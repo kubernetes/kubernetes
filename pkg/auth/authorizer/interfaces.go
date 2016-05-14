@@ -25,6 +25,9 @@ import (
 // Attributes is an interface used by an Authorizer to get information about a request
 // that is used to make an authorization decision.
 type Attributes interface {
+	// Extra data optionally passed back from Authentication plugins.
+	GetUserExtra() map[string][]string
+
 	// The user string which the request was authenticated as, or empty if
 	// no authentication occurred and the request was allowed to proceed.
 	GetUserName() string
@@ -99,6 +102,10 @@ type AttributesRecord struct {
 	Name            string
 	ResourceRequest bool
 	Path            string
+}
+
+func (a AttributesRecord) GetUserExtra() map[string][]string {
+	return a.User.GetExtra()
 }
 
 func (a AttributesRecord) GetUserName() string {

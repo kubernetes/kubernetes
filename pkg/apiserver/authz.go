@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/role"
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/keystone"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
@@ -69,10 +70,11 @@ const (
 	ModeABAC        string = "ABAC"
 	ModeWebhook     string = "Webhook"
 	ModeRBAC        string = "RBAC"
+	ModeKeystone    string = "Keystone"
 )
 
 // Keep this list in sync with constant list above.
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC}
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC, ModeKeystone}
 
 type AuthorizationConfig struct {
 	// Options for ModeABAC
@@ -98,6 +100,10 @@ type AuthorizationConfig struct {
 	RBACClusterRoleBindingRegistry clusterrolebinding.Registry
 	RBACRoleRegistry               role.Registry
 	RBACRoleBindingRegistry        rolebinding.Registry
+
+	// Options for Keystone
+	KeystoneSingleProjectId string
+	KeystoneRole            string
 }
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
@@ -154,6 +160,17 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, rbacAuthorizer)
+		case ModeKeystone:
+			if config.KeystoneSingleProjectId == "" {
+				return nil, errors.New("Keystone needs a Project ID that was not passed")
+			} else if config.KeystoneRole == "" {
+				return nil, errors.New("Keystone needs a Role that was not passed")
+			}
+			keystoneAuthorizer, err := keystone.New(config.KeystoneSingleProjectId, config.KeystoneRole)
+			if err != nil {
+				return nil, err
+			}
+			authorizers = append(authorizers, keystoneAuthorizer)
 		default:
 			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
 		}
@@ -168,6 +185,12 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 	}
 	if !authorizerMap[ModeRBAC] && config.RBACSuperUser != "" {
 		return nil, errors.New("Cannot specify --authorization-rbac-super-user without mode RBAC")
+        }
+	if !authorizerMap[ModeKeystone] && config.KeystoneSingleProjectId != "" {
+		return nil, errors.New("Cannot specify --experimental-authorization-keystone-single-projectid without mode Keystone")
+	}
+	if !authorizerMap[ModeKeystone] && config.KeystoneRole != "" {
+		return nil, errors.New("Cannot specify --experimental-authorization-keystone-role without mode Keystone")
 	}
 
 	return union.New(authorizers...), nil

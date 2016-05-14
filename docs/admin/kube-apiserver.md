@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/admin/kube-apiserver.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -53,7 +58,7 @@ kube-apiserver
       --apiserver-count=1: The number of apiservers running in the cluster
       --authentication-token-webhook-cache-ttl=2m0s: The duration to cache responses from the webhook token authenticator. Default is 2m
       --authentication-token-webhook-config-file="": File with webhook configuration for token authentication in kubeconfig format. The API server will query the remote service to determine authentication for bearer tokens.
-      --authorization-mode="AlwaysAllow": Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: AlwaysAllow,AlwaysDeny,ABAC,Webhook,RBAC
+      --authorization-mode="AlwaysAllow": Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: AlwaysAllow,AlwaysDeny,ABAC,Webhook,RBAC,Keystone
       --authorization-policy-file="": File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.
       --authorization-rbac-super-user="": If specified, a username which avoids RBAC authorization checks and role binding privilege escalation checks, to be used with --authorization-mode=RBAC.
       --authorization-webhook-cache-authorized-ttl=5m0s: The duration to cache 'authorized' responses from the webhook authorizer. Default is 5m.
@@ -77,6 +82,8 @@ kube-apiserver
       --etcd-servers=[]: List of etcd servers to connect with (http://ip:port), comma separated.
       --etcd-servers-overrides=[]: Per-resource etcd servers overrides, comma separated. The individual override format: group/resource#servers, where servers are http://ip:port, semicolon separated.
       --event-ttl=1h0m0s: Amount of time to retain events. Default 1 hour.
+      --experimental-authorization-keystone-role="": Keystone Project ID to restrict all access to, used with --authorization-mode=Keystone, --experimental-keystone-config, and --experimental-authorization-keystone-single-projectid. The API server will restrict all Keystone Token based access to Scoped Tokens with primary Project set to this ID and has the role specified by --experimental-authorization-keystone-role to determine access on the API server's secure port.
+      --experimental-authorization-keystone-single-projectid="": Keystone Project ID to restrict all access to, used with --authorization-mode=Keystone, --experimental-keystone-config, and --experimental-authorization-keystone-role. The API server will restrict all Keystone Token based access to Scoped Tokens with primary Project set to this ID and has the role specified by --experimental-authorization-keystone-role to determine access on the API server's secure port.
       --experimental-keystone-auth-mode="": If passed, selects between token and password modes
       --experimental-keystone-config="": If passed, activates the keystone authentication plugin
       --experimental-keystone-url="": If passed, activates the keystone authentication plugin
