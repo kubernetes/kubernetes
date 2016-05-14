@@ -198,12 +198,18 @@ func Run(s *options.APIServer) error {
 		ServiceAccountLookup:        s.ServiceAccountLookup,
 		ServiceAccountTokenGetter:   serviceAccountGetter,
 		KeystoneURL:                 s.KeystoneURL,
+		KeystoneConfig:              s.KeystoneConfig,
+		KeystoneAuthMode:            s.KeystoneAuthMode,
 		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
 		WebhookTokenAuthnCacheTTL:   s.WebhookTokenAuthnCacheTTL,
 	})
 
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
+	}
+
+	if len(s.KeystoneConfig) > 0 && (s.KeystoneAuthMode != "token" && s.KeystoneAuthMode != "password") {
+		glog.Fatalf("Invalid KeystoneAuthorization mode=%s. It must be either token or password", s.KeystoneAuthMode)
 	}
 
 	authorizationModeNames := strings.Split(s.AuthorizationMode, ",")

@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/admin/kube-apiserver.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -82,6 +77,8 @@ kube-apiserver
       --etcd-servers=[]: List of etcd servers to connect with (http://ip:port), comma separated.
       --etcd-servers-overrides=[]: Per-resource etcd servers overrides, comma separated. The individual override format: group/resource#servers, where servers are http://ip:port, semicolon separated.
       --event-ttl=1h0m0s: Amount of time to retain events. Default 1 hour.
+      --experimental-keystone-auth-mode="": If passed, selects between token and password modes
+      --experimental-keystone-config="": If passed, activates the keystone authentication plugin
       --experimental-keystone-url="": If passed, activates the keystone authentication plugin
       --external-hostname="": The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)
       --google-json-key="": The Google Cloud Platform Service Account JSON Key to use for authentication.

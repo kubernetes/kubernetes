@@ -24,11 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/crypto"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
+	keystonePassword "k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
+	keystoneToken "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/keystone"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
@@ -46,9 +47,11 @@ type AuthenticatorConfig struct {
 	ServiceAccountKeyFile       string
 	ServiceAccountLookup        bool
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
-	KeystoneURL                 string
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
+	KeystoneURL                 string
+	KeystoneConfig              string
+	KeystoneAuthMode            string
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -96,12 +99,20 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		authenticators = append(authenticators, serviceAccountAuth)
 	}
 
-	if len(config.KeystoneURL) > 0 {
-		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL)
-		if err != nil {
-			return nil, err
+	if len(config.KeystoneConfig) > 0 {
+		if config.KeystoneAuthMode == "token" {
+			keystoneTokenAuth, err := newTokenAuthenticatorFromKeystoneConfig(config.KeystoneConfig)
+			if err != nil {
+				return nil, err
+			}
+			authenticators = append(authenticators, keystoneTokenAuth)
+		} else if config.KeystoneAuthMode == "password" {
+			keystonePasswordAuth, err := newPasswordAuthenticatorFromKeystoneURL(config.KeystoneURL)
+			if err != nil {
+				return nil, err
+			}
+			authenticators = append(authenticators, keystonePasswordAuth)
 		}
-		authenticators = append(authenticators, keystoneAuth)
 	}
 
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
@@ -190,14 +201,23 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 	return x509.New(opts, x509.CommonNameUserConversion), nil
 }
 
-// newAuthenticatorFromTokenFile returns an authenticator.Request or an error
-func newAuthenticatorFromKeystoneURL(keystoneURL string) (authenticator.Request, error) {
-	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneURL)
+// newPasswordAuthenticatorFromTokenFile returns an authenticator.Request or an error
+func newPasswordAuthenticatorFromKeystoneURL(keystoneURL string) (authenticator.Request, error) {
+	keystonePasswordAuthenticator, err := keystonePassword.NewKeystoneAuthenticator(keystoneURL)
+	if err != nil {
+		return nil, err
+	}
+	return basicauth.New(keystonePasswordAuthenticator), nil
+}
+
+// newTokenAuthenticatorFromTokenFile returns an authenticator.Request or an error
+func newTokenAuthenticatorFromKeystoneConfig(keystoneConfigFile string) (authenticator.Request, error) {
+	keystoneTokenAuthenticator, err := keystoneToken.NewKeystoneAuthenticator(keystoneConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
-	return basicauth.New(keystoneAuthenticator), nil
+	return bearertoken.New(keystoneTokenAuthenticator), nil
 }
 
 func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Request, error) {

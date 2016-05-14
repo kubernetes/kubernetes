@@ -135,6 +135,8 @@ executor-path
 executor-suicide-timeout
 experimental-flannel-overlay
 experimental-keystone-url
+experimental-keystone-auth-mode
+experimental-keystone-config
 experimental-nvidia-gpus
 experimental-prefix
 external-hostname

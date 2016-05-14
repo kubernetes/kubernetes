@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	openstackutil "k8s.io/kubernetes/pkg/util/openstack"
 )
 
 const ProviderName = "openstack"
@@ -101,46 +102,30 @@ type OpenStack struct {
 }
 
 type Config struct {
-	Global struct {
-		AuthUrl    string `gcfg:"auth-url"`
-		Username   string
-		UserId     string `gcfg:"user-id"`
-		Password   string
-		ApiKey     string `gcfg:"api-key"`
-		TenantId   string `gcfg:"tenant-id"`
-		TenantName string `gcfg:"tenant-name"`
-		DomainId   string `gcfg:"domain-id"`
-		DomainName string `gcfg:"domain-name"`
-		Region     string
-	}
+	Global       openstackutil.KeystoneAuthOpts `gcfg:"Global"`
 	LoadBalancer LoadBalancerOpts
+}
+
+func ConfigToProvider(config io.Reader) (Config, *gophercloud.ProviderClient, error) {
+	cfg, err := readConfig(config)
+	if err != nil {
+		return cfg, nil, err
+	}
+	provider, err := openstack.AuthenticatedClient(cfg.Global.ToAuthOptions())
+	if err != nil {
+		return cfg, nil, err
+	}
+	return cfg, provider, nil
 }
 
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
-		cfg, err := readConfig(config)
+		cfg, provider, err := ConfigToProvider(config)
 		if err != nil {
 			return nil, err
 		}
-		return newOpenStack(cfg)
+		return newOpenStack(cfg, provider)
 	})
-}
-
-func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
-	return gophercloud.AuthOptions{
-		IdentityEndpoint: cfg.Global.AuthUrl,
-		Username:         cfg.Global.Username,
-		UserID:           cfg.Global.UserId,
-		Password:         cfg.Global.Password,
-		APIKey:           cfg.Global.ApiKey,
-		TenantID:         cfg.Global.TenantId,
-		TenantName:       cfg.Global.TenantName,
-		DomainID:         cfg.Global.DomainId,
-		DomainName:       cfg.Global.DomainName,
-
-		// Persistent service, so we need to be able to renew tokens.
-		AllowReauth: true,
-	}
 }
 
 func readConfig(config io.Reader) (Config, error) {
@@ -219,12 +204,7 @@ func readInstanceID() (string, error) {
 	return instanceID, nil
 }
 
-func newOpenStack(cfg Config) (*OpenStack, error) {
-	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
-	if err != nil {
-		return nil, err
-	}
-
+func newOpenStack(cfg Config, provider *gophercloud.ProviderClient) (*OpenStack, error) {
 	id, err := readInstanceID()
 	if err != nil {
 		return nil, err
