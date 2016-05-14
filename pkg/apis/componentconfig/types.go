@@ -533,9 +533,12 @@ type KubeControllerManagerConfiguration struct {
 	ServiceCIDR string `json:"serviceCIDR"`
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32 `json:"nodeCIDRMaskSize"`
-	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and set on the
-	// cloud provider.
+	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
+	// ConfigureCloudRoutes is true, to be set on the cloud provider.
 	AllocateNodeCIDRs bool `json:"allocateNodeCIDRs"`
+	// configureCloudRoutes enables CIDRs allocated with allocateNodeCIDRs
+	// to be configured on the cloud provider.
+	ConfigureCloudRoutes bool `json:"configureCloudRoutes"`
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string `json:"rootCAFile"`

@@ -66,6 +66,7 @@ concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
 config-sync-period
 configure-cbr0
+configure-cloud-routes
 conntrack-max
 conntrack-tcp-timeout-established
 contain-pod-resources
