@@ -94,6 +94,9 @@ func readInstanceID(cfg *VSphereConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if out.Len() == 0 {
+		return "", fmt.Errorf("unable to retrieve Instance ID")
+	}
 
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
