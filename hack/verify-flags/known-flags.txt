@@ -176,6 +176,7 @@ image-gc-high-threshold
 image-gc-low-threshold
 image-pull-policy
 include-extended-apis
+included-types-overrides
 input-base
 input-dirs
 insecure-bind-address
@@ -198,8 +199,8 @@ k8s-build-output
 keep-gogoproto
 km-path
 kube-api-burst
-kube-api-qps
 kube-api-content-type
+kube-api-qps
 kube-master
 kube-master
 kube-master-url
