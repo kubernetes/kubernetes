@@ -62,6 +62,8 @@ type systemdInterface interface {
 	RestartUnit(name string, mode string, ch chan<- string) (int, error)
 	// Reload is equivalent to 'systemctl daemon-reload'.
 	Reload() error
+	// ResetFailed is equivalent to 'systemctl reset-failed'.
+	ResetFailed() error
 }
 
 // systemd implements the systemdInterface using dbus and systemctl.
@@ -100,4 +102,9 @@ func (s *systemd) Version() (systemdVersion, error) {
 		return -1, err
 	}
 	return systemdVersion(result), nil
+}
+
+// ResetFailed calls 'systemctl reset failed'
+func (s *systemd) ResetFailed() error {
+	return exec.Command("systemctl", "reset-failed").Run()
 }

@@ -430,6 +430,7 @@ func NewMainKubelet(
 			klet,
 			recorder,
 			containerRefManager,
+			klet.podManager,
 			klet.livenessManager,
 			klet.volumeManager,
 			klet.httpClient,
