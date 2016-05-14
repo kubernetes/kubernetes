@@ -45,8 +45,8 @@ ${clientgen} "$@"
 ${clientgen} -t "$@"
 
 # Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/"   "$@"
-${clientgen} --clientset-name=federation_release_1_3 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1alpha1"   "$@"
+${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/" --included-types-overrides="api/Service"   "$@"
+${clientgen} --clientset-name=federation_release_1_3 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1alpha1","api/v1" --included-types-overrides="api/v1/Service"   "$@"
 
 ${conversiongen} "$@"
 ${deepcopygen} "$@"

@@ -18,6 +18,8 @@ package fake
 
 import (
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	unversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned"
+	fakeunversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned/fake"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
 	fakeunversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned/fake"
 	"k8s.io/kubernetes/pkg/api"
@@ -62,4 +64,9 @@ var _ clientset.Interface = &Clientset{}
 // Federation retrieves the FederationClient
 func (c *Clientset) Federation() unversionedfederation.FederationInterface {
 	return &fakeunversionedfederation.FakeFederation{Fake: &c.Fake}
+}
+
+// Core retrieves the CoreClient
+func (c *Clientset) Core() unversionedcore.CoreInterface {
+	return &fakeunversionedcore.FakeCore{Fake: &c.Fake}
 }
