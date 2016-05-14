@@ -141,26 +141,30 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 	filtered := []api.Node{}
 	failedPredicateMap := FailedPredicateMap{}
 	errs := []error{}
-
-	checkNode := func(i int) {
-		nodeName := nodes.Items[i].Name
-		fits, failedPredicate, err := podFitsOnNode(pod, nodeNameToInfo[nodeName], predicateFuncs)
-
-		predicateResultLock.Lock()
-		defer predicateResultLock.Unlock()
-		if err != nil {
-			errs = append(errs, err)
-			return
+	
+	if len(predicateFuncs) == 0 {
+		filtered = nodes.Items
+	} else {
+		checkNode := func(i int) {
+			nodeName := nodes.Items[i].Name
+			fits, failedPredicate, err := podFitsOnNode(pod, nodeNameToInfo[nodeName], predicateFuncs)
+	
+			predicateResultLock.Lock()
+			defer predicateResultLock.Unlock()
+			if err != nil {
+				errs = append(errs, err)
+				return
+			}
+			if fits {
+				filtered = append(filtered, nodes.Items[i])
+			} else {
+				failedPredicateMap[nodeName] = failedPredicate
+			}
 		}
-		if fits {
-			filtered = append(filtered, nodes.Items[i])
-		} else {
-			failedPredicateMap[nodeName] = failedPredicate
+		workqueue.Parallelize(16, len(nodes.Items), checkNode)
+		if len(errs) > 0 {
+			return api.NodeList{}, FailedPredicateMap{}, errors.NewAggregate(errs)
 		}
-	}
-	workqueue.Parallelize(16, len(nodes.Items), checkNode)
-	if len(errs) > 0 {
-		return api.NodeList{}, FailedPredicateMap{}, errors.NewAggregate(errs)
 	}
 
 	if len(filtered) > 0 && len(extenders) != 0 {
