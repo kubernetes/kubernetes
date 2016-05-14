@@ -36,6 +36,8 @@ import (
 var FileExtensions = []string{".json", ".yaml", ".yml"}
 var InputExtensions = append(FileExtensions, "stdin")
 
+const defaultHttpGetAttempts int = 3
+
 // Builder provides convenience functions for taking arguments and parameters
 // from the command line and converting them to a list of resources to iterate
 // over using the Visitor interface.
@@ -109,7 +111,7 @@ func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...strin
 				b.errs = append(b.errs, fmt.Errorf("the URL passed to filename %q is not valid: %v", s, err))
 				continue
 			}
-			b.URL(url)
+			b.URL(defaultHttpGetAttempts, url)
 		default:
 			b.Path(recursive, s)
 		}
@@ -123,11 +125,12 @@ func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...strin
 }
 
 // URL accepts a number of URLs directly.
-func (b *Builder) URL(urls ...*url.URL) *Builder {
+func (b *Builder) URL(httpAttemptCount int, urls ...*url.URL) *Builder {
 	for _, u := range urls {
 		b.paths = append(b.paths, &URLVisitor{
-			URL:           u,
-			StreamVisitor: NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
+			URL:              u,
+			StreamVisitor:    NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
+			HttpAttemptCount: httpAttemptCount,
 		})
 	}
 	return b
