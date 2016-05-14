@@ -170,10 +170,10 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
 
-	if s.AllocateNodeCIDRs {
+	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
 		routes, ok := cloud.Routes()
 		if !ok {
-			glog.Fatal("Cloud provider must support routes if allocate-node-cidrs is set")
+			glog.Fatal("Cloud provider must support routes if configure-cloud-routes is set")
 		}
 		routeController := routecontroller.New(routes, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, clusterCIDR)
 		routeController.Run(s.NodeSyncPeriod.Duration)
