@@ -41,6 +41,8 @@ import (
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/policy"
+	policyapiv1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -67,6 +69,7 @@ import (
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
 	petsetetcd "k8s.io/kubernetes/pkg/registry/petset/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
+	poddisruptionbudgetetcd "k8s.io/kubernetes/pkg/registry/poddisruptionbudget/etcd"
 	pspetcd "k8s.io/kubernetes/pkg/registry/podsecuritypolicy/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
@@ -342,6 +345,38 @@ func (m *Master) InstallAPIs(c *Config) {
 			PreferredVersion: batchGVForDiscovery,
 		}
 		allGroups = append(allGroups, group)
+	}
+
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(policyapiv1alpha1.SchemeGroupVersion) {
+		policyResources := m.getPolicyResources(c)
+		policyGroupMeta := registered.GroupOrDie(policy.GroupName)
+
+		// Hard code preferred group version to policy/v1alpha1
+		policyGroupMeta.GroupVersion = policyapiv1alpha1.SchemeGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *policyGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1alpha1": policyResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		policyGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: policyGroupMeta.GroupVersion.String(),
+			Version:      policyGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             policyGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{policyGVForDiscovery},
+			PreferredVersion: policyGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+
 	}
 
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(appsapi.SchemeGroupVersion) {
@@ -839,6 +874,20 @@ func (m *Master) getBatchResources(c *Config, version unversioned.GroupVersion) 
 	return storage
 }
 
+// getPolicyResources returns the resources for policy api
+func (m *Master) getPolicyResources(c *Config) map[string]rest.Storage {
+	// TODO update when we support more than one version of this group
+	version := policyapiv1alpha1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("poddisruptionbudgets")) {
+		poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage := poddisruptionbudgetetcd.NewREST(m.GetRESTOptionsOrDie(c, policy.Resource("poddisruptionbudgets")))
+		storage["poddisruptionbudgets"] = poddisruptionbudgetStorage
+		storage["poddisruptionbudgets/status"] = poddisruptionbudgetStatusStorage
+	}
+	return storage
+}
+
 // getPetSetResources returns the resources for apps api
 func (m *Master) getAppsResources(c *Config) map[string]rest.Storage {
 	// TODO update when we support more than one version of this group
@@ -905,7 +954,7 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, policyapiv1alpha1.SchemeGroupVersion)
 
 	// all extensions resources except these are disabled by default
 	ret.EnableResources(

@@ -120,6 +120,7 @@ type Client struct {
 	*BatchClient
 	*ExtensionsClient
 	*AppsClient
+	*PolicyClient
 	*discovery.DiscoveryClient
 }
 

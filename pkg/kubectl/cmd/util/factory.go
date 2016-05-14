@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/metrics"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
@@ -321,6 +322,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return c.AutoscalingClient.RESTClient, nil
 			case batch.GroupName:
 				return c.BatchClient.RESTClient, nil
+			case policy.GroupName:
+				return c.PolicyClient.RESTClient, nil
 			case apps.GroupName:
 				return c.AppsClient.RESTClient, nil
 			case extensions.GroupName:
@@ -899,6 +902,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 			return errors.New("unable to validate: no autoscaling client")
 		}
 		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+	}
+	if gvk.Group == policy.GroupName {
+		if c.c.PolicyClient == nil {
+			return errors.New("unable to validate: no policy client")
+		}
+		return getSchemaAndValidate(c.c.PolicyClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
 	if gvk.Group == apps.GroupName {
 		if c.c.AppsClient == nil {

@@ -61,3 +61,10 @@ type PodDisruptionBudget struct {
 	// Most recently observed status of the PodDisruptionBudget.
 	Status PodDisruptionBudgetStatus `json:"status,omitempty"`
 }
+
+// PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
+type PodDisruptionBudgetList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+	Items                []PodDisruptionBudget `json:"items"`
+}

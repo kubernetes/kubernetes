@@ -26,6 +26,7 @@ limitations under the License.
 
 	It has these top-level messages:
 		PodDisruptionBudget
+		PodDisruptionBudgetList
 		PodDisruptionBudgetSpec
 		PodDisruptionBudgetStatus
 */
@@ -48,6 +49,10 @@ func (m *PodDisruptionBudget) Reset()         { *m = PodDisruptionBudget{} }
 func (m *PodDisruptionBudget) String() string { return proto.CompactTextString(m) }
 func (*PodDisruptionBudget) ProtoMessage()    {}
 
+func (m *PodDisruptionBudgetList) Reset()         { *m = PodDisruptionBudgetList{} }
+func (m *PodDisruptionBudgetList) String() string { return proto.CompactTextString(m) }
+func (*PodDisruptionBudgetList) ProtoMessage()    {}
+
 func (m *PodDisruptionBudgetSpec) Reset()         { *m = PodDisruptionBudgetSpec{} }
 func (m *PodDisruptionBudgetSpec) String() string { return proto.CompactTextString(m) }
 func (*PodDisruptionBudgetSpec) ProtoMessage()    {}
@@ -58,6 +63,7 @@ func (*PodDisruptionBudgetStatus) ProtoMessage()    {}
 
 func init() {
 	proto.RegisterType((*PodDisruptionBudget)(nil), "k8s.io.kubernetes.pkg.apis.policy.v1alpha1.PodDisruptionBudget")
+	proto.RegisterType((*PodDisruptionBudgetList)(nil), "k8s.io.kubernetes.pkg.apis.policy.v1alpha1.PodDisruptionBudgetList")
 	proto.RegisterType((*PodDisruptionBudgetSpec)(nil), "k8s.io.kubernetes.pkg.apis.policy.v1alpha1.PodDisruptionBudgetSpec")
 	proto.RegisterType((*PodDisruptionBudgetStatus)(nil), "k8s.io.kubernetes.pkg.apis.policy.v1alpha1.PodDisruptionBudgetStatus")
 }
@@ -103,6 +109,44 @@ func (m *PodDisruptionBudget) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *PodDisruptionBudgetList) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PodDisruptionBudgetList) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
+	n4, err := m.ListMeta.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n4
+	if len(m.Items) > 0 {
+		for _, msg := range m.Items {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
 func (m *PodDisruptionBudgetSpec) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -121,20 +165,20 @@ func (m *PodDisruptionBudgetSpec) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.MinAvailable.Size()))
-	n4, err := m.MinAvailable.MarshalTo(data[i:])
+	n5, err := m.MinAvailable.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n4
+	i += n5
 	if m.Selector != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Selector.Size()))
-		n5, err := m.Selector.MarshalTo(data[i:])
+		n6, err := m.Selector.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i += n6
 	}
 	return i, nil
 }
@@ -210,6 +254,20 @@ func (m *PodDisruptionBudget) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.Status.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *PodDisruptionBudgetList) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -364,6 +422,117 @@ func (m *PodDisruptionBudget) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if err := m.Status.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PodDisruptionBudgetList) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodDisruptionBudgetList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodDisruptionBudgetList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, PodDisruptionBudget{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

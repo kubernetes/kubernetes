@@ -31,6 +31,8 @@ func init() {
 	if err := api.Scheme.AddGeneratedConversionFuncs(
 		Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget,
 		Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget,
+		Convert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList,
+		Convert_policy_PodDisruptionBudgetList_To_v1alpha1_PodDisruptionBudgetList,
 		Convert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec,
 		Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec,
 		Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus,
@@ -81,6 +83,56 @@ func autoConvert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(in *
 
 func Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(in *policy.PodDisruptionBudget, out *PodDisruptionBudget, s conversion.Scope) error {
 	return autoConvert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *PodDisruptionBudgetList, out *policy.PodDisruptionBudgetList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]policy.PodDisruptionBudget, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *PodDisruptionBudgetList, out *policy.PodDisruptionBudgetList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in, out, s)
+}
+
+func autoConvert_policy_PodDisruptionBudgetList_To_v1alpha1_PodDisruptionBudgetList(in *policy.PodDisruptionBudgetList, out *PodDisruptionBudgetList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PodDisruptionBudget, len(*in))
+		for i := range *in {
+			if err := Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_policy_PodDisruptionBudgetList_To_v1alpha1_PodDisruptionBudgetList(in *policy.PodDisruptionBudgetList, out *PodDisruptionBudgetList, s conversion.Scope) error {
+	return autoConvert_policy_PodDisruptionBudgetList_To_v1alpha1_PodDisruptionBudgetList(in, out, s)
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {

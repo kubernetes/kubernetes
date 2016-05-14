@@ -47,7 +47,9 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodDisruptionBudget{},
+		&PodDisruptionBudgetList{},
 	)
 }
 
-func (obj *PodDisruptionBudget) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *PodDisruptionBudget) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *PodDisruptionBudgetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
