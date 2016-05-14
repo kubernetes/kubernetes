@@ -539,10 +539,10 @@ func (r *Request) Body(obj interface{}) *Request {
 			return r
 		}
 		glog.V(8).Infof("Request Body: %s", string(data))
-		r.body = bytes.NewBuffer(data)
+		r.body = bytes.NewReader(data)
 	case []byte:
 		glog.V(8).Infof("Request Body: %s", string(t))
-		r.body = bytes.NewBuffer(t)
+		r.body = bytes.NewReader(t)
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
@@ -556,7 +556,7 @@ func (r *Request) Body(obj interface{}) *Request {
 			return r
 		}
 		glog.V(8).Infof("Request Body: %s", string(data))
-		r.body = bytes.NewBuffer(data)
+		r.body = bytes.NewReader(data)
 		r.SetHeader("Content-Type", r.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -823,6 +823,15 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 
 			retries++
 			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
+				if seeker, ok := r.body.(io.Seeker); ok && r.body != nil {
+					_, err := seeker.Seek(0, 0)
+					if err != nil {
+						glog.V(4).Infof("Could not retry request, can't Seek() back to beginning of body for %T", r.body)
+						fn(req, resp)
+						return true
+					}
+				}
+
 				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
 				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
 				return false
