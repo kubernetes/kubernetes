@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -38,7 +37,7 @@ import (
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := options.NewAPIServer()
+	s := genericapiserver.NewServerRunOptions()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "federated-apiserver",
@@ -54,8 +53,8 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(s *options.APIServer) error {
-	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
+func Run(s *genericapiserver.ServerRunOptions) error {
+	genericapiserver.DefaultAndValidateRunOptions(s)
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
@@ -120,7 +119,7 @@ func Run(s *options.APIServer) error {
 	}
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
 
-	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
+	genericConfig := genericapiserver.NewConfig(s)
 	// TODO: Move the following to generic api server as well.
 	genericConfig.StorageFactory = storageFactory
 	genericConfig.Authenticator = authenticator
@@ -143,6 +142,6 @@ func Run(s *options.APIServer) error {
 
 	installFederationAPIs(s, m, storageFactory)
 
-	m.Run(s.ServerRunOptions)
+	m.Run(s)
 	return nil
 }

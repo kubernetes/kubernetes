@@ -21,9 +21,12 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apiserver"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -41,30 +44,45 @@ const (
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
-	APIGroupPrefix        string
-	APIPrefix             string
-	AdvertiseAddress      net.IP
-	BindAddress           net.IP
-	CertDirectory         string
-	ClientCAFile          string
-	CloudConfigFile       string
-	CloudProvider         string
-	CorsAllowedOriginList []string
+	APIGroupPrefix             string
+	APIPrefix                  string
+	AdmissionControl           string
+	AdmissionControlConfigFile string
+	AdvertiseAddress           net.IP
+	AuthorizationConfig        apiserver.AuthorizationConfig
+	AuthorizationMode          string
+	BasicAuthFile              string
+	BindAddress                net.IP
+	CertDirectory              string
+	ClientCAFile               string
+	CloudConfigFile            string
+	CloudProvider              string
+	CorsAllowedOriginList      []string
+	DefaultStorageMediaType    string
+	DeleteCollectionWorkers    int
 	// Used to specify the storage version that should be used for the legacy v1 api group.
 	DeprecatedStorageVersion  string
 	EnableLogsSupport         bool
 	EnableProfiling           bool
 	EnableSwaggerUI           bool
 	EnableWatchCache          bool
+	EtcdServersOverrides      []string
 	StorageConfig             storagebackend.Config
 	ExternalHost              string
 	InsecureBindAddress       net.IP
 	InsecurePort              int
+	KeystoneURL               string
 	KubernetesServiceNodePort int
 	LongRunningRequestRE      string
 	MasterCount               int
+	MasterServiceNamespace    string
 	MaxRequestsInFlight       int
 	MinRequestTimeout         int
+	OIDCCAFile                string
+	OIDCClientID              string
+	OIDCIssuerURL             string
+	OIDCUsernameClaim         string
+	OIDCGroupsClaim           string
 	RuntimeConfig             config.ConfigurationMap
 	SecurePort                int
 	ServiceClusterIPRange     net.IPNet // TODO: make this a list
@@ -76,31 +94,38 @@ type ServerRunOptions struct {
 	DefaultStorageVersions string
 	TLSCertFile            string
 	TLSPrivateKeyFile      string
+	TokenAuthFile          string
+	WatchCacheSizes        []string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
-		APIGroupPrefix:         "/apis",
-		APIPrefix:              "/api",
-		BindAddress:            net.ParseIP("0.0.0.0"),
-		CertDirectory:          "/var/run/kubernetes",
-		DefaultStorageVersions: registered.AllPreferredGroupVersions(),
+		APIGroupPrefix:          "/apis",
+		APIPrefix:               "/api",
+		AdmissionControl:        "AlwaysAdmit",
+		AuthorizationMode:       "AlwaysAllow",
+		BindAddress:             net.ParseIP("0.0.0.0"),
+		CertDirectory:           "/var/run/kubernetes",
+		DefaultStorageMediaType: "application/json",
+		DefaultStorageVersions:  registered.AllPreferredGroupVersions(),
 		StorageConfig: storagebackend.Config{
 			Prefix: DefaultEtcdPathPrefix,
 			DeserializationCacheSize: DefaultDeserializationCacheSize,
 		},
-		EnableLogsSupport:    true,
-		EnableProfiling:      true,
-		EnableWatchCache:     true,
-		InsecureBindAddress:  net.ParseIP("127.0.0.1"),
-		InsecurePort:         8080,
-		LongRunningRequestRE: defaultLongRunningRequestRE,
-		MasterCount:          1,
-		MaxRequestsInFlight:  400,
-		MinRequestTimeout:    1800,
-		RuntimeConfig:        make(config.ConfigurationMap),
-		SecurePort:           6443,
-		StorageVersions:      registered.AllPreferredGroupVersions(),
+		DeleteCollectionWorkers: 1,
+		EnableLogsSupport:       true,
+		EnableProfiling:         true,
+		EnableWatchCache:        true,
+		InsecureBindAddress:     net.ParseIP("127.0.0.1"),
+		InsecurePort:            8080,
+		LongRunningRequestRE:    defaultLongRunningRequestRE,
+		MasterCount:             1,
+		MasterServiceNamespace:  api.NamespaceDefault,
+		MaxRequestsInFlight:     400,
+		MinRequestTimeout:       1800,
+		RuntimeConfig:           make(config.ConfigurationMap),
+		SecurePort:              6443,
+		StorageVersions:         registered.AllPreferredGroupVersions(),
 	}
 }
 
@@ -178,11 +203,22 @@ func (s *ServerRunOptions) NewSelfClient() (clientset.Interface, error) {
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
+
+	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
+	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile, "File with admission control configuration.")
+
 	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
 		"The IP address on which to advertise the apiserver to members of the cluster. This "+
 		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
+
+	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
+
+	fs.StringVar(&s.AuthorizationConfig.PolicyFile, "authorization-policy-file", s.AuthorizationConfig.PolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
+	fs.StringVar(&s.AuthorizationConfig.WebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationConfig.WebhookConfigFile, "File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. The API server will query the remote service to determine access on the API server's secure port.")
+
+	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
 
 	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress, "DEPRECATED: see --bind-address instead")
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead")
@@ -201,14 +237,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 
-	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type, "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
-	fs.StringSliceVar(&s.StorageConfig.ServerList, "etcd-servers", s.StorageConfig.ServerList, "List of etcd servers to connect with (http://ip:port), comma separated.")
-	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix, "The prefix for all resource paths in etcd.")
-	fs.StringVar(&s.StorageConfig.KeyFile, "etcd-keyfile", s.StorageConfig.KeyFile, "SSL key file used to secure etcd communication")
-	fs.StringVar(&s.StorageConfig.CertFile, "etcd-certfile", s.StorageConfig.CertFile, "SSL certification file used to secure etcd communication")
-	fs.StringVar(&s.StorageConfig.CAFile, "etcd-cafile", s.StorageConfig.CAFile, "SSL Certificate Authority file used to secure etcd communication")
-	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum, "If true, enable quorum read")
-	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize, "Number of deserialized json objects to cache in memory.")
+	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, "The media type to use to store objects in storage. Defaults to application/json. Some resources may only support a specific media type and will ignore this setting.")
+
+	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers, "Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
 
 	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 
@@ -216,6 +247,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	// TODO: enable cache in integration tests.
 	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache, "Enable watch caching in the apiserver")
+
+	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, "Per-resource etcd servers overrides, comma separated. The individual override format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost, "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
 
@@ -233,6 +266,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
 	fs.MarkDeprecated("port", "see --insecure-port instead")
 
+	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
+
 	// See #14282 for details on how to test/try this option out.  TODO remove this comment once this option is tested in CI.
 	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, "If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be of type NodePort, using this as the value of the port. If zero, the Kubernetes master service will be of type ClusterIP.")
 
@@ -240,9 +275,19 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount, "The number of apiservers running in the cluster")
 
+	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
+
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
 
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, "An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load.")
+
+	fs.StringVar(&s.OIDCIssuerURL, "oidc-issuer-url", s.OIDCIssuerURL, "The URL of the OpenID issuer, only HTTPS scheme will be accepted. If set, it will be used to verify the OIDC JSON Web Token (JWT)")
+	fs.StringVar(&s.OIDCClientID, "oidc-client-id", s.OIDCClientID, "The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set")
+	fs.StringVar(&s.OIDCCAFile, "oidc-ca-file", s.OIDCCAFile, "If set, the OpenID server's certificate will be verified by one of the authorities in the oidc-ca-file, otherwise the host's root CA set will be used")
+	fs.StringVar(&s.OIDCUsernameClaim, "oidc-username-claim", "sub", ""+
+		"The OpenID claim to use as the user name. Note that claims other than the default ('sub') is not "+
+		"guaranteed to be unique and immutable. This flag is experimental, please see the authentication documentation for further details.")
+	fs.StringVar(&s.OIDCGroupsClaim, "oidc-groups-claim", "", "If provided, the name of a custom OpenID Connect claim for specifying user groups. The claim value is expected to be an array of strings. This flag is experimental, please see the authentication documentation for further details.")
 
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
 
@@ -258,6 +303,15 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "Deprecated: see --service-node-port-range instead.")
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead.")
 
+	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type, "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+	fs.StringSliceVar(&s.StorageConfig.ServerList, "etcd-servers", s.StorageConfig.ServerList, "List of etcd servers to connect with (http://ip:port), comma separated.")
+	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix, "The prefix for all resource paths in etcd.")
+	fs.StringVar(&s.StorageConfig.KeyFile, "etcd-keyfile", s.StorageConfig.KeyFile, "SSL key file used to secure etcd communication")
+	fs.StringVar(&s.StorageConfig.CertFile, "etcd-certfile", s.StorageConfig.CertFile, "SSL certification file used to secure etcd communication")
+	fs.StringVar(&s.StorageConfig.CAFile, "etcd-cafile", s.StorageConfig.CAFile, "SSL Certificate Authority file used to secure etcd communication")
+	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum, "If true, enable quorum read")
+	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize, "Number of deserialized json objects to cache in memory.")
+
 	fs.StringVar(&s.DeprecatedStorageVersion, "storage-version", s.DeprecatedStorageVersion, "The version to store the legacy v1 resources with. Defaults to server preferred")
 	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API is retired. See --storage-versions instead.")
 	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, "The per-group version to store resources in. "+
@@ -272,4 +326,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.")
 
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")
+
+	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
+
+	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, "List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. The individual override format: resource#size, where size is a number. It takes effect when watch-cache is enabled.")
 }
