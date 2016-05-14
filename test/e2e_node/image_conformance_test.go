@@ -31,7 +31,7 @@ const (
 	imagePullInterval = time.Second * 15
 )
 
-var _ = Describe("Container Conformance Test", func() {
+var _ = Describe("Image Container Conformance Test", func() {
 	var cl *client.Client
 
 	BeforeEach(func() {
