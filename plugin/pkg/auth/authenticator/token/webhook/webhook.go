@@ -18,10 +18,13 @@ limitations under the License.
 package webhook
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	_ "k8s.io/kubernetes/pkg/apis/authentication.k8s.io/install"
@@ -36,30 +39,36 @@ var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 
 type WebhookTokenAuthenticator struct {
 	*webhook.GenericWebhook
+	responseCache *cache.LRUExpireCache
+	ttl           time.Duration
 }
 
 // New creates a new WebhookTokenAuthenticator from the provided kubeconfig file.
-func New(kubeConfigFile string) (*WebhookTokenAuthenticator, error) {
+func New(kubeConfigFile string, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
 	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions)
 	if err != nil {
 		return nil, err
 	}
-	return &WebhookTokenAuthenticator{gw}, nil
+	return &WebhookTokenAuthenticator{gw, cache.NewLRUExpireCache(1024), ttl}, nil
 }
 
-// AuthenticateToken
+// AuthenticateToken implements the authenticator.Token interface.
 func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
 	r := &v1beta1.TokenReview{
-		Spec: v1beta1.TokenReviewSpec{
-			Token: token,
-		},
+		Spec: v1beta1.TokenReviewSpec{Token: token},
 	}
-	result := w.RestClient.Post().Body(r).Do()
-	if err := result.Error(); err != nil {
-		return nil, false, err
-	}
-	if err := result.Into(r); err != nil {
-		return nil, false, err
+	if entry, ok := w.responseCache.Get(r.Spec); ok {
+		r.Status = entry.(v1beta1.TokenReviewStatus)
+	} else {
+		result := w.RestClient.Post().Body(r).Do()
+		if err := result.Error(); err != nil {
+			return nil, false, err
+		}
+		spec := r.Spec
+		if err := result.Into(r); err != nil {
+			return nil, false, err
+		}
+		go w.responseCache.Add(spec, r.Status, w.ttl)
 	}
 	if !r.Status.Authenticated {
 		return nil, false, nil
