@@ -239,7 +239,7 @@ func TestWatch(t *testing.T) {
 	}
 	defer tooOldWatcher.Stop()
 	// Ensure we get a "Gone" error
-	expectedGoneError := errors.NewGone("").(*errors.StatusError).ErrStatus
+	expectedGoneError := errors.NewGone("").ErrStatus
 	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedGoneError)
 
 	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
