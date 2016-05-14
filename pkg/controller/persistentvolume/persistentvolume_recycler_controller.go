@@ -94,6 +94,9 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 		},
 		&api.PersistentVolume{},
 		syncPeriod,
+		// TODO: Convert these edge triggered handlers to a level based
+		// reconciliation loop. Event handlers typically shouldn't block, and
+		// errors should get retried even after the event.
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				pv, ok := obj.(*api.PersistentVolume)
@@ -101,7 +104,9 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 					glog.Errorf("Error casting object to PersistentVolume: %v", obj)
 					return
 				}
-				recycler.reclaimVolume(pv)
+				if err := recycler.reclaimVolume(pv); err != nil {
+					glog.Errorf("Failed to reclaim volume %v", err)
+				}
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				pv, ok := newObj.(*api.PersistentVolume)
@@ -109,7 +114,9 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 					glog.Errorf("Error casting object to PersistentVolume: %v", newObj)
 					return
 				}
-				recycler.reclaimVolume(pv)
+				if err := recycler.reclaimVolume(pv); err != nil {
+					glog.Errorf("Failed to reclaim volume %v", err)
+				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				pv, ok := obj.(*api.PersistentVolume)
@@ -117,7 +124,11 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 					glog.Errorf("Error casting object to PersistentVolume: %v", obj)
 					return
 				}
-				recycler.reclaimVolume(pv)
+				if err := recycler.reclaimVolume(pv); err != nil {
+					glog.Errorf("Failed to reclaim volume %v", err)
+				}
+				// TODO: Do we really want to remove the pv from internal cache
+				// if it failed reclaim?
 				recycler.removeReleasedVolume(pv)
 			},
 		},
