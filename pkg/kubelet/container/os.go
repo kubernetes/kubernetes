@@ -17,7 +17,9 @@ limitations under the License.
 package container
 
 import (
+	"io/ioutil"
 	"os"
+	"time"
 )
 
 // OSInterface collects system level operations that need to be mocked out
@@ -26,6 +28,12 @@ type OSInterface interface {
 	Mkdir(path string, perm os.FileMode) error
 	Symlink(oldname string, newname string) error
 	Stat(path string) (os.FileInfo, error)
+	Remove(path string) error
+	Create(path string) (*os.File, error)
+	Hostname() (name string, err error)
+	Chtimes(path string, atime time.Time, mtime time.Time) error
+	Pipe() (r *os.File, w *os.File, err error)
+	ReadDir(dirname string) ([]os.FileInfo, error)
 }
 
 // RealOS is used to dispatch the real system level operaitons.
@@ -44,4 +52,35 @@ func (RealOS) Symlink(oldname string, newname string) error {
 // Stat will call os.Stat to get the FileInfo for a given path
 func (RealOS) Stat(path string) (os.FileInfo, error) {
 	return os.Stat(path)
+}
+
+// Remove will call os.Remove to remove the path.
+func (RealOS) Remove(path string) error {
+	return os.Remove(path)
+}
+
+// Create will call os.Create to create and return a file
+// at path.
+func (RealOS) Create(path string) (*os.File, error) {
+	return os.Create(path)
+}
+
+// Hostname will call os.Hostname to return the hostname.
+func (RealOS) Hostname() (name string, err error) {
+	return os.Hostname()
+}
+
+// Chtimes will call os.Chtimes to change the atime and mtime of the path
+func (RealOS) Chtimes(path string, atime time.Time, mtime time.Time) error {
+	return os.Chtimes(path, atime, mtime)
+}
+
+// Pipe will call os.Pipe to return a connected pair of pipe.
+func (RealOS) Pipe() (r *os.File, w *os.File, err error) {
+	return os.Pipe()
+}
+
+// ReadDir will call ioutil.ReadDir to return the files under the directory.
+func (RealOS) ReadDir(dirname string) ([]os.FileInfo, error) {
+	return ioutil.ReadDir(dirname)
 }

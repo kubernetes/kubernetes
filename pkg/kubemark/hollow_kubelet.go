@@ -65,14 +65,14 @@ func NewHollowKubelet(
 			cadvisorInterface,
 			manifestFilePath,
 			nil, /* cloud-provider */
-			containertest.FakeOS{}, /* os-interface */
-			20*time.Second,         /* FileCheckFrequency */
-			20*time.Second,         /* HTTPCheckFrequency */
-			1*time.Minute,          /* MinimumGCAge */
-			10*time.Second,         /* NodeStatusUpdateFrequency */
-			10*time.Second,         /* SyncFrequency */
-			5*time.Minute,          /* OutOfDiskTransitionFrequency */
-			5*time.Minute,          /* EvictionPressureTransitionPeriod */
+			&containertest.FakeOS{}, /* os-interface */
+			20*time.Second,          /* FileCheckFrequency */
+			20*time.Second,          /* HTTPCheckFrequency */
+			1*time.Minute,           /* MinimumGCAge */
+			10*time.Second,          /* NodeStatusUpdateFrequency */
+			10*time.Second,          /* SyncFrequency */
+			5*time.Minute,           /* OutOfDiskTransitionFrequency */
+			5*time.Minute,           /* EvictionPressureTransitionPeriod */
 			maxPods,
 			containerManager,
 			nil,
