@@ -92,14 +92,20 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 	return b
 }
 
+type FilenameParamOptions struct {
+	Recursive           bool
+	Filenames           []string
+	FilenameHttpRetries int
+}
+
 // FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
 // If enforceNamespace is false, namespaces in the specs will be allowed to
 // override the default namespace. If it is true, namespaces that don't match
 // will cause an error.
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...string) *Builder {
-	for _, s := range paths {
+func (b *Builder) FilenameParam(enforceNamespace bool, params *FilenameParamOptions) *Builder {
+	for _, s := range params.Filenames {
 		switch {
 		case s == "-":
 			b.Stdin()
@@ -109,9 +115,9 @@ func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...strin
 				b.errs = append(b.errs, fmt.Errorf("the URL passed to filename %q is not valid: %v", s, err))
 				continue
 			}
-			b.URL(url)
+			b.URL(params.FilenameHttpRetries, url)
 		default:
-			b.Path(recursive, s)
+			b.Path(params.Recursive, s)
 		}
 	}
 
@@ -123,11 +129,12 @@ func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...strin
 }
 
 // URL accepts a number of URLs directly.
-func (b *Builder) URL(urls ...*url.URL) *Builder {
+func (b *Builder) URL(filenameHttpRetries int, urls ...*url.URL) *Builder {
 	for _, u := range urls {
 		b.paths = append(b.paths, &URLVisitor{
-			URL:           u,
-			StreamVisitor: NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
+			URL:                 u,
+			StreamVisitor:       NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
+			FilenameHttpRetries: filenameHttpRetries,
 		})
 	}
 	return b

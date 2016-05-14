@@ -31,8 +31,7 @@ import (
 // HistoryOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type HistoryOptions struct {
-	Filenames []string
-	Recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -59,13 +58,12 @@ func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd.Flags().Int64("revision", 0, "See the details, including podTemplate of the revision specified")
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameParams, usage)
 	return cmd
 }
 
 func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *HistoryOptions) error {
-	if len(args) == 0 && len(options.Filenames) == 0 {
+	if len(args) == 0 && len(options.FilenameParams.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 	revisionDetail := cmdutil.GetFlagInt64(cmd, "revision")
@@ -79,7 +77,7 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 
 	infos, err := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		ResourceTypeOrNameArgs(true, args...).
 		Latest().
 		Flatten().

@@ -41,7 +41,6 @@ type AnnotateOptions struct {
 	newAnnotations    map[string]string
 	removeAnnotations []string
 	builder           *resource.Builder
-	filenames         []string
 	selector          string
 
 	overwrite       bool
@@ -54,8 +53,7 @@ type AnnotateOptions struct {
 	f   *cmdutil.Factory
 	out io.Writer
 	cmd *cobra.Command
-
-	recursive bool
+	FilenameOptions resource.FilenameParamOptions
 }
 
 const (
@@ -132,8 +130,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "Filename, directory, or URL to a file identifying the resource to update the annotation"
-	kubectl.AddJsonFilenameFlag(cmd, &options.filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.recursive)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
@@ -164,7 +161,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 			return fmt.Errorf("all resources must be specified before annotation changes: %s", s)
 		}
 	}
-	if len(o.resources) < 1 && len(o.filenames) == 0 {
+	if len(o.resources) < 1 && len(o.FilenameOptions.Filenames) == 0 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(annotationArgs) < 1 {
@@ -182,7 +179,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.recursive, o.filenames...).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		SelectorParam(o.selector).
 		ResourceTypeOrNameArgs(o.all, o.resources...).
 		Flatten().

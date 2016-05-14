@@ -504,7 +504,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	cmd := NewCmdAnnotate(f, buf)
 	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
-	options.filenames = []string{"../../../examples/cassandra/cassandra-controller.yaml"}
+	options.FilenameOptions.Filenames = []string{"../../../examples/cassandra/cassandra-controller.yaml"}
 	args := []string{"a=b", "c-"}
 	if err := options.Complete(f, buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,8 +37,7 @@ type ResumeConfig struct {
 	Info         *resource.Info
 
 	Out       io.Writer
-	Filenames []string
-	Recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -68,13 +66,12 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &opts.Recursive)
+	cmdutil.AddFilenameParamFlags(cmd, &opts.FilenameParams, usage)
 	return cmd
 }
 
 func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && len(o.Filenames) == 0 {
+	if len(args) == 0 && len(o.FilenameParams.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}
 
@@ -89,7 +86,7 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 
 	infos, err := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, &o.FilenameParams).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().

@@ -20,16 +20,19 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -221,20 +224,63 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 type URLVisitor struct {
 	URL *url.URL
 	*StreamVisitor
+	FilenameHttpRetries int
 }
 
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
-	res, err := http.Get(v.URL.String())
+	body, err := v.readHttp()
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return fmt.Errorf("unable to read URL %q, server reported %d %s", v.URL, res.StatusCode, res.Status)
-	}
-
-	v.StreamVisitor.Reader = res.Body
+	v.StreamVisitor.Reader = bytes.NewReader(body)
 	return v.StreamVisitor.Visit(fn)
+}
+
+// readHttp Gets v.URL and returns the response body as a byte slice.  Http protocol failures and 500 StatusCodes
+// will be retried up to v.HttpRetryCount times using exponential backoff.  In the event of an ErrWaitTimeout
+// (exceeded retry limit), only the final error will be returned.
+func (v *URLVisitor) readHttp() ([]byte, error) {
+	// Store the results in these variables since the ExponentialBackoff only returns an error
+	var resultBody []byte
+	var resultError error
+
+	// Steps is the total number of desired executions, not the number of retries so we must add 1 to it.
+	if v.FilenameHttpRetries < 0 {
+		v.FilenameHttpRetries = 0
+	}
+	opts := wait.Backoff{Duration: time.Second / 2, Factor: 2.0, Steps: v.FilenameHttpRetries + 1}
+
+	// Retry failed http requests with exponential backoff.  Returning an error to the function
+	// stops retries, so we return nil for errors we want to retry.
+	wait.ExponentialBackoff(opts, func() (bool, error) {
+		// Fetch the url
+		res, err := http.Get(v.URL.String())
+		if err != nil {
+			resultError = err
+			return false, nil // Retry http protocol failures
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode != 200 {
+			resultError = err
+			if res.StatusCode >= 500 && res.StatusCode < 600 {
+				return false, nil // Retry 500 status codes
+			} else {
+				// Don't retry other status codes
+				return false, fmt.Errorf("unable to read URL %q, server reported %d %s", v.URL, res.StatusCode, res.Status)
+			}
+		}
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			resultError = err
+			return false, nil
+		}
+		// Success, Don't retry
+		resultBody = body
+		resultError = nil
+		return true, nil
+	})
+	return resultBody, resultError
 }
 
 // DecoratedVisitor will invoke the decorators in order prior to invoking the visitor function

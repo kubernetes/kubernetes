@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 func TestDeleteObjectByTuple(t *testing.T) {
@@ -145,7 +146,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"},
+		FilenameParams: resource.FilenameParamOptions{Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}},
 	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
@@ -325,7 +326,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"},
+		FilenameParams: resource.FilenameParamOptions{Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"}},
 	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")

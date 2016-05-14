@@ -73,8 +73,7 @@ func NewCmdConvert(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	usage := "Filename, directory, or URL to file to need to get converted."
-	kubectl.AddJsonFilenameFlag(cmd, &options.filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.recursive)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameParams, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
@@ -86,7 +85,6 @@ func NewCmdConvert(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 // ConvertOptions have the data required to perform the convert operation
 type ConvertOptions struct {
 	builder   *resource.Builder
-	filenames []string
 	local     bool
 
 	encoder runtime.Encoder
@@ -95,7 +93,7 @@ type ConvertOptions struct {
 
 	outputVersion unversioned.GroupVersion
 
-	recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 // Complete collects information required to run Convert command from command line.
@@ -129,7 +127,7 @@ func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.
 	}
 	o.builder = o.builder.NamespaceParam(cmdNamespace).
 		ContinueOnError().
-		FilenameParam(false, o.recursive, o.filenames...).
+		FilenameParam(false, &o.FilenameParams).
 		Flatten()
 
 	// build the printer

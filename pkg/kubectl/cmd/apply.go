@@ -34,8 +34,7 @@ import (
 // ApplyOptions stores cmd.Flag values for apply.  As new fields are added,
 // add them here instead of referencing the cmd.Flags()
 type ApplyOptions struct {
-	Filenames []string
-	Recursive bool
+	FilenameOptions resource.FilenameParamOptions
 }
 
 const (
@@ -67,10 +66,9 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	usage := "Filename, directory, or URL to file that contains the configuration to apply"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -102,7 +100,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		Flatten().
 		Do()
 	err = r.Err()
