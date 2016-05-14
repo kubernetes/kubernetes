@@ -668,6 +668,9 @@ func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration)
 func (cl *ClusterVerification) ForEach(podFunc func(api.Pod)) error {
 	pods, err := cl.podState.filter(cl.client, cl.namespace)
 	if err == nil {
+		if len(pods) == 0 {
+			Failf("No pods matched the filter.")
+		}
 		Logf("ForEach: Found %v pods from the filter.  Now looping through them.", len(pods))
 		for _, p := range pods {
 			podFunc(p)
