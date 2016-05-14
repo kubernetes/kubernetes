@@ -58,25 +58,25 @@ func usage() {
 	os.Exit(2)
 }
 
-type pkg struct {
-	Dir          string
-	ImportPath   string
-	Target       string
-	Stale        bool
-	TestGoFiles  []string
-	TestImports  []string
-	XTestGoFiles []string
-	XTestImports []string
+// golist is an interface emulating the `go list` command to get package information.
+// TODO: Evaluate using `go/build` package instead. It doesn't provide staleness
+// information, but we can probably run `go list` and `go/build.Import()` concurrently
+// in goroutines and merge the results. Evaluate if that's faster.
+type golist interface {
+	pkgInfo(pkgPaths []string) ([]pkg, error)
 }
 
-func pkgInfo(pkgPaths []string) ([]pkg, error) {
-	args := []string{
-		"list",
-		"-json",
-	}
-	args = append(args, pkgPaths...)
-	cmd := exec.Command("go", args...)
-	cmd.Env = os.Environ()
+// execmd implements the `golist` interface.
+type execcmd struct {
+	cmd  string
+	args []string
+	env  []string
+}
+
+func (e *execcmd) pkgInfo(pkgPaths []string) ([]pkg, error) {
+	args := append(e.args, pkgPaths...)
+	cmd := exec.Command(e.cmd, args...)
+	cmd.Env = e.env
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -107,7 +107,18 @@ func pkgInfo(pkgPaths []string) ([]pkg, error) {
 	return pkgs, nil
 }
 
-func (p *pkg) isNewerThan(buildTime time.Time) bool {
+type pkg struct {
+	Dir          string
+	ImportPath   string
+	Target       string
+	Stale        bool
+	TestGoFiles  []string
+	TestImports  []string
+	XTestGoFiles []string
+	XTestImports []string
+}
+
+func (p *pkg) isNewerThan(cmd golist, buildTime time.Time) bool {
 	// If the package itself is stale, then we have to rebuild the whole thing anyway.
 	if p.Stale {
 		return true
@@ -137,7 +148,7 @@ func (p *pkg) isNewerThan(buildTime time.Time) bool {
 	// dependencies. However, it returns the list of test dependencies. This
 	// second call to `go list` checks the staleness of all the test
 	// dependencies.
-	pkgs, err := pkgInfo(imps)
+	pkgs, err := cmd.pkgInfo(imps)
 	if err != nil || len(pkgs) < 1 {
 		glog.V(4).Infof("failed to obtain metadata for packages %s: %v", imps, err)
 		return true
@@ -163,7 +174,7 @@ func isNewerThan(filename string, buildTime time.Time) bool {
 
 // isTestStale checks if the test binary is stale and needs to rebuilt.
 // Some of the ideas here are inspired by how Go does staleness checks.
-func isTestStale(binPath, pkgPath string) bool {
+func isTestStale(cmd golist, binPath, pkgPath string) bool {
 	bStat, err := os.Stat(binPath)
 	if err != nil {
 		glog.V(4).Infof("Couldn't obtain the modified time of the binary %s: %v", binPath, err)
@@ -171,19 +182,28 @@ func isTestStale(binPath, pkgPath string) bool {
 	}
 	buildTime := bStat.ModTime()
 
-	pkgs, err := pkgInfo([]string{pkgPath})
+	pkgs, err := cmd.pkgInfo([]string{pkgPath})
 	if err != nil || len(pkgs) < 1 {
 		glog.V(4).Infof("Couldn't retrieve test package information for package %s: %v", pkgPath, err)
 		return false
 	}
 
-	return pkgs[0].isNewerThan(buildTime)
+	return pkgs[0].isNewerThan(cmd, buildTime)
 }
 
 func main() {
 	flag.Usage = usage
 	flag.Parse()
-	if !isTestStale(*binary, *pkgPath) {
+
+	cmd := &execcmd{
+		cmd: "go",
+		args: []string{
+			"list",
+			"-json",
+		},
+		env: os.Environ(),
+	}
+	if !isTestStale(cmd, *binary, *pkgPath) {
 		os.Exit(1)
 	}
 }
