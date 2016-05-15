@@ -982,53 +982,6 @@ func (dm *DockerManager) getDefaultSecurityOpt() ([]string, error) {
 	return nil, nil
 }
 
-// RunInContainer run the command inside the container identified by containerID
-func (dm *DockerManager) RunInContainer(containerID kubecontainer.ContainerID, cmd []string) ([]byte, error) {
-	glog.V(2).Infof("Using docker native exec to run cmd %+v inside container %s", cmd, containerID)
-	createOpts := dockertypes.ExecConfig{
-		Cmd:          cmd,
-		AttachStdin:  false,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          false,
-	}
-	execObj, err := dm.client.CreateExec(containerID.ID, createOpts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to run in container - Exec setup failed - %v", err)
-	}
-	var buf bytes.Buffer
-	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: false}
-	streamOpts := StreamOptions{
-		OutputStream: &buf,
-		ErrorStream:  &buf,
-		RawTerminal:  false,
-	}
-	err = dm.client.StartExec(execObj.ID, startOpts, streamOpts)
-	if err != nil {
-		glog.V(2).Infof("StartExec With error: %v", err)
-		return nil, err
-	}
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	for {
-		inspect, err2 := dm.client.InspectExec(execObj.ID)
-		if err2 != nil {
-			glog.V(2).Infof("InspectExec %s failed with error: %+v", execObj.ID, err2)
-			return buf.Bytes(), err2
-		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				glog.V(2).Infof("InspectExec %s exit with result %+v", execObj.ID, inspect)
-				err = &dockerExitError{inspect}
-			}
-			break
-		}
-		<-ticker.C
-	}
-
-	return buf.Bytes(), err
-}
-
 type dockerExitError struct {
 	Inspect *dockertypes.ContainerExecInspect
 }

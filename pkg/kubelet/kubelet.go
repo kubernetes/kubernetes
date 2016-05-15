@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -3582,7 +3583,15 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.runner.RunInContainer(container.ID, cmd)
+
+	var buffer bytes.Buffer
+	output := ioutils.WriteCloserWrapper(&buffer)
+	err = kl.runner.ExecInContainer(container.ID, cmd, nil, output, output, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
 
 // ExecInContainer executes a command in a container, connecting the supplied
