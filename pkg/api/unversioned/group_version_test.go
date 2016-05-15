@@ -24,6 +24,77 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
+func TestGroupVersionParse(t *testing.T) {
+	tests := []struct {
+		input string
+		out   GroupVersion
+		err   func(error) bool
+	}{
+		{input: "v1", out: GroupVersion{Version: "v1"}},
+		{input: "v2", out: GroupVersion{Version: "v2"}},
+		{input: "/v1", out: GroupVersion{Version: "v1"}},
+		{input: "v1/", out: GroupVersion{Group: "v1"}},
+		{input: "/v1/", err: func(err error) bool { return err.Error() == "unexpected GroupVersion string: /v1/" }},
+		{input: "v1/a", out: GroupVersion{Group: "v1", Version: "a"}},
+	}
+	for i, test := range tests {
+		out, err := ParseGroupVersion(test.input)
+		if test.err == nil && err != nil || err == nil && test.err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		if test.err != nil && !test.err(err) {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		if out != test.out {
+			t.Errorf("%d: unexpected output: %#v", i, out)
+		}
+	}
+}
+
+func TestGroupResourceParse(t *testing.T) {
+	tests := []struct {
+		input string
+		out   GroupResource
+	}{
+		{input: "v1", out: GroupResource{Resource: "v1"}},
+		{input: ".v1", out: GroupResource{Group: "v1"}},
+		{input: "v1.", out: GroupResource{Resource: "v1"}},
+		{input: "v1.a", out: GroupResource{Group: "a", Resource: "v1"}},
+		{input: "b.v1.a", out: GroupResource{Group: "v1.a", Resource: "b"}},
+	}
+	for i, test := range tests {
+		out := ParseGroupResource(test.input)
+		if out != test.out {
+			t.Errorf("%d: unexpected output: %#v", i, out)
+		}
+	}
+}
+
+func TestParseResourceArg(t *testing.T) {
+	tests := []struct {
+		input string
+		gvr   *GroupVersionResource
+		gr    GroupResource
+	}{
+		{input: "v1", gr: GroupResource{Resource: "v1"}},
+		{input: ".v1", gr: GroupResource{Group: "v1"}},
+		{input: "v1.", gr: GroupResource{Resource: "v1"}},
+		{input: "v1.a", gr: GroupResource{Group: "a", Resource: "v1"}},
+		{input: "b.v1.a", gvr: &GroupVersionResource{Group: "a", Version: "v1", Resource: "b"}, gr: GroupResource{Group: "v1.a", Resource: "b"}},
+	}
+	for i, test := range tests {
+		gvr, gr := ParseResourceArg(test.input)
+		if (gvr != nil && test.gvr == nil) || (gvr == nil && test.gvr != nil) || (test.gvr != nil && *gvr != *test.gvr) {
+			t.Errorf("%d: unexpected output: %#v", i, gvr)
+		}
+		if gr != test.gr {
+			t.Errorf("%d: unexpected output: %#v", i, gr)
+		}
+	}
+}
+
 type GroupVersionHolder struct {
 	GV GroupVersion `json:"val"`
 }

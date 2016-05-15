@@ -29,8 +29,8 @@ import (
 // `resource.group.com` -> `group=com, version=group, resource=resource` and `group=group.com, resource=resource`
 func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
 	var gvr *GroupVersionResource
-	s := strings.SplitN(arg, ".", 3)
-	if len(s) == 3 {
+	if strings.Count(arg, ".") >= 2 {
+		s := strings.SplitN(arg, ".", 3)
 		gvr = &GroupVersionResource{Group: s[2], Version: s[1], Resource: s[0]}
 	}
 
@@ -64,12 +64,11 @@ func (gr *GroupResource) String() string {
 // ParseGroupResource turns "resource.group" string into a GroupResource struct.  Empty strings are allowed
 // for each field.
 func ParseGroupResource(gr string) GroupResource {
-	s := strings.SplitN(gr, ".", 2)
-	if len(s) == 1 {
-		return GroupResource{Resource: s[0]}
+	if i := strings.Index(gr, "."); i == -1 {
+		return GroupResource{Resource: gr}
+	} else {
+		return GroupResource{Group: gr[i+1:], Resource: gr[:i]}
 	}
-
-	return GroupResource{Group: s[1], Resource: s[0]}
 }
 
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
@@ -189,18 +188,14 @@ func ParseGroupVersion(gv string) (GroupVersion, error) {
 		return GroupVersion{}, nil
 	}
 
-	s := strings.Split(gv, "/")
-	// "v1" is the only special case. Otherwise GroupVersion is expected to contain
-	// one "/" dividing the string into two parts.
-	switch {
-	case len(s) == 1 && gv == "v1":
-		return GroupVersion{"", "v1"}, nil
-	case len(s) == 1:
-		return GroupVersion{"", s[0]}, nil
-	case len(s) == 2:
-		return GroupVersion{s[0], s[1]}, nil
+	switch strings.Count(gv, "/") {
+	case 0:
+		return GroupVersion{"", gv}, nil
+	case 1:
+		i := strings.Index(gv, "/")
+		return GroupVersion{gv[:i], gv[i+1:]}, nil
 	default:
-		return GroupVersion{}, fmt.Errorf("Unexpected GroupVersion string: %v", gv)
+		return GroupVersion{}, fmt.Errorf("unexpected GroupVersion string: %v", gv)
 	}
 }
 
