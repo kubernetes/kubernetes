@@ -47,20 +47,22 @@ func TestValidateLabels(t *testing.T) {
 		}
 	}
 
-	labelNameErrorCases := []map[string]string{
-		{"nospecialchars^=@": "bar"},
-		{"cantendwithadash-": "bar"},
-		{"only/one/slash": "bar"},
-		{strings.Repeat("a", 254): "bar"},
+	labelNameErrorCases := []struct {
+		labels map[string]string
+		expect string
+	}{
+		{map[string]string{"nospecialchars^=@": "bar"}, "must match the regex"},
+		{map[string]string{"cantendwithadash-": "bar"}, "must match the regex"},
+		{map[string]string{"only/one/slash": "bar"}, "must match the regex"},
+		{map[string]string{strings.Repeat("a", 254): "bar"}, "must be no more than"},
 	}
 	for i := range labelNameErrorCases {
-		errs := ValidateLabels(labelNameErrorCases[i], field.NewPath("field"))
+		errs := ValidateLabels(labelNameErrorCases[i].labels, field.NewPath("field"))
 		if len(errs) != 1 {
-			t.Errorf("case[%d] expected failure", i)
+			t.Errorf("case[%d]: expected failure", i)
 		} else {
-			detail := errs[0].Detail
-			if detail != qualifiedNameErrorMsg {
-				t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
+			if !strings.Contains(errs[0].Detail, labelNameErrorCases[i].expect) {
+				t.Errorf("case[%d]: error details do not include %q: %q", i, labelNameErrorCases[i].expect, errs[0].Detail)
 			}
 		}
 	}

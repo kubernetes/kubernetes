@@ -307,7 +307,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	failureDomainArgs := strings.Split(f.FailureDomains, ",")
 	for _, failureDomain := range failureDomainArgs {
-		if !utilvalidation.IsQualifiedName(failureDomain) {
+		if len(utilvalidation.IsQualifiedName(failureDomain)) != 0 {
 			return nil, fmt.Errorf("invalid failure domain: %s", failureDomain)
 		}
 	}

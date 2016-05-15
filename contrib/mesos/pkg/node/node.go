@@ -180,8 +180,8 @@ func SlaveAttributesToLabels(attrs []*mesos.Attribute) map[string]string {
 			v = strconv.FormatFloat(a.GetScalar().GetValue(), 'G', -1, 64)
 		}
 
-		if !validation.IsQualifiedName(k) {
-			log.V(3).Infof("ignoring invalid node label name %q", k)
+		if errs := validation.IsQualifiedName(k); len(errs) != 0 {
+			log.V(3).Infof("ignoring invalid node label name %q", k, errs)
 			continue
 		}
 

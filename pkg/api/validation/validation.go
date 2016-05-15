@@ -59,7 +59,6 @@ func InclusiveRangeErrorMsg(lo, hi int) string {
 }
 
 var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, validation.LabelValueMaxLength, validation.LabelValueFmt)
-var qualifiedNameErrorMsg string = fmt.Sprintf(`must be a qualified name (at most %d characters, matching regex %s), with an optional DNS subdomain prefix (at most %d characters, matching regex %s) and slash (/): e.g. "MyName" or "example.com/MyName"`, validation.QualifiedNameMaxLength, validation.QualifiedNameFmt, validation.DNS1123SubdomainMaxLength, validation.DNS1123SubdomainFmt)
 var DNSSubdomainErrorMsg string = fmt.Sprintf(`must be a DNS subdomain (at most %d characters, matching regex %s): e.g. "example.com"`, validation.DNS1123SubdomainMaxLength, validation.DNS1123SubdomainFmt)
 var DNS1123LabelErrorMsg string = fmt.Sprintf(`must be a DNS label (at most %d characters, matching regex %s): e.g. "my-name"`, validation.DNS1123LabelMaxLength, validation.DNS1123LabelFmt)
 var DNS952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, validation.DNS952LabelMaxLength, validation.DNS952LabelFmt)
@@ -94,8 +93,8 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	var totalSize int64
 	for k, v := range annotations {
-		if !validation.IsQualifiedName(strings.ToLower(k)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, qualifiedNameErrorMsg))
+		for _, err := range validation.IsQualifiedName(strings.ToLower(k)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, err))
 		}
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
@@ -2148,8 +2147,11 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validation.IsQualifiedName(value) {
-		return append(allErrs, field.Invalid(fldPath, value, qualifiedNameErrorMsg))
+	for _, err := range validation.IsQualifiedName(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, err))
+	}
+	if len(allErrs) != 0 {
+		return allErrs
 	}
 
 	if len(strings.Split(value, "/")) == 1 {
@@ -2188,8 +2190,11 @@ func validateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 // Validate limit range types
 func validateLimitRangeTypeName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validation.IsQualifiedName(value) {
-		return append(allErrs, field.Invalid(fldPath, value, qualifiedNameErrorMsg))
+	for _, err := range validation.IsQualifiedName(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, err))
+	}
+	if len(allErrs) != 0 {
+		return allErrs
 	}
 
 	if len(strings.Split(value, "/")) == 1 {
@@ -2659,8 +2664,11 @@ func ValidateNamespace(namespace *api.Namespace) field.ErrorList {
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validation.IsQualifiedName(stringValue) {
-		return append(allErrs, field.Invalid(fldPath, stringValue, qualifiedNameErrorMsg))
+	for _, err := range validation.IsQualifiedName(stringValue) {
+		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, err))
+	}
+	if len(allErrs) != 0 {
+		return allErrs
 	}
 
 	if len(strings.Split(stringValue, "/")) == 1 {
