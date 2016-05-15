@@ -43,6 +43,7 @@ The following environment variables may be used to override the default configur
 | KUBERNETES_PORT_443_TCP_PORT   | 443                                   | API port number                  |
 | CASSANDRA_SERVICE              | cassandra                             | Default service name for lookup  |
 | POD_NAMESPACE                  | default                               | Default pod service namespace    |
+| K8S_ACCOUNT_TOKEN 		 | /var/run/secrets/kubernetes.io/serviceaccount/token | Default path to service token |
 
 # Using
 

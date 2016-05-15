@@ -54,6 +54,7 @@ import java.util.Map;
  *     <li>CASSANDRA_SERVICE defaults to cassandra</li>
  *     <li>POD_NAMESPACE defaults to 'default'</li>
  *     <li>CASSANDRA_SERVICE_NUM_SEEDS defaults to 8 seeds</li>
+ *     <li>K8S_ACCOUNT_TOKEN defaults to the path for the default token</li>
  * </ul>
  */
 public class KubernetesSeedProvider implements SeedProvider {
@@ -107,10 +108,11 @@ public class KubernetesSeedProvider implements SeedProvider {
         String path = String.format("/api/v1/namespaces/%s/endpoints/", podNamespace);
         String seedSizeVar = getEnvOrDefault("CASSANDRA_SERVICE_NUM_SEEDS", "8");
         Integer seedSize = Integer.valueOf(seedSizeVar);
+        String accountToken = getEnvOrDefault("K8S_ACCOUNT_TOKEN", "/var/run/secrets/kubernetes.io/serviceaccount/token");
 
         List<InetAddress> seeds = new ArrayList<InetAddress>();
         try {
-            String token = getServiceAccountToken();
+            String token = getServiceAccountToken(accountToken);
 
             SSLContext ctx = SSLContext.getInstance("SSL");
             ctx.init(null, trustAll, new SecureRandom());
@@ -222,13 +224,12 @@ public class KubernetesSeedProvider implements SeedProvider {
         return val;
     }
 
-    private static String getServiceAccountToken()  throws IOException {
-        String file = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+    private static String getServiceAccountToken(String file)  {
         try {
             return new String(Files.readAllBytes(Paths.get(file)));
         } catch (IOException e) {
-            logger.warn("unable to load service account token");
-            throw e;
+            logger.warn("unable to load service account token" + file);
+            throw new RuntimeException("Unable to load services account token " + file);
         }
     }
 
