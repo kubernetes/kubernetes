@@ -1599,28 +1599,6 @@ func (r *Runtime) removePod(uuid string) error {
 	return errors.NewAggregate(errlist)
 }
 
-// Note: In rkt, the container ID is in the form of "UUID:appName", where
-// appName is the container name.
-// TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) RunInContainer(containerID kubecontainer.ContainerID, cmd []string) ([]byte, error) {
-	glog.V(4).Infof("Rkt running in container.")
-
-	id, err := parseContainerID(containerID)
-	if err != nil {
-		return nil, err
-	}
-	args := append([]string{}, "enter", fmt.Sprintf("--app=%s", id.appName), id.uuid)
-	args = append(args, cmd...)
-
-	result, err := r.buildCommand(args...).CombinedOutput()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			err = &rktExitError{exitErr}
-		}
-	}
-	return result, err
-}
-
 // rktExitError implemets /pkg/util/exec.ExitError interface.
 type rktExitError struct{ *exec.ExitError }
 

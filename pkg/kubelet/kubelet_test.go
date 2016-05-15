@@ -697,12 +697,6 @@ type fakeContainerCommandRunner struct {
 	Stream io.ReadWriteCloser
 }
 
-func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string) ([]byte, error) {
-	f.Cmd = cmd
-	f.ID = id
-	return []byte{}, f.E
-}
-
 func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
 	f.Cmd = cmd
 	f.ID = id

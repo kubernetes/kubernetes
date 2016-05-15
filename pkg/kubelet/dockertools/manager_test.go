@@ -478,7 +478,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 	if err := fakeDocker.AssertStopped([]string{containerToKill.ID}); err != nil {
 		t.Errorf("container was not stopped correctly: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{"list", "create_exec", "start_exec", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "create_exec", "start_exec", "stop"})
 	if !reflect.DeepEqual(expectedCmd, fakeDocker.execCmd) {
 		t.Errorf("expected: %v, got %v", expectedCmd, fakeDocker.execCmd)
 	}
