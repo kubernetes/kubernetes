@@ -44,7 +44,20 @@ func ValidateThirdPartyResourceUpdate(update, old *extensions.ThirdPartyResource
 }
 
 func ValidateThirdPartyResourceName(name string, prefix bool) (bool, string) {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
+	// Make sure it's a valid DNS subdomain
+	if ok, msg := apivalidation.NameIsDNSSubdomain(name, prefix); !ok {
+		return ok, msg
+	}
+
+	// Make sure it's at least three segments (kind + two-segment group name)
+	if !prefix {
+		parts := strings.Split(name, ".")
+		if len(parts) < 3 {
+			return false, "must be at least three segments long: <kind>.<domain>.<tld>"
+		}
+	}
+
+	return true, ""
 }
 
 func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorList {
@@ -56,6 +69,8 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorL
 		version := &obj.Versions[ix]
 		if len(version.Name) == 0 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, "must not be empty"))
+		} else if !validation.IsDNS1123Label(version.Name) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, apivalidation.DNS1123LabelErrorMsg))
 		}
 		if versions.Has(version.Name) {
 			allErrs = append(allErrs, field.Duplicate(field.NewPath("versions").Index(ix).Child("name"), version))
@@ -275,15 +290,11 @@ func ValidateDeploymentRollback(obj *extensions.DeploymentRollback) field.ErrorL
 }
 
 func ValidateThirdPartyResourceDataUpdate(update, old *extensions.ThirdPartyResourceData) field.ErrorList {
-	return ValidateThirdPartyResourceData(update)
+	return apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 }
 
 func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(obj.Name) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("name"), ""))
-	}
-	return allErrs
+	return apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, apivalidation.NameIsDNSLabel, field.NewPath("metadata"))
 }
 
 // ValidateIngress tests if required fields in the Ingress are set.
