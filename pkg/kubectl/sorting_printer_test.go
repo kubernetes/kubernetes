@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	internal "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -143,6 +144,48 @@ func TestSortingPrinter(t *testing.T) {
 				},
 			},
 			field: "{.metadata.name}",
+		},
+		{
+			name: "random-order-timestamp",
+			obj: &api.PodList{
+				Items: []api.Pod{
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(300, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(100, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(200, 0),
+						},
+					},
+				},
+			},
+			sort: &api.PodList{
+				Items: []api.Pod{
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(100, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(200, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(300, 0),
+						},
+					},
+				},
+			},
+			field: "{.metadata.creationTimestamp}",
 		},
 		{
 			name: "random-order-numbers",
