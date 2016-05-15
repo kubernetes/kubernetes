@@ -643,6 +643,12 @@ RKT_PATH: $(yaml-quote ${RKT_PATH:-})
 KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
+  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+      cat >>$file <<EOF
+ENABLE_NODE_AUTOSCALER: $(yaml-quote ${ENABLE_NODE_AUTOSCALER})
+AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
+EOF
+  fi
 }
 
 function sha1sum-file() {
