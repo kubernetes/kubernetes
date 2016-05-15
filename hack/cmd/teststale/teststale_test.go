@@ -181,19 +181,145 @@ func (fgl *fakegolist) pkgInfo(pkgPaths []string) ([]pkg, error) {
 	return pkgs, nil
 }
 
+func (fgl *fakegolist) chMtime(filename string, mtime time.Time) error {
+	for _, fn := range fgl.testFiles {
+		if fn == filename {
+			fp := filepath.Join(fgl.dir, "src", testPkg, fn)
+			if err := os.Chtimes(fp, time.Now(), mtime); err != nil {
+				return fmt.Errorf("failed to modify the mtime of %q: %v", filename, err)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("file %q not found", filename)
+}
+
+func (fgl *fakegolist) chStale(pkg string, stale bool) error {
+	if p, ok := fgl.importMap[pkg]; ok {
+		p.Stale = stale
+		fgl.importMap[pkg] = p
+		return nil
+	}
+	return fmt.Errorf("package %q not found", pkg)
+}
+
 func (fgl *fakegolist) cleanup() {
 	os.RemoveAll(fgl.dir)
 	os.Remove(fgl.binfile)
 }
 
 func TestIsTestStale(t *testing.T) {
-	fgl, err := newFakegolist()
-	if err != nil {
-		t.Fatalf("failed to setup the test: %v", err)
+	cases := []struct {
+		fileMtime    map[string]time.Time
+		pkgStaleness map[string]bool
+		result       bool
+	}{
+		// Basic test: binary is fresh, all modifications were before the binary was built.
+		{
+			result: false,
+		},
+		// A local test file is new, hence binary must be stale.
+		{
+			fileMtime: map[string]time.Time{
+				"foo_test.go": time.Now().Add(1 * time.Hour),
+			},
+			result: true,
+		},
+		// Test package is new, so binary must be stale.
+		{
+			pkgStaleness: map[string]bool{
+				"example.com/proj/pkg/test": true,
+			},
+			result: true,
+		},
+		// Test package dependencies are new, so binary must be stale.
+		{
+			pkgStaleness: map[string]bool{
+				"example.com/proj/cmd/p3/c12/c23": true,
+				"strings":                         true,
+			},
+			result: true,
+		},
+		// External test files are new, hence binary must be stale.
+		{
+			fileMtime: map[string]time.Time{
+				"xfoo_test.go": time.Now().Add(1 * time.Hour),
+				"xbar_test.go": time.Now().Add(2 * time.Hour),
+			},
+			result: true,
+		},
+		// External test dependency is new, so binary must be stale.
+		{
+			pkgStaleness: map[string]bool{
+				"os": true,
+			},
+			result: true,
+		},
+		// Multiple source files and dependencies are new, so binary must be stale.
+		{
+			fileMtime: map[string]time.Time{
+				"foo_test.go":  time.Now().Add(1 * time.Hour),
+				"xfoo_test.go": time.Now().Add(2 * time.Hour),
+				"xbar_test.go": time.Now().Add(3 * time.Hour),
+			},
+			pkgStaleness: map[string]bool{
+				"example.com/proj/pkg/p1":         true,
+				"example.com/proj/pkg/p1/c11":     true,
+				"example.com/proj/pkg/p2":         true,
+				"example.com/proj/cmd/p3/c12/c23": true,
+				"strings":                         true,
+				"os":                              true,
+			},
+			result: true,
+		},
+		// Everything is new, so binary must be stale.
+		{
+			fileMtime: map[string]time.Time{
+				"foo_test.go":  time.Now().Add(3 * time.Hour),
+				"bar_test.go":  time.Now().Add(1 * time.Hour),
+				"xfoo_test.go": time.Now().Add(2 * time.Hour),
+				"xbar_test.go": time.Now().Add(1 * time.Hour),
+				"xbaz_test.go": time.Now().Add(2 * time.Hour),
+			},
+			pkgStaleness: map[string]bool{
+				"example.com/proj/pkg/p1":         true,
+				"example.com/proj/pkg/p1/c11":     true,
+				"example.com/proj/pkg/p2":         true,
+				"example.com/proj/cmd/p3/c12/c23": true,
+				"example.com/proj/pkg/test":       true,
+				"strings":                         true,
+				"testing":                         true,
+				"os":                              true,
+			},
+			result: true,
+		},
 	}
-	defer fgl.cleanup()
 
-	if isTestStale(fgl, fgl.binfile, testPkg) {
-		t.Errorf("Expected test package %q to be not stale", testPkg)
+	for _, tc := range cases {
+		fgl, err := newFakegolist()
+		if err != nil {
+			t.Fatalf("failed to setup the test: %v", err)
+		}
+		defer fgl.cleanup()
+
+		for fn, mtime := range tc.fileMtime {
+			if err := fgl.chMtime(fn, mtime); err != nil {
+				t.Fatalf("failed to change the mtime of %q: %v", fn, err)
+			}
+		}
+
+		for pkg, stale := range tc.pkgStaleness {
+			if err := fgl.chStale(pkg, stale); err != nil {
+				t.Fatalf("failed to change the staleness of %q: %v", pkg, err)
+			}
+		}
+
+		if tc.result != isTestStale(fgl, fgl.binfile, testPkg) {
+			if tc.result {
+				t.Errorf("Expected test package %q to be stale", testPkg)
+			} else {
+				t.Errorf("Expected test package %q to be not stale", testPkg)
+			}
+		}
 	}
 }
