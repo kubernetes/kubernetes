@@ -2049,6 +2049,7 @@ __EOF__
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl get pods --sort-by="{metadata.name}"
+  kubectl get pods --sort-by="{metadata.creationTimestamp}"
 
   ############################
   # Kubectl --all-namespaces #
