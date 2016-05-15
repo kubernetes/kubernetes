@@ -380,6 +380,8 @@ type genConversion struct {
 	defaulters    defaulters
 	imports       namer.ImportTracker
 	typesForInit  []conversionType
+
+	globalVariables map[string]interface{}
 }
 
 func NewGenConversion(sanitizedName, targetPackage string, preexisting conversions, defaulters defaulters) generator.Generator {
@@ -460,12 +462,6 @@ func (g *genConversion) isOtherPackage(pkg string) bool {
 
 func (g *genConversion) Imports(c *generator.Context) (imports []string) {
 	var importLines []string
-	if g.isOtherPackage(apiPackagePath) {
-		importLines = append(importLines, "api \""+apiPackagePath+"\"")
-	}
-	if g.isOtherPackage(conversionPackagePath) {
-		importLines = append(importLines, "conversion \""+conversionPackagePath+"\"")
-	}
 	for _, singleImport := range g.imports.ImportLines() {
 		if g.isOtherPackage(singleImport) {
 			importLines = append(importLines, singleImport)
@@ -474,7 +470,16 @@ func (g *genConversion) Imports(c *generator.Context) (imports []string) {
 	return importLines
 }
 
-func argsFromType(inType, outType *types.Type) interface{} {
+func (g *genConversion) withGlobals(args map[string]interface{}) map[string]interface{} {
+	for k, v := range g.globalVariables {
+		if _, ok := args[k]; !ok {
+			args[k] = v
+		}
+	}
+	return args
+}
+
+func argsFromType(inType, outType *types.Type) map[string]interface{} {
 	return map[string]interface{}{
 		"inType":  inType,
 		"outType": outType,
@@ -499,13 +504,20 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
+	scheme := c.Universe.Variable(types.Name{Package: apiPackagePath, Name: "Scheme"})
+	g.imports.AddType(scheme)
+	scope := c.Universe.Type(types.Name{Package: conversionPackagePath, Name: "Scope"})
+	g.imports.AddType(scope)
+	g.globalVariables = map[string]interface{}{
+		"scheme": scheme,
+		"Scope":  scope,
+	}
+
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
-	if g.targetPackage == apiPackagePath {
-		sw.Do("if err := Scheme.AddGeneratedConversionFuncs(\n", nil)
-	} else {
-		sw.Do("if err := api.Scheme.AddGeneratedConversionFuncs(\n", nil)
-	}
+	sw.Do("if err := $.scheme|raw$.AddGeneratedConversionFuncs(\n", map[string]interface{}{
+		"scheme": scheme,
+	})
 	for _, conv := range g.typesForInit {
 		funcName := g.funcNameTmpl(conv.inType, conv.outType)
 		sw.Do(fmt.Sprintf("%s,\n", funcName), argsFromType(conv.inType, conv.outType))
@@ -532,27 +544,19 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 
 func (g *genConversion) generateConversion(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	funcName := g.funcNameTmpl(inType, outType)
-	if g.targetPackage == conversionPackagePath {
-		sw.Do(fmt.Sprintf("func auto%s(in *$.inType|raw$, out *$.outType|raw$, s Scope) error {\n", funcName), argsFromType(inType, outType))
-	} else {
-		sw.Do(fmt.Sprintf("func auto%s(in *$.inType|raw$, out *$.outType|raw$, s conversion.Scope) error {\n", funcName), argsFromType(inType, outType))
-	}
+
+	sw.Do(fmt.Sprintf("func auto%s(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", funcName), g.withGlobals(argsFromType(inType, outType)))
 	// if no defaulter of form SetDefaults_XXX is defined, do not inline a check for defaulting.
 	if function, ok := g.defaulters[inType]; ok {
 		sw.Do("$.|raw$(in)\n", function)
 	}
-
 	g.generateFor(inType, outType, sw)
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
 
 	// If there is no public preexisting Convert method, generate it.
 	if _, ok := g.preexists(inType, outType); !ok {
-		if g.targetPackage == conversionPackagePath {
-			sw.Do(fmt.Sprintf("func %s(in *$.inType|raw$, out *$.outType|raw$, s Scope) error {\n", funcName), argsFromType(inType, outType))
-		} else {
-			sw.Do(fmt.Sprintf("func %s(in *$.inType|raw$, out *$.outType|raw$, s conversion.Scope) error {\n", funcName), argsFromType(inType, outType))
-		}
+		sw.Do(fmt.Sprintf("func %s(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", funcName), g.withGlobals(argsFromType(inType, outType)))
 		sw.Do(fmt.Sprintf("return auto%s(in, out, s)\n", funcName), argsFromType(inType, outType))
 		sw.Do("}\n\n", nil)
 	}
