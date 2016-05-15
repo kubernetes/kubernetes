@@ -725,4 +725,48 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			testVolumeClient(c, config, volume, &fsGroup, content)
 		})
 	})
+
+	////////////////////////////////////////////////////////////////////////
+	// GCE PD
+	////////////////////////////////////////////////////////////////////////
+
+	framework.KubeDescribe("PD", func() {
+		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "pd",
+			}
+
+			By("creating a test gce pd volume")
+			volumeName, err := createPDWithRetry()
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				deletePDWithRetry(volumeName)
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					volumeTestCleanup(f, config)
+				}
+			}()
+			volume := api.VolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+					PDName:   volumeName,
+					FSType:   "ext3",
+					ReadOnly: false,
+				},
+			}
+
+			// Insert index.html into the test volume with some random content
+			// to make sure we don't see the content from previous test runs.
+			content := "Hello from GCE PD from namespace " + volumeName
+			injectHtml(c, config, volume, content)
+
+			fsGroup := int64(1234)
+			testVolumeClient(c, config, volume, &fsGroup, content)
+		})
+	})
 })
