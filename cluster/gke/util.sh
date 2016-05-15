@@ -50,7 +50,7 @@ function prepare-e2e() {
 function detect-project() {
   echo "... in gke:detect-project()" >&2
   if [[ -z "${PROJECT:-}" ]]; then
-    export PROJECT=$("${GCLOUD}" config list project | tail -n 1 | cut -f 3 -d ' ')
+    export PROJECT=$("${GCLOUD}" config list project --format 'value(core.project)')
     echo "... Using project: ${PROJECT}" >&2
   fi
   if [[ -z "${PROJECT:-}" ]]; then
@@ -202,7 +202,7 @@ function test-setup() {
   detect-nodes >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  NODE_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
+  NODE_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" --format='value(tags.items)' | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node")
   OLD_NODE_TAG="k8s-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
@@ -233,8 +233,8 @@ function detect-master() {
   echo "... in gke:detect-master()" >&2
   detect-project >&2
   KUBE_MASTER_IP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep endpoint | cut -f 2 -d ' ')
+    --project="${PROJECT}" --zone="${ZONE}" --format='value(endpoint)' \
+    "${CLUSTER_NAME}")
 }
 
 # Assumed vars:
@@ -280,9 +280,10 @@ function detect-node-names {
 #   NODE_INSTANCE_GROUP
 function detect-node-instance-group {
   echo "... in gke:detect-node-instance-group()" >&2
-  NODE_INSTANCE_GROUP=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep instanceGroupManagers | grep "${ZONE}" | cut -d '/' -f 11)
+  local url=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
+    --project="${PROJECT}" --zone="${ZONE}" \
+    --format='value(instanceGroupUrls)' "${CLUSTER_NAME}")
+  NODE_INSTANCE_GROUP="${url##*/}"
 }
 
 # SSH to a node by name ($1) and run a command ($2).

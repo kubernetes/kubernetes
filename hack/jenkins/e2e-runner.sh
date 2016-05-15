@@ -34,10 +34,7 @@ function fetch_output_tars() {
 }
 
 function fetch_server_version_tars() {
-    local -r msg=$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
-    # msg will look like "defaultClusterVersion: 1.0.1". Strip
-    # everything up to, including ": "
-    local -r build_version="v${msg##*: }"
+    local -r build_version="v$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE}  --format='value(defaultClusterVersion)')"
     fetch_tars_from_gcs "release" "${build_version}"
     unpack_binaries
 }

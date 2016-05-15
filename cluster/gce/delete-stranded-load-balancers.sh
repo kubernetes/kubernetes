@@ -18,7 +18,7 @@
 PROJECT=${PROJECT:-kubernetes-jenkins}
 REGION=${REGION:-us-central1}
 
-LIST=$(gcloud --project=${PROJECT} compute target-pools list | sed 1d | awk '{print $1}')
+LIST=$(gcloud --project=${PROJECT} compute target-pools list --format='value(name)')
 
 result=0
 for x in ${LIST}; do
