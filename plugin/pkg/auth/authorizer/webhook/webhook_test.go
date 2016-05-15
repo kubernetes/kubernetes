@@ -182,7 +182,7 @@ current-context: default
 				return fmt.Errorf("failed to execute test template: %v", err)
 			}
 			// Create a new authorizer
-			_, err = New(p)
+			_, err = New(p, 0, 0)
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -283,7 +283,7 @@ func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte) (*Webho
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
-	return New(p)
+	return New(p, 0, 0)
 }
 
 func TestTLSConfig(t *testing.T) {

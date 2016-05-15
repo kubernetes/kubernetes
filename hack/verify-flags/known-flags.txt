@@ -23,6 +23,8 @@ authentication-token-webhook-config-file
 authorization-mode
 authorization-policy-file
 authorization-webhook-config-file
+authorization-webhook-cache-authorized-ttl
+authorization-webhook-cache-unauthorized-ttl
 babysit-daemons
 basic-auth-file
 bench-pods
