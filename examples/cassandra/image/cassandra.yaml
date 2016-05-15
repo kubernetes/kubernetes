@@ -22,7 +22,7 @@ cluster_name: 'Test Cluster'
 #
 # If you already have a cluster with 1 token per node, and wish to migrate to
 # multiple tokens per node, see http://wiki.apache.org/cassandra/Operations
-num_tokens: 256
+num_tokens: 32
 
 # initial_token allows you to specify tokens manually.  While you can use # it with
 # vnodes (num_tokens > 1, above) -- in which case you should provide a
@@ -258,7 +258,7 @@ seed_provider:
       parameters:
           # seeds is actually a comma-delimited list of addresses.
           # Ex: "<ip1>,<ip2>,<ip3>"
-          - seeds: "%%ip%%"
+          - seeds: 127.0.0.1
 
 # For workloads with more data than can fit in memory, Cassandra's
 # bottleneck will be reads that need to fetch data from
@@ -364,7 +364,7 @@ ssl_storage_port: 7001
 # address associated with the hostname (it might not be).
 #
 # Setting listen_address to 0.0.0.0 is always wrong.
-listen_address: %%ip%%
+listen_address: 127.0.0.1
 # listen_interface: eth0
 
 # Address to broadcast to other Cassandra nodes
@@ -405,7 +405,7 @@ start_rpc: true
 #
 # Note that unlike listen_address, you can specify 0.0.0.0, but you must also
 # set broadcast_rpc_address to a value other than 0.0.0.0.
-rpc_address: %%ip%%
+rpc_address: 127.0.0.1
 # rpc_interface: eth1
 
 # port for Thrift to listen for clients on
@@ -769,6 +769,6 @@ inter_dc_tcp_nodelay: false
 disk_access_mode: mmap
 row_cache_class_name: org.apache.cassandra.cache.OHCProvider
 
-# Not till 3.5  
+# Not till 3.5
 #enable_user_defined_functions: true
 #enable_scripted_user_defined_functions: tru
