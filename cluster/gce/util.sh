@@ -33,7 +33,8 @@ elif [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
   # If the user does not set a GCI image for master, we run both master and nodes
   # using the latest GCI dev image.
   if [[ "${MASTER_IMAGE}" != gci* ]]; then
-    gci_images=( $(gcloud compute images list --project google-containers | grep "gci-dev" | cut -d ' ' -f1) )
+    gci_images=( $(gcloud compute images list --project google-containers \
+      --regexp='gci-dev.*' --format='value(name)') )
     MASTER_IMAGE="${gci_images[0]}"
     NODE_IMAGE="${MASTER_IMAGE}"
     NODE_IMAGE_PROJECT="${MASTER_IMAGE_PROJECT}"
@@ -113,7 +114,7 @@ function ensure-temp-dir {
 #   PROJECT_REPORTED
 function detect-project () {
   if [[ -z "${PROJECT-}" ]]; then
-    PROJECT=$(gcloud config list project | tail -n 1 | cut -f 3 -d ' ')
+    PROJECT=$(gcloud config list project --format 'value(core.project)')
   fi
 
   if [[ -z "${PROJECT-}" ]]; then
@@ -663,8 +664,7 @@ function create-master() {
   local REGION=${ZONE%-*}
   create-static-ip "${MASTER_NAME}-ip" "${REGION}"
   MASTER_RESERVED_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
+    --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
 
   create-certs "${MASTER_RESERVED_IP}"
 
@@ -881,9 +881,9 @@ function kube-down {
 
   # Delete autoscaler for nodes if present. We assume that all or none instance groups have an autoscaler
   local autoscaler
-  autoscaler=( $(gcloud compute instance-groups managed list --zone "${ZONE}" --project "${PROJECT}" \
-                 | grep "${NODE_INSTANCE_PREFIX}-group" \
-                 | awk '{print $7}') )
+  autoscaler=( $(gcloud compute instance-groups managed list \
+    --zone "${ZONE}" --project "${PROJECT}" --regexp="${NODE_INSTANCE_PREFIX}-.+" \
+    --format='value(autoscaled)') )
   if [[ "${autoscaler:-}" == "yes" ]]; then
     for group in ${INSTANCE_GROUPS[@]:-}; do
       gcloud compute instance-groups managed stop-autoscaling "${group}" --zone "${ZONE}" --project "${PROJECT}"
@@ -895,28 +895,13 @@ function kube-down {
   # change during a cluster upgrade.)
   local template=$(get-template "${PROJECT}")
 
-  # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
-  # do is parse the output and special case particular responses we are interested in.
   for group in ${INSTANCE_GROUPS[@]:-}; do
     if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-      deleteCmdOutput=$(gcloud compute instance-groups managed delete --zone "${ZONE}" \
+      gcloud compute instance-groups managed delete \
         --project "${PROJECT}" \
         --quiet \
-        "${group}")
-      if [[ "$deleteCmdOutput" != ""  ]]; then
-        # Managed instance group deletion is done asynchronously, we must wait for it to complete, or subsequent steps fail
-        deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
-        if [[ "$deleteCmdOperationId" != ""  ]]; then
-          deleteCmdStatus="PENDING"
-          while [[ "$deleteCmdStatus" != "DONE" ]]
-          do
-            sleep 5
-            deleteCmdOperationOutput=$(gcloud compute instance-groups managed --zone "${ZONE}" --project "${PROJECT}" get-operation $deleteCmdOperationId)
-            deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
-            echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
-          done
-        fi
-      fi
+        --zone "${ZONE}" \
+        "${group}"
     fi
   done
 
@@ -962,7 +947,7 @@ function kube-down {
   minions=( $(gcloud compute instances list \
                 --project "${PROJECT}" --zone "${ZONE}" \
                 --regexp "${NODE_INSTANCE_PREFIX}-.+" \
-                | awk 'NR >= 2 { print $1 }') )
+                --format='value(name)') )
   # If any minions are running, delete them in batches.
   while (( "${#minions[@]}" > 0 )); do
     echo Deleting nodes "${minions[*]::10}"
@@ -1000,7 +985,8 @@ function kube-down {
   # first allows the master to cleanup routes itself.
   local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}" | awk 'NR >= 2 { print $1 }') )
+    --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}"  \
+    --format='value(name)') )
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
     gcloud compute routes delete \
@@ -1031,15 +1017,10 @@ function kube-down {
 #   NODE_INSTANCE_PREFIX
 #
 # $1: project
-# $2: zone
 function get-template {
-  local template=""
-  if [[ -n $(gcloud compute instance-templates list "${NODE_INSTANCE_PREFIX}"-template --project="${1}" | grep template) ]]; then
-    template="${NODE_INSTANCE_PREFIX}"-template
-  fi
-  echo "${template}"
+  gcloud compute instance-templates list "${NODE_INSTANCE_PREFIX}-template" \
+    --project="${1}" --format='value(name)'
 }
-
 
 # Checks if there are any present resources related kubernetes cluster.
 #
@@ -1086,7 +1067,7 @@ function check-resources {
   minions=( $(gcloud compute instances list \
                 --project "${PROJECT}" --zone "${ZONE}" \
                 --regexp "${NODE_INSTANCE_PREFIX}-.+" \
-                | awk 'NR >= 2 { print $1 }') )
+                --format='value(name)') )
   if (( "${#minions[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#minions[@]} matching matching ${NODE_INSTANCE_PREFIX}-.+"
     return 1
@@ -1104,7 +1085,7 @@ function check-resources {
 
   local -a routes
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${INSTANCE_PREFIX}-minion-.{4}" | awk 'NR >= 2 { print $1 }') )
+    --regexp "${INSTANCE_PREFIX}-minion-.{4}" --format='value(name)') )
   if (( "${#routes[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-minion-.{4}"
     return 1
