@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -44,33 +45,40 @@ func validNewThirdPartyResource(name string) *extensions.ThirdPartyResource {
 		},
 		Versions: []extensions.APIVersion{
 			{
-				Name: "stable/v1",
+				Name: "v1",
 			},
 		},
 	}
 }
 
+func namer(i int) string {
+	return fmt.Sprintf("kind%d.example.com", i)
+}
+
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Store).ClusterScope()
-	rsrc := validNewThirdPartyResource("foo")
-	rsrc.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
+	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer).GeneratesName()
+	rsrc := validNewThirdPartyResource("kind.domain.tld")
 	test.TestCreate(
 		// valid
 		rsrc,
 		// invalid
 		&extensions.ThirdPartyResource{},
+		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
+		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.tld"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
+		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "v.1"}}},
+		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "stable/v1"}}},
 	)
 }
 
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
 	test.TestUpdate(
 		// valid
-		validNewThirdPartyResource("foo"),
+		validNewThirdPartyResource("kind.domain.tld"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.ThirdPartyResource)
@@ -83,30 +91,30 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Store).ClusterScope()
-	test.TestDelete(validNewThirdPartyResource("foo"))
+	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
+	test.TestDelete(validNewThirdPartyResource("kind.domain.tld"))
 }
 
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Store).ClusterScope()
-	test.TestGet(validNewThirdPartyResource("foo"))
+	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
+	test.TestGet(validNewThirdPartyResource("kind.domain.tld"))
 }
 
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Store).ClusterScope()
-	test.TestList(validNewThirdPartyResource("foo"))
+	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
+	test.TestList(validNewThirdPartyResource("kind.domain.tld"))
 }
 
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
 	test.TestWatch(
-		validNewThirdPartyResource("foo"),
+		validNewThirdPartyResource("kind.domain.tld"),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels

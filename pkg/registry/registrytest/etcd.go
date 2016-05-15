@@ -64,6 +64,11 @@ func (t *Tester) ClusterScope() *Tester {
 	return t
 }
 
+func (t *Tester) Namer(namer func(int) string) *Tester {
+	t.tester = t.tester.Namer(namer)
+	return t
+}
+
 func (t *Tester) AllowCreateOnUpdate() *Tester {
 	t.tester = t.tester.AllowCreateOnUpdate()
 	return t
