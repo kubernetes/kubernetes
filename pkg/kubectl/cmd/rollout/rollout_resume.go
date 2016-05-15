@@ -17,7 +17,6 @@ limitations under the License.
 package rollout
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -27,6 +26,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -35,7 +35,7 @@ type ResumeConfig struct {
 	ResumeObject func(object runtime.Object) (bool, error)
 	Mapper       meta.RESTMapper
 	Typer        runtime.ObjectTyper
-	Info         *resource.Info
+	Infos        []*resource.Info
 
 	Out       io.Writer
 	Filenames []string
@@ -62,8 +62,16 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    resume_long,
 		Example: resume_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(opts.CompleteResume(f, cmd, out, args))
-			cmdutil.CheckErr(opts.RunResume())
+			allErrs := []error{}
+			err := opts.CompleteResume(f, cmd, out, args)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+			err = opts.RunResume()
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 		},
 	}
 
@@ -87,32 +95,45 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 		return err
 	}
 
-	infos, err := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
 		ResourceTypeOrNameArgs(true, args...).
-		SingleResourceType().
+		ContinueOnError().
 		Latest().
-		Do().Infos()
+		Flatten().
+		Do()
+	err = r.Err()
 	if err != nil {
 		return err
 	}
-	if len(infos) != 1 {
-		return fmt.Errorf("rollout resume is only supported on individual resources - %d resources were found", len(infos))
+
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		o.Infos = append(o.Infos, info)
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-	o.Info = infos[0]
 	return nil
 }
 
 func (o ResumeConfig) RunResume() error {
-	isAlreadyResumed, err := o.ResumeObject(o.Info.Object)
-	if err != nil {
-		return err
+	allErrs := []error{}
+	for _, info := range o.Infos {
+		isAlreadyResumed, err := o.ResumeObject(info.Object)
+		if err != nil {
+			allErrs = append(allErrs, cmdutil.AddSourceToErr("resuming", info.Source, err))
+			continue
+		}
+		if isAlreadyResumed {
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "already resumed")
+			continue
+		}
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "resumed")
 	}
-	if isAlreadyResumed {
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "already resumed")
-		return nil
-	}
-	cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "resumed")
-	return nil
+	return utilerrors.NewAggregate(allErrs)
 }

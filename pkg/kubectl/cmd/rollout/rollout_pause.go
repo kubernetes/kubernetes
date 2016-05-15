@@ -17,7 +17,6 @@ limitations under the License.
 package rollout
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -27,6 +26,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // PauseConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -35,7 +35,7 @@ type PauseConfig struct {
 	PauseObject func(object runtime.Object) (bool, error)
 	Mapper      meta.RESTMapper
 	Typer       runtime.ObjectTyper
-	Info        *resource.Info
+	Infos       []*resource.Info
 
 	Out       io.Writer
 	Filenames []string
@@ -64,8 +64,16 @@ func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    pause_long,
 		Example: pause_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(opts.CompletePause(f, cmd, out, args))
-			cmdutil.CheckErr(opts.RunPause())
+			allErrs := []error{}
+			err := opts.CompletePause(f, cmd, out, args)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+			err = opts.RunPause()
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 		},
 	}
 
@@ -89,32 +97,39 @@ func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out 
 		return err
 	}
 
-	infos, err := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
 		ResourceTypeOrNameArgs(true, args...).
-		SingleResourceType().
+		ContinueOnError().
 		Latest().
-		Do().Infos()
+		Flatten().
+		Do()
+	err = r.Err()
 	if err != nil {
 		return err
 	}
-	if len(infos) != 1 {
-		return fmt.Errorf("rollout pause is only supported on individual resources - %d resources were found", len(infos))
+
+	o.Infos, err = r.Infos()
+	if err != nil {
+		return err
 	}
-	o.Info = infos[0]
 	return nil
 }
 
 func (o PauseConfig) RunPause() error {
-	isAlreadyPaused, err := o.PauseObject(o.Info.Object)
-	if err != nil {
-		return err
+	allErrs := []error{}
+	for _, info := range o.Infos {
+		isAlreadyPaused, err := o.PauseObject(info.Object)
+		if err != nil {
+			allErrs = append(allErrs, cmdutil.AddSourceToErr("pausing", info.Source, err))
+			continue
+		}
+		if isAlreadyPaused {
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "already paused")
+			continue
+		}
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "paused")
 	}
-	if isAlreadyPaused {
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "already paused")
-		return nil
-	}
-	cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "paused")
-	return nil
+	return utilerrors.NewAggregate(allErrs)
 }
