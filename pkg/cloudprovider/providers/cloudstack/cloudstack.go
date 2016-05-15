@@ -462,21 +462,27 @@ func (lb *LoadBalancer) getPublicIpId(lbIP string) (string, error) {
 
 func (lb *LoadBalancer) getVirtualMachineIds(hosts []string) ([]string, error) {
 	var vmIDs []string
+	ipAddrs := map[string]bool{}
 	for _, host := range hosts {
-		vmParams := lb.cs.client.VirtualMachine.NewListVirtualMachinesParams()
-		vmParams.SetName(host)
-		vmParams.SetListall(true)
-		vmResponse, err := lb.cs.client.VirtualMachine.ListVirtualMachines(vmParams)
-		if err != nil {
-			return nil, err
-		}
-		if vmResponse.Count > 1 {
-			return nil, fmt.Errorf("Found more than one ID of node name %s", host)
-		} else if vmResponse.Count == 0 {
-			return nil, fmt.Errorf("ID of node name %s is not found", host)
-		}
-		vmIDs = append(vmIDs, vmResponse.VirtualMachines[0].Id)
+		ipAddrs[host] = true
 	}
+
+	//list all vms
+	listVMParams := lb.cs.client.VirtualMachine.NewListVirtualMachinesParams()
+	listVMParams.SetListall(true)
+	listVMResponse, err := lb.cs.client.VirtualMachine.ListVirtualMachines(listVMParams)
+	if err != nil {
+		return nil, err
+	}
+
+	//check if ipaddress belongs to the hosts slice, then add the corresponding vmid
+	for i := 0; i < listVMResponse.Count; i++ {
+		//check only the first Nic
+		ipAddr := listVMResponse.VirtualMachines[i].Nic[0].Ipaddress
+		if _, found := ipAddrs[ipAddr]; found {
+			vmIDs = append(vmIDs, listVMResponse.VirtualMachines[i].Id)
+		}
+	}
+
 	return vmIDs, nil
 }
-
