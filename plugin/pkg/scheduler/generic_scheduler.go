@@ -137,14 +137,15 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
 func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate, nodes api.NodeList, extenders []algorithm.SchedulerExtender) (api.NodeList, FailedPredicateMap, error) {
-	predicateResultLock := sync.Mutex{}
 	filtered := []api.Node{}
 	failedPredicateMap := FailedPredicateMap{}
-	errs := []error{}
 	
 	if len(predicateFuncs) == 0 {
 		filtered = nodes.Items
 	} else {
+		predicateResultLock := sync.Mutex{}
+		errs := []error{}
+		
 		checkNode := func(i int) {
 			nodeName := nodes.Items[i].Name
 			fits, failedPredicate, err := podFitsOnNode(pod, nodeNameToInfo[nodeName], predicateFuncs)
