@@ -62,7 +62,7 @@ func (grm *goRoutineMap) Run(operationName string, operation func() error) error
 	defer grm.Unlock()
 	if grm.operations[operationName] {
 		// Operation with name exists
-		return fmt.Errorf("Failed to create operation with name %q. An operation with that name already exists.", operationName)
+		return newAlreadyExistsError(operationName)
 	}
 
 	grm.operations[operationName] = true
@@ -85,4 +85,31 @@ func (grm *goRoutineMap) operationComplete(operationName string) {
 
 func (grm *goRoutineMap) Wait() {
 	grm.wg.Wait()
+}
+
+// alreadyExistsError is specific error returned when NewGoRoutine()
+// detects that operation with given name is already running.
+type alreadyExistsError struct {
+	operationName string
+}
+
+var _ error = alreadyExistsError{}
+
+func (err alreadyExistsError) Error() string {
+	return fmt.Sprintf("Failed to create operation with name %q. An operation with that name already exists", err.operationName)
+}
+
+func newAlreadyExistsError(operationName string) error {
+	return alreadyExistsError{operationName}
+}
+
+// IsAlreadyExists returns true if an error returned from NewGoRoutine indicates
+// that operation with the same name already exists.
+func IsAlreadyExists(err error) bool {
+	switch err.(type) {
+	case alreadyExistsError:
+		return true
+	default:
+		return false
+	}
 }

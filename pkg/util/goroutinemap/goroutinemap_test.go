@@ -120,6 +120,9 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 	if err2 == nil {
 		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", operationName)
 	}
+	if !IsAlreadyExists(err2) {
+		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
+	}
 }
 
 func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
@@ -141,6 +144,9 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	// Assert
 	if err2 == nil {
 		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", operationName)
+	}
+	if !IsAlreadyExists(err2) {
+		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
 	}
 
 	// Act
