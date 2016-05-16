@@ -98,20 +98,11 @@ type ResourceClient struct {
 	ns       string
 }
 
-// namespace applies a namespace to the request if the configured
-// resource is a namespaced resource. Otherwise, it just returns the
-// passed in request.
-func (rc *ResourceClient) namespace(req *restclient.Request) *restclient.Request {
-	if rc.resource.Namespaced {
-		return req.Namespace(rc.ns)
-	}
-	return req
-}
-
 // List returns a list of objects for this resource.
 func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, error) {
 	result := new(runtime.UnstructuredList)
-	err := rc.namespace(rc.cl.Get()).
+	err := rc.cl.Get().
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(opts, parameterEncoder).
 		Do().
@@ -122,7 +113,8 @@ func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, 
 // Get gets the resource with the specified name.
 func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	err := rc.namespace(rc.cl.Get()).
+	err := rc.cl.Get().
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		Name(name).
 		Do().
@@ -132,7 +124,8 @@ func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
 
 // Delete deletes the resource with the specified name.
 func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
-	return rc.namespace(rc.cl.Delete()).
+	return rc.cl.Delete().
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		Name(name).
 		Body(opts).
@@ -142,7 +135,8 @@ func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, listOptions runtime.Object) error {
-	return rc.namespace(rc.cl.Delete()).
+	return rc.cl.Delete().
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(listOptions, parameterEncoder).
 		Body(deleteOptions).
@@ -153,7 +147,8 @@ func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, list
 // Create creates the provided resource.
 func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	err := rc.namespace(rc.cl.Post()).
+	err := rc.cl.Post().
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		Body(obj).
 		Do().
@@ -167,7 +162,8 @@ func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructur
 	if len(obj.GetName()) == 0 {
 		return result, errors.New("object missing name")
 	}
-	err := rc.namespace(rc.cl.Put()).
+	err := rc.cl.Put().
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		Name(obj.GetName()).
 		Body(obj).
@@ -178,10 +174,24 @@ func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructur
 
 // Watch returns a watch.Interface that watches the resource.
 func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
-	return rc.namespace(rc.cl.Get().Prefix("watch")).
+	return rc.cl.Get().
+		Prefix("watch").
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(opts, parameterEncoder).
 		Watch()
+}
+
+func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*runtime.Unstructured, error) {
+	result := new(runtime.Unstructured)
+	err := rc.cl.Patch(pt).
+		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
+		Resource(rc.resource.Name).
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return result, err
 }
 
 // dynamicCodec is a codec that wraps the standard unstructured codec
