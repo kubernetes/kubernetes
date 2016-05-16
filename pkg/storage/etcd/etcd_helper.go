@@ -361,7 +361,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.F
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
 func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFunc, slicePtr interface{}) error {
 	trace := util.NewTrace("decodeNodeList " + getTypeName(slicePtr))
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer trace.LogIfLong(400 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		// This should not happen at runtime.
@@ -406,7 +406,7 @@ func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion strin
 		glog.Errorf("Context is nil")
 	}
 	trace := util.NewTrace("List " + getTypeName(listObj))
-	defer trace.LogIfLong(time.Second)
+	defer trace.LogIfLong(400 * time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
