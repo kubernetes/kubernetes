@@ -51,7 +51,7 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 	ks.healthzPort = config.HealthzPort
-	ks.kd = kdns.NewKubeDNS(kubeClient, config.ClusterDomain)
+	ks.kd = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
 	return &ks
 }
 
