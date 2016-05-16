@@ -24,21 +24,21 @@ import (
 	"testing"
 )
 
-func TestGetWriterNoOp(t *testing.T) {
+func TestSetupOutputWriterNoOp(t *testing.T) {
 	tests := []string{"", "-"}
 	for _, test := range tests {
 		out := &bytes.Buffer{}
 		f, _, _ := NewAPIFactory()
 		cmd := NewCmdClusterInfoDump(f, os.Stdout)
 		cmd.Flag("output-directory").Value.Set(test)
-		writer := getWriter(cmd, out, "/some/file/that/should/be/ignored")
+		writer := setupOutputWriter(cmd, out, "/some/file/that/should/be/ignored")
 		if writer != out {
 			t.Errorf("expected: %v, saw: %v", out, writer)
 		}
 	}
 }
 
-func TestGetWriterFile(t *testing.T) {
+func TestSetupOutputWriterFile(t *testing.T) {
 	file := "output.json"
 	dir, err := ioutil.TempDir(os.TempDir(), "out")
 	if err != nil {
@@ -51,7 +51,7 @@ func TestGetWriterFile(t *testing.T) {
 	f, _, _ := NewAPIFactory()
 	cmd := NewCmdClusterInfoDump(f, os.Stdout)
 	cmd.Flag("output-directory").Value.Set(dir)
-	writer := getWriter(cmd, out, file)
+	writer := setupOutputWriter(cmd, out, file)
 	if writer == out {
 		t.Errorf("expected: %v, saw: %v", out, writer)
 	}

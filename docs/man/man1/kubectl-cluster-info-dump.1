@@ -18,6 +18,10 @@ stdout. You can optionally specify a directory with \-\-output\-directory.  If y
 build a set of files in that directory.  By default only dumps things in the 'kube\-system' namespace, but you can
 switch to a different namespace with the \-\-namespaces flag, or specify \-\-all\-namespaces to dump all namespaces.
 
+.PP
+The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories
+based on namespace and pod name.
+
 
 .SH OPTIONS
 .PP
@@ -129,6 +133,27 @@ switch to a different namespace with the \-\-namespaces flag, or specify \-\-all
 .PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Dump current cluster state to stdout
+kubectl cluster\-info dump
+  
+# Dump current cluster state to /path/to/cluster\-state
+kubectl cluster\-info dump \-\-output\-directory=/path/to/cluster\-state
+  
+# Dump all namespaces to stdout
+kubectl cluster\-info dump \-\-all\-namespaces
+  
+# Dump a set of namespaces to /path/to/cluster\-state
+kubectl cluster\-info dump \-\-namespaces default,kube\-system \-\-output\-directory=/path/to/cluster\-state
+
+.fi
+.RE
 
 
 .SH SEE ALSO

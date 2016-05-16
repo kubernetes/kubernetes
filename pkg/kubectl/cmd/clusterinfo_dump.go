@@ -33,9 +33,10 @@ import (
 // NewCmdCreateSecret groups subcommands to create various types of secrets
 func NewCmdClusterInfoDump(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dump",
-		Short: "Dump lots of relevant info for debugging and diagnosis.",
-		Long:  dumpLong + "\n" + dumpExample,
+		Use:     "dump",
+		Short:   "Dump lots of relevant info for debugging and diagnosis.",
+		Long:    dumpLong,
+		Example: dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(dumpClusterInfo(f, cmd, args, cmdOut))
 		},
@@ -57,17 +58,17 @@ The command also dumps the logs of all of the pods in the cluster, these logs ar
 based on namespace and pod name.
 `
 
-	dumpExample = `  # Dump current cluster state to stdout
-  kubectl cluster-info dump
+	dumpExample = `# Dump current cluster state to stdout
+kubectl cluster-info dump
   
-  # Dump current cluster state to /path/to/cluster-state
-  kubectl cluster-info dump --output-directory=/path/to/cluster-state
+# Dump current cluster state to /path/to/cluster-state
+kubectl cluster-info dump --output-directory=/path/to/cluster-state
   
-  # Dump all namespaces to stdout
-  kubectl cluster-info dump --all-namespaces
+# Dump all namespaces to stdout
+kubectl cluster-info dump --all-namespaces
   
-  # Dump a set of namespaces to /path/to/cluster-state
-  kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`
+# Dump a set of namespaces to /path/to/cluster-state
+kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`
 )
 
 func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename string) io.Writer {
