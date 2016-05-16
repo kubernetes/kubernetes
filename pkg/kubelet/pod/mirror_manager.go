@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,9 +46,12 @@ import (
 // When a static pod gets deleted, the associated orphaned mirror pod will
 // also be removed.
 //
-// The mirror pod manager is composed of staticPods store, mirrorPods store and a syncer.
+// The mirror pod manager is composed of a staticPods store, a mirrorPods store and a syncer.
 // As is shown in the figure below, mirrorPods stores the mirror pods from apiserver. staticPods
-// stores the static pods from other sources. The syncer periodically checks mirrorPods and staticPods,
+// stores the static pods from other sources. Whenever a static pod is added/removed, the syner
+// will be invoked to create/delete corresponding mirror pod. However, the creation/deletion
+// may fail and someone may unexpectedly change the mirror pod on apiserver, to keep mirror pod
+// matching the static pod, the syncer will also periodically check mirrorPods and staticPods,
 // if they are not match, it will create and delete mirror pods accordingly.
 //     file/http ---> staticPods --->
 //                                   syncer
@@ -266,16 +269,20 @@ func (m *mirrorPodManager) handleMirrorPodCreation(mirrorPod *api.Pod) {
 	// So we should make sure the old mirror pod is indeed invalid so as to avoid recreation loop.
 	oldMirrorPod, err := m.apiserverClient.Core().Pods(mirrorPod.Namespace).Get(mirrorPod.Name)
 	if err == nil {
-		m.lock.RLock()
-		defer m.lock.RUnlock()
-		if isMirrorPodOf(oldMirrorPod, m.staticPods[getKey(mirrorPod)]) {
+		staticPod := func() *api.Pod {
+			// Critical block
+			m.lock.RLock()
+			defer m.lock.RUnlock()
+			return m.staticPods[getKey(mirrorPod)]
+		}()
+		if isMirrorPodOf(oldMirrorPod, staticPod) {
 			return
 		}
 	}
 	if err == nil || !errors.IsNotFound(err) {
 		// Delete old mirror pod first
 		if !m.handleMirrorPodDeletion(oldMirrorPod) {
-			// If the old mirror pod is failed to be deleted, just return, it will be recreated
+			// If the old mirror pod failed to be deleted, just return, it will be recreated
 			// again in next periodic cleanup.
 			return
 		}
@@ -284,7 +291,7 @@ func (m *mirrorPodManager) handleMirrorPodCreation(mirrorPod *api.Pod) {
 	glog.V(4).Infof("Creating a mirror pod %q", format.Pod(mirrorPod))
 	_, err = m.apiserverClient.Core().Pods(mirrorPod.Namespace).Create(mirrorPod)
 	if err != nil {
-		// If the mirror pod is failed to be created, just return, it will be created again
+		// If the mirror pod failed to be created, just return, it will be created again
 		// in next periodic cleanup
 		glog.Errorf("Failed creating mirror pod %q: %v", format.Pod(mirrorPod), err)
 		return
@@ -296,8 +303,8 @@ func (m *mirrorPodManager) handleMirrorPodDeletion(mirrorPod *api.Pod) bool {
 	namespace := mirrorPod.Namespace
 	name := mirrorPod.Name
 	if err := m.apiserverClient.Core().Pods(namespace).Delete(name, api.NewDeleteOptions(0)); err != nil {
-		// * If the mirror pod is not found on apiserver, report an error and proceeding
-		// * If the mirror pod is failed to be deleted for other reasons, the mirror pod
+		// * If the mirror pod is not found on apiserver, report an error and proceed
+		// * If the mirror pod failed to be deleted for other reasons, the mirror pod
 		// will be deleted again in next periodic cleanup.
 		if !errors.IsNotFound(err) {
 			glog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
