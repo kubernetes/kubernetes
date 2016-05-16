@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -478,6 +479,72 @@ func TestWatch(t *testing.T) {
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("Watch(%q) want: %v\ngot: %v", tc.name, want, got)
 			}
+		}
+	}
+}
+
+func TestPatch(t *testing.T) {
+	tcs := []struct {
+		name      string
+		namespace string
+		patch     []byte
+		want      *runtime.Unstructured
+		path      string
+	}{
+		{
+			name:  "normal_patch",
+			path:  "/api/gtest/vtest/rtest/normal_patch",
+			patch: getJSON("vTest", "rTest", "normal_patch"),
+			want:  getObject("vTest", "rTest", "normal_patch"),
+		},
+		{
+			name:      "namespaced_patch",
+			namespace: "nstest",
+			path:      "/api/gtest/vtest/namespaces/nstest/rtest/namespaced_patch",
+			patch:     getJSON("vTest", "rTest", "namespaced_patch"),
+			want:      getObject("vTest", "rTest", "namespaced_patch"),
+		},
+	}
+	for _, tc := range tcs {
+		gv := &unversioned.GroupVersion{Group: "gtest", Version: "vtest"}
+		resource := &unversioned.APIResource{Name: "rtest", Namespaced: len(tc.namespace) != 0}
+		cl, srv, err := getClientServer(gv, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "PATCH" {
+				t.Errorf("Patch(%q) got HTTP method %s. wanted PATCH", tc.name, r.Method)
+			}
+
+			if r.URL.Path != tc.path {
+				t.Errorf("Patch(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
+			}
+
+			content := r.Header.Get("Content-Type")
+			if content != string(api.StrategicMergePatchType) {
+				t.Errorf("Patch(%q) got Content-Type %s. wanted %s", tc.name, content, api.StrategicMergePatchType)
+			}
+
+			data, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				t.Errorf("Patch(%q) unexpected error reading body: %v", tc.name, err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.Write(data)
+		})
+		if err != nil {
+			t.Errorf("unexpected error when creating client: %v", err)
+			continue
+		}
+		defer srv.Close()
+
+		got, err := cl.Resource(resource, tc.namespace).Patch(tc.name, api.StrategicMergePatchType, tc.patch)
+		if err != nil {
+			t.Errorf("unexpected error when patching %q: %v", tc.name, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("Patch(%q) want: %v\ngot: %v", tc.name, tc.want, got)
 		}
 	}
 }
