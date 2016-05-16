@@ -24,6 +24,20 @@ coreos:
         ExecStartPre=/usr/bin/mv /etc/kube-env.yaml /etc/kube-env
         ExecStart=/usr/bin/sed -i "s/: '/=/;s/'$//" /etc/kube-env
 
+    - name: kubernetes-install-cni.service
+      command: start
+      content: |
+        [Unit]
+        Description=Download cni
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/usr/bin/mkdir -p /opt/cni
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-42c4cb842dad606a84e93aad5a4484ded48e3046.tar.gz
+        ExecStart=/usr/bin/tar xf /opt/downloads/cni.tar.gz -C /opt/cni/        
+        
     - name: kubernetes-install-rkt.service
       command: start
       content: |
@@ -105,12 +119,8 @@ coreos:
       content: |
         [Unit]
         Description=Run Kubelet service
-        Requires=network-online.target
-        After=network-online.target
-        Requires=kube-env.service
-        After=kube-env.service
-        Requires=kubernetes-download-manifests.service
-        After=kubernetes-download-manifests.service
+        Requires=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service
+        After=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service
         [Service]
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/curl --fail --silent --show-error \
