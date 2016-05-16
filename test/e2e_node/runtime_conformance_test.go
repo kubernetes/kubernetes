@@ -32,8 +32,9 @@ import (
 )
 
 const (
-	retryTimeout = time.Minute * 5
-	pollInterval = time.Second * 5
+	consistentCheckTimeout = time.Second * 20
+	retryTimeout           = time.Minute * 5
+	pollInterval           = time.Second * 5
 )
 
 type testStatus struct {
@@ -176,7 +177,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 					Consistently(func() api.PodPhase {
 						status, phase, err = runningContainer.GetStatus()
 						return phase
-					}, retryTimeout, pollInterval).Should(Equal(testStatus.Phase))
+					}, consistentCheckTimeout, pollInterval).Should(Equal(testStatus.Phase))
 					Expect(err).NotTo(HaveOccurred())
 
 					By("it should get the expected 'RestartCount'")
@@ -282,7 +283,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 					} else {
 						return phase
 					}
-				}, retryTimeout, pollInterval).Should(Equal(testStatus.Phase))
+				}, consistentCheckTimeout, pollInterval).Should(Equal(testStatus.Phase))
 				Expect(err).NotTo(HaveOccurred())
 
 				By("it should get the expected 'RestartCount'")
