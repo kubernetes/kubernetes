@@ -165,13 +165,29 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 
+	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
+	// we need second healthy node in tests. Because of how the tests are written we need to update
+	// the status of this Node.
+	healthyNodeNewStatus := api.NodeStatus{
+		Conditions: []api.NodeCondition{
+			{
+				Type:   api.NodeReady,
+				Status: api.ConditionTrue,
+				// Node status has just been updated, and is NotReady for 10min.
+				LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
+				LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
 	table := []struct {
-		fakeNodeHandler   *FakeNodeHandler
-		daemonSets        []extensions.DaemonSet
-		timeToPass        time.Duration
-		newNodeStatus     api.NodeStatus
-		expectedEvictPods bool
-		description       string
+		fakeNodeHandler     *FakeNodeHandler
+		daemonSets          []extensions.DaemonSet
+		timeToPass          time.Duration
+		newNodeStatus       api.NodeStatus
+		secondNodeNewStatus api.NodeStatus
+		expectedEvictPods   bool
+		description         string
 	}{
 		// Node created recently, with no status (happens only at cluster startup).
 		{
@@ -183,14 +199,31 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 							CreationTimestamp: fakeNow,
 						},
 					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
 				},
 				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
-			daemonSets:        nil,
-			timeToPass:        0,
-			newNodeStatus:     api.NodeStatus{},
-			expectedEvictPods: false,
-			description:       "Node created recently, with no status.",
+			daemonSets:          nil,
+			timeToPass:          0,
+			newNodeStatus:       api.NodeStatus{},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node created recently, with no status.",
 		},
 		// Node created long time ago, and kubelet posted NotReady for a short period of time.
 		{
@@ -206,6 +239,22 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionFalse,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
 									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
@@ -228,8 +277,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					},
 				},
 			},
-			expectedEvictPods: false,
-			description:       "Node created long time ago, and kubelet posted NotReady for a short period of time.",
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node created long time ago, and kubelet posted NotReady for a short period of time.",
 		},
 		// Pod is ds-managed, and kubelet posted NotReady for a long period of time.
 		{
@@ -245,6 +295,22 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionFalse,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
 									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
@@ -294,8 +360,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					},
 				},
 			},
-			expectedEvictPods: false,
-			description:       "Pod is ds-managed, and kubelet posted NotReady for a long period of time.",
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Pod is ds-managed, and kubelet posted NotReady for a long period of time.",
 		},
 		// Node created long time ago, and kubelet posted NotReady for a long period of time.
 		{
@@ -311,6 +378,22 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionFalse,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
 									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
@@ -333,8 +416,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					},
 				},
 			},
-			expectedEvictPods: true,
-			description:       "Node created long time ago, and kubelet posted NotReady for a long period of time.",
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   true,
+			description:         "Node created long time ago, and kubelet posted NotReady for a long period of time.",
 		},
 		// Node created long time ago, node controller posted Unknown for a short period of time.
 		{
@@ -350,6 +434,22 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionUnknown,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
 									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
@@ -372,8 +472,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					},
 				},
 			},
-			expectedEvictPods: false,
-			description:       "Node created long time ago, node controller posted Unknown for a short period of time.",
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node created long time ago, node controller posted Unknown for a short period of time.",
 		},
 		// Node created long time ago, node controller posted Unknown for a long period of time.
 		{
@@ -382,6 +483,78 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionUnknown,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			daemonSets: nil,
+			timeToPass: 60 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionUnknown,
+						// Node status was updated by nodecontroller 1hr ago
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   true,
+			description:         "Node created long time ago, node controller posted Unknown for a long period of time.",
+		},
+		// NetworkSegmentation: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionUnknown,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
@@ -411,8 +584,76 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					},
 				},
 			},
-			expectedEvictPods: true,
-			description:       "Node created long time ago, node controller posted Unknown for a long period of time.",
+			secondNodeNewStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionUnknown,
+						// Node status was updated by nodecontroller 1hr ago
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			expectedEvictPods: false,
+			description:       "Network Segmentation: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.",
+		},
+		// NetworkSegmentation: Node created long time ago, node controller posted Unknown for a long period
+		// of on first Node, eviction should stop even though -master Node is healthy.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionUnknown,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node-master",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			daemonSets: nil,
+			timeToPass: 60 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionUnknown,
+						// Node status was updated by nodecontroller 1hr ago
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "NetworkSegmentation: Node created long time ago, node controller posted Unknown for a long period of on first Node, eviction should stop even though -master Node is healthy",
 		},
 	}
 
@@ -430,6 +671,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		if item.timeToPass > 0 {
 			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+			item.fakeNodeHandler.Existing[1].Status = item.secondNodeNewStatus
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
