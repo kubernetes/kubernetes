@@ -41,10 +41,7 @@ const (
 	// NodeStartupThreshold is a rough estimate of the time allocated for a pod to start on a node.
 	NodeStartupThreshold = 4 * time.Second
 
-	podStartupThreshold           time.Duration = 5 * time.Second
-	listPodLatencySmallThreshold  time.Duration = 1 * time.Second
-	listPodLatencyMediumThreshold time.Duration = 1 * time.Second
-	listPodLatencyLargeThreshold  time.Duration = 1 * time.Second
+	podStartupThreshold time.Duration = 5 * time.Second
 	// TODO: Decrease the small threshold to 250ms once tests are fixed.
 	apiCallLatencySmallThreshold  time.Duration = 500 * time.Millisecond
 	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
@@ -241,14 +238,8 @@ func apiCallLatencyThreshold(numNodes int) time.Duration {
 	return apiCallLatencyLargeThreshold
 }
 
-func listPodsLatencyThreshold(numNodes int) time.Duration {
-	if numNodes <= 250 {
-		return listPodLatencySmallThreshold
-	}
-	if numNodes <= 500 {
-		return listPodLatencyMediumThreshold
-	}
-	return listPodLatencyLargeThreshold
+func listNodesLatencyThreshold(numNodes int) time.Duration {
+	return apiCallLatencyLargeThreshold
 }
 
 // Prints top five summary metrics for request types with latency and returns
@@ -268,8 +259,8 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 	top := 5
 	for _, metric := range metrics.APICalls {
 		threshold := apiCallLatencyThreshold(numNodes)
-		if metric.Verb == "LIST" && metric.Resource == "pods" {
-			threshold = listPodsLatencyThreshold(numNodes)
+		if metric.Verb == "LIST" && metric.Resource == "nodes" {
+			threshold = listNodesLatencyThreshold(numNodes)
 		}
 
 		isBad := false
