@@ -60,9 +60,12 @@ func CreateTestArchive() string {
 	if err != nil {
 		glog.Fatalf("Failed to locate test/e2e_node directory %v.", err)
 	}
-	out, err := exec.Command("ginkgo", "build", testDir).CombinedOutput()
+	cmd := exec.Command("ginkgo", "build", testDir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
 	if err != nil {
-		glog.Fatalf("Failed to build e2e tests under %s %v.  Output:\n%s", testDir, err, out)
+		glog.Fatalf("Failed to build e2e tests under %s %v\n", testDir, err)
 	}
 	ginkgoTest := filepath.Join(testDir, "e2e_node.test")
 	if _, err := os.Stat(ginkgoTest); err != nil {
@@ -92,7 +95,7 @@ func CreateTestArchive() string {
 	defer os.RemoveAll(tardir)
 
 	// Copy binaries
-	out, err = exec.Command("cp", ginkgoTest, filepath.Join(tardir, "e2e_node.test")).CombinedOutput()
+	out, err := exec.Command("cp", ginkgoTest, filepath.Join(tardir, "e2e_node.test")).CombinedOutput()
 	if err != nil {
 		glog.Fatalf("Failed to copy e2e_node.test %v.", err)
 	}
