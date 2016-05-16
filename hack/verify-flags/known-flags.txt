@@ -165,6 +165,7 @@ gather-resource-usage
 gce-project
 gce-service-account
 gce-zone
+ginkgo-flags
 gke-cluster
 go-header-file
 google-json-key
