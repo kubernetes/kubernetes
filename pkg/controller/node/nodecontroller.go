@@ -73,6 +73,7 @@ type NodeController struct {
 	allocateNodeCIDRs       bool
 	cloud                   cloudprovider.Interface
 	clusterCIDR             *net.IPNet
+	serviceCIDR             *net.IPNet
 	deletingPodsRateLimiter flowcontrol.RateLimiter
 	knownNodeSet            sets.String
 	kubeClient              clientset.Interface
@@ -146,6 +147,7 @@ func NewNodeController(
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
 	clusterCIDR *net.IPNet,
+	serviceCIDR *net.IPNet,
 	allocateNodeCIDRs bool) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
@@ -192,6 +194,7 @@ func NewNodeController(
 		lookupIP:                  net.LookupIP,
 		now:                       unversioned.Now,
 		clusterCIDR:               clusterCIDR,
+		serviceCIDR:               serviceCIDR,
 		allocateNodeCIDRs:         allocateNodeCIDRs,
 		forcefullyDeletePod:       func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
 		nodeExistsInCloudProvider: func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
@@ -264,6 +267,9 @@ func NewNodeController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
+
+	nc.filterOutServiceRange()
+
 	go nc.nodeController.Run(wait.NeverStop)
 	go nc.podController.Run(wait.NeverStop)
 	go nc.daemonSetController.Run(wait.NeverStop)
@@ -332,6 +338,16 @@ func (nc *NodeController) Run(period time.Duration) {
 	}, nodeEvictionPeriod, wait.NeverStop)
 
 	go wait.Until(nc.cleanupOrphanedPods, 30*time.Second, wait.NeverStop)
+}
+
+func (nc *NodeController) filterOutServiceRange() {
+	if !nc.clusterCIDR.Contains(nc.serviceCIDR.IP.Mask(nc.clusterCIDR.Mask)) {
+		return
+	}
+
+	if err := nc.cidrAllocator.Occupy(nc.serviceCIDR); err != nil {
+		glog.Errorf("Error filtering out service cidr: %v", err)
+	}
 }
 
 // allocateOrOccupyCIDR looks at each new observed node, assigns it a valid CIDR
