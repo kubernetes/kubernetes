@@ -76,16 +76,16 @@ function unpack_binaries() {
     tar -xzf kubernetes-test.tar.gz
 }
 
-# GCP Project to fetch Trusty images.
-function get_trusty_image_project() {
+# GCP Project to fetch GCI images.
+function get_gci_image_project() {
   local project=""
   # Retry the gsutil command a couple times to mitigate the effect of
   # transient server errors.
   for n in $(seq 3); do
-    project="$(gsutil cat "gs://trusty-images/image-project.txt")" && break || sleep 1
+    project="$(gsutil cat "gs://gci-staging/image-project.txt")" && break || sleep 1
   done
   if [[ -z "${project}" ]]; then
-    echo "Failed to find the image project for Trusty images."
+    echo "Failed to find the image project for GCI images."
     exit 1
   fi
   echo "${project}"
@@ -94,19 +94,19 @@ function get_trusty_image_project() {
   rm -rf .gsutil &> /dev/null
 }
 
-# Get the latest Trusty image for a Jenkins job.
-function get_latest_trusty_image() {
+# Get the latest GCI image of a type.
+function get_latest_gci_image() {
     local image_project="$1"
     local image_type="$2"
     local image_index=""
     if [[ "${image_type}" == head ]]; then
-      image_index="trusty-head"
+      image_index="gci-head"
     elif [[ "${image_type}" == dev ]]; then
-      image_index="trusty-dev"
+      image_index="gci-dev"
     elif [[ "${image_type}" == beta ]]; then
-      image_index="trusty-beta"
+      image_index="gci-beta"
     elif [[ "${image_type}" == stable ]]; then
-      image_index="trusty-stable"
+      image_index="gci-stable"
     fi
 
     local image=""
@@ -116,7 +116,7 @@ function get_latest_trusty_image() {
       image="$(gsutil cat "gs://${image_project}/image-indices/latest-base-image-${image_index}")" && break || sleep 1
     done
     if [[ -z "${image}" ]]; then
-      echo "Failed to find Trusty image for ${image_type}"
+      echo "Failed to find GCI image for ${image_type}"
       exit 1
     fi
     echo "${image}"
@@ -180,13 +180,13 @@ if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
     export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
 fi
 
-# We get the image project and name for Trusty dynamically.
-if [[ -n "${JENKINS_TRUSTY_IMAGE_TYPE:-}" ]]; then
-  trusty_image_project="$(get_trusty_image_project)"
-  trusty_image="$(get_latest_trusty_image "${trusty_image_project}" "${JENKINS_TRUSTY_IMAGE_TYPE}")"
-  export KUBE_GCE_MASTER_PROJECT="${trusty_image_project}"
-  export KUBE_GCE_MASTER_IMAGE="${trusty_image}"
-  export KUBE_OS_DISTRIBUTION="trusty"
+# We get the image project and name for GCI dynamically.
+if [[ -n "${JENKINS_GCI_IMAGE_TYPE:-}" ]]; then
+  gci_image_project="$(get_gci_image_project)"
+  gci_image="$(get_latest_gci_image "${gci_image_project}" "${JENKINS_GCI_IMAGE_TYPE}")"
+  export KUBE_GCE_MASTER_PROJECT="${gci_image_project}"
+  export KUBE_GCE_MASTER_IMAGE="${gci_image}"
+  export KUBE_OS_DISTRIBUTION="gci"
 fi
 
 function e2e_test() {
