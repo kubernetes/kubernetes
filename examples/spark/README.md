@@ -294,7 +294,7 @@ kubectl get pods -lcomponent=zeppelin # Get the driver pod to interact with.
 ```
 
 At which point the Master UI will be available at
-[http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
+[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
 
 You can either interact with the Spark cluster the traditional `spark-shell` /
 `spark-subsubmit` / `pyspark` commands by using `kubectl exec` against the
