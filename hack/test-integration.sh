@@ -34,7 +34,7 @@ KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1;v1,autos
 # Give integration tests longer to run
 # TODO: allow a larger value to be passed in
 #KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 240s}
-KUBE_TIMEOUT="-timeout 1200s"
+KUBE_TIMEOUT="-timeout 600s"
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 
