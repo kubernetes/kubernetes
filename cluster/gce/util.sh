@@ -624,6 +624,18 @@ function create-network() {
   fi
 }
 
+# Assumes:
+#   NUM_NODES
+# Sets:
+#   MASTER_ROOT_DISK_SIZE
+function get-master-root-disk-size() {
+  if [ "$NUM_NODES" -le "1000"]; then
+    export MASTER_ROOT_DISK_SIZE="10"
+  else
+    export MASTER_ROOT_DISK_SIZE="50"
+  fi
+}
+
 function create-master() {
   echo "Starting master and configuring firewalls"
   gcloud compute firewall-rules create "${MASTER_NAME}-https" \
@@ -666,6 +678,9 @@ function create-master() {
     --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
 
   create-certs "${MASTER_RESERVED_IP}"
+
+  # Sets MASTER_ROOT_DISK_SIZE that is used by create-master-instance
+  get-master-root-disk-size
 
   create-master-instance "${MASTER_RESERVED_IP}" &
 }
