@@ -95,7 +95,12 @@ source "${KUBE_ROOT}/cluster/aws/${OS_DISTRIBUTION}/util.sh"
 load_distro_utils
 
 # This removes the final character in bash (somehow)
-AWS_REGION=${ZONE%?}
+re='[a-zA-Z]'
+if [[ ${ZONE: -1} =~ $re  ]]; then 
+  AWS_REGION=${ZONE%?}
+else 
+  AWS_REGION=$ZONE
+fi
 
 export AWS_DEFAULT_REGION=${AWS_REGION}
 export AWS_DEFAULT_OUTPUT=text
