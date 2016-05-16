@@ -625,6 +625,36 @@ message ListOptions {
   optional int64 timeoutSeconds = 5;
 }
 
+// Parameter defines a name/value variable that is to be processed during
+// the Template to Config transformation.
+message Parameter {
+  // Required: Parameter name must be set and it can be referenced in Template
+  // Items (See Value)
+  optional string name = 1;
+
+  // Optional: The name that will show in UI instead of parameter 'Name'
+  optional string displayName = 2;
+
+  // Optional: Parameter can have description
+  optional string description = 3;
+
+  // Optional: Value holds the Parameter data.
+  // The value replaces all occurrences of the Parameter $(Name)
+  // expression during the Template to Config transformation.
+  // Defaults to the empty string.  Parameters of Type != 'string'
+  // must provide a non-empty value or be Required.
+  optional string value = 4;
+
+  // Optional: Indicates the parameter must have a value.  Defaults to false.
+  // Defaults to false.
+  optional bool required = 7;
+
+  // Optional: Type-value of the parameter (one of string, int, bool, or base64)
+  // Used by clients to provide validation of user input and guide users.
+  // Defaults to 'string'
+  optional string type = 8;
+}
+
 // Pod Security Policy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
 message PodSecurityPolicy {
@@ -878,6 +908,40 @@ message SupplementalGroupsStrategyOptions {
   // Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
   // supplemental group then supply a single range with the same start and end.
   repeated IDRange ranges = 2;
+}
+
+// Template contains the inputs needed to produce a Config.
+message Template {
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  optional TemplateSpec spec = 2;
+}
+
+// TemplateList is a list of Template objects.
+message TemplateList {
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+
+  repeated Template items = 2;
+}
+
+// TemplateParameters contains the substitution parameters for processing a Template
+message TemplateParameters {
+  // Required: This must match the Name of a template
+  optional string name = 3;
+
+  // Optional: ParameterValues is a map of Substitution parameters to be expanded in the Template
+  // All required Template Parameters must be specified in this map and parseable to the Parameter Type
+  // if specified
+  map<string, string> parameters = 1;
+}
+
+message TemplateSpec {
+  // Optional: Parameters is an array of Parameters used during the
+  // Template to Config transformation.
+  repeated Parameter parameters = 2;
+
+  // Required: A yaml config list of resources to create
+  repeated k8s.io.kubernetes.pkg.runtime.RawExtension objects = 3;
 }
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
