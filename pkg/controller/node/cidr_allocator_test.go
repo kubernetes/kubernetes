@@ -18,6 +18,7 @@ package node
 
 import (
 	"github.com/golang/glog"
+	"math/big"
 	"net"
 	"reflect"
 	"testing"
@@ -223,7 +224,7 @@ func TestGetBitforCIDR(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		got, err := ra.getBitforCIDR(subnetCIDR)
+		got, err := ra.getIndexForCIDR(subnetCIDR)
 		if err == nil && tc.expectErr {
 			glog.Errorf("expected error but got null")
 			continue
@@ -236,6 +237,113 @@ func TestGetBitforCIDR(t *testing.T) {
 
 		if got != tc.expectedBit {
 			glog.Errorf("expected %v, but got %v", tc.expectedBit, got)
+		}
+	}
+}
+
+func TestOccupy(t *testing.T) {
+	cases := []struct {
+		clusterCIDRStr    string
+		subNetMaskSize    int
+		subNetCIDRStr     string
+		expectedUsedBegin int
+		expectedUsedEnd   int
+		expectErr         bool
+	}{
+		{
+			clusterCIDRStr:    "127.0.0.0/8",
+			subNetMaskSize:    16,
+			subNetCIDRStr:     "127.0.0.0/8",
+			expectedUsedBegin: 0,
+			expectedUsedEnd:   256,
+			expectErr:         false,
+		},
+		{
+			clusterCIDRStr:    "127.0.0.0/8",
+			subNetMaskSize:    16,
+			subNetCIDRStr:     "127.0.0.0/2",
+			expectedUsedBegin: 0,
+			expectedUsedEnd:   256,
+			expectErr:         false,
+		},
+		{
+			clusterCIDRStr:    "127.0.0.0/8",
+			subNetMaskSize:    16,
+			subNetCIDRStr:     "127.0.0.0/16",
+			expectedUsedBegin: 0,
+			expectedUsedEnd:   0,
+			expectErr:         false,
+		},
+		{
+			clusterCIDRStr:    "127.0.0.0/8",
+			subNetMaskSize:    32,
+			subNetCIDRStr:     "127.0.0.0/16",
+			expectedUsedBegin: 0,
+			expectedUsedEnd:   65535,
+			expectErr:         false,
+		},
+		{
+			clusterCIDRStr:    "127.0.0.0/7",
+			subNetMaskSize:    16,
+			subNetCIDRStr:     "127.0.0.0/15",
+			expectedUsedBegin: 256,
+			expectedUsedEnd:   257,
+			expectErr:         false,
+		},
+		{
+			clusterCIDRStr:    "127.0.0.0/7",
+			subNetMaskSize:    15,
+			subNetCIDRStr:     "127.0.0.0/15",
+			expectedUsedBegin: 128,
+			expectedUsedEnd:   128,
+			expectErr:         false,
+		},
+		{
+			clusterCIDRStr:    "127.0.0.0/7",
+			subNetMaskSize:    18,
+			subNetCIDRStr:     "127.0.0.0/15",
+			expectedUsedBegin: 1024,
+			expectedUsedEnd:   1031,
+			expectErr:         false,
+		},
+	}
+
+	for _, tc := range cases {
+		_, clusterCIDR, err := net.ParseCIDR(tc.clusterCIDRStr)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		clusterMask := clusterCIDR.Mask
+		clusterMaskSize, _ := clusterMask.Size()
+
+		ra := &rangeAllocator{
+			clusterCIDR:     clusterCIDR,
+			clusterIP:       clusterCIDR.IP.To4(),
+			clusterMaskSize: clusterMaskSize,
+			subNetMaskSize:  tc.subNetMaskSize,
+			maxCIDRs:        1 << uint32(tc.subNetMaskSize-clusterMaskSize),
+		}
+
+		_, subnetCIDR, err := net.ParseCIDR(tc.subNetCIDRStr)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		err = ra.Occupy(subnetCIDR)
+		if err == nil && tc.expectErr {
+			t.Errorf("expected error but got none")
+			continue
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		expectedUsed := big.Int{}
+		for i := tc.expectedUsedBegin; i <= tc.expectedUsedEnd; i++ {
+			expectedUsed.SetBit(&expectedUsed, i, 1)
+		}
+		if expectedUsed.Cmp(&ra.used) != 0 {
+			t.Errorf("error")
 		}
 	}
 }

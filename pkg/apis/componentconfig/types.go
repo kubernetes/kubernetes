@@ -522,6 +522,8 @@ type KubeControllerManagerConfiguration struct {
 	ClusterName string `json:"clusterName"`
 	// clusterCIDR is CIDR Range for Pods in cluster.
 	ClusterCIDR string `json:"clusterCIDR"`
+	// serviceCIDR is CIDR Range for Services in cluster.
+	ServiceCIDR string `json:"serviceCIDR"`
 	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and set on the
 	// cloud provider.
 	AllocateNodeCIDRs bool `json:"allocateNodeCIDRs"`
