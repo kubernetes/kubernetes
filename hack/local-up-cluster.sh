@@ -61,7 +61,7 @@ export KUBE_CACHE_MUTATION_DETECTOR
 
 # START_MODE can be 'all', 'kubeletonly', 'nokubelet', or a comma separated list of
 # services to start. Valid values for service names:
-# etcd, kube-apiserver, kube-ctrlmgr, kube-scheduler, kubelet, kube-proxy
+# etcd, kube-apiserver, kube-ctrlmgr, kube-scheduler, kubelet, kube-proxy, kube-dns
 
 
 START_MODE=${START_MODE:-"all"}
@@ -87,22 +87,33 @@ set -e
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+function is_dns_disabled {
+    if [[ "${ENABLE_CLUSTER_DNS}" == "false" ]]; then
+        [[ "$services" =~ "kube-dns" ]] && return 1
+    fi
+    return 0
+}
+
 function is_service_enabled {
     local services=$@
     local enabled_services=$START_MODE
     if [[ "$enabled_services" == "all" ]]; then
-        # everything is enabled!
-        return 0
+        # everything is enabled, just check DNS
+        return ! is_dns_disabled
     elif [[ "$enabled_services" == "nokubelet" ]]; then
         # anything but kubelet is good
         for service in ${services}; do
             [[ 'kubelet' == ${service} ]] && return 1
         done
-        return 0
+        return ! is_dns_disabled
     elif [[ "$enabled_services" == "kubeletonly" ]]; then
         enabled_services='kubelet'
     fi
-    # START_MODE is a service name list. All services must match
+    # if we are here enabled_services is a service name list. All services must match
+    if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
+        # It is possible that kube-dns will get repeated but it won't harm
+        enabled_services=${enabled_services}",kube-dns"
+    fi
     local service
     for service in ${services}; do
         [[ ,${enabled_services}, =~ ,${service}, ]] && continue || return 1
@@ -473,12 +484,12 @@ function start_kubelet {
     mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       # Enable dns
-      if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+      if is_service_enabled kube-dns; then
          dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
       else
-         # To start a private DNS server set ENABLE_CLUSTER_DNS and
-         # DNS_SERVER_IP/DOMAIN. This will at least provide a working
-         # DNS server for real world hostnames.
+         # To start a private DNS server add kube_dns to START_MODE or set
+         # ENABLE_CLUSTER_DNS, and specify DNS_SERVER_IP/DOMAIN.
+         # This will at least provide a working DNS server for real world hostnames.
          dns_args="--cluster-dns=8.8.8.8"
       fi
 
@@ -601,43 +612,40 @@ function start_kubescheduler {
 }
 
 function start_kubedns {
-
-    if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-        echo "Creating kube-system namespace"
-        sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| skydns-rc.yaml
-        if [[ "${FEDERATION:-}" == "true" ]]; then
-          FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
-          if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-            FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-          fi
-          if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" skydns-rc.yaml
-          else
-            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
-          fi
-        else
-          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
-        fi
-        sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
-        cat <<EOF >namespace.yaml
+    echo "Creating kube-system namespace"
+    sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| skydns-rc.yaml
+    if [[ "${FEDERATION:-}" == "true" ]]; then
+      FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
+      if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+        FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+      fi
+      if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+        sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" skydns-rc.yaml
+      else
+        sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+      fi
+    else
+      sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+    fi
+    sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
+    cat <<EOF >namespace.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
   name: kube-system
 EOF
-        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-        ${KUBECTL} config set-credentials myself --username=admin --password=admin
-        ${KUBECTL} config set-context local --cluster=local --user=myself
-        ${KUBECTL} config set-context local --cluster=local
-        ${KUBECTL} config use-context local
+    ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
+    ${KUBECTL} config set-credentials myself --username=admin --password=admin
+    ${KUBECTL} config set-context local --cluster=local --user=myself
+    ${KUBECTL} config set-context local --cluster=local
+    ${KUBECTL} config use-context local
 
-        ${KUBECTL} create -f namespace.yaml
-        # use kubectl to create skydns rc and service
-        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml
-        ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
-        echo "Kube-dns rc and service successfully deployed."
-        KUBEDNS_POD_NAME=$(${KUBECTL} get pods --namespace kube-system -o name | grep "kube-dns")
-    fi
+    ${KUBECTL} create -f namespace.yaml
+    # use kubectl to create skydns rc and service
+    ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml
+    ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+    echo "Kube-dns rc and service successfully deployed."
+    KUBEDNS_POD_NAME=$(${KUBECTL} get pods --namespace kube-system -o name | grep "kube-dns")
 }
 
 function print_success {
@@ -705,9 +713,9 @@ fi
 if is_service_enabled kube-proxy; then
     start_kubeproxy
 fi
-
-# DNS startup is regulated by ENABLE_CLUSTER_DNS
-start_kubedns
+if is_service_enabled kube-dns; then
+    start_kubedns
+fi
 
 print_success
 
