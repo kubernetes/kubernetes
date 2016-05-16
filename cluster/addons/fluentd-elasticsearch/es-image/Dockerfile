@@ -30,7 +30,10 @@ RUN cd / && \
     tar xf elasticsearch-1.5.2.tar.gz && \
     rm elasticsearch-1.5.2.tar.gz
 
+RUN mkdir -p /elasticsearch-1.5.2/config/templates
+
 COPY elasticsearch.yml /elasticsearch-1.5.2/config/elasticsearch.yml
+COPY template-k8s-logstash.json /elasticsearch-1.5.2/config/templates/template-k8s-logstash.json
 COPY run.sh /
 COPY elasticsearch_logging_discovery /
 
