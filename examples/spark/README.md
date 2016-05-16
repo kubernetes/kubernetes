@@ -156,7 +156,7 @@ kubectl proxy --port=8001
 ```
 
 At which point the UI will be available at
-[http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
+[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
 
 ## Step Three: Start your Spark workers
 
