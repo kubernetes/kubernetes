@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -421,6 +422,29 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	} else {
 		go attachDetachController.Run(wait.NeverStop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	}
+
+	groupVersion = "certificates/v1alpha1"
+	resources, found = resourceMap[groupVersion]
+	glog.Infof("Attempting to start certificates, full resource map %+v", resourceMap)
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "certificatesigningrequests") {
+			glog.Infof("Starting certificate request controller")
+			resyncPeriod := ResyncPeriod(s)()
+			certController, err := certcontroller.NewCertificateController(
+				clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "certificate-controller")),
+				resyncPeriod,
+				s.ClusterSigningCertFile,
+				s.ClusterSigningKeyFile,
+			)
+			if err != nil {
+				glog.Errorf("Failed to start certificate controller: %v", err)
+			} else {
+				go certController.Run(1, wait.NeverStop)
+			}
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
 	}
 
 	var rootCA []byte
