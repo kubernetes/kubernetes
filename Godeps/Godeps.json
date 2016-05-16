@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v63",
+	"GodepVersion": "v67",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -52,18 +52,18 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.7.4-43-gd22f52b",
-			"Rev": "d22f52bfeba06614d37c7aa1ad6fd76d8fdb2ba8"
+			"Comment": "v0.8.1-2-g5a62e1c",
+			"Rev": "5a62e1c7be2ab875146f1b06f15a30df213d0334"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/common",
-			"Comment": "v0.7.4-43-gd22f52b",
-			"Rev": "d22f52bfeba06614d37c7aa1ad6fd76d8fdb2ba8"
+			"Comment": "v0.8.1-2-g5a62e1c",
+			"Rev": "5a62e1c7be2ab875146f1b06f15a30df213d0334"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/types",
-			"Comment": "v0.7.4-43-gd22f52b",
-			"Rev": "d22f52bfeba06614d37c7aa1ad6fd76d8fdb2ba8"
+			"Comment": "v0.8.1-2-g5a62e1c",
+			"Rev": "5a62e1c7be2ab875146f1b06f15a30df213d0334"
 		},
 		{
 			"ImportPath": "github.com/armon/go-metrics",
@@ -2098,6 +2098,36 @@
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
 			"Comment": "v1.1.0-beta1-15-gde510e4",
 			"Rev": "de510e4bdcdea96722b5bde19ff0b7a142939485"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/pkg/api/resource",
+			"Comment": "v1.3.0-alpha.3-943-gc20dcfc",
+			"Rev": "c20dcfc406599a1896d396b601776ac97c09a7fb"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/proto",
+			"Comment": "v1.3.0-alpha.3-943-gc20dcfc",
+			"Rev": "c20dcfc406599a1896d396b601776ac97c09a7fb"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/vendor/github.com/spf13/pflag",
+			"Comment": "v1.3.0-alpha.3-943-gc20dcfc",
+			"Rev": "c20dcfc406599a1896d396b601776ac97c09a7fb"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/vendor/gopkg.in/inf.v0",
+			"Comment": "v1.3.0-alpha.3-943-gc20dcfc",
+			"Rev": "c20dcfc406599a1896d396b601776ac97c09a7fb"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/pkg/conversion",
+			"Comment": "v1.3.0-alpha.3-943-gc20dcfc",
+			"Rev": "c20dcfc406599a1896d396b601776ac97c09a7fb"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/third_party/forked/reflect",
+			"Comment": "v1.3.0-alpha.3-943-gc20dcfc",
+			"Rev": "c20dcfc406599a1896d396b601776ac97c09a7fb"
 		}
 	]
 }
