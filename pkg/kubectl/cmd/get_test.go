@@ -88,6 +88,19 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
+func testDynamicResources() []*unversioned.APIResourceList {
+	return []*unversioned.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []unversioned.APIResource{
+				{Kind: "Pod", Namespaced: true},
+				{Kind: "Service", Namespaced: true},
+				{Kind: "ReplicationController", Namespaced: true},
+			},
+		},
+	}
+}
+
 func testComponentStatusData() *api.ComponentStatusList {
 	good := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
