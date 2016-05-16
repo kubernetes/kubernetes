@@ -55,6 +55,8 @@ type VolumeOptions struct {
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
+	// The claim's UID is used to deterministically name a PV created for provisioning, allowing many concurrent provisioners
+	ClaimUID types.UID
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a

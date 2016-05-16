@@ -444,8 +444,8 @@ func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.Persistent
 	// cinderVolumeProvisioner.Provision()
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-cinder-",
-			Labels:       map[string]string{},
+			Name:   fmt.Sprintf("pv-cinder-%s", c.options.ClaimUID),
+			Labels: map[string]string{},
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "cinder-dynamic-provisioner",
 			},
