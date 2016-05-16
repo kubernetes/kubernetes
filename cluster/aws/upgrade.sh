@@ -32,7 +32,6 @@ KUBERNETES_RELEASE=$(cat ${KUBE_ROOT}/Version)
 AWS_S3_BUCKET="kubernetes-artifacts-${KUBERNETES_RELEASE}"
 
 
-ASG_NAME="prod-minion-group-us-west-1b"
 AWS_ASG_CMD="aws autoscaling"
 
 create-bootstrap-script
