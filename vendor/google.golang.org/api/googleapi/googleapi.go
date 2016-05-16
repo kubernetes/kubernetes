@@ -14,14 +14,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"regexp"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
-	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 	"google.golang.org/api/googleapi/internal/uritemplates"
 )
 
@@ -53,14 +47,15 @@ type ServerResponse struct {
 const (
 	Version = "0.5"
 
-	// statusResumeIncomplete is the code returned by the Google uploader when the transfer is not yet complete.
-	statusResumeIncomplete = 308
-
 	// UserAgent is the header string used to identify this package.
 	UserAgent = "google-api-go-client/" + Version
 
-	// uploadPause determines the delay between failed upload attempts
-	uploadPause = 1 * time.Second
+	// The default chunk size to use for resumable uplods if not specified by the user.
+	DefaultUploadChunkSize = 8 * 1024 * 1024
+
+	// The minimum chunk size that can be used for resumable uploads.  All
+	// user-specified chunk sizes must be multiple of this value.
+	MinUploadChunkSize = 256 * 1024
 )
 
 // Error contains an error response from the server.
@@ -217,134 +212,60 @@ func (w countingWriter) Write(p []byte) (int, error) {
 // The remaining usable pieces of resumable uploads is exposed in each auto-generated API.
 type ProgressUpdater func(current, total int64)
 
-// ResumableUpload is used by the generated APIs to provide resumable uploads.
+type MediaOption interface {
+	setOptions(o *MediaOptions)
+}
+
+type contentTypeOption string
+
+func (ct contentTypeOption) setOptions(o *MediaOptions) {
+	o.ContentType = string(ct)
+	if o.ContentType == "" {
+		o.ForceEmptyContentType = true
+	}
+}
+
+// ContentType returns a MediaOption which sets the Content-Type header for media uploads.
+// If ctype is empty, the Content-Type header will be omitted.
+func ContentType(ctype string) MediaOption {
+	return contentTypeOption(ctype)
+}
+
+type chunkSizeOption int
+
+func (cs chunkSizeOption) setOptions(o *MediaOptions) {
+	size := int(cs)
+	if size%MinUploadChunkSize != 0 {
+		size += MinUploadChunkSize - (size % MinUploadChunkSize)
+	}
+	o.ChunkSize = size
+}
+
+// ChunkSize returns a MediaOption which sets the chunk size for media uploads.
+// size will be rounded up to the nearest multiple of 256K.
+// Media which contains fewer than size bytes will be uploaded in a single request.
+// Media which contains size bytes or more will be uploaded in separate chunks.
+// If size is zero, media will be uploaded in a single request.
+func ChunkSize(size int) MediaOption {
+	return chunkSizeOption(size)
+}
+
+// MediaOptions stores options for customizing media upload.  It is not used by developers directly.
+type MediaOptions struct {
+	ContentType           string
+	ForceEmptyContentType bool
+
+	ChunkSize int
+}
+
+// ProcessMediaOptions stores options from opts in a MediaOptions.
 // It is not used by developers directly.
-type ResumableUpload struct {
-	Client *http.Client
-	// URI is the resumable resource destination provided by the server after specifying "&uploadType=resumable".
-	URI       string
-	UserAgent string // User-Agent for header of the request
-	// Media is the object being uploaded.
-	Media io.ReaderAt
-	// MediaType defines the media type, e.g. "image/jpeg".
-	MediaType string
-	// ContentLength is the full size of the object being uploaded.
-	ContentLength int64
-
-	mu       sync.Mutex // guards progress
-	progress int64      // number of bytes uploaded so far
-
-	// Callback is an optional function that will be periodically called with the cumulative number of bytes uploaded.
-	Callback func(int64)
-}
-
-var (
-	// rangeRE matches the transfer status response from the server. $1 is the last byte index uploaded.
-	rangeRE = regexp.MustCompile(`^bytes=0\-(\d+)$`)
-	// chunkSize is the size of the chunks created during a resumable upload and should be a power of two.
-	// 1<<18 is the minimum size supported by the Google uploader, and there is no maximum.
-	chunkSize int64 = 1 << 18
-)
-
-// Progress returns the number of bytes uploaded at this point.
-func (rx *ResumableUpload) Progress() int64 {
-	rx.mu.Lock()
-	defer rx.mu.Unlock()
-	return rx.progress
-}
-
-func (rx *ResumableUpload) transferStatus(ctx context.Context) (int64, *http.Response, error) {
-	req, _ := http.NewRequest("POST", rx.URI, nil)
-	req.ContentLength = 0
-	req.Header.Set("User-Agent", rx.UserAgent)
-	req.Header.Set("Content-Range", fmt.Sprintf("bytes */%v", rx.ContentLength))
-	res, err := ctxhttp.Do(ctx, rx.Client, req)
-	if err != nil || res.StatusCode != statusResumeIncomplete {
-		return 0, res, err
+func ProcessMediaOptions(opts []MediaOption) *MediaOptions {
+	mo := &MediaOptions{ChunkSize: DefaultUploadChunkSize}
+	for _, o := range opts {
+		o.setOptions(mo)
 	}
-	var start int64
-	if m := rangeRE.FindStringSubmatch(res.Header.Get("Range")); len(m) == 2 {
-		start, err = strconv.ParseInt(m[1], 10, 64)
-		if err != nil {
-			return 0, nil, fmt.Errorf("unable to parse range size %v", m[1])
-		}
-		start += 1 // Start at the next byte
-	}
-	return start, res, nil
-}
-
-type chunk struct {
-	body io.Reader
-	size int64
-	err  error
-}
-
-func (rx *ResumableUpload) transferChunks(ctx context.Context) (*http.Response, error) {
-	start, res, err := rx.transferStatus(ctx)
-	if err != nil || res.StatusCode != statusResumeIncomplete {
-		if err == context.Canceled {
-			return &http.Response{StatusCode: http.StatusRequestTimeout}, err
-		}
-		return res, err
-	}
-
-	for {
-		select { // Check for cancellation
-		case <-ctx.Done():
-			res.StatusCode = http.StatusRequestTimeout
-			return res, ctx.Err()
-		default:
-		}
-		reqSize := rx.ContentLength - start
-		if reqSize > chunkSize {
-			reqSize = chunkSize
-		}
-		r := io.NewSectionReader(rx.Media, start, reqSize)
-		req, _ := http.NewRequest("POST", rx.URI, r)
-		req.ContentLength = reqSize
-		req.Header.Set("Content-Range", fmt.Sprintf("bytes %v-%v/%v", start, start+reqSize-1, rx.ContentLength))
-		req.Header.Set("Content-Type", rx.MediaType)
-		req.Header.Set("User-Agent", rx.UserAgent)
-		res, err = ctxhttp.Do(ctx, rx.Client, req)
-		start += reqSize
-		if err == nil && (res.StatusCode == statusResumeIncomplete || res.StatusCode == http.StatusOK) {
-			rx.mu.Lock()
-			rx.progress = start // keep track of number of bytes sent so far
-			rx.mu.Unlock()
-			if rx.Callback != nil {
-				rx.Callback(start)
-			}
-		}
-		if err != nil || res.StatusCode != statusResumeIncomplete {
-			break
-		}
-	}
-	return res, err
-}
-
-var sleep = time.Sleep // override in unit tests
-
-// Upload starts the process of a resumable upload with a cancellable context.
-// It retries indefinitely (with a pause of uploadPause between attempts) until cancelled.
-// It is called from the auto-generated API code and is not visible to the user.
-// rx is private to the auto-generated API code.
-func (rx *ResumableUpload) Upload(ctx context.Context) (*http.Response, error) {
-	var res *http.Response
-	var err error
-	for {
-		res, err = rx.transferChunks(ctx)
-		if err != nil || res.StatusCode == http.StatusCreated || res.StatusCode == http.StatusOK {
-			return res, err
-		}
-		select { // Check for cancellation
-		case <-ctx.Done():
-			res.StatusCode = http.StatusRequestTimeout
-			return res, ctx.Err()
-		default:
-		}
-		sleep(uploadPause)
-	}
-	return res, err
+	return mo
 }
 
 func ResolveRelative(basestr, relstr string) string {
@@ -471,3 +392,41 @@ func CombineFields(s []Field) string {
 	}
 	return strings.Join(r, ",")
 }
+
+// A CallOption is an optional argument to an API call.
+// It should be treated as an opaque value by users of Google APIs.
+//
+// A CallOption is something that configures an API call in a way that is
+// not specific to that API; for instance, controlling the quota user for
+// an API call is common across many APIs, and is thus a CallOption.
+type CallOption interface {
+	Get() (key, value string)
+}
+
+// QuotaUser returns a CallOption that will set the quota user for a call.
+// The quota user can be used by server-side applications to control accounting.
+// It can be an arbitrary string up to 40 characters, and will override UserIP
+// if both are provided.
+func QuotaUser(u string) CallOption { return quotaUser(u) }
+
+type quotaUser string
+
+func (q quotaUser) Get() (string, string) { return "quotaUser", string(q) }
+
+// UserIP returns a CallOption that will set the "userIp" parameter of a call.
+// This should be the IP address of the originating request.
+func UserIP(ip string) CallOption { return userIP(ip) }
+
+type userIP string
+
+func (i userIP) Get() (string, string) { return "userIp", string(i) }
+
+// Trace returns a CallOption that enables diagnostic tracing for a call.
+// traceToken is an ID supplied by Google support.
+func Trace(traceToken string) CallOption { return traceTok(traceToken) }
+
+type traceTok string
+
+func (t traceTok) Get() (string, string) { return "trace", "token:" + string(t) }
+
+// TODO: Fields too
