@@ -55,6 +55,14 @@ endif
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 	rm ${TEMP_DIR}/*.back
 
+	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer
+	# they'll take up twice the space because the new executable binary differs from the old one, but everything is cached in layers.
+	cd ${TEMP_DIR} && chmod a+rx \
+        hyperkube \
+        safe_format_and_mount \
+        setup-files.sh \
+        make-ca-cert.sh
+
 ifeq ($(ARCH),amd64)
 	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
 	cd ${TEMP_DIR} && sed -i ""  "/CROSS_BUILD_/d" Dockerfile
