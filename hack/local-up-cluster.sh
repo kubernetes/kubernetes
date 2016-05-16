@@ -66,8 +66,9 @@ AUTH_ARGS=${AUTH_ARGS:-""}
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
-
-# START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
+# START_MODE can be 'all', 'kubeletonly', 'nokubelet', or a comma separated list of
+# services to start. Valid values for service names:
+# etcd, kube-apiserver, kube-ctrlmgr, kube-scheduler, kubelet, kube-proxy
 START_MODE=${START_MODE:-"all"}
 
 # sanity check for OpenStack provider
@@ -90,6 +91,29 @@ fi
 set -e
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
+
+function is_service_enabled {
+    local services=$@
+    local enabled_services=$START_MODE
+    if [[ "$enabled_services" == "all" ]]; then
+        # everything is enabled!
+        return 0
+    elif [[ "$enabled_services" == "nokubelet" ]]; then
+        # anything but kubelet is good
+        for service in ${services}; do
+            [[ 'kubelet' == ${service} ]] && return 1
+        done
+        return 0
+    elif [[ "$enabled_services" == "kubeletonly" ]]; then
+        enabled_services='kubelet'
+    fi
+    # START_MODE is a service name list. All services must match
+    local service
+    for service in ${services}; do
+        [[ ,${enabled_services}, =~ ,${service}, ]] && continue || return 1
+    done
+    return 0
+}
 
 function usage {
             echo "This script starts a local kube cluster. "
@@ -603,7 +627,10 @@ function start_kubeproxy {
       --kubeconfig "$CERT_DIR"/kube-proxy.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
+}
 
+function start_kubescheduler {
+    test_kubeconfig_present scheduler
     SCHEDULER_LOG=/tmp/kube-scheduler.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
@@ -689,10 +716,6 @@ if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
   test_rkt
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  test_apiserver_off
-fi
-
 kube::util::test_openssl_installed
 kube::util::test_cfssl_installed
 
@@ -708,18 +731,31 @@ trap cleanup EXIT
 fi
 
 echo "Starting services now!"
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  start_etcd
-  set_service_accounts
-  start_apiserver
-  start_controller_manager
-  start_kubeproxy
-  start_kubedns
+if is_service_enabled etcd; then
+    start_etcd
 fi
 
-if [[ "${START_MODE}" != "nokubelet" ]]; then
-  start_kubelet
+set_service_accounts
+
+if is_service_enabled kube-apiserver; then
+    test_apiserver_off
+    start_apiserver
 fi
+if is_service_enabled kube-controller-manager; then
+    start_controller_manager
+fi
+if is_service_enabled kubelet; then
+    start_kubelet
+fi
+if is_service_enabled kube-scheduler; then
+    start_kubescheduler
+fi
+if is_service_enabled kube-proxy; then
+    start_kubeproxy
+fi
+
+# DNS startup is regulated by ENABLE_CLUSTER_DNS
+start_kubedns
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
     create_psp_policy
