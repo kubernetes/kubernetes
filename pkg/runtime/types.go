@@ -17,6 +17,8 @@ limitations under the License.
 package runtime
 
 import (
+	"bytes"
+
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -128,6 +130,39 @@ type Unstructured struct {
 	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
 	// children.
 	Object map[string]interface{}
+}
+
+// UnstructuredFrom creates an Unstructured object from the provided
+// object. It is up to the caller to make sure the object has a valid
+// group, version, and kind before calling this.
+func UnstructuredFrom(obj Object) (*Unstructured, error) {
+	var buf bytes.Buffer
+	u := new(Unstructured)
+	err := UnstructuredJSONScheme.EncodeToStream(obj, &buf)
+	if err != nil {
+		return nil, err
+	}
+
+	_, _, err = UnstructuredJSONScheme.Decode(buf.Bytes(), nil, u)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// PopulateObject translates the unstructured object to the object
+// provided. No conversions or defaulting is done. It is up to the
+// caller to make sure the schemas match and the translation makes
+// sense.
+func (u *Unstructured) PopulateObject(obj Object) error {
+	var buf bytes.Buffer
+	err := UnstructuredJSONScheme.EncodeToStream(u, &buf)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = UnstructuredJSONScheme.Decode(buf.Bytes(), nil, obj)
+	return err
 }
 
 func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
