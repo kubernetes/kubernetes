@@ -31,11 +31,11 @@ import (
 const (
 	kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
 	// TODO: auto-generate this
-	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (po), services (svc), deployments,
-replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
-persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
-serviceaccounts (sa), ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
-componentstatuses (cs), endpoints (ep), and secrets.`
+	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (aka 'po'), services (aka 'svc'), deployments,
+replicasets (aka 'rs'), replicationcontrollers (aka 'rc'), nodes (aka 'no'), events (aka 'ev'), limitranges (aka 'limits'),
+persistentvolumes (aka 'pv'), persistentvolumeclaims (aka 'pvc'), resourcequotas (aka 'quota'), namespaces (aka 'ns'),
+serviceaccounts (aka 'sa'), ingresses (aka 'ing'), horizontalpodautoscalers (aka 'hpa'), daemonsets (aka 'ds'), configmaps,
+componentstatuses (aka 'cs), endpoints (aka 'ep'), petsets (alpha feature, may be unstable) and secrets.`
 )
 
 type NamespaceInfo struct {
