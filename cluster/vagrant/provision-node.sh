@@ -79,6 +79,7 @@ else
 fi
 
 install-salt
+add-volume-support
 
 run-salt
 
