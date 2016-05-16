@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -44,18 +46,21 @@ func TestCreateObject(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	fakeREST := &fake.RESTClient{
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+			case p == "/api/v1/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("unexpected request: %s\n%#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
+	tf.Client = fakeREST
+	tf.ClientConfig = &restclient.Config{Transport: fakeREST.Client.Transport}
+	tf.DynamicResources = testDynamicResources()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -76,20 +81,23 @@ func TestCreateMultipleObject(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	fakeREST := &fake.RESTClient{
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/services" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+			case p == "/api/v1/namespaces/test/services" && m == "POST":
+				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+			case p == "/api/v1/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
+	tf.Client = fakeREST
+	tf.ClientConfig = &restclient.Config{Transport: fakeREST.Client.Transport}
+	tf.DynamicResources = testDynamicResources()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -112,18 +120,21 @@ func TestCreateDirectory(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	fakeREST := &fake.RESTClient{
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+			case p == "/api/v1/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
+	tf.Client = fakeREST
+	tf.ClientConfig = &restclient.Config{Transport: fakeREST.Client.Transport}
+	tf.DynamicResources = testDynamicResources()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -144,25 +155,38 @@ func TestPrintObjectSpecificMessage(t *testing.T) {
 		expectOutput bool
 	}{
 		{
-			obj:          &api.Service{},
+			obj:          &v1.Service{},
 			expectOutput: false,
 		},
 		{
-			obj:          &api.Pod{},
+			obj:          &v1.Pod{},
 			expectOutput: false,
 		},
 		{
-			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer}},
+			obj:          &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}},
 			expectOutput: false,
 		},
 		{
-			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort}},
+			obj:          &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}},
 			expectOutput: true,
 		},
 	}
 	for _, test := range tests {
+		gvk, err := api.Scheme.ObjectKind(test.obj)
+		if err != nil {
+			t.Errorf("Could not get ObjectKind for %t: %s", test.obj, err)
+			continue
+		}
+		test.obj.GetObjectKind().SetGroupVersionKind(gvk)
+
+		u, err := runtime.UnstructuredFrom(test.obj)
+		if err != nil {
+			t.Errorf("Could not create unstructured object from %v: %s", test.obj, err)
+			continue
+		}
+
 		buff := &bytes.Buffer{}
-		printObjectSpecificMessage(test.obj, buff)
+		printObjectSpecificMessage(u, buff)
 		if test.expectOutput && buff.Len() == 0 {
 			t.Errorf("Expected output, saw none for %v", test.obj)
 		}
@@ -175,13 +199,13 @@ func TestPrintObjectSpecificMessage(t *testing.T) {
 func TestMakePortsString(t *testing.T) {
 	initTestErrorHandler(t)
 	tests := []struct {
-		ports          []api.ServicePort
+		ports          []v1.ServicePort
 		useNodePort    bool
 		expectedOutput string
 	}{
 		{ports: nil, expectedOutput: ""},
-		{ports: []api.ServicePort{}, expectedOutput: ""},
-		{ports: []api.ServicePort{
+		{ports: []v1.ServicePort{}, expectedOutput: ""},
+		{ports: []v1.ServicePort{
 			{
 				Port:     80,
 				Protocol: "TCP",
@@ -189,7 +213,7 @@ func TestMakePortsString(t *testing.T) {
 		},
 			expectedOutput: "tcp:80",
 		},
-		{ports: []api.ServicePort{
+		{ports: []v1.ServicePort{
 			{
 				Port:     80,
 				Protocol: "TCP",
@@ -205,7 +229,7 @@ func TestMakePortsString(t *testing.T) {
 		},
 			expectedOutput: "tcp:80,udp:8080,tcp:9000",
 		},
-		{ports: []api.ServicePort{
+		{ports: []v1.ServicePort{
 			{
 				Port:     80,
 				NodePort: 9090,

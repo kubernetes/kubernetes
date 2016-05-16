@@ -23,8 +23,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -104,8 +105,8 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		return err
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, typer := f.DynamicObject()
+	r := resource.NewBuilder(mapper, typer, resource.DisabledClientForMapping{}, runtime.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -132,7 +133,12 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 			}
 		}
 
-		if err := createAndRefresh(info); err != nil {
+		client, err := f.DynamicClient(info.Mapping.GroupVersionKind.GroupVersion())
+		if err != nil {
+			return cmdutil.AddSourceToErr("creating", info.Source, err)
+		}
+
+		if err := dynamicCreateAndRefresh(client, info); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
@@ -154,9 +160,19 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 }
 
 func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
-	switch obj := obj.(type) {
-	case *api.Service:
-		if obj.Spec.Type == api.ServiceTypeNodePort {
+	u, ok := obj.(*runtime.Unstructured)
+	if !ok {
+		return
+	}
+	switch u.GroupVersionKind() {
+	case unversioned.GroupVersionKind{Version: "v1", Kind: "Service"}:
+		var svc v1.Service
+		err := u.PopulateObject(&svc)
+		if err != nil {
+			return
+		}
+
+		if svc.Spec.Type == v1.ServiceTypeNodePort {
 			msg := fmt.Sprintf(
 				`You have exposed your service on an external port on all nodes in your
 cluster.  If you want to expose this service to the external internet, you may
@@ -164,13 +180,14 @@ need to set up firewall rules for the service port(s) (%s) to serve traffic.
 
 See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
 `,
-				makePortsString(obj.Spec.Ports, true))
+				makePortsString(svc.Spec.Ports, true))
 			out.Write([]byte(msg))
 		}
 	}
+
 }
 
-func makePortsString(ports []api.ServicePort, useNodePort bool) string {
+func makePortsString(ports []v1.ServicePort, useNodePort bool) string {
 	pieces := make([]string, len(ports))
 	for ix := range ports {
 		var port int32
@@ -187,6 +204,16 @@ func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 // createAndRefresh creates an object from input info and refreshes info with that object
 func createAndRefresh(info *resource.Info) error {
 	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+	if err != nil {
+		return err
+	}
+	info.Refresh(obj, true)
+	return nil
+}
+
+// dynamicCreateAndRefresh creates an object from input info and refreshes info with that object
+func dynamicCreateAndRefresh(client *dynamic.Client, info *resource.Info) error {
+	obj, err := client.Resource(info.APIResource(), info.Namespace).Create(info.Object.(*runtime.Unstructured))
 	if err != nil {
 		return err
 	}
