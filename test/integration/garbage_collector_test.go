@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -100,29 +100,6 @@ func newOwnerRC(name string) *v1.ReplicationController {
 			},
 		},
 	}
-}
-
-func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *api.Pod) {
-	deleted := false
-	timeout := false
-	timer := time.After(60 * time.Second)
-	for !deleted && !timeout {
-		select {
-		case event, _ := <-w.ResultChan():
-			if event.Type == watch.Deleted {
-				// TODO: used the commented code once we fix the client.
-				// deletedPod = event.Object.(*v1.Pod)
-				deletedPod = event.Object.(*api.Pod)
-				deleted = true
-			}
-		case <-timer:
-			timeout = true
-		}
-	}
-	if !deleted {
-		t.Fatalf("Failed to observe pod deletion")
-	}
-	return
 }
 
 func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interface) {
@@ -211,13 +188,6 @@ func TestCascadingDeletion(t *testing.T) {
 	if len(pods.Items) != 3 {
 		t.Fatalf("Expect only 3 pods")
 	}
-	options := api.ListOptions{
-		ResourceVersion: pods.ListMeta.ResourceVersion,
-	}
-	w, err := podClient.Watch(options)
-	if err != nil {
-		t.Fatalf("Failed to set up watch: %v", err)
-	}
 	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
@@ -225,22 +195,22 @@ func TestCascadingDeletion(t *testing.T) {
 	if err := rcClient.Delete(toBeDeletedRCName, nil); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
 	}
-
-	deletedPod := observePodDeletion(t, w)
-	if deletedPod == nil {
-		t.Fatalf("empty deletedPod")
+	// wait for the garbage collector to drain its queue
+	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
+		return gc.QueuesDrained(), nil
+	}); err != nil {
+		t.Fatal(err)
 	}
-	if deletedPod.Name != garbageCollectedPodName {
-		t.Fatalf("deleted unexpected pod: %v", *deletedPod)
-	}
-	// wait for another 30 seconds to give garbage collect a chance to make mistakes.
-	time.Sleep(30 * time.Second)
+	t.Logf("garbage collector queues drained")
 	// checks the garbage collect doesn't delete pods it shouldn't do.
 	if _, err := podClient.Get(independentPodName); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := podClient.Get(oneValidOwnerPodName); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := podClient.Get(garbageCollectedPodName); err == nil || !errors.IsNotFound(err) {
+		t.Fatalf("expect pod %s to be garbage collected", garbageCollectedPodName)
 	}
 }
 
@@ -264,22 +234,18 @@ func TestCreateWithNonExisitentOwner(t *testing.T) {
 	if len(pods.Items) != 1 {
 		t.Fatalf("Expect only 1 pod")
 	}
-	options := api.ListOptions{
-		ResourceVersion: pods.ListMeta.ResourceVersion,
-	}
-	w, err := podClient.Watch(options)
-	if err != nil {
-		t.Fatalf("Failed to set up watch: %v", err)
-	}
 	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
-	deletedPod := observePodDeletion(t, w)
-	if deletedPod == nil {
-		t.Fatalf("empty deletedPod")
+	// wait for the garbage collector to drain its queue
+	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
+		return gc.QueuesDrained(), nil
+	}); err != nil {
+		t.Fatal(err)
 	}
-	if deletedPod.Name != garbageCollectedPodName {
-		t.Fatalf("deleted unexpected pod: %v", *deletedPod)
+	t.Logf("garbage collector queues drained")
+	if _, err := podClient.Get(garbageCollectedPodName); err == nil || !errors.IsNotFound(err) {
+		t.Fatalf("expect pod %s to be garbage collected", garbageCollectedPodName)
 	}
 }
 
