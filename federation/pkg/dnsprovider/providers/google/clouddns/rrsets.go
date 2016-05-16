@@ -51,7 +51,7 @@ func (rrsets ResourceRecordSets) Add(rrset dnsprovider.ResourceRecordSet) (dnspr
 	}
 	newAdditions := newChange.Additions()
 	if len(newAdditions) != len(additions) {
-		return nil, fmt.Errorf("Internal error when adding resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%s, record set:%v", len(additions), len(newAdditions), rrset)
+		return nil, fmt.Errorf("Internal error when adding resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%d, record set:%v", len(additions), len(newAdditions), rrset)
 	}
 	return ResourceRecordSet{newChange.Additions()[0], &rrsets}, nil
 }
@@ -66,7 +66,7 @@ func (rrsets ResourceRecordSets) Remove(rrset dnsprovider.ResourceRecordSet) err
 	}
 	newDeletions := newChange.Deletions()
 	if len(newDeletions) != len(deletions) {
-		return fmt.Errorf("Internal error when deleting resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%s, record set:%v", len(deletions), len(newDeletions), rrset)
+		return fmt.Errorf("Internal error when deleting resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%d, record set:%v", len(deletions), len(newDeletions), rrset)
 	}
 	return nil
 }

@@ -162,7 +162,7 @@ func TestResourceRecordSetsAdditionVisible(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("Failed to find added resource record set %v", rrs)
+		t.Errorf("Failed to find added resource record set %s", rrset.Name())
 	}
 }
 
@@ -194,9 +194,9 @@ func TestResourceRecordSetsRemove(t *testing.T) {
 	if err != nil {
 		// Try again to clean up.
 		defer sets.Remove(rrset)
-		t.Error("Failed to remove resource record set %v after adding", rrs)
+		t.Errorf("Failed to remove resource record set %v after adding", rrset)
 	} else {
-		t.Logf("Successfully removed resource set %v after adding", rrs)
+		t.Logf("Successfully removed resource set %v after adding", set)
 	}
 }
 
@@ -210,9 +210,9 @@ func TestResourceRecordSetsRemoveGone(t *testing.T) {
 	if err != nil {
 		// Try again to clean up.
 		defer sets.Remove(rrset)
-		t.Error("Failed to remove resource record set %v after adding", rrs)
+		t.Errorf("Failed to remove resource record set %v after adding", rrset)
 	} else {
-		t.Logf("Successfully removed resource set %v after adding", rrs)
+		t.Logf("Successfully removed resource set %v after adding", set)
 	}
 	// Check that it's gone
 	list := listRrsOrFail(t, sets)
@@ -224,6 +224,6 @@ func TestResourceRecordSetsRemoveGone(t *testing.T) {
 		}
 	}
 	if found {
-		t.Errorf("Deleted resource record set %v is still present", rrs)
+		t.Errorf("Deleted resource record set %v is still present", rrset)
 	}
 }
