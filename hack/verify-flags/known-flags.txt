@@ -61,6 +61,8 @@ cluster-domain
 cluster-name
 cluster-tag
 cluster-monitor-period
+cluster-signing-cert-file
+cluster-signing-key-file
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-namespace-syncs
