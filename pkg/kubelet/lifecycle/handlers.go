@@ -17,15 +17,18 @@ limitations under the License.
 package lifecycle
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"net/http"
 	"strconv"
 
-	"bytes"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -55,9 +58,16 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod
 		var buffer bytes.Buffer
 		output := ioutils.WriteCloserWrapper(&buffer)
 		err := hr.commandRunner.ExecInContainer(containerID, handler.Exec.Command, nil, output, output, false)
+		if err != nil {
+			glog.V(1).Infof("Exec lifecycle hook (%v) for Container %q in Pod %q failed - %q", handler.Exec.Command, container.Name, format.Pod(pod), buffer.String())
+		}
 		return err
 	case handler.HTTPGet != nil:
-		return hr.runHTTPHandler(pod, container, handler)
+		msg, err := hr.runHTTPHandler(pod, container, handler)
+		if err != nil {
+			glog.V(1).Infof("Http lifecycle hook (%s) for Container %q in Pod %q failed - %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), msg)
+		}
+		return err
 	default:
 		err := fmt.Errorf("Invalid handler: %v", handler)
 		glog.Errorf("Cannot run handler: %v", err)
@@ -88,16 +98,16 @@ func resolvePort(portReference intstr.IntOrString, container *api.Container) (in
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *HandlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, handler *api.Handler) error {
+func (hr *HandlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, handler *api.Handler) (string, error) {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
 			glog.Errorf("Unable to get pod info, event handlers may be invalid.")
-			return err
+			return "", err
 		}
 		if status.IP == "" {
-			return fmt.Errorf("failed to find networking container: %v", status)
+			return "", fmt.Errorf("failed to find networking container: %v", status)
 		}
 		host = status.IP
 	}
@@ -108,10 +118,21 @@ func (hr *HandlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, 
 		var err error
 		port, err = resolvePort(handler.HTTPGet.Port, container)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
-	_, err := hr.httpGetter.Get(url)
-	return err
+	resp, err := hr.httpGetter.Get(url)
+	return getHttpRespBody(resp), err
+}
+
+func getHttpRespBody(resp *http.Response) string {
+	if resp == nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if bytes, err := ioutil.ReadAll(resp.Body); err == nil {
+		return string(bytes)
+	}
+	return ""
 }

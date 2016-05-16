@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -182,5 +183,43 @@ func TestRunHandlerNil(t *testing.T) {
 	err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
+	}
+}
+
+func TestRunHandlerHttpFailure(t *testing.T) {
+	expectedErr := fmt.Errorf("fake http error")
+	fakeHttp := fakeHTTP{err: expectedErr}
+	handlerRunner := &HandlerRunner{
+		httpGetter:       &fakeHttp,
+		commandRunner:    &fakeContainerCommandRunner{},
+		containerManager: nil,
+	}
+	containerName := "containerFoo"
+
+	container := api.Container{
+		Name: containerName,
+		Lifecycle: &api.Lifecycle{
+			PostStart: &api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Host: "foo",
+					Port: intstr.FromInt(8080),
+					Path: "bar",
+				},
+			},
+		},
+	}
+	pod := api.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []api.Container{container}
+	msg, err := handlerRunner.runHTTPHandler(&pod, &container, container.Lifecycle.PostStart)
+	if err == nil {
+		t.Errorf("expected error: %v", expectedErr)
+	}
+	if msg != "" {
+		t.Errorf("expected empty error message")
+	}
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
 	}
 }
