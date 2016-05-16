@@ -42,11 +42,12 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // RESTClient provides a fake RESTClient interface.
 type RESTClient struct {
-	Client *http.Client
-	Codec  runtime.Codec
-	Req    *http.Request
-	Resp   *http.Response
-	Err    error
+	APIPath string
+	Client  *http.Client
+	Codec   runtime.Codec
+	Req     *http.Request
+	Resp    *http.Response
+	Err     error
 }
 
 func (c *RESTClient) Get() *restclient.Request {
@@ -81,7 +82,7 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 		StreamingSerializer: c.Codec,
 		Framer:              runtime.DefaultFramer,
 	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.APIPath, config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
