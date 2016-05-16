@@ -3811,6 +3811,13 @@ func autoConvert_v1_OwnerReference_To_api_OwnerReference(in *OwnerReference, out
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.UID = in.UID
+	if in.Controller != nil {
+		in, out := &in.Controller, &out.Controller
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.Controller = nil
+	}
 	return nil
 }
 
@@ -3823,6 +3830,13 @@ func autoConvert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference,
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.UID = in.UID
+	if in.Controller != nil {
+		in, out := &in.Controller, &out.Controller
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.Controller = nil
+	}
 	return nil
 }
 
