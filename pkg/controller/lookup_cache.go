@@ -72,8 +72,8 @@ func (c *MatchingCache) Add(labelObj objectWithMeta, selectorObj objectWithMeta)
 // we need check in the external request to ensure the cache data is not dirty.
 func (c *MatchingCache) GetMatchingObject(labelObj objectWithMeta) (controller interface{}, exists bool) {
 	key := keyFunc(labelObj)
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 	return c.cache.Get(key)
 }
 
