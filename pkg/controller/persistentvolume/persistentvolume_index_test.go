@@ -22,12 +22,17 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
+func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
+	return persistentVolumeOrderedIndex{cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc})}
+}
+
 func TestMatchVolume(t *testing.T) {
-	volList := NewPersistentVolumeOrderedIndex()
+	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
-		volList.Add(pv)
+		volList.store.Add(pv)
 	}
 
 	scenarios := map[string]struct {
@@ -122,7 +127,7 @@ func TestMatchVolume(t *testing.T) {
 }
 
 func TestMatchingWithBoundVolumes(t *testing.T) {
-	volumeIndex := NewPersistentVolumeOrderedIndex()
+	volumeIndex := newPersistentVolumeOrderedIndex()
 	// two similar volumes, one is bound
 	pv1 := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
@@ -158,8 +163,8 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 		},
 	}
 
-	volumeIndex.Add(pv1)
-	volumeIndex.Add(pv2)
+	volumeIndex.store.Add(pv1)
+	volumeIndex.store.Add(pv2)
 
 	claim := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
@@ -189,12 +194,12 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 }
 
 func TestSort(t *testing.T) {
-	volList := NewPersistentVolumeOrderedIndex()
+	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
-		volList.Add(pv)
+		volList.store.Add(pv)
 	}
 
-	volumes, err := volList.ListByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany})
+	volumes, err := volList.listByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany})
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
@@ -205,7 +210,7 @@ func TestSort(t *testing.T) {
 		}
 	}
 
-	volumes, err = volList.ListByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany})
+	volumes, err = volList.listByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany})
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
@@ -218,9 +223,9 @@ func TestSort(t *testing.T) {
 }
 
 func TestAllPossibleAccessModes(t *testing.T) {
-	index := NewPersistentVolumeOrderedIndex()
+	index := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
-		index.Add(pv)
+		index.store.Add(pv)
 	}
 
 	// the mock PVs creates contain 2 types of accessmodes:   RWO+ROX and RWO+ROW+RWX
@@ -292,10 +297,10 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 		},
 	}
 
-	index := NewPersistentVolumeOrderedIndex()
-	index.Add(gce)
-	index.Add(ebs)
-	index.Add(nfs)
+	index := newPersistentVolumeOrderedIndex()
+	index.store.Add(gce)
+	index.store.Add(ebs)
+	index.store.Add(nfs)
 
 	volume, _ := index.findBestMatchForClaim(claim)
 	if volume.Name != ebs.Name {
@@ -521,10 +526,10 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	pv5 := testVolume("pv5", "5Gi")
 	pv8 := testVolume("pv8", "8Gi")
 
-	index := NewPersistentVolumeOrderedIndex()
-	index.Add(pv1)
-	index.Add(pv5)
-	index.Add(pv8)
+	index := newPersistentVolumeOrderedIndex()
+	index.store.Add(pv1)
+	index.store.Add(pv5)
+	index.store.Add(pv8)
 
 	// expected exact match on size
 	volume, _ := index.findBestMatchForClaim(claim)
