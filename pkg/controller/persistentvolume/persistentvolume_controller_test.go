@@ -128,8 +128,7 @@ func TestControllerSync(t *testing.T) {
 		client := &fake.Clientset{}
 		volumeSource := framework.NewFakeControllerSource()
 		claimSource := framework.NewFakeControllerSource()
-		ctrl := newPersistentVolumeController(client)
-		ctrl.initializeController(time.Minute, volumeSource, claimSource)
+		ctrl := newPersistentVolumeController(client, volumeSource, claimSource)
 		reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource, test.errors)
 		for _, claim := range test.initialClaims {
 			claimSource.Add(claim)

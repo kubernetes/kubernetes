@@ -484,7 +484,7 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 	return reactor
 }
 
-func newPersistentVolumeController(kubeClient clientset.Interface) *PersistentVolumeController {
+func newPersistentVolumeController(kubeClient clientset.Interface, volumeSource, claimSource cache.ListerWatcher) *PersistentVolumeController {
 	ctrl := &PersistentVolumeController{
 		volumes:           newPersistentVolumeOrderedIndex(),
 		claims:            cache.NewStore(cache.MetaNamespaceKeyFunc),
@@ -496,6 +496,15 @@ func newPersistentVolumeController(kubeClient clientset.Interface) *PersistentVo
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   5 * time.Millisecond,
 	}
+
+	// Create dummy volume/claim sources for controller watchers when needed
+	if volumeSource == nil {
+		volumeSource = framework.NewFakeControllerSource()
+	}
+	if claimSource == nil {
+		claimSource = framework.NewFakeControllerSource()
+	}
+	ctrl.initializeController(5*time.Second, volumeSource, claimSource)
 	return ctrl
 }
 
@@ -723,7 +732,7 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newPersistentVolumeController(client)
+		ctrl := newPersistentVolumeController(client, nil, nil)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -767,7 +776,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newPersistentVolumeController(client)
+		ctrl := newPersistentVolumeController(client, nil, nil)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
