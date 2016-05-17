@@ -45,6 +45,16 @@ func (r *LogREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// LogREST implements StorageMetadata
+func (r *LogREST) ProducesMIMETypes(verb string) []string {
+	// Since the default list does not include "plain/text", we need to
+	// explicitly override ProducesMIMETypes, so that it gets added to
+	// the "produces" section for pods/{name}/log
+	return []string{
+		"text/plain",
+	}
+}
+
 // Get retrieves a runtime.Object that will stream the contents of the pod log
 func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtime.Object, error) {
 	logOpts, ok := opts.(*api.PodLogOptions)

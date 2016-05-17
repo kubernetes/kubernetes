@@ -8817,6 +8817,7 @@
        }
       ],
       "produces": [
+       "text/plain",
        "application/json",
        "application/yaml",
        "application/vnd.kubernetes.protobuf"
