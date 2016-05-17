@@ -23,7 +23,6 @@ import (
 	"io"
 	"os/exec"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -112,7 +111,7 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 		return err
 	}
 
-	cmd := exec.Command("journalctl", "-m", fmt.Sprintf("_MACHINE_ID=%s", strings.Replace(id.uuid, "-", "", -1)), "-u", id.appName, "-a")
+	cmd := exec.Command("journalctl", "-u", fmt.Sprintf("k8s_%s", id.uuid), "-u", id.appName, "-a")
 	// Get the json structured logs.
 	cmd.Args = append(cmd.Args, "-o", "json")
 
