@@ -130,7 +130,7 @@ DOCKER_CONF=""
 start_k8s(){
     # Start etcd
     docker -H unix:///var/run/docker-bootstrap.sock run \
-        --restart=on-failure \
+        --restart=always \
         --net=host \
         -d \
         gcr.io/google_containers/etcd-${ARCH}:${ETCD_VERSION} \
@@ -149,7 +149,7 @@ start_k8s(){
 
     # iface may change to a private network interface, eth0 is for default
     flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
-        --restart=on-failure \
+        --restart=always \
         -d \
         --net=host \
         --privileged \
