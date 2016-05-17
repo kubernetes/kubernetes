@@ -139,11 +139,12 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 		Process: s.HandleDeltas,
 	}
-	s.controller = New(cfg)
 
 	func() {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
+
+		s.controller = New(cfg)
 		s.started = true
 	}()
 
@@ -158,6 +159,12 @@ func (s *sharedIndexInformer) isStarted() bool {
 }
 
 func (s *sharedIndexInformer) HasSynced() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.controller == nil {
+		return false
+	}
 	return s.controller.HasSynced()
 }
 
