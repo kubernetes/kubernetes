@@ -254,9 +254,6 @@ func (m *Master) InstallAPIs(c *Config) {
 		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
 	}
 
-	// allGroups records all supported groups at /apis
-	allGroups := []unversioned.APIGroup{}
-
 	// Install extensions unless disabled.
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
 		var err error
@@ -280,17 +277,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		extensionsGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: extensionsGroupMeta.GroupVersion.String(),
-			Version:      extensionsGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             extensionsGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{extensionsGVForDiscovery},
-			PreferredVersion: extensionsGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
 	}
 
 	// Install autoscaling unless disabled.
@@ -312,17 +298,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		autoscalingGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: autoscalingGroupMeta.GroupVersion.String(),
-			Version:      autoscalingGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             autoscalingGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{autoscalingGVForDiscovery},
-			PreferredVersion: autoscalingGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
 	}
 
 	// Install batch unless disabled.
@@ -348,19 +323,7 @@ func (m *Master) InstallAPIs(c *Config) {
 			batchv2alpha1Resources := m.getBatchResources(c, batchapiv2alpha1.SchemeGroupVersion)
 			apiGroupInfo.VersionedResourcesStorageMap["v2alpha1"] = batchv2alpha1Resources
 		}
-
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		batchGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: batchGroupMeta.GroupVersion.String(),
-			Version:      batchGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             batchGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{batchGVForDiscovery},
-			PreferredVersion: batchGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
 	}
 
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(policyapiv1alpha1.SchemeGroupVersion) {
@@ -381,18 +344,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		policyGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: policyGroupMeta.GroupVersion.String(),
-			Version:      policyGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             policyGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{policyGVForDiscovery},
-			PreferredVersion: policyGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
-
 	}
 
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(appsapi.SchemeGroupVersion) {
@@ -413,18 +364,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		appsGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: appsGroupMeta.GroupVersion.String(),
-			Version:      appsGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             appsGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{appsGVForDiscovery},
-			PreferredVersion: appsGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
-
 	}
 
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(rbacapi.SchemeGroupVersion) {
@@ -445,18 +384,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		rbacGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: rbacGroupMeta.GroupVersion.String(),
-			Version:      rbacGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             rbacGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{rbacGVForDiscovery},
-			PreferredVersion: rbacGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
-
 	}
 
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
