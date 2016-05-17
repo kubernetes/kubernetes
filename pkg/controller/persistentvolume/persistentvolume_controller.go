@@ -192,7 +192,43 @@ func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{})
 // deleteVolume is callback from framework.Controller watching PersistentVolume
 // events.
 func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
-	// Intentionally left blank - we do not react on deleted volumes
+	if !ctrl.isFullySynced() {
+		return
+	}
+
+	var volume *api.PersistentVolume
+	var ok bool
+	volume, ok = obj.(*api.PersistentVolume)
+	if !ok {
+		if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok && unknown.Obj != nil {
+			volume, ok = unknown.Obj.(*api.PersistentVolume)
+			if !ok {
+				glog.Errorf("Expected PersistentVolume but deleteVolume received %+v", unknown.Obj)
+				return
+			}
+		} else {
+			glog.Errorf("Expected PersistentVolume but deleteVolume received %+v", obj)
+			return
+		}
+	}
+
+	if !ok || volume == nil || volume.Spec.ClaimRef == nil {
+		return
+	}
+
+	if claimObj, exists, _ := ctrl.claims.GetByKey(claimrefToClaimKey(volume.Spec.ClaimRef)); exists {
+		if claim, ok := claimObj.(*api.PersistentVolumeClaim); ok && claim != nil {
+			// sync the claim when its volume is deleted. Explicitly syncing the
+			// claim here in response to volume deletion prevents the claim from
+			// waiting until the next sync period for its Lost status.
+			err := ctrl.syncClaim(claim)
+			if err != nil {
+				glog.Errorf("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", claimToClaimKey(claim), err)
+			}
+		} else {
+			glog.Errorf("Cannot convert object from claim cache to claim %q!?: %+v", claimrefToClaimKey(volume.Spec.ClaimRef), claimObj)
+		}
+	}
 }
 
 // addClaim is callback from framework.Controller watching PersistentVolumeClaim
