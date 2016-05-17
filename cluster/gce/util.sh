@@ -44,6 +44,18 @@ else
   exit 1
 fi
 
+# Verfiy cluster autoscaler configuration.
+if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+  if [ -z $AUTOSCALER_MIN_NODES ]; then
+    echo "AUTOSCALER_MIN_NODES not set."
+    exit 1
+  fi
+  if [ -z $AUTOSCALER_MAX_NODES ]; then
+    echo "AUTOSCALER_MAX_NODES not set."
+    exit 1
+  fi
+fi
+
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
 ALLOCATE_NODE_CIDRS=true
