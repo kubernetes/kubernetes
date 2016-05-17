@@ -29,7 +29,7 @@ ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
 K8S_VERSION=${K8S_VERSION:-"1.1.1"}
 
 # Define docker version to use.
-DOCKER_VERSION=${DOCKER_VERSION:-"1.10.3"}
+DOCKER_VERSION=${DOCKER_VERSION:-"1.9.1"}
 
 FLANNEL_DOWNLOAD_URL=\
 "https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz"
