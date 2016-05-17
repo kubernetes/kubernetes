@@ -92,8 +92,8 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 				continue
 			}
 
-			if claim.Name == volume.Spec.ClaimRef.Name && claim.Namespace == volume.Spec.ClaimRef.Namespace && claim.UID == volume.Spec.ClaimRef.UID {
-				// exact match! No search required.
+			if isVolumeBoundToClaim(volume, claim) {
+				// Exact match! No search required.
 				return volume, nil
 			}
 		}

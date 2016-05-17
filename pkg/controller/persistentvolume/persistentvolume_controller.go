@@ -270,3 +270,19 @@ func (ctrl *PersistentVolumeController) Stop() {
 func (ctrl *PersistentVolumeController) isFullySynced() bool {
 	return ctrl.volumeController.HasSynced() && ctrl.claimController.HasSynced()
 }
+
+// isVolumeBoundToClaim returns true, if given volume is pre-bound or bound
+// to specific claim. Both claim.Name and claim.Namespace must be equal.
+// If claim.UID is present in volume.Spec.ClaimRef, it must be equal too.
+func isVolumeBoundToClaim(volume *api.PersistentVolume, claim *api.PersistentVolumeClaim) bool {
+	if volume.Spec.ClaimRef == nil {
+		return false
+	}
+	if claim.Name != volume.Spec.ClaimRef.Name || claim.Namespace != volume.Spec.ClaimRef.Namespace {
+		return false
+	}
+	if volume.Spec.ClaimRef.UID != "" && claim.UID != volume.Spec.ClaimRef.UID {
+		return false
+	}
+	return true
+}
