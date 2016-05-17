@@ -44,6 +44,10 @@ var (
 		"By default, verify that client and server have exact version match. "+
 		"You can explicitly set to false if you're, e.g., testing client changes "+
 		"for which the server version doesn't make a difference.")
+	checkNodeCount = flag.Bool("check_node_count", true, ""+
+		"By default, verify that the cluster has at least two nodes."+
+		"You can explicitly set to false if you're, e.g., testing single-node clusters "+
+		"for which the node count is supposed to be one.")
 
 	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
 )
@@ -181,7 +185,9 @@ func Test() bool {
 		log.Fatal("Testing requested, but e2e cluster not up!")
 	}
 
-	ValidateClusterSize()
+	if *checkNodeCount {
+		ValidateClusterSize()
+	}
 
 	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
 }
