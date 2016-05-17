@@ -660,7 +660,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
 
 			mkpath := func(file string) string {
-				return "examples/guestbook-go/" + file
+				return kubeCtlManifestPath + "/" + file
 			}
 			controllerJson := framework.ReadOrDie(mkpath("redis-master-controller.json"))
 			serviceJson := framework.ReadOrDie(mkpath("redis-master-service.json"))
