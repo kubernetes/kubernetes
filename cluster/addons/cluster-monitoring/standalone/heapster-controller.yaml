@@ -8,26 +8,26 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: heapster-v1.1.0.beta1
+  name: heapster-v1.1.0.beta2
   namespace: kube-system
   labels:
     k8s-app: heapster
     kubernetes.io/cluster-service: "true"
-    version: v1.1.0.beta1
+    version: v1.1.0.beta2
 spec:
   replicas: 1
   selector:
     matchLabels:
       k8s-app: heapster
-      version: v1.1.0.beta1
+      version: v1.1.0.beta2
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v1.1.0.beta1
+        version: v1.1.0.beta2
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v1.1.0-beta1
+        - image: gcr.io/google_containers/heapster:v1.1.0-beta2
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -40,7 +40,6 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-            - --metric_resolution=60s
         - image: gcr.io/google_containers/addon-resizer:1.0
           name: heapster-nanny
           resources:
@@ -66,6 +65,6 @@ spec:
             - --memory={{ metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
             - --threshold=5
-            - --deployment=heapster-v1.1.0.beta1
+            - --deployment=heapster-v1.1.0.beta2
             - --container=heapster
             - --poll-period=300000
