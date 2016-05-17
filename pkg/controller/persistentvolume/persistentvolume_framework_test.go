@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -91,6 +90,7 @@ type controllerTest struct {
 type testCall func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error
 
 const testNamespace = "default"
+const mockPluginName = "MockVolumePlugin"
 
 var versionConflictError = errors.New("VersionError")
 var novolumes []*api.PersistentVolume
@@ -135,6 +135,26 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 	glog.V(4).Infof("reactor got operation %q on %q", action.GetVerb(), action.GetResource())
 
 	switch {
+	case action.Matches("create", "persistentvolumes"):
+		obj := action.(core.UpdateAction).GetObject()
+		volume := obj.(*api.PersistentVolume)
+
+		// check the volume does not exist
+		_, found := r.volumes[volume.Name]
+		if found {
+			return true, nil, fmt.Errorf("Cannot create volume %s: volume already exists", volume.Name)
+		}
+
+		// Store the updated object to appropriate places.
+		if r.volumeSource != nil {
+			r.volumeSource.Add(volume)
+		}
+		r.volumes[volume.Name] = volume
+		r.changedObjects = append(r.changedObjects, volume)
+		r.changedSinceLastSync++
+		glog.V(4).Infof("created volume %s", volume.Name)
+		return true, volume, nil
+
 	case action.Matches("update", "persistentvolumes"):
 		obj := action.(core.UpdateAction).GetObject()
 		volume := obj.(*api.PersistentVolume)
@@ -446,6 +466,13 @@ func addDeletePlugin(ctrl *PersistentVolumeController, expectedDeleteCalls []err
 	ctrl.recyclePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl)
 }
 
+func addProvisionPlugin(ctrl *PersistentVolumeController, expectedDeleteCalls []error) {
+	plugin := &mockVolumePlugin{
+		provisionCalls: expectedDeleteCalls,
+	}
+	ctrl.provisioner = plugin
+}
+
 // newVolume returns a new volume with given attributes
 func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, reclaimPolicy api.PersistentVolumeReclaimPolicy, annotations ...string) *api.PersistentVolume {
 	volume := api.PersistentVolume{
@@ -481,7 +508,11 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 	if len(annotations) > 0 {
 		volume.Annotations = make(map[string]string)
 		for _, a := range annotations {
-			volume.Annotations[a] = "yes"
+			if a != annDynamicallyProvisioned {
+				volume.Annotations[a] = "yes"
+			} else {
+				volume.Annotations[a] = mockPluginName
+			}
 		}
 	}
 
@@ -559,10 +590,11 @@ type operationType string
 
 const operationDelete = "Delete"
 const operationRecycle = "Recycle"
+const operationProvision = "Provision"
 
 // wrapTestWithControllerConfig returns a testCall that:
-// - configures controller with recycler or deleter which will return provided
-//   errors when a volume is deleted or recycled.
+// - configures controller with recycler, deleter or provisioner which will
+//   return provided errors when a volume is deleted, recycled or provisioned
 // - calls given testCall
 func wrapTestWithControllerConfig(operation operationType, expectedOperationCalls []error, toWrap testCall) testCall {
 	expected := expectedOperationCalls
@@ -573,6 +605,8 @@ func wrapTestWithControllerConfig(operation operationType, expectedOperationCall
 			addDeletePlugin(ctrl, expected)
 		case operationRecycle:
 			addRecyclePlugin(ctrl, expected)
+		case operationProvision:
+			addProvisionPlugin(ctrl, expected)
 		}
 
 		return toWrap(ctrl, reactor, test)
@@ -798,7 +832,7 @@ func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
 }
 
 func (plugin *mockVolumePlugin) Name() string {
-	return "mockVolumePlugin"
+	return mockPluginName
 }
 
 func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
@@ -834,26 +868,19 @@ func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
 	var pv *api.PersistentVolume
 	err := plugin.provisionCalls[plugin.provisionCallCounter]
 	if err == nil {
-		// Create a fake PV
-		fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
-
+		// Create a fake PV with known GCE volume (to match expected volume)
 		pv = &api.PersistentVolume{
 			ObjectMeta: api.ObjectMeta{
 				Name: plugin.provisionOptions.PVName,
-				Annotations: map[string]string{
-					"kubernetes.io/createdby": "hostpath-dynamic-provisioner",
-				},
 			},
 			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeReclaimPolicy: plugin.provisionOptions.PersistentVolumeReclaimPolicy,
-				AccessModes:                   plugin.provisionOptions.AccessModes,
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): plugin.provisionOptions.Capacity,
 				},
+				AccessModes:                   plugin.provisionOptions.AccessModes,
+				PersistentVolumeReclaimPolicy: plugin.provisionOptions.PersistentVolumeReclaimPolicy,
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{
-						Path: fullpath,
-					},
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 				},
 			},
 		}
