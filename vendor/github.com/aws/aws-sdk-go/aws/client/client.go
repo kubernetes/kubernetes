@@ -108,7 +108,7 @@ const logRespMsg = `DEBUG: Response %s/%s Details:
 -----------------------------------------------------`
 
 func logResponse(r *request.Request) {
-	var msg = "no reponse data"
+	var msg = "no response data"
 	if r.HTTPResponse != nil {
 		logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
 		dumpedBody, _ := httputil.DumpResponse(r.HTTPResponse, logBody)

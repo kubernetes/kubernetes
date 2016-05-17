@@ -34,6 +34,10 @@ function detect-vivid-image () {
         AWS_IMAGE=ami-ee023e80
         ;;
 
+      ap-northeast-2)
+        AWS_IMAGE=ami-c2df11ac
+        ;;
+
       ap-southeast-1)
         AWS_IMAGE=ami-7ad91519
         ;;
