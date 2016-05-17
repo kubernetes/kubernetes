@@ -377,3 +377,50 @@ func TestSync(t *testing.T) {
 	}
 	runSyncTests(t, tests)
 }
+
+// Test multiple calls to syncClaim/syncVolume and periodic sync of all
+// volume/claims. The test follows this pattern:
+// 0. Load the controller with initial data.
+// 1. Call controllerTest.testCall() once as in TestSync()
+// 2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
+//    call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
+//    events). Go to 2. if these calls change anything.
+// 3. When all changes are processed and no new changes were made, call
+//    syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
+// 4. If some changes were done by step 3., go to 2. (simulation of
+//    "volume/claim updated" events, eventually performing step 3. again)
+// 5. When 3. does not do any changes, finish the tests and compare final set
+//    of volumes/claims with expected claims/volumes and report differences.
+// Some limit of calls in enforced to prevent endless loops.
+func TestMultiSync(t *testing.T) {
+	tests := []controllerTest{
+		// Test simple binding
+		{
+			// syncClaim binds to a matching unbound volume.
+			"10-1 - successful bind",
+			newVolumeArray("volume10-1", "1Gi", "", "", api.VolumePending),
+			newVolumeArray("volume10-1", "1Gi", "uid10-1", "claim10-1", api.VolumeBound, annBoundByController),
+			newClaimArray("claim10-1", "uid10-1", "1Gi", "", api.ClaimPending),
+			newClaimArray("claim10-1", "uid10-1", "1Gi", "volume10-1", api.ClaimBound, annBoundByController, annBindCompleted),
+			testSyncClaim,
+		},
+		{
+			// Two controllers bound two PVs to single claim. Test one of them
+			// wins and the second rolls back.
+			"10-2 - bind PV race",
+			[]*api.PersistentVolume{
+				newVolume("volume10-2-1", "1Gi", "uid10-2", "claim10-2", api.VolumeBound, annBoundByController),
+				newVolume("volume10-2-2", "1Gi", "uid10-2", "claim10-2", api.VolumeBound, annBoundByController),
+			},
+			[]*api.PersistentVolume{
+				newVolume("volume10-2-1", "1Gi", "uid10-2", "claim10-2", api.VolumeBound, annBoundByController),
+				newVolume("volume10-2-2", "1Gi", "", "", api.VolumeAvailable),
+			},
+			newClaimArray("claim10-2", "uid10-2", "1Gi", "volume10-2-1", api.ClaimBound, annBoundByController, annBindCompleted),
+			newClaimArray("claim10-2", "uid10-2", "1Gi", "volume10-2-1", api.ClaimBound, annBoundByController, annBindCompleted),
+			testSyncClaim,
+		},
+	}
+
+	runMultisyncTests(t, tests)
+}

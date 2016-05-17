@@ -461,3 +461,113 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 		evaluateTestResults(ctrl, reactor, test, t)
 	}
 }
+
+// Test multiple calls to syncClaim/syncVolume and periodic sync of all
+// volume/claims. For all tests, the test follows this pattern:
+// 0. Load the controller with initial data.
+// 1. Call controllerTest.testCall() once as in TestSync()
+// 2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
+//    call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
+//    events). Go to 2. if these calls change anything.
+// 3. When all changes are processed and no new changes were made, call
+//    syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
+// 4. If some changes were done by step 3., go to 2. (simulation of
+//    "volume/claim updated" events, eventually performing step 3. again)
+// 5. When 3. does not do any changes, finish the tests and compare final set
+//    of volumes/claims with expected claims/volumes and report differences.
+// Some limit of calls in enforced to prevent endless loops.
+func runMultisyncTests(t *testing.T, tests []controllerTest) {
+	for _, test := range tests {
+		glog.V(4).Infof("starting multisync test %q", test.name)
+
+		// Initialize the controller
+		client := &fake.Clientset{}
+		ctrl := newPersistentVolumeController(client)
+		reactor := newVolumeReactor(client, ctrl, nil, nil)
+		for _, claim := range test.initialClaims {
+			ctrl.claims.Add(claim)
+			reactor.claims[claim.Name] = claim
+		}
+		for _, volume := range test.initialVolumes {
+			ctrl.volumes.store.Add(volume)
+			reactor.volumes[volume.Name] = volume
+		}
+
+		// Run the tested function
+		err := test.test(ctrl, reactor, test)
+		if err != nil {
+			t.Errorf("Test %q failed: %v", test.name, err)
+		}
+
+		// Simulate any "changed" events and "periodical sync" until we reach a
+		// stable state.
+		firstSync := true
+		counter := 0
+		for {
+			counter++
+			glog.V(4).Infof("test %q: iteration %d", test.name, counter)
+
+			if counter > 100 {
+				t.Errorf("Test %q failed: too many iterations", test.name)
+				break
+			}
+
+			obj := reactor.popChange()
+			if obj == nil {
+				// Nothing was changed, should we exit?
+				if firstSync || reactor.changedSinceLastSync > 0 {
+					// There were some changes after the last "periodic sync".
+					// Simulate "periodic sync" of everything (until it produces
+					// no changes).
+					firstSync = false
+					glog.V(4).Infof("test %q: simulating periodical sync of all claims and volumes", test.name)
+					reactor.syncAll()
+				} else {
+					// Last sync did not produce any updates, the test reached
+					// stable state -> finish.
+					break
+				}
+			}
+
+			// There were some changes, process them
+			switch obj.(type) {
+			case *api.PersistentVolumeClaim:
+				claim := obj.(*api.PersistentVolumeClaim)
+				// Simulate "claim updated" event
+				ctrl.claims.Update(claim)
+				err = ctrl.syncClaim(claim)
+				if err != nil {
+					if err == versionConflictError {
+						// Ignore version errors
+						glog.V(4).Infof("test intentionaly ignores version error.")
+					} else {
+						t.Errorf("Error calling syncClaim: %v", err)
+						// Finish the loop on the first error
+						break
+					}
+				}
+				// Process generated changes
+				continue
+			case *api.PersistentVolume:
+				volume := obj.(*api.PersistentVolume)
+				// Simulate "volume updated" event
+				ctrl.volumes.store.Update(volume)
+				err = ctrl.syncVolume(volume)
+				if err != nil {
+					if err == versionConflictError {
+						// Ignore version errors
+						glog.V(4).Infof("test intentionaly ignores version error.")
+					} else {
+						t.Errorf("Error calling syncVolume: %v", err)
+						// Finish the loop on the first error
+						break
+					}
+				}
+				// Process generated changes
+				continue
+			}
+		}
+		evaluateTestResults(ctrl, reactor, test, t)
+		glog.V(4).Infof("test %q finished after %d iterations", test.name, counter)
+	}
+}
