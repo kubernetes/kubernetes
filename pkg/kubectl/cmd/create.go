@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -165,6 +166,18 @@ need to set up firewall rules for the service port(s) (%s) to serve traffic.
 See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
 `,
 				makePortsString(obj.Spec.Ports, true))
+			out.Write([]byte(msg))
+		}
+
+		_, ok := obj.Annotations[service.AnnotationLoadBalancerSourceRangesKey]
+		if ok {
+			msg := fmt.Sprintf(
+				`You are using service annotation [service.beta.kubernetes.io/load-balancer-source-ranges].
+It has been promoted to field [loadBalancerSourceRanges] in service spec. This annotation will be deprecated in the future.
+Please use the loadBalancerSourceRanges field instead.
+
+See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
+`)
 			out.Write([]byte(msg))
 		}
 	}

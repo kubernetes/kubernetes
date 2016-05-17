@@ -84,7 +84,7 @@ type LoadBalancer interface {
 	GetLoadBalancer(service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	EnsureLoadBalancer(service *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error)
+	EnsureLoadBalancer(service *api.Service, hosts []string) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
 	UpdateLoadBalancer(service *api.Service, hosts []string) error
