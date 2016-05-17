@@ -93,7 +93,7 @@ func Subtract(a api.ResourceList, b api.ResourceList) api.ResourceList {
 	for key, value := range b {
 		if _, found := result[key]; !found {
 			quantity := *value.Copy()
-			quantity.Neg(value)
+			quantity.Neg()
 			result[key] = quantity
 		}
 	}

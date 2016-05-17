@@ -581,7 +581,7 @@ func (dm *DockerManager) runContainer(
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
-	if cpuRequest.Amount == nil && cpuLimit.Amount != nil {
+	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
 		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
 	} else {
 		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number

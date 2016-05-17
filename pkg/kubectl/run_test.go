@@ -378,10 +378,12 @@ func TestGenerate(t *testing.T) {
 		},
 	}
 	generator := BasicReplicationController{}
-	for _, test := range tests {
+	for i, test := range tests {
 		obj, err := generator.Generate(test.params)
+		t.Logf("%d: %#v", i, obj)
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
+			continue
 		}
 		if test.expectErr && err != nil {
 			continue

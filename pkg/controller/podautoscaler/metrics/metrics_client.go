@@ -129,8 +129,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 
 		podNames = append(podNames, pod.Name)
 		for _, container := range pod.Spec.Containers {
-			containerRequest := container.Resources.Requests[api.ResourceCPU]
-			if containerRequest.Amount != nil {
+			if containerRequest, ok := container.Resources.Requests[api.ResourceCPU]; ok {
 				requestSum += containerRequest.MilliValue()
 			} else {
 				missing = true

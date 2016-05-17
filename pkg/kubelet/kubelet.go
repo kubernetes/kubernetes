@@ -3053,7 +3053,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 		if kl.reservation.Kubernetes != nil {
 			value.Sub(kl.reservation.Kubernetes[k])
 		}
-		if value.Amount != nil && value.Amount.Sign() < 0 {
+		if value.Sign() < 0 {
 			// Negative Allocatable resources don't make sense.
 			value.Set(0)
 		}

@@ -58,16 +58,7 @@ var Semantic = conversion.EqualitiesOrDie(
 		// TODO: if we decide it's important, it should be safe to start comparing the format.
 		//
 		// Uninitialized quantities are equivalent to 0 quantities.
-		if a.Amount == nil && b.MilliValue() == 0 {
-			return true
-		}
-		if b.Amount == nil && a.MilliValue() == 0 {
-			return true
-		}
-		if a.Amount == nil || b.Amount == nil {
-			return false
-		}
-		return a.Amount.Cmp(b.Amount) == 0
+		return a.Cmp(b) == 0
 	},
 	func(a, b unversioned.Time) bool {
 		return a.UTC() == b.UTC()

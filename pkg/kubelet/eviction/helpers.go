@@ -148,7 +148,7 @@ func parseThresholdStatement(statement string) (Threshold, error) {
 	return Threshold{
 		Signal:   signal,
 		Operator: operator,
-		Value:    *quantity,
+		Value:    quantity,
 	}, nil
 }
 

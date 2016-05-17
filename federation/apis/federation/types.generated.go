@@ -25,11 +25,10 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
-	pkg4_inf_v0 "gopkg.in/inf.v0"
 	pkg1_api "k8s.io/kubernetes/pkg/api"
 	pkg3_resource "k8s.io/kubernetes/pkg/api/resource"
 	pkg2_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	pkg5_types "k8s.io/kubernetes/pkg/types"
+	pkg4_types "k8s.io/kubernetes/pkg/types"
 	"reflect"
 	"runtime"
 	time "time"
@@ -65,13 +64,12 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg4_inf_v0.Dec
-		var v1 pkg1_api.ConditionStatus
-		var v2 pkg3_resource.Quantity
-		var v3 pkg2_unversioned.Time
-		var v4 pkg5_types.UID
-		var v5 time.Time
-		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5
+		var v0 pkg1_api.ConditionStatus
+		var v1 pkg3_resource.Quantity
+		var v2 pkg2_unversioned.Time
+		var v3 pkg4_types.UID
+		var v4 time.Time
+		_, _, _, _, _ = v0, v1, v2, v3, v4
 	}
 }
 
