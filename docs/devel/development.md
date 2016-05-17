@@ -244,25 +244,46 @@ godep restore
 
 4) Next, you can either add a new dependency or update an existing one.
 
+To add a new dependency is simple (if a bit slow):
+
 ```sh
-# To add a new dependency, do:
 cd $KPATH/src/k8s.io/kubernetes
-godep get path/to/dependency
+DEP=example.com/path/to/dependency
+godep get $DEP/...
 # Now change code in Kubernetes to use the dependency.
-hack/godep-save.sh
+./hack/godep-save.sh
+```
 
+To update an existing dependency is a bit more complicated.  Godep has an
+`update` command, but none of us can figure out how to actually make it work.
+Instead, this procedure seems to work reliably:
 
-# To update an existing dependency, do:
+```sh
 cd $KPATH/src/k8s.io/kubernetes
-go get -u path/to/dependency
-# Change code in Kubernetes accordingly if necessary.
-godep update path/to/dependency
+DEP=example.com/path/to/dependency
+# NB: For the next step, $DEP is assumed be the repo root.  If it is actually a
+# subdir of the repo, use the repo root here.  This is required to keep godep
+# from getting angry because `godep restore` left the tree in a "detached head"
+# state.
+rm -rf $KPATH/src/$DEP # repo root
+godep get $DEP/...
+# Change code in Kubernetes, if necessary.
+rm -rf Godeps
+rm -rf vendor
+./hack/godep-save.sh
+git co -- $(git st -s | grep "^ D" | awk '{print $2}' | grep ^Godeps)
 ```
 
 _If `go get -u path/to/dependency` fails with compilation errors, instead try
 `go get -d -u path/to/dependency` to fetch the dependencies without compiling
 them. This is unusual, but has been observed._
 
+After all of this is done, `git status` should show you what files have been
+modified and added/removed.  Make sure to `git add` and `git rm` them.  It is
+commonly advised to make one `git commit` which includes just the dependency
+update and Godeps files, and another `git commit` that includes changes to
+Kubernetes code to use the new/updated dependency.  These commits can go into a
+single pull request.
 
 5) Before sending your PR, it's a good idea to sanity check that your
 Godeps.json file and the contents of `vendor/ `are ok by running `hack/verify-godeps.sh`
@@ -275,9 +296,6 @@ dependency changes._
 It is sometimes expedient to manually fix the /Godeps/Godeps.json file to
 minimize the changes. However without great care this can lead to failures
 with `hack/verify-godeps.sh`. This must pass for every PR.
-
-Please send dependency updates in separate commits within your PR, for easier
-reviewing.
 
 6) If you updated the Godeps, please also update `Godeps/LICENSES` by running
 `hack/update-godep-licenses.sh`.
