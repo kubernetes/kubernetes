@@ -1120,25 +1120,55 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 // deleteVolumeOperation deletes a volume. This method is running in standalone
 // goroutine and already has all necessary locks.
 func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
-	volume := arg.(*api.PersistentVolume)
-	glog.V(4).Infof("deleteVolumeOperation [%s] started", volume.Name)
-	/*else if pv.Spec.ReclaimPolicy == "Delete" {
-	plugin := findDeleterPluginForPV(pv)
-	if plugin != nil {
-		// maintain a map with the current deleter goroutines that are running
-		// if the key is already present in the map, return
-		//
-		// launch the goroutine that:
-		// 1. deletes the storage asset
-		// 2. deletes the PV API object
-		// 3. deletes itself from the map when it's done
-	} else {
-		// make an event calling out that no deleter was configured
-		// mark the PV as failed
-		// NB: external provisioners/deleters are currently not
-		// considered.
+	volume, ok := arg.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Cannot convert deleteVolumeOperation argument to volume, got %+v", arg)
+		return
 	}
-	*/
+	glog.V(4).Infof("deleteVolumeOperation [%s] started", volume.Name)
+
+	// This method may have been waiting for a volume lock for some time.
+	// Previous deleteVolumeOperation might just have saved an updated version, so
+	// read current volume state now.
+	newVolume, err := ctrl.kubeClient.Core().PersistentVolumes().Get(volume.Name)
+	if err != nil {
+		glog.V(3).Infof("error reading peristent volume %q: %v", volume.Name, err)
+		return
+	}
+	needsReclaim, err := ctrl.isVolumeReleased(newVolume)
+	if err != nil {
+		glog.V(3).Infof("error reading claim for volume %q: %v", volume.Name, err)
+		return
+	}
+	if !needsReclaim {
+		glog.V(3).Infof("volume %q no longer needs deletion, skipping", volume.Name)
+		return
+	}
+
+	if err = ctrl.doDeleteVolume(volume); err != nil {
+		// Delete failed, update the volume and emit an event.
+		glog.V(3).Infof("deletion of volume %q failed: %v", volume.Name, err)
+		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedDelete", err.Error()); err != nil {
+			glog.V(4).Infof("deleteVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
+			// Save failed, retry on the next deletion attempt
+			return
+		}
+		// Despite the volume being Failed, the controller will retry deleting
+		// the volume in every syncVolume() call.
+		return
+	}
+
+	glog.V(4).Infof("deleteVolumeOperation [%s]: success", volume.Name)
+	// Delete the volume
+	if err = ctrl.kubeClient.Core().PersistentVolumes().Delete(volume.Name, nil); err != nil {
+		// Oops, could not delete the volume and therefore the controller will
+		// try to delete the volume again on next update. We _could_ maintain a
+		// cache of "recently deleted volumes" and avoid unnecessary deletion,
+		// this is left out as future optimization.
+		glog.V(3).Infof("failed to delete volume %q from database: %v", volume.Name, err)
+		return
+	}
+	return
 }
 
 // isVolumeReleased returns true if given volume is released and can be recycled
@@ -1181,6 +1211,34 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *api.PersistentV
 
 	glog.V(2).Infof("isVolumeReleased[%s]: volume is released", volume.Name)
 	return true, nil
+}
+
+// doDeleteVolume finds appropriate delete plugin and deletes given volume
+// (it will be re-used in future provisioner error cases).
+func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVolume) error {
+	glog.V(4).Infof("doDeleteVolume [%s]", volume.Name)
+	// Find a plugin.
+	spec := vol.NewSpecFromPersistentVolume(volume, false)
+	plugin, err := ctrl.recyclePluginMgr.FindDeletablePluginBySpec(spec)
+	if err != nil {
+		// No deleter found. Emit an event and mark the volume Failed.
+		return fmt.Errorf("Error getting deleter volume plugin for volume %q: %v", volume.Name, err)
+	}
+
+	// Plugin found
+	deleter, err := plugin.NewDeleter(spec)
+	if err != nil {
+		// Cannot create deleter
+		return fmt.Errorf("Failed to create deleter for volume %q: %v", volume.Name, err)
+	}
+
+	if err = deleter.Delete(); err != nil {
+		// Deleter failed
+		return fmt.Errorf("Delete of volume %q failed: %v", volume.Name, err)
+	}
+
+	glog.V(2).Infof("volume %q deleted", volume.Name)
+	return nil
 }
 
 // scheduleOperation starts given asynchronous operation on given volume. It

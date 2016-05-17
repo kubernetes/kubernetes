@@ -198,7 +198,30 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			glog.V(4).Infof("GetVolume: volume %s not found", name)
 			return true, nil, fmt.Errorf("Cannot find volume %s", name)
 		}
+
+	case action.Matches("delete", "persistentvolumes"):
+		name := action.(core.DeleteAction).GetName()
+		glog.V(4).Infof("deleted volume %s", name)
+		_, found := r.volumes[name]
+		if found {
+			delete(r.volumes, name)
+			return true, nil, nil
+		} else {
+			return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
+		}
+
+	case action.Matches("delete", "persistentvolumeclaims"):
+		name := action.(core.DeleteAction).GetName()
+		glog.V(4).Infof("deleted claim %s", name)
+		_, found := r.volumes[name]
+		if found {
+			delete(r.claims, name)
+			return true, nil, nil
+		} else {
+			return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
+		}
 	}
+
 	return false, nil, nil
 }
 
