@@ -92,6 +92,7 @@ type PersistentVolumeController struct {
 	claimControllerStopCh  chan struct{}
 	kubeClient             clientset.Interface
 	eventRecorder          record.EventRecorder
+	cloud                  cloudprovider.Interface
 }
 
 // NewPersistentVolumeController creates a new PersistentVolumeController
@@ -109,6 +110,7 @@ func NewPersistentVolumeController(
 	controller := &PersistentVolumeController{
 		kubeClient:    kubeClient,
 		eventRecorder: recorder,
+		cloud:         cloud,
 	}
 
 	volumeSource := &cache.ListWatch{
@@ -995,6 +997,8 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *api.PersistentVolu
 	*/
 	return nil
 }
+
+// Stateless functions
 
 func hasAnnotation(obj api.ObjectMeta, ann string) bool {
 	_, found := obj.Annotations[ann]
