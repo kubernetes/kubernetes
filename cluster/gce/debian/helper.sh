@@ -54,6 +54,7 @@ function create-master-instance {
     --metadata-from-file \
       "startup-script=${KUBE_TEMP}/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
+    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
     ${preemptible_master}
 }
 
