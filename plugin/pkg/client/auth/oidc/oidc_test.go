@@ -615,6 +615,14 @@ func (t *testOIDCClient) verify() error {
 	return nil
 }
 
+func (o *testOIDCClient) authCodeURL(accessType string) string {
+	return ""
+}
+
+func (o *testOIDCClient) exchangeCode(code string) (oauth2.TokenResponse, error) {
+	return oauth2.TokenResponse{}, nil
+}
+
 func compareJWTs(a, b jose.JWT) string {
 	if a.Encode() == b.Encode() {
 		return ""
