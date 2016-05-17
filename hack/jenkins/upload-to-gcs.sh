@@ -85,7 +85,8 @@ function upload_version() {
     gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" <(
       echo "{"
       echo "    \"version\": \"${version}\","
-      echo "    \"timestamp\": ${timestamp}"
+      echo "    \"timestamp\": ${timestamp},"
+      echo "    \"jenkins-node\": \"${NODE_NAME:-}\""
       echo "}"
     ) "${json_file}" || continue
     break
