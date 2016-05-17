@@ -53,7 +53,7 @@ const (
 	testPort                  = 9376
 )
 
-func resizeGroup(size int32) error {
+func ResizeGroup(size int32) error {
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 		defer framework.CoreDump(framework.TestContext.ReportDir)
@@ -371,7 +371,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			}
 
 			By("restoring the original node instance group size")
-			if err := resizeGroup(int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := ResizeGroup(int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
@@ -410,7 +410,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
-			err = resizeGroup(replicas - 1)
+			err = ResizeGroup(replicas - 1)
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas - 1)
 			Expect(err).NotTo(HaveOccurred())
@@ -434,7 +434,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
-			err = resizeGroup(replicas + 1)
+			err = ResizeGroup(replicas + 1)
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas + 1)
 			Expect(err).NotTo(HaveOccurred())
