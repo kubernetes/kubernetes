@@ -1485,20 +1485,20 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		}
 	}
 
+	// Container information is used in adjusting OOM scores, adding ndots and getting the logPath.
+	containerInfo, err := dm.client.InspectContainer(id.ID)
+	if err != nil {
+		return kubecontainer.ContainerID{}, fmt.Errorf("InspectContainer: %v", err)
+	}
+
 	// Create a symbolic link to the Docker container log file using a name which captures the
 	// full pod name, the container name and the Docker container ID. Cluster level logging will
 	// capture these symbolic filenames which can be used for search terms in Elasticsearch or for
 	// labels for Cloud Logging.
-	containerLogFile := path.Join(dm.dockerRoot, "containers", id.ID, fmt.Sprintf("%s-json.log", id.ID))
+	containerLogFile := containerInfo.LogPath
 	symlinkFile := LogSymlink(dm.containerLogsDir, kubecontainer.GetPodFullName(pod), container.Name, id.ID)
 	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
 		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", format.Pod(pod), container.Name, err)
-	}
-
-	// Container information is used in adjusting OOM scores and adding ndots.
-	containerInfo, err := dm.client.InspectContainer(id.ID)
-	if err != nil {
-		return kubecontainer.ContainerID{}, fmt.Errorf("InspectContainer: %v", err)
 	}
 
 	// Check if current docker version is higher than 1.10. Otherwise, we have to apply OOMScoreAdj instead of using docker API.
