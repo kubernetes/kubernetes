@@ -1,4 +1,5 @@
 check_version_skew
+check_node_count
 concurrent_rc_syncs
 file_content
 file_mode
