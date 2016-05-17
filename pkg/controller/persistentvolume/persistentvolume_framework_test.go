@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -144,6 +145,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 				return true, obj, versionConflictError
 			}
 			volume.ResourceVersion = strconv.Itoa(storedVer + 1)
+		} else {
+			return true, nil, fmt.Errorf("Cannot update volume %s: volume not found", volume.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -169,6 +172,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 				return true, obj, versionConflictError
 			}
 			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
+		} else {
+			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -338,6 +343,23 @@ func (r *volumeReactor) getChangeCount() int {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	return r.changedSinceLastSync
+}
+
+// waitTest waits until all tests, controllers and other goroutines do their
+// job and no new actions are registered for 10 milliseconds.
+func (r *volumeReactor) waitTest() {
+	// Check every 10ms if the controller does something and stop if it's
+	// idle.
+	oldChanges := -1
+	for {
+		time.Sleep(10 * time.Millisecond)
+		changes := r.getChangeCount()
+		if changes == oldChanges {
+			// No changes for last 10ms -> controller must be idle.
+			break
+		}
+		oldChanges = changes
+	}
 }
 
 func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource, claimSource *framework.FakeControllerSource) *volumeReactor {
