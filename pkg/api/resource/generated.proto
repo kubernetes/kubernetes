@@ -84,26 +84,10 @@ option go_package = "resource";
 // cause implementors to also use a fixed point implementation.
 // 
 // +protobuf=true
-// +protobuf.embed=QuantityProto
+// +protobuf.embed=string
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message Quantity {
-  optional QuantityProto QuantityProto = 1;
-}
-
-// QuantityProto is a struct that is equivalent to Quantity, but intended for
-// protobuf marshalling/unmarshalling. It is generated into a serialization
-// that matches Quantity. Do not use in Go structs.
-// 
-// +protobuf=true
-message QuantityProto {
-  // The format of the quantity
-  optional string format = 1;
-
-  // The scale dimension of the value
-  optional int32 scale = 2;
-
-  // Bigint is serialized as a raw bytes array
-  optional bytes bigint = 3;
+  optional string string = 1;
 }
 

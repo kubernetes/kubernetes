@@ -17,62 +17,268 @@ limitations under the License.
 package resource
 
 import (
-	"math/big"
+	"fmt"
+	"io"
 
-	inf "gopkg.in/inf.v0"
+	"github.com/gogo/protobuf/proto"
 )
 
-// QuantityProto is a struct that is equivalent to Quantity, but intended for
-// protobuf marshalling/unmarshalling. It is generated into a serialization
-// that matches Quantity. Do not use in Go structs.
-//
-// +protobuf=true
-type QuantityProto struct {
-	// The format of the quantity
-	Format Format `protobuf:"bytes,1,opt,name=format,casttype=Format"`
-	// The scale dimension of the value
-	Scale int32 `protobuf:"varint,2,opt,name=scale"`
-	// Bigint is serialized as a raw bytes array
-	Bigint []byte `protobuf:"bytes,3,opt,name=bigint"`
+var _ proto.Sizer = &Quantity{}
+
+func (m *Quantity) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
 }
 
-// ProtoTime returns the Time as a new ProtoTime value.
-func (q *Quantity) QuantityProto() *QuantityProto {
-	if q == nil {
-		return &QuantityProto{}
-	}
-	p := &QuantityProto{
-		Format: q.Format,
-	}
-	if q.Amount != nil {
-		p.Scale = int32(q.Amount.Scale())
-		p.Bigint = q.Amount.UnscaledBig().Bytes()
-	}
-	return p
+// MarshalTo is a customized version of the generated Protobuf unmarshaler for a struct
+// with a single string field.
+func (m *Quantity) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+
+	data[i] = 0xa
+	i++
+	// BEGIN CUSTOM MARSHAL
+	out := m.toBytes()
+	i = encodeVarintGenerated(data, i, uint64(len(out)))
+	i += copy(data[i:], out)
+	// END CUSTOM MARSHAL
+
+	return i, nil
 }
 
-// Size implements the protobuf marshalling interface.
-func (q *Quantity) Size() (n int) { return q.QuantityProto().Size() }
-
-// Reset implements the protobuf marshalling interface.
-func (q *Quantity) Unmarshal(data []byte) error {
-	p := QuantityProto{}
-	if err := p.Unmarshal(data); err != nil {
-		return err
+func encodeVarintGenerated(data []byte, offset int, v uint64) int {
+	for v >= 1<<7 {
+		data[offset] = uint8(v&0x7f | 0x80)
+		v >>= 7
+		offset++
 	}
-	q.Format = p.Format
-	b := big.NewInt(0)
-	b.SetBytes(p.Bigint)
-	q.Amount = inf.NewDecBig(b, inf.Scale(p.Scale))
+	data[offset] = uint8(v)
+	return offset + 1
+}
+
+func (m *Quantity) Size() (n int) {
+	var l int
+	_ = l
+
+	// BEGIN CUSTOM SIZE
+	l = len(m.toBytes())
+	// END CUSTOM SIZE
+
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func sovGenerated(x uint64) (n int) {
+	for {
+		n++
+		x >>= 7
+		if x == 0 {
+			break
+		}
+	}
+	return n
+}
+
+// Unmarshal is a customized version of the generated Protobuf unmarshaler for a struct
+// with a single string field.
+func (m *Quantity) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Quantity: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Quantity: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field String_", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(data[iNdEx:postIndex])
+
+			// BEGIN CUSTOM DECODE
+			p, err := ParseQuantity(s)
+			if err != nil {
+				return err
+			}
+			*m = p
+			// END CUSTOM DECODE
+
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
 	return nil
 }
 
-// Marshal implements the protobuf marshalling interface.
-func (q *Quantity) Marshal() (data []byte, err error) {
-	return q.QuantityProto().Marshal()
+func skipGenerated(data []byte) (n int, err error) {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return 0, ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return 0, io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		wireType := int(wire & 0x7)
+		switch wireType {
+		case 0:
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return 0, ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return 0, io.ErrUnexpectedEOF
+				}
+				iNdEx++
+				if data[iNdEx-1] < 0x80 {
+					break
+				}
+			}
+			return iNdEx, nil
+		case 1:
+			iNdEx += 8
+			return iNdEx, nil
+		case 2:
+			var length int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return 0, ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return 0, io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				length |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			iNdEx += length
+			if length < 0 {
+				return 0, ErrInvalidLengthGenerated
+			}
+			return iNdEx, nil
+		case 3:
+			for {
+				var innerWire uint64
+				var start int = iNdEx
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return 0, ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return 0, io.ErrUnexpectedEOF
+					}
+					b := data[iNdEx]
+					iNdEx++
+					innerWire |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				innerWireType := int(innerWire & 0x7)
+				if innerWireType == 4 {
+					break
+				}
+				next, err := skipGenerated(data[start:])
+				if err != nil {
+					return 0, err
+				}
+				iNdEx = start + next
+			}
+			return iNdEx, nil
+		case 4:
+			return iNdEx, nil
+		case 5:
+			iNdEx += 4
+			return iNdEx, nil
+		default:
+			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
+		}
+	}
+	panic("unreachable")
 }
 
-// MarshalTo implements the protobuf marshalling interface.
-func (q *Quantity) MarshalTo(data []byte) (int, error) {
-	return q.QuantityProto().MarshalTo(data)
-}
+var (
+	ErrInvalidLengthGenerated = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowGenerated   = fmt.Errorf("proto: integer overflow")
+)
