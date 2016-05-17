@@ -1,4 +1,4 @@
-From nobody Thu Mar 10 10:33:00 2016
+From nobody Thu May 13 20:33:00 2016
 Content-Type: multipart/mixed; boundary="===================================="
 MIME-Version: 1.0
 
@@ -15,6 +15,7 @@ description "Download and install k8s binaries and configurations"
 start on cloud-config
 
 script
+{
 	set -o errexit
 	set -o nounset
 
@@ -29,6 +30,7 @@ script
 	. /etc/kube-env
 	echo "Install kube nodes binary and configuration files"
 	install_kube_binary_config
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 --====================================
@@ -44,6 +46,7 @@ description "Prepare kube node environment"
 start on stopped kube-install-node
 
 script
+{
 	set -o errexit
 	set -o nounset
 
@@ -62,6 +65,7 @@ script
 	echo "Assemble kubelet command line"
 	# Kubelet command flags will be in /etc/default/kubelet
 	assemble_kubelet_flags
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 --====================================
@@ -77,11 +81,13 @@ description "Install packages needed to run kubernetes"
 start on stopped kube-install-node
 
 script
+{
 	set -o errexit
 	set -o nounset
 
 	. /etc/kube-configure-helper.sh
 	install_critical_packages
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 --====================================
@@ -97,11 +103,13 @@ description "Install additional packages used by kubernetes"
 start on stopped kube-install-packages
 
 script
+{
 	set -o errexit
 	set -o nounset
 
 	. /etc/kube-configure-helper.sh
 	install_additional_packages
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 --====================================
@@ -119,12 +127,14 @@ start on stopped kube-install-packages and stopped kube-env
 respawn
 
 script
+{
 	set -o errexit
 	set -o nounset
 
 	echo "Start kubelet upstart job"
 	. /etc/default/kubelet
 	/usr/bin/kubelet ${KUBELET_OPTS} 1>>/var/log/kubelet.log 2>&1
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 # Wait for 10s to start kubelet again.
@@ -143,12 +153,14 @@ description "Restart docker daemon"
 start on started kubelet
 
 script
+{
 	set -o errexit
 	set -o nounset
 
 	. /etc/kube-configure-helper.sh
 	. /etc/kube-env
 	restart_docker_daemon
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 --====================================
@@ -164,6 +176,7 @@ description "Start kube-proxy static pod"
 start on stopped kube-docker
 
 script
+{
 	set -o errexit
 	set -o nounset
 
@@ -207,6 +220,7 @@ script
 	fi
 
 	mv -f ${tmp_file} /etc/kubernetes/manifests/
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 --====================================
@@ -222,6 +236,7 @@ description "Install kubelet add-on manifest files"
 start on stopped kube-docker
 
 script
+{
 	set -o errexit
 	set -o nounset
 
@@ -233,6 +248,7 @@ script
 	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
 		cp /home/kubernetes/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
 	fi
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 --====================================
@@ -248,6 +264,7 @@ start on stopped kube-docker
 respawn
 
 script
+{
 	set -o nounset
 	set -o errexit
 
@@ -257,6 +274,7 @@ script
 	. /etc/kube-configure-helper.sh
 	. /etc/kube-env
 	health_monitoring
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
 # Wait for 10s to start it again.
