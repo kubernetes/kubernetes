@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -783,6 +784,7 @@ type mockVolumePlugin struct {
 	deleteCallCounter    int
 	recycleCalls         []error
 	recycleCallCounter   int
+	provisionOptions     vol.VolumeOptions
 }
 
 var _ vol.VolumePlugin = &mockVolumePlugin{}
@@ -813,30 +815,49 @@ func (plugin *mockVolumePlugin) NewProvisioner(options vol.VolumeOptions) (vol.P
 	if len(plugin.provisionCalls) > 0 {
 		// mockVolumePlugin directly implements Provisioner interface
 		glog.V(4).Infof("mock plugin NewProvisioner called, returning mock provisioner")
+		plugin.provisionOptions = options
 		return plugin, nil
 	} else {
 		return nil, fmt.Errorf("Mock plugin error: no provisionCalls configured")
 	}
 }
 
-func (plugin *mockVolumePlugin) Provision(*api.PersistentVolume) error {
-	if len(plugin.provisionCalls) <= plugin.provisionCallCounter {
-		return fmt.Errorf("Mock plugin error: unexpected provisioner call %d", plugin.provisionCallCounter)
-	}
-	ret := plugin.provisionCalls[plugin.provisionCallCounter]
-	plugin.provisionCallCounter++
-	glog.V(4).Infof("mock plugin Provision call nr. %d, returning %v", plugin.provisionCallCounter, ret)
-	return ret
-}
-
-func (plugin *mockVolumePlugin) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
 	if len(plugin.provisionCalls) <= plugin.provisionCallCounter {
 		return nil, fmt.Errorf("Mock plugin error: unexpected provisioner call %d", plugin.provisionCallCounter)
 	}
-	ret := plugin.provisionCalls[plugin.provisionCallCounter]
+
+	var pv *api.PersistentVolume
+	err := plugin.provisionCalls[plugin.provisionCallCounter]
+	if err == nil {
+		// Create a fake PV
+		fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
+
+		pv = &api.PersistentVolume{
+			ObjectMeta: api.ObjectMeta{
+				Name: plugin.provisionOptions.PVName,
+				Annotations: map[string]string{
+					"kubernetes.io/createdby": "hostpath-dynamic-provisioner",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeReclaimPolicy: plugin.provisionOptions.PersistentVolumeReclaimPolicy,
+				AccessModes:                   plugin.provisionOptions.AccessModes,
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): plugin.provisionOptions.Capacity,
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: fullpath,
+					},
+				},
+			},
+		}
+	}
+
 	plugin.provisionCallCounter++
-	glog.V(4).Infof("mock plugin NewPersistentVolumeTemplate call nr. %d, returning %v", plugin.provisionCallCounter, ret)
-	return nil, ret
+	glog.V(4).Infof("mock plugin Provision call nr. %d, returning %v: %v", plugin.provisionCallCounter, pv, err)
+	return pv, err
 }
 
 // Deleter interfaces

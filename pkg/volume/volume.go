@@ -111,13 +111,10 @@ type Recycler interface {
 // Provisioner is an interface that creates templates for PersistentVolumes and can create the volume
 // as a new resource in the infrastructure provider.
 type Provisioner interface {
-	// Provision creates the resource by allocating the underlying volume in a storage system.
-	// This method should block until completion.
-	Provision(*api.PersistentVolume) error
-	// NewPersistentVolumeTemplate creates a new PersistentVolume to be used as a template before saving.
-	// The provisioner will want to tweak its properties, assign correct annotations, etc.
-	// This func should *NOT* persist the PV in the API.  That is left to the caller.
-	NewPersistentVolumeTemplate() (*api.PersistentVolume, error)
+	// Provision creates the resource by allocating the underlying volume in a
+	// storage system. This method should block until completion and returns
+	// PersistentVolume representing the created storage resource.
+	Provision() (*api.PersistentVolume, error)
 }
 
 // Deleter removes the resource from the underlying storage provider.  Calls to this method should block until
