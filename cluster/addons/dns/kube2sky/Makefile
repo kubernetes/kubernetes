@@ -40,6 +40,9 @@ endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/busybox
 endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/busybox
+endif
 
 
 all: container

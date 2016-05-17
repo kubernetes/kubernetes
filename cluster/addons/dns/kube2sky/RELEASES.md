@@ -30,6 +30,9 @@ are ready, not on every PR.
 
 	$ make push ARCH=ppc64le
 	# ---> gcr.io/google_containers/kube2sky-ppc64le:TAG
+	
+	$ make push ARCH=s390x
+	# ---> gcr.io/google_containers/kube2sky-s390x:TAG	
 	```
 
 6. Manually deploy this to your own cluster by updating the replication

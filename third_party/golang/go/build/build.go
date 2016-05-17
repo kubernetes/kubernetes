@@ -282,6 +282,7 @@ var cgoEnabled = map[string]bool{
 	"solaris/amd64":   true,
 	"windows/386":     true,
 	"windows/amd64":   true,
+    "linux/s390x":     true,	
 }
 
 func defaultContext() Context {

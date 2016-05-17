@@ -68,6 +68,7 @@ else
     linux/arm
     linux/arm64
     linux/ppc64le
+    linux/s390x
   )
 
   # If we update this we should also update the set of golang compilers we build
@@ -82,6 +83,7 @@ else
     darwin/386
     windows/amd64
     windows/386
+    linux/s390x
   )
 
   # Which platforms we should compile test targets for. Not all client platforms need these tests
@@ -231,6 +233,9 @@ kube::golang::set_platform_envs() {
   elif [[ ${platform} == "linux/ppc64le" ]]; then
     export CGO_ENABLED=1
     export CC=powerpc64le-linux-gnu-gcc
+  elif [[ ${platform} == "linux/s390x" ]]; then
+    export CGO_ENABLED=1
+    export CC=s390x-linux-gnu-gcc	
   fi
 }
 

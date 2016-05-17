@@ -34,6 +34,9 @@ endif
 ifeq ($(ARCH),ppc64le)
 	CC=powerpc64le-linux-gnu-gcc
 endif
+ifeq ($(ARCH),s390x)
+	CC=s390x-linux-gnu-gcc
+endif
 
 build:
 ifeq ($(ARCH),amd64)

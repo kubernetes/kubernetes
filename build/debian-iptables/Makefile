@@ -35,6 +35,10 @@ ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian:jessie
 	QEMUARCH=ppc64le
 endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/debian:jessie
+	QEMUARCH=s390x
+endif
 
 build:
 	cp ./* $(TEMP_DIR)

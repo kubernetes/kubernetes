@@ -27,6 +27,7 @@ ENV KUBE_CROSSPLATFORMS \
   linux/386 \
   linux/arm linux/arm64 \
   linux/ppc64le \
+  linux/s390x \
   darwin/amd64 darwin/386 \
   windows/amd64 windows/386
 
