@@ -195,12 +195,29 @@ func TestCascadingDeletion(t *testing.T) {
 	if err := rcClient.Delete(toBeDeletedRCName, nil); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
 	}
+
 	// wait for the garbage collector to drain its queue
 	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
 		return gc.QueuesDrained(), nil
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// sometimes the deletion of the RC takes long time to be observed by
+	// the gc, so wait for the garbage collector to observe the deletion of
+	// the toBeDeletedRC
+	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
+		return !gc.GraphHasUID([]types.UID{toBeDeletedRC.ObjectMeta.UID}), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// wait for the garbage collector to drain its queue again because it's
+	// possible it just processed the delete of the toBeDeletedRC.
+	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
+		return gc.QueuesDrained(), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
 	t.Logf("garbage collector queues drained")
 	// checks the garbage collect doesn't delete pods it shouldn't do.
 	if _, err := podClient.Get(independentPodName); err != nil {
@@ -210,7 +227,7 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := podClient.Get(garbageCollectedPodName); err == nil || !errors.IsNotFound(err) {
-		t.Fatalf("expect pod %s to be garbage collected", garbageCollectedPodName)
+		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
 	}
 }
 
