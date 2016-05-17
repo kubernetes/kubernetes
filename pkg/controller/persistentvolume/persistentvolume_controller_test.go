@@ -48,7 +48,7 @@ func TestControllerSync(t *testing.T) {
 			newVolumeArray("volume5-1", "10Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRetain),
 			newClaimArray("claim5-1", "uid5-1", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim5-1", "uid5-1", "1Gi", "", api.ClaimPending),
-			noevents,
+			noevents, noerrors,
 			// Custom test function that generates an add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				volume := newVolume("volume5-1", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain)
@@ -64,7 +64,7 @@ func TestControllerSync(t *testing.T) {
 			newVolumeArray("volume5-2", "10Gi", "uid5-2", "claim5-2", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
 			noclaims, /* added in testAddClaim5_2 */
 			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", api.ClaimBound, annBoundByController, annBindCompleted),
-			noevents,
+			noevents, noerrors,
 			// Custom test function that generates an add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", api.ClaimPending)
@@ -80,7 +80,7 @@ func TestControllerSync(t *testing.T) {
 			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", api.VolumeReleased, api.PersistentVolumeReclaimRetain, annBoundByController),
 			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", api.ClaimBound, annBoundByController, annBindCompleted),
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			// Custom test function that generates a delete event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				obj := ctrl.claims.List()[0]
@@ -103,7 +103,7 @@ func TestControllerSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimBound, annBoundByController, annBindCompleted),
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimLost, annBoundByController, annBindCompleted),
-			[]string{"Warning ClaimLost"},
+			[]string{"Warning ClaimLost"}, noerrors,
 			// Custom test function that generates a delete event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				obj := ctrl.volumes.store.List()[0]
@@ -130,7 +130,7 @@ func TestControllerSync(t *testing.T) {
 		claimSource := framework.NewFakeControllerSource()
 		ctrl := newPersistentVolumeController(client)
 		ctrl.initializeController(time.Minute, volumeSource, claimSource)
-		reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource)
+		reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource, test.errors)
 		for _, claim := range test.initialClaims {
 			claimSource.Add(claim)
 			reactor.claims[claim.Name] = claim
