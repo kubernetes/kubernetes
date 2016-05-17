@@ -58,12 +58,7 @@ RUN mkdir -p /opt/cni
 RUN curl https://storage.googleapis.com/kubernetes-release/network-plugins/cni-c864f0e1ea73719b8f4582402b0847064f9883b0.tar.gz \
   | tar xzv -C /opt/cni
 
-# Make scripts executable
-RUN chmod a+rx \
-        /hyperkube \
-        /usr/share/google/safe_format_and_mount \
-        /setup-files.sh \
-        /make-ca-cert.sh
-
 # Create symlinks for each hyperkube server
-RUN /hyperkube --make-symlinks
+# TODO: this is unreliable for now (e.g. running "/kubelet" panics)
+# Also, it doesn't work for other architectures
+# RUN /hyperkube --make-symlinks
