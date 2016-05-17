@@ -196,26 +196,6 @@ func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count i
 	return podNames, volumes
 }
 
-func createPod(f *framework.Framework, podName string, containers []api.Container, volumes []api.Volume) {
-	podClient := f.Client.Pods(f.Namespace.Name)
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: podName,
-		},
-		Spec: api.PodSpec{
-			// Force the Pod to schedule to the node without a scheduler running
-			NodeName: *nodeName,
-			// Don't restart the Pod since it is expected to exit
-			RestartPolicy: api.RestartPolicyNever,
-			Containers:    containers,
-			Volumes:       volumes,
-		},
-	}
-	_, err := podClient.Create(pod)
-	Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
-	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-}
-
 // Returns pods missing from summary.
 func podsMissingFromSummary(s stats.Summary, expectedPods sets.String) sets.String {
 	expectedPods = sets.StringKeySet(expectedPods)
