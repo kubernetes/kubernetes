@@ -95,5 +95,6 @@ function create-master-instance {
     --can-ip-forward \
     --metadata-from-file \
       "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/trusty/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt${image_metadata}" \
-    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
+    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
+    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}"
 }
