@@ -37,7 +37,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", api.ClaimPending, annClass),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", api.ClaimPending, annClass),
-			noevents, wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			noevents, noerrors, wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
 		},
 		{
 			// Provision failure - plugin not found
@@ -46,7 +46,7 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim11-2", "uid11-2", "1Gi", "", api.ClaimPending, annClass),
 			newClaimArray("claim11-2", "uid11-2", "1Gi", "", api.ClaimPending, annClass),
-			[]string{"Warning ProvisioningFailed"},
+			[]string{"Warning ProvisioningFailed"}, noerrors,
 			testSyncClaim,
 		},
 		{
@@ -56,7 +56,7 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim11-3", "uid11-3", "1Gi", "", api.ClaimPending, annClass),
 			newClaimArray("claim11-3", "uid11-3", "1Gi", "", api.ClaimPending, annClass),
-			[]string{"Warning ProvisioningFailed"},
+			[]string{"Warning ProvisioningFailed"}, noerrors,
 			wrapTestWithControllerConfig(operationProvision, []error{}, testSyncClaim),
 		},
 		{
@@ -66,7 +66,7 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim11-4", "uid11-4", "1Gi", "", api.ClaimPending, annClass),
 			newClaimArray("claim11-4", "uid11-4", "1Gi", "", api.ClaimPending, annClass),
-			[]string{"Warning ProvisioningFailed"},
+			[]string{"Warning ProvisioningFailed"}, noerrors,
 			wrapTestWithControllerConfig(operationProvision, []error{errors.New("Moc provisioner error")}, testSyncClaim),
 		},
 		{
@@ -129,7 +129,7 @@ func TestProvisionMultiSync(t *testing.T) {
 			newClaimArray("claim12-1", "uid12-1", "1Gi", "", api.ClaimPending, annClass),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim12-1", "uid12-1", "1Gi", "pv-provisioned-for-uid12-1", api.ClaimBound, annClass, annBoundByController, annBindCompleted),
-			noevents, wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			noevents, noerrors, wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
 		},
 	}
 

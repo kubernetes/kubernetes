@@ -36,7 +36,7 @@ func TestDeleteSync(t *testing.T) {
 			novolumes,
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			// Inject deleter into the controller and call syncVolume. The
 			// deleter simulates one delete() call that succeeds.
 			wrapTestWithControllerConfig(operationDelete, []error{nil}, testSyncVolume),
@@ -48,7 +48,7 @@ func TestDeleteSync(t *testing.T) {
 			novolumes,
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			// Inject deleter into the controller and call syncVolume. The
 			// deleter simulates one delete() call that succeeds.
 			wrapTestWithControllerConfig(operationDelete, []error{nil}, testSyncVolume),
@@ -60,7 +60,7 @@ func TestDeleteSync(t *testing.T) {
 			newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", api.VolumeFailed, api.PersistentVolumeReclaimDelete),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"}, testSyncVolume,
+			[]string{"Warning VolumeFailedDelete"}, noerrors, testSyncVolume,
 		},
 		{
 			// delete failure - newDeleter returns error
@@ -69,7 +69,7 @@ func TestDeleteSync(t *testing.T) {
 			newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", api.VolumeFailed, api.PersistentVolumeReclaimDelete),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"},
+			[]string{"Warning VolumeFailedDelete"}, noerrors,
 			wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume),
 		},
 		{
@@ -79,7 +79,7 @@ func TestDeleteSync(t *testing.T) {
 			newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeFailed, api.PersistentVolumeReclaimDelete),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"},
+			[]string{"Warning VolumeFailedDelete"}, noerrors,
 			wrapTestWithControllerConfig(operationDelete, []error{errors.New("Mock delete error")}, testSyncVolume),
 		},
 		{
@@ -89,7 +89,7 @@ func TestDeleteSync(t *testing.T) {
 			novolumes,
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Delete the volume before delete operation starts
 				reactor.lock.Lock()
@@ -106,7 +106,7 @@ func TestDeleteSync(t *testing.T) {
 			newVolumeArray("volume8-7", "1Gi", "uid8-7", "claim8-7", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController),
 			noclaims,
 			newClaimArray("claim8-7", "uid8-7", "10Gi", "volume8-7", api.ClaimBound),
-			noevents,
+			noevents, noerrors,
 			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				reactor.lock.Lock()
 				defer reactor.lock.Unlock()
@@ -127,7 +127,7 @@ func TestDeleteSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim8-9", "uid8-9-x", "10Gi", "", api.ClaimPending),
 			newClaimArray("claim8-9", "uid8-9-x", "10Gi", "", api.ClaimPending),
-			noevents,
+			noevents, noerrors,
 			// Inject deleter into the controller and call syncVolume. The
 			// deleter simulates one delete() call that succeeds.
 			wrapTestWithControllerConfig(operationDelete, []error{nil}, testSyncVolume),
@@ -160,7 +160,7 @@ func TestDeleteMultiSync(t *testing.T) {
 			novolumes,
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"},
+			[]string{"Warning VolumeFailedDelete"}, noerrors,
 			wrapTestWithControllerConfig(operationDelete, []error{errors.New("Mock delete error"), nil}, testSyncVolume),
 		},
 	}

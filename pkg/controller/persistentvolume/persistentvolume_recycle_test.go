@@ -36,7 +36,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-1", "1Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			// Inject recycler into the controller and call syncVolume. The
 			// recycler simulates one recycle() call that succeeds.
 			wrapTestWithControllerConfig(operationRecycle, []error{nil}, testSyncVolume),
@@ -48,7 +48,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-2", "1Gi", "", "claim6-2", api.VolumeAvailable, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			// Inject recycler into the controller and call syncVolume. The
 			// recycler simulates one recycle() call that succeeds.
 			wrapTestWithControllerConfig(operationRecycle, []error{nil}, testSyncVolume),
@@ -60,7 +60,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", api.VolumeFailed, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"}, testSyncVolume,
+			[]string{"Warning VolumeFailedRecycle"}, noerrors, testSyncVolume,
 		},
 		{
 			// recycle failure - newRecycler returns error
@@ -69,7 +69,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", api.VolumeFailed, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"},
+			[]string{"Warning VolumeFailedRecycle"}, noerrors,
 			wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume),
 		},
 		{
@@ -79,7 +79,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", api.VolumeFailed, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"},
+			[]string{"Warning VolumeFailedRecycle"}, noerrors,
 			wrapTestWithControllerConfig(operationRecycle, []error{errors.New("Mock recycle error")}, testSyncVolume),
 		},
 		{
@@ -89,7 +89,7 @@ func TestRecycleSync(t *testing.T) {
 			novolumes,
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Delete the volume before recycle operation starts
 				reactor.lock.Lock()
@@ -106,7 +106,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-7", "1Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Mark the volume as Available before the recycler starts
 				reactor.lock.Lock()
@@ -127,7 +127,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-8", "1Gi", "", "claim6-8", api.VolumeAvailable, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			noevents,
+			noevents, noerrors,
 			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Mark the volume as Available before the recycler starts
 				reactor.lock.Lock()
@@ -145,7 +145,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-9", "1Gi", "", "claim6-9", api.VolumeAvailable, api.PersistentVolumeReclaimRecycle),
 			newClaimArray("claim6-9", "uid6-9-x", "10Gi", "", api.ClaimPending),
 			newClaimArray("claim6-9", "uid6-9-x", "10Gi", "", api.ClaimPending),
-			noevents,
+			noevents, noerrors,
 			// Inject recycler into the controller and call syncVolume. The
 			// recycler simulates one recycle() call that succeeds.
 			wrapTestWithControllerConfig(operationRecycle, []error{nil}, testSyncVolume),
@@ -157,7 +157,7 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", api.VolumeFailed, "Unknown"),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeUnknownReclaimPolicy"}, testSyncVolume,
+			[]string{"Warning VolumeUnknownReclaimPolicy"}, noerrors, testSyncVolume,
 		},
 	}
 	runSyncTests(t, tests)
@@ -187,7 +187,7 @@ func TestRecycleMultiSync(t *testing.T) {
 			newVolumeArray("volume7-1", "1Gi", "", "claim7-1", api.VolumeAvailable, api.PersistentVolumeReclaimRecycle),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"},
+			[]string{"Warning VolumeFailedRecycle"}, noerrors,
 			wrapTestWithControllerConfig(operationRecycle, []error{errors.New("Mock recycle error"), nil}, testSyncVolume),
 		},
 	}
