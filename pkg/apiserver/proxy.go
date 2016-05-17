@@ -57,7 +57,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer metrics.Monitor(&verb, &apiResource, net.GetHTTPClient(req), httpCode, reqStart)
+	defer metrics.Monitor(&verb, &apiResource, net.GetHTTPClient(req), w.Header().Get("Content-Type"), httpCode, reqStart)
 
 	requestInfo, err := r.requestInfoResolver.GetRequestInfo(req)
 	if err != nil || !requestInfo.IsResourceRequest {
