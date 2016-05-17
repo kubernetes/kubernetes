@@ -281,7 +281,9 @@ func NewResourceUsageGatherer(c *client.Client, options ResourceGathererOptions)
 					finished:             false,
 					inKubemark:           false,
 				})
-				break
+				if options.masterOnly {
+					break
+				}
 			}
 		}
 	}
