@@ -215,8 +215,10 @@ resources, a targeted field selector should be used in favor of client side
 filtering of related resources.
 
 * For fields that can be explicitly unset (booleans, integers, structs), the
-output should say `<unset>`. Likewise, for arrays `<none>` should be used.
-Lastly `<unknown>` should be used where unrecognized field type was specified.
+output should say `<unset>`. Likewise, for arrays `<none>` should be used; for
+external IP, `<nodes>` should be used; for load balancer, `<pending>` should be
+used.  Lastly `<unknown>` should be used where unrecognized field type was
+specified.
 
 * Mutations should output TYPE/name verbed by default, where TYPE is singular;
 `-o name` may be used to just display TYPE/name, which may be used to specify
