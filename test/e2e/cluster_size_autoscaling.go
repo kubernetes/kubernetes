@@ -65,10 +65,37 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Feature:ClusterSizeAut
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount+1, scaleTimeout))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
-		// TODO(jsz): Enable code bellow when scale down is implemented.
-		// framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleDownTimeout))
+		// TODO(jsz): Disable the line bellow when scale down is implemented.
+		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
+		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleTimeout))
+
+		By("Handling node port pods")
+		CreateHostPortPods(f, "host-port", nodeCount+2, false)
+		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount+2, scaleTimeout))
+		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "host-port"))
+		// TODO(jsz): Disable the line bellow when scale down is implemented.
+		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
+		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleTimeout))
 	})
 })
+
+func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
+	By(fmt.Sprintf("Running RC which reserves host port"))
+	config := &framework.RCConfig{
+		Client:    f.Client,
+		Name:      id,
+		Namespace: f.Namespace.Name,
+		Timeout:   scaleTimeout,
+		Image:     "gcr.io/google_containers/pause-amd64:3.0",
+		Replicas:  replicas,
+		HostPorts: map[string]int{"port1": 4321},
+	}
+	err := framework.RunRC(*config)
+	if expectRunning {
+		framework.ExpectNoError(err)
+	}
+
+}
 
 func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 	By(fmt.Sprintf("Running RC which reserves %v millicores", millicores))
