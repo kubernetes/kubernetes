@@ -112,6 +112,10 @@ func (ctrl *PersistentVolumeController) initializeController(syncPeriod time.Dur
 // addVolume is callback from framework.Controller watching PersistentVolume
 // events.
 func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
+	if !ctrl.isFullySynced() {
+		return
+	}
+
 	pv, ok := obj.(*api.PersistentVolume)
 	if !ok {
 		glog.Errorf("expected PersistentVolume but handler received %+v", obj)
@@ -125,6 +129,10 @@ func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 // updateVolume is callback from framework.Controller watching PersistentVolume
 // events.
 func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{}) {
+	if !ctrl.isFullySynced() {
+		return
+	}
+
 	newVolume, ok := newObj.(*api.PersistentVolume)
 	if !ok {
 		glog.Errorf("Expected PersistentVolume but handler received %+v", newObj)
@@ -144,6 +152,10 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 // addClaim is callback from framework.Controller watching PersistentVolumeClaim
 // events.
 func (ctrl *PersistentVolumeController) addClaim(obj interface{}) {
+	if !ctrl.isFullySynced() {
+		return
+	}
+
 	claim, ok := obj.(*api.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but addClaim received %+v", obj)
@@ -157,6 +169,10 @@ func (ctrl *PersistentVolumeController) addClaim(obj interface{}) {
 // updateClaim is callback from framework.Controller watching PersistentVolumeClaim
 // events.
 func (ctrl *PersistentVolumeController) updateClaim(oldObj, newObj interface{}) {
+	if !ctrl.isFullySynced() {
+		return
+	}
+
 	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but updateClaim received %+v", newObj)
@@ -170,6 +186,10 @@ func (ctrl *PersistentVolumeController) updateClaim(oldObj, newObj interface{}) 
 // deleteClaim is callback from framework.Controller watching PersistentVolumeClaim
 // events.
 func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
+	if !ctrl.isFullySynced() {
+		return
+	}
+
 	var volume *api.PersistentVolume
 	var claim *api.PersistentVolumeClaim
 	var ok bool
@@ -241,4 +261,12 @@ func (ctrl *PersistentVolumeController) Stop() {
 	glog.V(4).Infof("stopping PersistentVolumeController")
 	close(ctrl.volumeControllerStopCh)
 	close(ctrl.claimControllerStopCh)
+}
+
+// isFullySynced returns true, if both volume and claim caches are fully loaded
+// after startup.
+// We do not want to process events with not fully loaded caches - e.g. we might
+// recycle/delete PVs that don't have corresponding claim in the cache yet.
+func (ctrl *PersistentVolumeController) isFullySynced() bool {
+	return ctrl.volumeController.HasSynced() && ctrl.claimController.HasSynced()
 }
