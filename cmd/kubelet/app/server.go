@@ -927,10 +927,10 @@ func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) 
 			if err != nil {
 				return nil, err
 			}
-			if q.Amount.Sign() == -1 {
+			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
-			rl[api.ResourceName(k)] = *q
+			rl[api.ResourceName(k)] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}

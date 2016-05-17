@@ -57,5 +57,5 @@ func Du(path string) (*resource.Quantity, error) {
 		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
 	}
 	used.Format = resource.BinarySI
-	return used, nil
+	return &used, nil
 }

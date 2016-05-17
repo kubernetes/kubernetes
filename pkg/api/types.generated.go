@@ -25,14 +25,13 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
-	pkg4_inf_v0 "gopkg.in/inf.v0"
 	pkg3_resource "k8s.io/kubernetes/pkg/api/resource"
 	pkg2_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	pkg7_fields "k8s.io/kubernetes/pkg/fields"
-	pkg6_labels "k8s.io/kubernetes/pkg/labels"
-	pkg8_runtime "k8s.io/kubernetes/pkg/runtime"
+	pkg6_fields "k8s.io/kubernetes/pkg/fields"
+	pkg5_labels "k8s.io/kubernetes/pkg/labels"
+	pkg7_runtime "k8s.io/kubernetes/pkg/runtime"
 	pkg1_types "k8s.io/kubernetes/pkg/types"
-	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"
+	pkg4_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	time "time"
@@ -68,16 +67,15 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg4_inf_v0.Dec
-		var v1 pkg3_resource.Quantity
-		var v2 pkg2_unversioned.Time
-		var v3 pkg7_fields.Selector
-		var v4 pkg6_labels.Selector
-		var v5 pkg8_runtime.Object
-		var v6 pkg1_types.UID
-		var v7 pkg5_intstr.IntOrString
-		var v8 time.Time
-		_, _, _, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6, v7, v8
+		var v0 pkg3_resource.Quantity
+		var v1 pkg2_unversioned.Time
+		var v2 pkg6_fields.Selector
+		var v3 pkg5_labels.Selector
+		var v4 pkg7_runtime.Object
+		var v5 pkg1_types.UID
+		var v6 pkg4_intstr.IntOrString
+		var v7 time.Time
+		_, _, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6, v7
 	}
 }
 
@@ -16227,7 +16225,7 @@ func (x *HTTPGetAction) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "port":
 			if r.TryDecodeAsNil() {
-				x.Port = pkg5_intstr.IntOrString{}
+				x.Port = pkg4_intstr.IntOrString{}
 			} else {
 				yyv5 := &x.Port
 				yym6 := z.DecBinary()
@@ -16306,7 +16304,7 @@ func (x *HTTPGetAction) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Port = pkg5_intstr.IntOrString{}
+		x.Port = pkg4_intstr.IntOrString{}
 	} else {
 		yyv13 := &x.Port
 		yym14 := z.DecBinary()
@@ -16542,7 +16540,7 @@ func (x *TCPSocketAction) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		switch yys3 {
 		case "port":
 			if r.TryDecodeAsNil() {
-				x.Port = pkg5_intstr.IntOrString{}
+				x.Port = pkg4_intstr.IntOrString{}
 			} else {
 				yyv4 := &x.Port
 				yym5 := z.DecBinary()
@@ -16581,7 +16579,7 @@ func (x *TCPSocketAction) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Port = pkg5_intstr.IntOrString{}
+		x.Port = pkg4_intstr.IntOrString{}
 	} else {
 		yyv7 := &x.Port
 		yym8 := z.DecBinary()
@@ -31535,7 +31533,7 @@ func (x *ServicePort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "targetPort":
 			if r.TryDecodeAsNil() {
-				x.TargetPort = pkg5_intstr.IntOrString{}
+				x.TargetPort = pkg4_intstr.IntOrString{}
 			} else {
 				yyv7 := &x.TargetPort
 				yym8 := z.DecBinary()
@@ -31628,7 +31626,7 @@ func (x *ServicePort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.TargetPort = pkg5_intstr.IntOrString{}
+		x.TargetPort = pkg4_intstr.IntOrString{}
 	} else {
 		yyv14 := &x.TargetPort
 		yym15 := z.DecBinary()
@@ -45477,7 +45475,7 @@ func (x *List) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym9
 					if false {
 					} else {
-						h.encSliceruntime_Object(([]pkg8_runtime.Object)(x.Items), e)
+						h.encSliceruntime_Object(([]pkg7_runtime.Object)(x.Items), e)
 					}
 				}
 			} else {
@@ -45491,7 +45489,7 @@ func (x *List) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym10
 					if false {
 					} else {
-						h.encSliceruntime_Object(([]pkg8_runtime.Object)(x.Items), e)
+						h.encSliceruntime_Object(([]pkg7_runtime.Object)(x.Items), e)
 					}
 				}
 			}
@@ -45628,7 +45626,7 @@ func (x *List) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				_ = yym7
 				if false {
 				} else {
-					h.decSliceruntime_Object((*[]pkg8_runtime.Object)(yyv6), d)
+					h.decSliceruntime_Object((*[]pkg7_runtime.Object)(yyv6), d)
 				}
 			}
 		case "kind":
@@ -45699,7 +45697,7 @@ func (x *List) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		_ = yym14
 		if false {
 		} else {
-			h.decSliceruntime_Object((*[]pkg8_runtime.Object)(yyv13), d)
+			h.decSliceruntime_Object((*[]pkg7_runtime.Object)(yyv13), d)
 		}
 	}
 	yyj10++
@@ -56094,7 +56092,7 @@ func (x codecSelfer1234) decResourceList(v *ResourceList, d *codec1978.Decoder) 
 	yyl1 := r.ReadMapStart()
 	yybh1 := z.DecBasicHandle()
 	if yyv1 == nil {
-		yyrl1, _ := z.DecInferLen(yyl1, yybh1.MaxInitLen, 40)
+		yyrl1, _ := z.DecInferLen(yyl1, yybh1.MaxInitLen, 80)
 		yyv1 = make(map[ResourceName]pkg3_resource.Quantity, yyrl1)
 		*v = yyv1
 	}
@@ -56643,7 +56641,7 @@ func (x codecSelfer1234) decSliceEvent(v *[]Event, d *codec1978.Decoder) {
 	}
 }
 
-func (x codecSelfer1234) encSliceruntime_Object(v []pkg8_runtime.Object, e *codec1978.Encoder) {
+func (x codecSelfer1234) encSliceruntime_Object(v []pkg7_runtime.Object, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -56665,7 +56663,7 @@ func (x codecSelfer1234) encSliceruntime_Object(v []pkg8_runtime.Object, e *code
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *codec1978.Decoder) {
+func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg7_runtime.Object, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -56676,7 +56674,7 @@ func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *cod
 	_ = yyc1
 	if yyl1 == 0 {
 		if yyv1 == nil {
-			yyv1 = []pkg8_runtime.Object{}
+			yyv1 = []pkg7_runtime.Object{}
 			yyc1 = true
 		} else if len(yyv1) != 0 {
 			yyv1 = yyv1[:0]
@@ -56696,10 +56694,10 @@ func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *cod
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
 				} else {
-					yyv1 = make([]pkg8_runtime.Object, yyrl1)
+					yyv1 = make([]pkg7_runtime.Object, yyrl1)
 				}
 			} else {
-				yyv1 = make([]pkg8_runtime.Object, yyrl1)
+				yyv1 = make([]pkg7_runtime.Object, yyrl1)
 			}
 			yyc1 = true
 			yyrr1 = len(yyv1)
@@ -56752,7 +56750,7 @@ func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *cod
 		for ; !r.CheckBreak(); yyj1++ {
 
 			if yyj1 >= len(yyv1) {
-				yyv1 = append(yyv1, nil) // var yyz1 pkg8_runtime.Object
+				yyv1 = append(yyv1, nil) // var yyz1 pkg7_runtime.Object
 				yyc1 = true
 			}
 			yyh1.ElemContainerState(yyj1)
@@ -56779,7 +56777,7 @@ func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *cod
 			yyv1 = yyv1[:yyj1]
 			yyc1 = true
 		} else if yyj1 == 0 && yyv1 == nil {
-			yyv1 = []pkg8_runtime.Object{}
+			yyv1 = []pkg7_runtime.Object{}
 			yyc1 = true
 		}
 	}
