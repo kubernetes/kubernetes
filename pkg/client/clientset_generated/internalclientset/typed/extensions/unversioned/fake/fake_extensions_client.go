@@ -50,6 +50,10 @@ func (c *FakeExtensions) Scales(namespace string) unversioned.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
+func (c *FakeExtensions) Templates(namespace string) unversioned.TemplateInterface {
+	return &FakeTemplates{c, namespace}
+}
+
 func (c *FakeExtensions) ThirdPartyResources() unversioned.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{c}
 }

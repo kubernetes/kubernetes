@@ -1111,24 +1111,24 @@ type PodSecurityPolicyList struct {
 // Parameter values maybe set at processing time.
 type Template struct {
 	unversioned.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty"`
+	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Spec TemplateSpec `json:"spec"`
+	Spec TemplateSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type TemplateSpec struct {
 	// Parameters is a list of Parameters used to substitute values into Template Objects
-	Parameters []Parameter `json:"parameters,omitempty"`
+	Parameters []Parameter `json:"parameters,omitempty" protobuf:"bytes,1,rep,name=parameters"`
 
 	// Objects is a list of partially complete Objects with substitution symbols.
-	Objects []runtime.RawExtension `json:"objects"`
+	Objects []runtime.RawExtension `json:"objects" protobuf:"bytes,2,rep,name=objects"`
 }
 
 // TemplateList is a list of Template objects.
 type TemplateList struct {
 	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,omitempty"`
-	Items                []Template `json:"items,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items                []Template `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 }
 
 const (
@@ -1142,31 +1142,31 @@ const (
 // Template processing time.
 type Parameter struct {
 	// Name defines the symbol to be replaced.  Name should appear as $(Name) in Objects.
-	Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// DisplayName is used instead of Name when displaying the Parameter in a UI
-	DisplayName *string `json:"displayName,omitempty"`
+	DisplayName *string `json:"displayName,omitempty" protobuf:"bytes,2,opt,name=displayName"`
 
 	// Description is used to give context about the Parameter, such as its purpose
 	// and what values are acceptable.
-	Description *string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty" protobuf:"bytes,3,opt,name=description"`
 
 	// Value holds a default value to replace all occurrences of $(Name) within the Template's
 	// Objects when the Template is processed.  The Value maybe overridden at Template
 	// processing time.  If no Value is provided as a default or override, then
 	// the empty string will be used for substitution.
-	Value *string `json:"value,omitempty"`
+	Value *string `json:"value,omitempty" protobuf:"bytes,4,opt,name=value"`
 
 	// Required indicates the parameter must have a non-empty value when the Template is processed.
 	// Parameters of Type 'integer' and 'boolean' are always Required.
-	Required *bool `json:"required,omitempty"`
+	Required *bool `json:"required,omitempty" protobuf:"varint,5,opt,name=required"`
 
 	// Type is the type that the parameter value must be parsed to. Type may be one of
 	// 'string', 'integer', 'boolean', or 'base64'.
 	// Type is used by clients to provide validation of user input and direction to users.
 	//  Parameters used to define integer or boolean fields (e.g. replicaCount) should have the
 	// Type set to integer or boolean accordingly.
-	Type *string `json:"type,omitempty"`
+	Type *string `json:"type,omitempty" protobuf:"bytes,6,opt,name=type"`
 }
 
 // TemplateParameters contains the substitution parameter overrides when processing a Template
@@ -1174,9 +1174,9 @@ type TemplateParameters struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// Name is the name of the Template to be processed.
-        Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// ParameterValues is a map of substitution parameter name:value pairs to be expanded in the Template.
 	// Values defined in this map will override any defaults already set in the Template.
-	ParameterValues map[string]string `json:"parameters,omitempty"`
+	ParameterValues map[string]string `json:"parameters,omitempty" protobuf:"bytes,2,rep,name=parameters"`
 }

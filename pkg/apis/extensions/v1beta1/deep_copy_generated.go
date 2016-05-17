@@ -26,6 +26,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -73,6 +74,7 @@ func init() {
 		DeepCopy_v1beta1_LabelSelector,
 		DeepCopy_v1beta1_LabelSelectorRequirement,
 		DeepCopy_v1beta1_ListOptions,
+		DeepCopy_v1beta1_Parameter,
 		DeepCopy_v1beta1_PodSecurityPolicy,
 		DeepCopy_v1beta1_PodSecurityPolicyList,
 		DeepCopy_v1beta1_PodSecurityPolicySpec,
@@ -90,6 +92,10 @@ func init() {
 		DeepCopy_v1beta1_ScaleStatus,
 		DeepCopy_v1beta1_SubresourceReference,
 		DeepCopy_v1beta1_SupplementalGroupsStrategyOptions,
+		DeepCopy_v1beta1_Template,
+		DeepCopy_v1beta1_TemplateList,
+		DeepCopy_v1beta1_TemplateParameters,
+		DeepCopy_v1beta1_TemplateSpec,
 		DeepCopy_v1beta1_ThirdPartyResource,
 		DeepCopy_v1beta1_ThirdPartyResourceData,
 		DeepCopy_v1beta1_ThirdPartyResourceDataList,
@@ -796,6 +802,46 @@ func DeepCopy_v1beta1_ListOptions(in ListOptions, out *ListOptions, c *conversio
 	return nil
 }
 
+func DeepCopy_v1beta1_Parameter(in Parameter, out *Parameter, c *conversion.Cloner) error {
+	out.Name = in.Name
+	if in.DisplayName != nil {
+		in, out := in.DisplayName, &out.DisplayName
+		*out = new(string)
+		**out = *in
+	} else {
+		out.DisplayName = nil
+	}
+	if in.Description != nil {
+		in, out := in.Description, &out.Description
+		*out = new(string)
+		**out = *in
+	} else {
+		out.Description = nil
+	}
+	if in.Value != nil {
+		in, out := in.Value, &out.Value
+		*out = new(string)
+		**out = *in
+	} else {
+		out.Value = nil
+	}
+	if in.Required != nil {
+		in, out := in.Required, &out.Required
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.Required = nil
+	}
+	if in.Type != nil {
+		in, out := in.Type, &out.Type
+		*out = new(string)
+		**out = *in
+	} else {
+		out.Type = nil
+	}
+	return nil
+}
+
 func DeepCopy_v1beta1_PodSecurityPolicy(in PodSecurityPolicy, out *PodSecurityPolicy, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1085,6 +1131,83 @@ func DeepCopy_v1beta1_SupplementalGroupsStrategyOptions(in SupplementalGroupsStr
 		}
 	} else {
 		out.Ranges = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1beta1_Template(in Template, out *Template, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1beta1_TemplateSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeepCopy_v1beta1_TemplateList(in TemplateList, out *TemplateList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]Template, len(in))
+		for i := range in {
+			if err := DeepCopy_v1beta1_Template(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1beta1_TemplateParameters(in TemplateParameters, out *TemplateParameters, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	if in.ParameterValues != nil {
+		in, out := in.ParameterValues, &out.ParameterValues
+		*out = make(map[string]string)
+		for key, val := range in {
+			(*out)[key] = val
+		}
+	} else {
+		out.ParameterValues = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1beta1_TemplateSpec(in TemplateSpec, out *TemplateSpec, c *conversion.Cloner) error {
+	if in.Parameters != nil {
+		in, out := in.Parameters, &out.Parameters
+		*out = make([]Parameter, len(in))
+		for i := range in {
+			if err := DeepCopy_v1beta1_Parameter(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Parameters = nil
+	}
+	if in.Objects != nil {
+		in, out := in.Objects, &out.Objects
+		*out = make([]runtime.RawExtension, len(in))
+		for i := range in {
+			if err := runtime.DeepCopy_runtime_RawExtension(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Objects = nil
 	}
 	return nil
 }
