@@ -46,15 +46,20 @@ func NewPersistentVolumeController(
 	provisioner vol.ProvisionableVolumePlugin,
 	recyclers []vol.VolumePlugin,
 	cloud cloudprovider.Interface,
-	clusterName string) *PersistentVolumeController {
+	clusterName string,
+	volumeSource, claimSource cache.ListerWatcher,
+	eventRecorder record.EventRecorder,
+) *PersistentVolumeController {
 
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "persistentvolume-controller"})
+	if eventRecorder == nil {
+		broadcaster := record.NewBroadcaster()
+		broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+		eventRecorder = broadcaster.NewRecorder(api.EventSource{Component: "persistentvolume-controller"})
+	}
 
 	controller := &PersistentVolumeController{
 		kubeClient:                    kubeClient,
-		eventRecorder:                 recorder,
+		eventRecorder:                 eventRecorder,
 		runningOperations:             make(map[string]bool),
 		cloud:                         cloud,
 		provisioner:                   provisioner,
@@ -62,6 +67,7 @@ func NewPersistentVolumeController(
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 	}
+
 	controller.recyclePluginMgr.InitPlugins(recyclers, controller)
 	if controller.provisioner != nil {
 		if err := controller.provisioner.Init(controller); err != nil {
@@ -69,56 +75,50 @@ func NewPersistentVolumeController(
 		}
 	}
 
-	volumeSource := &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Core().PersistentVolumes().List(options)
-		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return kubeClient.Core().PersistentVolumes().Watch(options)
-		},
+	if volumeSource == nil {
+		volumeSource = &cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return kubeClient.Core().PersistentVolumes().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return kubeClient.Core().PersistentVolumes().Watch(options)
+			},
+		}
 	}
 
-	claimSource := &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
-		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return kubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
-		},
+	if claimSource == nil {
+		claimSource = &cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return kubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return kubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
+			},
+		}
 	}
 
-	controller.initializeController(syncPeriod, volumeSource, claimSource)
-
-	return controller
-}
-
-// initializeController prepares watching for PersistentVolume and
-// PersistentVolumeClaim events from given sources. This should be used to
-// initialize the controller for real operation (with real event sources) and
-// also during testing (with fake ones).
-func (ctrl *PersistentVolumeController) initializeController(syncPeriod time.Duration, volumeSource, claimSource cache.ListerWatcher) {
-	glog.V(4).Infof("initializing PersistentVolumeController, sync every %s", syncPeriod.String())
-	ctrl.volumes.store, ctrl.volumeController = framework.NewIndexerInformer(
+	controller.volumes.store, controller.volumeController = framework.NewIndexerInformer(
 		volumeSource,
 		&api.PersistentVolume{},
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
-			AddFunc:    ctrl.addVolume,
-			UpdateFunc: ctrl.updateVolume,
-			DeleteFunc: ctrl.deleteVolume,
+			AddFunc:    controller.addVolume,
+			UpdateFunc: controller.updateVolume,
+			DeleteFunc: controller.deleteVolume,
 		},
 		cache.Indexers{"accessmodes": accessModesIndexFunc},
 	)
-	ctrl.claims, ctrl.claimController = framework.NewInformer(
+	controller.claims, controller.claimController = framework.NewInformer(
 		claimSource,
 		&api.PersistentVolumeClaim{},
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
-			AddFunc:    ctrl.addClaim,
-			UpdateFunc: ctrl.updateClaim,
-			DeleteFunc: ctrl.deleteClaim,
+			AddFunc:    controller.addClaim,
+			UpdateFunc: controller.updateClaim,
+			DeleteFunc: controller.deleteClaim,
 		},
 	)
+	return controller
 }
 
 // addVolume is callback from framework.Controller watching PersistentVolume
