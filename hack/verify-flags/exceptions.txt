@@ -64,13 +64,9 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  va
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/vitess/env.sh:    node_ip=$(get_node_ip)
-hack/jenkins/job-builder-image/Dockerfile:# JJB configuration lives in /etc/jenkins_jobs/jenkins_jobs.ini
-hack/jenkins/update-jobs.sh:    docker cp jenkins_jobs.ini job-builder:/etc/jenkins_jobs
-hack/jenkins/update-jobs.sh:    echo "jenkins_jobs.ini not found in workspace" >&2
-hack/jenkins/update-jobs.sh:  # jenkins_jobs.ini contains administrative credentials for Jenkins.
-hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
+hack/test-update-storage-objects.sh:  local storage_media_type=${2:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${1:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
@@ -88,8 +84,8 @@ test/e2e/es_cluster_logging.go:		framework.Failf("No cluster_name field in Elast
 test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
 test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
 test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
+test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
 test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
-test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
