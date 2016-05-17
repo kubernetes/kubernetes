@@ -47,7 +47,11 @@ const (
 	// We'll attempt to recompute the required replicas of all replication controllers
 	// that have fulfilled their expectations at least this often. This recomputation
 	// happens based on contents in local pod storage.
-	FullControllerResyncPeriod = 30 * time.Second
+	// Full Resync shouldn't be needed at all in a healthy system. This is a protection
+	// against disappearing objects and watch notification, that we believe should not
+	// happen at all.
+	// TODO: We should get rid of it completely in the fullness of time.
+	FullControllerResyncPeriod = 10 * time.Minute
 
 	// Realistic value of the burstReplica field for the replication manager based off
 	// performance requirements for kubernetes 1.0.
@@ -477,6 +481,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)
+					rm.enqueueController(rc)
 					utilruntime.HandleError(err)
 				}
 			}()
@@ -518,6 +523,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					podKey := controller.PodKey(filteredPods[ix])
 					glog.V(2).Infof("Failed to delete %v due to %v, decrementing expectations for controller %q/%q", podKey, err, rc.Namespace, rc.Name)
 					rm.expectations.DeletionObserved(rcKey, podKey)
+					rm.enqueueController(rc)
 					utilruntime.HandleError(err)
 				}
 			}(i)
