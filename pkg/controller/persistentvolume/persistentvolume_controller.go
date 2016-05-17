@@ -651,14 +651,27 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
-			// This block collapses into a NOP; we're leaving this here for
-			// completeness.
 			if hasAnnotation(volume.ObjectMeta, annBoundByController) {
 				// The binding is not completed; let PVC sync handle it
 				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume not bound yet, waiting for syncClaim to fix it", volume.Name)
 			} else {
 				// Dangling PV; try to re-establish the link in the PVC sync
 				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume was bound and got unbound (by user?), waiting for syncClaim to fix it", volume.Name)
+			}
+			// In both cases, the volume is Bound and the claim is Pending.
+			// Next syncClaim will fix it. To speed it up, we enqueue the claim
+			// into the controller, which results in syncClaim to be called
+			// shortly (and in the right goroutine).
+			// This speeds up binding of provisioned volumes - provisioner saves
+			// only the new PV and it expects that next syncClaim will bind the
+			// claim to it.
+			clone, err := conversion.NewCloner().DeepCopy(claim)
+			if err != nil {
+				return fmt.Errorf("error cloning claim %q: %v", claimToClaimKey(claim), err)
+			}
+			err = ctrl.claimController.Requeue(clone)
+			if err != nil {
+				return fmt.Errorf("error enqueing claim %q for faster sync: %v", claimToClaimKey(claim), err)
 			}
 			return nil
 		} else if claim.Spec.VolumeName == volume.Name {
