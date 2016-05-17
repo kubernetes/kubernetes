@@ -405,9 +405,8 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 				} else {
 					// This should never happen because someone had to remove
 					// annBindCompleted annotation on the claim.
-					otherClaimName := fmt.Sprintf("%s/%s", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
-					glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), otherClaimName)
-					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, otherClaimName)
+					glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
+					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 				}
 			}
 		}
@@ -454,7 +453,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 			return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
 		}
 
-		glog.V(4).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, ctrl.getVolumeStatusForLogging(volume))
+		glog.V(4).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, getVolumeStatusForLogging(volume))
 		if volume.Spec.ClaimRef == nil {
 			// Claim is bound but volume has come unbound.
 			// Or, a claim was bound and the controller has not received updated
@@ -481,10 +480,9 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 			// Claim is bound but volume has a different claimant.
 			// Set the claim phase to 'Lost', which is a terminal
 			// phase.
-			otherClaimName := fmt.Sprintf("%s/%s", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
 			if claim.Status.Phase != api.ClaimLost {
 				// Log the error only once, when we enter 'Lost' phase
-				glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q bound to another claim %q, this claim is lost!", claimToClaimKey(claim), claim.Spec.VolumeName, otherClaimName)
+				glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q bound to another claim %q, this claim is lost!", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 			}
 			// TODO: emit event and save reason
 			if _, err = ctrl.updateClaimPhase(claim, api.ClaimLost); err != nil {
@@ -502,7 +500,164 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume) error {
 	glog.V(4).Infof("synchronizing PersistentVolume[%s]: %s", volume.Name, getVolumeStatusForLogging(volume))
 
-	return nil
+	// [Unit test set 4]
+	if volume.Spec.ClaimRef == nil {
+		// Volume is unused
+		glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is unused", volume.Name)
+		if _, err := ctrl.updateVolumePhase(volume, api.VolumeAvailable); err != nil {
+			// Nothing was saved; we will fall back into the same
+			// condition in the next call to this method
+			return err
+		}
+		return nil
+	} else /* pv.Spec.ClaimRef != nil */ {
+		// Volume is bound to a claim.
+		if volume.Spec.ClaimRef.UID == "" {
+			// The PV is reserved for a PVC; that PVC has not yet been
+			// bound to this PV; the PVC sync will handle it.
+			glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is pre-bound to claim %s", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
+			if _, err := ctrl.updateVolumePhase(volume, api.VolumeAvailable); err != nil {
+				// Nothing was saved; we will fall back into the same
+				// condition in the next call to this method
+				return err
+			}
+			return nil
+		}
+		glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is bound to claim %s", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
+		// Get the PVC by _name_
+		var claim *api.PersistentVolumeClaim
+		claimName := claimrefToClaimKey(volume.Spec.ClaimRef)
+		obj, found, err := ctrl.claims.GetByKey(claimName)
+		if err != nil {
+			return err
+		}
+		if !found {
+			glog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s not found", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
+			// Fall through with claim = nil
+		} else {
+			var ok bool
+			claim, ok = obj.(*api.PersistentVolumeClaim)
+			if !ok {
+				return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
+			}
+			glog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s found: %s", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef), getClaimStatusForLogging(claim))
+		}
+		if claim != nil && claim.UID != volume.Spec.ClaimRef.UID {
+			// The claim that the PV was pointing to was deleted, and another
+			// with the same name created.
+			glog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s has different UID, the old one must have been deleted", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
+			// Treat the volume as bound to a missing claim.
+			claim = nil
+		}
+
+		if claim == nil {
+			// If we get into this block, the claim must have been deleted;
+			// NOTE: reclaimVolume may either release the PV back into the pool or
+			// recycle it or do nothing (retain)
+
+			// Do not overwrite previous Failed state - let the user see that
+			// something went wrong, while we still re-try to reclaim the
+			// volume.
+			if volume.Status.Phase != api.VolumeReleased && volume.Status.Phase != api.VolumeFailed {
+				// Also, log this only once:
+				glog.V(2).Infof("volume %q is released and reclaim policy %q will be executed", volume.Name, volume.Spec.PersistentVolumeReclaimPolicy)
+				if volume, err = ctrl.updateVolumePhase(volume, api.VolumeReleased); err != nil {
+					// Nothing was saved; we will fall back into the same condition
+					// in the next call to this method
+					return err
+				}
+			}
+
+			// HOWTO RELEASE A PV
+			if volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRetain {
+				glog.V(4).Infof("synchronizing PersistentVolume[%s]: policy is Retain, nothing to do", volume.Name)
+				return nil
+			}
+			// TODO: implement recycler
+			return nil
+			/*
+				else if pv.Spec.ReclaimPolicy == "Delete" {
+					plugin := findDeleterPluginForPV(pv)
+					if plugin != nil {
+						// maintain a map with the current deleter goroutines that are running
+						// if the key is already present in the map, return
+						//
+						// launch the goroutine that:
+						// 1. deletes the storage asset
+						// 2. deletes the PV API object
+						// 3. deletes itself from the map when it's done
+					} else {
+						// make an event calling out that no deleter was configured
+						// mark the PV as failed
+						// NB: external provisioners/deleters are currently not
+						// considered.
+					}
+				} else if pv.Spec.ReclaimPolicy == "Recycle" {
+					plugin := findRecyclerPluginForPV(pv)
+					if plugin != nil {
+						// maintain a map of running scrubber-pod-monitoring
+						// goroutines, guarded by mutex
+						//
+						// launch a goroutine that:
+						// 0. verify the PV object still needs to be recycled or return
+						// 1. launches a scrubber pod; the pod's name is deterministically created based on PV uid
+						// 2. if the pod is rejected for dup, adopt the existing pod
+						// 2.5. if the pod is rejected for any other reason, retry later
+						// 3. else (the create succeeds), ok
+						// 4. wait for pod completion
+						// 5. marks the PV API object as available
+						// 5.5. clear ClaimRef.UID
+						// 5.6. if boundByController, clear ClaimRef & boundByController annotation
+						// 6. deletes itself from the map when it's done
+					} else {
+						// make an event calling out that no recycler was configured
+						// mark the PV as failed
+					}
+				}*/
+		} else if claim.Spec.VolumeName == "" {
+			// This block collapses into a NOP; we're leaving this here for
+			// completeness.
+			if hasAnnotation(volume.ObjectMeta, annBoundByController) {
+				// The binding is not completed; let PVC sync handle it
+				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume not bound yet, waiting for syncClaim to fix it", volume.Name)
+			} else {
+				// Dangling PV; try to re-establish the link in the PVC sync
+				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume was bound and got unbound (by user?), waiting for syncClaim to fix it", volume.Name)
+			}
+			return nil
+		} else if claim.Spec.VolumeName == volume.Name {
+			// Volume is bound to a claim properly, update status if necessary
+			glog.V(4).Infof("synchronizing PersistentVolume[%s]: all is bound", volume.Name)
+			if _, err = ctrl.updateVolumePhase(volume, api.VolumeBound); err != nil {
+				// Nothing was saved; we will fall back into the same
+				// condition in the next call to this method
+				return err
+			}
+			return nil
+		} else {
+			// Volume is bound to a claim, but the claim is bound elsewhere
+			if hasAnnotation(volume.ObjectMeta, annBoundByController) {
+				// This is part of the normal operation of the controller; the
+				// controller tried to use this volume for a claim but the claim
+				// was fulfilled by another volume. We did this; fix it.
+				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is bound by controller to a claim that is bound to another volume, unbinding", volume.Name)
+				if err = ctrl.unbindVolume(volume); err != nil {
+					return err
+				}
+				return nil
+			} else {
+				// The PV must have been created with this ptr; leave it alone.
+				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is bound by user to a claim that is bound to another volume, waiting for the claim to get unbound", volume.Name)
+				// This just updates the volume phase and clears
+				// volume.Spec.ClaimRef.UID. It leaves the volume pre-bound
+				// to the claim.
+				if err = ctrl.unbindVolume(volume); err != nil {
+					return err
+				}
+				return nil
+			}
+		}
+	}
 }
 
 // Run starts all of this controller's control loops
@@ -741,6 +896,52 @@ func (ctrl *PersistentVolumeController) bind(volume *api.PersistentVolume, claim
 	glog.V(4).Infof("volume %q status after binding: %s", volume.Name, getVolumeStatusForLogging(volume))
 	glog.V(4).Infof("claim %q status after binding: %s", claimToClaimKey(claim), getClaimStatusForLogging(claim))
 	return nil
+}
+
+// unbindVolume rolls back previous binding of the volume. This may be necessary
+// when two controllers bound two volumes to single claim - when we detect this,
+// only one binding succeeds and the second one must be rolled back.
+// This method updates both Spec and Status.
+// It returns on first error, it's up to the caller to implement some retry
+// mechanism.
+func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolume) error {
+	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
+
+	// Save the PV only when any modification is neccesary.
+	clone, err := conversion.NewCloner().DeepCopy(volume)
+	if err != nil {
+		return fmt.Errorf("Error cloning pv: %v", err)
+	}
+	volumeClone, ok := clone.(*api.PersistentVolume)
+	if !ok {
+		return fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
+	}
+
+	if hasAnnotation(volume.ObjectMeta, annBoundByController) {
+		// The volume was bound by the controller.
+		volumeClone.Spec.ClaimRef = nil
+		delete(volumeClone.Annotations, annBoundByController)
+		if len(volumeClone.Annotations) == 0 {
+			// No annotations look better than empty annotation map (and it's easier
+			// to test).
+			volumeClone.Annotations = nil
+		}
+	} else {
+		// The volume was pre-bound by user. Clear only the binging UID.
+		volumeClone.Spec.ClaimRef.UID = ""
+	}
+
+	newVol, err := ctrl.kubeClient.Core().PersistentVolumes().Update(volumeClone)
+	if err != nil {
+		glog.V(4).Infof("updating PersistentVolume[%s]: rollback failed: %v", volume.Name, err)
+		return err
+	}
+	glog.V(4).Infof("updating PersistentVolume[%s]: rolled back", newVol.Name)
+
+	// Update the status
+	_, err = ctrl.updateVolumePhase(newVol, api.VolumeAvailable)
+	return err
+
 }
 
 func hasAnnotation(obj api.ObjectMeta, ann string) bool {

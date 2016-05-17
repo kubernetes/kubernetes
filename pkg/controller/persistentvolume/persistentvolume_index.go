@@ -244,3 +244,7 @@ func (c byAccessModes) Len() int {
 func claimToClaimKey(claim *api.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
 }
+
+func claimrefToClaimKey(claimref *api.ObjectReference) string {
+	return fmt.Sprintf("%s/%s", claimref.Namespace, claimref.Name)
+}

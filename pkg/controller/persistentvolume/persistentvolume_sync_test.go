@@ -283,6 +283,97 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim3-6", "uid3-6", "10Gi", "volume3-6", api.ClaimLost, annBindCompleted),
 			testSyncClaim,
 		},
+		// [Unit test set 4] All syncVolume tests.
+		{
+			// syncVolume with pending volume. Check it's marked as Available.
+			"4-1 - pending volume",
+			newVolumeArray("volume4-1", "10Gi", "", "", api.VolumePending),
+			newVolumeArray("volume4-1", "10Gi", "", "", api.VolumeAvailable),
+			noclaims,
+			noclaims,
+			testSyncVolume,
+		},
+		{
+			// syncVolume with prebound pending volume. Check it's marked as
+			// Available.
+			"4-2 - pending prebound volume",
+			newVolumeArray("volume4-2", "10Gi", "", "claim4-2", api.VolumePending),
+			newVolumeArray("volume4-2", "10Gi", "", "claim4-2", api.VolumeAvailable),
+			noclaims,
+			noclaims,
+			testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound to missing claim.
+			// Check the volume gets Released
+			"4-3 - bound volume with missing claim",
+			newVolumeArray("volume4-3", "10Gi", "uid4-3", "claim4-3", api.VolumeBound),
+			newVolumeArray("volume4-3", "10Gi", "uid4-3", "claim4-3", api.VolumeReleased),
+			noclaims,
+			noclaims,
+			testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound to claim with different UID.
+			// Check the volume gets Released.
+			"4-4 - volume bound to claim with different UID",
+			newVolumeArray("volume4-4", "10Gi", "uid4-4", "claim4-4", api.VolumeBound),
+			newVolumeArray("volume4-4", "10Gi", "uid4-4", "claim4-4", api.VolumeReleased),
+			newClaimArray("claim4-4", "uid4-4-x", "10Gi", "volume4-4", api.ClaimBound, annBindCompleted),
+			newClaimArray("claim4-4", "uid4-4-x", "10Gi", "volume4-4", api.ClaimBound, annBindCompleted),
+			testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound by controller to unbound claim.
+			// Check syncVolume does not do anything.
+			"4-5 - volume bound by controller to unbound claim",
+			newVolumeArray("volume4-5", "10Gi", "uid4-5", "claim4-5", api.VolumeBound, annBoundByController),
+			newVolumeArray("volume4-5", "10Gi", "uid4-5", "claim4-5", api.VolumeBound, annBoundByController),
+			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
+			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
+			testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound by user to unbound claim.
+			// Check syncVolume does not do anything.
+			"4-5 - volume bound by user to bound claim",
+			newVolumeArray("volume4-5", "10Gi", "uid4-5", "claim4-5", api.VolumeBound),
+			newVolumeArray("volume4-5", "10Gi", "uid4-5", "claim4-5", api.VolumeBound),
+			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
+			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
+			testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound to bound claim.
+			// Check that the volume is marked as Bound.
+			"4-6 - volume bound by to bound claim",
+			newVolumeArray("volume4-6", "10Gi", "uid4-6", "claim4-6", api.VolumeAvailable),
+			newVolumeArray("volume4-6", "10Gi", "uid4-6", "claim4-6", api.VolumeBound),
+			newClaimArray("claim4-6", "uid4-6", "10Gi", "volume4-6", api.ClaimBound),
+			newClaimArray("claim4-6", "uid4-6", "10Gi", "volume4-6", api.ClaimBound),
+			testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound by controller to claim bound to
+			// another volume. Check that the volume is rolled back.
+			"4-7 - volume bound by controller to claim bound somewhere else",
+			newVolumeArray("volume4-7", "10Gi", "uid4-7", "claim4-7", api.VolumeBound, annBoundByController),
+			newVolumeArray("volume4-7", "10Gi", "", "", api.VolumeAvailable),
+			newClaimArray("claim4-7", "uid4-7", "10Gi", "volume4-7-x", api.ClaimBound),
+			newClaimArray("claim4-7", "uid4-7", "10Gi", "volume4-7-x", api.ClaimBound),
+			testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound by user to claim bound to
+			// another volume. Check that the volume is marked as Available
+			// and its UID is reset.
+			"4-8 - volume bound by user to claim bound somewhere else",
+			newVolumeArray("volume4-8", "10Gi", "uid4-8", "claim4-8", api.VolumeBound),
+			newVolumeArray("volume4-8", "10Gi", "", "claim4-8", api.VolumeAvailable),
+			newClaimArray("claim4-8", "uid4-8", "10Gi", "volume4-8-x", api.ClaimBound),
+			newClaimArray("claim4-8", "uid4-8", "10Gi", "volume4-8-x", api.ClaimBound),
+			testSyncVolume,
+		},
 	}
 	runSyncTests(t, tests)
 }
