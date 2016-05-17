@@ -81,26 +81,145 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-6", "uid11-6", "1Gi", "", api.ClaimPending, annClass),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-6", "uid11-6", "1Gi", "", api.ClaimPending, annClass),
-			noevents,
+			noevents, noerrors,
 			// No provisioning plugin confingure - makes the test fail when
 			// the controller errorneously tries to provision something
 			wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
 		},
-		/*		{
-				// Provision success? - claim is bound before provisioner creates
-				// a volume.
-				"11-7 - claim is bound before provisioning",
-				novolumes,
-				novolumes,
-				[]*api.PersistentVolumeClaim{
-					newClaim("claim11-7", "uid11-7", "1Gi", "", api.ClaimPending, annClass),
+		{
+			// Provision success? - claim is bound before provisioner creates
+			// a volume.
+			"11-7 - claim is bound before provisioning",
+			novolumes,
+			newVolumeArray("pv-provisioned-for-uid11-7", "1Gi", "uid11-7", "claim11-7", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			newClaimArray("claim11-7", "uid11-7", "1Gi", "", api.ClaimPending, annClass),
+			// The claim would be bound in next syncClaim
+			newClaimArray("claim11-7", "uid11-7", "1Gi", "", api.ClaimPending, annClass),
+			noevents, noerrors,
+			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationProvision, []error{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+				// Create a volume before provisionClaimOperation starts.
+				// This similates a parallel controller provisioning the volume.
+				reactor.lock.Lock()
+				volume := newVolume("pv-provisioned-for-uid11-7", "1Gi", "uid11-7", "claim11-7", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned)
+				reactor.volumes[volume.Name] = volume
+				reactor.lock.Unlock()
+			}),
+		},
+		{
+			// Provision success - cannot save provisioned PV once,
+			// second retry succeeds
+			"11-8 - cannot save provisioned volume",
+			novolumes,
+			newVolumeArray("pv-provisioned-for-uid11-8", "1Gi", "uid11-8", "claim11-8", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			newClaimArray("claim11-8", "uid11-8", "1Gi", "", api.ClaimPending, annClass),
+			// Binding will be completed in the next syncClaim
+			newClaimArray("claim11-8", "uid11-8", "1Gi", "", api.ClaimPending, annClass),
+			noevents,
+			[]reactorError{
+				// Inject error to the first
+				// kubeclient.PersistentVolumes.Create() call. All other calls
+				// will succeed.
+				{"create", "persistentvolumes", errors.New("Mock creation error")},
+			},
+			wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+		},
+		{
+			// Provision success? - cannot save provisioned PV five times,
+			// volume is deleted and delete succeeds
+			"11-9 - cannot save provisioned volume, delete succeeds",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-9", "uid11-9", "1Gi", "", api.ClaimPending, annClass),
+			newClaimArray("claim11-9", "uid11-9", "1Gi", "", api.ClaimPending, annClass),
+			[]string{"Warning ProvisioningFailed"},
+			[]reactorError{
+				// Inject error to five kubeclient.PersistentVolumes.Create()
+				// calls
+				{"create", "persistentvolumes", errors.New("Mock creation error1")},
+				{"create", "persistentvolumes", errors.New("Mock creation error2")},
+				{"create", "persistentvolumes", errors.New("Mock creation error3")},
+				{"create", "persistentvolumes", errors.New("Mock creation error4")},
+				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+			},
+			wrapTestWithControllerConfig(operationDelete, []error{nil},
+				wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim)),
+		},
+		{
+			// Provision failure - cannot save provisioned PV five times,
+			// volume delete failed - no plugin found
+			"11-10 - cannot save provisioned volume, no delete plugin found",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-10", "uid11-10", "1Gi", "", api.ClaimPending, annClass),
+			newClaimArray("claim11-10", "uid11-10", "1Gi", "", api.ClaimPending, annClass),
+			[]string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
+			[]reactorError{
+				// Inject error to five kubeclient.PersistentVolumes.Create()
+				// calls
+				{"create", "persistentvolumes", errors.New("Mock creation error1")},
+				{"create", "persistentvolumes", errors.New("Mock creation error2")},
+				{"create", "persistentvolumes", errors.New("Mock creation error3")},
+				{"create", "persistentvolumes", errors.New("Mock creation error4")},
+				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+			},
+			// No deleteCalls are configured, which results into no deleter plugin available for the volume
+			wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+		},
+		{
+			// Provision failure - cannot save provisioned PV five times,
+			// volume delete failed - deleter returns error five times
+			"11-11 - cannot save provisioned volume, deleter fails",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-11", "uid11-11", "1Gi", "", api.ClaimPending, annClass),
+			newClaimArray("claim11-11", "uid11-11", "1Gi", "", api.ClaimPending, annClass),
+			[]string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
+			[]reactorError{
+				// Inject error to five kubeclient.PersistentVolumes.Create()
+				// calls
+				{"create", "persistentvolumes", errors.New("Mock creation error1")},
+				{"create", "persistentvolumes", errors.New("Mock creation error2")},
+				{"create", "persistentvolumes", errors.New("Mock creation error3")},
+				{"create", "persistentvolumes", errors.New("Mock creation error4")},
+				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+			},
+			wrapTestWithControllerConfig(
+				operationDelete, []error{
+					errors.New("Mock deletion error1"),
+					errors.New("Mock deletion error2"),
+					errors.New("Mock deletion error3"),
+					errors.New("Mock deletion error4"),
+					errors.New("Mock deletion error5"),
 				},
-				[]*api.PersistentVolumeClaim{
-					newClaim("claim11-7", "uid11-7", "1Gi", "volume11-7", api.ClaimBound, annClass, annBindCompleted),
+				wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			),
+		},
+		{
+			// Provision failure - cannot save provisioned PV five times,
+			// volume delete succeeds 2nd time
+			"11-12 - cannot save provisioned volume, delete succeeds 2nd time",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-12", "uid11-12", "1Gi", "", api.ClaimPending, annClass),
+			newClaimArray("claim11-12", "uid11-12", "1Gi", "", api.ClaimPending, annClass),
+			[]string{"Warning ProvisioningFailed"},
+			[]reactorError{
+				// Inject error to five kubeclient.PersistentVolumes.Create()
+				// calls
+				{"create", "persistentvolumes", errors.New("Mock creation error1")},
+				{"create", "persistentvolumes", errors.New("Mock creation error2")},
+				{"create", "persistentvolumes", errors.New("Mock creation error3")},
+				{"create", "persistentvolumes", errors.New("Mock creation error4")},
+				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+			},
+			wrapTestWithControllerConfig(
+				operationDelete, []error{
+					errors.New("Mock deletion error1"),
+					nil,
 				},
-				[]string{"Warning ProvisioningFailed"},
-				getSyncClaimWithOperation(operationProvision, []error{errors.New("Moc provisioner error")}),
-			}, */
+				wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			),
+		},
 	}
 	runSyncTests(t, tests)
 }
