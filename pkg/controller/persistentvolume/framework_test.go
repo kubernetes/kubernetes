@@ -484,27 +484,27 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 	return reactor
 }
 
-func newPersistentVolumeController(kubeClient clientset.Interface, volumeSource, claimSource cache.ListerWatcher) *PersistentVolumeController {
-	ctrl := &PersistentVolumeController{
-		volumes:           newPersistentVolumeOrderedIndex(),
-		claims:            cache.NewStore(cache.MetaNamespaceKeyFunc),
-		kubeClient:        kubeClient,
-		eventRecorder:     record.NewFakeRecorder(1000),
-		runningOperations: make(map[string]bool),
-
-		// Speed up the testing
-		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
-		createProvisionedPVInterval:   5 * time.Millisecond,
-	}
-
-	// Create dummy volume/claim sources for controller watchers when needed
+func newTestController(kubeClient clientset.Interface, volumeSource, claimSource cache.ListerWatcher) *PersistentVolumeController {
 	if volumeSource == nil {
 		volumeSource = framework.NewFakeControllerSource()
 	}
 	if claimSource == nil {
 		claimSource = framework.NewFakeControllerSource()
 	}
-	ctrl.initializeController(5*time.Second, volumeSource, claimSource)
+	ctrl := NewPersistentVolumeController(
+		kubeClient,
+		5*time.Second,        // sync period
+		nil,                  // provisioner
+		[]vol.VolumePlugin{}, // recyclers
+		nil,                  // cloud
+		"",
+		volumeSource,
+		claimSource,
+		record.NewFakeRecorder(1000), // event recorder
+	)
+
+	// Speed up the test
+	ctrl.createProvisionedPVInterval = 5 * time.Millisecond
 	return ctrl
 }
 
@@ -732,7 +732,7 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newPersistentVolumeController(client, nil, nil)
+		ctrl := newTestController(client, nil, nil)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -776,7 +776,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newPersistentVolumeController(client, nil, nil)
+		ctrl := newTestController(client, nil, nil)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)

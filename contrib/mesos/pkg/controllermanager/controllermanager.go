@@ -283,6 +283,9 @@ func (s *CMServer) Run(_ []string) error {
 		kubecontrollermanager.ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
 		cloud,
 		s.ClusterName,
+		nil,
+		nil,
+		nil,
 	)
 	volumeController.Run()
 

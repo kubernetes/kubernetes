@@ -55,7 +55,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0, nil, nil, nil, nil}}
 	cloud := &fake_cloud.FakeCloud{}
 
-	ctrl := persistentvolumecontroller.NewPersistentVolumeController(testClient, 10*time.Second, nil, plugins, cloud, "")
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(testClient, 10*time.Second, nil, plugins, cloud, "", nil, nil, nil)
 	ctrl.Run()
 	defer ctrl.Stop()
 
