@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -63,7 +65,7 @@ import (
 //   - testSyncVolume - calls syncVolume on the first volume in initialVolumes.
 //   - any custom function for specialized tests.
 // The test then contains list of volumes/claims that are expected at the end
-// of the test.
+// of the test and list of generated events.
 type controllerTest struct {
 	// Name of the test, for logging
 	name string
@@ -75,6 +77,9 @@ type controllerTest struct {
 	initialClaims []*api.PersistentVolumeClaim
 	// Expected content of controller claim cache at the end of the test.
 	expectedClaims []*api.PersistentVolumeClaim
+	// Expected events - any event with prefix will pass, we don't check full
+	// event message.
+	expectedEvents []string
 	// Function to call as the test.
 	test testCall
 }
@@ -86,6 +91,7 @@ const testNamespace = "default"
 var versionConflictError = errors.New("VersionError")
 var novolumes []*api.PersistentVolume
 var noclaims []*api.PersistentVolumeClaim
+var noevents = []string{}
 
 // volumeReactor is a core.Reactor that simulates etcd and API server. It
 // stores:
@@ -238,6 +244,51 @@ func (r *volumeReactor) checkClaims(t *testing.T, expectedClaims []*api.Persiste
 	return nil
 }
 
+// checkEvents compares all expectedEvents with events generated during the test
+// and reports differences.
+func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeController) error {
+	var err error
+
+	// Read recorded events
+	fakeRecorder := ctrl.eventRecorder.(*record.FakeRecorder)
+	gotEvents := []string{}
+	finished := false
+	for !finished {
+		select {
+		case event, ok := <-fakeRecorder.Events:
+			if ok {
+				glog.V(5).Infof("event recorder got event %s", event)
+				gotEvents = append(gotEvents, event)
+			} else {
+				glog.V(5).Infof("event recorder finished")
+				finished = true
+			}
+		default:
+			glog.V(5).Infof("event recorder finished")
+			finished = true
+		}
+	}
+
+	// Evaluate the events
+	for i, expected := range expectedEvents {
+		if len(gotEvents) <= i {
+			t.Errorf("Event %q not emitted", expected)
+			err = fmt.Errorf("Events do not match")
+			continue
+		}
+		received := gotEvents[i]
+		if !strings.HasPrefix(received, expected) {
+			t.Errorf("Unexpected event received, expected %q, got %q", expected, received)
+			err = fmt.Errorf("Events do not match")
+		}
+	}
+	for i := len(expectedEvents); i < len(gotEvents); i++ {
+		t.Errorf("Unexpected event received: %q", gotEvents[i])
+		err = fmt.Errorf("Events do not match")
+	}
+	return err
+}
+
 // popChange returns one recorded updated object, either *api.PersistentVolume
 // or *api.PersistentVolumeClaim. Returns nil when there are no changes.
 func (r *volumeReactor) popChange() interface{} {
@@ -303,9 +354,10 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 
 func newPersistentVolumeController(kubeClient clientset.Interface) *PersistentVolumeController {
 	ctrl := &PersistentVolumeController{
-		volumes:    newPersistentVolumeOrderedIndex(),
-		claims:     cache.NewStore(cache.MetaNamespaceKeyFunc),
-		kubeClient: kubeClient,
+		volumes:       newPersistentVolumeOrderedIndex(),
+		claims:        cache.NewStore(cache.MetaNamespaceKeyFunc),
+		kubeClient:    kubeClient,
+		eventRecorder: record.NewFakeRecorder(1000),
 	}
 	return ctrl
 }
@@ -425,6 +477,10 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *volumeReacto
 
 	}
 	if err := reactor.checkVolumes(t, test.expectedVolumes); err != nil {
+		t.Errorf("Test %q: %v", test.name, err)
+	}
+
+	if err := checkEvents(t, test.expectedEvents, ctrl); err != nil {
 		t.Errorf("Test %q: %v", test.name, err)
 	}
 }

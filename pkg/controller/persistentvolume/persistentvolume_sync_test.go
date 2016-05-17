@@ -39,7 +39,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-1", "1Gi", "uid1-1", "claim1-1", api.VolumeBound, annBoundByController),
 			newClaimArray("claim1-1", "uid1-1", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim1-1", "uid1-1", "1Gi", "volume1-1", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim does not do anything when there is no matching volume.
@@ -48,7 +48,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-2", "1Gi", "", "", api.VolumePending),
 			newClaimArray("claim1-2", "uid1-2", "10Gi", "", api.ClaimPending),
 			newClaimArray("claim1-2", "uid1-2", "10Gi", "", api.ClaimPending),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim resets claim.Status to Pending when there is no
@@ -58,7 +58,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-3", "1Gi", "", "", api.VolumePending),
 			newClaimArray("claim1-3", "uid1-3", "10Gi", "", api.ClaimBound),
 			newClaimArray("claim1-3", "uid1-3", "10Gi", "", api.ClaimPending),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim binds claims to the smallest matching volume
@@ -73,7 +73,7 @@ func TestSync(t *testing.T) {
 			},
 			newClaimArray("claim1-4", "uid1-4", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim1-4", "uid1-4", "1Gi", "volume1-4_2", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim binds a claim only to volume that points to it (by
@@ -89,7 +89,7 @@ func TestSync(t *testing.T) {
 			},
 			newClaimArray("claim1-5", "uid1-5", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim1-5", "uid1-5", "1Gi", "volume1-5_1", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim binds a claim only to volume that points to it (by
@@ -105,7 +105,7 @@ func TestSync(t *testing.T) {
 			},
 			newClaimArray("claim1-6", "uid1-6", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim1-6", "uid1-6", "1Gi", "volume1-6_1", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim does not bind claim to a volume prebound to a claim with
@@ -115,7 +115,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-7", "10Gi", "uid1-777", "claim1-7", api.VolumePending),
 			newClaimArray("claim1-7", "uid1-7", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim1-7", "uid1-7", "1Gi", "", api.ClaimPending),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim completes binding - simulates controller crash after
@@ -125,7 +125,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-8", "1Gi", "uid1-8", "claim1-8", api.VolumeBound, annBoundByController),
 			newClaimArray("claim1-8", "uid1-8", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim1-8", "uid1-8", "1Gi", "volume1-8", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim completes binding - simulates controller crash after
@@ -135,7 +135,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-9", "1Gi", "uid1-9", "claim1-9", api.VolumeBound, annBoundByController),
 			newClaimArray("claim1-9", "uid1-9", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim1-9", "uid1-9", "1Gi", "volume1-9", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim completes binding - simulates controller crash after
@@ -145,7 +145,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-10", "1Gi", "uid1-10", "claim1-10", api.VolumeBound, annBoundByController),
 			newClaimArray("claim1-10", "uid1-10", "1Gi", "volume1-10", api.ClaimPending, annBoundByController, annBindCompleted),
 			newClaimArray("claim1-10", "uid1-10", "1Gi", "volume1-10", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		// [Unit test set 2] User asked for a specific PV.
 		// Test the binding when pv.ClaimRef is already set by controller or
@@ -157,7 +157,7 @@ func TestSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim2-1", "uid2-1", "10Gi", "volume2-1", api.ClaimPending),
 			newClaimArray("claim2-1", "uid2-1", "10Gi", "volume2-1", api.ClaimPending),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim with claim pre-bound to a PV that does not exist.
@@ -167,7 +167,7 @@ func TestSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim2-2", "uid2-2", "10Gi", "volume2-2", api.ClaimBound),
 			newClaimArray("claim2-2", "uid2-2", "10Gi", "volume2-2", api.ClaimPending),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim with claim pre-bound to a PV that exists and is
@@ -177,7 +177,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume2-3", "1Gi", "uid2-3", "claim2-3", api.VolumeBound, annBoundByController),
 			newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimPending),
 			newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimBound, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// claim with claim pre-bound to a PV that is pre-bound to the claim
@@ -187,7 +187,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume2-4", "1Gi", "uid2-4", "claim2-4", api.VolumeBound),
 			newClaimArray("claim2-4", "uid2-4", "10Gi", "volume2-4", api.ClaimPending),
 			newClaimArray("claim2-4", "uid2-4", "10Gi", "volume2-4", api.ClaimBound, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim with claim pre-bound to a PV that is pre-bound to the
@@ -198,7 +198,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume2-5", "1Gi", "uid2-5", "claim2-5", api.VolumeBound),
 			newClaimArray("claim2-5", "uid2-5", "10Gi", "volume2-5", api.ClaimPending),
 			newClaimArray("claim2-5", "uid2-5", "10Gi", "volume2-5", api.ClaimBound, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim with claim pre-bound to a PV that is bound to different
@@ -208,7 +208,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume2-6", "1Gi", "uid2-6_1", "claim2-6_1", api.VolumeBound),
 			newClaimArray("claim2-6", "uid2-6", "10Gi", "volume2-6", api.ClaimBound),
 			newClaimArray("claim2-6", "uid2-6", "10Gi", "volume2-6", api.ClaimPending),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound by controller to a PV that is bound to
@@ -218,7 +218,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume2-7", "1Gi", "uid2-7_1", "claim2-7_1", api.VolumeBound),
 			newClaimArray("claim2-7", "uid2-7", "10Gi", "volume2-7", api.ClaimBound, annBoundByController),
 			newClaimArray("claim2-7", "uid2-7", "10Gi", "volume2-7", api.ClaimBound, annBoundByController),
-			testSyncClaimError,
+			noevents, testSyncClaimError,
 		},
 		// [Unit test set 3] Syncing bound claim
 		{
@@ -229,7 +229,7 @@ func TestSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim3-1", "uid3-1", "10Gi", "", api.ClaimBound, annBoundByController, annBindCompleted),
 			newClaimArray("claim3-1", "uid3-1", "10Gi", "", api.ClaimLost, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			[]string{"Warning ClaimLost"}, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to non-exising volume. Check it's
@@ -239,7 +239,7 @@ func TestSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim3-2", "uid3-2", "10Gi", "volume3-2", api.ClaimBound, annBoundByController, annBindCompleted),
 			newClaimArray("claim3-2", "uid3-2", "10Gi", "volume3-2", api.ClaimLost, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			[]string{"Warning ClaimLost"}, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to unbound volume. Check it's bound.
@@ -249,7 +249,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume3-3", "10Gi", "uid3-3", "claim3-3", api.VolumeBound, annBoundByController),
 			newClaimArray("claim3-3", "uid3-3", "10Gi", "volume3-3", api.ClaimPending, annBoundByController, annBindCompleted),
 			newClaimArray("claim3-3", "uid3-3", "10Gi", "volume3-3", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to volume with missing (or different)
@@ -259,7 +259,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume3-4", "10Gi", "claim3-4-x", "claim3-4", api.VolumePending),
 			newClaimArray("claim3-4", "uid3-4", "10Gi", "volume3-4", api.ClaimPending, annBoundByController, annBindCompleted),
 			newClaimArray("claim3-4", "uid3-4", "10Gi", "volume3-4", api.ClaimLost, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			[]string{"Warning ClaimMisbound"}, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to bound volume. Check that the
@@ -270,7 +270,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume3-5", "10Gi", "uid3-5", "claim3-5", api.VolumeBound),
 			newClaimArray("claim3-5", "uid3-5", "10Gi", "volume3-5", api.ClaimPending, annBindCompleted),
 			newClaimArray("claim3-5", "uid3-5", "10Gi", "volume3-5", api.ClaimBound, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to a volume that is bound to different
@@ -281,7 +281,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume3-6", "10Gi", "uid3-6-x", "claim3-6-x", api.VolumePending),
 			newClaimArray("claim3-6", "uid3-6", "10Gi", "volume3-6", api.ClaimPending, annBindCompleted),
 			newClaimArray("claim3-6", "uid3-6", "10Gi", "volume3-6", api.ClaimLost, annBindCompleted),
-			testSyncClaim,
+			[]string{"Warning ClaimMisbound"}, testSyncClaim,
 		},
 		// [Unit test set 4] All syncVolume tests.
 		{
@@ -291,7 +291,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-1", "10Gi", "", "", api.VolumeAvailable),
 			noclaims,
 			noclaims,
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with prebound pending volume. Check it's marked as
@@ -301,7 +301,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-2", "10Gi", "", "claim4-2", api.VolumeAvailable),
 			noclaims,
 			noclaims,
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with volume bound to missing claim.
@@ -311,7 +311,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-3", "10Gi", "uid4-3", "claim4-3", api.VolumeReleased),
 			noclaims,
 			noclaims,
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with volume bound to claim with different UID.
@@ -321,7 +321,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-4", "10Gi", "uid4-4", "claim4-4", api.VolumeReleased),
 			newClaimArray("claim4-4", "uid4-4-x", "10Gi", "volume4-4", api.ClaimBound, annBindCompleted),
 			newClaimArray("claim4-4", "uid4-4-x", "10Gi", "volume4-4", api.ClaimBound, annBindCompleted),
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with volume bound by controller to unbound claim.
@@ -331,7 +331,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-5", "10Gi", "uid4-5", "claim4-5", api.VolumeBound, annBoundByController),
 			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
 			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with volume bound by user to unbound claim.
@@ -341,7 +341,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-5", "10Gi", "uid4-5", "claim4-5", api.VolumeBound),
 			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
 			newClaimArray("claim4-5", "uid4-5", "10Gi", "", api.ClaimPending),
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with volume bound to bound claim.
@@ -351,7 +351,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-6", "10Gi", "uid4-6", "claim4-6", api.VolumeBound),
 			newClaimArray("claim4-6", "uid4-6", "10Gi", "volume4-6", api.ClaimBound),
 			newClaimArray("claim4-6", "uid4-6", "10Gi", "volume4-6", api.ClaimBound),
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with volume bound by controller to claim bound to
@@ -361,7 +361,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-7", "10Gi", "", "", api.VolumeAvailable),
 			newClaimArray("claim4-7", "uid4-7", "10Gi", "volume4-7-x", api.ClaimBound),
 			newClaimArray("claim4-7", "uid4-7", "10Gi", "volume4-7-x", api.ClaimBound),
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 		{
 			// syncVolume with volume bound by user to claim bound to
@@ -372,7 +372,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-8", "10Gi", "", "claim4-8", api.VolumeAvailable),
 			newClaimArray("claim4-8", "uid4-8", "10Gi", "volume4-8-x", api.ClaimBound),
 			newClaimArray("claim4-8", "uid4-8", "10Gi", "volume4-8-x", api.ClaimBound),
-			testSyncVolume,
+			noevents, testSyncVolume,
 		},
 	}
 	runSyncTests(t, tests)
@@ -402,7 +402,7 @@ func TestMultiSync(t *testing.T) {
 			newVolumeArray("volume10-1", "1Gi", "uid10-1", "claim10-1", api.VolumeBound, annBoundByController),
 			newClaimArray("claim10-1", "uid10-1", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim10-1", "uid10-1", "1Gi", "volume10-1", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 		{
 			// Two controllers bound two PVs to single claim. Test one of them
@@ -418,7 +418,7 @@ func TestMultiSync(t *testing.T) {
 			},
 			newClaimArray("claim10-2", "uid10-2", "1Gi", "volume10-2-1", api.ClaimBound, annBoundByController, annBindCompleted),
 			newClaimArray("claim10-2", "uid10-2", "1Gi", "volume10-2-1", api.ClaimBound, annBoundByController, annBindCompleted),
-			testSyncClaim,
+			noevents, testSyncClaim,
 		},
 	}
 
