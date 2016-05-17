@@ -672,25 +672,39 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			return nil
 		} else {
 			// Volume is bound to a claim, but the claim is bound elsewhere
-			if hasAnnotation(volume.ObjectMeta, annBoundByController) {
-				// This is part of the normal operation of the controller; the
-				// controller tried to use this volume for a claim but the claim
-				// was fulfilled by another volume. We did this; fix it.
-				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is bound by controller to a claim that is bound to another volume, unbinding", volume.Name)
-				if err = ctrl.unbindVolume(volume); err != nil {
+			if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) && volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimDelete {
+				// This volume was dynamically provisioned for this claim. The
+				// claim got bound elsewhere, and thus this volume is not
+				// needed. Delete it.
+				if err = ctrl.reclaimVolume(volume); err != nil {
+					// Deletion failed, we will fall back into the same condition
+					// in the next call to this method
 					return err
 				}
 				return nil
 			} else {
-				// The PV must have been created with this ptr; leave it alone.
-				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is bound by user to a claim that is bound to another volume, waiting for the claim to get unbound", volume.Name)
-				// This just updates the volume phase and clears
-				// volume.Spec.ClaimRef.UID. It leaves the volume pre-bound
-				// to the claim.
-				if err = ctrl.unbindVolume(volume); err != nil {
-					return err
+				// Volume is bound to a claim, but the claim is bound elsewhere
+				// and it's not dynamically provisioned.
+				if hasAnnotation(volume.ObjectMeta, annBoundByController) {
+					// This is part of the normal operation of the controller; the
+					// controller tried to use this volume for a claim but the claim
+					// was fulfilled by another volume. We did this; fix it.
+					glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is bound by controller to a claim that is bound to another volume, unbinding", volume.Name)
+					if err = ctrl.unbindVolume(volume); err != nil {
+						return err
+					}
+					return nil
+				} else {
+					// The PV must have been created with this ptr; leave it alone.
+					glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is bound by user to a claim that is bound to another volume, waiting for the claim to get unbound", volume.Name)
+					// This just updates the volume phase and clears
+					// volume.Spec.ClaimRef.UID. It leaves the volume pre-bound
+					// to the claim.
+					if err = ctrl.unbindVolume(volume); err != nil {
+						return err
+					}
+					return nil
 				}
-				return nil
 			}
 		}
 	}
