@@ -151,7 +151,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 		} else if vol.PersistentVolumeClaim != nil {
 			pvcName := vol.PersistentVolumeClaim.ClaimName
 			if pvcName == "" {
-				return fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+				return fmt.Errorf("PersistentVolumeClaim had no name")
 			}
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil {
@@ -304,7 +304,7 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, nodeInfo *schedulercache.Nod
 		if volume.PersistentVolumeClaim != nil {
 			pvcName := volume.PersistentVolumeClaim.ClaimName
 			if pvcName == "" {
-				return false, fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+				return false, fmt.Errorf("PersistentVolumeClaim had no name")
 			}
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil {
