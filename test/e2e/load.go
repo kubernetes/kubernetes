@@ -130,7 +130,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				for _, service := range services {
-					_, err := c.Services(ns).Create(service)
+					_, err := c.Services(service.Namespace).Create(service)
 					framework.ExpectNoError(err)
 				}
 			} else {
