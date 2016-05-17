@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversioned_core "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
@@ -238,7 +239,13 @@ func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 		return
 	}
 	if err := ctrl.syncVolume(pv); err != nil {
-		glog.Errorf("PersistentVolumeController could not add volume %q: %+v", pv.Name, err)
+		if errors.IsConflict(err) {
+			// Version conflict error happens quite often and the controller
+			// recovers from it easily.
+			glog.V(3).Infof("PersistentVolumeController could not add volume %q: %+v", pv.Name, err)
+		} else {
+			glog.Errorf("PersistentVolumeController could not add volume %q: %+v", pv.Name, err)
+		}
 	}
 }
 
@@ -255,7 +262,13 @@ func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{})
 		return
 	}
 	if err := ctrl.syncVolume(newVolume); err != nil {
-		glog.Errorf("PersistentVolumeController could not update volume %q: %+v", newVolume.Name, err)
+		if errors.IsConflict(err) {
+			// Version conflict error happens quite often and the controller
+			// recovers from it easily.
+			glog.V(3).Infof("PersistentVolumeController could not update volume %q: %+v", newVolume.Name, err)
+		} else {
+			glog.Errorf("PersistentVolumeController could not update volume %q: %+v", newVolume.Name, err)
+		}
 	}
 }
 
@@ -293,7 +306,13 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 			// waiting until the next sync period for its Lost status.
 			err := ctrl.syncClaim(claim)
 			if err != nil {
-				glog.Errorf("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", claimToClaimKey(claim), err)
+				if errors.IsConflict(err) {
+					// Version conflict error happens quite often and the
+					// controller recovers from it easily.
+					glog.V(3).Infof("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", claimToClaimKey(claim), err)
+				} else {
+					glog.Errorf("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", claimToClaimKey(claim), err)
+				}
 			}
 		} else {
 			glog.Errorf("Cannot convert object from claim cache to claim %q!?: %+v", claimrefToClaimKey(volume.Spec.ClaimRef), claimObj)
@@ -314,7 +333,13 @@ func (ctrl *PersistentVolumeController) addClaim(obj interface{}) {
 		return
 	}
 	if err := ctrl.syncClaim(claim); err != nil {
-		glog.Errorf("PersistentVolumeController could not add claim %q: %+v", claimToClaimKey(claim), err)
+		if errors.IsConflict(err) {
+			// Version conflict error happens quite often and the controller
+			// recovers from it easily.
+			glog.V(3).Infof("PersistentVolumeController could not add claim %q: %+v", claimToClaimKey(claim), err)
+		} else {
+			glog.Errorf("PersistentVolumeController could not add claim %q: %+v", claimToClaimKey(claim), err)
+		}
 	}
 }
 
@@ -331,7 +356,13 @@ func (ctrl *PersistentVolumeController) updateClaim(oldObj, newObj interface{}) 
 		return
 	}
 	if err := ctrl.syncClaim(newClaim); err != nil {
-		glog.Errorf("PersistentVolumeController could not update claim %q: %+v", claimToClaimKey(newClaim), err)
+		if errors.IsConflict(err) {
+			// Version conflict error happens quite often and the controller
+			// recovers from it easily.
+			glog.V(3).Infof("PersistentVolumeController could not update claim %q: %+v", claimToClaimKey(newClaim), err)
+		} else {
+			glog.Errorf("PersistentVolumeController could not update claim %q: %+v", claimToClaimKey(newClaim), err)
+		}
 	}
 }
 
@@ -372,7 +403,13 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 			if volume != nil {
 				err := ctrl.syncVolume(volume)
 				if err != nil {
-					glog.Errorf("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", volume.Name, err)
+					if errors.IsConflict(err) {
+						// Version conflict error happens quite often and the
+						// controller recovers from it easily.
+						glog.V(3).Infof("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", volume.Name, err)
+					} else {
+						glog.Errorf("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", volume.Name, err)
+					}
 				}
 			}
 		} else {
@@ -669,6 +706,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			if err != nil {
 				return fmt.Errorf("error cloning claim %q: %v", claimToClaimKey(claim), err)
 			}
+			glog.V(5).Infof("requeueing claim %q for faster syncClaim", claimToClaimKey(claim))
 			err = ctrl.claimController.Requeue(clone)
 			if err != nil {
 				return fmt.Errorf("error enqueing claim %q for faster sync: %v", claimToClaimKey(claim), err)
@@ -980,28 +1018,36 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *api.PersistentV
 // mechanism.
 func (ctrl *PersistentVolumeController) bind(volume *api.PersistentVolume, claim *api.PersistentVolumeClaim) error {
 	var err error
+	// use updateClaim/updatedVolume to keep the original claim/volume for
+	// logging in error cases.
+	var updatedClaim *api.PersistentVolumeClaim
+	var updatedVolume *api.PersistentVolume
 
 	glog.V(4).Infof("binding volume %q to claim %q", volume.Name, claimToClaimKey(claim))
 
-	if volume, err = ctrl.bindVolumeToClaim(volume, claim); err != nil {
+	if updatedVolume, err = ctrl.bindVolumeToClaim(volume, claim); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the volume: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
+	volume = updatedVolume
 
-	if volume, err = ctrl.updateVolumePhase(volume, api.VolumeBound); err != nil {
+	if updatedVolume, err = ctrl.updateVolumePhase(volume, api.VolumeBound); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the volume status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
+	volume = updatedVolume
 
-	if claim, err = ctrl.bindClaimToVolume(claim, volume); err != nil {
+	if updatedClaim, err = ctrl.bindClaimToVolume(claim, volume); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
+	claim = updatedClaim
 
-	if _, err = ctrl.updateClaimPhase(claim, api.ClaimBound); err != nil {
+	if updatedClaim, err = ctrl.updateClaimPhase(claim, api.ClaimBound); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
+	claim = updatedClaim
 
 	glog.V(4).Infof("volume %q bound to claim %q", volume.Name, claimToClaimKey(claim))
 	glog.V(4).Infof("volume %q status after binding: %s", volume.Name, getVolumeStatusForLogging(volume))
