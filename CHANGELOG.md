@@ -1,5 +1,8 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
+- [v1.3.0-alpha.4](#v130-alpha4)
+  - [Downloads](#downloads)
+  - [Changes since v1.3.0-alpha.4](#changes-since-v130-alpha4)
 - [v1.2.4](#v124)
   - [Downloads](#downloads)
   - [Changes since v1.2.3](#changes-since-v123)
@@ -49,6 +52,22 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.3.0-alpha.4
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+
+## Downloads
+
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0-alpha.4/kubernetes.tar.gz) | `758e97e7e50153840379ecd9f8fda1869543539f` | `4e18ae6a428c99fcc30e2137d7c41854`
+
+## Changes since v1.3.0-alpha.4
+
+**No notable changes for this release**
+
 
 
 # v1.2.4
