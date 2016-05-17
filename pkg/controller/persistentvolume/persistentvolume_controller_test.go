@@ -45,13 +45,13 @@ func TestControllerSync(t *testing.T) {
 			// syncClaim, not on addVolume.
 			"5-1 - addVolume",
 			novolumes, /* added in testCall below */
-			newVolumeArray("volume5-1", "10Gi", "", "", api.VolumeAvailable),
+			newVolumeArray("volume5-1", "10Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRetain),
 			newClaimArray("claim5-1", "uid5-1", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim5-1", "uid5-1", "1Gi", "", api.ClaimPending),
 			noevents,
 			// Custom test function that generates an add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-1", "10Gi", "", "", api.VolumePending)
+				volume := newVolume("volume5-1", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain)
 				reactor.volumes[volume.Name] = volume
 				reactor.volumeSource.Add(volume)
 				return nil
@@ -60,8 +60,8 @@ func TestControllerSync(t *testing.T) {
 		{
 			// addClaim gets a new claim. Check it's bound to a volume.
 			"5-2 - complete bind",
-			newVolumeArray("volume5-2", "10Gi", "", "", api.VolumeAvailable),
-			newVolumeArray("volume5-2", "10Gi", "uid5-2", "claim5-2", api.VolumeBound, annBoundByController),
+			newVolumeArray("volume5-2", "10Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRetain),
+			newVolumeArray("volume5-2", "10Gi", "uid5-2", "claim5-2", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
 			noclaims, /* added in testAddClaim5_2 */
 			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", api.ClaimBound, annBoundByController, annBindCompleted),
 			noevents,
@@ -76,8 +76,8 @@ func TestControllerSync(t *testing.T) {
 		{
 			// deleteClaim with a bound claim makes bound volume released.
 			"5-3 - delete claim",
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", api.VolumeBound, annBoundByController),
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", api.VolumeReleased, annBoundByController),
+			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
+			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", api.VolumeReleased, api.PersistentVolumeReclaimRetain, annBoundByController),
 			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", api.ClaimBound, annBoundByController, annBindCompleted),
 			noclaims,
 			noevents,
@@ -99,7 +99,7 @@ func TestControllerSync(t *testing.T) {
 		{
 			// deleteVolume with a bound volume. Check the claim is Lost.
 			"5-4 - delete volume",
-			newVolumeArray("volume5-4", "10Gi", "uid5-4", "claim5-4", api.VolumeBound),
+			newVolumeArray("volume5-4", "10Gi", "uid5-4", "claim5-4", api.VolumeBound, api.PersistentVolumeReclaimRetain),
 			novolumes,
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimBound, annBoundByController, annBindCompleted),
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimLost, annBoundByController, annBindCompleted),

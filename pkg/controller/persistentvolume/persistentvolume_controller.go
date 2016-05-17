@@ -108,6 +108,10 @@ type PersistentVolumeController struct {
 	// runningOperations is map of running operations. The value does not
 	// matter, presence of a key is enough to consider an operation running.
 	runningOperations map[string]bool
+
+	// For testing only: hook to call before an asynchronous operation starts.
+	// Not used when set to nil.
+	preOperationHook func(operationName string, operationArgument interface{})
 }
 
 // NewPersistentVolumeController creates a new PersistentVolumeController
@@ -1183,6 +1187,11 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *api.PersistentV
 // makes sure the operation is already not running.
 func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, operation func(arg interface{}), arg interface{}) {
 	glog.V(4).Infof("scheduleOperation[%s]", operationName)
+
+	// Poke test code that an operation is just about to get started.
+	if ctrl.preOperationHook != nil {
+		ctrl.preOperationHook(operationName, arg)
+	}
 
 	isRunning := func() bool {
 		// In anonymous func() to get the locking right.
