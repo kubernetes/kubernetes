@@ -31,11 +31,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
@@ -76,10 +79,30 @@ func TestRunOnce(t *testing.T) {
 		reasonCache:         NewReasonCache(),
 		clock:               util.RealClock{},
 		kubeClient:          &fake.Clientset{},
+		hostname:            testKubeletHostname,
+		nodeName:            testKubeletHostname,
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone)
+	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	volumeStatsAggPeriod := time.Second * 10
+	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)
+	nodeRef := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      kb.nodeName,
+		UID:       types.UID(kb.nodeName),
+		Namespace: "",
+	}
+	fakeKillPodFunc := func(pod *api.Pod, podStatus api.PodStatus, gracePeriodOverride *int64) error {
+		return nil
+	}
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, kb.recorder, nodeRef, kb.clock)
+	if err != nil {
+		t.Fatalf("failed to initialize eviction manager: %v", err)
+	}
+	kb.evictionManager = evictionManager
+	kb.AddPodAdmitHandler(evictionAdmitHandler)
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}
