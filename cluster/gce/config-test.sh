@@ -128,9 +128,8 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 # Optional: Create autoscaler for cluster's nodes.
 ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
 if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
-  AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
-  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_NODES}}"
-  TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
+  AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-}"
+  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-}"
 fi
 
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
