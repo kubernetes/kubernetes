@@ -41,7 +41,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 				APIPath: "/api",
 				ContentConfig: restclient.ContentConfig{
 					GroupVersion:         testapi.Default.GroupVersion(),
-					Codec:                testapi.Default.Codec(),
+					Codec:                testapi.Default.Codec(testapi.Default.GroupVersion()),
 					NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 				},
 				QPS:   5,
@@ -141,7 +141,7 @@ func TestSetsCodec(t *testing.T) {
 		Prefix string
 		Codec  runtime.Codec
 	}{
-		testapi.Default.GroupVersion().Version: {false, "/api/" + testapi.Default.GroupVersion().Version, testapi.Default.Codec()},
+		testapi.Default.GroupVersion().Version: {false, "/api/" + testapi.Default.GroupVersion().Version, testapi.Default.Codec(testapi.Default.GroupVersion())},
 		// Add this test back when we fixed config and SetKubernetesDefaults
 		// "invalidVersion":                       {true, "", nil},
 	}

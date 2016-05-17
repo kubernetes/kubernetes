@@ -25,12 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func getDeploymentsResourceName() string {
-	return "deployments"
+func getDeploymentsResource() unversioned.GroupVersionResource {
+	return v1beta1.SchemeGroupVersion.WithResource("deployments")
 }
 
 func TestDeploymentCreate(t *testing.T) {
@@ -44,11 +45,12 @@ func TestDeploymentCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   &deployment,
 		},
-		Response: simple.Response{StatusCode: 200, Body: &deployment},
+		Response:     simple.Response{StatusCode: 200, Body: &deployment},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Create(&deployment)
@@ -70,11 +72,12 @@ func TestDeploymentGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc"),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, "abc"),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: deployment},
+		Response:     simple.Response{StatusCode: 200, Body: deployment},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Get("abc")
@@ -97,11 +100,12 @@ func TestDeploymentList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: deploymentList},
+		Response:     simple.Response{StatusCode: 200, Body: deploymentList},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Deployments(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -120,10 +124,11 @@ func TestDeploymentUpdate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc"),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, "abc"),
 			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: simple.Response{StatusCode: 200, Body: deployment},
+		Response:     simple.Response{StatusCode: 200, Body: deployment},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Deployments(ns).Update(deployment)
 	defer c.Close()
@@ -142,10 +147,11 @@ func TestDeploymentUpdateStatus(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc") + "/status",
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, "abc") + "/status",
 			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: simple.Response{StatusCode: 200, Body: deployment},
+		Response:     simple.Response{StatusCode: 200, Body: deployment},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Deployments(ns).UpdateStatus(deployment)
 	defer c.Close()
@@ -157,10 +163,11 @@ func TestDeploymentDelete(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Deployments(ns).Delete("foo", nil)
 	defer c.Close()
@@ -171,10 +178,11 @@ func TestDeploymentWatch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getDeploymentsResourceName(), "", ""),
+			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getDeploymentsResource(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}},
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(api.ListOptions{})
 	defer c.Close()
@@ -187,7 +195,7 @@ func TestListDeploymentsLabels(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath("deployments", ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, ""),
 			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: simple.Response{
 			StatusCode: http.StatusOK,
@@ -204,6 +212,7 @@ func TestListDeploymentsLabels(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	c.Setup(t)
 	defer c.Close()
@@ -224,11 +233,12 @@ func TestDeploymentRollback(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc") + "/rollback",
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResource(), ns, "abc") + "/rollback",
 			Query:  simple.BuildQueryValues(nil),
 			Body:   deploymentRollback,
 		},
-		Response: simple.Response{StatusCode: http.StatusOK},
+		Response:     simple.Response{StatusCode: http.StatusOK},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Deployments(ns).Rollback(deploymentRollback)
 	defer c.Close()

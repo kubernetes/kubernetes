@@ -21,12 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getIngressResourceName() string {
-	return "ingresses"
+func getIngressResource() unversioned.GroupVersionResource {
+	return v1beta1.SchemeGroupVersion.WithResource("ingresses")
 }
 
 func TestListIngress(t *testing.T) {
@@ -34,7 +36,7 @@ func TestListIngress(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getIngressResource(), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.IngressList{
@@ -54,6 +56,7 @@ func TestListIngress(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedIngressList, err := c.Setup(t).Extensions().Ingress(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -65,7 +68,7 @@ func TestGetIngress(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResource(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -83,6 +86,7 @@ func TestGetIngress(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Get("foo")
 	defer c.Close()
@@ -113,7 +117,7 @@ func TestUpdateIngress(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResource(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -131,6 +135,7 @@ func TestUpdateIngress(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Update(requestIngress)
 	defer c.Close()
@@ -157,7 +162,7 @@ func TestUpdateIngressStatus(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo") + "/status",
+			Path:   testapi.Extensions.ResourcePath(getIngressResource(), ns, "foo") + "/status",
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -178,6 +183,7 @@ func TestUpdateIngressStatus(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).UpdateStatus(requestIngress)
 	defer c.Close()
@@ -189,7 +195,7 @@ func TestDeleteIngress(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getIngressResource(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{StatusCode: 200},
@@ -210,7 +216,7 @@ func TestCreateIngress(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getIngressResource(), ns, ""),
 			Body:   requestIngress,
 			Query:  simple.BuildQueryValues(nil),
 		},
@@ -229,6 +235,7 @@ func TestCreateIngress(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Create(requestIngress)
 	defer c.Close()

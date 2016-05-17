@@ -21,12 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getPetSetResourceName() string {
-	return "petsets"
+func getPetSetResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("petsets")
 }
 
 func TestListPetSets(t *testing.T) {
@@ -34,7 +36,7 @@ func TestListPetSets(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Apps.ResourcePath(getPetSetResourceName(), ns, ""),
+			Path:   testapi.Apps.ResourcePath(getPetSetResource(), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &apps.PetSetList{
@@ -55,6 +57,7 @@ func TestListPetSets(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedRSList, err := c.Setup(t).Apps().PetSets(ns).List(api.ListOptions{})
 	c.Validate(t, receivedRSList, err)
@@ -63,7 +66,7 @@ func TestListPetSets(t *testing.T) {
 func TestGetPetSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Apps.ResourcePath(getPetSetResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Apps.ResourcePath(getPetSetResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &apps.PetSet{
@@ -80,6 +83,7 @@ func TestGetPetSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedRS, err := c.Setup(t).Apps().PetSets(ns).Get("foo")
 	c.Validate(t, receivedRS, err)
@@ -102,7 +106,7 @@ func TestUpdatePetSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Apps.ResourcePath(getPetSetResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Apps.ResourcePath(getPetSetResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &apps.PetSet{
@@ -119,6 +123,7 @@ func TestUpdatePetSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedRS, err := c.Setup(t).Apps().PetSets(ns).Update(requestRS)
 	c.Validate(t, receivedRS, err)
@@ -127,8 +132,9 @@ func TestUpdatePetSet(t *testing.T) {
 func TestDeletePetSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Apps.ResourcePath(getPetSetResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200},
+		Request:      simple.Request{Method: "DELETE", Path: testapi.Apps.ResourcePath(getPetSetResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Apps().PetSets(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
@@ -140,7 +146,7 @@ func TestCreatePetSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Apps.ResourcePath(getPetSetResourceName(), ns, ""), Body: requestRS, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Apps.ResourcePath(getPetSetResource(), ns, ""), Body: requestRS, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &apps.PetSet{
@@ -157,6 +163,7 @@ func TestCreatePetSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedRS, err := c.Setup(t).Apps().PetSets(ns).Create(requestRS)
 	c.Validate(t, receivedRS, err)

@@ -21,11 +21,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getRCResourceName() string {
-	return "replicationcontrollers"
+func getRCResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("replicationcontrollers")
 }
 
 func TestListControllers(t *testing.T) {
@@ -33,7 +35,7 @@ func TestListControllers(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getRCResourceName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(getRCResource(), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &api.ReplicationControllerList{
@@ -54,6 +56,7 @@ func TestListControllers(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedControllerList, err := c.Setup(t).ReplicationControllers(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -64,7 +67,7 @@ func TestListControllers(t *testing.T) {
 func TestGetController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getRCResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -81,6 +84,7 @@ func TestGetController(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedController, err := c.Setup(t).ReplicationControllers(ns).Get("foo")
 	defer c.Close()
@@ -105,7 +109,7 @@ func TestUpdateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -122,6 +126,7 @@ func TestUpdateController(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedController, err := c.Setup(t).ReplicationControllers(ns).Update(requestController)
 	defer c.Close()
@@ -134,7 +139,7 @@ func TestUpdateStatusController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResource(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -154,6 +159,7 @@ func TestUpdateStatusController(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedController, err := c.Setup(t).ReplicationControllers(ns).UpdateStatus(requestController)
 	defer c.Close()
@@ -162,8 +168,9 @@ func TestUpdateStatusController(t *testing.T) {
 func TestDeleteController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200},
+		Request:      simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getRCResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).ReplicationControllers(ns).Delete("foo")
 	defer c.Close()
@@ -176,7 +183,7 @@ func TestCreateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, ""), Body: requestController, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Default.ResourcePath(getRCResource(), ns, ""), Body: requestController, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -193,6 +200,7 @@ func TestCreateController(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedController, err := c.Setup(t).ReplicationControllers(ns).Create(requestController)
 	defer c.Close()

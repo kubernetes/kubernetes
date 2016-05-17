@@ -49,10 +49,14 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&Job{},
 		&JobList{},
 		&JobTemplate{},
+		&ScheduledJob{},
+		&ScheduledJobList{},
 		&api.ListOptions{},
 	)
 }
 
-func (obj *Job) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
-func (obj *JobList) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *JobTemplate) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *Job) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
+func (obj *JobList) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
+func (obj *JobTemplate) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
+func (obj *ScheduledJob) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *ScheduledJobList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

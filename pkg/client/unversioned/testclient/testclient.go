@@ -341,6 +341,10 @@ func (c *FakeBatch) Jobs(namespace string) client.JobInterface {
 	return &FakeJobsV1{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeBatch) ScheduledJobs(namespace string) client.ScheduledJobInterface {
+	return &FakeScheduledJobs{Fake: c, Namespace: namespace}
+}
+
 // NewSimpleFakeExp returns a client that will respond with the provided objects
 func NewSimpleFakeExp(objects ...runtime.Object) *FakeExperimental {
 	return &FakeExperimental{Fake: NewSimpleFake(objects...)}

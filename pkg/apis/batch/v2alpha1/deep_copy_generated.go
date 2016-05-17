@@ -287,14 +287,8 @@ func DeepCopy_v2alpha1_ScheduledJobSpec(in ScheduledJobSpec, out *ScheduledJobSp
 	}
 	out.ConcurrencyPolicy = in.ConcurrencyPolicy
 	out.Suspend = in.Suspend
-	if in.JobTemplate != nil {
-		in, out := in.JobTemplate, &out.JobTemplate
-		*out = new(JobTemplateSpec)
-		if err := DeepCopy_v2alpha1_JobTemplateSpec(*in, *out, c); err != nil {
-			return err
-		}
-	} else {
-		out.JobTemplate = nil
+	if err := DeepCopy_v2alpha1_JobTemplateSpec(in.JobTemplate, &out.JobTemplate, c); err != nil {
+		return err
 	}
 	return nil
 }

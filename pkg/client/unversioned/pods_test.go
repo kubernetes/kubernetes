@@ -24,15 +24,21 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
+func getPodsResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("pods")
+}
+
 func TestListEmptyPods(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
+		Request:      simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getPodsResource(), ns, ""), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	podList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -42,7 +48,7 @@ func TestListEmptyPods(t *testing.T) {
 func TestListPods(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getPodsResource(), ns, ""), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: http.StatusOK,
 			Body: &api.PodList{
 				Items: []api.Pod{
@@ -60,6 +66,7 @@ func TestListPods(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedPodList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -72,7 +79,7 @@ func TestListPodsLabels(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("pods", ns, ""),
+			Path:   testapi.Default.ResourcePath(getPodsResource(), ns, ""),
 			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: simple.Response{
 			StatusCode: http.StatusOK,
@@ -92,6 +99,7 @@ func TestListPodsLabels(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	c.Setup(t)
 	defer c.Close()
@@ -105,7 +113,7 @@ func TestListPodsLabels(t *testing.T) {
 func TestGetPod(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getPodsResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: http.StatusOK,
 			Body: &api.Pod{
@@ -120,6 +128,7 @@ func TestGetPod(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Get("foo")
 	defer c.Close()
@@ -141,8 +150,9 @@ func TestGetPodWithNoName(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: http.StatusOK},
+		Request:      simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getPodsResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: http.StatusOK},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Pods(ns).Delete("foo", nil)
 	defer c.Close()
@@ -163,11 +173,12 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: simple.BuildQueryValues(nil), Body: requestPod},
+		Request: simple.Request{Method: "POST", Path: testapi.Default.ResourcePath(getPodsResource(), ns, ""), Query: simple.BuildQueryValues(nil), Body: requestPod},
 		Response: simple.Response{
 			StatusCode: http.StatusOK,
 			Body:       requestPod,
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Create(requestPod)
 	defer c.Close()
@@ -190,8 +201,9 @@ func TestUpdatePod(t *testing.T) {
 		},
 	}
 	c := &simple.Client{
-		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: http.StatusOK, Body: requestPod},
+		Request:      simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getPodsResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: http.StatusOK, Body: requestPod},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Update(requestPod)
 	defer c.Close()
@@ -207,13 +219,14 @@ func TestPodGetLogs(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("pods", ns, "podName") + "/log",
+			Path:   testapi.Default.ResourcePath(getPodsResource(), ns, "podName") + "/log",
 			Query: url.Values{
 				"follow":     []string{"true"},
 				"timestamps": []string{"true"},
 			},
 		},
-		Response: simple.Response{StatusCode: http.StatusOK},
+		Response:     simple.Response{StatusCode: http.StatusOK},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	body, err := c.Setup(t).Pods(ns).GetLogs("podName", opts).Stream()

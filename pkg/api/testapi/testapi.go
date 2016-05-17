@@ -202,7 +202,16 @@ func init() {
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {
-	return "application/json", g.GroupVersion(), g.Codec()
+	return "application/json", g.GroupVersion(), g.Codec(g.GroupVersion())
+}
+
+func (g TestGroup) IsEnabledVersion(v *unversioned.GroupVersion) bool {
+	for _, gv := range g.externalGroupVersions {
+		if gv.String() == v.String() {
+			return true
+		}
+	}
+	return false
 }
 
 func (g TestGroup) GroupVersion() *unversioned.GroupVersion {
@@ -227,8 +236,11 @@ func (g TestGroup) InternalTypes() map[string]reflect.Type {
 
 // Codec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API_TYPE env var.
-func (g TestGroup) Codec() runtime.Codec {
+func (g TestGroup) Codec(gv *unversioned.GroupVersion) runtime.Codec {
 	if serializer.Serializer == nil {
+		if g.IsEnabledVersion(gv) {
+			return api.Codecs.LegacyCodec(*gv)
+		}
 		return api.Codecs.LegacyCodec(g.externalGroupVersions[0])
 	}
 	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), g.externalGroupVersions, nil)
@@ -304,14 +316,18 @@ func (g TestGroup) SelfLink(resource, name string) string {
 // Returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
 // For ex, this is of the form:
 // /api/v1/watch/namespaces/foo/pods/pod0 for v1.
-func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
+func (g TestGroup) ResourcePathWithPrefix(prefix string, gvr unversioned.GroupVersionResource, namespace, name string) string {
 	var path string
-	if g.externalGroupVersions[0].Group == api.GroupName {
-		path = "/api/" + g.externalGroupVersions[0].Version
+	groupVersion := gvr.GroupVersion()
+	if !g.IsEnabledVersion(&groupVersion) {
+		groupVersion = g.externalGroupVersions[0]
+	}
+	if groupVersion.Group == api.GroupName {
+		path = "/api/" + groupVersion.Version
 	} else {
 		// TODO: switch back once we have proper multiple group support
 		// path = "/apis/" + g.Group + "/" + Version(group...)
-		path = "/apis/" + g.externalGroupVersions[0].Group + "/" + g.externalGroupVersions[0].Version
+		path = "/apis/" + groupVersion.Group + "/" + groupVersion.Version
 	}
 
 	if prefix != "" {
@@ -321,7 +337,7 @@ func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name stri
 		path = path + "/namespaces/" + namespace
 	}
 	// Resource names are lower case.
-	resource = strings.ToLower(resource)
+	resource := strings.ToLower(gvr.Resource)
 	if resource != "" {
 		path = path + "/" + resource
 	}
@@ -334,7 +350,7 @@ func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name stri
 // Returns the appropriate path for the given resource, namespace and name.
 // For example, this is of the form:
 // /api/v1/namespaces/foo/pods/pod0 for v1.
-func (g TestGroup) ResourcePath(resource, namespace, name string) string {
+func (g TestGroup) ResourcePath(resource unversioned.GroupVersionResource, namespace, name string) string {
 	return g.ResourcePathWithPrefix("", resource, namespace, name)
 }
 
@@ -365,7 +381,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 		}
 
 		if api.Scheme.Recognizes(kind) {
-			return group.Codec(), nil
+			return group.Codec(group.GroupVersion()), nil
 		}
 	}
 	// Codec used for unversioned types

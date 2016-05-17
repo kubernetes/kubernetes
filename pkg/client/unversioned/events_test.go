@@ -17,11 +17,6 @@ limitations under the License.
 package unversioned_test
 
 import (
-	. "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
-)
-
-import (
 	"net/url"
 	"reflect"
 	"testing"
@@ -29,13 +24,20 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	. "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
+
+func getEventsResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("events")
+}
 
 func TestEventSearch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("events", "baz", ""),
+			Path:   testapi.Default.ResourcePath(getEventsResource(), "baz", ""),
 			Query: url.Values{
 				unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{
 					GetInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
@@ -45,7 +47,8 @@ func TestEventSearch(t *testing.T) {
 				unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{},
 			},
 		},
-		Response: simple.Response{StatusCode: 200, Body: &api.EventList{}},
+		Response:     simple.Response{StatusCode: 200, Body: &api.EventList{}},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	eventList, err := c.Setup(t).Events("baz").Search(
 		&api.Pod{
@@ -83,10 +86,11 @@ func TestEventCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath("events", api.NamespaceDefault, ""),
+			Path:   testapi.Default.ResourcePath(getEventsResource(), api.NamespaceDefault, ""),
 			Body:   event,
 		},
-		Response: simple.Response{StatusCode: 200, Body: event},
+		Response:     simple.Response{StatusCode: 200, Body: event},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).Events(api.NamespaceDefault).Create(event)
@@ -124,10 +128,11 @@ func TestEventGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("events", "other", "1"),
+			Path:   testapi.Default.ResourcePath(getEventsResource(), "other", "1"),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: event},
+		Response:     simple.Response{StatusCode: 200, Body: event},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).Events("other").Get("1")
@@ -167,10 +172,11 @@ func TestEventList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("events", ns, ""),
+			Path:   testapi.Default.ResourcePath(getEventsResource(), ns, ""),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: eventList},
+		Response:     simple.Response{StatusCode: 200, Body: eventList},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Events(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -195,9 +201,10 @@ func TestEventDelete(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Default.ResourcePath("events", ns, "foo"),
+			Path:   testapi.Default.ResourcePath(getEventsResource(), ns, "foo"),
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Events(ns).Delete("foo")
 	defer c.Close()
