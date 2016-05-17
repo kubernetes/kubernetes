@@ -137,6 +137,8 @@ var (
 
 		When you are ready to put the node back into service, use kubectl uncordon, which
 		will make the node schedulable again.
+
+		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)
 		`)
 
 	drain_example = dedent.Dedent(`
