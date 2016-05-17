@@ -16,19 +16,17 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-kube::golang::setup_env
 
 focus=${FOCUS:-""}
 skip=${SKIP:-""}
 
 ginkgo=$(kube::util::find-binary "ginkgo")
 if [[ -z "${ginkgo}" ]]; then
-  echo "You do not appear to have ginkgo built. Try 'hack/build-go.sh github.com/onsi/ginkgo/ginkgo'"
+  echo "You do not appear to have ginkgo built. Try 'make WHAT=vendor/github.com/onsi/ginkgo/ginkgo'"
   exit 1
 fi
 
 # Provided for backwards compatibility
-sudo -v
 "${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true --start-services=true --stop-services=true
 
 exit $?
