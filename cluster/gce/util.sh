@@ -28,16 +28,17 @@ if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "$
 elif [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
   # TODO(andyzheng0831): Switch to use the GCI specific code.
   source "${KUBE_ROOT}/cluster/gce/trusty/helper.sh"
-  MASTER_IMAGE_PROJECT="google-containers"
-  # If choosing "gci" disto, at least the cluster master needs to run on GCI image.
-  # If the user does not set a GCI image for master, we run both master and nodes
-  # using the latest GCI dev image.
-  if [[ "${MASTER_IMAGE}" != gci* ]]; then
-    gci_images=( $(gcloud compute images list --project google-containers \
+  # If the master or node image is not set, we use the latest GCI dev image.
+  # Otherwise, we respect whatever set by the user.
+  gci_images=( $(gcloud compute images list --project google-containers \
       --regexp='gci-dev.*' --format='value(name)') )
+  if [[ -z "${KUBE_GCE_MASTER_IMAGE:-}" ]]; then
     MASTER_IMAGE="${gci_images[0]}"
-    NODE_IMAGE="${MASTER_IMAGE}"
-    NODE_IMAGE_PROJECT="${MASTER_IMAGE_PROJECT}"
+    MASTER_IMAGE_PROJECT="google-containers"
+  fi
+  if [[ -z "${KUBE_GCE_NODE_IMAGE:-}" ]]; then
+    NODE_IMAGE="${gci_images[0]}"
+    NODE_IMAGE_PROJECT="google-containers"
   fi
 else
   echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
