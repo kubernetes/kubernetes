@@ -150,7 +150,7 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: redis-master
-  # these labels can be applied automatically
+  # these labels can be applied automatically 
   # from the labels in the pod template if not set
   # labels:
   #   app: redis
@@ -160,7 +160,7 @@ spec:
   # this replicas value is default
   # modify it according to your case
   replicas: 1
-  # selector can be applied automatically
+  # selector can be applied automatically 
   # from the labels in the pod template if not set
   # selector:
   #   matchLabels:
