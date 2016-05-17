@@ -370,14 +370,35 @@ type gcePersistentDiskProvisioner struct {
 
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
 
-func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error {
+func (c *gcePersistentDiskProvisioner) Provision() (*api.PersistentVolume, error) {
 	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName = volumeID
-	pv.Spec.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:   c.options.PVName,
+			Labels: map[string]string{},
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   c.options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+					PDName:    volumeID,
+					FSType:    "ext4",
+					Partition: 0,
+					ReadOnly:  false,
+				},
+			},
+		},
 	}
 
 	if len(labels) != 0 {
@@ -389,34 +410,5 @@ func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error
 		}
 	}
 
-	return nil
-}
-
-func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	// Provide dummy api.PersistentVolume.Spec, it will be filled in
-	// gcePersistentDiskProvisioner.Provision()
-	return &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-gce-",
-			Labels:       map[string]string{},
-			Annotations: map[string]string{
-				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
-			},
-		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): c.options.Capacity,
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:    volume.ProvisionedVolumeName,
-					FSType:    "ext4",
-					Partition: 0,
-					ReadOnly:  false,
-				},
-			},
-		},
-	}, nil
+	return pv, nil
 }

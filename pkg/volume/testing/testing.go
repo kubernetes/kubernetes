@@ -340,11 +340,12 @@ type FakeProvisioner struct {
 	Host    VolumeHost
 }
 
-func (fc *FakeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+func (fc *FakeProvisioner) Provision() (*api.PersistentVolume, error) {
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
-	return &api.PersistentVolume{
+
+	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-fakeplugin-",
+			Name: fc.Options.PVName,
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "fakeplugin-provisioner",
 			},
@@ -361,11 +362,9 @@ func (fc *FakeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume,
 				},
 			},
 		},
-	}, nil
-}
+	}
 
-func (fc *FakeProvisioner) Provision(pv *api.PersistentVolume) error {
-	return nil
+	return pv, nil
 }
 
 // FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
