@@ -373,37 +373,20 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		}
 	}
 
-	volumePlugins := ProbeRecyclableVolumePlugins(s.VolumeConfiguration)
 	provisioner, err := NewVolumeProvisioner(cloud, s.VolumeConfiguration)
 	if err != nil {
 		glog.Fatal("A Provisioner could not be created, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.")
 	}
 
-	pvclaimBinder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")), s.PVClaimBinderSyncPeriod.Duration)
-	pvclaimBinder.Run()
-	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-
-	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-recycler")),
+	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")),
 		s.PVClaimBinderSyncPeriod.Duration,
-		int(s.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.MaximumRetry),
+		provisioner,
 		ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
 		cloud,
 	)
-	if err != nil {
-		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
-	}
-	pvRecycler.Run()
+	volumeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-
-	if provisioner != nil {
-		pvController, err := persistentvolumecontroller.NewPersistentVolumeProvisionerController(persistentvolumecontroller.NewControllerClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-provisioner"))), s.PVClaimBinderSyncPeriod.Duration, s.ClusterName, volumePlugins, provisioner, cloud)
-		if err != nil {
-			glog.Fatalf("Failed to start persistent volume provisioner controller: %+v", err)
-		}
-		pvController.Run()
-		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-	}
 
 	go volume.NewAttachDetachController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "attachdetach-controller")), podInformer, nodeInformer, ResyncPeriod(s)()).
 		Run(wait.NeverStop)
