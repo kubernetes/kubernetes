@@ -52,8 +52,6 @@ type KillPodOptions struct {
 type UpdatePodOptions struct {
 	// pod to update
 	Pod *api.Pod
-	// the mirror pod for the pod to update, if it is a static pod
-	MirrorPod *api.Pod
 	// the type of update (create, update, sync, kill)
 	UpdateType kubetypes.SyncPodType
 	// optional callback function when operation completes
@@ -75,8 +73,6 @@ type PodWorkers interface {
 
 // syncPodOptions provides the arguments to a SyncPod operation.
 type syncPodOptions struct {
-	// the mirror pod for the pod to sync, if it is a static pod
-	mirrorPod *api.Pod
 	// pod to sync
 	pod *api.Pod
 	// the type of update (create, update, sync)
@@ -163,7 +159,6 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 				return err
 			}
 			err = p.syncPodFn(syncPodOptions{
-				mirrorPod:      update.MirrorPod,
 				pod:            update.Pod,
 				podStatus:      status,
 				killPodOptions: update.KillPodOptions,

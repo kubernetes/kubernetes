@@ -118,14 +118,8 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		}
 		glog.Infof("pod %q containers not running: syncing", format.Pod(pod))
 
-		glog.Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
-		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-			glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
-		}
-		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		if err = kl.syncPod(syncPodOptions{
 			pod:        pod,
-			mirrorPod:  mirrorPod,
 			podStatus:  status,
 			updateType: kubetypes.SyncPodUpdate,
 		}); err != nil {

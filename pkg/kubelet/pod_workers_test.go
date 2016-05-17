@@ -46,7 +46,6 @@ func (f *fakePodWorkers) UpdatePod(options *UpdatePodOptions) {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
 	if err := f.syncPodFn(syncPodOptions{
-		mirrorPod:      options.MirrorPod,
 		pod:            options.Pod,
 		podStatus:      status,
 		updateType:     options.UpdateType,
@@ -240,18 +239,18 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 
 type simpleFakeKubelet struct {
 	pod       *api.Pod
-	mirrorPod *api.Pod
 	podStatus *kubecontainer.PodStatus
 	wg        sync.WaitGroup
 }
 
 func (kl *simpleFakeKubelet) syncPod(options syncPodOptions) error {
-	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
+	kl.pod, kl.podStatus = options.pod, options.podStatus
 	return nil
 }
 
 func (kl *simpleFakeKubelet) syncPodWithWaitGroup(options syncPodOptions) error {
-	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
+	kl.pod, kl.podStatus = options.pod, options.podStatus
+
 	kl.wg.Done()
 	return nil
 }
@@ -282,34 +281,20 @@ func TestFakePodWorkers(t *testing.T) {
 	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&util.RealClock{}), time.Second, time.Second, fakeCache)
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
 
-	tests := []struct {
-		pod       *api.Pod
-		mirrorPod *api.Pod
-	}{
-		{
-			&api.Pod{},
-			&api.Pod{},
-		},
-		{
-			podWithUidNameNs("12345678", "foo", "new"),
-			podWithUidNameNs("12345678", "fooMirror", "new"),
-		},
-		{
-			podWithUidNameNs("98765", "bar", "new"),
-			podWithUidNameNs("98765", "barMirror", "new"),
-		},
+	pods := []*api.Pod{
+		{},
+		podWithUidNameNs("12345678", "foo", "new"),
+		podWithUidNameNs("98765", "bar", "new"),
 	}
 
-	for i, tt := range tests {
+	for i, pod := range pods {
 		kubeletForRealWorkers.wg.Add(1)
 		realPodWorkers.UpdatePod(&UpdatePodOptions{
-			Pod:        tt.pod,
-			MirrorPod:  tt.mirrorPod,
+			Pod:        pod,
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
 		fakePodWorkers.UpdatePod(&UpdatePodOptions{
-			Pod:        tt.pod,
-			MirrorPod:  tt.mirrorPod,
+			Pod:        pod,
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
 
@@ -317,10 +302,6 @@ func TestFakePodWorkers(t *testing.T) {
 
 		if !reflect.DeepEqual(kubeletForRealWorkers.pod, kubeletForFakeWorkers.pod) {
 			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.pod, kubeletForFakeWorkers.pod)
-		}
-
-		if !reflect.DeepEqual(kubeletForRealWorkers.mirrorPod, kubeletForFakeWorkers.mirrorPod) {
-			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.mirrorPod, kubeletForFakeWorkers.mirrorPod)
 		}
 
 		if !reflect.DeepEqual(kubeletForRealWorkers.podStatus, kubeletForFakeWorkers.podStatus) {

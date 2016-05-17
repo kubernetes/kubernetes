@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/util"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -52,7 +51,7 @@ func TestRunOnce(t *testing.T) {
 		Usage:    9 * mb,
 		Capacity: 10 * mb,
 	}, nil)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(nil)
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")

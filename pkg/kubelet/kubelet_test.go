@@ -52,7 +52,6 @@ import (
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -94,13 +93,12 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 }
 
 type TestKubelet struct {
-	kubelet          *Kubelet
-	fakeRuntime      *containertest.FakeRuntime
-	fakeCadvisor     *cadvisortest.Mock
-	fakeKubeClient   *fake.Clientset
-	fakeMirrorClient *podtest.FakeMirrorClient
-	fakeClock        *util.FakeClock
-	mounter          mount.Interface
+	kubelet        *Kubelet
+	fakeRuntime    *containertest.FakeRuntime
+	fakeCadvisor   *cadvisortest.Mock
+	fakeKubeClient *fake.Clientset
+	fakeClock      *util.FakeClock
+	mounter        mount.Interface
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
@@ -150,8 +148,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.daemonEndpoints = &api.NodeDaemonEndpoints{}
 	mockCadvisor := &cadvisortest.Mock{}
 	kubelet.cadvisor = mockCadvisor
-	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeKubeClient)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
@@ -202,7 +199,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, util.RealClock{})
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
-	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil}
+	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeClock, nil}
 }
 
 func newTestPods(count int) []*api.Pod {
@@ -3015,121 +3012,70 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	}
 }
 
-func TestCreateMirrorPod(t *testing.T) {
-	for _, updateType := range []kubetypes.SyncPodType{kubetypes.SyncPodCreate, kubetypes.SyncPodUpdate} {
-		testKubelet := newTestKubelet(t)
-		kl := testKubelet.kubelet
-		manager := testKubelet.fakeMirrorClient
-		pod := podWithUidNameNs("12345678", "bar", "foo")
-		pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
-		pods := []*api.Pod{pod}
-		kl.podManager.SetPods(pods)
-		err := kl.syncPod(syncPodOptions{
-			pod:        pod,
-			podStatus:  &kubecontainer.PodStatus{},
-			updateType: updateType,
-		})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		podFullName := kubecontainer.GetPodFullName(pod)
-		if !manager.HasPod(podFullName) {
-			t.Errorf("expected mirror pod %q to be created", podFullName)
-		}
-		if manager.NumOfPods() != 1 || !manager.HasPod(podFullName) {
-			t.Errorf("expected one mirror pod %q, got %v", podFullName, manager.GetPods())
-		}
-	}
-}
-
-func TestDeleteOutdatedMirrorPod(t *testing.T) {
+func TestHandleMirrorPods(t *testing.T) {
+	// Handle mirror pods should filter out all the mirror pods, set static pod and check mirror
+	// pod with mirror pod manager.
 	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("Start").Return(nil)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-
 	kl := testKubelet.kubelet
-	manager := testKubelet.fakeMirrorClient
-	pod := podWithUidNameNsSpec("12345678", "foo", "ns", api.PodSpec{
-		Containers: []api.Container{
-			{Name: "1234", Image: "foo"},
-		},
-	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
-
-	// Mirror pod has an outdated spec.
-	mirrorPod := podWithUidNameNsSpec("11111111", "foo", "ns", api.PodSpec{
-		Containers: []api.Container{
-			{Name: "1234", Image: "bar"},
-		},
-	})
-	mirrorPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "api"
-	mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = "mirror"
-
-	pods := []*api.Pod{pod, mirrorPod}
-	kl.podManager.SetPods(pods)
-	err := kl.syncPod(syncPodOptions{
-		pod:        pod,
-		mirrorPod:  mirrorPod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	name := kubecontainer.GetPodFullName(pod)
-	creates, deletes := manager.GetCounts(name)
-	if creates != 1 || deletes != 1 {
-		t.Errorf("expected 1 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
-	}
-}
-
-func TestDeleteOrphanedMirrorPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("Start").Return(nil)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-
-	kl := testKubelet.kubelet
-	manager := testKubelet.fakeMirrorClient
-	orphanPods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "pod1",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					kubetypes.ConfigSourceAnnotationKey: "api",
-					kubetypes.ConfigMirrorAnnotationKey: "mirror",
-				},
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345679",
-				Name:      "pod2",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					kubetypes.ConfigSourceAnnotationKey: "api",
-					kubetypes.ConfigMirrorAnnotationKey: "mirror",
-				},
+	mirrorPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "789",
+			Name:      "static",
+			Namespace: "pod",
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: "api",
+				kubetypes.ConfigHashAnnotationKey:   "456",
+				kubetypes.ConfigMirrorAnnotationKey: "456",
 			},
 		},
 	}
-
-	kl.podManager.SetPods(orphanPods)
-	// Sync with an empty pod list to delete all mirror pods.
-	kl.HandlePodCleanups()
-	if manager.NumOfPods() != 0 {
-		t.Errorf("expected zero mirror pods, got %v", manager.GetPods())
+	pods := []*api.Pod{
+		// Normal pod
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "123",
+				Name:      "normal",
+				Namespace: "pod",
+				Annotations: map[string]string{
+					kubetypes.ConfigSourceAnnotationKey: "api",
+					kubetypes.ConfigHashAnnotationKey:   "123",
+				},
+			},
+		},
+		// Mirror pod
+		mirrorPod,
 	}
-	for _, pod := range orphanPods {
-		name := kubecontainer.GetPodFullName(pod)
-		creates, deletes := manager.GetCounts(name)
-		if creates != 0 || deletes != 1 {
-			t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)
+	// Should only filter out mirror pod
+	assertUpdate := func(t *testing.T, update *kubetypes.PodUpdate) {
+		if len(update.Pods) != 1 {
+			t.Errorf("Should filter out mirror pod, expected pod count: %d, got: %d", 1, len(update.Pods))
+		} else if !reflect.DeepEqual(update.Pods[0], pods[0]) {
+			t.Errorf("Should not filter out or modify api pod, expected pod: %+v, got: %+v", pods[0], update.Pods[0])
+		}
+	}
+
+	for _, test := range []struct {
+		op    kubetypes.PodOperation
+		found bool
+	}{
+		{kubetypes.ADD, true},
+		{kubetypes.UPDATE, true},
+		{kubetypes.RECONCILE, true},
+		{kubetypes.REMOVE, false},
+	} {
+		update := &kubetypes.PodUpdate{
+			Pods:   pods,
+			Op:     test.op,
+			Source: "api",
+		}
+		kl.handleMirrorPods(update)
+		assertUpdate(t, update)
+		actualPod := kl.podManager.GetMirrorPod(mirrorPod.Name, mirrorPod.Namespace)
+		if !test.found && actualPod != nil {
+			t.Errorf("Should not get mirror pod %+v", actualPod)
+		}
+		if test.found && !reflect.DeepEqual(actualPod, mirrorPod) {
+			t.Errorf("Should get mirror pod, expected %+v, got %+v", mirrorPod, actualPod)
 		}
 	}
 }
@@ -3137,36 +3083,34 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	// pods contain one static and one mirror pod with the same name but
 	// different UIDs.
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "1234",
-				Name:      "qux",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					kubetypes.ConfigSourceAnnotationKey: "file",
-				},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "foo"},
-				},
+	staticPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "1234",
+			Name:      "qux",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: "file",
 			},
 		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "5678",
-				Name:      "qux",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					kubetypes.ConfigSourceAnnotationKey: "api",
-					kubetypes.ConfigMirrorAnnotationKey: "mirror",
-				},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo"},
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "foo"},
-				},
+		},
+	}
+	mirrorPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "5678",
+			Name:      "qux",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: "api",
+				kubetypes.ConfigMirrorAnnotationKey: "mirror",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo"},
 			},
 		},
 	}
@@ -3200,9 +3144,11 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 		},
 	}
 
-	kubelet.podManager.SetPods(pods)
+	kubelet.podManager.AddPod(staticPod)
+	kubelet.podManager.AddMirrorPod(mirrorPod)
+
 	// Use the mirror pod UID to retrieve the stats.
-	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", cadvisorReq)
+	stats, err := kubelet.GetContainerInfo("qux_ns", mirrorPod.UID, "foo", cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3259,7 +3205,6 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			HostNetwork: true,
 		},
 	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
 	err := kubelet.syncPod(syncPodOptions{
 		pod:        pod,
