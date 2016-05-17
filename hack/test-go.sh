@@ -58,6 +58,8 @@ KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Lists of API Versions of each groups that should be tested, groups are
 # separated by comma, lists are separated by semicolon. e.g.,
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
+# FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
+# ONLY the last version is tested in each group.
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,autoscaling/v1,batch/v1,batch/v2alpha1,extensions/v1beta1,apps/v1alpha1,federation/v1alpha1,policy/v1alpha1,rbac.authorization.k8s.io/v1alpha1"}
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
