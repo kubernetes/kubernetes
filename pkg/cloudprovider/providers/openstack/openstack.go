@@ -666,8 +666,8 @@ func (lb *LoadBalancer) GetLoadBalancer(service *api.Service) (*api.LoadBalancer
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
+func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, apiService.Annotations)
 
 	ports := apiService.Spec.Ports
 	if len(ports) > 1 {
@@ -693,7 +693,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}

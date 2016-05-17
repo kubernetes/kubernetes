@@ -2055,12 +2055,26 @@ func ValidateService(service *api.Service) field.ErrorList {
 		nodePorts[key] = true
 	}
 
-	_, err := apiservice.GetLoadBalancerSourceRanges(service.Annotations)
-	if err != nil {
-		v := service.Annotations[apiservice.AnnotationLoadBalancerSourceRangesKey]
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(apiservice.AnnotationLoadBalancerSourceRangesKey), v, "must be a comma separated list of CIDRs e.g. 192.168.0.0/16,10.0.0.0/8"))
+	// Validate SourceRange field and annotation
+	_, ok := service.Annotations[apiservice.AnnotationLoadBalancerSourceRangesKey]
+	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
+		var fieldPath *field.Path
+		var val string
+		if len(service.Spec.LoadBalancerSourceRanges) > 0 {
+			fieldPath = specPath.Child("LoadBalancerSourceRanges")
+			val = fmt.Sprintf("%v", service.Spec.LoadBalancerSourceRanges)
+		} else {
+			fieldPath = field.NewPath("metadata", "annotations").Key(apiservice.AnnotationLoadBalancerSourceRangesKey)
+			val = service.Annotations[apiservice.AnnotationLoadBalancerSourceRangesKey]
+		}
+		if service.Spec.Type != api.ServiceTypeLoadBalancer {
+			allErrs = append(allErrs, field.Invalid(fieldPath, "", "may only be used when `type` is 'LoadBalancer'"))
+		}
+		_, err := apiservice.GetLoadBalancerSourceRanges(service)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fieldPath, val, "must be a list of IP ranges. For example, 10.240.0.0/24,10.250.0.0/24 "))
+		}
 	}
-
 	return allErrs
 }
 

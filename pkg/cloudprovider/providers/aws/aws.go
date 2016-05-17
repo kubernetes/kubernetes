@@ -2120,9 +2120,9 @@ func buildListener(port api.ServicePort, annotations map[string]string) (*elb.Li
 }
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
-func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
+func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
-		apiService.Namespace, apiService.Name, s.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
+		apiService.Namespace, apiService.Name, s.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, apiService.Annotations)
 
 	if apiService.Spec.SessionAffinity != api.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
@@ -2143,7 +2143,7 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string, a
 			glog.Errorf("Ignoring port without NodePort defined: %v", port)
 			continue
 		}
-		listener, err := buildListener(port, annotations)
+		listener, err := buildListener(port, apiService.Annotations)
 		if err != nil {
 			return nil, err
 		}
@@ -2159,14 +2159,14 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string, a
 		return nil, err
 	}
 
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}
 
 	// Determine if this is tagged as an Internal ELB
 	internalELB := false
-	internalAnnotation := annotations[ServiceAnnotationLoadBalancerInternal]
+	internalAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerInternal]
 	if internalAnnotation != "" {
 		if internalAnnotation != "0.0.0.0/0" {
 			return nil, fmt.Errorf("annotation %q=%q detected, but the only value supported currently is 0.0.0.0/0", ServiceAnnotationLoadBalancerInternal, internalAnnotation)
