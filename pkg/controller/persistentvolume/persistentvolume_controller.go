@@ -485,12 +485,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 	// [Unit test set 3]
 	if claim.Spec.VolumeName == "" {
 		// Claim was bound before but not any more.
-		if claim.Status.Phase != api.ClaimLost {
-			// Log the error only once, when we enter 'Lost' phase
-			glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume reference lost!", claimToClaimKey(claim))
-			ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ClaimLost", "Bound claim has lost reference to PersistentVolume. Data on the volume is lost!")
-		}
-		if _, err := ctrl.updateClaimPhase(claim, api.ClaimLost); err != nil {
+		if _, err := ctrl.updateClaimPhaseWithEvent(claim, api.ClaimLost, api.EventTypeWarning, "ClaimLost", "Bound claim has lost reference to PersistentVolume. Data on the volume is lost!"); err != nil {
 			return err
 		}
 		return nil
@@ -501,12 +496,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 	}
 	if !found {
 		// Claim is bound to a non-existing volume.
-		if claim.Status.Phase != api.ClaimLost {
-			// Log the error only once, when we enter 'Lost' phase
-			glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q lost!", claimToClaimKey(claim), claim.Spec.VolumeName)
-			ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ClaimLost", "Bound claim has lost its PersistentVolume. Data on the volume is lost!")
-		}
-		if _, err = ctrl.updateClaimPhase(claim, api.ClaimLost); err != nil {
+		if _, err = ctrl.updateClaimPhaseWithEvent(claim, api.ClaimLost, api.EventTypeWarning, "ClaimLost", "Bound claim has lost its PersistentVolume. Data on the volume is lost!"); err != nil {
 			return err
 		}
 		return nil
@@ -543,12 +533,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 			// Claim is bound but volume has a different claimant.
 			// Set the claim phase to 'Lost', which is a terminal
 			// phase.
-			if claim.Status.Phase != api.ClaimLost {
-				// Log the error only once, when we enter 'Lost' phase
-				glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q bound to another claim %q, this claim is lost!", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
-				ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ClaimMisbound", "Two claims are bound to the same volume, this one is bound incorrectly")
-			}
-			if _, err = ctrl.updateClaimPhase(claim, api.ClaimLost); err != nil {
+			if _, err = ctrl.updateClaimPhaseWithEvent(claim, api.ClaimLost, api.EventTypeWarning, "ClaimMisbound", "Two claims are bound to the same volume, this one is bound incorrectly"); err != nil {
 				return err
 			}
 			return nil
@@ -741,6 +726,30 @@ func (ctrl *PersistentVolumeController) updateClaimPhase(claim *api.PersistentVo
 	return newClaim, nil
 }
 
+// updateClaimPhaseWithEvent saves new claim phase to API server and emits given
+// event on the claim. It saves the phase and emits the event only when the
+// phase has actually changed from the version saved in API server.
+func (ctrl *PersistentVolumeController) updateClaimPhaseWithEvent(claim *api.PersistentVolumeClaim, phase api.PersistentVolumeClaimPhase, eventtype, reason, message string) (*api.PersistentVolumeClaim, error) {
+	glog.V(4).Infof("updating updateClaimPhaseWithEvent[%s]: set phase %s", claimToClaimKey(claim), phase)
+	if claim.Status.Phase == phase {
+		// Nothing to do.
+		glog.V(4).Infof("updating updateClaimPhaseWithEvent[%s]: phase %s already set", claimToClaimKey(claim), phase)
+		return claim, nil
+	}
+
+	newClaim, err := ctrl.updateClaimPhase(claim, phase)
+	if err != nil {
+		return nil, err
+	}
+
+	// Emit the event only when the status change happens, not everytime
+	// syncClaim is called.
+	glog.V(3).Infof("claim %q changed status to %q: %s", claimToClaimKey(claim), phase, message)
+	ctrl.eventRecorder.Event(newClaim, eventtype, reason, message)
+
+	return newClaim, nil
+}
+
 // updateVolumePhase saves new volume phase to API server.
 func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.PersistentVolume, phase api.PersistentVolumePhase) (*api.PersistentVolume, error) {
 	glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s", volume.Name, phase)
@@ -767,6 +776,30 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.Persistent
 	}
 	glog.V(2).Infof("volume %q entered phase %q", volume.Name, phase)
 	return newVol, err
+}
+
+// updateVolumePhaseWithEvent saves new volume phase to API server and emits
+// given event on the volume. It saves the phase and emits the event only when
+// the phase has actually changed from the version saved in API server.
+func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *api.PersistentVolume, phase api.PersistentVolumePhase, eventtype, reason, message string) (*api.PersistentVolume, error) {
+	glog.V(4).Infof("updating updateVolumePhaseWithEvent[%s]: set phase %s", volume.Name, phase)
+	if volume.Status.Phase == phase {
+		// Nothing to do.
+		glog.V(4).Infof("updating updateVolumePhaseWithEvent[%s]: phase %s already set", volume.Name, phase)
+		return volume, nil
+	}
+
+	newVol, err := ctrl.updateVolumePhase(volume, phase)
+	if err != nil {
+		return nil, err
+	}
+
+	// Emit the event only when the status change happens, not everytime
+	// syncClaim is called.
+	glog.V(3).Infof("volume %q changed status to %q: %s", volume.Name, phase, message)
+	ctrl.eventRecorder.Event(newVol, eventtype, reason, message)
+
+	return newVol, nil
 }
 
 // bindVolumeToClaim modifes given volume to be bound to a claim and saves it to
@@ -984,12 +1017,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *api.PersistentVolu
 
 	default:
 		// Unknown PersistentVolumeReclaimPolicy
-		if volume.Status.Phase != api.VolumeFailed {
-			// Log the error only once, when we enter 'Failed' phase
-			glog.V(3).Infof("reclaimVolume[%s]: volume has unrecognized PersistentVolumeReclaimPolicy %q, marking as Failed", volume.Name, volume.Spec.PersistentVolumeReclaimPolicy)
-			ctrl.eventRecorder.Event(volume, api.EventTypeWarning, "VolumeUnknownReclaimPolicy", "Volume has unrecognized PersistentVolumeReclaimPolicy")
-		}
-		if _, err := ctrl.updateVolumePhase(volume, api.VolumeFailed); err != nil {
+		if _, err := ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeUnknownReclaimPolicy", "Volume has unrecognized PersistentVolumeReclaimPolicy"); err != nil {
 			return err
 		}
 	}
@@ -1034,13 +1062,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	plugin, err := ctrl.recyclePluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		// No recycler found. Emit an event and mark the volume Failed.
-		if volume.Status.Phase != api.VolumeFailed {
-			// Log the error only once, when we enter 'Failed' phase
-			glog.V(2).Infof("failed to find recycle plugin for volume %q: %v", volume.Name, err)
-			ctrl.eventRecorder.Event(volume, api.EventTypeWarning, "VolumeFailedRecycle", "No recycler plugin found for the volume!")
-		}
-
-		if _, err = ctrl.updateVolumePhase(volume, api.VolumeFailed); err != nil {
+		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedRecycle", "No recycler plugin found for the volume!"); err != nil {
 			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt
 			return
@@ -1054,14 +1076,8 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	recycler, err := plugin.NewRecycler(spec)
 	if err != nil {
 		// Cannot create recycler
-		if volume.Status.Phase != api.VolumeFailed {
-			// Log the error only once, when we enter 'Failed' phase
-			glog.V(2).Infof("failed to create recycler for volume %q: %v", volume.Name, err)
-			strerr := fmt.Sprintf("Failed to create recycler: %v", err)
-			ctrl.eventRecorder.Event(volume, api.EventTypeWarning, "VolumeFailedRecycle", strerr)
-		}
-
-		if _, err = ctrl.updateVolumePhase(volume, api.VolumeFailed); err != nil {
+		strerr := fmt.Sprintf("Failed to create recycler: %v", err)
+		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
 			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt
 			return
@@ -1073,14 +1089,8 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 
 	if err = recycler.Recycle(); err != nil {
 		// Recycler failed
-		if volume.Status.Phase != api.VolumeFailed {
-			// Log the error only once, when we enter 'Failed' phase
-			glog.V(2).Infof("recycler for volume %q failed: %v", volume.Name, err)
-			strerr := fmt.Sprintf("Recycler failed: %s", err)
-			ctrl.eventRecorder.Event(volume, api.EventTypeWarning, "VolumeFailedRecycle", strerr)
-		}
-
-		if _, err = ctrl.updateVolumePhase(volume, api.VolumeFailed); err != nil {
+		strerr := fmt.Sprintf("Recycler failed: %s", err)
+		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
 			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt
 			return
