@@ -424,6 +424,10 @@ func newPersistentVolumeController(kubeClient clientset.Interface) *PersistentVo
 		kubeClient:        kubeClient,
 		eventRecorder:     record.NewFakeRecorder(1000),
 		runningOperations: make(map[string]bool),
+
+		// Speed up the testing
+		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
+		createProvisionedPVInterval:   5 * time.Millisecond,
 	}
 	return ctrl
 }

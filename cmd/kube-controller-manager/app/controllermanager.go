@@ -384,6 +384,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		provisioner,
 		ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
 		cloud,
+		s.ClusterName,
 	)
 	volumeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
