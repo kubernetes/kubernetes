@@ -190,6 +190,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 	}
 	evictionConfig := eviction.Config{
 		PressureTransitionPeriod: s.EvictionPressureTransitionPeriod.Duration,
+		MaxPodGracePeriodSeconds: int64(s.EvictionMaxPodGracePeriod),
 		Thresholds:               thresholds,
 	}
 

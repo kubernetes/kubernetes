@@ -551,3 +551,16 @@ func reclaimResources(thresholds []Threshold) []api.ResourceName {
 	}
 	return results
 }
+
+// isSoftEviction returns true if the thresholds met for the starved resource are only soft thresholds
+func isSoftEviction(thresholds []Threshold, starvedResource api.ResourceName) bool {
+	for _, threshold := range thresholds {
+		if resourceToCheck := signalToResource[threshold.Signal]; resourceToCheck != starvedResource {
+			continue
+		}
+		if threshold.GracePeriod == time.Duration(0) {
+			return false
+		}
+	}
+	return true
+}
