@@ -561,15 +561,15 @@ setup_addon_manifests() {
   if [ ! -d "${dst_dir}" ]; then
     mkdir -p "${dst_dir}"
   fi
-  files=$(find "${src_dir}" -name "*.yaml")
+  files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml")
   if [ -n "${files}" ]; then
     cp "${src_dir}/"*.yaml "${dst_dir}"
   fi
-  files=$(find "${src_dir}" -name "*.json")
+  files=$(find "${src_dir}" -maxdepth 1 -name "*.json")
   if [ -n "${files}" ]; then
     cp "${src_dir}/"*.json "${dst_dir}"
   fi
-  files=$(find "${src_dir}" -name "*.yaml.in")
+  files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml.in")
   if [ -n "${files}" ]; then
     cp "${src_dir}/"*.yaml.in "${dst_dir}"
   fi

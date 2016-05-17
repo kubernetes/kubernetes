@@ -152,9 +152,9 @@ install_kube_binary_config() {
   tar xzf "${kube_home}/${manifests_tar}" -C "${dst_dir}" --overwrite
   readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
   if [ "${kube_addon_registry}" != "gcr.io/google_containers" ]; then
-    find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
+    find "${dst_dir}" -maxdepth 1 -name \*.yaml -or -maxdepth 1 -name \*.yaml.in | \
       xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
-    find "${dst_dir}" -name \*.manifest -or -name \*.json | \
+    find "${dst_dir}" -maxdepth 1 -name \*.manifest -or -maxdepth 1 -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/configure-helper.sh" /etc/kube-configure-helper.sh
