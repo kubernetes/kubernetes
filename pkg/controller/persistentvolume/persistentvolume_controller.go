@@ -612,52 +612,12 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 				}
 			}
 
-			// HOWTO RELEASE A PV
-			if volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRetain {
-				glog.V(4).Infof("synchronizing PersistentVolume[%s]: policy is Retain, nothing to do", volume.Name)
-				return nil
+			if err = ctrl.reclaimVolume(volume); err != nil {
+				// Release failed, we will fall back into the same condition
+				// in the next call to this method
+				return err
 			}
-			// TODO: implement recycler
 			return nil
-			/*
-				else if pv.Spec.ReclaimPolicy == "Delete" {
-					plugin := findDeleterPluginForPV(pv)
-					if plugin != nil {
-						// maintain a map with the current deleter goroutines that are running
-						// if the key is already present in the map, return
-						//
-						// launch the goroutine that:
-						// 1. deletes the storage asset
-						// 2. deletes the PV API object
-						// 3. deletes itself from the map when it's done
-					} else {
-						// make an event calling out that no deleter was configured
-						// mark the PV as failed
-						// NB: external provisioners/deleters are currently not
-						// considered.
-					}
-				} else if pv.Spec.ReclaimPolicy == "Recycle" {
-					plugin := findRecyclerPluginForPV(pv)
-					if plugin != nil {
-						// maintain a map of running scrubber-pod-monitoring
-						// goroutines, guarded by mutex
-						//
-						// launch a goroutine that:
-						// 0. verify the PV object still needs to be recycled or return
-						// 1. launches a scrubber pod; the pod's name is deterministically created based on PV uid
-						// 2. if the pod is rejected for dup, adopt the existing pod
-						// 2.5. if the pod is rejected for any other reason, retry later
-						// 3. else (the create succeeds), ok
-						// 4. wait for pod completion
-						// 5. marks the PV API object as available
-						// 5.5. clear ClaimRef.UID
-						// 5.6. if boundByController, clear ClaimRef & boundByController annotation
-						// 6. deletes itself from the map when it's done
-					} else {
-						// make an event calling out that no recycler was configured
-						// mark the PV as failed
-					}
-				}*/
 		} else if claim.Spec.VolumeName == "" {
 			// This block collapses into a NOP; we're leaving this here for
 			// completeness.
@@ -986,6 +946,54 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolum
 	_, err = ctrl.updateVolumePhase(newVol, api.VolumeAvailable)
 	return err
 
+}
+
+func (ctrl *PersistentVolumeController) reclaimVolume(volume *api.PersistentVolume) error {
+	if volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRetain {
+		glog.V(4).Infof("synchronizing PersistentVolume[%s]: policy is Retain, nothing to do", volume.Name)
+		return nil
+	}
+	/* else if volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRecycle {
+		plugin := findRecyclerPluginForPV(pv)
+		if plugin != nil {
+			// HOWTO RELEASE A PV
+			// maintain a map of running scrubber-pod-monitoring
+			// goroutines, guarded by mutex
+			//
+			// launch a goroutine that:
+			// 0. verify the PV object still needs to be recycled or return
+			// 1. launches a scrubber pod; the pod's name is deterministically created based on PV uid
+			// 2. if the pod is rejected for dup, adopt the existing pod
+			// 2.5. if the pod is rejected for any other reason, retry later
+			// 3. else (the create succeeds), ok
+			// 4. wait for pod completion
+			// 5. marks the PV API object as available
+			// 5.5. clear ClaimRef.UID
+			// 5.6. if boundByController, clear ClaimRef & boundByController annotation
+			// 6. deletes itself from the map when it's done
+		} else {
+			// make an event calling out that no recycler was configured
+			// mark the PV as failed
+
+		}
+	} else if pv.Spec.ReclaimPolicy == "Delete" {
+			plugin := findDeleterPluginForPV(pv)
+			if plugin != nil {
+				// maintain a map with the current deleter goroutines that are running
+				// if the key is already present in the map, return
+				//
+				// launch the goroutine that:
+				// 1. deletes the storage asset
+				// 2. deletes the PV API object
+				// 3. deletes itself from the map when it's done
+			} else {
+				// make an event calling out that no deleter was configured
+				// mark the PV as failed
+				// NB: external provisioners/deleters are currently not
+				// considered.
+			}
+	*/
+	return nil
 }
 
 func hasAnnotation(obj api.ObjectMeta, ann string) bool {
