@@ -1169,7 +1169,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 // getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
 // The name must be unique
 func (ctrl *PersistentVolumeController) getProvisionedVolumeNameForClaim(claim *api.PersistentVolumeClaim) string {
-	return "pv-provisioned-for-" + string(claim.UID)
+	return "pvc-" + string(claim.UID)
 }
 
 // scheduleOperation starts given asynchronous operation on given volume. It
