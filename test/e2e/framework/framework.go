@@ -85,6 +85,7 @@ type TestDataSummary interface {
 type FrameworkOptions struct {
 	ClientQPS   float32
 	ClientBurst int
+	ReinitializeClientOnEachSpec bool
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
@@ -93,6 +94,7 @@ func NewDefaultFramework(baseName string) *Framework {
 	options := FrameworkOptions{
 		ClientQPS:   20,
 		ClientBurst: 50,
+		ReinitializeClientOnEachSpec: true,
 	}
 	return NewFramework(baseName, options, nil)
 }
@@ -203,7 +205,9 @@ func (f *Framework) AfterEach() {
 
 		// Paranoia-- prevent reuse!
 		f.Namespace = nil
-		f.Client = nil
+		if f.options.ReinitializeClientOnEachSpec{
+			f.Client = nil
+		}
 	}()
 
 	// Print events if the test failed.

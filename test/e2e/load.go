@@ -75,6 +75,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	options := framework.FrameworkOptions{
 		ClientQPS:   50,
 		ClientBurst: 100,
+		ReinitializeClientOnEachSpec: true,
 	}
 	f := framework.NewFramework("load", options, nil)
 	f.NamespaceDeletionTimeout = time.Hour

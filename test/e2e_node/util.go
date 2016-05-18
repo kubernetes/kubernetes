@@ -36,5 +36,6 @@ func NewDefaultFramework(baseName string) *framework.Framework {
 	return framework.NewFramework(baseName, framework.FrameworkOptions{
 		ClientQPS:   100,
 		ClientBurst: 100,
+		ReinitializeClientOnEachSpec: false,
 	}, client)
 }
