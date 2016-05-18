@@ -109,6 +109,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		extensions.Kind("Deployment"):               &DeploymentDescriber{adapter.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                      &JobDescriber{c},
 		batch.Kind("Job"):                           &JobDescriber{c},
+		batch.Kind("ScheduledJob"):                  &ScheduledJobDescriber{adapter.FromUnversionedClient(c)},
 		apps.Kind("PetSet"):                         &PetSetDescriber{c},
 		extensions.Kind("Ingress"):                  &IngressDescriber{c},
 	}
@@ -1019,6 +1020,14 @@ func describeStatus(stateName string, state api.ContainerState, out io.Writer) {
 	}
 }
 
+func printBoolPtr(value *bool) string {
+	if value != nil {
+		return printBool(*value)
+	}
+
+	return "<unset>"
+}
+
 func printBool(value bool) string {
 	if value {
 		return "True"
@@ -1148,18 +1157,18 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 
 // JobDescriber generates information about a job and the pods it has created.
 type JobDescriber struct {
-	client *client.Client
+	client.Interface
 }
 
 func (d *JobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	job, err := d.client.Extensions().Jobs(namespace).Get(name)
+	job, err := d.Batch().Jobs(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.client.Events(namespace).Search(job)
+		events, _ = d.Events(namespace).Search(job)
 	}
 
 	return describeJob(job, events)
@@ -1192,6 +1201,92 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		}
 		return nil
 	})
+}
+
+// ScheduledJobDescriber generates information about a scheduled job and the jobs it has created.
+type ScheduledJobDescriber struct {
+	clientset.Interface
+}
+
+func (d *ScheduledJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	scheduledJob, err := d.Batch().ScheduledJobs(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Core().Events(namespace).Search(scheduledJob)
+	}
+
+	return describeScheduledJob(scheduledJob, events)
+}
+
+func describeScheduledJob(scheduledJob *batch.ScheduledJob, events *api.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", scheduledJob.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", scheduledJob.Namespace)
+		fmt.Fprintf(out, "Schedule:\t%s\n", scheduledJob.Spec.Schedule)
+		fmt.Fprintf(out, "Concurrency Policy:\t%s\n", scheduledJob.Spec.ConcurrencyPolicy)
+		fmt.Fprintf(out, "Suspend:\t%s\n", printBoolPtr(scheduledJob.Spec.Suspend))
+		if scheduledJob.Spec.StartingDeadlineSeconds != nil {
+			fmt.Fprintf(out, "Starting Deadline Seconds:\t%ds\n", *scheduledJob.Spec.StartingDeadlineSeconds)
+		} else {
+			fmt.Fprintf(out, "Starting Deadline Seconds:\t<unset>\n")
+		}
+		describeJobTemplate(scheduledJob.Spec.JobTemplate, out)
+		printLabelsMultiline(out, "Labels", scheduledJob.Labels)
+		if scheduledJob.Status.LastScheduleTime != nil {
+			fmt.Fprintf(out, "Last Schedule Time:\t%s\n", scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
+		} else {
+			fmt.Fprintf(out, "Last Schedule Time:\t<unset>\n")
+		}
+		printActiveJobs(out, "Active Jobs", scheduledJob.Status.Active)
+		if events != nil {
+			DescribeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+func describeJobTemplate(jobTemplate batch.JobTemplateSpec, out io.Writer) {
+	fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&jobTemplate.Spec.Template.Spec))
+	if jobTemplate.Spec.Selector != nil {
+		selector, _ := unversioned.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
+		fmt.Fprintf(out, "Selector:\t%s\n", selector)
+	} else {
+		fmt.Fprintf(out, "Selector:\t<unset>\n")
+	}
+	if jobTemplate.Spec.Parallelism != nil {
+		fmt.Fprintf(out, "Parallelism:\t%d\n", *jobTemplate.Spec.Parallelism)
+	} else {
+		fmt.Fprintf(out, "Parallelism:\t<unset>\n")
+	}
+	if jobTemplate.Spec.Completions != nil {
+		fmt.Fprintf(out, "Completions:\t%d\n", *jobTemplate.Spec.Completions)
+	} else {
+		fmt.Fprintf(out, "Completions:\t<unset>\n")
+	}
+	if jobTemplate.Spec.ActiveDeadlineSeconds != nil {
+		fmt.Fprintf(out, "Active Deadline Seconds:\t%ds\n", *jobTemplate.Spec.ActiveDeadlineSeconds)
+	}
+	describeVolumes(jobTemplate.Spec.Template.Spec.Volumes, out, "")
+}
+
+func printActiveJobs(out io.Writer, title string, jobs []api.ObjectReference) {
+	fmt.Fprintf(out, "%s:\t", title)
+	if len(jobs) == 0 {
+		fmt.Fprintln(out, "<none>")
+		return
+	}
+
+	for i, job := range jobs {
+		if i != 0 {
+			fmt.Fprint(out, ", ")
+		}
+		fmt.Fprintf(out, "%s", job.Name)
+	}
+	fmt.Fprintln(out, "")
 }
 
 // DaemonSetDescriber generates information about a daemon set and the pods it has created.

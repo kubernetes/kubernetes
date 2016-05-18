@@ -69,7 +69,10 @@ var (
 		kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
 
 		# Start the perl container to compute π to 2000 places and print it out.
-		kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`)
+		kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
+
+		# Start the scheduled job to compute π to 2000 places and print it out every 5 minutes.
+		kubectl run pi --schedule="* 0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`)
 )
 
 func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -118,6 +121,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("service-generator", "service/v2", "The name of the generator to use for creating a service.  Only used if --expose is true")
 	cmd.Flags().String("service-overrides", "", "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.")
 	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
+	cmd.Flags().String("schedule", "", "A schedule in the Cron format the job should be run with.")
 }
 
 func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
@@ -154,6 +158,10 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
+	schedule := cmdutil.GetFlagString(cmd, "schedule")
+	if len(schedule) != 0 && len(generatorName) == 0 {
+		generatorName = "scheduledjob/v2alpha1"
+	}
 	if len(generatorName) == 0 {
 		client, err := f.Client()
 		if err != nil {

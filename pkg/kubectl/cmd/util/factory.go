@@ -164,6 +164,7 @@ const (
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
 	JobV1GeneratorName                          = "job/v1"
+	ScheduledJobV2Alpha1GeneratorName           = "scheduledjob/v2alpha1"
 	NamespaceV1GeneratorName                    = "namespace/v1"
 	ResourceQuotaV1GeneratorName                = "resourcequotas/v1"
 	SecretV1GeneratorName                       = "secret/v1"
@@ -180,11 +181,12 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		ServiceV2GeneratorName: kubectl.ServiceGeneratorV2{},
 	}
 	generators["run"] = map[string]kubectl.Generator{
-		RunV1GeneratorName:             kubectl.BasicReplicationController{},
-		RunPodV1GeneratorName:          kubectl.BasicPod{},
-		DeploymentV1Beta1GeneratorName: kubectl.DeploymentV1Beta1{},
-		JobV1Beta1GeneratorName:        kubectl.JobV1Beta1{},
-		JobV1GeneratorName:             kubectl.JobV1{},
+		RunV1GeneratorName:                kubectl.BasicReplicationController{},
+		RunPodV1GeneratorName:             kubectl.BasicPod{},
+		DeploymentV1Beta1GeneratorName:    kubectl.DeploymentV1Beta1{},
+		JobV1Beta1GeneratorName:           kubectl.JobV1Beta1{},
+		JobV1GeneratorName:                kubectl.JobV1{},
+		ScheduledJobV2Alpha1GeneratorName: kubectl.ScheduledJobV2Alpha1{},
 	}
 	generators["autoscale"] = map[string]kubectl.Generator{
 		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
