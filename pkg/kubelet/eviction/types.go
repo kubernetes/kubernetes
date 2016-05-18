@@ -55,7 +55,7 @@ type Threshold struct {
 	// Operator represents a relationship of a signal to a value.
 	Operator ThresholdOperator
 	// value is a quantity associated with the signal that is evaluated against the specified operator.
-	Value resource.Quantity
+	Value *resource.Quantity
 	// GracePeriod represents the amount of time that a threshold must be met before eviction is triggered.
 	GracePeriod time.Duration
 }
@@ -88,7 +88,7 @@ type statsFunc func(pod *api.Pod) (statsapi.PodStats, bool)
 type rankFunc func(pods []*api.Pod, stats statsFunc)
 
 // signalObservations maps a signal to an observed quantity
-type signalObservations map[Signal]resource.Quantity
+type signalObservations map[Signal]*resource.Quantity
 
 // thresholdsObservedAt maps a threshold to a time that it was observed
 type thresholdsObservedAt map[Threshold]time.Time

@@ -148,7 +148,7 @@ func parseThresholdStatement(statement string) (Threshold, error) {
 	return Threshold{
 		Signal:   signal,
 		Operator: operator,
-		Value:    quantity,
+		Value:    &quantity,
 	}, nil
 }
 
@@ -213,14 +213,10 @@ func podUsage(podStats statsapi.PodStats) (api.ResourceList, error) {
 		// disk usage (if known)
 		// TODO: need to handle volumes
 		for _, fsStats := range []*statsapi.FsStats{container.Rootfs, container.Logs} {
-			if err := disk.Add(*diskUsage(fsStats)); err != nil {
-				return nil, err
-			}
+			disk.Add(*diskUsage(fsStats))
 		}
 		// memory usage (if known)
-		if err := memory.Add(*memoryUsage(container.Memory)); err != nil {
-			return nil, err
-		}
+		memory.Add(*memoryUsage(container.Memory))
 	}
 	return api.ResourceList{
 		api.ResourceMemory: memory,
@@ -430,7 +426,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
 	result := signalObservations{}
-	result[SignalMemoryAvailable] = *resource.NewQuantity(int64(*summary.Node.Memory.AvailableBytes), resource.BinarySI)
+	result[SignalMemoryAvailable] = resource.NewQuantity(int64(*summary.Node.Memory.AvailableBytes), resource.BinarySI)
 	return result, statsFunc, nil
 }
 
@@ -446,7 +442,7 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations) []Th
 		}
 		// determine if we have met the specified threshold
 		thresholdMet := false
-		thresholdResult := threshold.Value.Cmp(observed)
+		thresholdResult := threshold.Value.Cmp(*observed)
 		switch threshold.Operator {
 		case OpLessThan:
 			thresholdMet = thresholdResult > 0
@@ -538,7 +534,7 @@ func hasNodeCondition(inputs []api.NodeConditionType, item api.NodeConditionType
 // hasThreshold returns true if the node condition is in the input list
 func hasThreshold(inputs []Threshold, item Threshold) bool {
 	for _, input := range inputs {
-		if input.GracePeriod == item.GracePeriod && input.Operator == item.Operator && input.Signal == item.Signal && input.Value.Cmp(item.Value) == 0 {
+		if input.GracePeriod == item.GracePeriod && input.Operator == item.Operator && input.Signal == item.Signal && input.Value.Cmp(*item.Value) == 0 {
 			return true
 		}
 	}
