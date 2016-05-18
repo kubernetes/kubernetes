@@ -109,6 +109,7 @@ enable-debugging-handlers
 enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
+enable-garbage-collector
 etcd-cafile
 etcd-certfile
 etcd-config

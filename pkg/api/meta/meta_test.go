@@ -43,6 +43,10 @@ func TestAPIObjectMeta(t *testing.T) {
 			SelfLink:        "some/place/only/we/know",
 			Labels:          map[string]string{"foo": "bar"},
 			Annotations:     map[string]string{"x": "y"},
+			Finalizers: []string{
+				"finalizer.1",
+				"finalizer.2",
+			},
 		},
 	}
 	var _ meta.Object = &j.ObjectMeta
@@ -72,6 +76,9 @@ func TestAPIObjectMeta(t *testing.T) {
 	if e, a := "some/place/only/we/know", accessor.GetSelfLink(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := []string{"finalizer.1", "finalizer.2"}, accessor.GetFinalizers(); !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
 	typeAccessor, err := meta.TypeAccessor(j)
 	if err != nil {
@@ -92,6 +99,7 @@ func TestAPIObjectMeta(t *testing.T) {
 	typeAccessor.SetKind("d")
 	accessor.SetResourceVersion("2")
 	accessor.SetSelfLink("google.com")
+	accessor.SetFinalizers([]string{"finalizer.3"})
 
 	// Prove that accessor changes the original object.
 	if e, a := "baz", j.Namespace; e != a {
@@ -116,6 +124,9 @@ func TestAPIObjectMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "google.com", j.SelfLink; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := []string{"finalizer.3"}, j.Finalizers; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -143,6 +154,7 @@ func TestGenericTypeMeta(t *testing.T) {
 		Labels            map[string]string    `json:"labels,omitempty"`
 		Annotations       map[string]string    `json:"annotations,omitempty"`
 		OwnerReferences   []api.OwnerReference `json:"ownerReferences,omitempty"`
+		Finalizers        []string             `json:"finalizers,omitempty"`
 	}
 	type Object struct {
 		TypeMeta `json:",inline"`
@@ -159,6 +171,7 @@ func TestGenericTypeMeta(t *testing.T) {
 			SelfLink:        "some/place/only/we/know",
 			Labels:          map[string]string{"foo": "bar"},
 			Annotations:     map[string]string{"x": "y"},
+			Finalizers:      []string{"finalizer.1", "finalizer.2"},
 		},
 	}
 	accessor, err := meta.Accessor(&j)
@@ -183,6 +196,9 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "some/place/only/we/know", accessor.GetSelfLink(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := []string{"finalizer.1", "finalizer.2"}, accessor.GetFinalizers(); !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
 	typeAccessor, err := meta.TypeAccessor(&j)
 	if err != nil {
@@ -203,6 +219,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	typeAccessor.SetKind("d")
 	accessor.SetResourceVersion("2")
 	accessor.SetSelfLink("google.com")
+	accessor.SetFinalizers([]string{"finalizer.3"})
 
 	// Prove that accessor changes the original object.
 	if e, a := "baz", j.Namespace; e != a {
@@ -229,6 +246,9 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "google.com", j.SelfLink; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := []string{"finalizer.3"}, j.Finalizers; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
 	typeAccessor.SetAPIVersion("d")
 	typeAccessor.SetKind("e")
@@ -252,6 +272,7 @@ type InternalTypeMeta struct {
 	APIVersion        string               `json:"apiVersion,omitempty"`
 	Labels            map[string]string    `json:"labels,omitempty"`
 	Annotations       map[string]string    `json:"annotations,omitempty"`
+	Finalizers        []string             `json:"finalizers,omitempty"`
 	OwnerReferences   []api.OwnerReference `json:"ownerReferences,omitempty"`
 }
 
@@ -435,6 +456,7 @@ func TestGenericObjectMeta(t *testing.T) {
 		ResourceVersion   string               `json:"resourceVersion,omitempty"`
 		Labels            map[string]string    `json:"labels,omitempty"`
 		Annotations       map[string]string    `json:"annotations,omitempty"`
+		Finalizers        []string             `json:"finalizers,omitempty"`
 		OwnerReferences   []api.OwnerReference `json:"ownerReferences,omitempty"`
 	}
 	type Object struct {
@@ -455,6 +477,10 @@ func TestGenericObjectMeta(t *testing.T) {
 			SelfLink:        "some/place/only/we/know",
 			Labels:          map[string]string{"foo": "bar"},
 			Annotations:     map[string]string{"a": "b"},
+			Finalizers: []string{
+				"finalizer.1",
+				"finalizer.2",
+			},
 		},
 	}
 	accessor, err := meta.Accessor(&j)
@@ -485,6 +511,9 @@ func TestGenericObjectMeta(t *testing.T) {
 	if e, a := 1, len(accessor.GetAnnotations()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := []string{"finalizer.1", "finalizer.2"}, accessor.GetFinalizers(); !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
 	typeAccessor, err := meta.TypeAccessor(&j)
 	if err != nil {
@@ -507,6 +536,7 @@ func TestGenericObjectMeta(t *testing.T) {
 	accessor.SetSelfLink("google.com")
 	accessor.SetLabels(map[string]string{"other": "label"})
 	accessor.SetAnnotations(map[string]string{"c": "d"})
+	accessor.SetFinalizers([]string{"finalizer.3"})
 
 	// Prove that accessor changes the original object.
 	if e, a := "baz", j.Namespace; e != a {
@@ -538,6 +568,9 @@ func TestGenericObjectMeta(t *testing.T) {
 	}
 	if e, a := map[string]string{"c": "d"}, j.Annotations; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %#v, got %#v", e, a)
+	}
+	if e, a := []string{"finalizer.3"}, j.Finalizers; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
 	}
 }
 

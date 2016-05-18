@@ -267,21 +267,6 @@ func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
 	}
 }
 
-// Ensure updating finalizers is disallowed
-func TestValidateObjectMetaUpdateDisallowsUpdatingFinalizers(t *testing.T) {
-	errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{"orphaning"}},
-		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
-		field.NewPath("field"),
-	)
-	if len(errs) != 1 {
-		t.Fatalf("unexpected errors: %v", errs)
-	}
-	if !strings.Contains(errs[0].Error(), "field is immutable") {
-		t.Errorf("unexpected error message: %v", errs)
-	}
-}
-
 func TestValidateAnnotations(t *testing.T) {
 	successCases := []map[string]string{
 		{"simple": "bar"},
