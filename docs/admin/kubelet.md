@@ -135,6 +135,7 @@ kubelet
       --outofdisk-transition-frequency=5m0s: Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s
       --pod-cidr="": The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.
       --pod-infra-container-image="gcr.io/google_containers/pause-amd64:3.0": The image whose network/ipc namespaces containers in each pod will use.
+      --pods-per-core=0: Number of Pods per core that can run on this Kubelet. The total number of Pods on this Kubelet cannot exceed max-pods, so max-pods will be used if this caulcation results in a larger number of Pods allowed on the Kubelet. A value of 0 disables this limit.
       --port=10250: The port for the Kubelet to serve on.
       --read-only-port=10255: The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)
       --really-crash-for-testing[=false]: If true, when panics occur crash. Intended for testing.

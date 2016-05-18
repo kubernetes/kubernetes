@@ -240,6 +240,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* OutOfDiskTransitionFrequency */
 		10*time.Second, /* EvictionPressureTransitionPeriod */
 		40,             /* MaxPods */
+		0,              /* PodsPerCore*/
 		cm, net.ParseIP("127.0.0.1"))
 
 	kubeletapp.RunKubelet(kcfg)
@@ -273,6 +274,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* OutOfDiskTransitionFrequency */
 		10*time.Second, /* EvictionPressureTransitionPeriod */
 		40,             /* MaxPods */
+		0,              /* PodsPerCore*/
 		cm,
 		net.ParseIP("127.0.0.1"))
 

@@ -43,7 +43,7 @@ func NewHollowKubelet(
 	dockerClient dockertools.DockerInterface,
 	kubeletPort, kubeletReadOnlyPort int,
 	containerManager cm.ContainerManager,
-	maxPods int,
+	maxPods int, podsPerCore int,
 ) *HollowKubelet {
 	testRootDir := integration.MakeTempDirOrDie("hollow-kubelet.", "")
 	manifestFilePath := integration.MakeTempDirOrDie("manifest", testRootDir)
@@ -74,6 +74,7 @@ func NewHollowKubelet(
 			5*time.Minute,           /* OutOfDiskTransitionFrequency */
 			5*time.Minute,           /* EvictionPressureTransitionPeriod */
 			maxPods,
+			podsPerCore,
 			containerManager,
 			nil,
 		),
