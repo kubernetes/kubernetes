@@ -24,22 +24,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry/generic"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
 )
 
 func installFederationAPIs(s *genericapiserver.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
-	storage, err := f.New(federation.Resource("clusters"))
-	if err != nil {
-		glog.Fatalf("Unable to find storage destination for %v, due to %v", "clusters", err.Error())
-	}
-	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(generic.RESTOptions{
-		Storage:                 storage,
-		Decorator:               g.StorageDecorator(),
-		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
-	})
+	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("clusters")))
 	federationResources := map[string]rest.Storage{
 		"clusters":        clusterStorage,
 		"clusters/status": clusterStatusStorage,
