@@ -109,6 +109,10 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 		allErrs = append(allErrs, ValidateAffinityInPodAnnotations(annotations, fldPath)...)
 	}
 
+	if annotations[api.TolerationsAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
+	}
+
 	if hostname, exists := annotations[utilpod.PodHostnameAnnotation]; exists && !validation.IsDNS1123Label(hostname) {
 		allErrs = append(allErrs, field.Invalid(fldPath, utilpod.PodHostnameAnnotation, DNS1123LabelErrorMsg))
 	}
@@ -1462,6 +1466,60 @@ func validateImagePullSecrets(imagePullSecrets []api.LocalObjectReference, fldPa
 	return allErrors
 }
 
+func validateTaintEffect(effect *api.TaintEffect, allowEmpty bool, fldPath *field.Path) field.ErrorList {
+	if !allowEmpty && len(*effect) == 0 {
+		return field.ErrorList{field.Required(fldPath, "")}
+	}
+
+	allErrors := field.ErrorList{}
+	switch *effect {
+	// TODO: Replace next line with subsequent commented-out line when implement TaintEffectNoScheduleNoAdmit, TaintEffectNoScheduleNoAdmitNoExecute.
+	case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule:
+		// case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule, api.TaintEffectNoScheduleNoAdmit, api.TaintEffectNoScheduleNoAdmitNoExecute:
+	default:
+		validValues := []string{
+			string(api.TaintEffectNoSchedule),
+			string(api.TaintEffectPreferNoSchedule),
+			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit, TaintEffectNoScheduleNoAdmitNoExecute.
+			// string(api.TaintEffectNoScheduleNoAdmit),
+			// string(api.TaintEffectNoScheduleNoAdmitNoExecute),
+		}
+		allErrors = append(allErrors, field.NotSupported(fldPath, effect, validValues))
+	}
+	return allErrors
+}
+
+// validateTolerations tests if given tolerations have valid data.
+func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	for i, toleration := range tolerations {
+		idxPath := fldPath.Index(i)
+		// validate the toleration key
+		allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
+
+		// validate toleration operator and value
+		switch toleration.Operator {
+		case api.TolerationOpEqual, "":
+			if errs := validation.IsValidLabelValue(toleration.Value); len(errs) != 0 {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Value, strings.Join(errs, ";")))
+			}
+		case api.TolerationOpExists:
+			if len(toleration.Value) > 0 {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration, "value must be empty when `operator` is 'Exists'"))
+			}
+		default:
+			validValues := []string{string(api.TolerationOpEqual), string(api.TolerationOpExists)}
+			allErrors = append(allErrors, field.NotSupported(idxPath.Child("operator"), toleration.Operator, validValues))
+		}
+
+		// validate toleration effect
+		if len(toleration.Effect) > 0 {
+			allErrors = append(allErrors, validateTaintEffect(&toleration.Effect, true, idxPath.Child("effect"))...)
+		}
+	}
+	return allErrors
+}
+
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
@@ -1696,6 +1754,22 @@ func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *fi
 	}
 	if affinity.PodAntiAffinity != nil {
 		allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, affinityFldPath.Child("podAntiAffinity"))...)
+	}
+
+	return allErrs
+}
+
+// ValidateTolerationsInPodAnnotations tests that the serialized tolerations in Pod.Annotations has valid data
+func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	tolerations, err := api.GetTolerationsFromPodAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
+		return allErrs
+	}
+	if len(tolerations) > 0 {
+		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
 	}
 
 	return allErrs
@@ -2113,9 +2187,51 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 	return allErrs
 }
 
+// validateTaints tests if given taints have valid data.
+func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	for i, currTaint := range taints {
+		idxPath := fldPath.Index(i)
+		// validate the taint key
+		allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(currTaint.Key, idxPath.Child("key"))...)
+		// validate the taint value
+		if errs := validation.IsValidLabelValue(currTaint.Value); len(errs) != 0 {
+			allErrors = append(allErrors, field.Invalid(idxPath.Child("value"), currTaint.Value, strings.Join(errs, ";")))
+		}
+		// validate the taint effect
+		allErrors = append(allErrors, validateTaintEffect(&currTaint.Effect, false, idxPath.Child("effect"))...)
+	}
+	return allErrors
+}
+
+// ValidateTaintsInNodeAnnotations tests that the serialized taints in Node.Annotations has valid data
+func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
+		return allErrs
+	}
+	if len(taints) > 0 {
+		allErrs = append(allErrs, validateTaints(taints, fldPath.Child(api.TaintsAnnotationKey))...)
+	}
+
+	return allErrs
+}
+
+func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	if annotations[api.TaintsAnnotationKey] != "" {
+		return ValidateTaintsInNodeAnnotations(annotations, fldPath)
+	}
+	return field.ErrorList{}
+}
+
 // ValidateNode tests if required fields in the node are set.
 func ValidateNode(node *api.Node) field.ErrorList {
-	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, field.NewPath("metadata"))
+	fldPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
 
 	// Only validate spec. All status fields are optional and can be updated later.
 
@@ -2130,7 +2246,9 @@ func ValidateNode(node *api.Node) field.ErrorList {
 
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
 func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
-	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, field.NewPath("metadata"))
+	fldPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
 
 	// TODO: Enable the code once we have better api object.status update model. Currently,
 	// anyone can update node status.
