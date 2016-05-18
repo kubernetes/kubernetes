@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -28,6 +29,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		SetDefaults_Job,
 		SetDefaults_HorizontalPodAutoscaler,
 		SetDefaults_ReplicaSet,
+		SetDefaults_NetworkPolicy,
 	)
 }
 
@@ -148,5 +150,18 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
+	}
+}
+
+func SetDefaults_NetworkPolicy(obj *NetworkPolicy) {
+	// Default any undefined Protocol fields to TCP.
+	for _, i := range obj.Spec.Ingress {
+		// TODO: Update Ports to be a pointer to slice as soon as auto-generation supports it.
+		for _, p := range i.Ports {
+			if p.Protocol == nil {
+				proto := v1.ProtocolTCP
+				p.Protocol = &proto
+			}
+		}
 	}
 }

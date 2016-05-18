@@ -67,6 +67,12 @@ limitations under the License.
 		LabelSelector
 		LabelSelectorRequirement
 		ListOptions
+		NetworkPolicy
+		NetworkPolicyIngressRule
+		NetworkPolicyList
+		NetworkPolicyPeer
+		NetworkPolicyPort
+		NetworkPolicySpec
 		PodSecurityPolicy
 		PodSecurityPolicyList
 		PodSecurityPolicySpec
@@ -275,6 +281,30 @@ func (m *ListOptions) Reset()         { *m = ListOptions{} }
 func (m *ListOptions) String() string { return proto.CompactTextString(m) }
 func (*ListOptions) ProtoMessage()    {}
 
+func (m *NetworkPolicy) Reset()         { *m = NetworkPolicy{} }
+func (m *NetworkPolicy) String() string { return proto.CompactTextString(m) }
+func (*NetworkPolicy) ProtoMessage()    {}
+
+func (m *NetworkPolicyIngressRule) Reset()         { *m = NetworkPolicyIngressRule{} }
+func (m *NetworkPolicyIngressRule) String() string { return proto.CompactTextString(m) }
+func (*NetworkPolicyIngressRule) ProtoMessage()    {}
+
+func (m *NetworkPolicyList) Reset()         { *m = NetworkPolicyList{} }
+func (m *NetworkPolicyList) String() string { return proto.CompactTextString(m) }
+func (*NetworkPolicyList) ProtoMessage()    {}
+
+func (m *NetworkPolicyPeer) Reset()         { *m = NetworkPolicyPeer{} }
+func (m *NetworkPolicyPeer) String() string { return proto.CompactTextString(m) }
+func (*NetworkPolicyPeer) ProtoMessage()    {}
+
+func (m *NetworkPolicyPort) Reset()         { *m = NetworkPolicyPort{} }
+func (m *NetworkPolicyPort) String() string { return proto.CompactTextString(m) }
+func (*NetworkPolicyPort) ProtoMessage()    {}
+
+func (m *NetworkPolicySpec) Reset()         { *m = NetworkPolicySpec{} }
+func (m *NetworkPolicySpec) String() string { return proto.CompactTextString(m) }
+func (*NetworkPolicySpec) ProtoMessage()    {}
+
 func (m *PodSecurityPolicy) Reset()         { *m = PodSecurityPolicy{} }
 func (m *PodSecurityPolicy) String() string { return proto.CompactTextString(m) }
 func (*PodSecurityPolicy) ProtoMessage()    {}
@@ -402,6 +432,12 @@ func init() {
 	proto.RegisterType((*LabelSelector)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.LabelSelector")
 	proto.RegisterType((*LabelSelectorRequirement)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.LabelSelectorRequirement")
 	proto.RegisterType((*ListOptions)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.ListOptions")
+	proto.RegisterType((*NetworkPolicy)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicy")
+	proto.RegisterType((*NetworkPolicyIngressRule)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicyIngressRule")
+	proto.RegisterType((*NetworkPolicyList)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicyList")
+	proto.RegisterType((*NetworkPolicyPeer)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicyPeer")
+	proto.RegisterType((*NetworkPolicyPort)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicyPort")
+	proto.RegisterType((*NetworkPolicySpec)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicySpec")
 	proto.RegisterType((*PodSecurityPolicy)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.PodSecurityPolicy")
 	proto.RegisterType((*PodSecurityPolicyList)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.PodSecurityPolicyList")
 	proto.RegisterType((*PodSecurityPolicySpec)(nil), "k8s.io.kubernetes.pkg.apis.extensions.v1beta1.PodSecurityPolicySpec")
@@ -2005,7 +2041,7 @@ func (m *ListOptions) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PodSecurityPolicy) Marshal() (data []byte, err error) {
+func (m *NetworkPolicy) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -2015,7 +2051,7 @@ func (m *PodSecurityPolicy) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *PodSecurityPolicy) MarshalTo(data []byte) (int, error) {
+func (m *NetworkPolicy) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -2039,6 +2075,230 @@ func (m *PodSecurityPolicy) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *NetworkPolicyIngressRule) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NetworkPolicyIngressRule) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Ports) > 0 {
+		for _, msg := range m.Ports {
+			data[i] = 0xa
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.From) > 0 {
+		for _, msg := range m.From {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *NetworkPolicyList) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NetworkPolicyList) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
+	n48, err := m.ListMeta.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n48
+	if len(m.Items) > 0 {
+		for _, msg := range m.Items {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *NetworkPolicyPeer) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NetworkPolicyPeer) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.PodSelector != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.PodSelector.Size()))
+		n49, err := m.PodSelector.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n49
+	}
+	if m.NamespaceSelector != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.NamespaceSelector.Size()))
+		n50, err := m.NamespaceSelector.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n50
+	}
+	return i, nil
+}
+
+func (m *NetworkPolicyPort) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NetworkPolicyPort) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Protocol != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintGenerated(data, i, uint64(len(*m.Protocol)))
+		i += copy(data[i:], *m.Protocol)
+	}
+	if m.Port != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.Port.Size()))
+		n51, err := m.Port.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n51
+	}
+	return i, nil
+}
+
+func (m *NetworkPolicySpec) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NetworkPolicySpec) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.PodSelector.Size()))
+	n52, err := m.PodSelector.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n52
+	if len(m.Ingress) > 0 {
+		for _, msg := range m.Ingress {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *PodSecurityPolicy) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PodSecurityPolicy) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
+	n53, err := m.ObjectMeta.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n53
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
+	n54, err := m.Spec.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n54
+	return i, nil
+}
+
 func (m *PodSecurityPolicyList) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -2057,11 +2317,11 @@ func (m *PodSecurityPolicyList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n48, err := m.ListMeta.MarshalTo(data[i:])
+	n55, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n48
+	i += n55
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -2199,35 +2459,35 @@ func (m *PodSecurityPolicySpec) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x52
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.SELinux.Size()))
-	n49, err := m.SELinux.MarshalTo(data[i:])
+	n56, err := m.SELinux.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n49
+	i += n56
 	data[i] = 0x5a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.RunAsUser.Size()))
-	n50, err := m.RunAsUser.MarshalTo(data[i:])
+	n57, err := m.RunAsUser.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n50
+	i += n57
 	data[i] = 0x62
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.SupplementalGroups.Size()))
-	n51, err := m.SupplementalGroups.MarshalTo(data[i:])
+	n58, err := m.SupplementalGroups.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n51
+	i += n58
 	data[i] = 0x6a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.FSGroup.Size()))
-	n52, err := m.FSGroup.MarshalTo(data[i:])
+	n59, err := m.FSGroup.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n52
+	i += n59
 	data[i] = 0x70
 	i++
 	if m.ReadOnlyRootFilesystem {
@@ -2257,27 +2517,27 @@ func (m *ReplicaSet) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n53, err := m.ObjectMeta.MarshalTo(data[i:])
+	n60, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n53
+	i += n60
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n54, err := m.Spec.MarshalTo(data[i:])
+	n61, err := m.Spec.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n54
+	i += n61
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n55, err := m.Status.MarshalTo(data[i:])
+	n62, err := m.Status.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n55
+	i += n62
 	return i, nil
 }
 
@@ -2299,11 +2559,11 @@ func (m *ReplicaSetList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n56, err := m.ListMeta.MarshalTo(data[i:])
+	n63, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n56
+	i += n63
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -2343,20 +2603,20 @@ func (m *ReplicaSetSpec) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Selector.Size()))
-		n57, err := m.Selector.MarshalTo(data[i:])
+		n64, err := m.Selector.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n57
+		i += n64
 	}
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Template.Size()))
-	n58, err := m.Template.MarshalTo(data[i:])
+	n65, err := m.Template.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n58
+	i += n65
 	return i, nil
 }
 
@@ -2445,21 +2705,21 @@ func (m *RollingUpdateDeployment) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.MaxUnavailable.Size()))
-		n59, err := m.MaxUnavailable.MarshalTo(data[i:])
+		n66, err := m.MaxUnavailable.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n59
+		i += n66
 	}
 	if m.MaxSurge != nil {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.MaxSurge.Size()))
-		n60, err := m.MaxSurge.MarshalTo(data[i:])
+		n67, err := m.MaxSurge.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n60
+		i += n67
 	}
 	return i, nil
 }
@@ -2521,11 +2781,11 @@ func (m *SELinuxStrategyOptions) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.SELinuxOptions.Size()))
-		n61, err := m.SELinuxOptions.MarshalTo(data[i:])
+		n68, err := m.SELinuxOptions.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n61
+		i += n68
 	}
 	return i, nil
 }
@@ -2548,27 +2808,27 @@ func (m *Scale) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n62, err := m.ObjectMeta.MarshalTo(data[i:])
+	n69, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n62
+	i += n69
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n63, err := m.Spec.MarshalTo(data[i:])
+	n70, err := m.Spec.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n63
+	i += n70
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n64, err := m.Status.MarshalTo(data[i:])
+	n71, err := m.Status.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n64
+	i += n71
 	return i, nil
 }
 
@@ -2721,11 +2981,11 @@ func (m *ThirdPartyResource) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n65, err := m.ObjectMeta.MarshalTo(data[i:])
+	n72, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n65
+	i += n72
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.Description)))
@@ -2763,11 +3023,11 @@ func (m *ThirdPartyResourceData) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n66, err := m.ObjectMeta.MarshalTo(data[i:])
+	n73, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n66
+	i += n73
 	if m.Data != nil {
 		data[i] = 0x12
 		i++
@@ -2795,11 +3055,11 @@ func (m *ThirdPartyResourceDataList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n67, err := m.ListMeta.MarshalTo(data[i:])
+	n74, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n67
+	i += n74
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -2833,11 +3093,11 @@ func (m *ThirdPartyResourceList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n68, err := m.ListMeta.MarshalTo(data[i:])
+	n75, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n68
+	i += n75
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -3438,6 +3698,90 @@ func (m *ListOptions) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	if m.TimeoutSeconds != nil {
 		n += 1 + sovGenerated(uint64(*m.TimeoutSeconds))
+	}
+	return n
+}
+
+func (m *NetworkPolicy) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *NetworkPolicyIngressRule) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Ports) > 0 {
+		for _, e := range m.Ports {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.From) > 0 {
+		for _, e := range m.From {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *NetworkPolicyList) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *NetworkPolicyPeer) Size() (n int) {
+	var l int
+	_ = l
+	if m.PodSelector != nil {
+		l = m.PodSelector.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.NamespaceSelector != nil {
+		l = m.NamespaceSelector.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *NetworkPolicyPort) Size() (n int) {
+	var l int
+	_ = l
+	if m.Protocol != nil {
+		l = len(*m.Protocol)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.Port != nil {
+		l = m.Port.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *NetworkPolicySpec) Size() (n int) {
+	var l int
+	_ = l
+	l = m.PodSelector.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Ingress) > 0 {
+		for _, e := range m.Ingress {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -9108,6 +9452,679 @@ func (m *ListOptions) Unmarshal(data []byte) error {
 				}
 			}
 			m.TimeoutSeconds = &v
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NetworkPolicy) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NetworkPolicy: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NetworkPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NetworkPolicyIngressRule) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NetworkPolicyIngressRule: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NetworkPolicyIngressRule: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ports", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ports = append(m.Ports, NetworkPolicyPort{})
+			if err := m.Ports[len(m.Ports)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field From", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.From = append(m.From, NetworkPolicyPeer{})
+			if err := m.From[len(m.From)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NetworkPolicyList) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NetworkPolicyList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NetworkPolicyList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, NetworkPolicy{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NetworkPolicyPeer) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NetworkPolicyPeer: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NetworkPolicyPeer: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodSelector", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PodSelector == nil {
+				m.PodSelector = &LabelSelector{}
+			}
+			if err := m.PodSelector.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NamespaceSelector", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.NamespaceSelector == nil {
+				m.NamespaceSelector = &LabelSelector{}
+			}
+			if err := m.NamespaceSelector.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NetworkPolicyPort) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NetworkPolicyPort: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NetworkPolicyPort: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Protocol", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := k8s_io_kubernetes_pkg_api_v1.Protocol(data[iNdEx:postIndex])
+			m.Protocol = &s
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Port", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Port == nil {
+				m.Port = &k8s_io_kubernetes_pkg_util_intstr.IntOrString{}
+			}
+			if err := m.Port.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NetworkPolicySpec) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NetworkPolicySpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NetworkPolicySpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodSelector", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.PodSelector.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ingress", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ingress = append(m.Ingress, NetworkPolicyIngressRule{})
+			if err := m.Ingress[len(m.Ingress)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
