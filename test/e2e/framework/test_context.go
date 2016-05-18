@@ -83,7 +83,8 @@ func SetTestContext(t TestContextType) {
 }
 
 func RegisterFlags() {
-	// Turn on verbose by default to get spec names
+	// Since we always want to see Ginkgo steps, we make a verbose reporter.
+	// See the Debugf implementation if interested in toggling test verbosity for other logs.
 	config.DefaultReporterConfig.Verbose = true
 
 	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)

@@ -148,6 +148,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	durations := make(chan time.Duration, total)
 
 	blocker := make(chan struct{}, inParallel)
+	framework.Logf("Creating several service latency pointers...")
 	for i := 0; i < total; i++ {
 		go func() {
 			defer GinkgoRecover()
@@ -330,7 +331,7 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 	if err != nil {
 		return 0, err
 	}
-	framework.Logf("Created: %v", gotSvc.Name)
+	framework.Debugf("Created: %v", gotSvc.Name)
 	defer f.Client.Services(gotSvc.Namespace).Delete(gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
@@ -338,6 +339,6 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 	}
 	stopTime := time.Now()
 	d := stopTime.Sub(startTime)
-	framework.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
+	framework.Debugf("Got endpoints: %v [%v]", gotSvc.Name, d)
 	return d, nil
 }
