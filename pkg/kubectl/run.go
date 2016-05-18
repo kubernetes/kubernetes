@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -392,6 +393,104 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 	}
 
 	return &job, nil
+}
+
+type ScheduledJobV2Alpha1 struct{}
+
+func (ScheduledJobV2Alpha1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"labels", false},
+		{"default-name", false},
+		{"name", true},
+		{"image", true},
+		{"port", false},
+		{"hostport", false},
+		{"stdin", false},
+		{"leave-stdin-open", false},
+		{"tty", false},
+		{"command", false},
+		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
+		{"restart", false},
+		{"schedule", true},
+	}
+}
+
+func (ScheduledJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getV1Envs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, true, name)
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makeV1PodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = updateV1PodContainers(params, args, envs, podSpec); err != nil {
+		return nil, err
+	}
+
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
+	podSpec.Containers[0].StdinOnce = !leaveStdinOpen && podSpec.Containers[0].Stdin
+
+	if err := updateV1PodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	restartPolicy := v1.RestartPolicy(params["restart"])
+	if len(restartPolicy) == 0 {
+		restartPolicy = v1.RestartPolicyNever
+	}
+	podSpec.RestartPolicy = restartPolicy
+
+	scheduledJob := batchv2alpha1.ScheduledJob{
+		ObjectMeta: v1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: batchv2alpha1.ScheduledJobSpec{
+			Schedule:          params["schedule"],
+			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				Spec: batchv2alpha1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Labels: labels,
+						},
+						Spec: *podSpec,
+					},
+				},
+			},
+		},
+	}
+
+	return &scheduledJob, nil
 }
 
 type BasicReplicationController struct{}
