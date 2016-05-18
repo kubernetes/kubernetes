@@ -764,8 +764,6 @@ func parse(selector string) (internalSelector, error) {
 	return internalSelector(items), err
 }
 
-var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, validation.LabelValueMaxLength, validation.LabelValueFmt)
-
 func validateLabelKey(k string) error {
 	if errs := validation.IsQualifiedName(k); len(errs) != 0 {
 		return fmt.Errorf("invalid label key %q: %s", k, strings.Join(errs, "; "))
@@ -774,8 +772,8 @@ func validateLabelKey(k string) error {
 }
 
 func validateLabelValue(v string) error {
-	if !validation.IsValidLabelValue(v) {
-		return fmt.Errorf("invalid label value: %s", labelValueErrorMsg)
+	if errs := validation.IsValidLabelValue(v); len(errs) != 0 {
+		return fmt.Errorf("invalid label value: %q: %s", v, strings.Join(errs, "; "))
 	}
 	return nil
 }
