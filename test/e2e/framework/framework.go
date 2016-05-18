@@ -209,6 +209,8 @@ func (f *Framework) AfterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		DumpAllNamespaceInfo(f.Client, f.Namespace.Name)
+		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
+		LogPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels)
 	}
 
 	summaries := make([]TestDataSummary, 0)
