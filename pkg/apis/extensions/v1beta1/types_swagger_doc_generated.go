@@ -456,6 +456,20 @@ func (ListOptions) SwaggerDoc() map[string]string {
 	return map_ListOptions
 }
 
+var map_Parameter = map[string]string{
+	"":            "Parameter defines a name/value variable that is substituted into Template Objects at Template processing time.",
+	"name":        "Name defines the symbol to be replaced.  Name should appear as $(Name) in Objects.",
+	"displayName": "DisplayName is used instead of Name when displaying the Parameter in a UI",
+	"description": "Description is used to give context about the Parameter, such as its purpose and what values are acceptable.",
+	"value":       "Value holds a default value to replace all occurrences of $(Name) within the Template's Objects when the Template is processed.  The Value maybe overridden at Template processing time.  If no Value is provided as a default or override, then the empty string will be used for substitution.",
+	"required":    "Required indicates the parameter must have a non-empty value when the Template is processed. Parameters of Type 'integer' and 'boolean' are always Required.",
+	"type":        "Type is the type that the parameter value must be parsed to. Type may be one of 'string', 'integer', 'boolean', or 'base64'. Type is used by clients to provide validation of user input and direction to users.\n Parameters used to define integer or boolean fields (e.g. replicaCount) should have the\nType set to integer or boolean accordingly.",
+}
+
+func (Parameter) SwaggerDoc() map[string]string {
+	return map_Parameter
+}
+
 var map_PodSecurityPolicy = map[string]string{
 	"":         "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -638,6 +652,41 @@ var map_SupplementalGroupsStrategyOptions = map[string]string{
 
 func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
 	return map_SupplementalGroupsStrategyOptions
+}
+
+var map_Template = map[string]string{
+	"": "Template defines a list of partially complete Objects and a list of Parameters that can be processed into a Config by substituting parameterized values at processing time. Parameter values maybe set at processing time.",
+}
+
+func (Template) SwaggerDoc() map[string]string {
+	return map_Template
+}
+
+var map_TemplateList = map[string]string{
+	"": "TemplateList is a list of Template objects.",
+}
+
+func (TemplateList) SwaggerDoc() map[string]string {
+	return map_TemplateList
+}
+
+var map_TemplateParameters = map[string]string{
+	"":           "TemplateParameters contains the substitution parameter overrides when processing a Template",
+	"name":       "Name is the name of the Template to be processed.",
+	"parameters": "ParameterValues is a map of substitution parameter name:value pairs to be expanded in the Template. Values defined in this map will override any defaults already set in the Template.",
+}
+
+func (TemplateParameters) SwaggerDoc() map[string]string {
+	return map_TemplateParameters
+}
+
+var map_TemplateSpec = map[string]string{
+	"parameters": "Parameters is a list of Parameters used to substitute values into Template Objects",
+	"objects":    "Objects is a list of partially complete Objects with substitution symbols.",
+}
+
+func (TemplateSpec) SwaggerDoc() map[string]string {
+	return map_TemplateSpec
 }
 
 var map_ThirdPartyResource = map[string]string{

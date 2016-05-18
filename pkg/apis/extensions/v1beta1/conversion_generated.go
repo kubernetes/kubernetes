@@ -110,6 +110,8 @@ func init() {
 		Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector,
 		Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement,
+		Convert_v1beta1_Parameter_To_extensions_Parameter,
+		Convert_extensions_Parameter_To_v1beta1_Parameter,
 		Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy,
 		Convert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy,
 		Convert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList,
@@ -142,6 +144,8 @@ func init() {
 		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
 		Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions,
 		Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions,
+		Convert_v1beta1_TemplateParameters_To_extensions_TemplateParameters,
+		Convert_extensions_TemplateParameters_To_v1beta1_TemplateParameters,
 		Convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource,
 		Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource,
 		Convert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData,
@@ -1558,6 +1562,55 @@ func Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequir
 	return autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in, out, s)
 }
 
+func autoConvert_v1beta1_Parameter_To_extensions_Parameter(in *Parameter, out *extensions.Parameter, s conversion.Scope) error {
+	SetDefaults_Parameter(in)
+	out.Name = in.Name
+	if err := api.Convert_Pointer_string_To_string(&in.DisplayName, &out.DisplayName, s); err != nil {
+		return err
+	}
+	if err := api.Convert_Pointer_string_To_string(&in.Description, &out.Description, s); err != nil {
+		return err
+	}
+	if err := api.Convert_Pointer_string_To_string(&in.Value, &out.Value, s); err != nil {
+		return err
+	}
+	if err := api.Convert_Pointer_bool_To_bool(&in.Required, &out.Required, s); err != nil {
+		return err
+	}
+	if err := api.Convert_Pointer_string_To_string(&in.Type, &out.Type, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_Parameter_To_extensions_Parameter(in *Parameter, out *extensions.Parameter, s conversion.Scope) error {
+	return autoConvert_v1beta1_Parameter_To_extensions_Parameter(in, out, s)
+}
+
+func autoConvert_extensions_Parameter_To_v1beta1_Parameter(in *extensions.Parameter, out *Parameter, s conversion.Scope) error {
+	out.Name = in.Name
+	if err := api.Convert_string_To_Pointer_string(&in.DisplayName, &out.DisplayName, s); err != nil {
+		return err
+	}
+	if err := api.Convert_string_To_Pointer_string(&in.Description, &out.Description, s); err != nil {
+		return err
+	}
+	if err := api.Convert_string_To_Pointer_string(&in.Value, &out.Value, s); err != nil {
+		return err
+	}
+	if err := api.Convert_bool_To_Pointer_bool(&in.Required, &out.Required, s); err != nil {
+		return err
+	}
+	if err := api.Convert_string_To_Pointer_string(&in.Type, &out.Type, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_Parameter_To_v1beta1_Parameter(in *extensions.Parameter, out *Parameter, s conversion.Scope) error {
+	return autoConvert_extensions_Parameter_To_v1beta1_Parameter(in, out, s)
+}
+
 func autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *PodSecurityPolicy, out *extensions.PodSecurityPolicy, s conversion.Scope) error {
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2119,6 +2172,49 @@ func autoConvert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_Supplem
 
 func Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *extensions.SupplementalGroupsStrategyOptions, out *SupplementalGroupsStrategyOptions, s conversion.Scope) error {
 	return autoConvert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in, out, s)
+}
+
+func autoConvert_v1beta1_TemplateParameters_To_extensions_TemplateParameters(in *TemplateParameters, out *extensions.TemplateParameters, s conversion.Scope) error {
+	SetDefaults_TemplateParameters(in)
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	if in.ParameterValues != nil {
+		in, out := &in.ParameterValues, &out.ParameterValues
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.ParameterValues = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_TemplateParameters_To_extensions_TemplateParameters(in *TemplateParameters, out *extensions.TemplateParameters, s conversion.Scope) error {
+	return autoConvert_v1beta1_TemplateParameters_To_extensions_TemplateParameters(in, out, s)
+}
+
+func autoConvert_extensions_TemplateParameters_To_v1beta1_TemplateParameters(in *extensions.TemplateParameters, out *TemplateParameters, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	if in.ParameterValues != nil {
+		in, out := &in.ParameterValues, &out.ParameterValues
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.ParameterValues = nil
+	}
+	return nil
+}
+
+func Convert_extensions_TemplateParameters_To_v1beta1_TemplateParameters(in *extensions.TemplateParameters, out *TemplateParameters, s conversion.Scope) error {
+	return autoConvert_extensions_TemplateParameters_To_v1beta1_TemplateParameters(in, out, s)
 }
 
 func autoConvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *extensions.ThirdPartyResource, s conversion.Scope) error {

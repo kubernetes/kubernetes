@@ -80,6 +80,7 @@ import (
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	templateetcd "k8s.io/kubernetes/pkg/registry/template/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
@@ -846,6 +847,13 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
 
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("templates")) {
+		templatesStorage, templateProcess := templateetcd.NewREST(restOptions("templates"))
+		// TODO: Add an endpoint for processing a template without storing it (kubernetes/kuberenetes#25373)
+		storage["templates"] = templatesStorage
+		storage["templates/process"] = templateProcess
+	}
+
 	return storage
 }
 
@@ -965,6 +973,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("jobs"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("templates"),
 	)
 
 	return ret
