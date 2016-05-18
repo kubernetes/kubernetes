@@ -186,6 +186,7 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 // the same psp or is not considered valid.
 func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.Path) field.ErrorList {
 	generatedSCs := make([]*api.SecurityContext, len(pod.Spec.Containers))
+	var generatedInitSCs []*api.SecurityContext
 
 	errs := field.ErrorList{}
 
@@ -200,6 +201,26 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 	originalPSC := pod.Spec.SecurityContext
 	pod.Spec.SecurityContext = psc
 	errs = append(errs, provider.ValidatePodSecurityContext(pod, field.NewPath("spec", "securityContext"))...)
+
+	// Note: this is not changing the original container, we will set container SCs later so long
+	// as all containers validated under the same PSP.
+	for i, containerCopy := range pod.Spec.InitContainers {
+		// We will determine the effective security context for the container and validate against that
+		// since that is how the sc provider will eventually apply settings in the runtime.
+		// This results in an SC that is based on the Pod's PSC with the set fields from the container
+		// overriding pod level settings.
+		containerCopy.SecurityContext = sc.DetermineEffectiveSecurityContext(pod, &containerCopy)
+
+		sc, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
+		if err != nil {
+			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
+			continue
+		}
+		generatedInitSCs = append(generatedInitSCs, sc)
+
+		containerCopy.SecurityContext = sc
+		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &containerCopy, field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
+	}
 
 	// Note: this is not changing the original container, we will set container SCs later so long
 	// as all containers validated under the same PSP.
@@ -229,6 +250,9 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 
 	// if we've reached this code then we've generated and validated an SC for every container in the
 	// pod so let's apply what we generated.  Note: the psc is already applied.
+	for i, sc := range generatedInitSCs {
+		pod.Spec.InitContainers[i].SecurityContext = sc
+	}
 	for i, sc := range generatedSCs {
 		pod.Spec.Containers[i].SecurityContext = sc
 	}
