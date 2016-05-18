@@ -359,6 +359,16 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 		result.milliCPU += requests.Cpu().MilliValue()
 		result.nvidiaGPU += requests.NvidiaGPU().Value()
 	}
+	// take max_resource(sum_pod, any_init_container)
+	for _, container := range pod.Spec.InitContainers {
+		requests := container.Resources.Requests
+		if mem := requests.Memory().Value(); mem > result.memory {
+			result.memory = mem
+		}
+		if cpu := requests.Cpu().MilliValue(); cpu > result.milliCPU {
+			result.milliCPU = cpu
+		}
+	}
 	return result
 }
 
@@ -428,7 +438,7 @@ func PodFitsResources(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, er
 	}
 	if totalMemory < podRequest.memory+nodeInfo.RequestedResource().Memory {
 		return false,
-			newInsufficientResourceError(memoryResoureceName, podRequest.memory, nodeInfo.RequestedResource().Memory, totalMemory)
+			newInsufficientResourceError(memoryResourceName, podRequest.memory, nodeInfo.RequestedResource().Memory, totalMemory)
 	}
 	if totalNvidiaGPU < podRequest.nvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
 		return false,

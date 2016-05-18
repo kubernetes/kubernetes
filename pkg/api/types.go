@@ -1076,6 +1076,8 @@ const (
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
 	PodReady PodConditionType = "Ready"
+	// PodInitialized means that all init containers in the pod have started successfully.
+	PodInitialized PodConditionType = "Initialized"
 )
 
 type PodCondition struct {
@@ -1309,7 +1311,9 @@ type PreferredSchedulingTerm struct {
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume `json:"volumes"`
-	// Required: there must be at least one container in a pod.
+	// List of initialization containers belonging to the pod.
+	InitContainers []Container `json:"-"`
+	// List of containers belonging to the pod.
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
@@ -1416,6 +1420,11 @@ type PodStatus struct {
 	// This is before the Kubelet pulled the container image(s) for the pod.
 	StartTime *unversioned.Time `json:"startTime,omitempty"`
 
+	// The list has one entry per init container in the manifest. The most recent successful
+	// init container will have ready = true, the most recently started container will have
+	// startTime set.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses
+	InitContainerStatuses []ContainerStatus `json:"-"`
 	// The list has one entry per container in the manifest. Each entry is
 	// currently the output of `docker inspect`. This output format is *not*
 	// final and should not be relied upon.

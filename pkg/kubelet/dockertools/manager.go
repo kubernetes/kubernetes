@@ -37,6 +37,7 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -57,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
 
@@ -876,6 +878,9 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 	} else if dm.networkPlugin.Name() != "cni" && dm.networkPlugin.Name() != "kubenet" {
 		// Docker only exports ports from the pod infra container. Let's
 		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.InitContainers {
+			ports = append(ports, container.Ports...)
+		}
 		for _, container := range pod.Spec.Containers {
 			ports = append(ports, container.Ports...)
 		}
@@ -1179,6 +1184,14 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 						break
 					}
 				}
+				if containerSpec == nil {
+					for i, c := range pod.Spec.InitContainers {
+						if c.Name == container.Name {
+							containerSpec = &pod.Spec.InitContainers[i]
+							break
+						}
+					}
+				}
 			}
 
 			// TODO: Handle this without signaling the pod infra container to
@@ -1370,6 +1383,14 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 				}
 			}
 			if container == nil {
+				for ix := range pod.Spec.InitContainers {
+					if pod.Spec.InitContainers[ix].Name == name {
+						container = &pod.Spec.InitContainers[ix]
+						break
+					}
+				}
+			}
+			if container == nil {
 				err = fmt.Errorf("unable to find container %s in pod %v", name, pod)
 			}
 		} else {
@@ -1425,6 +1446,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if err != nil {
 		glog.Errorf("Can't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
+	glog.Infof("Generating ref for container %s: %#v", container.Name, ref)
 
 	opts, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
@@ -1603,6 +1625,9 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 	} else {
 		// Docker only exports ports from the pod infra container.  Let's
 		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.InitContainers {
+			ports = append(ports, container.Ports...)
+		}
 		for _, container := range pod.Spec.Containers {
 			ports = append(ports, container.Ports...)
 		}
@@ -1640,13 +1665,16 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 //   should be kept running. If startInfraContainer is false then it contains an entry for infraContainerId (mapped to -1).
 //   It shouldn't be the case where containersToStart is empty and containersToKeep contains only infraContainerId. In such case
 //   Infra Container should be killed, hence it's removed from this map.
-// - all running containers which are NOT contained in containersToKeep should be killed.
+// - all init containers are stored in initContainersToKeep
+// - all running containers which are NOT contained in containersToKeep and initContainersToKeep should be killed.
 type podContainerChangesSpec struct {
-	StartInfraContainer bool
-	InfraChanged        bool
-	InfraContainerId    kubecontainer.DockerID
-	ContainersToStart   map[int]string
-	ContainersToKeep    map[kubecontainer.DockerID]int
+	StartInfraContainer  bool
+	InfraChanged         bool
+	InfraContainerId     kubecontainer.DockerID
+	InitFailed           bool
+	InitContainersToKeep map[kubecontainer.DockerID]int
+	ContainersToStart    map[int]string
+	ContainersToKeep     map[kubecontainer.DockerID]int
 }
 
 func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kubecontainer.PodStatus) (podContainerChangesSpec, error) {
@@ -1683,6 +1711,35 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 		containersToKeep[podInfraContainerID] = -1
 	}
 
+	// check the status of the init containers
+	initFailed := false
+	initContainersToKeep := make(map[kubecontainer.DockerID]int)
+	// always reset the init containers if the pod is reset
+	if !createPodInfraContainer {
+		// keep all successfully completed containers up to and including the first failing container
+	Containers:
+		for i, container := range pod.Spec.InitContainers {
+			containerStatus := podStatus.FindContainerStatusByName(container.Name)
+			if containerStatus == nil {
+				continue
+			}
+			switch {
+			case containerStatus == nil:
+				continue
+			case containerStatus.State == kubecontainer.ContainerStateRunning:
+				initContainersToKeep[kubecontainer.DockerID(containerStatus.ID.ID)] = i
+			case containerStatus.State == kubecontainer.ContainerStateExited:
+				initContainersToKeep[kubecontainer.DockerID(containerStatus.ID.ID)] = i
+				// TODO: should we abstract the "did the init container fail" check?
+				if containerStatus.ExitCode != 0 {
+					initFailed = true
+					break Containers
+				}
+			}
+		}
+	}
+
+	// check the status of the containers
 	for index, container := range pod.Spec.Containers {
 		expectedHash := kubecontainer.HashContainer(&container)
 
@@ -1716,6 +1773,19 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 			continue
 		}
 
+		if initFailed {
+			// initialization failed and Container exists
+			// If we have an initialization failure everything will be killed anyway
+			// If RestartPolicy is Always or OnFailure we restart containers that were running before we
+			// killed them when re-running initialization
+			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
+				message := fmt.Sprintf("Failed to initialize pod. %q will be restarted.", container.Name)
+				glog.V(1).Info(message)
+				containersToStart[index] = message
+			}
+			continue
+		}
+
 		// At this point, the container is running and pod infra container is good.
 		// We will look for changes and check healthiness for the container.
 		containerChanged := hash != 0 && hash != expectedHash
@@ -1743,17 +1813,21 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 	// (In fact, when createPodInfraContainer is false, containersToKeep will not be touched).
 	// - createPodInfraContainer is false and containersToKeep contains at least ID of Infra Container
 
-	// If Infra container is the last running one, we don't want to keep it.
+	// If Infra container is the last running one, we don't want to keep it, and we don't want to
+	// keep any init containers.
 	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
 		containersToKeep = make(map[kubecontainer.DockerID]int)
+		initContainersToKeep = make(map[kubecontainer.DockerID]int)
 	}
 
 	return podContainerChangesSpec{
-		StartInfraContainer: createPodInfraContainer,
-		InfraChanged:        changed,
-		InfraContainerId:    podInfraContainerID,
-		ContainersToStart:   containersToStart,
-		ContainersToKeep:    containersToKeep,
+		StartInfraContainer:  createPodInfraContainer,
+		InfraChanged:         changed,
+		InfraContainerId:     podInfraContainerID,
+		InitFailed:           initFailed,
+		InitContainersToKeep: initContainersToKeep,
+		ContainersToStart:    containersToStart,
+		ContainersToKeep:     containersToKeep,
 	}, nil
 }
 
@@ -1797,7 +1871,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		runningContainerStatues := podStatus.GetRunningContainerStatuses()
 		for _, containerStatus := range runningContainerStatues {
 			_, keep := containerChanges.ContainersToKeep[kubecontainer.DockerID(containerStatus.ID.ID)]
-			if !keep {
+			_, keepInit := containerChanges.InitContainersToKeep[kubecontainer.DockerID(containerStatus.ID.ID)]
+			if !keep && !keepInit {
 				glog.V(3).Infof("Killing unwanted container %q(id=%q) for pod %q", containerStatus.Name, containerStatus.ID, format.Pod(pod))
 				// attempt to find the appropriate container policy
 				var podContainer *api.Container
@@ -1819,6 +1894,9 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			}
 		}
 	}
+
+	// Keep terminated init containers fairly aggressively controlled
+	dm.pruneInitContainersBeforeStart(pod, podStatus, containerChanges.InitContainersToKeep)
 
 	// We pass the value of the podIP down to runContainerInPod, which in turn
 	// passes it to various other functions, in order to facilitate
@@ -1889,14 +1967,78 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 	}
 
-	// Start everything
+	next, status, done := findActiveInitContainer(pod, podStatus)
+	if status != nil {
+		if status.ExitCode != 0 {
+			// container initialization has failed, flag the pod as failed
+			initContainerResult := kubecontainer.NewSyncResult(kubecontainer.InitContainer, status.Name)
+			initContainerResult.Fail(kubecontainer.ErrRunInitContainer, fmt.Sprintf("init container %q exited with %d", status.Name, status.ExitCode))
+			result.AddSyncResult(initContainerResult)
+			if pod.Spec.RestartPolicy == api.RestartPolicyNever {
+				utilruntime.HandleError(fmt.Errorf("error running pod %q init container %q, restart=Never: %+v", format.Pod(pod), status.Name, status))
+				return
+			}
+			utilruntime.HandleError(fmt.Errorf("Error running pod %q init container %q, restarting: %+v", format.Pod(pod), status.Name, status))
+		}
+	}
+
+	// Note: when configuring the pod's containers anything that can be configured by pointing
+	// to the namespace of the infra container should use namespaceMode.  This includes things like the net namespace
+	// and IPC namespace.  PID mode cannot point to another container right now.
+	// See createPodInfraContainer for infra container setup.
+	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
+	pidMode := getPidMode(pod)
+
+	if next != nil {
+		if len(containerChanges.ContainersToStart) == 0 {
+			glog.V(4).Infof("No containers to start, stopping at init container %+v in pod %v", next.Name, format.Pod(pod))
+			return
+		}
+
+		// If we need to start the next container, do so now then exit
+		container := next
+		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
+		result.AddSyncResult(startContainerResult)
+
+		// containerChanges.StartInfraContainer causes the containers to be restarted for config reasons
+		if !containerChanges.StartInfraContainer {
+			isInBackOff, err, msg := dm.doBackOff(pod, container, podStatus, backOff)
+			if isInBackOff {
+				startContainerResult.Fail(err, msg)
+				glog.V(4).Infof("Backing Off restarting init container %+v in pod %v", container, format.Pod(pod))
+				return
+			}
+		}
+
+		glog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
+		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
+			startContainerResult.Fail(err, msg)
+			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
+			return
+		}
+
+		// Successfully started the container; clear the entry in the failure
+		glog.V(4).Infof("Completed init container %q for pod %q", container.Name, format.Pod(pod))
+		return
+	}
+	if !done {
+		// init container still running
+		glog.V(4).Infof("An init container is still running in pod %v", format.Pod(pod))
+		return
+	}
+	if containerChanges.InitFailed {
+		// init container still running
+		glog.V(4).Infof("Not all init containers have succeeded for pod %v", format.Pod(pod))
+		return
+	}
+
+	// Start regular containers
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
 		result.AddSyncResult(startContainerResult)
 
 		// containerChanges.StartInfraContainer causes the containers to be restarted for config reasons
-		// ignore backoff
 		if !containerChanges.StartInfraContainer {
 			isInBackOff, err, msg := dm.doBackOff(pod, container, podStatus, backOff)
 			if isInBackOff {
@@ -1905,44 +2047,129 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 				continue
 			}
 		}
+
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
-		err, msg := dm.imagePuller.PullImage(pod, container, pullSecrets)
-		if err != nil {
+		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
+			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			continue
 		}
-
-		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot != nil && *container.SecurityContext.RunAsNonRoot {
-			err := dm.verifyNonRoot(container)
-			if err != nil {
-				startContainerResult.Fail(kubecontainer.ErrVerifyNonRoot, err.Error())
-				glog.Errorf("Error running pod %q container %q: %v", format.Pod(pod), container.Name, err)
-				continue
-			}
-		}
-		// For a new container, the RestartCount should be 0
-		restartCount := 0
-		containerStatus := podStatus.FindContainerStatusByName(container.Name)
-		if containerStatus != nil {
-			restartCount = containerStatus.RestartCount + 1
-		}
-
-		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
-		// Note: when configuring the pod's containers anything that can be configured by pointing
-		// to the namespace of the infra container should use namespaceMode.  This includes things like the net namespace
-		// and IPC namespace.  PID mode cannot point to another container right now.
-		// See createPodInfraContainer for infra container setup.
-		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod), podIP, restartCount)
-		if err != nil {
-			startContainerResult.Fail(kubecontainer.ErrRunContainer, err.Error())
-			// TODO(bburns) : Perhaps blacklist a container after N failures?
-			glog.Errorf("Error running pod %q container %q: %v", format.Pod(pod), container.Name, err)
-			continue
-		}
-		// Successfully started the container; clear the entry in the failure
 	}
 	return
+}
+
+// tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
+// was not successful.
+func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, namespaceMode, pidMode, podIP string) (err error, reason string) {
+	err, msg := dm.imagePuller.PullImage(pod, container, pullSecrets)
+	if err != nil {
+		return err, msg
+	}
+
+	if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot != nil && *container.SecurityContext.RunAsNonRoot {
+		err := dm.verifyNonRoot(container)
+		if err != nil {
+			return kubecontainer.ErrVerifyNonRoot, err.Error()
+		}
+	}
+
+	// For a new container, the RestartCount should be 0
+	restartCount := 0
+	containerStatus := podStatus.FindContainerStatusByName(container.Name)
+	if containerStatus != nil {
+		restartCount = containerStatus.RestartCount + 1
+	}
+
+	// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
+	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, restartCount)
+	if err != nil {
+		// TODO(bburns) : Perhaps blacklist a container after N failures?
+		return kubecontainer.ErrRunContainer, err.Error()
+	}
+	return nil, ""
+}
+
+// pruneInitContainers ensures that before we begin creating init containers, we have reduced the number
+// of outstanding init containers still present. This reduces load on the container garbage collector
+// by only preserving the most recent terminated init container.
+func (dm *DockerManager) pruneInitContainersBeforeStart(pod *api.Pod, podStatus *kubecontainer.PodStatus, initContainersToKeep map[kubecontainer.DockerID]int) {
+	// only the last execution of an init container should be preserved, and only preserve it if it is in the
+	// list of init containers to keep.
+	initContainerNames := sets.NewString()
+	for _, container := range pod.Spec.InitContainers {
+		initContainerNames.Insert(container.Name)
+	}
+	for name := range initContainerNames {
+		count := 0
+		for _, status := range podStatus.ContainerStatuses {
+			if !initContainerNames.Has(status.Name) || status.State != kubecontainer.ContainerStateExited {
+				continue
+			}
+			count++
+			// keep the first init container we see
+			if count == 1 {
+				continue
+			}
+			// if there is a reason to preserve the older container, do so
+			if _, ok := initContainersToKeep[kubecontainer.DockerID(status.ID.ID)]; ok {
+				continue
+			}
+
+			// prune all other init containers that match this container name
+			// TODO: we may not need aggressive pruning
+			glog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
+			if err := dm.client.RemoveContainer(status.ID.ID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
+				if _, ok := err.(containerNotFoundError); ok {
+					count--
+					continue
+				}
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", name, err, format.Pod(pod)))
+				// TODO: report serious errors
+				continue
+			}
+
+			// remove any references to this container
+			if _, ok := dm.containerRefManager.GetRef(status.ID); ok {
+				dm.containerRefManager.ClearRef(status.ID)
+			} else {
+				glog.Warningf("No ref for pod '%q'", pod.Name)
+			}
+		}
+	}
+}
+
+// findActiveInitContainer returns the status of the last failed container, the next init container to
+// start, or done if there are no further init containers. Status is only returned if an init container
+// failed, in which case next will point to the current container.
+func findActiveInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (next *api.Container, status *kubecontainer.ContainerStatus, done bool) {
+	if len(pod.Spec.InitContainers) == 0 {
+		return nil, nil, true
+	}
+
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		switch {
+		case status == nil:
+			continue
+		case status.State == kubecontainer.ContainerStateRunning:
+			return nil, nil, false
+		case status.State == kubecontainer.ContainerStateExited:
+			switch {
+			// the container has failed, we'll have to retry
+			case status.ExitCode != 0:
+				return &pod.Spec.InitContainers[i], status, false
+			// all init containers successful
+			case i == (len(pod.Spec.InitContainers) - 1):
+				return nil, nil, true
+			// all containers up to i successful, go to i+1
+			default:
+				return &pod.Spec.InitContainers[i+1], nil, false
+			}
+		}
+	}
+
+	return &pod.Spec.InitContainers[0], nil, false
 }
 
 // verifyNonRoot returns an error if the container or image will run as the root user.
@@ -2018,6 +2245,7 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 		}
 	}
 	if cStatus != nil {
+		glog.Infof("checking backoff for container %q in pod %q", container.Name, pod.Name)
 		ts := cStatus.FinishedAt
 		// found a container that requires backoff
 		dockerName := KubeletContainerName{

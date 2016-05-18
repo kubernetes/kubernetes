@@ -1326,6 +1326,37 @@ func validatePullPolicy(policy api.PullPolicy, fldPath *field.Path) field.ErrorL
 	return allErrors
 }
 
+func validateInitContainers(containers, otherContainers []api.Container, volumes sets.String, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(containers) > 0 {
+		allErrs = append(allErrs, validateContainers(containers, volumes, fldPath)...)
+	}
+
+	allNames := sets.String{}
+	for _, ctr := range otherContainers {
+		allNames.Insert(ctr.Name)
+	}
+	for i, ctr := range containers {
+		idxPath := fldPath.Index(i)
+		if allNames.Has(ctr.Name) {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), ctr.Name))
+		}
+		if len(ctr.Name) > 0 {
+			allNames.Insert(ctr.Name)
+		}
+		if ctr.Lifecycle != nil {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("lifecycle"), ctr.Lifecycle, "must not be set for init containers"))
+		}
+		if ctr.LivenessProbe != nil {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("livenessProbe"), ctr.LivenessProbe, "must not be set for init containers"))
+		}
+		if ctr.ReadinessProbe != nil {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("readinessProbe"), ctr.ReadinessProbe, "must not be set for init containers"))
+		}
+	}
+	return allErrs
+}
+
 func validateContainers(containers []api.Container, volumes sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -1451,6 +1482,7 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allVolumes, vErrs := validateVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes, fldPath.Child("containers"))...)
+	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, allVolumes, fldPath.Child("initContainers"))...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)

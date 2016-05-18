@@ -207,6 +207,15 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *api.PodStatus) {
 		}
 		podStatus.ContainerStatuses[i].Ready = ready
 	}
+	// init containers are ready if they have exited with success or if a readiness probe has
+	// succeeded.
+	for i, c := range podStatus.InitContainerStatuses {
+		var ready bool
+		if c.State.Terminated != nil && c.State.Terminated.ExitCode == 0 {
+			ready = true
+		}
+		podStatus.InitContainerStatuses[i].Ready = ready
+	}
 }
 
 func (m *manager) getWorker(podUID types.UID, containerName string, probeType probeType) (*worker, bool) {

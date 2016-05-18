@@ -217,8 +217,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 	} else {
 		out.ManualSelector = nil
 	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -262,8 +261,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 	} else {
 		out.ManualSelector = nil
 	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
