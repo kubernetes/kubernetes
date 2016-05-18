@@ -149,7 +149,7 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 		checkNode := func(i int) {
 			nodeName := nodes.Items[i].Name
 			fits, failedPredicate, err := podFitsOnNode(pod, nodeNameToInfo[nodeName], predicateFuncs)
-	
+
 			predicateResultLock.Lock()
 			defer predicateResultLock.Unlock()
 			if err != nil {
