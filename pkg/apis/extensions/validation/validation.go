@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -679,5 +680,60 @@ func ValidatePodSecurityPolicyUpdate(old *extensions.PodSecurityPolicy, new *ext
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&old.ObjectMeta, &new.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateNetworkPolicyName can be used to check whether the given networkpolicy
+// name is valid.
+func ValidateNetworkPolicyName(name string, prefix bool) []string {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateNetworkPolicySpec tests if required fields in the networkpolicy spec are set.
+func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.PodSelector, fldPath.Child("podSelector"))...)
+
+	// Validate ingress rules.
+	for _, i := range spec.Ingress {
+		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
+		for _, f := range i.From {
+			numFroms := 0
+			allErrs := field.ErrorList{}
+			if f.PodSelector != nil {
+				numFroms++
+				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.PodSelector, fldPath.Child("podSelector"))...)
+			}
+			if f.NamespaceSelector != nil {
+				if numFroms > 0 {
+					allErrs = append(allErrs, field.Forbidden(fldPath, "may not specify more than 1 from type"))
+				} else {
+					numFroms++
+					allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.NamespaceSelector, fldPath.Child("namespaces"))...)
+				}
+			}
+
+			if numFroms == 0 {
+				// At least one of PodSelector and NamespaceSelector must be defined.
+				allErrs = append(allErrs, field.Required(fldPath, "must specify a from type"))
+			}
+		}
+	}
+	return allErrs
+}
+
+// ValidateNetworkPolicy validates a networkpolicy.
+func ValidateNetworkPolicy(np *extensions.NetworkPolicy) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&np.ObjectMeta, true, ValidateNetworkPolicyName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNetworkPolicySpec(&np.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateNetworkPolicyUpdate tests if an update to a NetworkPolicy is valid.
+func ValidateNetworkPolicyUpdate(np, oldNP *extensions.NetworkPolicy) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !reflect.DeepEqual(np, oldNP) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to networkpolicy spec are forbidden."))
+	}
 	return allErrs
 }

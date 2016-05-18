@@ -61,6 +61,8 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ReplicaSetList{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
+		&NetworkPolicy{},
+		&NetworkPolicyList{},
 	)
 	// Add the watch version that applies
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
@@ -88,3 +90,5 @@ func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                  {
 func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
 func (obj *PodSecurityPolicy) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
 func (obj *PodSecurityPolicyList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
+func (obj *NetworkPolicy) GetObjectKind() unversioned.ObjectKind               { return &obj.TypeMeta }
+func (obj *NetworkPolicyList) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }

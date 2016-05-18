@@ -58,6 +58,12 @@ func init() {
 		DeepCopy_extensions_IngressSpec,
 		DeepCopy_extensions_IngressStatus,
 		DeepCopy_extensions_IngressTLS,
+		DeepCopy_extensions_NetworkPolicy,
+		DeepCopy_extensions_NetworkPolicyIngressRule,
+		DeepCopy_extensions_NetworkPolicyList,
+		DeepCopy_extensions_NetworkPolicyPeer,
+		DeepCopy_extensions_NetworkPolicyPort,
+		DeepCopy_extensions_NetworkPolicySpec,
 		DeepCopy_extensions_PodSecurityPolicy,
 		DeepCopy_extensions_PodSecurityPolicyList,
 		DeepCopy_extensions_PodSecurityPolicySpec,
@@ -481,6 +487,130 @@ func DeepCopy_extensions_IngressTLS(in IngressTLS, out *IngressTLS, c *conversio
 		out.Hosts = nil
 	}
 	out.SecretName = in.SecretName
+	return nil
+}
+
+func DeepCopy_extensions_NetworkPolicy(in NetworkPolicy, out *NetworkPolicy, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_extensions_NetworkPolicySpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeepCopy_extensions_NetworkPolicyIngressRule(in NetworkPolicyIngressRule, out *NetworkPolicyIngressRule, c *conversion.Cloner) error {
+	if in.Ports != nil {
+		in, out := in.Ports, &out.Ports
+		*out = make([]NetworkPolicyPort, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_NetworkPolicyPort(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
+	}
+	if in.From != nil {
+		in, out := in.From, &out.From
+		*out = make([]NetworkPolicyPeer, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_NetworkPolicyPeer(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.From = nil
+	}
+	return nil
+}
+
+func DeepCopy_extensions_NetworkPolicyList(in NetworkPolicyList, out *NetworkPolicyList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]NetworkPolicy, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_NetworkPolicy(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_extensions_NetworkPolicyPeer(in NetworkPolicyPeer, out *NetworkPolicyPeer, c *conversion.Cloner) error {
+	if in.PodSelector != nil {
+		in, out := in.PodSelector, &out.PodSelector
+		*out = new(unversioned.LabelSelector)
+		if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.PodSelector = nil
+	}
+	if in.NamespaceSelector != nil {
+		in, out := in.NamespaceSelector, &out.NamespaceSelector
+		*out = new(unversioned.LabelSelector)
+		if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.NamespaceSelector = nil
+	}
+	return nil
+}
+
+func DeepCopy_extensions_NetworkPolicyPort(in NetworkPolicyPort, out *NetworkPolicyPort, c *conversion.Cloner) error {
+	if in.Protocol != nil {
+		in, out := in.Protocol, &out.Protocol
+		*out = new(api.Protocol)
+		if newVal, err := c.DeepCopy(*in); err != nil {
+			return err
+		} else {
+			**out = newVal.(api.Protocol)
+		}
+	} else {
+		out.Protocol = nil
+	}
+	if in.Port != nil {
+		in, out := in.Port, &out.Port
+		*out = new(intstr.IntOrString)
+		if err := intstr.DeepCopy_intstr_IntOrString(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Port = nil
+	}
+	return nil
+}
+
+func DeepCopy_extensions_NetworkPolicySpec(in NetworkPolicySpec, out *NetworkPolicySpec, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_LabelSelector(in.PodSelector, &out.PodSelector, c); err != nil {
+		return err
+	}
+	if in.Ingress != nil {
+		in, out := in.Ingress, &out.Ingress
+		*out = make([]NetworkPolicyIngressRule, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_NetworkPolicyIngressRule(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
 	return nil
 }
 

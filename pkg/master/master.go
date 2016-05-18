@@ -63,6 +63,7 @@ import (
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
+	networkpolicyetcd "k8s.io/kubernetes/pkg/registry/networkpolicy/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
 	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
@@ -845,6 +846,10 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
+	networkPolicyStorage := networkpolicyetcd.NewREST(restOptions("networkpolicies"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
+		storage["networkpolicies"] = networkPolicyStorage
+	}
 
 	return storage
 }
@@ -888,7 +893,7 @@ func (m *Master) getPolicyResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
-// getPetSetResources returns the resources for apps api
+// getAppsResources returns the resources for apps api
 func (m *Master) getAppsResources(c *Config) map[string]rest.Storage {
 	// TODO update when we support more than one version of this group
 	version := appsapi.SchemeGroupVersion
