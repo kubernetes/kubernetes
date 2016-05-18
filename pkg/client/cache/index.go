@@ -34,6 +34,10 @@ type Indexer interface {
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
 	// GetIndexer return the indexers
 	GetIndexers() Indexers
+
+	// AddIndexers adds more indexers to this store.  If you call this after you already have data
+	// in the store, the results are undefined.
+	AddIndexers(newIndexers Indexers) error
 }
 
 // IndexFunc knows how to provide an indexed value for an object.
