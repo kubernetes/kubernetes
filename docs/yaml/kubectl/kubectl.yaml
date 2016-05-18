@@ -93,6 +93,7 @@ see_also:
 - rollout
 - label
 - annotate
+- taint
 - config
 - cluster-info
 - api-versions

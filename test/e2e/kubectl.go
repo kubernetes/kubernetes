@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
+	pkgutil "k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -1281,6 +1282,39 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			if err != nil {
 				framework.Failf("Failed get of /api at %s: %v", path, err)
 			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl taint", func() {
+		It("should update the taint on a node", func() {
+			taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(pkgutil.NewUUID()))
+			taintValue := "testing-taint-value"
+			taintEffect := fmt.Sprintf("%s", api.TaintEffectNoSchedule)
+
+			nodes, err := c.Nodes().List(api.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			node := nodes.Items[0]
+			nodeName := node.Name
+
+			By("adding the taint " + taintName + " with value " + taintValue + " and taint effect " + taintEffect + " to a node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
+			By("verifying the node has the taint " + taintName + " with the value " + taintValue)
+			output := framework.RunKubectlOrDie("describe", "node", nodeName)
+			requiredStrings := [][]string{
+				{"Name:", nodeName},
+				{"Taints:"},
+				{taintName + "=" + taintValue + ":" + taintEffect},
+			}
+			checkOutput(output, requiredStrings)
+
+			By("removing the taint " + taintName + " of a node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
+			By("verifying the node doesn't have the taint " + taintName)
+			output = framework.RunKubectlOrDie("describe", "node", nodeName)
+			if strings.Contains(output, taintName) {
+				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
+			}
+
 		})
 	})
 })
