@@ -103,7 +103,7 @@ func TestMemoryPressure(t *testing.T) {
 			{
 				Signal:   SignalMemoryAvailable,
 				Operator: OpLessThan,
-				Value:    resource.MustParse("1Gi"),
+				Value:    quantityMustParse("1Gi"),
 			},
 		},
 	}
