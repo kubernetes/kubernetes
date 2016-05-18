@@ -92,6 +92,8 @@ func GetPodReadyCondition(status PodStatus) *PodCondition {
 	return condition
 }
 
+// GetPodCondition extracts the provided condition from the given status and returns that.
+// Returns nil and -1 if the condition is not present, and the the index of the located condition.
 func GetPodCondition(status *PodStatus, conditionType PodConditionType) (int, *PodCondition) {
 	for i, c := range status.Conditions {
 		if c.Type == conditionType {
@@ -158,6 +160,29 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 				limits[name] = *quantity.Copy()
 			} else if err = value.Add(quantity); err != nil {
 				return nil, nil, err
+			}
+		}
+	}
+	// init containers define the minimum of any resource
+	for _, container := range pod.Spec.InitContainers {
+		for name, quantity := range container.Resources.Requests {
+			value, ok := reqs[name]
+			if !ok {
+				reqs[name] = *quantity.Copy()
+				continue
+			}
+			if quantity.Cmp(value) > 0 {
+				reqs[name] = *quantity.Copy()
+			}
+		}
+		for name, quantity := range container.Resources.Limits {
+			value, ok := limits[name]
+			if !ok {
+				limits[name] = *quantity.Copy()
+				continue
+			}
+			if quantity.Cmp(value) > 0 {
+				limits[name] = *quantity.Copy()
 			}
 		}
 	}

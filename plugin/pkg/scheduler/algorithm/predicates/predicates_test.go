@@ -111,6 +111,11 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 	}
 }
 
+func newResourceInitPod(pod *api.Pod, usage ...resourceRequest) *api.Pod {
+	pod.Spec.InitContainers = newResourcePod(usage...).Spec.Containers
+	return pod
+}
+
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
 		pod      *api.Pod
@@ -136,6 +141,54 @@ func TestPodFitsResources(t *testing.T) {
 			wErr: newInsufficientResourceError(cpuResourceName, 1, 10, 10),
 		},
 		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 3, memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 8, memory: 19})),
+			fits: false,
+			test: "too many resources fails due to init container cpu",
+			wErr: newInsufficientResourceError(cpuResourceName, 3, 8, 10),
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 3, memory: 1}, resourceRequest{milliCPU: 2, memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 8, memory: 19})),
+			fits: false,
+			test: "too many resources fails due to highest init container cpu",
+			wErr: newInsufficientResourceError(cpuResourceName, 3, 8, 10),
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 3}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+			fits: false,
+			test: "too many resources fails due to init container memory",
+			wErr: newInsufficientResourceError(memoryResourceName, 3, 19, 20),
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 3}, resourceRequest{milliCPU: 1, memory: 2}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+			fits: false,
+			test: "too many resources fails due to highest init container memory",
+			wErr: newInsufficientResourceError(memoryResourceName, 3, 19, 20),
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+			fits: true,
+			test: "init container fits because it's the max, not sum, of containers and init containers",
+			wErr: nil,
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1}), resourceRequest{milliCPU: 1, memory: 1}, resourceRequest{milliCPU: 1, memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+			fits: true,
+			test: "multiple init containers fit because it's the max, not sum, of containers and init containers",
+			wErr: nil,
+		},
+		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 5})),
@@ -149,7 +202,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: false,
 			test: "one resources fits",
-			wErr: newInsufficientResourceError(memoryResoureceName, 2, 19, 20),
+			wErr: newInsufficientResourceError(memoryResourceName, 2, 19, 20),
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
@@ -157,6 +210,14 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: true,
 			test: "equal edge case",
+			wErr: nil,
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 4, memory: 1}), resourceRequest{milliCPU: 5, memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
+			fits: true,
+			test: "equal edge case for init container",
 			wErr: nil,
 		},
 	}
@@ -203,6 +264,14 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: false,
 			test: "even for equal edge case predicate fails when there's no space for additional pod",
+			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 5, memory: 1}), resourceRequest{milliCPU: 5, memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
+			fits: false,
+			test: "even for equal edge case predicate fails when there's no space for additional pod due to init container",
 			wErr: newInsufficientResourceError(podCountResourceName, 1, 1, 1),
 		},
 	}
