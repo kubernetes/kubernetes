@@ -7770,6 +7770,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">loadBalancerSourceRanges</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature." More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md">http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -7984,7 +7991,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-05-24 11:53:20 UTC
+Last updated 2016-05-26 18:58:49 UTC
 </div>
 </div>
 </body>

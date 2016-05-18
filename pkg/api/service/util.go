@@ -39,7 +39,7 @@ func IsAllowAll(ipnets netsets.IPNet) bool {
 }
 
 // GetLoadBalancerSourceRanges first try to parse and verify LoadBalancerSourceRanges field from a service.
-// If  field not specified, turn to verifies and parses the AnnotationLoadBalancerSourceRangesKey annotation from a service,
+// If the field is not specified, turn to parse and verify the AnnotationLoadBalancerSourceRangesKey annotation from a service,
 // extracting the source ranges to allow, and if not present returns a default (allow-all) value.
 func GetLoadBalancerSourceRanges(service *api.Service) (netsets.IPNet, error) {
 	var ipnets netsets.IPNet
