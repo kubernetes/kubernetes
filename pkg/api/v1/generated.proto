@@ -2701,6 +2701,12 @@ message ServiceSpec {
   // the loadBalancerIP when a load balancer is created.
   // This field will be ignored if the cloud-provider does not support the feature.
   optional string loadBalancerIP = 8;
+
+  // If specified and supported by the platform, this will restrict traffic through the cloud-provider
+  // load-balancer will be restricted to the specified client IPs. This field will be ignored if the
+  // cloud-provider does not support the feature."
+  // More info: http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md
+  repeated string loadBalancerSourceRanges = 9;
 }
 
 // ServiceStatus represents the current status of a service.
