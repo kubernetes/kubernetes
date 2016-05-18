@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/federation/apis/federation"
+	fed_fake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -518,6 +520,40 @@ func TestDescribeDeployment(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeCluster(t *testing.T) {
+	cluster := federation.Cluster{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "4",
+			Labels: map[string]string{
+				"name": "foo",
+			},
+		},
+		Spec: federation.ClusterSpec{
+			ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+				{
+					ClientCIDR:    "0.0.0.0/0",
+					ServerAddress: "localhost:8888",
+				},
+			},
+		},
+		Status: federation.ClusterStatus{
+			Conditions: []federation.ClusterCondition{
+				{Type: federation.ClusterReady, Status: api.ConditionTrue},
+			},
+		},
+	}
+	fake := fed_fake.NewSimpleClientset(&cluster)
+	d := ClusterDescriber{Interface: fake}
+	out, err := d.Describe("any", "foo", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") || !strings.Contains(out, "Version:") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
