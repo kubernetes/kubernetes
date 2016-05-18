@@ -26,9 +26,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ReplaceOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -116,8 +118,8 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		return forceReplace(f, out, cmd, args, shortOutput, options)
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, typer := f.DynamicObject()
+	r := resource.NewBuilder(mapper, typer, resource.DisabledClientForMapping{}, runtime.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -144,8 +146,14 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 			}
 		}
 
+		client, err := f.DynamicClient(info.Mapping.GroupVersionKind.GroupVersion())
+		if err != nil {
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
+		}
+
 		// Serialize the object with the annotation applied.
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, info.Object)
+		obj, err := overwriteReplace(client, info)
+
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
@@ -184,6 +192,11 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		}
 	}
 
+	// load these now to prevent discovery errors after we've already started deleting.
+	dynamicMapper, dynamicTyper := f.DynamicObject()
+
+	// Use the old mapper and typer until server-side garbage collection
+	// replaces client-side reaping
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
@@ -209,7 +222,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return err
 	}
 
-	r = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r = resource.NewBuilder(dynamicMapper, dynamicTyper, resource.DisabledClientForMapping{}, runtime.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -237,7 +250,12 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 			}
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+		client, err := f.DynamicClient(info.Mapping.GroupVersionKind.GroupVersion())
+		if err != nil {
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
+		}
+
+		obj, err := client.Resource(info.APIResource(), info.Namespace).Create(info.Object.(*runtime.Unstructured))
 		if err != nil {
 			return err
 		}
@@ -255,4 +273,15 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return fmt.Errorf("no objects passed to replace")
 	}
 	return nil
+}
+
+func overwriteReplace(cl *dynamic.Client, info *resource.Info) (*runtime.Unstructured, error) {
+	unstruct := info.Object.(*runtime.Unstructured)
+	if unstruct.GetResourceVersion() == "" {
+		serverUnstruct, err := cl.Resource(info.APIResource(), info.Namespace).Get(info.Name)
+		if err == nil {
+			unstruct.SetResourceVersion(serverUnstruct.GetResourceVersion())
+		}
+	}
+	return cl.Resource(info.APIResource(), info.Namespace).Update(unstruct)
 }

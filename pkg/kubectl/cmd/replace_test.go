@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
@@ -30,13 +31,14 @@ func TestReplaceObject(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		Codec: codec,
+	fakeREST := &fake.RESTClient{
+		APIPath: "/api/v1/",
+		Codec:   codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
+			case p == "/api/v1/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+			case p == "/api/v1/namespaces/test/replicationcontrollers" && m == "POST":
 				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -44,6 +46,9 @@ func TestReplaceObject(t *testing.T) {
 			}
 		}),
 	}
+	tf.Client = fakeREST
+	tf.ClientConfig = &restclient.Config{Transport: fakeREST.Client.Transport}
+	tf.DynamicResources = testDynamicResources()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -73,17 +78,18 @@ func TestReplaceMultipleObject(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		Codec: codec,
+	fakeREST := &fake.RESTClient{
+		APIPath: "/api/v1",
+		Codec:   codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
+			case p == "/api/v1/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+			case p == "/api/v1/namespaces/test/replicationcontrollers" && m == "POST":
 				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/services/frontend" && (m == "GET" || m == "PUT" || m == "DELETE"):
+			case p == "/api/v1/namespaces/test/services/frontend" && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/namespaces/test/services" && m == "POST":
+			case p == "/api/v1/namespaces/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -91,6 +97,9 @@ func TestReplaceMultipleObject(t *testing.T) {
 			}
 		}),
 	}
+	tf.Client = fakeREST
+	tf.ClientConfig = &restclient.Config{Transport: fakeREST.Client.Transport}
+	tf.DynamicResources = testDynamicResources()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -120,13 +129,14 @@ func TestReplaceDirectory(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		Codec: codec,
+	fakeREST := &fake.RESTClient{
+		APIPath: "/api/v1/",
+		Codec:   codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && (m == "GET" || m == "PUT" || m == "DELETE"):
+			case strings.HasPrefix(p, "/api/v1/namespaces/test/replicationcontrollers/") && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
-			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers") && m == "POST":
+			case strings.HasPrefix(p, "/api/v1/namespaces/test/replicationcontrollers") && m == "POST":
 				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -134,6 +144,9 @@ func TestReplaceDirectory(t *testing.T) {
 			}
 		}),
 	}
+	tf.Client = fakeREST
+	tf.ClientConfig = &restclient.Config{Transport: fakeREST.Client.Transport}
+	tf.DynamicResources = testDynamicResources()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -163,13 +176,14 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		Codec: codec,
+	fakeREST := &fake.RESTClient{
+		APIPath: "/api/v1/",
+		Codec:   codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+			case p == "/api/v1/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
 				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+			case p == "/api/v1/namespaces/test/replicationcontrollers" && m == "POST":
 				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -177,6 +191,9 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 			}
 		}),
 	}
+	tf.Client = fakeREST
+	tf.ClientConfig = &restclient.Config{Transport: fakeREST.Client.Transport}
+	tf.DynamicResources = testDynamicResources()
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 

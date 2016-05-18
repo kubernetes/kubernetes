@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -179,15 +180,16 @@ func (t *testDescriber) Describe(namespace, name string, describerSettings kubec
 }
 
 type testFactory struct {
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Client       kubectl.RESTClient
-	Describer    kubectl.Describer
-	Printer      kubectl.ResourcePrinter
-	Validator    validation.Schema
-	Namespace    string
-	ClientConfig *restclient.Config
-	Err          error
+	Mapper           meta.RESTMapper
+	Typer            runtime.ObjectTyper
+	Client           kubectl.RESTClient
+	Describer        kubectl.Describer
+	Printer          kubectl.ResourcePrinter
+	Validator        validation.Schema
+	Namespace        string
+	ClientConfig     *restclient.Config
+	DynamicResources []*unversioned.APIResourceList
+	Err              error
 }
 
 func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
@@ -326,6 +328,16 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 				}
 				return nil, fmt.Errorf("cannot get the logs from %v", fqKind)
 			}
+		},
+		DynamicObject: func() (meta.RESTMapper, runtime.ObjectTyper) {
+			mapper, _ := cmdutil.NewDiscoveryRESTMapper(t.DynamicResources, cmdutil.DynamicVersionInterfaces)
+			typer, _ := cmdutil.NewDynamicObjectTyper(t.DynamicResources)
+			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer
+		},
+		DynamicClient: func(gv unversioned.GroupVersion) (*dynamic.Client, error) {
+			cfg := *t.ClientConfig
+			cfg.GroupVersion = &gv
+			return dynamic.NewClient(&cfg)
 		},
 	}
 	rf := cmdutil.NewFactory(nil)
