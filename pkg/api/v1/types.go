@@ -756,7 +756,7 @@ type SecretVolumeSource struct {
 	// present. If a key is specified which is not present in the Secret,
 	// the volume setup will error. Paths must be relative and may not contain
 	// the '..' path or start with '..'.
-	Items []KeyToPath `json:"items,omitempty"`
+	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
