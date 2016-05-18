@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-
 	"github.com/skynetservices/skydns/metrics"
 	"github.com/skynetservices/skydns/server"
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
@@ -104,7 +103,13 @@ func (server *KubeDNSServer) setupHealthzHandlers() {
 		fmt.Fprintf(w, "ok\n")
 	})
 	http.HandleFunc("/cache", func(w http.ResponseWriter, req *http.Request) {
-		fmt.Fprint(w, server.kd.GetCacheAsJSON())
+		serializedJSON, err := server.kd.GetCacheAsJSON()
+		if err == nil {
+			fmt.Fprint(w, serializedJSON)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, err)
+		}
 	})
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,8 +52,8 @@ func (m clusterDomainVar) Set(v string) error {
 	v = strings.TrimSuffix(v, ".")
 	segments := strings.Split(v, ".")
 	for _, segment := range segments {
-		if !validation.IsDNS1123Label(segment) {
-			return fmt.Errorf("Not a valid DNS label")
+		if errs := validation.IsDNS1123Label(segment); len(errs) > 0 {
+			return fmt.Errorf("Not a valid DNS label. %v", errs)
 		}
 	}
 	if !strings.HasSuffix(v, ".") {

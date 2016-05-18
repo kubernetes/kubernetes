@@ -19,12 +19,9 @@ spec:
         version: v12
         kubernetes.io/cluster-service: "true"
     spec:
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vsphere', 'photon-controller' ] %}
-      hostNetwork: true
-{% endif %}
       containers:
       - name: kubedns
-        image: artfulcoder/kubedns-amd64:1.0
+        image: gcr.io/google_containers/kubedns-amd64:1.0
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
