@@ -68,6 +68,47 @@ func UnsafeObjectConvertor(scheme *Scheme) ObjectConvertor {
 	return unsafeObjectConvertor{scheme}
 }
 
+// SetField puts the value of src, into fieldName, which must be a member of v.
+// The value of src must be assignable to the field.
+func SetField(src interface{}, v reflect.Value, fieldName string) error {
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+	}
+	srcValue := reflect.ValueOf(src)
+	if srcValue.Type().AssignableTo(field.Type()) {
+		field.Set(srcValue)
+		return nil
+	}
+	if srcValue.Type().ConvertibleTo(field.Type()) {
+		field.Set(srcValue.Convert(field.Type()))
+		return nil
+	}
+	return fmt.Errorf("couldn't assign/convert %v to %v", srcValue.Type(), field.Type())
+}
+
+// Field puts the value of fieldName, which must be a member of v, into dest,
+// which must be a variable to which this field's value can be assigned.
+func Field(v reflect.Value, fieldName string, dest interface{}) error {
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+	}
+	destValue, err := conversion.EnforcePtr(dest)
+	if err != nil {
+		return err
+	}
+	if field.Type().AssignableTo(destValue.Type()) {
+		destValue.Set(field)
+		return nil
+	}
+	if field.Type().ConvertibleTo(destValue.Type()) {
+		destValue.Set(field.Convert(destValue.Type()))
+		return nil
+	}
+	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), destValue.Type())
+}
+
 // fieldPtr puts the address of fieldName, which must be a member of v,
 // into dest, which must be an address of a variable to which this field's
 // address can be assigned.

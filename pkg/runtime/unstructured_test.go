@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -141,6 +142,20 @@ func TestUnstructuredGetters(t *testing.T) {
 				"annotations": map[string]interface{}{
 					"test_annotation": "test_value",
 				},
+				"ownerReferences": []map[string]interface{}{
+					{
+						"kind":       "Pod",
+						"name":       "poda",
+						"apiVersion": "v1",
+						"uid":        "1",
+					},
+					{
+						"kind":       "Pod",
+						"name":       "podb",
+						"apiVersion": "v1",
+						"uid":        "2",
+					},
+				},
 			},
 		},
 	}
@@ -192,6 +207,24 @@ func TestUnstructuredGetters(t *testing.T) {
 	if got, want := unstruct.GetAnnotations(), map[string]string{"test_annotation": "test_value"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetAnnotations() = %s, want %s", got, want)
 	}
+	refs := unstruct.GetOwnerReferences()
+	expectedOwnerReferences := []metatypes.OwnerReference{
+		{
+			Kind:       "Pod",
+			Name:       "poda",
+			APIVersion: "v1",
+			UID:        "1",
+		},
+		{
+			Kind:       "Pod",
+			Name:       "podb",
+			APIVersion: "v1",
+			UID:        "2",
+		},
+	}
+	if got, want := refs, expectedOwnerReferences; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetOwnerReference()=%v, want %v", got, want)
+	}
 }
 
 func TestUnstructuredSetters(t *testing.T) {
@@ -216,6 +249,20 @@ func TestUnstructuredSetters(t *testing.T) {
 				"annotations": map[string]interface{}{
 					"test_annotation": "test_value",
 				},
+				"ownerReferences": []map[string]interface{}{
+					{
+						"kind":       "Pod",
+						"name":       "poda",
+						"apiVersion": "v1",
+						"uid":        "1",
+					},
+					{
+						"kind":       "Pod",
+						"name":       "podb",
+						"apiVersion": "v1",
+						"uid":        "2",
+					},
+				},
 			},
 		},
 	}
@@ -233,9 +280,24 @@ func TestUnstructuredSetters(t *testing.T) {
 	unstruct.SetDeletionTimestamp(&date)
 	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
 	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
+	newOwnerReferences := []metatypes.OwnerReference{
+		{
+			Kind:       "Pod",
+			Name:       "poda",
+			APIVersion: "v1",
+			UID:        "1",
+		},
+		{
+			Kind:       "Pod",
+			Name:       "podb",
+			APIVersion: "v1",
+			UID:        "2",
+		},
+	}
+	unstruct.SetOwnerReferences(newOwnerReferences)
 
 	if !reflect.DeepEqual(unstruct, want) {
-		t.Errorf("Wanted: \n%s\n Got:\n%s", unstruct, want)
+		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)
 	}
 }
 
