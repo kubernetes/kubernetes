@@ -39,6 +39,7 @@ import (
 )
 
 type cadvisorClient struct {
+	runtime string
 	manager.Manager
 }
 
@@ -60,7 +61,7 @@ func init() {
 }
 
 // Creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint) (Interface, error) {
+func New(port uint, runtime string) (Interface, error) {
 	sysFs, err := sysfs.NewRealSysFs()
 	if err != nil {
 		return nil, err
@@ -73,6 +74,7 @@ func New(port uint) (Interface, error) {
 	}
 
 	cadvisorClient := &cadvisorClient{
+		runtime: runtime,
 		Manager: m,
 	}
 
@@ -163,8 +165,19 @@ func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return cc.GetMachineInfo()
 }
 
-func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cc.getFsInfo(cadvisorfs.LabelDockerImages)
+func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	var label string
+
+	switch cc.runtime {
+	case "docker":
+		label = cadvisorfs.LabelDockerImages
+	case "rkt":
+		label = cadvisorfs.LabelRktImages
+	default:
+		return cadvisorapiv2.FsInfo{}, fmt.Errorf("ImagesFsInfo: unknown runtime: %v", cc.runtime)
+	}
+
+	return cc.getFsInfo(label)
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {

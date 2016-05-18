@@ -69,7 +69,7 @@ func (c *Mock) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return args.Get(0).(*cadvisorapi.VersionInfo), args.Error(1)
 }
 
-func (c *Mock) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (c *Mock) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	args := c.Called()
 	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }

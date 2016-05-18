@@ -142,8 +142,8 @@ func (_ *fakeKubelet) GetContainerInfoV2(_ string, _ cadvisorapiv2.RequestOption
 	return nil, nil
 }
 
-func (_ *fakeKubelet) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, fmt.Errorf("Unsupported Operation DockerImagesFsInfo")
+func (_ *fakeKubelet) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cadvisorapiv2.FsInfo{}, fmt.Errorf("Unsupported Operation ImagesFsInfo")
 }
 
 func (_ *fakeKubelet) RootFsInfo() (cadvisorapiv2.FsInfo, error) {

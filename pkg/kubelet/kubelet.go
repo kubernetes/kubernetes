@@ -2379,7 +2379,7 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	outOfDockerDisk := false
 	outOfRootDisk := false
 	// Check disk space once globally and reject or accept all new pods.
-	withinBounds, err := kl.diskSpaceManager.IsDockerDiskSpaceAvailable()
+	withinBounds, err := kl.diskSpaceManager.IsRuntimeDiskSpaceAvailable()
 	// Assume enough space in case of errors.
 	if err == nil && !withinBounds {
 		outOfDockerDisk = true
