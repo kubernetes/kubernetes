@@ -139,12 +139,20 @@ PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 # ensure ~/.kube/config isn't loaded by tests
 HOME="${KUBE_TEMP}"
 
+KUBELET_OUTPUT_HOSTBIN="${KUBELET_OUTPUT_HOSTBIN:-${KUBE_OUTPUT_HOSTBIN}}"
+KUBECTL_OUTPUT_HOSTBIN="${KUBECTL_OUTPUT_HOSTBIN:-${KUBE_OUTPUT_HOSTBIN}}"
+KUBE_MASTER_COMPONENTS_OUTPUT_HOSTBIN="${KUBE_MASTER_COMPONENTS_OUTPUT_HOSTBIN:-${KUBE_OUTPUT_HOSTBIN}}"
+
 # Check kubectl
 kube::log::status "Running kubectl with no options"
-"${KUBE_OUTPUT_HOSTBIN}/kubectl"
+"${KUBECTL_OUTPUT_HOSTBIN}/kubectl"
+
+# Check kubectl version
+kube::log::status "Running kubectl version"
+"${KUBECTL_OUTPUT_HOSTBIN}/kubectl" version -c
 
 kube::log::status "Starting kubelet in masterless mode"
-"${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+"${KUBELET_OUTPUT_HOSTBIN}/kubelet" \
   --really-crash-for-testing=true \
   --root-dir=/tmp/kubelet.$$ \
   --cert-dir="${TMPDIR:-/tmp/}" \
@@ -158,7 +166,7 @@ kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kub
 kill ${KUBELET_PID} 1>&2 2>/dev/null
 
 kube::log::status "Starting kubelet in masterful mode"
-"${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+"${KUBELET_OUTPUT_HOSTBIN}/kubelet" \
   --really-crash-for-testing=true \
   --root-dir=/tmp/kubelet.$$ \
   --cert-dir="${TMPDIR:-/tmp/}" \
@@ -178,7 +186,7 @@ kube::log::status "Starting kube-apiserver"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
 
-KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_MASTER_COMPONENTS_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -195,7 +203,7 @@ kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
 
 # Start controller manager
 kube::log::status "Starting controller-manager"
-"${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
+"${KUBE_MASTER_COMPONENTS_OUTPUT_HOSTBIN}/kube-controller-manager" \
   --port="${CTLRMGR_PORT}" \
   --master="127.0.0.1:${API_PORT}" 1>&2 &
 CTLRMGR_PID=$!
@@ -204,7 +212,7 @@ kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "apiserver(nodes)"
 
 # Expose kubectl directly for readability
-PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
+PATH="${KUBECTL_OUTPUT_HOSTBIN}":$PATH
 
 kube::log::status "Checking kubectl version"
 kubectl version
