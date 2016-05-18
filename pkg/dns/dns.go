@@ -533,6 +533,11 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 	path = path[:len(path)-len(kd.domainPath)]
 
 	// Append the zone name (zone in the cloud provider terminology, not a DNS zone)
+	zone, err := kd.getClusterZone()
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain the cluster zone: %v", err)
+	}
+	path = append(path, zone)
 
 	// We have already established that the map entry exists for the given federation,
 	// we just need to retrieve the domain name, validate it and append it to the path.
@@ -578,9 +583,16 @@ func (kd *KubeDNS) getClusterZone() (string, error) {
 			return "", fmt.Errorf("failed to retrieve the cluster nodes: %v", err)
 		}
 
-		node = &nodeList.Items[0]
-		if err := kd.nodesStore.Add(node); err != nil {
-			return "", fmt.Errorf("couldn't add the retrieved node to the cache: %v", err)
+		// Select a node (arbitrarily the first node) that has `LabelZoneFailureDomain` set.
+		for _, nodeItem := range nodeList.Items {
+			if _, ok := nodeItem.Annotations[unversioned.LabelZoneFailureDomain]; !ok {
+				continue
+			}
+			// Make a copy of the node, don't rely on the loop variable.
+			node = &(*(&nodeItem))
+			if err := kd.nodesStore.Add(node); err != nil {
+				return "", fmt.Errorf("couldn't add the retrieved node to the cache: %v", err)
+			}
 		}
 	}
 
