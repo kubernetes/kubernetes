@@ -360,6 +360,8 @@ type KubeletConfiguration struct {
 	EvictionPressureTransitionPeriod unversioned.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod,omitempty"`
+	// Maximum number of pods per core. Cannot exceed MaxPods
+	PodsPerCore int32 `json:"podsPerCore"`
 }
 
 type KubeSchedulerConfiguration struct {

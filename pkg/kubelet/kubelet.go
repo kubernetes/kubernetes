@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -216,6 +217,7 @@ func NewMainKubelet(
 	podCIDR string,
 	reconcileCIDR bool,
 	maxPods int,
+	podsPerCore int,
 	nvidiaGPUs int,
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
@@ -343,6 +345,7 @@ func NewMainKubelet(
 		nonMasqueradeCIDR:          nonMasqueradeCIDR,
 		reconcileCIDR:              reconcileCIDR,
 		maxPods:                    maxPods,
+		podsPerCore:                podsPerCore,
 		nvidiaGPUs:                 nvidiaGPUs,
 		syncLoopMonitor:            atomic.Value{},
 		resolverConfig:             resolverConfig,
@@ -817,6 +820,9 @@ type Kubelet struct {
 
 	// the list of handlers to call during pod sync.
 	lifecycle.PodSyncHandlers
+
+	// the number of allowed pods per core
+	podsPerCore int
 }
 
 // Validate given node IP belongs to the current host
@@ -3048,8 +3054,13 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 		node.Status.Capacity = cadvisor.CapacityFromMachineInfo(info)
-		node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
-			int64(kl.maxPods), resource.DecimalSI)
+		if kl.podsPerCore > 0 {
+			node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
+				int64(math.Min(float64(info.NumCores*kl.podsPerCore), float64(kl.maxPods))), resource.DecimalSI)
+		} else {
+			node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
+				int64(kl.maxPods), resource.DecimalSI)
+		}
 		node.Status.Capacity[api.ResourceNvidiaGPU] = *resource.NewQuantity(
 			int64(kl.nvidiaGPUs), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&
