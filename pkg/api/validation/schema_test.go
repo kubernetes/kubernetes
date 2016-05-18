@@ -69,6 +69,10 @@ var _ Schema = &Factory{}
 // TODO: Consider using a mocking library instead or fully fleshing this out into a fake impl and putting it in some
 // generally available location
 func (f *Factory) ValidateBytes(data []byte) error {
+	return f.ValidateBytesWithTemplates(data, map[string]string{})
+}
+
+func (f *Factory) ValidateBytesWithTemplates(data []byte, templateParamTypes map[string]string) error {
 	var obj interface{}
 	out, err := k8syaml.ToJSON(data)
 	if err != nil {
@@ -86,9 +90,9 @@ func (f *Factory) ValidateBytes(data []byte) error {
 	groupVersion := fields["apiVersion"]
 	switch groupVersion {
 	case "v1":
-		return f.defaultSchema.ValidateBytes(data)
+		return f.defaultSchema.ValidateBytesWithTemplates(data, templateParamTypes)
 	case "extensions/v1beta1":
-		return f.extensionsSchema.ValidateBytes(data)
+		return f.extensionsSchema.ValidateBytesWithTemplates(data, templateParamTypes)
 	default:
 		return fmt.Errorf("Unsupported API version %s", groupVersion)
 	}

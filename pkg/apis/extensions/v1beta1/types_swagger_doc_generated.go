@@ -456,6 +456,20 @@ func (ListOptions) SwaggerDoc() map[string]string {
 	return map_ListOptions
 }
 
+var map_Parameter = map[string]string{
+	"":            "Parameter defines a name/value variable that is to be processed during the Template to Config transformation.",
+	"name":        "Required: Parameter name must be set and it can be referenced in Template Items (See Value)",
+	"displayName": "Optional: The name that will show in UI instead of parameter 'Name'",
+	"description": "Optional: Parameter can have description",
+	"value":       "Optional: Value holds the Parameter data. The value replaces all occurrences of the Parameter $(Name) expression during the Template to Config transformation.",
+	"required":    "Optional: Indicates the parameter must have a value.  Defaults to false.",
+	"type":        "Optional: Type-value of the parameter (one of string, int, bool, or base64) Used by clients to provide validation of user input and guide users.",
+}
+
+func (Parameter) SwaggerDoc() map[string]string {
+	return map_Parameter
+}
+
 var map_PodSecurityPolicy = map[string]string{
 	"":         "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -638,6 +652,41 @@ var map_SupplementalGroupsStrategyOptions = map[string]string{
 
 func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
 	return map_SupplementalGroupsStrategyOptions
+}
+
+var map_Template = map[string]string{
+	"": "Template contains the inputs needed to produce a Config.",
+}
+
+func (Template) SwaggerDoc() map[string]string {
+	return map_Template
+}
+
+var map_TemplateList = map[string]string{
+	"": "TemplateList is a list of Template objects.",
+}
+
+func (TemplateList) SwaggerDoc() map[string]string {
+	return map_TemplateList
+}
+
+var map_TemplateParameters = map[string]string{
+	"":           "TemplateParameters contains the substitution parameters for processing a Template",
+	"name":       "Required: This must match the Name of a template",
+	"parameters": "Optional: ParameterValues is a map of Substitution parameters to be expanded in the Template All required Template Parameters must be specified in this map and parseable to the Parameter Type if specified",
+}
+
+func (TemplateParameters) SwaggerDoc() map[string]string {
+	return map_TemplateParameters
+}
+
+var map_TemplateSpec = map[string]string{
+	"parameters": "Optional: Parameters is an array of Parameters used during the Template to Config transformation.",
+	"objects":    "Required: A yaml config list of resources to create",
+}
+
+func (TemplateSpec) SwaggerDoc() map[string]string {
+	return map_TemplateSpec
 }
 
 var map_ThirdPartyResource = map[string]string{
