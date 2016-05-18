@@ -54,6 +54,7 @@ cluster-dns
 cluster-domain
 cluster-name
 cluster-tag
+cluster-monitor-period
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-namespace-syncs
@@ -136,6 +137,8 @@ external-ip
 failover-timeout
 failure-domains
 fake-clientset
+federated-api-burst
+federated-api-qps
 file-check-frequency
 file-suffix
 file_content_in_loop
