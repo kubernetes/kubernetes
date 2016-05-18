@@ -130,6 +130,10 @@ const (
 	ClaimProvisionTimeout = 5 * time.Minute
 )
 
+// Label allocated to the image puller static pod that runs on each node
+// before e2es.
+var ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+
 // SubResource proxy should have been functional in v1.0.0, but SubResource
 // proxy via tunneling is known to be broken in v1.0.  See
 // https://github.com/kubernetes/kubernetes/pull/15224#issuecomment-146769463
@@ -413,6 +417,48 @@ func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api
 	return false
 }
 
+// WaitForPodsSuccess waits till all labels matching the given selector enter
+// the Success state. The caller is expected to only invoke this method once the
+// pods have been created.
+func WaitForPodsSuccess(ns string, successPodLabels map[string]string, timeout time.Duration) error {
+	c, err := LoadClient()
+	if err != nil {
+		return err
+	}
+	successPodSelector := labels.SelectorFromSet(successPodLabels)
+	start, badPods := time.Now(), []api.Pod{}
+
+	if wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
+		podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: successPodSelector})
+		if err != nil {
+			Logf("Error getting pods in namespace %q: %v", ns, err)
+			return false, nil
+		}
+		if len(podList.Items) == 0 {
+			Logf("Waiting for pods to enter Success, but no pods in %q match label %v", ns, successPodLabels)
+			return true, nil
+		}
+		badPods = []api.Pod{}
+		for _, pod := range podList.Items {
+			if pod.Status.Phase != api.PodSucceeded {
+				badPods = append(badPods, pod)
+			}
+		}
+		successPods := len(podList.Items) - len(badPods)
+		Logf("%d / %d pods in namespace %q are in Success state (%d seconds elapsed)",
+			successPods, len(podList.Items), ns, int(time.Since(start).Seconds()))
+		if len(badPods) == 0 {
+			return true, nil
+		}
+		return false, nil
+	}) != nil {
+		logPodStates(badPods)
+		LogPodsWithLabels(c, ns, successPodLabels)
+		return fmt.Errorf("Not all pods in namespace %q are successful within %v", ns, timeout)
+	}
+	return nil
+}
+
 // WaitForPodsRunningReady waits up to timeout to ensure that all pods in
 // namespace ns are either running and ready, or failed but controlled by a
 // replication controller. Also, it ensures that at least minPods are running
@@ -420,11 +466,17 @@ func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api
 // that it requires the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
 // waiting.
-func WaitForPodsRunningReady(ns string, minPods int32, timeout time.Duration) error {
+// If ignoreSuccessPods is true, pods in the "Success" state are ignored and
+// this function waits for minPods to enter Running/Ready. Otherwise an error is
+// returned even if there are minPods pods, some of which are in Running/Ready
+// and some in Success. This is to allow the client to decide if "Success"
+// means "Ready" or not.
+func WaitForPodsRunningReady(ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
 	c, err := LoadClient()
 	if err != nil {
 		return err
 	}
+	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
@@ -449,6 +501,10 @@ func WaitForPodsRunningReady(ns string, minPods int32, timeout time.Duration) er
 		}
 		nOk, replicaOk, badPods := int32(0), int32(0), []api.Pod{}
 		for _, pod := range podList.Items {
+			if len(ignoreLabels) != 0 && ignoreSelector.Matches(labels.Set(pod.Labels)) {
+				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
+				continue
+			}
 			if res, err := PodRunningReady(&pod); res && err == nil {
 				nOk++
 				if hasReplicationControllersForPod(rcList, pod) {
@@ -535,6 +591,20 @@ func RunKubernetesServiceTestContainer(repoRoot string, ns string) {
 	}
 }
 
+func kubectlLogPod(c *client.Client, pod api.Pod) {
+	for _, container := range pod.Spec.Containers {
+		logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
+		if err != nil {
+			logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+			if err != nil {
+				Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+			}
+		}
+		By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
+		Logf(logs)
+	}
+}
+
 func LogFailedContainers(ns string) {
 	c, err := LoadClient()
 	if err != nil {
@@ -549,18 +619,20 @@ func LogFailedContainers(ns string) {
 	Logf("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := PodRunningReady(&pod); !res || err != nil {
-			for _, container := range pod.Spec.Containers {
-				logs, err := GetPodLogs(c, ns, pod.Name, container.Name)
-				if err != nil {
-					logs, err = getPreviousPodLogs(c, ns, pod.Name, container.Name)
-					if err != nil {
-						Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
-					}
-				}
-				By(fmt.Sprintf("Logs of %v/%v:%v on node %v", ns, pod.Name, container.Name, pod.Spec.NodeName))
-				Logf(logs)
-			}
+			kubectlLogPod(c, pod)
 		}
+	}
+}
+
+func LogPodsWithLabels(c *client.Client, ns string, match map[string]string) {
+	podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(match)})
+	if err != nil {
+		Logf("Error getting pods in namespace %q: %v", ns, err)
+		return
+	}
+	Logf("Running kubectl logs on pods with labels %v in %v", match, ns)
+	for _, pod := range podList.Items {
+		kubectlLogPod(c, pod)
 	}
 }
 

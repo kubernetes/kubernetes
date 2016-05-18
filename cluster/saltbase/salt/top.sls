@@ -39,6 +39,9 @@ base:
 {% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
     - kube-registry-proxy
 {% endif %}
+{% if pillar['prepull_e2e_images'] is defined and pillar['prepull_e2e_images'].lower() == 'true' %}
+    - e2e-image-puller
+{% endif %}
     - logrotate
     - supervisor
 

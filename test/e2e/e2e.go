@@ -44,6 +44,12 @@ const (
 	// running and ready before any e2e tests run. It includes pulling all of
 	// the pods (as of 5/18/15 this is 8 pods).
 	podStartupTimeout = 10 * time.Minute
+
+	// imagePrePullingTimeout is the time we wait for the e2e-image-puller
+	// static pods to pull the list of seeded images. If they don't pull
+	// images within this time we simply log their output and carry on
+	// with the tests.
+	imagePrePullingTimeout = 5 * time.Minute
 )
 
 var (
@@ -119,7 +125,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	if err := framework.WaitForPodsRunningReady(api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout); err != nil {
+	if err := framework.WaitForPodsRunningReady(api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels); err != nil {
 		if c, errClient := framework.LoadClient(); errClient != nil {
 			framework.Logf("Unable to dump cluster information because: %v", errClient)
 		} else {
@@ -128,6 +134,14 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.LogFailedContainers(api.NamespaceSystem)
 		framework.RunKubernetesServiceTestContainer(framework.TestContext.RepoRoot, api.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
+	}
+
+	if err := framework.WaitForPodsSuccess(api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout); err != nil {
+		// There is no guarantee that the image pulling will succeed in 3 minutes
+		// and we don't even run the image puller on all platforms (including GKE).
+		// We wait for it so we get an indication of failures in the logs, and to
+		// maximize benefit of image pre-pulling.
+		framework.Logf("WARNING: Image pulling pods failed to enter success in %v: %v", podStartupTimeout, err)
 	}
 
 	return nil
