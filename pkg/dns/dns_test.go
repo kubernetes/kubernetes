@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,9 @@ package dns
 
 import (
 	"fmt"
+	"net"
 	"strings"
+	"sync"
 	"testing"
 
 	skymsg "github.com/skynetservices/skydns/msg"
@@ -26,16 +28,12 @@ import (
 	"github.com/stretchr/testify/require"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"net"
 )
 
 const (
-	testDomain       = "cluster.local."
-	basePath         = "/skydns/local/cluster"
-	serviceSubDomain = "svc"
-	podSubDomain     = "pod"
-	testService      = "testservice"
-	testNamespace    = "default"
+	testDomain    = "cluster.local."
+	testService   = "testservice"
+	testNamespace = "default"
 )
 
 func newKubeDNS() *KubeDNS {
@@ -44,6 +42,7 @@ func newKubeDNS() *KubeDNS {
 		endpointsStore: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		servicesStore:  cache.NewStore(cache.MetaNamespaceKeyFunc),
 		cache:          NewTreeCache(),
+		cacheLock:      sync.RWMutex{},
 		domainPath:     reverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
 	}
 	return kd
@@ -53,7 +52,6 @@ func TestPodDns(t *testing.T) {
 	const (
 		testPodIP      = "1.2.3.4"
 		sanitizedPodIP = "1-2-3-4"
-		testPodName    = "testPod"
 	)
 	kd := newKubeDNS()
 
@@ -240,9 +238,7 @@ func newEndpoints(service *kapi.Service, subsets ...kapi.EndpointSubset) *kapi.E
 		Subsets:    []kapi.EndpointSubset{},
 	}
 
-	for _, subset := range subsets {
-		endpoints.Subsets = append(endpoints.Subsets, subset)
-	}
+	endpoints.Subsets = append(endpoints.Subsets, subsets...)
 	return &endpoints
 }
 
@@ -310,7 +306,7 @@ func assertCNameRecordsMatchEndpointIPs(t *testing.T, kd *KubeDNS, e []kapi.Endp
 	assert.Equal(t, len(e), len(records), "unexpected record count")
 	for _, record := range records {
 		_, found := endpoints[getIPForCName(t, kd, record.Host)]
-		assert.True(t, found, "Did not endpoint with address:%s", record.Host)
+		assert.True(t, found, "Did not find endpoint with address:%s", record.Host)
 	}
 }
 
@@ -342,20 +338,18 @@ func assertNoSRVForNamedPort(t *testing.T, kd *KubeDNS, s *kapi.Service, portNam
 }
 
 func assertNoDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	records, err := kd.Records(getServiceFQDN(kd, s), false)
-	require.Error(t, err)
-	assert.Equal(t, 0, len(records))
+	serviceFQDN := getServiceFQDN(kd, s)
+	queries := getEquivalentQueries(serviceFQDN, s.Namespace)
+	for _, query := range queries {
+		records, err := kd.Records(query, false)
+		require.Error(t, err)
+		assert.Equal(t, 0, len(records))
+	}
 }
 
 func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 	serviceFQDN := getServiceFQDN(kd, s)
-	queries := []string{
-		serviceFQDN,
-		strings.Replace(serviceFQDN, ".svc.", ".*.", 1),
-		strings.Replace(serviceFQDN, s.Namespace, "*", 1),
-		strings.Replace(strings.Replace(serviceFQDN, s.Namespace, "*", 1), ".svc.", ".*.", 1),
-		"*." + serviceFQDN,
-	}
+	queries := getEquivalentQueries(serviceFQDN, s.Namespace)
 	for _, query := range queries {
 		records, err := kd.Records(query, false)
 		require.NoError(t, err)
@@ -364,12 +358,22 @@ func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 	}
 }
 
+func getEquivalentQueries(serviceFQDN, namespace string) []string {
+	return []string{
+		serviceFQDN,
+		strings.Replace(serviceFQDN, ".svc.", ".*.", 1),
+		strings.Replace(serviceFQDN, namespace, "*", 1),
+		strings.Replace(strings.Replace(serviceFQDN, namespace, "*", 1), ".svc.", ".*.", 1),
+		"*." + serviceFQDN,
+	}
+}
+
 func getServiceFQDN(kd *KubeDNS, s *kapi.Service) string {
 	return fmt.Sprintf("%s.%s.svc.%s", s.Name, s.Namespace, kd.domain)
 }
 
 func getEndpointsFQDN(kd *KubeDNS, e *kapi.Endpoints) string {
-	return fmt.Sprintf("%s.%s.svc.%s", e.ObjectMeta.Name, e.ObjectMeta.Namespace, kd.domain)
+	return fmt.Sprintf("%s.%s.svc.%s", e.Name, e.Namespace, kd.domain)
 }
 
 func getSRVFQDN(kd *KubeDNS, s *kapi.Service, portName string) string {
