@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/emicklei/go-restful/swagger"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -55,6 +57,12 @@ type ServerResourcesInterface interface {
 	ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error)
 	// ServerResources returns the supported resources for all groups and versions.
 	ServerResources() (map[string]*unversioned.APIResourceList, error)
+	// ServerPreferredResources returns the supported resources with the version preferred by the
+	// server.
+	ServerPreferredResources() ([]unversioned.GroupVersionResource, error)
+	// ServerPreferredNamespacedResources returns the supported namespaced resources with the
+	// version preferred by the server.
+	ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error)
 }
 
 // ServerVersionInterface has a method for retrieving the server's version.
@@ -161,6 +169,50 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 		result[groupVersion] = resources
 	}
 	return result, nil
+}
+
+// serverPreferredResources returns the supported resources with the version preferred by the
+// server. If namespaced is true, only namespaced resources will be returned.
+func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversioned.GroupVersionResource, error) {
+	results := []unversioned.GroupVersionResource{}
+	serverGroupList, err := d.ServerGroups()
+	if err != nil {
+		return results, err
+	}
+
+	allErrs := []error{}
+	for _, apiGroup := range serverGroupList.Groups {
+		preferredVersion := apiGroup.PreferredVersion
+		apiResourceList, err := d.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
+		for _, apiResource := range apiResourceList.APIResources {
+			// ignore the root scoped resources if "namespaced" is true.
+			if namespaced && !apiResource.Namespaced {
+				continue
+			}
+			if strings.Contains(apiResource.Name, "/") {
+				continue
+			}
+			results = append(results, groupVersion.WithResource(apiResource.Name))
+		}
+	}
+	return results, utilerrors.NewAggregate(allErrs)
+}
+
+// ServerPreferredResources returns the supported resources with the version preferred by the
+// server.
+func (d *DiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+	return d.serverPreferredResources(false)
+}
+
+// ServerPreferredNamespacedResources returns the supported namespaced resources with the
+// version preferred by the server.
+func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	return d.serverPreferredResources(true)
 }
 
 // ServerVersion retrieves and parses the server's version (git version).
