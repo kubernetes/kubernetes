@@ -373,7 +373,7 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 	manager, _, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 40% usage.
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
 		Usage:    400,
 		Capacity: 1000,
 	}, nil)
@@ -388,7 +388,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	}
 	manager, _, mockCadvisor := newRealImageManager(policy)
 
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, fmt.Errorf("error"))
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, fmt.Errorf("error"))
 	assert.NotNil(t, manager.GarbageCollect())
 }
 
@@ -400,7 +400,7 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 95% usage and most of it gets freed.
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
 		Usage:    950,
 		Capacity: 1000,
 	}, nil)
@@ -419,7 +419,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 95% usage and little of it gets freed.
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
 		Usage:    950,
 		Capacity: 1000,
 	}, nil)

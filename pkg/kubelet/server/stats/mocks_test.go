@@ -162,8 +162,8 @@ func (_m *MockStatsProvider) GetNodeConfig() cm.NodeConfig {
 	return r0
 }
 
-// DockerImagesFsInfo provides a mock function with given fields:
-func (_m *MockStatsProvider) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+// ImagesFsInfo provides a mock function with given fields:
+func (_m *MockStatsProvider) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	ret := _m.Called()
 
 	var r0 cadvisorapiv2.FsInfo

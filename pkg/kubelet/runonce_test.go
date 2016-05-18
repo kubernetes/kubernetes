@@ -46,7 +46,7 @@ import (
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisortest.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	cadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	cadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
 		Usage:     400 * mb,
 		Capacity:  1000 * mb,
 		Available: 600 * mb,

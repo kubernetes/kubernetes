@@ -209,7 +209,7 @@ func (im *realImageManager) detectImages(detectTime time.Time) error {
 
 func (im *realImageManager) GarbageCollect() error {
 	// Get disk usage on disk holding images.
-	fsInfo, err := im.cadvisor.DockerImagesFsInfo()
+	fsInfo, err := im.cadvisor.ImagesFsInfo()
 	if err != nil {
 		return err
 	}

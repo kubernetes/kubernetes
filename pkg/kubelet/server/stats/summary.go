@@ -81,7 +81,7 @@ func (sp *summaryProviderImpl) Get() (*stats.Summary, error) {
 	if err != nil {
 		return nil, err
 	}
-	imageFsInfo, err := sp.provider.DockerImagesFsInfo()
+	imageFsInfo, err := sp.provider.ImagesFsInfo()
 	if err != nil {
 		return nil, err
 	}
