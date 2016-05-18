@@ -565,6 +565,12 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 	rc := *obj.(*api.ReplicationController)
 
+	if rc.Spec.Paused {
+		// Ignore paused replication controllers
+		glog.V(4).Infof("Ignoring paused replication controller %s/%s", rc.Namespace, rc.Name)
+		return nil
+	}
+
 	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the rc sync is just deferred till the next relist.

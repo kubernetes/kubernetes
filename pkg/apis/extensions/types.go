@@ -610,6 +610,10 @@ type ReplicaSetSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
 	Template api.PodTemplateSpec `json:"template,omitempty"`
+
+	// Indicates that the replicaset is paused and will not be processed by the replicaset controller.
+	// Since replicaset controller lists replicasets from local cache, it might lag reality by some window of time.
+	Paused bool `json:"paused,omitempty"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.

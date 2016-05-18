@@ -525,6 +525,12 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 	rs := *obj.(*extensions.ReplicaSet)
 
+	if rs.Spec.Paused {
+		// Ignore paused replicasets
+		glog.V(4).Infof("Ignoring paused replicaset %s/%s", rs.Namespace, rs.Name)
+		return nil
+	}
+
 	// Check the expectations of the ReplicaSet before counting active pods, otherwise a new pod can sneak
 	// in and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the ReplicaSet sync is just deferred till the next

@@ -897,6 +897,10 @@ type ReplicaSetSpec struct {
 	// insufficient replicas are detected.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
 	Template v1.PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
+
+	// Indicates that the replicaset is paused and will not be processed by the replicaset controller.
+	// Since replicaset controller lists replicasets from local cache, it might lag reality by some window of time.
+	Paused bool `json:"paused,omitempty"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.

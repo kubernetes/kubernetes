@@ -1597,6 +1597,10 @@ type ReplicationControllerSpec struct {
 	// insufficient replicas are detected. Internally, this takes precedence over a
 	// TemplateRef.
 	Template *PodTemplateSpec `json:"template,omitempty"`
+
+	// Indicates that the replication controller is paused and will not be processed by the replication manager.
+	// Since replication manager lists replication controllers from local cache, it might lag reality by some window of time.
+	Paused bool `json:"paused,omitempty"`
 }
 
 // ReplicationControllerStatus represents the current status of a replication
