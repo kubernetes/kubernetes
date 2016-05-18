@@ -28,8 +28,8 @@ import (
 	"github.com/skynetservices/skydns/server"
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
 )
@@ -56,7 +56,7 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 }
 
 // TODO: evaluate using pkg/client/clientcmd
-func newKubeClient(dnsConfig *options.KubeDNSConfig) (*kclient.Client, error) {
+func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error) {
 	var (
 		config *restclient.Config
 		err    error
@@ -85,7 +85,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (*kclient.Client, error) {
 
 	glog.Infof("Using %s for kubernetes master", config.Host)
 	glog.Infof("Using kubernetes API %v", config.GroupVersion)
-	return kclient.New(config)
+	return clientset.NewForConfig(config)
 }
 
 func (server *KubeDNSServer) Run() {
