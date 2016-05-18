@@ -57,14 +57,7 @@ type SharedIndexInformer interface {
 // TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
 // be shared amongst all consumers.
 func NewSharedInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
-	sharedInformer := &sharedIndexInformer{
-		processor:        &sharedProcessor{},
-		indexer:          cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{}),
-		listerWatcher:    lw,
-		objectType:       objType,
-		fullResyncPeriod: resyncPeriod,
-	}
-	return sharedInformer
+	return NewSharedIndexInformer(lw, objType, resyncPeriod, cache.Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
@@ -184,17 +177,7 @@ func (s *sharedIndexInformer) AddIndexers(indexers cache.Indexers) error {
 		return fmt.Errorf("informer has already started")
 	}
 
-	oldIndexers := s.indexer.GetIndexers()
-
-	for name, indexFunc := range oldIndexers {
-		if _, exist := indexers[name]; exist {
-			return fmt.Errorf("there is an index named %s already exist", name)
-		}
-		indexers[name] = indexFunc
-	}
-
-	s.indexer = cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
-	return nil
+	return s.indexer.AddIndexers(indexers)
 }
 
 func (s *sharedIndexInformer) GetController() ControllerInterface {
