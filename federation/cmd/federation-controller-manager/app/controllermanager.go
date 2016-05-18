@@ -30,9 +30,12 @@ import (
 
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util/configz"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -105,5 +108,14 @@ func Run(s *options.CMServer) error {
 func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) error {
 	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 	go clustercontroller.NewclusterController(federationClientSet, s.ClusterMonitorPeriod.Duration).Run()
+	dns, err := dnsprovider.InitCloudProvider(s.DnsProvider, s.DnsConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
+
+	servicecontroller := servicecontroller.New(federationClientSet, dns, "fed-1")
+	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
+		glog.Errorf("Failed to start service controller: %v", err)
+	}
 	select {}
 }
