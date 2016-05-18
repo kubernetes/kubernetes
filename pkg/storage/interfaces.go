@@ -129,7 +129,7 @@ type Interface interface {
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
 	// Note that object passed to tryUpdate may change across invocations of tryUpdate() if
-	// other writers are simultaneously updating it, to tryUpdate() needs to take into account
+	// other writers are simultaneously updating it, so tryUpdate() needs to take into account
 	// the current contents of the object when deciding how the update object should look.
 	// If the key doesn't exist, it will return NotFound storage error if ignoreNotFound=false
 	// or zero value in 'ptrToType' parameter otherwise.
