@@ -69,7 +69,7 @@ func pruneDocNulls(doc *partialDoc) *partialDoc {
 }
 
 func pruneAryNulls(ary *partialArray) *partialArray {
-	var newAry []*lazyNode
+	newAry := []*lazyNode{}
 
 	for _, v := range *ary {
 		if v != nil {
@@ -218,6 +218,9 @@ func matchesValue(av, bv interface{}) bool {
 			}
 		}
 		return true
+	case []interface{}:
+		bt := bv.([]interface{})
+		return matchesArray(at, bt)
 	}
 	return false
 }

@@ -740,7 +740,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "7dd4489c2eb6073e5a9d7746c3274c5b5f0387df"
+			"Rev": "6afe1bc0ee843e0da41a86fe797015fcd3e3a03c"
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
