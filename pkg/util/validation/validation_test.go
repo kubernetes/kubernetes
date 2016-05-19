@@ -28,8 +28,8 @@ func TestIsDNS1123Label(t *testing.T) {
 		strings.Repeat("a", 63),
 	}
 	for _, val := range goodValues {
-		if !IsDNS1123Label(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS1123Label(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -42,7 +42,7 @@ func TestIsDNS1123Label(t *testing.T) {
 		strings.Repeat("a", 64),
 	}
 	for _, val := range badValues {
-		if IsDNS1123Label(val) {
+		if msgs := IsDNS1123Label(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -60,8 +60,8 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 		strings.Repeat("a", 253),
 	}
 	for _, val := range goodValues {
-		if !IsDNS1123Subdomain(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS1123Subdomain(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -80,7 +80,7 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 		strings.Repeat("a", 254),
 	}
 	for _, val := range badValues {
-		if IsDNS1123Subdomain(val) {
+		if msgs := IsDNS1123Subdomain(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -92,8 +92,8 @@ func TestIsDNS952Label(t *testing.T) {
 		strings.Repeat("a", 24),
 	}
 	for _, val := range goodValues {
-		if !IsDNS952Label(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS952Label(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -107,7 +107,7 @@ func TestIsDNS952Label(t *testing.T) {
 		strings.Repeat("a", 25),
 	}
 	for _, val := range badValues {
-		if IsDNS952Label(val) {
+		if msgs := IsDNS952Label(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
