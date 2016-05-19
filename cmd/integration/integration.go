@@ -137,12 +137,12 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	cl := client.NewOrDie(&restclient.Config{Hosts: []string{apiServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{apiServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	cl.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
+	cl.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{Hosts: []string{apiServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
 
 	// Master
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
@@ -776,7 +776,7 @@ func main() {
 
 	kubeClient := client.NewOrDie(
 		&restclient.Config{
-			Host:          apiServerURL,
+			Hosts:         []string{apiServerURL},
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 			QPS:           20,
 			Burst:         50,
@@ -785,7 +785,7 @@ func main() {
 	// We will fix this by supporting multiple group versions in Config
 	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(
 		&restclient.Config{
-			Host:          apiServerURL,
+			Hosts:         []string{apiServerURL},
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
 			QPS:           20,
 			Burst:         50,

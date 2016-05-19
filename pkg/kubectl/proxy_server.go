@@ -147,7 +147,7 @@ type ProxyServer struct {
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
 // 'filter', if non-nil, protects requests to the api only.
 func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *restclient.Config) (*ProxyServer, error) {
-	host := cfg.Host
+	host := cfg.Hosts[0]
 	if !strings.HasSuffix(host, "/") {
 		host = host + "/"
 	}

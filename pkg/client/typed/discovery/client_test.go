@@ -48,7 +48,7 @@ func TestGetServerVersion(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Hosts: []string{server.URL}})
 
 	got, err := client.ServerVersion()
 	if err != nil {
@@ -83,7 +83,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Hosts: []string{server.URL}})
 	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.ServerGroups()
 	if err != nil {
@@ -119,7 +119,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Hosts: []string{server.URL}})
 	// ServerResources should not return an error even if server returns error at /api/v1.
 	resourceMap, err := client.ServerResources()
 	if err != nil {
@@ -211,7 +211,7 @@ func TestGetServerResources(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Hosts: []string{server.URL}})
 	for _, test := range tests {
 		got, err := client.ServerResourcesForGroupVersion(test.request)
 		if test.expectErr {
@@ -273,7 +273,7 @@ func TestGetSwaggerSchema(t *testing.T) {
 	}
 	defer server.Close()
 
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Hosts: []string{server.URL}})
 	got, err := client.SwaggerSchema(v1.SchemeGroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
@@ -292,7 +292,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	}
 	defer server.Close()
 
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Hosts: []string{server.URL}})
 	got, err := client.SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)

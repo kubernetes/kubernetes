@@ -126,7 +126,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	got, err := restclient.ServerAPIVersions(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}})
+	got, err := restclient.ServerAPIVersions(&restclient.Config{Hosts: []string{server.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}})
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestSetsCodec(t *testing.T) {
 	}
 	for version, expected := range testCases {
 		conf := &restclient.Config{
-			Host: "127.0.0.1",
+			Hosts: []string{"127.0.0.1"},
 			ContentConfig: restclient.ContentConfig{
 				GroupVersion: &unversioned.GroupVersion{Version: version},
 			},
@@ -156,7 +156,7 @@ func TestSetsCodec(t *testing.T) {
 		var versionedPath string
 		err := SetKubernetesDefaults(conf)
 		if err == nil {
-			_, versionedPath, err = restclient.DefaultServerURL(conf.Host, conf.APIPath, *conf.GroupVersion, false)
+			_, versionedPath, err = restclient.DefaultServerURL(conf.Hosts, conf.APIPath, *conf.GroupVersion, false)
 		}
 
 		switch {

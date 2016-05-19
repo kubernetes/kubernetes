@@ -37,7 +37,7 @@ var _ = Describe("MirrorPod", func() {
 	var cl *client.Client
 	BeforeEach(func() {
 		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
 	})
 	ns := "mirror-pod"
 	Context("when create a mirror pod ", func() {

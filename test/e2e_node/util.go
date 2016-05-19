@@ -32,7 +32,7 @@ var startServices = flag.Bool("start-services", true, "If true, start local node
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 
 func NewDefaultFramework(baseName string) *framework.Framework {
-	client := client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
+	client := client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
 	return framework.NewFramework(baseName, framework.FrameworkOptions{
 		ClientQPS:   100,
 		ClientBurst: 100,
