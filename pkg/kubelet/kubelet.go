@@ -3669,6 +3669,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *api.Pod, podStatus *kubeco
 
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {
+		if isInitContainer {
+			// If the init container is terminated with exit code 0, it won't be restarted.
+			// TODO(random-liu): Handle this in a cleaner way.
+			s := podStatus.FindContainerStatusByName(container.Name)
+			if s != nil && s.State == kubecontainer.ContainerStateExited && s.ExitCode == 0 {
+				continue
+			}
+		}
 		// If a container should be restarted in next syncpod, it is *Waiting*.
 		if !kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 			continue
