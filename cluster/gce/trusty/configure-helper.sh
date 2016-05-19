@@ -247,6 +247,7 @@ mount_master_pd() {
   readonly pd_path="/dev/disk/by-id/google-master-pd"
   readonly mount_point="/mnt/disks/master-pd"
 
+  # TODO(zmerlynn): GKE is still lagging in master-pd creation
   if [ ! -e "${pd_path}" ]; then
     return
   fi
