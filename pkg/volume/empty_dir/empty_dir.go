@@ -54,6 +54,10 @@ const (
 	emptyDirPluginName = "kubernetes.io/empty-dir"
 )
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(emptyDirPluginName), volName)
+}
+
 func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 
@@ -88,7 +92,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod
 		mountDetector:   mountDetector,
 		plugin:          plugin,
 		rootContext:     opts.RootContext,
-		MetricsProvider: volume.NewMetricsDu(GetPath(pod.UID, spec.Name(), plugin.host)),
+		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
 
@@ -105,7 +109,7 @@ func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsDu(GetPath(podUID, volName, plugin.host)),
+		MetricsProvider: volume.NewMetricsDu(getPath(podUID, volName, plugin.host)),
 	}
 	return ed, nil
 }
@@ -271,12 +275,7 @@ func (ed *emptyDir) setupDir(dir string) error {
 }
 
 func (ed *emptyDir) GetPath() string {
-	return GetPath(ed.pod.UID, ed.volName, ed.plugin.host)
-}
-
-func GetPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	name := emptyDirPluginName
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(name), volName)
+	return getPath(ed.pod.UID, ed.volName, ed.plugin.host)
 }
 
 // TearDown simply discards everything in the directory.
