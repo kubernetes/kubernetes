@@ -97,6 +97,10 @@ func setupProviderConfig() error {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only on Ginkgo node 1
 
+	if err := setupProviderConfig(); err != nil {
+		framework.Failf("Failed to setup provider config: %v", err)
+	}
+
 	// Delete any namespaces except default and kube-system. This ensures no
 	// lingering resources are left over from a previous test run.
 	if framework.TestContext.CleanStart {
@@ -135,6 +139,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 }, func(data []byte) {
 	// Run on all Ginkgo nodes
 
+	if cloudConfig.Provider == nil {
+		if err := setupProviderConfig(); err != nil {
+			framework.Failf("Failed to setup provider config: %v", err)
+		}
+	}
 })
 
 type CleanupActionHandle *int
@@ -201,12 +210,6 @@ func RunE2ETests(t *testing.T) {
 	runtime.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
-
-	// We must call setupProviderConfig first since SynchronizedBeforeSuite needs
-	// cloudConfig to be set up already.
-	if err := setupProviderConfig(); err != nil {
-		glog.Fatalf(err.Error())
-	}
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Disable skipped tests unless they are explicitly requested.
