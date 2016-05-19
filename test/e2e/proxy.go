@@ -277,7 +277,7 @@ func truncate(b []byte, maxLen int) []byte {
 
 func pickNode(c *client.Client) (string, error) {
 	// TODO: investigate why it doesn't work on master Node.
-	nodes := framework.ListSchedulableNodesOrDie(c)
+	nodes := framework.GetReadySchedulableNodesOrDie(c)
 	if len(nodes.Items) == 0 {
 		return "", fmt.Errorf("no nodes exist, can't test node proxy")
 	}

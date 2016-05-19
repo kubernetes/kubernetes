@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 
 	It("should grab all metrics from a Kubelet.", func() {
 		By("Proxying to Node through the API server")
-		nodes := framework.ListSchedulableNodesOrDie(c)
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		Expect(nodes.Items).NotTo(BeEmpty())
 		response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
 		framework.ExpectNoError(err)
