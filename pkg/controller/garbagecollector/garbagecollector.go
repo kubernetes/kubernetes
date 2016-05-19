@@ -17,9 +17,13 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"bytes"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
+
+	gruntime "runtime"
 
 	"github.com/golang/glog"
 
@@ -42,6 +46,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
+
+func getGID() uint64 {
+	b := make([]byte, 64)
+	b = b[:gruntime.Stack(b, false)]
+	b = bytes.TrimPrefix(b, []byte("goroutine "))
+	b = b[:bytes.IndexByte(b, ' ')]
+	n, _ := strconv.ParseUint(string(b), 10, 64)
+	return n
+}
 
 const ResourceResyncTime = 60 * time.Second
 
@@ -155,6 +168,9 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerRefer
 				dependents:     make(map[*node]struct{}),
 			}
 			p.uidToNode.Write(ownerNode)
+			p.uidToNode.RLock()
+			glog.V(6).Infof("add %s as a virtual node to uidToNode, uidToNode was %v. gid=%d", ownerNode.identity, p.uidToNode, getGID())
+			p.uidToNode.RUnlock()
 			p.gc.dirtyQueue.Add(ownerNode)
 		}
 		ownerNode.addDependent(n)
@@ -165,6 +181,9 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerRefer
 // in n.owners, and adds the node to their dependents list.
 func (p *Propagator) insertNode(n *node) {
 	p.uidToNode.Write(n)
+	p.uidToNode.RLock()
+	glog.V(6).Infof("add %s to uidToNode if it's not there yet. uidToNode was %v. gid=%d", n.identity, p.uidToNode, getGID())
+	p.uidToNode.RUnlock()
 	p.addDependentToOwners(n, n.owners)
 }
 
@@ -183,6 +202,9 @@ func (p *Propagator) removeDependentFromOwners(n *node, owners []metatypes.Owner
 // owners as listed in n.owners, and removes n from their dependents list.
 func (p *Propagator) removeNode(n *node) {
 	p.uidToNode.Delete(n.identity.UID)
+	p.uidToNode.RLock()
+	glog.V(6).Infof("remove %s from uidToNode, uidToNode now is %v. gid=%d", n.identity, p.uidToNode, getGID())
+	p.uidToNode.RUnlock()
 	p.removeDependentFromOwners(n, n.owners)
 }
 
@@ -362,7 +384,7 @@ func (p *Propagator) processEvent() {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return
 	}
-	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
+	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s, gid=%d", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType, getGID())
 	// Check if the node already exsits
 	existingNode, found := p.uidToNode.Read(accessor.GetUID())
 	switch {
@@ -397,7 +419,7 @@ func (p *Propagator) processEvent() {
 		// add/remove owner refs
 		added, removed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
 		if len(added) == 0 && len(removed) == 0 {
-			glog.V(6).Infof("The updateEvent %#v doesn't change node references, ignore", event)
+			glog.V(6).Infof("The updateEvent %#v doesn't change node references, ignore:\n event.obj=%#v\n, event.oldObj=%#v\n", event, event.obj, event.oldObj)
 			return
 		}
 		// update the node itself
@@ -409,7 +431,7 @@ func (p *Propagator) processEvent() {
 		p.removeDependentFromOwners(existingNode, removed)
 	case event.eventType == deleteEvent:
 		if !found {
-			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
+			glog.V(6).Infof("[%s/%s, namespace %s, name %s] doesn't exist in the graph, this shouldn't happen. gid=%d", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), getGID())
 			return
 		}
 		p.removeNode(existingNode)
@@ -539,6 +561,7 @@ func (gc *GarbageCollector) worker() {
 	err := gc.processItem(key.(*node))
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %v: %v", key, err))
+		// we probably should add the item back to the queue.
 	}
 }
 
@@ -613,6 +636,7 @@ func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
 }
 
 func (gc *GarbageCollector) processItem(item *node) error {
+	glog.V(6).Infof("processItem is processing %s", item.identity)
 	// Get the latest item from the API server
 	latest, err := gc.getObject(item.identity)
 	if err != nil {
@@ -705,6 +729,7 @@ func (gc *GarbageCollector) QueuesDrained() bool {
 // GraphHasUID returns if the Propagator has a particular UID store in its
 // uidToNode graph. It's useful for debugging.
 func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
+	glog.V(6).Infof("GraphHasUID is called")
 	for _, u := range UIDs {
 		if _, ok := gc.propagator.uidToNode.Read(u); ok {
 			return true

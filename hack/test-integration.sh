@@ -34,7 +34,7 @@ KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1;v1,autos
 # Give integration tests longer to run
 # TODO: allow a larger value to be passed in
 #KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 240s}
-KUBE_TIMEOUT="-timeout 600s"
+KUBE_TIMEOUT="-timeout 2400s"
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 
@@ -54,6 +54,7 @@ runTests() {
     KUBE_RACE="" \
     KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
+    KUBE_TEST_ARGS="--vmodule=garbage*collector*=6" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
   kube::log::status "Running integration test scenario with watch cache on"
