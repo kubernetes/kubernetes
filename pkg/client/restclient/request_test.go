@@ -874,6 +874,13 @@ func TestCheckRetryHandles429And5xx(t *testing.T) {
 	count := 0
 	ch := make(chan struct{})
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		data, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			t.Fatalf("unable to read request body: %v", err)
+		}
+		if !bytes.Equal(data, []byte(strings.Repeat("abcd", 1000))) {
+			t.Fatalf("retry did not send a complete body: %s", data)
+		}
 		t.Logf("attempt %d", count)
 		if count >= 4 {
 			w.WriteHeader(http.StatusOK)

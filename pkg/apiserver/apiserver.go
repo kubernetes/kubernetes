@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"path"
 	rt "runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -449,6 +450,11 @@ func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion
 func errorNegotiated(err error, s runtime.NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request) int {
 	status := errToAPIStatus(err)
 	code := int(status.Code)
+	// when writing an error, check to see if the status indicates a retry after period
+	if status.Details != nil && status.Details.RetryAfterSeconds > 0 {
+		delay := strconv.Itoa(int(status.Details.RetryAfterSeconds))
+		w.Header().Set("Retry-After", delay)
+	}
 	writeNegotiated(s, gv, w, req, code, status)
 	return code
 }

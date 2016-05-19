@@ -56,9 +56,9 @@ func TestErrors(t *testing.T) {
 	o.Add(&api.List{
 		Items: []runtime.Object{
 			// This first call to List will return this error
-			&(errors.NewNotFound(api.Resource("ServiceList"), "").(*errors.StatusError).ErrStatus),
+			&(errors.NewNotFound(api.Resource("ServiceList"), "").ErrStatus),
 			// The second call to List will return this error
-			&(errors.NewForbidden(api.Resource("ServiceList"), "", nil).(*errors.StatusError).ErrStatus),
+			&(errors.NewForbidden(api.Resource("ServiceList"), "", nil).ErrStatus),
 		},
 	})
 	client := &Fake{}
