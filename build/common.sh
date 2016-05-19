@@ -917,7 +917,9 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-addons/kube-addon-manager.yaml" "${dst_dir}"
-  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}"
+  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}/trusty-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${dst_dir}"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
@@ -1114,13 +1116,12 @@ function kube::release::gcs::copy_release_artifacts() {
   # Stage everything in release directory
   kube::release::gcs::stage_and_hash "${RELEASE_DIR}"/* . || return 1
 
-  # Having the configure-vm.sh script and trusty code from the GCE cluster
+  # Having the configure-vm.sh script and GCI code from the GCE cluster
   # deploy hosted with the release is useful for GKE.
-  # TODO(andyzheng0831): Replace the trusty path with GCI after finshing the GCI code.
   kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" extra/gce || return 1
-  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/node.yaml" extra/gce || return 1
-  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/master.yaml" extra/gce || return 1
-  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/configure.sh" extra/gce || return 1
+  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/gci/node.yaml" extra/gce || return 1
+  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/gci/master.yaml" extra/gce || return 1
+  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/gci/configure.sh" extra/gce || return 1
 
   # Upload the "naked" binaries to GCS.  This is useful for install scripts that
   # download the binaries directly and don't need tars.

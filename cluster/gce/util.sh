@@ -23,11 +23,14 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
-if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" ]]; then
+if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
-elif [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
-  # TODO(andyzheng0831): Switch to use the GCI specific code.
-  source "${KUBE_ROOT}/cluster/gce/trusty/helper.sh"
+else
+  echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
+  exit 1
+fi
+
+if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
   # If the master or node image is not set, we use the latest GCI dev image.
   # Otherwise, we respect whatever set by the user.
   gci_images=( $(gcloud compute images list --project google-containers \
@@ -40,9 +43,7 @@ elif [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
     NODE_IMAGE="${gci_images[0]}"
     NODE_IMAGE_PROJECT="google-containers"
   fi
-else
-  echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
-  exit 1
+
 fi
 
 # Verfiy cluster autoscaler configuration.
