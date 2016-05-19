@@ -910,23 +910,6 @@ type awsInstanceType struct {
 // This should be stored as a single letter (i.e. c, not sdc or /dev/sdc)
 type mountDevice string
 
-// TODO: Also return number of mounts allowed?
-func (self *awsInstanceType) getEBSMountDevices() []mountDevice {
-	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
-	// We will generate "ba", "bb", "bc"..."bz", "ca", ..., up to DefaultMaxEBSVolumes
-	devices := []mountDevice{}
-	count := 0
-	for first := 'b'; count < DefaultMaxEBSVolumes; first++ {
-		for second := 'a'; count < DefaultMaxEBSVolumes && second <= 'z'; second++ {
-			device := mountDevice(fmt.Sprintf("%c%c", first, second))
-			devices = append(devices, device)
-			count++
-		}
-	}
-
-	return devices
-}
-
 type awsInstance struct {
 	ec2 EC2
 
@@ -1056,19 +1039,20 @@ func (self *awsInstance) getMountDevice(volumeID string, assign bool) (assigned 
 		return mountDevice(""), false, nil
 	}
 
-	// Check all the valid mountpoints to see if any of them are free
-	valid := instanceType.getEBSMountDevices()
-	chosen := mountDevice("")
-	for _, mountDevice := range valid {
-		_, found := deviceMappings[mountDevice]
-		if !found {
-			chosen = mountDevice
-			break
+	// Find the first unused device in sequence 'ba', 'bb', 'bc', ... 'bz', 'ca', ... 'zz'
+	var chosen mountDevice
+	for first := 'b'; first <= 'z' && chosen == ""; first++ {
+		for second := 'a'; second <= 'z' && chosen == ""; second++ {
+			candidate := mountDevice(fmt.Sprintf("%c%c", first, second))
+			if _, found := deviceMappings[candidate]; !found {
+				chosen = candidate
+				break
+			}
 		}
 	}
 
 	if chosen == "" {
-		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", deviceMappings, valid)
+		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v", deviceMappings)
 		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", self.nodeName)
 	}
 
