@@ -29,6 +29,10 @@ type persistentVolumeOrderedIndex struct {
 	store cache.Indexer
 }
 
+func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
+	return persistentVolumeOrderedIndex{cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc})}
+}
+
 // accessModesIndexFunc is an indexing function that returns a persistent volume's AccessModes as a string
 func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*api.PersistentVolume); ok {
