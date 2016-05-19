@@ -110,7 +110,7 @@ var _ = Describe("ThirdParty resources", func() {
 			}
 			list := FooList{}
 			if err := json.Unmarshal(data, &list); err != nil {
-				framework.Failf("failed to decode: %v", err)
+				framework.Failf("failed to decode: %#v", err)
 			}
 			if len(list.Items) != 0 {
 				framework.Failf("unexpected object before create: %v", list)
@@ -139,7 +139,7 @@ var _ = Describe("ThirdParty resources", func() {
 			}
 			out := Foo{}
 			if err := json.Unmarshal(data, &out); err != nil {
-				framework.Failf("failed to decode: %v", err)
+				framework.Failf("failed to decode: %#v", err)
 			}
 			if out.Name != foo.Name || out.SomeField != foo.SomeField || out.OtherField != foo.OtherField {
 				framework.Failf("expected:\n%#v\nsaw:\n%#v\n%s\n", foo, &out, string(data))
@@ -150,7 +150,7 @@ var _ = Describe("ThirdParty resources", func() {
 				framework.Failf("failed to list with no objects: %v", err)
 			}
 			if err := json.Unmarshal(data, &list); err != nil {
-				framework.Failf("failed to decode: %v", err)
+				framework.Failf("failed to decode: %#v", err)
 			}
 			if len(list.Items) != 1 {
 				framework.Failf("unexpected object too few or too many: %v", list)
@@ -168,7 +168,7 @@ var _ = Describe("ThirdParty resources", func() {
 				framework.Failf("failed to list with no objects: %v", err)
 			}
 			if err := json.Unmarshal(data, &list); err != nil {
-				framework.Failf("failed to decode: %v", err)
+				framework.Failf("failed to decode: %#v", err)
 			}
 			if len(list.Items) != 0 {
 				framework.Failf("unexpected object after delete: %v", list)
