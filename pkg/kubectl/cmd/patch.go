@@ -167,17 +167,18 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		if !options.Local {
 			helper := resource.NewHelper(client, mapping)
-			patchedObject, err := helper.Patch(namespace, name, patchType, patchBytes)
+			_, err := helper.Patch(namespace, name, patchType, patchBytes)
 			if err != nil {
 				return err
 			}
 			if cmdutil.ShouldRecord(cmd, info) {
-				if err := cmdutil.RecordChangeCause(patchedObject, f.Command()); err == nil {
-					// don't return an error on failure.  The patch itself succeeded, its only the hint for that change that failed
-					// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
-					// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
-					// record hint is likely to be invalid anyway, so avoid the bad hint
-					resource.NewHelper(client, mapping).Replace(namespace, name, false, patchedObject)
+				// don't return an error on failure.  The patch itself succeeded, its only the hint for that change that failed
+				// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
+				// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
+				// record hint is likely to be invalid anyway, so avoid the bad hint
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				if err == nil {
+					helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 				}
 			}
 			count++
@@ -208,7 +209,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 		// TODO: if we ever want to go generic, this allows a clean -o yaml without trying to print columns or anything
 		// rawExtension := &runtime.Unknown{
-		// 	Raw: originalPatchedObjJS,
+		//	Raw: originalPatchedObjJS,
 		// }
 
 		printer, err := f.PrinterForMapping(cmd, mapping, false)
