@@ -1312,14 +1312,13 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 	}
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
-		if utilvalidation.IsDNS1123Label(pod.Spec.Hostname) {
-			hostname = pod.Spec.Hostname
-		} else {
-			return "", "", fmt.Errorf("Pod Hostname %q is not a valid DNS label.", pod.Spec.Hostname)
+		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
+			return "", "", fmt.Errorf("Pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
 		}
+		hostname = pod.Spec.Hostname
 	} else {
 		hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
-		if utilvalidation.IsDNS1123Label(hostnameCandidate) {
+		if len(utilvalidation.IsDNS1123Label(hostnameCandidate)) == 0 {
 			// use hostname annotation, if specified.
 			hostname = hostnameCandidate
 		}
@@ -1331,14 +1330,13 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 
 	hostDomain := ""
 	if len(pod.Spec.Subdomain) > 0 {
-		if utilvalidation.IsDNS1123Label(pod.Spec.Subdomain) {
-			hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
-		} else {
-			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label.", pod.Spec.Subdomain)
+		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Subdomain); len(msgs) != 0 {
+			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
+		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
 	} else {
 		subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
-		if utilvalidation.IsDNS1123Label(subdomainCandidate) {
+		if len(utilvalidation.IsDNS1123Label(subdomainCandidate)) == 0 {
 			hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
 		}
 	}

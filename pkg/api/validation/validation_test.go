@@ -90,10 +90,10 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 			return nil
 		},
 		field.NewPath("field"))
-	if len(errs) != 1 {
+	if len(errs) != 2 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
-	if !strings.Contains(errs[0].Error(), "Invalid value") {
+	if !strings.Contains(errs[0].Error(), "Invalid value") || !strings.Contains(errs[1].Error(), "Invalid value") {
 		t.Errorf("unexpected error message: %v", errs)
 	}
 }
@@ -748,12 +748,12 @@ func TestValidateVolumes(t *testing.T) {
 		"name > 63 characters": {
 			[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}},
 			field.ErrorTypeInvalid,
-			"name", "must be a DNS label",
+			"name", "must be no more than",
 		},
 		"name not a DNS label": {
 			[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}},
 			field.ErrorTypeInvalid,
-			"name", "must be a DNS label",
+			"name", "must match the regex",
 		},
 		"name not unique": {
 			[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}},
@@ -4691,11 +4691,11 @@ func TestValidateLimitRange(t *testing.T) {
 		},
 		"invalid-name": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
-			DNSSubdomainErrorMsg,
+			"must match the regex",
 		},
 		"invalid-namespace": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: api.LimitRangeSpec{}},
-			DNS1123LabelErrorMsg,
+			"must match the regex",
 		},
 		"duplicate-limit-type": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
@@ -4839,7 +4839,7 @@ func TestValidateLimitRange(t *testing.T) {
 		}
 		for i := range errs {
 			detail := errs[i].Detail
-			if detail != v.D {
+			if !strings.Contains(detail, v.D) {
 				t.Errorf("[%s]: expected error detail either empty or %q, got %q", k, v.D, detail)
 			}
 		}
@@ -5015,11 +5015,11 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 		"invalid Name": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
-			DNSSubdomainErrorMsg,
+			"must match the regex",
 		},
 		"invalid Namespace": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
-			DNS1123LabelErrorMsg,
+			"must match the regex",
 		},
 		"negative-limits": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
@@ -5052,7 +5052,7 @@ func TestValidateResourceQuota(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			if errs[i].Detail != v.D {
+			if !strings.Contains(errs[i].Detail, v.D) {
 				t.Errorf("[%s]: expected error detail either empty or %s, got %s", k, v.D, errs[i].Detail)
 			}
 		}
@@ -5613,12 +5613,12 @@ func TestValidateEndpoints(t *testing.T) {
 		"invalid namespace": {
 			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
 			errorType:   "FieldValueInvalid",
-			errorDetail: DNS1123LabelErrorMsg,
+			errorDetail: "must match the regex",
 		},
 		"invalid name": {
 			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
 			errorType:   "FieldValueInvalid",
-			errorDetail: DNSSubdomainErrorMsg,
+			errorDetail: "must match the regex",
 		},
 		"empty addresses": {
 			endpoints: api.Endpoints{
