@@ -1630,13 +1630,15 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			fmt.Fprint(out, "  ----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range node.Status.Conditions {
-				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
-					c.Type,
-					c.Status,
-					c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
-					c.Reason,
-					c.Message)
+				if c.Status == api.ConditionTrue || c.Type == api.NodeReady {
+					fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
+						c.Type,
+						c.Status,
+						c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
+						c.LastTransitionTime.Time.Format(time.RFC1123Z),
+						c.Reason,
+						c.Message)
+				}
 			}
 		}
 		var addresses []string
