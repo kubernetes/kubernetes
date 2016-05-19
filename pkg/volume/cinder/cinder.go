@@ -427,25 +427,16 @@ type cinderVolumeProvisioner struct {
 
 var _ volume.Provisioner = &cinderVolumeProvisioner{}
 
-func (c *cinderVolumeProvisioner) Provision(pv *api.PersistentVolume) error {
+func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	volumeID, sizeGB, err := c.manager.CreateVolume(c)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	pv.Spec.PersistentVolumeSource.Cinder.VolumeID = volumeID
-	pv.Spec.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
-	}
-	return nil
-}
 
-func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	// Provide dummy api.PersistentVolume.Spec, it will be filled in
-	// cinderVolumeProvisioner.Provision()
-	return &api.PersistentVolume{
+	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-cinder-",
-			Labels:       map[string]string{},
+			Name:   c.options.PVName,
+			Labels: map[string]string{},
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "cinder-dynamic-provisioner",
 			},
@@ -454,16 +445,16 @@ func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.Persistent
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   c.options.AccessModes,
 			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): c.options.Capacity,
+				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				Cinder: &api.CinderVolumeSource{
-					VolumeID: volume.ProvisionedVolumeName,
+					VolumeID: volumeID,
 					FSType:   "ext4",
 					ReadOnly: false,
 				},
 			},
 		},
-	}, nil
-
+	}
+	return pv, nil
 }
