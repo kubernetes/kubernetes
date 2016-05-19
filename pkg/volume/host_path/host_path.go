@@ -252,18 +252,12 @@ type hostPathProvisioner struct {
 
 // Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
 // This Provisioner is meant for development and testing only and WILL NOT WORK in a multi-node cluster.
-func (r *hostPathProvisioner) Provision(pv *api.PersistentVolume) error {
-	if pv.Spec.HostPath == nil {
-		return fmt.Errorf("pv.Spec.HostPath cannot be nil")
-	}
-	return os.MkdirAll(pv.Spec.HostPath.Path, 0750)
-}
-
-func (r *hostPathProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+func (r *hostPathProvisioner) Provision() (*api.PersistentVolume, error) {
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
-	return &api.PersistentVolume{
+
+	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-hostpath-",
+			Name: r.options.PVName,
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "hostpath-dynamic-provisioner",
 			},
@@ -280,7 +274,9 @@ func (r *hostPathProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolu
 				},
 			},
 		},
-	}, nil
+	}
+
+	return pv, os.MkdirAll(pv.Spec.HostPath.Path, 0750)
 }
 
 // hostPathDeleter deletes a hostPath PV from the cluster.

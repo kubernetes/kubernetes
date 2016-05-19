@@ -24,34 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
-const (
-	// A PVClaim can request a quality of service tier by adding this annotation.  The value of the annotation
-	// is arbitrary.  The values are pre-defined by a cluster admin and known to users when requesting a QoS.
-	// For example tiers might be gold, silver, and tin and the admin configures what that means for each volume plugin that can provision a volume.
-	// Values in the alpha version of this feature are not meaningful, but will be in the full version of this feature.
-	qosProvisioningKey = "volume.alpha.kubernetes.io/storage-class"
-	// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-	// with namespace of a persistent volume claim used to create this volume.
-	cloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
-	// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-	// with name of a persistent volume claim used to create this volume.
-	cloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
-	// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-	// with name of appropriate Kubernetes persistent volume .
-	cloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
-)
-
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes indexed by AccessModes and ordered by storage capacity.
 type persistentVolumeOrderedIndex struct {
-	cache.Indexer
-}
-
-var _ cache.Store = &persistentVolumeOrderedIndex{} // persistentVolumeOrderedIndex is a Store
-
-func NewPersistentVolumeOrderedIndex() *persistentVolumeOrderedIndex {
-	return &persistentVolumeOrderedIndex{
-		cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc}),
-	}
+	store cache.Indexer
 }
 
 // accessModesIndexFunc is an indexing function that returns a persistent volume's AccessModes as a string
@@ -63,15 +38,15 @@ func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
 }
 
-// ListByAccessModes returns all volumes with the given set of AccessModeTypes *in order* of their storage capacity (low to high)
-func (pvIndex *persistentVolumeOrderedIndex) ListByAccessModes(modes []api.PersistentVolumeAccessMode) ([]*api.PersistentVolume, error) {
+// listByAccessModes returns all volumes with the given set of AccessModeTypes *in order* of their storage capacity (low to high)
+func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.PersistentVolumeAccessMode) ([]*api.PersistentVolume, error) {
 	pv := &api.PersistentVolume{
 		Spec: api.PersistentVolumeSpec{
 			AccessModes: modes,
 		},
 	}
 
-	objs, err := pvIndex.Index("accessmodes", pv)
+	objs, err := pvIndex.store.Index("accessmodes", pv)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +76,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
 	for _, modes := range allPossibleModes {
-		volumes, err := pvIndex.ListByAccessModes(modes)
+		volumes, err := pvIndex.listByAccessModes(modes)
 		if err != nil {
 			return nil, err
 		}
@@ -117,16 +92,20 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 				continue
 			}
 
-			if claim.Name == volume.Spec.ClaimRef.Name && claim.Namespace == volume.Spec.ClaimRef.Namespace && claim.UID == volume.Spec.ClaimRef.UID {
-				// exact match! No search required.
+			if isVolumeBoundToClaim(volume, claim) {
+				// Exact match! No search required.
 				return volume, nil
 			}
 		}
 
-		// a claim requesting provisioning will have an exact match pre-bound to the claim.
-		// no need to search through unbound volumes.  The matching volume will be created by the provisioner
-		// and will match above when the claim is re-processed by the binder.
-		if keyExists(qosProvisioningKey, claim.Annotations) {
+		// We want to provision volumes if the annotation is set even if there
+		// is matching PV. Therefore, do not look for available PV and let
+		// a new volume to be provisioned.
+		//
+		// When provisioner creates a new PV to this claim, an exact match
+		// pre-bound to the claim will be found by the checks above during
+		// subsequent claim sync.
+		if hasAnnotation(claim.ObjectMeta, annClass) {
 			return nil, nil
 		}
 
@@ -213,7 +192,7 @@ func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 //
 func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requestedModes []api.PersistentVolumeAccessMode) [][]api.PersistentVolumeAccessMode {
 	matchedModes := [][]api.PersistentVolumeAccessMode{}
-	keys := pvIndex.Indexer.ListIndexFuncValues("accessmodes")
+	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
 	for _, key := range keys {
 		indexedModes := api.GetAccessModesFromString(key)
 		if containedInAll(indexedModes, requestedModes) {
@@ -264,4 +243,8 @@ func (c byAccessModes) Len() int {
 
 func claimToClaimKey(claim *api.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
+}
+
+func claimrefToClaimKey(claimref *api.ObjectReference) string {
+	return fmt.Sprintf("%s/%s", claimref.Namespace, claimref.Name)
 }

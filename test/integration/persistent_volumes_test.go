@@ -49,21 +49,15 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	deleteAllEtcdKeys()
 	// Use higher QPS and Burst, there is a test for race condition below, which
 	// creates many claims and default values were too low.
-	binderClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
-	recyclerClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
 	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
 
 	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0, nil, nil, nil, nil}}
 	cloud := &fake_cloud.FakeCloud{}
 
-	binder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(binderClient, 10*time.Second)
-	binder.Run()
-	defer binder.Stop()
-
-	recycler, _ := persistentvolumecontroller.NewPersistentVolumeRecycler(recyclerClient, 30*time.Second, 3, plugins, cloud)
-	recycler.Run()
-	defer recycler.Stop()
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(testClient, 10*time.Second, nil, plugins, cloud, "", nil, nil, nil)
+	ctrl.Run()
+	defer ctrl.Stop()
 
 	// This PV will be claimed, released, and recycled.
 	pv := &api.PersistentVolume{
