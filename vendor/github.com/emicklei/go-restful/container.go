@@ -6,6 +6,7 @@ package restful
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -83,34 +84,16 @@ func (c *Container) EnableContentEncoding(enabled bool) {
 	c.contentEncodingEnabled = enabled
 }
 
-// Add a WebService to the Container. It will detect duplicate root paths and panic in that case.
+// Add a WebService to the Container. It will detect duplicate root paths and exit in that case.
 func (c *Container) Add(service *WebService) *Container {
 	c.webServicesLock.Lock()
 	defer c.webServicesLock.Unlock()
-	// If registered on root then no additional specific mapping is needed
-	if !c.isRegisteredOnRoot {
-		pattern := c.fixedPrefixPath(service.RootPath())
-		// check if root path registration is needed
-		if "/" == pattern || "" == pattern {
-			c.ServeMux.HandleFunc("/", c.dispatch)
-			c.isRegisteredOnRoot = true
-		} else {
-			// detect if registration already exists
-			alreadyMapped := false
-			for _, each := range c.webServices {
-				if each.RootPath() == service.RootPath() {
-					alreadyMapped = true
-					break
-				}
-			}
-			if !alreadyMapped {
-				c.ServeMux.HandleFunc(pattern, c.dispatch)
-				if !strings.HasSuffix(pattern, "/") {
-					c.ServeMux.HandleFunc(pattern+"/", c.dispatch)
-				}
-			}
-		}
+
+	// if rootPath was not set then lazy initialize it
+	if len(service.rootPath) == 0 {
+		service.Path("/")
 	}
+
 	// cannot have duplicate root paths
 	for _, each := range c.webServices {
 		if each.RootPath() == service.RootPath() {
@@ -118,24 +101,64 @@ func (c *Container) Add(service *WebService) *Container {
 			os.Exit(1)
 		}
 	}
-	// if rootPath was not set then lazy initialize it
-	if len(service.rootPath) == 0 {
-		service.Path("/")
+
+	// If not registered on root then add specific mapping
+	if !c.isRegisteredOnRoot {
+		c.isRegisteredOnRoot = c.addHandler(service, c.ServeMux)
 	}
 	c.webServices = append(c.webServices, service)
 	return c
 }
 
-func (c *Container) Remove(ws *WebService) error {
-	c.webServicesLock.Lock()
-	defer c.webServicesLock.Unlock()
-	newServices := []*WebService{}
-	for ix := range c.webServices {
-		if c.webServices[ix].rootPath != ws.rootPath {
-			newServices = append(newServices, c.webServices[ix])
+// addHandler may set a new HandleFunc for the serveMux
+// this function must run inside the critical region protected by the webServicesLock.
+// returns true if the function was registered on root ("/")
+func (c *Container) addHandler(service *WebService, serveMux *http.ServeMux) bool {
+	pattern := fixedPrefixPath(service.RootPath())
+	// check if root path registration is needed
+	if "/" == pattern || "" == pattern {
+		serveMux.HandleFunc("/", c.dispatch)
+		return true
+	}
+	// detect if registration already exists
+	alreadyMapped := false
+	for _, each := range c.webServices {
+		if each.RootPath() == service.RootPath() {
+			alreadyMapped = true
+			break
 		}
 	}
-	c.webServices = newServices
+	if !alreadyMapped {
+		serveMux.HandleFunc(pattern, c.dispatch)
+		if !strings.HasSuffix(pattern, "/") {
+			serveMux.HandleFunc(pattern+"/", c.dispatch)
+		}
+	}
+	return false
+}
+
+func (c *Container) Remove(ws *WebService) error {
+	if c.ServeMux == http.DefaultServeMux {
+		errMsg := fmt.Sprintf("[restful] cannot remove a WebService from a Container using the DefaultServeMux: ['%v']", ws)
+		log.Printf(errMsg)
+		return errors.New(errMsg)
+	}
+	c.webServicesLock.Lock()
+	defer c.webServicesLock.Unlock()
+	// build a new ServeMux and re-register all WebServices
+	newServeMux := http.NewServeMux()
+	newServices := []*WebService{}
+	newIsRegisteredOnRoot := false
+	for _, each := range c.webServices {
+		if each.rootPath != ws.rootPath {
+			// If not registered on root then add specific mapping
+			if !newIsRegisteredOnRoot {
+				newIsRegisteredOnRoot = c.addHandler(each, newServeMux)
+			}
+			newServices = append(newServices, each)
+		}
+	}
+	c.webServices, c.ServeMux, c.isRegisteredOnRoot = newServices, newServeMux, newIsRegisteredOnRoot
 	return nil
 }
 
@@ -251,7 +274,7 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 }
 
 // fixedPrefixPath returns the fixed part of the partspec ; it may include template vars {}
-func (c Container) fixedPrefixPath(pathspec string) string {
+func fixedPrefixPath(pathspec string) string {
 	varBegin := strings.Index(pathspec, "{")
 	if -1 == varBegin {
 		return pathspec
