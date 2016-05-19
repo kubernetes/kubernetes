@@ -306,6 +306,10 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 func (f *DeltaFIFO) List() []interface{} {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+	return f.listLocked()
+}
+
+func (f *DeltaFIFO) listLocked() []interface{} {
 	list := make([]interface{}, 0, len(f.items))
 	for _, item := range f.items {
 		// Copy item's slice so operations on this slice (delta
@@ -447,6 +451,27 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		}
 		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// Resync will send a sync event for each item
+func (f *DeltaFIFO) Resync() error {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	for _, k := range f.knownObjects.ListKeys() {
+		obj, exists, err := f.knownObjects.GetByKey(k)
+		if err != nil {
+			glog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, k)
+			continue
+		} else if !exists {
+			glog.Infof("Key %v does not exist in known objects store, unable to queue object for sync", k)
+			continue
+		}
+
+		if err := f.queueActionLocked(Sync, obj); err != nil {
+			return fmt.Errorf("couldn't queue object: %v", err)
 		}
 	}
 	return nil
