@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storagebackend
+package factory
 
 import (
 	"net"
@@ -23,12 +23,15 @@ import (
 
 	etcd2client "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/pkg/transport"
+
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-func newETCD2Storage(c Config) (storage.Interface, error) {
+func newETCD2Storage(c storagebackend.Config, codec runtime.Codec) (storage.Interface, error) {
 	tr, err := newTransportForETCD2(c.CertFile, c.KeyFile, c.CAFile)
 	if err != nil {
 		return nil, err
@@ -37,7 +40,7 @@ func newETCD2Storage(c Config) (storage.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return etcd.NewEtcdStorage(client, c.Codec, c.Prefix, c.Quorum, c.DeserializationCacheSize), nil
+	return etcd.NewEtcdStorage(client, codec, c.Prefix, c.Quorum, c.DeserializationCacheSize), nil
 }
 
 func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client, error) {

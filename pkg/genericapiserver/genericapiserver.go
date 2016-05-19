@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
@@ -57,11 +58,7 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	DefaultEtcdPathPrefix           = "/registry"
-	DefaultDeserializationCacheSize = 50000
-	globalTimeout                   = time.Minute
-)
+const globalTimeout = time.Minute
 
 // Info about an API group.
 type APIGroupInfo struct {
@@ -95,6 +92,7 @@ type APIGroupInfo struct {
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
+	// The storage factory for other objects
 	StorageFactory StorageFactory
 	// allow downstream consumers to disable the core controller loops
 	EnableLogsSupport bool
@@ -538,7 +536,7 @@ func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
-func verifyClusterIPFlags(options *ServerRunOptions) {
+func verifyClusterIPFlags(options *options.ServerRunOptions) {
 	if options.ServiceClusterIPRange.IP == nil {
 		glog.Fatal("No --service-cluster-ip-range specified")
 	}
@@ -548,7 +546,7 @@ func verifyClusterIPFlags(options *ServerRunOptions) {
 	}
 }
 
-func NewConfig(options *ServerRunOptions) *Config {
+func NewConfig(options *options.ServerRunOptions) *Config {
 	return &Config{
 		APIGroupPrefix:            options.APIGroupPrefix,
 		APIPrefix:                 options.APIPrefix,
@@ -571,25 +569,25 @@ func NewConfig(options *ServerRunOptions) *Config {
 	}
 }
 
-func verifyServiceNodePort(options *ServerRunOptions) {
+func verifyServiceNodePort(options *options.ServerRunOptions) {
 	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
 		glog.Fatalf("Kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort))
 	}
 }
 
-func verifyEtcdServersList(options *ServerRunOptions) {
+func verifyEtcdServersList(options *options.ServerRunOptions) {
 	if len(options.StorageConfig.ServerList) == 0 {
 		glog.Fatalf("--etcd-servers must be specified")
 	}
 }
 
-func ValidateRunOptions(options *ServerRunOptions) {
+func ValidateRunOptions(options *options.ServerRunOptions) {
 	verifyClusterIPFlags(options)
 	verifyServiceNodePort(options)
 	verifyEtcdServersList(options)
 }
 
-func DefaultAndValidateRunOptions(options *ServerRunOptions) {
+func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	ValidateRunOptions(options)
 
 	// If advertise-address is not specified, use bind-address. If bind-address
@@ -635,7 +633,7 @@ func DefaultAndValidateRunOptions(options *ServerRunOptions) {
 	}
 }
 
-func (s *GenericAPIServer) Run(options *ServerRunOptions) {
+func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
 	}

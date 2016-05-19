@@ -14,18 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storagebackend
+package factory
 
 import (
 	"strings"
 
 	"github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
+
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd3"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
-func newETCD3Storage(c Config) (storage.Interface, error) {
+func newETCD3Storage(c storagebackend.Config, codec runtime.Codec) (storage.Interface, error) {
 	endpoints := c.ServerList
 	for i, s := range endpoints {
 		endpoints[i] = strings.TrimLeft(s, "http://")
@@ -38,5 +41,5 @@ func newETCD3Storage(c Config) (storage.Interface, error) {
 		return nil, err
 	}
 	etcd3.StartCompactor(context.Background(), client)
-	return etcd3.New(client, c.Codec, c.Prefix), nil
+	return etcd3.New(client, codec, c.Prefix), nil
 }
