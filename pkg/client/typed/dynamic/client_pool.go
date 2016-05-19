@@ -50,8 +50,9 @@ type clientPoolImpl struct {
 
 // NewClientPool returns a ClientPool from the specified config
 func NewClientPool(config *restclient.Config, apiPathResolverFunc APIPathResolverFunc) ClientPool {
+	confCopy := *config
 	return &clientPoolImpl{
-		config:              config,
+		config:              &confCopy,
 		clients:             map[unversioned.GroupVersion]*Client{},
 		apiPathResolverFunc: apiPathResolverFunc,
 	}
