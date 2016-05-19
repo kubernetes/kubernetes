@@ -28,36 +28,36 @@ var NameMayNotBe = []string{".", ".."}
 var NameMayNotContain = []string{"/", "%"}
 
 // IsValidPathSegmentName validates the name can be safely encoded as a path segment
-func IsValidPathSegmentName(name string) (bool, string) {
+func IsValidPathSegmentName(name string) []string {
 	for _, illegalName := range NameMayNotBe {
 		if name == illegalName {
-			return false, fmt.Sprintf(`name may not be %q`, illegalName)
+			return []string{fmt.Sprintf(`may not be '%s'`, illegalName)}
 		}
 	}
 
 	for _, illegalContent := range NameMayNotContain {
 		if strings.Contains(name, illegalContent) {
-			return false, fmt.Sprintf(`name may not contain %q`, illegalContent)
+			return []string{fmt.Sprintf(`may not contain '%s'`, illegalContent)}
 		}
 	}
 
-	return true, ""
+	return nil
 }
 
 // IsValidPathSegmentPrefix validates the name can be used as a prefix for a name which will be encoded as a path segment
 // It does not check for exact matches with disallowed names, since an arbitrary suffix might make the name valid
-func IsValidPathSegmentPrefix(name string) (bool, string) {
+func IsValidPathSegmentPrefix(name string) []string {
 	for _, illegalContent := range NameMayNotContain {
 		if strings.Contains(name, illegalContent) {
-			return false, fmt.Sprintf(`name may not contain %q`, illegalContent)
+			return []string{fmt.Sprintf(`may not contain '%s'`, illegalContent)}
 		}
 	}
 
-	return true, ""
+	return nil
 }
 
 // ValidatePathSegmentName validates the name can be safely encoded as a path segment
-func ValidatePathSegmentName(name string, prefix bool) (bool, string) {
+func ValidatePathSegmentName(name string, prefix bool) []string {
 	if prefix {
 		return IsValidPathSegmentPrefix(name)
 	} else {

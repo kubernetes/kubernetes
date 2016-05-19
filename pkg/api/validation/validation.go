@@ -92,8 +92,8 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	var totalSize int64
 	for k, v := range annotations {
-		for _, err := range validation.IsQualifiedName(strings.ToLower(k)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, err))
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
 		}
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
@@ -166,9 +166,11 @@ func ValidateOwnerReferences(ownerReferences []api.OwnerReference, fldPath *fiel
 }
 
 // ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names. Prefix is true if the
-// name will have a value appended to it.
-type ValidateNameFunc func(name string, prefix bool) (bool, string)
+// Not all resources have the same validation rules for names. Prefix is true
+// if the name will have a value appended to it.  If the names is not valid,
+// this returns a list of descriptions of individual characteristics of the
+// value that were not valid.  Otherwise this returns an empty list or nil.
+type ValidateNameFunc func(name string, prefix bool) []string
 
 // maskTrailingDash replaces the final character of a string with a subdomain safe
 // value if is a dash.
@@ -182,106 +184,86 @@ func maskTrailingDash(name string) string {
 // ValidatePodName can be used to check whether the given pod name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidatePodName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidatePodName = NameIsDNSSubdomain
 
 // ValidateReplicationControllerName can be used to check whether the given replication
 // controller name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateReplicationControllerName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateReplicationControllerName = NameIsDNSSubdomain
 
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateServiceName(name string, prefix bool) (bool, string) {
-	return NameIsDNS952Label(name, prefix)
-}
+var ValidateServiceName = NameIsDNS952Label
 
 // ValidateNodeName can be used to check whether the given node name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateNodeName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateNodeName = NameIsDNSSubdomain
 
 // ValidateNamespaceName can be used to check whether the given namespace name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateNamespaceName(name string, prefix bool) (bool, string) {
-	return NameIsDNSLabel(name, prefix)
-}
+var ValidateNamespaceName = NameIsDNSLabel
 
 // ValidateLimitRangeName can be used to check whether the given limit range name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateLimitRangeName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateLimitRangeName = NameIsDNSSubdomain
 
 // ValidateResourceQuotaName can be used to check whether the given
 // resource quota name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateResourceQuotaName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateResourceQuotaName = NameIsDNSSubdomain
 
 // ValidateSecretName can be used to check whether the given secret name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateSecretName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateSecretName = NameIsDNSSubdomain
 
 // ValidateServiceAccountName can be used to check whether the given service account name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateServiceAccountName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateServiceAccountName = NameIsDNSSubdomain
 
 // ValidateEndpointsName can be used to check whether the given endpoints name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateEndpointsName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateEndpointsName = NameIsDNSSubdomain
 
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func NameIsDNSSubdomain(name string, prefix bool) (bool, string) {
+func NameIsDNSSubdomain(name string, prefix bool) []string {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
 	if validation.IsDNS1123Subdomain(name) {
-		return true, ""
+		return nil
 	}
-	return false, DNSSubdomainErrorMsg
+	return []string{DNSSubdomainErrorMsg}
 }
 
 // NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
-func NameIsDNSLabel(name string, prefix bool) (bool, string) {
+func NameIsDNSLabel(name string, prefix bool) []string {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
 	if validation.IsDNS1123Label(name) {
-		return true, ""
+		return nil
 	}
-	return false, DNS1123LabelErrorMsg
+	return []string{DNS1123LabelErrorMsg}
 }
 
 // NameIsDNS952Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func NameIsDNS952Label(name string, prefix bool) (bool, string) {
+func NameIsDNS952Label(name string, prefix bool) []string {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
 	if validation.IsDNS952Label(name) {
-		return true, ""
+		return nil
 	}
-	return false, DNS952LabelErrorMsg
+	return []string{DNS952LabelErrorMsg}
 }
 
 // Validates that given value is not negative.
@@ -318,8 +300,8 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	allErrs := field.ErrorList{}
 
 	if len(meta.GenerateName) != 0 {
-		if ok, qualifier := nameFn(meta.GenerateName, true); !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("generateName"), meta.GenerateName, qualifier))
+		for _, msg := range nameFn(meta.GenerateName, true) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("generateName"), meta.GenerateName, msg))
 		}
 	}
 	// If the generated name validates, but the calculated value does not, it's a problem with generation, and we
@@ -328,15 +310,17 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	if len(meta.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name or generateName is required"))
 	} else {
-		if ok, qualifier := nameFn(meta.Name, false); !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), meta.Name, qualifier))
+		for _, msg := range nameFn(meta.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), meta.Name, msg))
 		}
 	}
 	if requiresNamespace {
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
-		} else if ok, _ := ValidateNamespaceName(meta.Namespace, false); !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.Namespace, DNS1123LabelErrorMsg))
+		} else {
+			for _, msg := range ValidateNamespaceName(meta.Namespace, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.Namespace, msg))
+			}
 		}
 	} else {
 		if len(meta.Namespace) != 0 {
@@ -820,9 +804,9 @@ func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) fi
 	return allErrs
 }
 
-func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+// ValidatePersistentVolumeName checks that a name is appropriate for a
+// PersistentVolumeName object.
+var ValidatePersistentVolumeName = NameIsDNSSubdomain
 
 var supportedAccessModes = sets.NewString(string(api.ReadWriteOnce), string(api.ReadOnlyMany), string(api.ReadWriteMany))
 
@@ -1546,13 +1530,13 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	if len(spec.ServiceAccountName) > 0 {
-		if ok, msg := ValidateServiceAccountName(spec.ServiceAccountName, false); !ok {
+		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
 		}
 	}
 
 	if len(spec.NodeName) > 0 {
-		if ok, msg := ValidateNodeName(spec.NodeName, false); !ok {
+		for _, msg := range ValidateNodeName(spec.NodeName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), spec.NodeName, msg))
 		}
 	}
@@ -1646,8 +1630,8 @@ func validatePodAffinityTerm(podAffinityTerm api.PodAffinityTerm, allowEmptyTopo
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
 	for _, name := range podAffinityTerm.Namespaces {
-		if ok, _ := ValidateNamespaceName(name, false); !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, DNS1123LabelErrorMsg))
+		for _, msg := range ValidateNamespaceName(name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
 		}
 	}
 	if !allowEmptyTopologyKey && len(podAffinityTerm.TopologyKey) == 0 {
@@ -2296,8 +2280,8 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, err := range validation.IsQualifiedName(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, err))
+	for _, msg := range validation.IsQualifiedName(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
 	}
 	if len(allErrs) != 0 {
 		return allErrs
@@ -2339,8 +2323,8 @@ func validateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 // Validate limit range types
 func validateLimitRangeTypeName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, err := range validation.IsQualifiedName(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, err))
+	for _, msg := range validation.IsQualifiedName(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
 	}
 	if len(allErrs) != 0 {
 		return allErrs
@@ -2599,9 +2583,7 @@ func ValidateSecretUpdate(newSecret, oldSecret *api.Secret) field.ErrorList {
 // ValidateConfigMapName can be used to check whether the given ConfigMap name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateConfigMapName(name string, prefix bool) (bool, string) {
-	return NameIsDNSSubdomain(name, prefix)
-}
+var ValidateConfigMapName = NameIsDNSSubdomain
 
 // ValidateConfigMap tests whether required fields in the ConfigMap are set.
 func ValidateConfigMap(cfg *api.ConfigMap) field.ErrorList {
@@ -2813,8 +2795,8 @@ func ValidateNamespace(namespace *api.Namespace) field.ErrorList {
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, err := range validation.IsQualifiedName(stringValue) {
-		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, err))
+	for _, msg := range validation.IsQualifiedName(stringValue) {
+		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg))
 	}
 	if len(allErrs) != 0 {
 		return allErrs
@@ -3020,8 +3002,8 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus, fldPath *field.P
 			}
 		}
 		if len(ingress.Hostname) > 0 {
-			if valid, errMsg := NameIsDNSSubdomain(ingress.Hostname, false); !valid {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, errMsg))
+			for _, msg := range NameIsDNSSubdomain(ingress.Hostname, false) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
 			}
 			if isIP := (net.ParseIP(ingress.Hostname) != nil); isIP {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))

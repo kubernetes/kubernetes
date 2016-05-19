@@ -47,11 +47,11 @@ func TestValidateObjectMetaCustomName(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&api.ObjectMeta{Name: "test", GenerateName: "foo"},
 		false,
-		func(s string, prefix bool) (bool, string) {
+		func(s string, prefix bool) []string {
 			if s == "test" {
-				return true, ""
+				return nil
 			}
-			return false, "name-gen"
+			return []string{"name-gen"}
 		},
 		field.NewPath("field"))
 	if len(errs) != 1 {
@@ -67,8 +67,8 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&api.ObjectMeta{Name: "test", Namespace: "foo.bar"},
 		true,
-		func(s string, prefix bool) (bool, string) {
-			return true, ""
+		func(s string, prefix bool) []string {
+			return nil
 		},
 		field.NewPath("field"))
 	if len(errs) != 1 {
@@ -86,8 +86,8 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	errs = ValidateObjectMeta(
 		&api.ObjectMeta{Name: "test", Namespace: string(b)},
 		true,
-		func(s string, prefix bool) (bool, string) {
-			return true, ""
+		func(s string, prefix bool) []string {
+			return nil
 		},
 		field.NewPath("field"))
 	if len(errs) != 1 {
@@ -132,8 +132,8 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 		errs := ValidateObjectMeta(
 			&api.ObjectMeta{Name: "test", Namespace: "test", OwnerReferences: tc.ownerReferences},
 			true,
-			func(s string, prefix bool) (bool, string) {
-				return true, ""
+			func(s string, prefix bool) []string {
+				return nil
 			},
 			field.NewPath("field"))
 		if len(errs) != 0 && !tc.expectError {
