@@ -20,6 +20,7 @@ package cm
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -39,6 +40,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -51,6 +53,9 @@ const (
 	DockerMemoryLimitThresholdPercent = 70
 	// The minimum memory limit allocated to docker container: 150Mi
 	MinDockerMemoryLimit = 150 * 1024 * 1024
+
+	dockerProcessName = "docker"
+	dockerPidFile     = "/var/run/docker.pid"
 )
 
 // A non-user container tracked by the Kubelet.
@@ -262,11 +267,12 @@ func (cm *containerManagerImpl) setupNode() error {
 			systemContainers = append(systemContainers, cont)
 		} else {
 			cm.periodicTasks = append(cm.periodicTasks, func() {
-				cont, err := getContainerNameForProcess("docker")
+				cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
 				if err != nil {
 					glog.Error(err)
 					return
 				}
+				glog.V(2).Infof("Discovered runtime cgroups name: %s", cont)
 				cm.Lock()
 				defer cm.Unlock()
 				cm.RuntimeCgroupsName = cont
@@ -324,8 +330,8 @@ func (cm *containerManagerImpl) setupNode() error {
 	return nil
 }
 
-func getContainerNameForProcess(name string) (string, error) {
-	pids, err := getPidsForProcess(name)
+func getContainerNameForProcess(name, pidFile string) (string, error) {
+	pids, err := getPidsForProcess(name, pidFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to detect process id for %q - %v", name, err)
 	}
@@ -418,7 +424,36 @@ func isProcessRunningInHost(pid int) (bool, error) {
 	return initMntNs == processMntNs, nil
 }
 
-func getPidsForProcess(name string) ([]int, error) {
+func getPidFromPidFile(pidFile string) (int, error) {
+	file, err := os.Open(pidFile)
+	if err != nil {
+		return 0, fmt.Errorf("error opening pid file %s: %v", pidFile, err)
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
+	}
+
+	pid, err := strconv.Atoi(string(data))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing %s as a number: %v", string(data), err)
+	}
+
+	return pid, nil
+}
+
+func getPidsForProcess(name, pidFile string) ([]int, error) {
+	if len(pidFile) > 0 {
+		if pid, err := getPidFromPidFile(pidFile); err == nil {
+			return []int{pid}, nil
+		} else {
+			// log the error and fall back to pidof
+			runtime.HandleError(err)
+		}
+	}
+
 	out, err := exec.Command("pidof", name).Output()
 	if err != nil {
 		return []int{}, fmt.Errorf("failed to find pid of %q: %v", name, err)
@@ -438,7 +473,7 @@ func getPidsForProcess(name string) ([]int, error) {
 
 // Ensures that the Docker daemon is in the desired container.
 func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manager *fs.Manager) error {
-	pids, err := getPidsForProcess("docker")
+	pids, err := getPidsForProcess(dockerProcessName, dockerPidFile)
 	if err != nil {
 		return err
 	}
