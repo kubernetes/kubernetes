@@ -32,13 +32,14 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := genericapiserver.NewServerRunOptions()
+	s := genericoptions.NewServerRunOptions()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "federated-apiserver",
@@ -54,7 +55,7 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(s *genericapiserver.ServerRunOptions) error {
+func Run(s *genericoptions.ServerRunOptions) error {
 	genericapiserver.DefaultAndValidateRunOptions(s)
 
 	// TODO: register cluster federation resources here.
@@ -148,7 +149,7 @@ func Run(s *genericapiserver.ServerRunOptions) error {
 	return nil
 }
 
-func createRESTOptionsOrDie(s *genericapiserver.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
+func createRESTOptionsOrDie(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
 	storage, err := f.New(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
