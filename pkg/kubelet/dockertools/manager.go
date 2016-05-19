@@ -1413,6 +1413,12 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 }
 
 func (dm *DockerManager) applyOOMScoreAdj(container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
+	if containerInfo.State.Pid == 0 {
+		// Container exited. We cannot do anything about it. Ignore this error.
+		glog.V(2).Infof("Failed to apply OOM score adj on container %q with ID %q. Init process does not exist.", containerInfo.Name, containerInfo.ID)
+		return nil
+	}
+
 	cgroupName, err := dm.procFs.GetFullContainerName(containerInfo.State.Pid)
 	if err != nil {
 		if err == os.ErrNotExist {
@@ -1495,24 +1501,6 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		return kubecontainer.ContainerID{}, fmt.Errorf("InspectContainer: %v", err)
 	}
 
-	if !containerInfo.State.Running {
-		if container.Name == PodInfraContainerName {
-			// If the infra container exited prematurely, return an error to raise
-			// awareness.
-			return id, fmt.Errorf("Infra container %q exited prematruely", id)
-		}
-		// For a user container, simply returns since we cannot apply oom score
-		// anymore.
-		glog.V(4).Info("Container %q already exited", containerInfo.ID)
-		return id, nil
-	}
-
-	// Ensure the PID actually exists, else we'll move ourselves.
-	// TODO: Should we simply log the error (or send an event) and move on? We
-	// don't check the oom score in the next sync and correct it anyway.
-	if containerInfo.State.Pid == 0 {
-		return kubecontainer.ContainerID{}, fmt.Errorf("can't get init PID for container %q", id)
-	}
 	// Check if current docker version is higher than 1.10. Otherwise, we have to apply OOMScoreAdj instead of using docker API.
 	// TODO: Remove this logic after we stop supporting docker version < 1.10.
 	if err := dm.applyOOMScoreAdjIfNeeded(container, containerInfo); err != nil {
