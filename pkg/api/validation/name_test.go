@@ -25,32 +25,27 @@ func TestValidatePathSegmentName(t *testing.T) {
 	testcases := map[string]struct {
 		Name        string
 		Prefix      bool
-		ExpectedOK  bool
 		ExpectedMsg string
 	}{
 		"empty": {
 			Name:        "",
 			Prefix:      false,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 		"empty,prefix": {
 			Name:        "",
 			Prefix:      true,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 
 		"valid": {
 			Name:        "foo.bar.baz",
 			Prefix:      false,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 		"valid,prefix": {
 			Name:        "foo.bar.baz",
 			Prefix:      true,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 
@@ -58,92 +53,80 @@ func TestValidatePathSegmentName(t *testing.T) {
 		"valid complex": {
 			Name:        "sha256:ABCDEF012345@ABCDEF012345",
 			Prefix:      false,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 		// Make sure non-ascii characters are tolerated
 		"valid extended charset": {
 			Name:        "Iñtërnâtiônàlizætiøn",
 			Prefix:      false,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 
 		"dot": {
 			Name:        ".",
 			Prefix:      false,
-			ExpectedOK:  false,
 			ExpectedMsg: ".",
 		},
 		"dot leading": {
 			Name:        ".test",
 			Prefix:      false,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 		"dot,prefix": {
 			Name:        ".",
 			Prefix:      true,
-			ExpectedOK:  true, // allowed because a suffix could make it valid
 			ExpectedMsg: "",
 		},
 
 		"dot dot": {
 			Name:        "..",
 			Prefix:      false,
-			ExpectedOK:  false,
 			ExpectedMsg: "..",
 		},
 		"dot dot leading": {
 			Name:        "..test",
 			Prefix:      false,
-			ExpectedOK:  true,
 			ExpectedMsg: "",
 		},
 		"dot dot,prefix": {
 			Name:        "..",
 			Prefix:      true,
-			ExpectedOK:  true, // allowed because a suffix could make it valid
 			ExpectedMsg: "",
 		},
 
 		"slash": {
 			Name:        "foo/bar",
 			Prefix:      false,
-			ExpectedOK:  false,
 			ExpectedMsg: "/",
 		},
 		"slash,prefix": {
 			Name:        "foo/bar",
 			Prefix:      true,
-			ExpectedOK:  false,
 			ExpectedMsg: "/",
 		},
 
 		"percent": {
 			Name:        "foo%bar",
 			Prefix:      false,
-			ExpectedOK:  false,
 			ExpectedMsg: "%",
 		},
 		"percent,prefix": {
 			Name:        "foo%bar",
 			Prefix:      true,
-			ExpectedOK:  false,
 			ExpectedMsg: "%",
 		},
 	}
 
 	for k, tc := range testcases {
-		ok, msg := ValidatePathSegmentName(tc.Name, tc.Prefix)
-		if ok != tc.ExpectedOK {
-			t.Errorf("%s: expected ok=%v, got %v", k, tc.ExpectedOK, ok)
+		msgs := ValidatePathSegmentName(tc.Name, tc.Prefix)
+		if len(tc.ExpectedMsg) == 0 && len(msgs) > 0 {
+			t.Errorf("%s: expected no message, got %v", k, msgs)
 		}
-		if len(tc.ExpectedMsg) == 0 && len(msg) > 0 {
-			t.Errorf("%s: expected no message, got %v", k, msg)
+		if len(tc.ExpectedMsg) > 0 && len(msgs) == 0 {
+			t.Errorf("%s: expected error message, got none", k)
 		}
-		if len(tc.ExpectedMsg) > 0 && !strings.Contains(msg, tc.ExpectedMsg) {
-			t.Errorf("%s: expected message containing %q, got %v", k, tc.ExpectedMsg, msg)
+		if len(tc.ExpectedMsg) > 0 && !strings.Contains(msgs[0], tc.ExpectedMsg) {
+			t.Errorf("%s: expected message containing %q, got %v", k, tc.ExpectedMsg, msgs[0])
 		}
 	}
 }
