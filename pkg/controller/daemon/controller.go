@@ -168,11 +168,7 @@ func NewDaemonSetsController(podInformer framework.SharedIndexInformer, kubeClie
 				glog.V(4).Infof("Updating daemon set %s", oldDS.Name)
 				dsc.enqueueDaemonSet(curDS)
 			},
-			DeleteFunc: func(obj interface{}) {
-				ds := obj.(*extensions.DaemonSet)
-				glog.V(4).Infof("Deleting daemon set %s", ds.Name)
-				dsc.enqueueDaemonSet(ds)
-			},
+			DeleteFunc: dsc.deleteDaemonset,
 		},
 	)
 
@@ -215,6 +211,24 @@ func NewDaemonSetsControllerFromClient(kubeClient clientset.Interface, resyncPer
 	dsc.internalPodInformer = podInformer
 
 	return dsc
+}
+
+func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
+	ds, ok := obj.(*extensions.DaemonSet)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		ds, ok = tombstone.Obj.(*extensions.DaemonSet)
+		if !ok {
+			glog.Errorf("Tombstone contained object that is not a DaemonSet %+v", obj)
+			return
+		}
+	}
+	glog.V(4).Infof("Deleting daemon set %s", ds.Name)
+	dsc.enqueueDaemonSet(ds)
 }
 
 // Run begins watching and syncing daemon sets.

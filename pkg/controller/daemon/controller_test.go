@@ -158,6 +158,18 @@ func syncAndValidateDaemonSets(t *testing.T, manager *DaemonSetsController, ds *
 	validateSyncDaemonSets(t, podControl, expectedCreates, expectedDeletes)
 }
 
+func TestDeleteFinalStateUnknown(t *testing.T) {
+	manager, _ := newTestController()
+	addNodes(manager.nodeStore.Store, 0, 1, nil)
+	ds := newDaemonSet("foo")
+	// DeletedFinalStateUnknown should queue the embedded DS if found.
+	manager.deleteDaemonset(cache.DeletedFinalStateUnknown{Key: "foo", Obj: ds})
+	enqueuedKey, _ := manager.queue.Get()
+	if enqueuedKey.(string) != "default/foo" {
+		t.Errorf("expected delete of DeletedFinalStateUnknown to enqueue the daemonset but found: %#v", enqueuedKey)
+	}
+}
+
 // DaemonSets without node selectors should launch pods on every node.
 func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	manager, podControl := newTestController()
