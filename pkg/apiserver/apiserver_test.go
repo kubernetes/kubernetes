@@ -1562,6 +1562,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 		t.Errorf("Never set self link")
 	}
 }
+
 func TestGetMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -1572,13 +1573,35 @@ func TestGetMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/id")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", resp)
+	}
+}
+
+func TestGetRetryAfter(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		errors: map[string]error{"get": apierrs.NewServerTimeout(api.Resource("simples"), "id", 2)},
+	}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Unexpected response %#v", resp)
+	}
+	if resp.Header.Get("Retry-After") != "2" {
+		t.Errorf("Unexpected Retry-After header: %v", resp.Header)
 	}
 }
 

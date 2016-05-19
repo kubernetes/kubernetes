@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
@@ -168,8 +169,8 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
 	err := admit.Admit(attrs)
-	if err == nil {
-		t.Errorf("Expected admission error for missing API token")
+	if err == nil || !errors.IsServerTimeout(err) {
+		t.Errorf("Expected server timeout error for missing API token: %v", err)
 	}
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -376,7 +377,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		trace.Step("About to convert to expected version")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, original, gvk)
+			err = transformDecodeError(typer, err, original, gvk, body)
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
@@ -650,7 +651,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		trace.Step("About to convert to expected version")
 		obj, gvk, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, original, gvk)
+			err = transformDecodeError(typer, err, original, gvk, body)
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
@@ -938,7 +939,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 }
 
 // transformDecodeError adds additional information when a decode fails.
-func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, gvk *unversioned.GroupVersionKind) error {
+func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, gvk *unversioned.GroupVersionKind, body []byte) error {
 	objGVK, err := typer.ObjectKind(into)
 	if err != nil {
 		return err
@@ -946,7 +947,8 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 	if gvk != nil && len(gvk.Kind) > 0 {
 		return errors.NewBadRequest(fmt.Sprintf("%s in version %q cannot be handled as a %s: %v", gvk.Kind, gvk.Version, objGVK.Kind, baseErr))
 	}
-	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", objGVK.Kind, baseErr))
+	summary := summarizeData(body, 30)
+	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v (%s)", objGVK.Kind, baseErr, summary))
 }
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request
@@ -1036,5 +1038,22 @@ func getPatchedJS(patchType api.PatchType, originalJS, patchJS []byte, obj runti
 	default:
 		// only here as a safety net - go-restful filters content-type
 		return nil, fmt.Errorf("unknown Content-Type header for patch: %v", patchType)
+	}
+}
+
+func summarizeData(data []byte, maxLength int) string {
+	switch {
+	case len(data) == 0:
+		return "<empty>"
+	case data[0] == '{':
+		if len(data) > maxLength {
+			return string(data[:maxLength]) + " ..."
+		}
+		return string(data)
+	default:
+		if len(data) > maxLength {
+			return hex.EncodeToString(data[:maxLength]) + " ..."
+		}
+		return hex.EncodeToString(data)
 	}
 }
