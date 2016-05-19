@@ -73,7 +73,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 	BeforeEach(func() {
 		c = f.Client
 
-		nodelist := framework.ListSchedulableNodesOrDie(c)
+		nodelist := framework.GetReadySchedulableNodesOrDie(c)
 
 		// Skip this test on small clusters.  No need to fail since it is not a use
 		// case that any cluster of small size needs to support.
@@ -87,7 +87,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 
 	AfterEach(func() {
 
-		nodelist := framework.ListSchedulableNodesOrDie(c)
+		nodelist := framework.GetReadySchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).ToNot(BeZero())
 		for _, node := range nodelist.Items {
 			if unfilledNodeName == node.Name || recoveredNodeName == node.Name {
@@ -150,7 +150,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 			}
 		})
 
-		nodelist := framework.ListSchedulableNodesOrDie(c)
+		nodelist := framework.GetReadySchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
 
 		nodeToRecover := nodelist.Items[1]

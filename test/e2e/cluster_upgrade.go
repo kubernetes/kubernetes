@@ -337,7 +337,7 @@ func checkMasterVersion(c *client.Client, want string) error {
 }
 
 func checkNodesVersions(c *client.Client, want string) error {
-	l := framework.ListSchedulableNodesOrDie(c)
+	l := framework.GetReadySchedulableNodesOrDie(c)
 	for _, n := range l.Items {
 		// We do prefix trimming and then matching because:
 		// want   looks like:  0.19.3-815-g50e67d4

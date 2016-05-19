@@ -18,7 +18,6 @@ package framework
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -2355,8 +2354,8 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 	return events.Items
 }
 
-// Convenient wrapper around listing nodes supporting retries.
-func ListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
+// waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
+func waitListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
 	var nodes *api.NodeList
 	var err error
 	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
@@ -2367,6 +2366,20 @@ func ListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
 	}) != nil {
 		ExpectNoError(err, "Timed out while listing nodes for e2e cluster.")
 	}
+	return nodes
+}
+
+// GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
+// 1) Needs to be schedulable.
+// 2) Needs to be ready.
+// If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
+func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
+	nodes = waitListSchedulableNodesOrDie(c)
+	// previous tests may have cause failures of some nodes. Let's skip
+	// 'Not Ready' nodes, just in case (there is no need to fail the test).
+	FilterNodes(nodes, func(node api.Node) bool {
+		return !node.Spec.Unschedulable && IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
+	})
 	return nodes
 }
 
@@ -2920,7 +2933,7 @@ func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []strin
 // It returns an error if it can't find an external IP for every node, though it still returns all
 // hosts that it found in that case.
 func NodeSSHHosts(c *client.Client) ([]string, error) {
-	nodelist := ListSchedulableNodesOrDie(c)
+	nodelist := waitListSchedulableNodesOrDie(c)
 
 	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
 	hosts := NodeAddresses(nodelist, api.NodeExternalIP)
@@ -3699,22 +3712,6 @@ func CheckPodHashLabel(pods *api.PodList) error {
 		return fmt.Errorf("%s", invalidPod)
 	}
 	return nil
-}
-
-// GetReadyNodes retrieves a list of schedulable nodes whose condition
-// is Ready.  An error will be returned if no such nodes are found.
-func GetReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
-	nodes = ListSchedulableNodesOrDie(f.Client)
-	// previous tests may have cause failures of some nodes. Let's skip
-	// 'Not Ready' nodes, just in case (there is no need to fail the test).
-	FilterNodes(nodes, func(node api.Node) bool {
-		return !node.Spec.Unschedulable && IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
-	})
-
-	if len(nodes.Items) == 0 {
-		return nil, errors.New("No Ready nodes found.")
-	}
-	return nodes, nil
 }
 
 // timeout for proxy requests.

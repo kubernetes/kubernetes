@@ -158,7 +158,7 @@ var _ = framework.KubeDescribe("Density", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 
-		nodes := framework.ListSchedulableNodesOrDie(c)
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 

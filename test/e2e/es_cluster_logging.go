@@ -201,7 +201,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	}
 
 	// Obtain a list of nodes so we can place one synthetic logger on each node.
-	nodes := framework.ListSchedulableNodesOrDie(f.Client)
+	nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 	nodeCount := len(nodes.Items)
 	if nodeCount == 0 {
 		framework.Failf("Failed to find any nodes")
