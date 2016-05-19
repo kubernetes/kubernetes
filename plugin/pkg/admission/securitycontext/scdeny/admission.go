@@ -74,6 +74,17 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
 	}
 
+	for _, v := range pod.Spec.InitContainers {
+		if v.SecurityContext != nil {
+			if v.SecurityContext.SELinuxOptions != nil {
+				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SELinuxOptions is forbidden"))
+			}
+			if v.SecurityContext.RunAsUser != nil {
+				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.RunAsUser is forbidden"))
+			}
+		}
+	}
+
 	for _, v := range pod.Spec.Containers {
 		if v.SecurityContext != nil {
 			if v.SecurityContext.SELinuxOptions != nil {

@@ -324,6 +324,16 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 		}
 	}
 
+	for _, container := range pod.Spec.InitContainers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
+					return fmt.Errorf("Init container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+				}
+			}
+		}
+	}
+
 	for _, container := range pod.Spec.Containers {
 		for _, env := range container.Env {
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
@@ -394,6 +404,20 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 
 	// Ensure every container mounts the APISecret volume
 	needsTokenVolume := false
+	for i, container := range pod.Spec.InitContainers {
+		existingContainerMount := false
+		for _, volumeMount := range container.VolumeMounts {
+			// Existing mounts at the default mount path prevent mounting of the API token
+			if volumeMount.MountPath == DefaultAPITokenMountPath {
+				existingContainerMount = true
+				break
+			}
+		}
+		if !existingContainerMount {
+			pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
+			needsTokenVolume = true
+		}
+	}
 	for i, container := range pod.Spec.Containers {
 		existingContainerMount := false
 		for _, volumeMount := range container.VolumeMounts {
