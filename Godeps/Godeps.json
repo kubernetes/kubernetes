@@ -1774,6 +1774,11 @@
 			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
 		},
 		{
+			"ImportPath": "github.com/renstrom/dedent",
+			"Comment": "v1.0.0-3-g020d11c",
+			"Rev": "020d11c3b9c0c7a3c2efcc8e5cf5b9ef7bcea21f"
+		},
+		{
 			"ImportPath": "github.com/robfig/cron",
 			"Comment": "v1-16-g0f39cf7",
 			"Rev": "0f39cf7ebc65a602f45692f9894bd6a193faf8fa"
