@@ -1,0 +1,11 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: claim-0003
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage:
+  volumeName: pv0003
