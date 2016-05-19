@@ -68,7 +68,7 @@ else
     linux/amd64
     linux/arm
     linux/arm64
-    linux/ppc64le
+    #linux/ppc64le # temporarily disabled due to a linking error
   )
 
   # If we update this we should also update the set of golang compilers we build
@@ -78,7 +78,7 @@ else
     linux/386
     linux/arm
     linux/arm64
-    linux/ppc64le
+    #linux/ppc64le # temporarily disabled due to a linking error
     darwin/amd64
     darwin/386
     windows/amd64

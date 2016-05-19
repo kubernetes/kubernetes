@@ -151,15 +151,17 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 		for name, quantity := range container.Resources.Requests {
 			if value, ok := reqs[name]; !ok {
 				reqs[name] = *quantity.Copy()
-			} else if err = value.Add(quantity); err != nil {
-				return nil, nil, err
+			} else {
+				value.Add(quantity)
+				reqs[name] = value
 			}
 		}
 		for name, quantity := range container.Resources.Limits {
 			if value, ok := limits[name]; !ok {
 				limits[name] = *quantity.Copy()
-			} else if err = value.Add(quantity); err != nil {
-				return nil, nil, err
+			} else {
+				value.Add(quantity)
+				limits[name] = value
 			}
 		}
 	}

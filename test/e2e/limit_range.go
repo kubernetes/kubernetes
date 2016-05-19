@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 })
 
 func equalResourceRequirement(expected api.ResourceRequirements, actual api.ResourceRequirements) error {
-	framework.Logf("Verifying requests: expected %s with actual %s", expected.Requests, actual.Requests)
+	framework.Logf("Verifying requests: expected %v with actual %v", expected.Requests, actual.Requests)
 	err := equalResourceList(expected.Requests, actual.Requests)
 	if err != nil {
 		return err

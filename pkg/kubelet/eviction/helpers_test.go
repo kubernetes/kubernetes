@@ -30,6 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
+func quantityMustParse(value string) *resource.Quantity {
+	q := resource.MustParse(value)
+	return &q
+}
+
 func TestParseThresholdConfig(t *testing.T) {
 	gracePeriod, _ := time.ParseDuration("30s")
 	testCases := map[string]struct {
@@ -55,12 +60,12 @@ func TestParseThresholdConfig(t *testing.T) {
 				{
 					Signal:   SignalMemoryAvailable,
 					Operator: OpLessThan,
-					Value:    resource.MustParse("150Mi"),
+					Value:    quantityMustParse("150Mi"),
 				},
 				{
 					Signal:      SignalMemoryAvailable,
 					Operator:    OpLessThan,
-					Value:       resource.MustParse("300Mi"),
+					Value:       quantityMustParse("300Mi"),
 					GracePeriod: gracePeriod,
 				},
 			},
@@ -145,7 +150,7 @@ func thresholdEqual(a Threshold, b Threshold) bool {
 	return a.GracePeriod == b.GracePeriod &&
 		a.Operator == b.Operator &&
 		a.Signal == b.Signal &&
-		a.Value.Cmp(b.Value) == 0
+		a.Value.Cmp(*b.Value) == 0
 }
 
 // TestOrderedByQoS ensures we order BestEffort < Burstable < Guaranteed
@@ -348,7 +353,7 @@ func TestThresholdsMet(t *testing.T) {
 	hardThreshold := Threshold{
 		Signal:   SignalMemoryAvailable,
 		Operator: OpLessThan,
-		Value:    resource.MustParse("1Gi"),
+		Value:    quantityMustParse("1Gi"),
 	}
 	testCases := map[string]struct {
 		thresholds   []Threshold
@@ -363,14 +368,14 @@ func TestThresholdsMet(t *testing.T) {
 		"threshold-met": {
 			thresholds: []Threshold{hardThreshold},
 			observations: signalObservations{
-				SignalMemoryAvailable: resource.MustParse("500Mi"),
+				SignalMemoryAvailable: quantityMustParse("500Mi"),
 			},
 			result: []Threshold{hardThreshold},
 		},
 		"threshold-not-met": {
 			thresholds: []Threshold{hardThreshold},
 			observations: signalObservations{
-				SignalMemoryAvailable: resource.MustParse("2Gi"),
+				SignalMemoryAvailable: quantityMustParse("2Gi"),
 			},
 			result: []Threshold{},
 		},
@@ -387,7 +392,7 @@ func TestThresholdsFirstObservedAt(t *testing.T) {
 	hardThreshold := Threshold{
 		Signal:   SignalMemoryAvailable,
 		Operator: OpLessThan,
-		Value:    resource.MustParse("1Gi"),
+		Value:    quantityMustParse("1Gi"),
 	}
 	now := unversioned.Now()
 	oldTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
@@ -435,12 +440,12 @@ func TestThresholdsMetGracePeriod(t *testing.T) {
 	hardThreshold := Threshold{
 		Signal:   SignalMemoryAvailable,
 		Operator: OpLessThan,
-		Value:    resource.MustParse("1Gi"),
+		Value:    quantityMustParse("1Gi"),
 	}
 	softThreshold := Threshold{
 		Signal:      SignalMemoryAvailable,
 		Operator:    OpLessThan,
-		Value:       resource.MustParse("2Gi"),
+		Value:       quantityMustParse("2Gi"),
 		GracePeriod: 1 * time.Minute,
 	}
 	oldTime := unversioned.NewTime(now.Time.Add(-2 * time.Minute))

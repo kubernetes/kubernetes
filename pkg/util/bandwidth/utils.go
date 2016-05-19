@@ -38,18 +38,22 @@ func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 func ExtractPodBandwidthResources(podAnnotations map[string]string) (ingress, egress *resource.Quantity, err error) {
 	str, found := podAnnotations["kubernetes.io/ingress-bandwidth"]
 	if found {
-		if ingress, err = resource.ParseQuantity(str); err != nil {
+		ingressValue, err := resource.ParseQuantity(str)
+		if err != nil {
 			return nil, nil, err
 		}
+		ingress = &ingressValue
 		if err := validateBandwidthIsReasonable(ingress); err != nil {
 			return nil, nil, err
 		}
 	}
 	str, found = podAnnotations["kubernetes.io/egress-bandwidth"]
 	if found {
-		if egress, err = resource.ParseQuantity(str); err != nil {
+		egressValue, err := resource.ParseQuantity(str)
+		if err != nil {
 			return nil, nil, err
 		}
+		egress = &egressValue
 		if err := validateBandwidthIsReasonable(egress); err != nil {
 			return nil, nil, err
 		}

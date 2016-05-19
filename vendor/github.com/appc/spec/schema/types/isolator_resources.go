@@ -155,8 +155,8 @@ func NewResourceCPUIsolator(request, limit string) (*ResourceCPU, error) {
 	res := &ResourceCPU{
 		ResourceBase{
 			resourceValue{
-				Request: req,
-				Limit:   lim,
+				Request: &req,
+				Limit:   &lim,
 			},
 		},
 	}
@@ -209,8 +209,8 @@ func NewResourceMemoryIsolator(request, limit string) (*ResourceMemory, error) {
 	res := &ResourceMemory{
 		ResourceBase{
 			resourceValue{
-				Request: req,
-				Limit:   lim,
+				Request: &req,
+				Limit:   &lim,
 			},
 		},
 	}

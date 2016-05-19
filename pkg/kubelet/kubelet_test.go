@@ -3853,16 +3853,16 @@ func TestExtractBandwidthResources(t *testing.T) {
 		},
 		{
 			pod:             testPod("10M", ""),
-			expectedIngress: ten,
+			expectedIngress: &ten,
 		},
 		{
 			pod:            testPod("", "10M"),
-			expectedEgress: ten,
+			expectedEgress: &ten,
 		},
 		{
 			pod:             testPod("4M", "20M"),
-			expectedIngress: four,
-			expectedEgress:  twenty,
+			expectedIngress: &four,
+			expectedEgress:  &twenty,
 		},
 		{
 			pod:         testPod("foo", ""),
