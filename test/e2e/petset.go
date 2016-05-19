@@ -314,10 +314,7 @@ func newPVC(name string) api.PersistentVolumeClaim {
 			},
 			Resources: api.ResourceRequirements{
 				Requests: api.ResourceList{
-					api.ResourceStorage: resource.Quantity{
-						Amount: dec(1, 0),
-						Format: resource.BinarySI,
-					},
+					api.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},

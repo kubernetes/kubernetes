@@ -434,7 +434,7 @@ func populateResourceList(spec string) (api.ResourceList, error) {
 		if err != nil {
 			return nil, err
 		}
-		result[resourceName] = *resourceQuantity
+		result[resourceName] = resourceQuantity
 	}
 	return result, nil
 }
@@ -458,7 +458,7 @@ func populateV1ResourceList(spec string) (v1.ResourceList, error) {
 		if err != nil {
 			return nil, err
 		}
-		result[resourceName] = *resourceQuantity
+		result[resourceName] = resourceQuantity
 	}
 	return result, nil
 }

@@ -25,12 +25,11 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
-	pkg5_inf_v0 "gopkg.in/inf.v0"
 	pkg2_api "k8s.io/kubernetes/pkg/api"
 	pkg4_resource "k8s.io/kubernetes/pkg/api/resource"
 	pkg1_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	pkg3_types "k8s.io/kubernetes/pkg/types"
-	pkg6_intstr "k8s.io/kubernetes/pkg/util/intstr"
+	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	time "time"
@@ -66,14 +65,13 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg5_inf_v0.Dec
-		var v1 pkg2_api.ObjectMeta
-		var v2 pkg4_resource.Quantity
-		var v3 pkg1_unversioned.LabelSelector
-		var v4 pkg3_types.UID
-		var v5 pkg6_intstr.IntOrString
-		var v6 time.Time
-		_, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6
+		var v0 pkg2_api.ObjectMeta
+		var v1 pkg4_resource.Quantity
+		var v2 pkg1_unversioned.LabelSelector
+		var v3 pkg3_types.UID
+		var v4 pkg5_intstr.IntOrString
+		var v5 time.Time
+		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5
 	}
 }
 
@@ -4916,7 +4914,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 		switch yys3 {
 		case "maxUnavailable":
 			if r.TryDecodeAsNil() {
-				x.MaxUnavailable = pkg6_intstr.IntOrString{}
+				x.MaxUnavailable = pkg5_intstr.IntOrString{}
 			} else {
 				yyv4 := &x.MaxUnavailable
 				yym5 := z.DecBinary()
@@ -4931,7 +4929,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 			}
 		case "maxSurge":
 			if r.TryDecodeAsNil() {
-				x.MaxSurge = pkg6_intstr.IntOrString{}
+				x.MaxSurge = pkg5_intstr.IntOrString{}
 			} else {
 				yyv6 := &x.MaxSurge
 				yym7 := z.DecBinary()
@@ -4970,7 +4968,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromArray(l int, d *codec1978.D
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.MaxUnavailable = pkg6_intstr.IntOrString{}
+		x.MaxUnavailable = pkg5_intstr.IntOrString{}
 	} else {
 		yyv9 := &x.MaxUnavailable
 		yym10 := z.DecBinary()
@@ -4995,7 +4993,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromArray(l int, d *codec1978.D
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.MaxSurge = pkg6_intstr.IntOrString{}
+		x.MaxSurge = pkg5_intstr.IntOrString{}
 	} else {
 		yyv11 := &x.MaxSurge
 		yym12 := z.DecBinary()
@@ -9593,7 +9591,7 @@ func (x *IngressBackend) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "servicePort":
 			if r.TryDecodeAsNil() {
-				x.ServicePort = pkg6_intstr.IntOrString{}
+				x.ServicePort = pkg5_intstr.IntOrString{}
 			} else {
 				yyv5 := &x.ServicePort
 				yym6 := z.DecBinary()
@@ -9648,7 +9646,7 @@ func (x *IngressBackend) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ServicePort = pkg6_intstr.IntOrString{}
+		x.ServicePort = pkg5_intstr.IntOrString{}
 	} else {
 		yyv9 := &x.ServicePort
 		yym10 := z.DecBinary()
@@ -13849,7 +13847,7 @@ func (x codecSelfer1234) decSliceCustomMetricTarget(v *[]CustomMetricTarget, d *
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 40)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 80)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
@@ -13968,7 +13966,7 @@ func (x codecSelfer1234) decSliceCustomMetricCurrentStatus(v *[]CustomMetricCurr
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 40)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 80)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

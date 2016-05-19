@@ -431,7 +431,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		if !reflect.DeepEqual(reqs, testCase.expectedReqs) {
+		if !api.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
 			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
 		}
 	}
