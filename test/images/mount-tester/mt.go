@@ -162,9 +162,9 @@ func fileMode(path string) error {
 		return nil
 	}
 
-	fileinfo, err := os.Lstat(path)
+	fileinfo, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		fmt.Printf("error from Stat(%q): %v\n", path, err)
 		return err
 	}
 
@@ -177,9 +177,9 @@ func filePerm(path string) error {
 		return nil
 	}
 
-	fileinfo, err := os.Lstat(path)
+	fileinfo, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		fmt.Printf("error from Stat(%q): %v\n", path, err)
 		return err
 	}
 
