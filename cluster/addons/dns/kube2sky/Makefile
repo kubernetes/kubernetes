@@ -21,7 +21,7 @@
 
 # Default registry, arch and tag. This can be overwritten by arguments to make
 ARCH?=amd64
-TAG?=1.15
+TAG?=1.16
 REGISTRY?=gcr.io/google_containers
 GOLANG_VERSION=1.6
 GOARM=6

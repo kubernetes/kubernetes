@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package lib
 
 import (
 	"encoding/json"
@@ -85,13 +85,13 @@ const (
 	podSubDomain     = "pod"
 )
 
-func newKube2Sky(ec etcdClient) *kube2sky {
-	return &kube2sky{
-		etcdClient:          ec,
-		domain:              testDomain,
-		etcdMutationTimeout: time.Second,
-		endpointsStore:      cache.NewStore(cache.MetaNamespaceKeyFunc),
-		servicesStore:       cache.NewStore(cache.MetaNamespaceKeyFunc),
+func newKube2Sky(ec etcdClient) *Kube2sky {
+	return &Kube2sky{
+		EtcdClient:          ec,
+		Domain:              testDomain,
+		EtcdMutationTimeout: time.Second,
+		EndpointsStore:      cache.NewStore(cache.MetaNamespaceKeyFunc),
+		ServicesStore:       cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
 }
 
@@ -245,13 +245,13 @@ func TestHeadlessService(t *testing.T) {
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
-	assert.NoError(t, k2s.servicesStore.Add(&service))
+	assert.NoError(t, k2s.ServicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"), newSubsetWithOnePort("", 8080, "10.0.0.3", "10.0.0.4"))
 
 	// We expect 4 records.
 	expectedDNSRecords := 4
-	assert.NoError(t, k2s.endpointsStore.Add(&endpoints))
-	k2s.newService(&service)
+	assert.NoError(t, k2s.EndpointsStore.Add(&endpoints))
+	k2s.NewService(&service)
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
 	k2s.removeService(&service)
 	assert.Empty(t, ec.writes)
@@ -265,13 +265,13 @@ func TestHeadlessServiceWithNamedPorts(t *testing.T) {
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
-	assert.NoError(t, k2s.servicesStore.Add(&service))
+	assert.NoError(t, k2s.ServicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithTwoPorts("http1", 80, "http2", 81, "10.0.0.1", "10.0.0.2"), newSubsetWithOnePort("https", 443, "10.0.0.3", "10.0.0.4"))
 
 	// We expect 10 records. 6 SRV records. 4 POD records.
 	expectedDNSRecords := 10
-	assert.NoError(t, k2s.endpointsStore.Add(&endpoints))
-	k2s.newService(&service)
+	assert.NoError(t, k2s.EndpointsStore.Add(&endpoints))
+	k2s.NewService(&service)
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
 	assertSRVEntryInEtcd(t, ec, "http1", "tcp", testService, testNamespace, 80, 2)
 	assertSRVEntryInEtcd(t, ec, "http2", "tcp", testService, testNamespace, 81, 2)
@@ -297,12 +297,12 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
-	assert.NoError(t, k2s.servicesStore.Add(&service))
+	assert.NoError(t, k2s.ServicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"))
 
 	expectedDNSRecords := 2
-	assert.NoError(t, k2s.endpointsStore.Add(&endpoints))
-	k2s.newService(&service)
+	assert.NoError(t, k2s.EndpointsStore.Add(&endpoints))
+	k2s.NewService(&service)
 	assert.Equal(t, expectedDNSRecords, len(ec.writes))
 	endpoints.Subsets = append(endpoints.Subsets,
 		newSubsetWithOnePort("", 8080, "10.0.0.3", "10.0.0.4"),
@@ -323,10 +323,10 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
-	assert.NoError(t, k2s.servicesStore.Add(&service))
+	assert.NoError(t, k2s.ServicesStore.Add(&service))
 	// Headless service DNS records should not be created since
 	// corresponding endpoints object doesn't exist.
-	k2s.newService(&service)
+	k2s.NewService(&service)
 	assert.Empty(t, ec.writes)
 
 	// Add an endpoints object for the service.
@@ -348,7 +348,7 @@ func TestAddSinglePortService(t *testing.T) {
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
 	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
-	k2s.newService(&service)
+	k2s.NewService(&service)
 	expectedValue := getHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 }
@@ -361,7 +361,7 @@ func TestUpdateSinglePortService(t *testing.T) {
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
 	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
-	k2s.newService(&service)
+	k2s.NewService(&service)
 	assert.Len(t, ec.writes, 1)
 	newService := service
 	newService.Spec.ClusterIP = "0.0.0.0"
@@ -379,7 +379,7 @@ func TestDeleteSinglePortService(t *testing.T) {
 	k2s := newKube2Sky(ec)
 	service := newService(testNamespace, testService, "1.2.3.4", "", 80)
 	// Add the service
-	k2s.newService(&service)
+	k2s.NewService(&service)
 	assert.Len(t, ec.writes, 1)
 	// Delete the service
 	k2s.removeService(&service)
@@ -396,7 +396,7 @@ func TestServiceWithNamePort(t *testing.T) {
 
 	// create service
 	service := newService(testNamespace, testService, "1.2.3.4", "http1", 80)
-	k2s.newService(&service)
+	k2s.NewService(&service)
 	expectedValue := getHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 	assertSRVEntryInEtcd(t, ec, "http1", "tcp", testService, testNamespace, 80, 1)
