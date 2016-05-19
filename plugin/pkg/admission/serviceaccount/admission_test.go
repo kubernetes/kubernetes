@@ -290,6 +290,33 @@ func TestAutomountsAPIToken(t *testing.T) {
 	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
 		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
 	}
+
+	pod = &api.Pod{
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	}
+	if len(pod.Spec.Volumes) != 1 {
+		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
+	}
+	if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
+		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
+	}
+	if len(pod.Spec.InitContainers[0].VolumeMounts) != 1 {
+		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.InitContainers[0].VolumeMounts))
+	}
+	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0]) {
+		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0])
+	}
 }
 
 func TestRespectsExistingMount(t *testing.T) {
@@ -366,6 +393,35 @@ func TestRespectsExistingMount(t *testing.T) {
 	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
 		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
 	}
+
+	// check init containers
+	pod = &api.Pod{
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{
+					VolumeMounts: []api.VolumeMount{
+						expectedVolumeMount,
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	}
+	if len(pod.Spec.Volumes) != 0 {
+		t.Fatalf("Expected 0 volumes (shouldn't create a volume for a secret we don't need), got %d", len(pod.Spec.Volumes))
+	}
+	if len(pod.Spec.InitContainers[0].VolumeMounts) != 1 {
+		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.InitContainers[0].VolumeMounts))
+	}
+	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0]) {
+		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0])
+	}
 }
 
 func TestAllowsReferencedSecret(t *testing.T) {
@@ -421,6 +477,30 @@ func TestAllowsReferencedSecret(t *testing.T) {
 	if err := admit.Admit(attrs); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+
+	pod2 = &api.Pod{
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{
+					Name: "container-1",
+					Env: []api.EnvVar{
+						{
+							Name: "env-1",
+							ValueFrom: &api.EnvVarSource{
+								SecretKeyRef: &api.SecretKeySelector{
+									LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 }
 
 func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
@@ -453,6 +533,30 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 	pod2 := &api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
+				{
+					Name: "container-1",
+					Env: []api.EnvVar{
+						{
+							Name: "env-1",
+							ValueFrom: &api.EnvVarSource{
+								SecretKeyRef: &api.SecretKeySelector{
+									LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err == nil || !strings.Contains(err.Error(), "with envVar") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	pod2 = &api.Pod{
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
 				{
 					Name: "container-1",
 					Env: []api.EnvVar{

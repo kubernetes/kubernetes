@@ -85,6 +85,29 @@ func TestAdmission(t *testing.T) {
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, true)
 	}
+
+	// run against an init container
+	handler = &denyExec{
+		Handler:    admission.NewHandler(admission.Connect),
+		hostIPC:    true,
+		hostPID:    true,
+		privileged: true,
+	}
+
+	for _, tc := range testCases {
+		tc.pod.Spec.InitContainers = tc.pod.Spec.Containers
+		tc.pod.Spec.Containers = nil
+		testAdmission(t, tc.pod, handler, tc.shouldAccept)
+	}
+
+	// run with a permissive config and all cases should pass
+	handler.privileged = false
+	handler.hostPID = false
+	handler.hostIPC = false
+
+	for _, tc := range testCases {
+		testAdmission(t, tc.pod, handler, true)
+	}
 }
 
 func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept bool) {
@@ -171,6 +194,13 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 		privileged: true,
 	}
 	for _, tc := range testCases {
+		testAdmission(t, tc.pod, handler, tc.shouldAccept)
+	}
+
+	// test init containers
+	for _, tc := range testCases {
+		tc.pod.Spec.InitContainers = tc.pod.Spec.Containers
+		tc.pod.Spec.Containers = nil
 		testAdmission(t, tc.pod, handler, tc.shouldAccept)
 	}
 }
