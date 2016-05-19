@@ -194,7 +194,7 @@ func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 	podVolDir := kl.getPodVolumesDir(podUID)
 	volumeKindDirs, err := ioutil.ReadDir(podVolDir)
 	if err != nil {
-		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+		glog.Errorf("could not read volume directory %s: %v", podVolDir, err)
 	}
 	for _, volumeKindDir := range volumeKindDirs {
 		volumeKind := volumeKindDir.Name()
@@ -203,13 +203,15 @@ func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 		// but skipping dirs means no cleanup for healthy volumes. switching to a no-exit api solves this problem
 		volumeNameDirs, volumeNameDirsStat, err := util.ReadDirNoExit(volumeKindPath)
 		if err != nil {
-			return []*volumeTuple{}, fmt.Errorf("could not read directory %s: %v", volumeKindPath, err)
+			return []*volumeTuple{}, fmt.Errorf("could not read volume directory %s: %v", volumeKindPath, err)
 		}
 		for i, volumeNameDir := range volumeNameDirs {
 			if volumeNameDir != nil {
 				volumes = append(volumes, &volumeTuple{Kind: volumeKind, Name: volumeNameDir.Name()})
 			} else {
-				glog.Errorf("Could not read directory %s: %v", podVolDir, volumeNameDirsStat[i])
+				// failed syscall type error, expose it
+				glog.Errorf("could not read volume directory %s: %v", podVolDir, volumeNameDirsStat[i])
+				return volumes, fmt.Errorf("could not read volume directory %q: %v", volumeKindPath, volumeNameDirsStat[i])
 			}
 		}
 	}
@@ -237,7 +239,15 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleaner {
 	for _, podUID := range podUIDs {
 		volumes, err := kl.getPodVolumes(podUID)
 		if err != nil {
-			glog.Errorf("%v", err)
+			// add an event to expose underlying volume/syscall
+			// type of errors in the describe
+			pod, ok := kl.podManager.GetPodByUID(podUID)
+			if ok {
+				ref, errGetRef := api.GetReference(pod)
+				if errGetRef == nil && ref != nil {
+					kl.recorder.Event(ref, api.EventTypeWarning, kubecontainer.FailedMountVolume, err.Error())
+				}
+			}
 			continue
 		}
 		for _, volume := range volumes {
