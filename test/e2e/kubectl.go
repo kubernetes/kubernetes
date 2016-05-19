@@ -80,6 +80,8 @@ const (
 	busyboxImage             = "gcr.io/google_containers/busybox:1.24"
 	nginxImage               = "gcr.io/google_containers/nginx:1.7.9"
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
+	redisControllerFilename  = "redis-master-controller.json"
+	redisServiceFilename     = "redis-master-service.json"
 )
 
 var (
@@ -130,6 +132,10 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	framework.AssertCleanup(ns, selectors...)
 }
 
+func readTestFileOrDie(file string) []byte {
+	return framework.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+}
+
 var _ = framework.KubeDescribe("Kubectl client", func() {
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
@@ -142,13 +148,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				ValidPhases: []api.PodPhase{api.PodRunning /*api.PodPending*/},
 			})
 	}
-	// Customized Wait  / ForEach wrapper for this test.  These demonstrate the
-	// idiomatic way to wrap the ClusterVerification structs for syntactic sugar in large
-	// test files.
-	waitFor := func(atLeast int) {
-		// 60 seconds can be flakey for some of the containers.
-		clusterState().WaitFor(atLeast, 90*time.Second)
-	}
+
 	forEachPod := func(podFunc func(p api.Pod)) {
 		clusterState().ForEach(podFunc)
 	}
@@ -158,6 +158,19 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 	})
+
+	// Customized Wait  / ForEach wrapper for this test.  These demonstrate the
+	// idiomatic way to wrap the ClusterVerification structs for syntactic sugar in large
+	// test files.
+	// Print debug info if atLeast Pods are not found before the timeout
+	waitForOrFailWithDebug := func(atLeast int) {
+		pods, err := clusterState().WaitFor(atLeast, 90*time.Second)
+		if err != nil || len(pods) < atLeast {
+			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
+			framework.DumpAllNamespaceInfo(c, ns)
+			framework.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
+		}
+	}
 
 	framework.KubeDescribe("Update Demo", func() {
 		var nautilus, kitten []byte
@@ -235,7 +248,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var podPath []byte
 
 		BeforeEach(func() {
-			podPath = framework.ReadOrDie("test/e2e/testing-manifests/kubectl/pod-with-readiness-probe.yaml")
+			podPath = framework.ReadOrDie(path.Join(kubeCtlManifestPath, "pod-with-readiness-probe.yaml"))
 			By(fmt.Sprintf("creating the pod from %v", string(podPath)))
 			framework.RunKubectlOrDieInput(string(podPath[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)
@@ -597,10 +610,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl apply", func() {
 		It("should apply a new configuration to an existing RC", func() {
-			mkpath := func(file string) string {
-				return "examples/guestbook-go/" + file
-			}
-			controllerJson := framework.ReadOrDie(mkpath("redis-master-controller.json"))
+			controllerJson := readTestFileOrDie(redisControllerFilename)
+
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
 			framework.RunKubectlOrDieInput(string(controllerJson), "create", "-f", "-", nsFlag)
@@ -613,10 +624,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			forEachReplicationController(c, ns, "app", "redis", validateReplicationControllerConfiguration)
 		})
 		It("should reuse nodePort when apply to an existing SVC", func() {
-			mkpath := func(file string) string {
-				return "examples/guestbook-go/" + file
-			}
-			serviceJson := framework.ReadOrDie(mkpath("redis-master-service.json"))
+			serviceJson := readTestFileOrDie(redisServiceFilename)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("creating Redis SVC")
@@ -659,19 +667,15 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		// Flaky issue: #25083
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance] [Flaky]", func() {
 			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
-
-			mkpath := func(file string) string {
-				return kubeCtlManifestPath + "/" + file
-			}
-			controllerJson := framework.ReadOrDie(mkpath("redis-master-controller.json"))
-			serviceJson := framework.ReadOrDie(mkpath("redis-master-service.json"))
+			controllerJson := readTestFileOrDie(redisControllerFilename)
+			serviceJson := readTestFileOrDie(redisServiceFilename)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(string(controllerJson[:]), "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(string(serviceJson[:]), "create", "-f", "-", nsFlag)
 
 			By("Waiting for Redis master to start.")
-			waitFor(1)
+			waitForOrFailWithDebug(1)
 			// Pod
 			forEachPod(func(pod api.Pod) {
 				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
@@ -762,10 +766,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl expose", func() {
 		It("should create services for rc [Conformance]", func() {
-			mkpath := func(file string) string {
-				return "examples/guestbook-go/" + file
-			}
-			controllerJson := framework.ReadOrDie(mkpath("redis-master-controller.json"))
+			controllerJson := readTestFileOrDie(redisControllerFilename)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
@@ -777,7 +778,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			// It may take a while for the pods to get registered in some cases, wait to be sure.
 			By("Waiting for Redis master to start.")
-			waitFor(1)
+			waitForOrFailWithDebug(1)
 			forEachPod(func(pod api.Pod) {
 				framework.Logf("wait on redis-master startup in %v ", ns)
 				framework.LookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", framework.PodStartTimeout)
@@ -878,10 +879,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var nsFlag string
 		containerName := "redis-master"
 		BeforeEach(func() {
-			mkpath := func(file string) string {
-				return "examples/guestbook-go/" + file
-			}
-			rc = framework.ReadOrDie(mkpath("redis-master-controller.json"))
+			rc = readTestFileOrDie(redisControllerFilename)
 			By("creating an rc")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(string(rc[:]), "create", "-f", "-", nsFlag)
@@ -900,7 +898,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 
 			By("Waiting for Redis master to start.")
-			waitFor(1)
+			waitForOrFailWithDebug(1)
 			forEachPod(func(pod api.Pod) {
 				By("checking for a matching strings")
 				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", framework.PodStartTimeout)
@@ -944,15 +942,12 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl patch", func() {
 		It("should add annotations for pods in rc [Conformance]", func() {
-			mkpath := func(file string) string {
-				return "examples/guestbook-go/" + file
-			}
-			controllerJson := framework.ReadOrDie(mkpath("redis-master-controller.json"))
+			controllerJson := readTestFileOrDie(redisControllerFilename)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
 			framework.RunKubectlOrDieInput(string(controllerJson[:]), "create", "-f", "-", nsFlag)
 			By("Waiting for Redis master to start.")
-			waitFor(1)
+			waitForOrFailWithDebug(1)
 			By("patching all pods")
 			forEachPod(func(pod api.Pod) {
 				framework.RunKubectlOrDie("patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
