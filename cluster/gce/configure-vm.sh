@@ -358,7 +358,6 @@ stop-salt-minion() {
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
 find-master-pd() {
   MASTER_PD_DEVICE=""
-  # TODO(zmerlynn): GKE is still lagging in master-pd creation
   if [[ ! -e /dev/disk/by-id/google-master-pd ]]; then
     return
   fi
@@ -376,7 +375,7 @@ find-master-pd() {
 # already exists.
 mount-master-pd() {
   find-master-pd
-  if [[ -z "${MASTER_PD_DEVICE}" ]]; then
+  if [[ -z "${MASTER_PD_DEVICE:-}" ]]; then
     return
   fi
 
@@ -568,7 +567,7 @@ function convert-bytes-gce-kube() {
 #  - Optionally uses KUBECFG_CERT and KUBECFG_KEY to store a copy of the client
 #    cert credentials.
 #
-# After the first boot and on upgrade, these files exists on the master-pd
+# After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
 function create-salt-master-auth() {
