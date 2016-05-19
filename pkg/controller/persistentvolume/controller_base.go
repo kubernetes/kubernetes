@@ -204,9 +204,9 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 				if errors.IsConflict(err) {
 					// Version conflict error happens quite often and the
 					// controller recovers from it easily.
-					glog.V(3).Infof("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", claimToClaimKey(claim), err)
+					glog.V(3).Infof("PersistentVolumeController could not update volume %q from deleteVolume handler: %+v", claimToClaimKey(claim), err)
 				} else {
-					glog.Errorf("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", claimToClaimKey(claim), err)
+					glog.Errorf("PersistentVolumeController could not update volume %q from deleteVolume handler: %+v", claimToClaimKey(claim), err)
 				}
 			}
 		} else {
