@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -157,5 +158,73 @@ func TestControllerSync(t *testing.T) {
 		reactor.waitTest()
 
 		evaluateTestResults(ctrl, reactor, test, t)
+	}
+}
+
+func storeVersion(t *testing.T, prefix string, c cache.Store, version string, expectedReturn bool) {
+	pv := newVolume("pvName", "1Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimDelete)
+	pv.ResourceVersion = version
+	ret, err := storeObjectUpdate(c, pv, "volume")
+	if err != nil {
+		t.Errorf("%s: expected storeObjectUpdate to succeed, got: %v", prefix, err)
+	}
+	if expectedReturn != ret {
+		t.Errorf("%s: expected storeObjectUpdate to return %v, got: %v", prefix, expectedReturn, ret)
+	}
+
+	// find the stored version
+
+	pvObj, found, err := c.GetByKey("pvName")
+	if err != nil {
+		t.Errorf("expected volume 'pvName' in the cache, got error instead: %v", err)
+	}
+	if !found {
+		t.Errorf("expected volume 'pvName' in the cache but it was not found")
+	}
+	pv, ok := pvObj.(*api.PersistentVolume)
+	if !ok {
+		t.Errorf("expected volume in the cache, got different object instead: %+v", pvObj)
+	}
+
+	if ret {
+		if pv.ResourceVersion != version {
+			t.Errorf("expected volume with version %s in the cache, got %s instead", version, pv.ResourceVersion)
+		}
+	} else {
+		if pv.ResourceVersion == version {
+			t.Errorf("expected volume with version other than %s in the cache, got %s instead", version, pv.ResourceVersion)
+		}
+	}
+}
+
+// TestControllerCache tests func storeObjectUpdate()
+func TestControllerCache(t *testing.T) {
+	// Cache under test
+	c := cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
+
+	// Store new PV
+	storeVersion(t, "Step1", c, "1", true)
+	// Store the same PV
+	storeVersion(t, "Step2", c, "1", true)
+	// Store newer PV
+	storeVersion(t, "Step3", c, "2", true)
+	// Store older PV - simulating old "PV updated" event or periodic sync with
+	// old data
+	storeVersion(t, "Step4", c, "1", false)
+	// Store newer PV - test integer parsing ("2" > "10" as string,
+	// while 2 < 10 as integers)
+	storeVersion(t, "Step5", c, "10", true)
+}
+
+func TestControllerCacheParsingError(t *testing.T) {
+	c := cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
+	// There must be something in the cache to compare with
+	storeVersion(t, "Step1", c, "1", true)
+
+	pv := newVolume("pvName", "1Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimDelete)
+	pv.ResourceVersion = "xxx"
+	_, err := storeObjectUpdate(c, pv, "volume")
+	if err == nil {
+		t.Errorf("Expected parsing error, got nil instead")
 	}
 }
