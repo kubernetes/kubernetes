@@ -802,11 +802,13 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *api.PersistentVolu
 
 	case api.PersistentVolumeReclaimRecycle:
 		glog.V(4).Infof("reclaimVolume[%s]: policy is Recycle", volume.Name)
-		ctrl.scheduleOperation("recycle-"+string(volume.UID), ctrl.recycleVolumeOperation, volume)
+		opName := fmt.Sprintf("recycle-%s[%s]", volume.Name, string(volume.UID))
+		ctrl.scheduleOperation(opName, ctrl.recycleVolumeOperation, volume)
 
 	case api.PersistentVolumeReclaimDelete:
 		glog.V(4).Infof("reclaimVolume[%s]: policy is Delete", volume.Name)
-		ctrl.scheduleOperation("delete-"+string(volume.UID), ctrl.deleteVolumeOperation, volume)
+		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
+		ctrl.scheduleOperation(opName, ctrl.deleteVolumeOperation, volume)
 
 	default:
 		// Unknown PersistentVolumeReclaimPolicy
@@ -1032,7 +1034,8 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 // provisionClaim starts new asynchronous operation to provision a claim.
 func (ctrl *PersistentVolumeController) provisionClaim(claim *api.PersistentVolumeClaim) error {
 	glog.V(4).Infof("provisionClaim[%s]: started", claimToClaimKey(claim))
-	ctrl.scheduleOperation("provision-"+string(claim.UID), ctrl.provisionClaimOperation, claim)
+	opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
+	ctrl.scheduleOperation(opName, ctrl.provisionClaimOperation, claim)
 	return nil
 }
 
