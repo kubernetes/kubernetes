@@ -261,3 +261,16 @@ func TestTryRemovingWhileTry(t *testing.T) {
 		t.Fatalf("unexpected iterations: %d", count)
 	}
 }
+
+func TestClear(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
+
+	evictor.Clear()
+
+	if len(evictor.queue.queue) != 0 {
+		t.Fatalf("Clear should remove all elements from the queue.")
+	}
+}
