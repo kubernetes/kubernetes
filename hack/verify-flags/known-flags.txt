@@ -320,6 +320,7 @@ pod-running
 policy-config-file
 poll-interval
 portal-net
+prepull-images
 private-mountns
 prom-push-gateway
 proto-import
