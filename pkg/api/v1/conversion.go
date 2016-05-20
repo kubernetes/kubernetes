@@ -272,15 +272,14 @@ func Convert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResult, 
 		}
 		out.Annotations[PodInitContainerStatusesAnnotationKey] = string(value)
 	} else {
-		delete(in.Annotations, PodInitContainerStatusesAnnotationKey)
+		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
 	}
 	return nil
 }
 
 func Convert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out *api.PodStatusResult, s conversion.Scope) error {
 	// TODO: when we move init container to beta, remove these conversions
-	if value := in.Annotations[PodInitContainerStatusesAnnotationKey]; len(value) > 0 {
-		delete(in.Annotations, PodInitContainerStatusesAnnotationKey)
+	if value, ok := in.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
 		var values []ContainerStatus
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
@@ -288,7 +287,11 @@ func Convert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out 
 		in.Status.InitContainerStatuses = values
 	}
 
-	return autoConvert_v1_PodStatusResult_To_api_PodStatusResult(in, out, s)
+	if err := autoConvert_v1_PodStatusResult_To_api_PodStatusResult(in, out, s); err != nil {
+		return err
+	}
+	delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
+	return nil
 }
 
 func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, out *PodTemplateSpec, s conversion.Scope) error {
@@ -314,8 +317,7 @@ func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, 
 
 func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
 	// TODO: when we move init container to beta, remove these conversions
-	if value := in.Annotations[PodInitContainersAnnotationKey]; len(value) > 0 {
-		delete(in.Annotations, PodInitContainersAnnotationKey)
+	if value, ok := in.Annotations[PodInitContainersAnnotationKey]; ok {
 		var values []Container
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
@@ -323,7 +325,11 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 		in.Spec.InitContainers = values
 	}
 
-	return autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s)
+	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
+		return err
+	}
+	delete(out.Annotations, PodInitContainersAnnotationKey)
+	return nil
 }
 
 // The following two PodSpec conversions are done here to support ServiceAccount
@@ -531,7 +537,7 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		}
 		out.Annotations[PodInitContainerStatusesAnnotationKey] = string(value)
 	} else {
-		delete(in.Annotations, PodInitContainerStatusesAnnotationKey)
+		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
 	}
 
 	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
@@ -550,16 +556,14 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 
 func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
 	// TODO: when we move init container to beta, remove these conversions
-	if value := in.Annotations[PodInitContainersAnnotationKey]; len(value) > 0 {
-		delete(in.Annotations, PodInitContainersAnnotationKey)
+	if value, ok := in.Annotations[PodInitContainersAnnotationKey]; ok {
 		var values []Container
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
 		}
 		in.Spec.InitContainers = values
 	}
-	if value := in.Annotations[PodInitContainerStatusesAnnotationKey]; len(value) > 0 {
-		delete(in.Annotations, PodInitContainerStatusesAnnotationKey)
+	if value, ok := in.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
 		var values []ContainerStatus
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
@@ -567,7 +571,12 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 		in.Status.InitContainerStatuses = values
 	}
 
-	return autoConvert_v1_Pod_To_api_Pod(in, out, s)
+	if err := autoConvert_v1_Pod_To_api_Pod(in, out, s); err != nil {
+		return err
+	}
+	delete(out.Annotations, PodInitContainersAnnotationKey)
+	delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
+	return nil
 }
 
 func Convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
