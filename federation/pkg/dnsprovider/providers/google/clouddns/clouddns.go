@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/stubs"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
@@ -98,4 +99,18 @@ func CreateInterface(projectID string, tokenSource oauth2.TokenSource) (*Interfa
 	}
 	glog.Infof("Successfully got DNS service: %v\n", service)
 	return newInterfaceWithStub(projectID, internal.NewService(service)), nil
+}
+
+// NewFakeInterface returns a fake clouddns interface, useful for unit testing purposes.
+func NewFakeInterface() (dnsprovider.Interface, error) {
+	service := stubs.NewService()
+	interface_ := newInterfaceWithStub("", service)
+	zones := service.ManagedZones_
+	// Add a fake zone to test against.
+	zone := &stubs.ManagedZone{zones, "example.com", []stubs.ResourceRecordSet{}}
+	call := zones.Create(interface_.project(), zone)
+	if _, err := call.Do(); err != nil {
+		return nil, err
+	}
+	return interface_, nil
 }

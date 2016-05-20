@@ -42,7 +42,7 @@ func (sc *ServiceController) clusterEndpointWorker() {
 						return
 					}
 					defer cache.endpointQueue.Done(key)
-					err := sc.clusterCache.syncEndpoint(key.(string), clusterName, cache, sc.serviceCache, fedClient)
+					err := sc.clusterCache.syncEndpoint(key.(string), clusterName, cache, sc.serviceCache, fedClient, sc)
 					if err != nil {
 						glog.V(2).Infof("Failed to sync endpoint: %+v", err)
 					}
@@ -54,7 +54,7 @@ func (sc *ServiceController) clusterEndpointWorker() {
 
 // Whenever there is change on endpoint, the federation service should be updated
 // key is the namespaced name of endpoint
-func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federationclientset.Interface) error {
+func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federationclientset.Interface, serviceController *ServiceController) error {
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
 		// here we filtered all non-federation services
@@ -70,19 +70,19 @@ func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache
 		endpoint, ok := endpointInterface.(*api.Endpoints)
 		if ok {
 			glog.V(4).Infof("Found endpoint for federation service %s/%s from cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
-			err = cc.processEndpointUpdate(cachedService, endpoint, clusterName)
+			err = cc.processEndpointUpdate(cachedService, endpoint, clusterName, serviceController)
 		} else {
 			_, ok := endpointInterface.(cache.DeletedFinalStateUnknown)
 			if !ok {
 				return fmt.Errorf("Object contained wasn't a service or a deleted key: %+v", endpointInterface)
 			}
 			glog.Infof("Found tombstone for %v", key)
-			err = cc.processEndpointDeletion(cachedService, clusterName)
+			err = cc.processEndpointDeletion(cachedService, clusterName, serviceController)
 		}
 	} else {
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Can not get endpoint %v for cluster %s from endpointStore", key, clusterName)
-		err = cc.processEndpointDeletion(cachedService, clusterName)
+		err = cc.processEndpointDeletion(cachedService, clusterName, serviceController)
 	}
 	if err != nil {
 		glog.Errorf("Failed to sync service: %+v, put back to service queue", err)
@@ -92,7 +92,7 @@ func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache
 	return nil
 }
 
-func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedService, clusterName string) error {
+func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedService, clusterName string, serviceController *ServiceController) error {
 	glog.V(4).Infof("Processing endpoint update for %s/%s, cluster %s", cachedService.lastState.Namespace, cachedService.lastState.Name, clusterName)
 	var err error
 	cachedService.rwlock.Lock()
@@ -103,13 +103,12 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 	if ok {
 		// endpoints lost, clean dns record
 		glog.V(4).Infof("Cached endpoint was not found for %s/%s, cluster %s, building one", cachedService.lastState.Namespace, cachedService.lastState.Name, clusterName)
-		// TODO: need to integrate with dns.go:ensureDNSRecords
 		for i := 0; i < clientRetryCount; i++ {
-			err := ensureDNSRecords(clusterName, cachedService)
-			if err == nil {
+			if err := serviceController.ensureDnsRecords(clusterName, cachedService); err == nil {
 				delete(cachedService.endpointMap, clusterName)
 				return nil
 			}
+			glog.V(4).Infof("Error ensuring DNS Records: %v", err)
 			time.Sleep(cachedService.nextDNSUpdateDelay())
 		}
 	}
@@ -118,7 +117,7 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 
 // Update dns info when endpoint update event received
 // We do not care about the endpoint info, what we need to make sure here is len(endpoints.subsets)>0
-func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService, endpoint *api.Endpoints, clusterName string) error {
+func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService, endpoint *api.Endpoints, clusterName string, serviceController *ServiceController) error {
 	glog.V(4).Infof("Processing endpoint update for %s/%s, cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
 	cachedService.rwlock.Lock()
 	defer cachedService.rwlock.Unlock()
@@ -132,12 +131,11 @@ func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService
 		// first time get endpoints, update dns record
 		glog.V(4).Infof("Cached endpoint was not found for %s/%s, cluster %s, building one", endpoint.Namespace, endpoint.Name, clusterName)
 		cachedService.endpointMap[clusterName] = 1
-		err := ensureDNSRecords(clusterName, cachedService)
-		if err != nil {
-			// TODO: need to integrate with dns.go:ensureDNSRecords
+		if err := serviceController.ensureDnsRecords(clusterName, cachedService); err != nil {
+			glog.V(4).Infof("Error ensuring DNS Records: %v", err)
 			for i := 0; i < clientRetryCount; i++ {
 				time.Sleep(cachedService.nextDNSUpdateDelay())
-				err := ensureDNSRecords(clusterName, cachedService)
+				err := serviceController.ensureDnsRecords(clusterName, cachedService)
 				if err == nil {
 					return nil
 				}

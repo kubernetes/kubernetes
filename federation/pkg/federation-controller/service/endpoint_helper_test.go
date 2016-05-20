@@ -19,8 +19,24 @@ package service
 import (
 	"testing"
 
+	"k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
+
+var fakeDns, _ = clouddns.NewFakeInterface() // No need to check for unsupported interfaces, as the fake interface supports everything that's required.
+var fakeDnsZones, _ = fakeDns.Zones()
+
+var fakeServiceController = ServiceController{
+	dns:          fakeDns,
+	dnsZones:     fakeDnsZones,
+	serviceCache: &serviceCache{fedServiceMap: make(map[string]*cachedService)},
+	clusterCache: &clusterClientCache{
+		clientMap: make(map[string]*clusterCache),
+	},
+	knownClusterSet: make(sets.String),
+}
 
 func buildEndpoint(subsets [][]string) *api.Endpoints {
 	endpoint := &api.Endpoints{
@@ -69,8 +85,9 @@ func TestProcessEndpointUpdate(t *testing.T) {
 			1,
 		},
 	}
+
 	for _, test := range tests {
-		cc.processEndpointUpdate(test.cachedService, test.endpoint, test.clusterName)
+		cc.processEndpointUpdate(test.cachedService, test.endpoint, test.clusterName, &fakeServiceController)
 		if test.expectResult != test.cachedService.endpointMap[test.clusterName] {
 			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectResult, test.cachedService.endpointMap[test.clusterName])
 		}
@@ -78,8 +95,18 @@ func TestProcessEndpointUpdate(t *testing.T) {
 }
 
 func TestProcessEndpointDeletion(t *testing.T) {
+	clusterName := "foo"
 	cc := clusterClientCache{
-		clientMap: make(map[string]*clusterCache),
+		clientMap: map[string]*clusterCache{
+			clusterName: {
+				cluster: &federation.Cluster{
+					Status: federation.ClusterStatus{
+						Zones:  []string{"foozone"},
+						Region: "fooregion",
+					},
+				},
+			},
+		},
 	}
 	tests := []struct {
 		name          string
@@ -95,7 +122,7 @@ func TestProcessEndpointDeletion(t *testing.T) {
 				endpointMap: make(map[string]int),
 			},
 			buildEndpoint([][]string{{"ip1", ""}}),
-			"foo",
+			clusterName,
 			0,
 		},
 		{
@@ -103,16 +130,17 @@ func TestProcessEndpointDeletion(t *testing.T) {
 			&cachedService{
 				lastState: &api.Service{},
 				endpointMap: map[string]int{
-					"foo": 1,
+					clusterName: 1,
 				},
 			},
 			buildEndpoint([][]string{{"ip1", ""}}),
-			"foo",
+			clusterName,
 			0,
 		},
 	}
+	fakeServiceController.clusterCache = &cc
 	for _, test := range tests {
-		cc.processEndpointDeletion(test.cachedService, test.clusterName)
+		cc.processEndpointDeletion(test.cachedService, test.clusterName, &fakeServiceController)
 		if test.expectResult != test.cachedService.endpointMap[test.clusterName] {
 			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectResult, test.cachedService.endpointMap[test.clusterName])
 		}
