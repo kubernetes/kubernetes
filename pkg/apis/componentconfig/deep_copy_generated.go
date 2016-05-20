@@ -117,6 +117,8 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterName = in.ClusterName
 	out.ClusterCIDR = in.ClusterCIDR
+	out.ServiceCIDR = in.ServiceCIDR
+	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
 	out.RootCAFile = in.RootCAFile
 	out.ContentType = in.ContentType

@@ -57,6 +57,8 @@ var (
 const (
 	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
 	nodeStatusUpdateRetry = 5
+	// podCIDRUpdateRetry controls the number of retries of writing Node.Spec.PodCIDR update.
+	podCIDRUpdateRetry = 5
 	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
 	nodeEvictionPeriod = 100 * time.Millisecond
 )
@@ -71,6 +73,7 @@ type NodeController struct {
 	allocateNodeCIDRs       bool
 	cloud                   cloudprovider.Interface
 	clusterCIDR             *net.IPNet
+	serviceCIDR             *net.IPNet
 	deletingPodsRateLimiter flowcontrol.RateLimiter
 	knownNodeSet            sets.String
 	kubeClient              clientset.Interface
@@ -121,6 +124,8 @@ type NodeController struct {
 	// DaemonSet framework and store
 	daemonSetController *framework.Controller
 	daemonSetStore      cache.StoreToDaemonSetLister
+	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
+	cidrAllocator CIDRAllocator
 
 	forcefullyDeletePod       func(*api.Pod) error
 	nodeExistsInCloudProvider func(string) (bool, error)
@@ -142,6 +147,8 @@ func NewNodeController(
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
 	clusterCIDR *net.IPNet,
+	serviceCIDR *net.IPNet,
+	nodeCIDRMaskSize int,
 	allocateNodeCIDRs bool) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
@@ -157,8 +164,14 @@ func NewNodeController(
 		metrics.RegisterMetricAndTrackRateLimiterUsage("node_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
 	}
 
-	if allocateNodeCIDRs && clusterCIDR == nil {
-		glog.Fatal("NodeController: Must specify clusterCIDR if allocateNodeCIDRs == true.")
+	if allocateNodeCIDRs {
+		if clusterCIDR == nil {
+			glog.Fatal("NodeController: Must specify clusterCIDR if allocateNodeCIDRs == true.")
+		}
+		mask := clusterCIDR.Mask
+		if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
+			glog.Fatal("NodeController: Invalid clusterCIDR, mask size of clusterCIDR must be less than nodeCIDRMaskSize.")
+		}
 	}
 	evictorLock := sync.Mutex{}
 
@@ -179,6 +192,7 @@ func NewNodeController(
 		lookupIP:                  net.LookupIP,
 		now:                       unversioned.Now,
 		clusterCIDR:               clusterCIDR,
+		serviceCIDR:               serviceCIDR,
 		allocateNodeCIDRs:         allocateNodeCIDRs,
 		forcefullyDeletePod:       func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
 		nodeExistsInCloudProvider: func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
@@ -204,6 +218,15 @@ func NewNodeController(
 		// they'll get the benefits they expect. It will also reserve the name for future refactorings.
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
+
+	nodeEventHandlerFuncs := framework.ResourceEventHandlerFuncs{}
+	if nc.allocateNodeCIDRs {
+		nodeEventHandlerFuncs = framework.ResourceEventHandlerFuncs{
+			AddFunc:    nc.allocateOrOccupyCIDR,
+			DeleteFunc: nc.recycleCIDR,
+		}
+	}
+
 	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -215,8 +238,9 @@ func NewNodeController(
 		},
 		&api.Node{},
 		controller.NoResyncPeriodFunc(),
-		framework.ResourceEventHandlerFuncs{},
+		nodeEventHandlerFuncs,
 	)
+
 	nc.daemonSetStore.Store, nc.daemonSetController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -230,11 +254,20 @@ func NewNodeController(
 		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{},
 	)
+
+	if allocateNodeCIDRs {
+		nc.cidrAllocator = NewCIDRRangeAllocator(clusterCIDR, nodeCIDRMaskSize)
+	}
+
 	return nc
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
+	if nc.allocateNodeCIDRs {
+		nc.filterOutServiceRange()
+	}
+
 	go nc.nodeController.Run(wait.NeverStop)
 	go nc.podController.Run(wait.NeverStop)
 	go nc.daemonSetController.Run(wait.NeverStop)
@@ -305,17 +338,78 @@ func (nc *NodeController) Run(period time.Duration) {
 	go wait.Until(nc.cleanupOrphanedPods, 30*time.Second, wait.NeverStop)
 }
 
-// Generates num pod CIDRs that could be assigned to nodes.
-func generateCIDRs(clusterCIDR *net.IPNet, num int) sets.String {
-	res := sets.NewString()
-	cidrIP := clusterCIDR.IP.To4()
-	for i := 0; i < num; i++ {
-		// TODO: Make the CIDRs configurable.
-		b1 := byte(i >> 8)
-		b2 := byte(i % 256)
-		res.Insert(fmt.Sprintf("%d.%d.%d.0/24", cidrIP[0], cidrIP[1]+b1, cidrIP[2]+b2))
+func (nc *NodeController) filterOutServiceRange() {
+	if !nc.clusterCIDR.Contains(nc.serviceCIDR.IP.Mask(nc.clusterCIDR.Mask)) && !nc.serviceCIDR.Contains(nc.clusterCIDR.IP.Mask(nc.serviceCIDR.Mask)) {
+		return
 	}
-	return res
+
+	if err := nc.cidrAllocator.Occupy(nc.serviceCIDR); err != nil {
+		glog.Errorf("Error filtering out service cidr: %v", err)
+	}
+}
+
+// allocateOrOccupyCIDR looks at each new observed node, assigns it a valid CIDR
+// if it doesn't currently have one or mark the CIDR as used if the node already have one.
+func (nc *NodeController) allocateOrOccupyCIDR(obj interface{}) {
+	node := obj.(*api.Node)
+
+	if node.Spec.PodCIDR != "" {
+		_, podCIDR, err := net.ParseCIDR(node.Spec.PodCIDR)
+		if err != nil {
+			glog.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
+			return
+		}
+		if err := nc.cidrAllocator.Occupy(podCIDR); err != nil {
+			glog.Errorf("failed to mark cidr as occupied :%v", err)
+			return
+		}
+		return
+	}
+
+	podCIDR, err := nc.cidrAllocator.AllocateNext()
+	if err != nil {
+		nc.recordNodeStatusChange(node, "CIDRNotAvailable")
+		return
+	}
+
+	glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
+	for rep := 0; rep < podCIDRUpdateRetry; rep++ {
+		node.Spec.PodCIDR = podCIDR.String()
+		if _, err := nc.kubeClient.Core().Nodes().Update(node); err == nil {
+			glog.Errorf("Failed while updating Node.Spec.PodCIDR : %v", err)
+			break
+		}
+		node, err = nc.kubeClient.Core().Nodes().Get(node.Name)
+		if err != nil {
+			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", node.Name, err)
+			break
+		}
+	}
+	if err != nil {
+		glog.Errorf("Update PodCIDR of node %v from NodeController exceeds retry count.", node.Name)
+		nc.recordNodeStatusChange(node, "CIDRAssignmentFailed")
+		glog.Errorf("CIDR assignment for node %v failed: %v", node.Name, err)
+	}
+}
+
+// recycleCIDR recycles the CIDR of a removed node
+func (nc *NodeController) recycleCIDR(obj interface{}) {
+	node := obj.(*api.Node)
+
+	if node.Spec.PodCIDR == "" {
+		return
+	}
+
+	_, podCIDR, err := net.ParseCIDR(node.Spec.PodCIDR)
+	if err != nil {
+		glog.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
+		return
+	}
+
+	glog.V(4).Infof("recycle node %s CIDR %s", node.Name, podCIDR)
+	if err := nc.cidrAllocator.Release(podCIDR); err != nil {
+		glog.Errorf("failed to release cidr: %v", err)
+	}
 }
 
 // getCondition returns a condition object for the specific condition
@@ -450,11 +544,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 		}
 	}
 
-	if nc.allocateNodeCIDRs {
-		// TODO (cjcullen): Use pkg/controller/framework to watch nodes and
-		// reduce lists/decouple this from monitoring status.
-		nc.reconcileNodeCIDRs(nodes)
-	}
 	seenReady := false
 	for i := range nodes.Items {
 		var gracePeriod time.Duration
@@ -588,42 +677,6 @@ func (nc *NodeController) forcefullyDeleteNode(nodeName string) error {
 		return fmt.Errorf("unable to delete node %q: %v", nodeName, err)
 	}
 	return nil
-}
-
-// reconcileNodeCIDRs looks at each node and assigns it a valid CIDR
-// if it doesn't currently have one.
-func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
-	glog.V(4).Infof("Reconciling cidrs for %d nodes", len(nodes.Items))
-	// TODO(roberthbailey): This seems inefficient. Why re-calculate CIDRs
-	// on each sync period?
-	availableCIDRs := generateCIDRs(nc.clusterCIDR, len(nodes.Items))
-	for _, node := range nodes.Items {
-		if node.Spec.PodCIDR != "" {
-			glog.V(4).Infof("CIDR %s is already being used by node %s", node.Spec.PodCIDR, node.Name)
-			availableCIDRs.Delete(node.Spec.PodCIDR)
-		}
-	}
-	for _, node := range nodes.Items {
-		if node.Spec.PodCIDR == "" {
-			// Re-GET node (because ours might be stale by now).
-			n, err := nc.kubeClient.Core().Nodes().Get(node.Name)
-			if err != nil {
-				glog.Errorf("Failed to get node %q: %v", node.Name, err)
-				continue
-			}
-			podCIDR, found := availableCIDRs.PopAny()
-			if !found {
-				nc.recordNodeStatusChange(n, "CIDRNotAvailable")
-				continue
-			}
-			glog.V(1).Infof("Assigning node %s CIDR %s", n.Name, podCIDR)
-			n.Spec.PodCIDR = podCIDR
-			if _, err := nc.kubeClient.Core().Nodes().Update(n); err != nil {
-				nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")
-			}
-		}
-
-	}
 }
 
 func (nc *NodeController) recordNodeEvent(nodeName, eventtype, reason, event string) {

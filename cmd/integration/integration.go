@@ -206,7 +206,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	go podInformer.Run(wait.NeverStop)
 
 	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, flowcontrol.NewFakeAlwaysRateLimiter(), flowcontrol.NewFakeAlwaysRateLimiter(),
-		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
+		40*time.Second, 60*time.Second, 5*time.Second, nil, nil, 0, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisortest.Fake)
 
