@@ -97,6 +97,7 @@ func New(client *http.Client) (*Service, error) {
 	s.Routes = NewRoutesService(s)
 	s.Snapshots = NewSnapshotsService(s)
 	s.SslCertificates = NewSslCertificatesService(s)
+	s.Subnetworks = NewSubnetworksService(s)
 	s.TargetHttpProxies = NewTargetHttpProxiesService(s)
 	s.TargetHttpsProxies = NewTargetHttpsProxiesService(s)
 	s.TargetInstances = NewTargetInstancesService(s)
@@ -165,6 +166,8 @@ type Service struct {
 	Snapshots *SnapshotsService
 
 	SslCertificates *SslCertificatesService
+
+	Subnetworks *SubnetworksService
 
 	TargetHttpProxies *TargetHttpProxiesService
 
@@ -426,6 +429,15 @@ type SslCertificatesService struct {
 	s *Service
 }
 
+func NewSubnetworksService(s *Service) *SubnetworksService {
+	rs := &SubnetworksService{s: s}
+	return rs
+}
+
+type SubnetworksService struct {
+	s *Service
+}
+
 func NewTargetHttpProxiesService(s *Service) *TargetHttpProxiesService {
 	rs := &TargetHttpProxiesService{s: s}
 	return rs
@@ -567,7 +579,7 @@ type Address struct {
 	// addresses.
 	Kind string `json:"kind,omitempty"`
 
-	// Name: Name of the resource; provided by the client when the resource
+	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
 	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
@@ -658,13 +670,13 @@ func (s *AddressAggregatedList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// AddressList: Contains a list of address resources.
+// AddressList: Contains a list of addresses.
 type AddressList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
 	Id string `json:"id,omitempty"`
 
-	// Items: [Output Only] A list of Address resources.
+	// Items: [Output Only] A list of addresses.
 	Items []*Address `json:"items,omitempty"`
 
 	// Kind: [Output Only] Type of resource. Always compute#addressList for
@@ -732,6 +744,7 @@ type AddressesScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -777,7 +790,7 @@ type AddressesScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -840,8 +853,11 @@ type AttachedDisk struct {
 	InitializeParams *AttachedDiskInitializeParams `json:"initializeParams,omitempty"`
 
 	// Interface: Specifies the disk interface to use for attaching this
-	// disk, either SCSI or NVME. The default is SCSI. For performance
-	// characteristics of SCSI over NVMe, see Local SSD performance.
+	// disk, which is either SCSI or NVME. The default is SCSI. Persistent
+	// disks must always use SCSI and the request will fail if you attempt
+	// to attach a persistent disk in any other format than SCSI. Local SSDs
+	// can use either NVME or SCSI. For performance characteristics of SCSI
+	// over NVMe, see Local SSD performance.
 	//
 	// Possible values:
 	//   "NVME"
@@ -924,22 +940,32 @@ type AttachedDiskInitializeParams struct {
 	// - zones/zone/diskTypes/diskType
 	DiskType string `json:"diskType,omitempty"`
 
-	// SourceImage: A source image used to create the disk. You can provide
-	// a private (custom) image, and Compute Engine will use the
-	// corresponding image from your project. For
-	// example:
+	// SourceImage: The source image used to create this disk. If the source
+	// image is deleted, this field will not be set.
+	//
+	// To create a disk with one of the public operating system images,
+	// specify the image by its family name. For example, specify
+	// family/debian-8 to use the latest Debian 8
+	// image:
+	//
+	// projects/debian-cloud/global/images/family/debian-8
+	//
+	// Alternatively, use a specific version of a public operating system
+	// image:
+	//
+	// projects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD
+	//
+	// To create a disk with a private image that you created, specify the
+	// image name in the following format:
 	//
 	// global/images/my-private-image
 	//
-	// Or you can provide an image from a publicly-available project. For
-	// example, to use a Debian image from the debian-cloud project, make
-	// sure to include the project in the
-	// URL:
+	// You can also specify a private image by its image family, which
+	// returns the latest version of the image in that family. Replace the
+	// image name with
+	// family/family-name:
 	//
-	// projects/debian-cloud/global/images/debian-7-wheezy-vYYYYMMDD
-	//
-	// where vYYYYMMDD is the image version. The fully-qualified URL will
-	// also work in both cases.
+	// global/images/family/my-private-family
 	SourceImage string `json:"sourceImage,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "DiskName") to
@@ -957,8 +983,18 @@ func (s *AttachedDiskInitializeParams) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
+// Autoscaler: Represents an Autoscaler resource. Autoscalers allow you
+// to automatically scale virtual machine instances in managed instance
+// groups according to an autoscaling policy that you define. For more
+// information, read Autoscaling Groups of Instances.
 type Autoscaler struct {
-	// AutoscalingPolicy: Autoscaling configuration.
+	// AutoscalingPolicy: The configuration parameters for the autoscaling
+	// algorithm. You can define one or more of the policies for an
+	// autoscaler: cpuUtilization, customMetricUtilizations, and
+	// loadBalancingUtilization.
+	//
+	// If none of these are specified, the default will be to autoscale
+	// based on cpuUtilization to 0.8 or 80%.
 	AutoscalingPolicy *AutoscalingPolicy `json:"autoscalingPolicy,omitempty"`
 
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
@@ -973,7 +1009,8 @@ type Autoscaler struct {
 	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
 
-	// Kind: Type of the resource.
+	// Kind: [Output Only] Type of the resource. Always compute#autoscaler
+	// for autoscalers.
 	Kind string `json:"kind,omitempty"`
 
 	// Name: Name of the resource. Provided by the client when the resource
@@ -988,8 +1025,8 @@ type Autoscaler struct {
 	// SelfLink: [Output Only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
-	// Target: URL of Instance Group Manager or Replica Pool which will be
-	// controlled by Autoscaler.
+	// Target: URL of the managed instance group that this autoscaler will
+	// scale.
 	Target string `json:"target,omitempty"`
 
 	// Zone: [Output Only] URL of the zone where the instance group resides.
@@ -1022,7 +1059,8 @@ type AutoscalerAggregatedList struct {
 	// Items: A map of scoped autoscaler lists.
 	Items map[string]AutoscalersScopedList `json:"items,omitempty"`
 
-	// Kind: Type of resource.
+	// Kind: [Output Only] Type of resource. Always
+	// compute#autoscalerAggregatedList for aggregated lists of autoscalers.
 	Kind string `json:"kind,omitempty"`
 
 	// NextPageToken: [Output Only] This token allows you to get the next
@@ -1055,7 +1093,7 @@ func (s *AutoscalerAggregatedList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// AutoscalerList: Contains a list of persistent autoscaler resources.
+// AutoscalerList: Contains a list of Autoscaler resources.
 type AutoscalerList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
@@ -1064,7 +1102,8 @@ type AutoscalerList struct {
 	// Items: A list of Autoscaler resources.
 	Items []*Autoscaler `json:"items,omitempty"`
 
-	// Kind: Type of resource.
+	// Kind: [Output Only] Type of resource. Always compute#autoscalerList
+	// for lists of autoscalers.
 	Kind string `json:"kind,omitempty"`
 
 	// NextPageToken: [Output Only] This token allows you to get the next
@@ -1098,11 +1137,12 @@ func (s *AutoscalerList) MarshalJSON() ([]byte, error) {
 }
 
 type AutoscalersScopedList struct {
-	// Autoscalers: List of autoscalers contained in this scope.
+	// Autoscalers: [Output Only] List of autoscalers contained in this
+	// scope.
 	Autoscalers []*Autoscaler `json:"autoscalers,omitempty"`
 
-	// Warning: Informational warning which replaces the list of autoscalers
-	// when the list is empty.
+	// Warning: [Output Only] Informational warning which replaces the list
+	// of autoscalers when the list is empty.
 	Warning *AutoscalersScopedListWarning `json:"warning,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Autoscalers") to
@@ -1120,14 +1160,15 @@ func (s *AutoscalersScopedList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// AutoscalersScopedListWarning: Informational warning which replaces
-// the list of autoscalers when the list is empty.
+// AutoscalersScopedListWarning: [Output Only] Informational warning
+// which replaces the list of autoscalers when the list is empty.
 type AutoscalersScopedListWarning struct {
 	// Code: [Output Only] A warning code, if applicable. For example,
 	// Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -1173,7 +1214,7 @@ type AutoscalersScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -1199,38 +1240,42 @@ func (s *AutoscalersScopedListWarningData) MarshalJSON() ([]byte, error) {
 
 // AutoscalingPolicy: Cloud Autoscaler policy.
 type AutoscalingPolicy struct {
-	// CoolDownPeriodSec: The number of seconds that the Autoscaler should
-	// wait between two succeeding changes to the number of virtual
-	// machines. You should define an interval that is at least as long as
-	// the initialization time of a virtual machine and the time it may take
-	// for replica pool to create the virtual machine. The default is 60
+	// CoolDownPeriodSec: The number of seconds that the autoscaler should
+	// wait before it starts collecting information from a new instance.
+	// This prevents the autoscaler from collecting information when the
+	// instance is initializing, during which the collected usage would not
+	// be reliable. The default time autoscaler waits is 60
 	// seconds.
+	//
+	// Virtual machine initialization times might vary because of numerous
+	// factors. We recommend that you test how long an instance may take to
+	// initialize. To do this, create an instance and time the startup
+	// process.
 	CoolDownPeriodSec int64 `json:"coolDownPeriodSec,omitempty"`
 
-	// CpuUtilization: TODO(jbartosik): Add support for scaling based on
-	// muliple utilization metrics (take max recommendation). Exactly one
-	// utilization policy should be provided. Configuration parameters of
-	// CPU based autoscaling policy.
+	// CpuUtilization: Defines the CPU utilization policy that allows the
+	// autoscaler to scale based on the average CPU utilization of a managed
+	// instance group.
 	CpuUtilization *AutoscalingPolicyCpuUtilization `json:"cpuUtilization,omitempty"`
 
 	// CustomMetricUtilizations: Configuration parameters of autoscaling
-	// based on custom metric.
+	// based on a custom metric.
 	CustomMetricUtilizations []*AutoscalingPolicyCustomMetricUtilization `json:"customMetricUtilizations,omitempty"`
 
 	// LoadBalancingUtilization: Configuration parameters of autoscaling
 	// based on load balancer.
 	LoadBalancingUtilization *AutoscalingPolicyLoadBalancingUtilization `json:"loadBalancingUtilization,omitempty"`
 
-	// MaxNumReplicas: The maximum number of replicas that the Autoscaler
-	// can scale up to. This field is required for config to be effective.
-	// Maximum number of replicas should be not lower than minimal number of
-	// replicas. Absolute limit for this value is defined in Autoscaler
-	// backend.
+	// MaxNumReplicas: The maximum number of instances that the autoscaler
+	// can scale up to. This is required when creating or updating an
+	// autoscaler. The maximum number of replicas should not be lower than
+	// minimal number of replicas.
 	MaxNumReplicas int64 `json:"maxNumReplicas,omitempty"`
 
-	// MinNumReplicas: The minimum number of replicas that the Autoscaler
-	// can scale down to. Can't be less than 0. If not provided Autoscaler
-	// will choose default value depending on maximal number of replicas.
+	// MinNumReplicas: The minimum number of replicas that the autoscaler
+	// can scale down to. This cannot be less than 0. If not provided,
+	// autoscaler will choose a default value depending on maximum number of
+	// instances allowed.
 	MinNumReplicas int64 `json:"minNumReplicas,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "CoolDownPeriodSec")
@@ -1250,10 +1295,19 @@ func (s *AutoscalingPolicy) MarshalJSON() ([]byte, error) {
 
 // AutoscalingPolicyCpuUtilization: CPU utilization policy.
 type AutoscalingPolicyCpuUtilization struct {
-	// UtilizationTarget: The target utilization that the Autoscaler should
-	// maintain. It is represented as a fraction of used cores. For example:
-	// 6 cores used in 8-core VM are represented here as 0.75. Must be a
-	// float value between (0, 1]. If not defined, the default is 0.8.
+	// UtilizationTarget: The target CPU utilization that the autoscaler
+	// should maintain. Must be a float value in the range (0, 1]. If not
+	// specified, the default is 0.8.
+	//
+	// If the CPU level is below the target utilization, the autoscaler
+	// scales down the number of instances until it reaches the minimum
+	// number of instances you specified or until the average CPU of your
+	// instances reaches the target utilization.
+	//
+	// If the average CPU is above the target utilization, the autoscaler
+	// scales up until it reaches the maximum number of instances you
+	// specified or until the average utilization reaches the target
+	// utilization.
 	UtilizationTarget float64 `json:"utilizationTarget,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "UtilizationTarget")
@@ -1274,20 +1328,34 @@ func (s *AutoscalingPolicyCpuUtilization) MarshalJSON() ([]byte, error) {
 // AutoscalingPolicyCustomMetricUtilization: Custom utilization metric
 // policy.
 type AutoscalingPolicyCustomMetricUtilization struct {
-	// Metric: Identifier of the metric. It should be a Cloud Monitoring
-	// metric. The metric can not have negative values. The metric should be
-	// an utilization metric (increasing number of VMs handling requests x
-	// times should reduce average value of the metric roughly x times). For
-	// example you could use:
-	// compute.googleapis.com/instance/network/received_bytes_count.
+	// Metric: The identifier of the Cloud Monitoring metric. The metric
+	// cannot have negative values and should be a utilization metric, which
+	// means that the number of virtual machines handling requests should
+	// increase or decrease proportionally to the metric. The metric must
+	// also have a label of compute.googleapis.com/resource_id with the
+	// value of the instance's unique ID, although this alone does not
+	// guarantee that the metric is valid.
+	//
+	// For example, the following is a valid
+	// metric:
+	// compute.googleapis.com/instance/network/received_bytes_count
+	//
+	//
+	//
+	// The following is not a valid metric because it does not increase or
+	// decrease based on
+	// usage:
+	// compute.googleapis.com/instance/cpu/reserved_cores
 	Metric string `json:"metric,omitempty"`
 
-	// UtilizationTarget: Target value of the metric which Autoscaler should
+	// UtilizationTarget: Target value of the metric which autoscaler should
 	// maintain. Must be a positive value.
 	UtilizationTarget float64 `json:"utilizationTarget,omitempty"`
 
-	// UtilizationTargetType: Defines type in which utilization_target is
-	// expressed.
+	// UtilizationTargetType: Defines how target utilization value is
+	// expressed for a Cloud Monitoring metric. Either GAUGE,
+	// DELTA_PER_SECOND, or DELTA_PER_MINUTE. If not specified, the default
+	// is GAUGE.
 	//
 	// Possible values:
 	//   "DELTA_PER_MINUTE"
@@ -1310,16 +1378,13 @@ func (s *AutoscalingPolicyCustomMetricUtilization) MarshalJSON() ([]byte, error)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// AutoscalingPolicyLoadBalancingUtilization: Load balancing utilization
-// policy.
+// AutoscalingPolicyLoadBalancingUtilization: Configuration parameters
+// of autoscaling based on load balancing.
 type AutoscalingPolicyLoadBalancingUtilization struct {
 	// UtilizationTarget: Fraction of backend capacity utilization (set in
-	// HTTP load balancing configuration) that Autoscaler should maintain.
-	// Must be a positive float value. If not defined, the default is 0.8.
-	// For example if your maxRatePerInstance capacity (in HTTP Load
-	// Balancing configuration) is set at 10 and you would like to keep
-	// number of instances such that each instance receives 7 QPS on
-	// average, set this to 0.7.
+	// HTTP(s) load balancing configuration) that autoscaler should
+	// maintain. Must be a positive float value. If not defined, the default
+	// is 0.8.
 	UtilizationTarget float64 `json:"utilizationTarget,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "UtilizationTarget")
@@ -1339,8 +1404,9 @@ func (s *AutoscalingPolicyLoadBalancingUtilization) MarshalJSON() ([]byte, error
 
 // Backend: Message containing information of one individual backend.
 type Backend struct {
-	// BalancingMode: Specifies the balancing mode for this backend. The
-	// default is UTILIZATION but available values are UTILIZATION and RATE.
+	// BalancingMode: Specifies the balancing mode for this backend. For
+	// global HTTP(S) load balancing, the default is UTILIZATION. Valid
+	// values are UTILIZATION and RATE.
 	//
 	// Possible values:
 	//   "RATE"
@@ -1370,15 +1436,16 @@ type Backend struct {
 	// fully-qualified URL, rather than a partial URL.
 	Group string `json:"group,omitempty"`
 
-	// MaxRate: The max RPS of the group. Can be used with either balancing
-	// mode, but required if RATE mode. For RATE mode, either maxRate or
-	// maxRatePerInstance must be set.
+	// MaxRate: The max requests per second (RPS) of the group. Can be used
+	// with either RATE or UTILIZATION balancing modes, but required if RATE
+	// mode. For RATE mode, either maxRate or maxRatePerInstance must be
+	// set.
 	MaxRate int64 `json:"maxRate,omitempty"`
 
-	// MaxRatePerInstance: The max RPS that a single backed instance can
-	// handle. This is used to calculate the capacity of the group. Can be
-	// used in either balancing mode. For RATE mode, either maxRate or
-	// maxRatePerInstance must be set.
+	// MaxRatePerInstance: The max requests per second (RPS) that a single
+	// backend instance can handle.This is used to calculate the capacity of
+	// the group. Can be used in either balancing mode. For RATE mode,
+	// either maxRate or maxRatePerInstance must be set.
 	MaxRatePerInstance float64 `json:"maxRatePerInstance,omitempty"`
 
 	// MaxUtilization: Used when balancingMode is UTILIZATION. This ratio
@@ -1402,8 +1469,7 @@ func (s *Backend) MarshalJSON() ([]byte, error) {
 }
 
 // BackendService: A BackendService resource. This resource defines a
-// group of backend virtual machines together with their serving
-// capacity.
+// group of backend virtual machines and their serving capacity.
 type BackendService struct {
 	// Backends: The list of backends that serve this BackendService.
 	Backends []*Backend `json:"backends,omitempty"`
@@ -1445,18 +1511,28 @@ type BackendService struct {
 	// last character, which cannot be a dash.
 	Name string `json:"name,omitempty"`
 
-	// Port: Deprecated in favor of port name. The TCP port to connect on
-	// the backend. The default value is 80.
+	// Port: Deprecated in favor of portName. The TCP port to connect on the
+	// backend. The default value is 80.
 	Port int64 `json:"port,omitempty"`
 
 	// PortName: Name of backend port. The same name should appear in the
-	// resource views referenced by this service. Required.
+	// instance groups referenced by this service. Required.
 	PortName string `json:"portName,omitempty"`
 
+	// Protocol: The protocol this BackendService uses to communicate with
+	// backends.
+	//
+	// Possible values are HTTP, HTTPS, HTTP2, TCP and SSL.
+	//
 	// Possible values:
 	//   "HTTP"
 	//   "HTTPS"
 	Protocol string `json:"protocol,omitempty"`
+
+	// Region: [Output Only] URL of the region where the regional backend
+	// service resides. This field is not applicable to global backend
+	// services.
+	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
@@ -1626,10 +1702,10 @@ type Disk struct {
 	// text format.
 	LastDetachTimestamp string `json:"lastDetachTimestamp,omitempty"`
 
-	// Licenses: Any applicable publicly visible licenses.
+	// Licenses: [Output Only] Any applicable publicly visible licenses.
 	Licenses []string `json:"licenses,omitempty"`
 
-	// Name: Name of the resource; provided by the client when the resource
+	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
 	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
@@ -1656,32 +1732,39 @@ type Disk struct {
 	SizeGb int64 `json:"sizeGb,omitempty,string"`
 
 	// SourceImage: The source image used to create this disk. If the source
-	// image is deleted from the system, this field will not be set, even if
-	// an image with the same name has been re-created.
+	// image is deleted, this field will not be set.
 	//
-	// When creating a disk, you can provide a private (custom) image using
-	// the following input, and Compute Engine will use the corresponding
-	// image from your project. For example:
+	// To create a disk with one of the public operating system images,
+	// specify the image by its family name. For example, specify
+	// family/debian-8 to use the latest Debian 8
+	// image:
+	//
+	// projects/debian-cloud/global/images/family/debian-8
+	//
+	// Alternatively, use a specific version of a public operating system
+	// image:
+	//
+	// projects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD
+	//
+	// To create a disk with a private image that you created, specify the
+	// image name in the following format:
 	//
 	// global/images/my-private-image
 	//
-	// Or you can provide an image from a publicly-available project. For
-	// example, to use a Debian image from the debian-cloud project, make
-	// sure to include the project in the
-	// URL:
+	// You can also specify a private image by its image family, which
+	// returns the latest version of the image in that family. Replace the
+	// image name with
+	// family/family-name:
 	//
-	// projects/debian-cloud/global/images/debian-7-wheezy-vYYYYMMDD
-	//
-	// where vYYYYMMDD is the image version. The fully-qualified URL will
-	// also work in both cases.
+	// global/images/family/my-private-family
 	SourceImage string `json:"sourceImage,omitempty"`
 
-	// SourceImageId: The ID value of the image used to create this disk.
-	// This value identifies the exact image that was used to create this
-	// persistent disk. For example, if you created the persistent disk from
-	// an image that was later deleted and recreated under the same name,
-	// the source image ID would identify the exact version of the image
-	// that was used.
+	// SourceImageId: [Output Only] The ID value of the image used to create
+	// this disk. This value identifies the exact image that was used to
+	// create this persistent disk. For example, if you created the
+	// persistent disk from an image that was later deleted and recreated
+	// under the same name, the source image ID would identify the exact
+	// version of the image that was used.
 	SourceImageId string `json:"sourceImageId,omitempty"`
 
 	// SourceSnapshot: The source snapshot used to create this disk. You can
@@ -1712,11 +1795,11 @@ type Disk struct {
 	Status string `json:"status,omitempty"`
 
 	// Type: URL of the disk type resource describing which disk type to use
-	// to create the disk; provided by the client when the disk is created.
+	// to create the disk. Provide this when creating the disk.
 	Type string `json:"type,omitempty"`
 
-	// Users: Links to the users of the disk (attached instances) in form:
-	// project/zones/zone/instances/instance
+	// Users: [Output Only] Links to the users of the disk (attached
+	// instances) in form: project/zones/zone/instances/instance
 	Users []string `json:"users,omitempty"`
 
 	// Zone: [Output Only] URL of the zone where the disk resides.
@@ -1827,7 +1910,7 @@ func (s *DiskList) MarshalJSON() ([]byte, error) {
 }
 
 type DiskMoveRequest struct {
-	// DestinationZone: The URL of the destination zone to move the disk to.
+	// DestinationZone: The URL of the destination zone to move the disk.
 	// This can be a full or partial URL. For example, the following are all
 	// valid URLs to a zone:
 	// - https://www.googleapis.com/compute/v1/projects/project/zones/zone
@@ -1860,7 +1943,7 @@ func (s *DiskMoveRequest) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// DiskType: A disk type resource.
+// DiskType: A DiskType resource.
 type DiskType struct {
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
 	// format.
@@ -1959,7 +2042,7 @@ func (s *DiskTypeAggregatedList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// DiskTypeList: Contains a list of disk type resources.
+// DiskTypeList: Contains a list of disk types.
 type DiskTypeList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
@@ -2033,6 +2116,7 @@ type DiskTypesScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -2078,7 +2162,7 @@ type DiskTypesScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -2098,6 +2182,26 @@ type DiskTypesScopedListWarningData struct {
 
 func (s *DiskTypesScopedListWarningData) MarshalJSON() ([]byte, error) {
 	type noMethod DiskTypesScopedListWarningData
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
+type DisksResizeRequest struct {
+	// SizeGb: The new size of the persistent disk, which is specified in
+	// GB.
+	SizeGb int64 `json:"sizeGb,omitempty,string"`
+
+	// ForceSendFields is a list of field names (e.g. "SizeGb") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *DisksResizeRequest) MarshalJSON() ([]byte, error) {
+	type noMethod DisksResizeRequest
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
@@ -2133,6 +2237,7 @@ type DisksScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -2178,7 +2283,7 @@ type DisksScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -2202,7 +2307,7 @@ func (s *DisksScopedListWarningData) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// Firewall: A Firewall resource.
+// Firewall: Represents a Firewall resource.
 type Firewall struct {
 	// Allowed: The list of rules specified by this firewall. Each rule
 	// specifies a protocol and port-range tuple that describes a permitted
@@ -2234,10 +2339,9 @@ type Firewall struct {
 	// last character, which cannot be a dash.
 	Name string `json:"name,omitempty"`
 
-	// Network: URL of the network resource for this firewall rule. This
-	// field is required for creating an instance but optional when creating
-	// a firewall rule. If not specified when creating a firewall rule, the
-	// default network is used:
+	// Network: URL of the network resource for this firewall rule. If not
+	// specified when creating a firewall rule, the default network is
+	// used:
 	// global/networks/default
 	// If you choose to specify this property, you can specify the network
 	// as a full or partial URL. For example, the following are all valid
@@ -2297,9 +2401,9 @@ func (s *Firewall) MarshalJSON() ([]byte, error) {
 
 type FirewallAllowed struct {
 	// IPProtocol: The IP protocol that is allowed for this rule. The
-	// protocol type is required when creating a firewall. This value can
-	// either be one of the following well known protocol strings (tcp, udp,
-	// icmp, esp, ah, sctp), or the IP protocol number.
+	// protocol type is required when creating a firewall rule. This value
+	// can either be one of the following well known protocol strings (tcp,
+	// udp, icmp, esp, ah, sctp), or the IP protocol number.
 	IPProtocol string `json:"IPProtocol,omitempty"`
 
 	// Ports: An optional list of ports which are allowed. This field is
@@ -2325,7 +2429,7 @@ func (s *FirewallAllowed) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// FirewallList: Contains a list of Firewall resources.
+// FirewallList: Contains a list of firewalls.
 type FirewallList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
@@ -2381,7 +2485,7 @@ type ForwardingRule struct {
 	IPAddress string `json:"IPAddress,omitempty"`
 
 	// IPProtocol: The IP protocol to which this rule applies. Valid options
-	// are TCP, UDP, ESP, AH or SCTP.
+	// are TCP, UDP, ESP, AH, SCTP or ICMP.
 	//
 	// Possible values:
 	//   "AH"
@@ -2434,6 +2538,9 @@ type ForwardingRule struct {
 	// traffic. For regional forwarding rules, this target must live in the
 	// same region as the forwarding rule. For global forwarding rules, this
 	// target must be a global TargetHttpProxy or TargetHttpsProxy resource.
+	// The forwarded traffic must be of a type appropriate to the target
+	// object. For example, TargetHttpProxy requires HTTP traffic, and
+	// TargetHttpsProxy requires HTTPS traffic.
 	Target string `json:"target,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -2463,7 +2570,8 @@ type ForwardingRuleAggregatedList struct {
 	// Items: A map of scoped forwarding rule lists.
 	Items map[string]ForwardingRulesScopedList `json:"items,omitempty"`
 
-	// Kind: Type of resource.
+	// Kind: [Output Only] Type of resource. Always
+	// compute#forwardingRuleAggregatedList for lists of forwarding rules.
 	Kind string `json:"kind,omitempty"`
 
 	// NextPageToken: [Output Only] This token allows you to get the next
@@ -2569,6 +2677,7 @@ type ForwardingRulesScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -2614,7 +2723,7 @@ type ForwardingRulesScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -2638,6 +2747,12 @@ func (s *ForwardingRulesScopedListWarningData) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
+// HealthCheckReference: A full or valid partial URL to a health check.
+// For example, the following are valid URLs:
+// -
+// https://www.googleapis.com/compute/beta/projects/project-id/global/httpHealthChecks/health-check
+// - projects/project-id/global/httpHealthChecks/health-check
+// - global/httpHealthChecks/health-check
 type HealthCheckReference struct {
 	HealthCheck string `json:"healthCheck,omitempty"`
 
@@ -2749,7 +2864,8 @@ type HttpHealthCheck struct {
 	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
 
-	// Kind: Type of the resource.
+	// Kind: [Output Only] Type of the resource. Always
+	// compute#httpHealthCheck for HTTP health checks.
 	Kind string `json:"kind,omitempty"`
 
 	// Name: Name of the resource. Provided by the client when the resource
@@ -2766,7 +2882,7 @@ type HttpHealthCheck struct {
 	Port int64 `json:"port,omitempty"`
 
 	// RequestPath: The request path of the HTTP health check request. The
-	// default value is "/".
+	// default value is /.
 	RequestPath string `json:"requestPath,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -2987,6 +3103,12 @@ type Image struct {
 	// (in GB).
 	DiskSizeGb int64 `json:"diskSizeGb,omitempty,string"`
 
+	// Family: The name of the image family to which this image belongs. You
+	// can create disks by specifying an image family instead of a specific
+	// image name. The image family always returns its latest image that is
+	// not deprecated.
+	Family string `json:"family,omitempty"`
+
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
@@ -3100,7 +3222,7 @@ func (s *ImageRawDisk) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// ImageList: Contains a list of Image resources.
+// ImageList: Contains a list of images.
 type ImageList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
@@ -3157,16 +3279,16 @@ type Instance struct {
 	// format.
 	CreationTimestamp string `json:"creationTimestamp,omitempty"`
 
-	// Description: An optional textual description of the resource;
-	// provided by the client when the resource is created.
+	// Description: An optional description of this resource. Provide this
+	// property when you create the resource.
 	Description string `json:"description,omitempty"`
 
 	// Disks: Array of disks associated with this instance. Persistent disks
 	// must be created before you can assign them.
 	Disks []*AttachedDisk `json:"disks,omitempty"`
 
-	// Id: [Output Only] Unique identifier for the resource. This identifier
-	// is defined by the server.
+	// Id: [Output Only] The unique identifier for the resource. This
+	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
 
 	// Kind: [Output Only] Type of the resource. Always compute#instance for
@@ -3174,10 +3296,10 @@ type Instance struct {
 	Kind string `json:"kind,omitempty"`
 
 	// MachineType: Full or partial URL of the machine type resource to use
-	// for this instance, in the format: zones/zone/machineTypes/
-	// machine-type. This is provided by the client when the instance is
-	// created. For example, the following is a valid partial url to a
-	// predefined machine
+	// for this instance, in the format:
+	// zones/zone/machineTypes/machine-type. This is provided by the client
+	// when the instance is created. For example, the following is a valid
+	// partial url to a predefined machine
 	// type:
 	//
 	// zones/us-central1-f/machineTypes/n1-standard-1
@@ -3201,13 +3323,14 @@ type Instance struct {
 	// This includes custom metadata and predefined keys.
 	Metadata *Metadata `json:"metadata,omitempty"`
 
-	// Name: Name of the resource; provided by the client when the resource
-	// is created. The name must be 1-63 characters long, and comply with
-	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
-	// the first character must be a lowercase letter, and all following
-	// characters must be a dash, lowercase letter, or digit, except the
-	// last character, which cannot be a dash.
+	// Name: The name of the resource, provided by the client when initially
+	// creating the resource. The resource name must be 1-63 characters
+	// long, and comply with RFC1035. Specifically, the name must be 1-63
+	// characters long and match the regular expression
+	// [a-z]([-a-z0-9]*[a-z0-9])? which means the first character must be a
+	// lowercase letter, and all following characters must be a dash,
+	// lowercase letter, or digit, except the last character, which cannot
+	// be a dash.
 	Name string `json:"name,omitempty"`
 
 	// NetworkInterfaces: An array of configurations for this interface.
@@ -3218,7 +3341,7 @@ type Instance struct {
 	// Scheduling: Scheduling options for this instance.
 	Scheduling *Scheduling `json:"scheduling,omitempty"`
 
-	// SelfLink: [Output Only] Server defined URL for this resource.
+	// SelfLink: [Output Only] Server-defined URL for this resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// ServiceAccounts: A list of service accounts, with their specified
@@ -3247,7 +3370,7 @@ type Instance struct {
 	// of the status.
 	StatusMessage string `json:"statusMessage,omitempty"`
 
-	// Tags: A list of tags to appy to this instance. Tags are used to
+	// Tags: A list of tags to apply to this instance. Tags are used to
 	// identify valid sources or targets for network firewalls and are
 	// specified by the client during instance creation. The tags can be
 	// later modified by the setTags method. Each tag within the list must
@@ -3289,11 +3412,15 @@ type InstanceAggregatedList struct {
 	// resources.
 	Kind string `json:"kind,omitempty"`
 
-	// NextPageToken: [Output Only] A token used to continue a truncated
-	// list request.
+	// NextPageToken: [Output Only] This token allows you to get the next
+	// page of results for list requests. If the number of results is larger
+	// than maxResults, use the nextPageToken as a value for the query
+	// parameter pageToken in the next list request. Subsequent list
+	// requests will have their own nextPageToken to continue paging through
+	// the results.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
-	// SelfLink: [Output Only] Server defined URL for this resource.
+	// SelfLink: [Output Only] Server-defined URL for this resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -3352,8 +3479,8 @@ type InstanceGroup struct {
 	// Named ports apply to all instances in this instance group.
 	NamedPorts []*NamedPort `json:"namedPorts,omitempty"`
 
-	// Network: [Output Only] The URL of the network to which all instances
-	// in the instance group belong.
+	// Network: The URL of the network to which all instances in the
+	// instance group belong.
 	Network string `json:"network,omitempty"`
 
 	// SelfLink: [Output Only] The URL for this instance group. The server
@@ -3363,6 +3490,10 @@ type InstanceGroup struct {
 	// Size: [Output Only] The total number of instances in the instance
 	// group.
 	Size int64 `json:"size,omitempty"`
+
+	// Subnetwork: The URL of the subnetwork to which all instances in the
+	// instance group belong.
+	Subnetwork string `json:"subnetwork,omitempty"`
 
 	// Zone: [Output Only] The URL of the zone where the instance group is
 	// located.
@@ -3475,9 +3606,6 @@ func (s *InstanceGroupList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// InstanceGroupManager: InstanceGroupManagers
-//
-// Next available tag: 20
 type InstanceGroupManager struct {
 	// BaseInstanceName: The base instance name to use for instances in this
 	// group. The value must be 1-58 characters long. Instances are named by
@@ -3498,9 +3626,9 @@ type InstanceGroupManager struct {
 	// property when you create the resource.
 	Description string `json:"description,omitempty"`
 
-	// Fingerprint: [Output Only] The fingerprint of the target pools
-	// information. You can use this optional field for optimistic locking
-	// when you update the target pool entries.
+	// Fingerprint: [Output Only] The fingerprint of the resource data. You
+	// can use this optional field for optimistic locking when you update
+	// the resource.
 	Fingerprint string `json:"fingerprint,omitempty"`
 
 	// Id: [Output Only] A unique identifier for this resource type. The
@@ -3573,7 +3701,8 @@ type InstanceGroupManagerActionsSummary struct {
 
 	// Creating: [Output Only] The number of instances in the managed
 	// instance group that are scheduled to be created or are currently
-	// being created.
+	// being created. If the group fails to create one of these instances,
+	// it tries again until it creates the instance successfully.
 	Creating int64 `json:"creating,omitempty"`
 
 	// Deleting: [Output Only] The number of instances in the managed
@@ -3825,6 +3954,7 @@ type InstanceGroupManagersScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -3870,7 +4000,7 @@ type InstanceGroupManagersScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -4087,6 +4217,7 @@ type InstanceGroupsScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -4132,7 +4263,7 @@ type InstanceGroupsScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -4183,24 +4314,28 @@ func (s *InstanceGroupsSetNamedPortsRequest) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// InstanceList: Contains a list of instance resources.
+// InstanceList: Contains a list of instances.
 type InstanceList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
 	Id string `json:"id,omitempty"`
 
-	// Items: [Output Only] A list of Instance resources.
+	// Items: [Output Only] A list of instances.
 	Items []*Instance `json:"items,omitempty"`
 
 	// Kind: [Output Only] Type of resource. Always compute#instanceList for
 	// lists of Instance resources.
 	Kind string `json:"kind,omitempty"`
 
-	// NextPageToken: [Output Only] A token used to continue a truncated
-	// list request.
+	// NextPageToken: [Output Only] This token allows you to get the next
+	// page of results for list requests. If the number of results is larger
+	// than maxResults, use the nextPageToken as a value for the query
+	// parameter pageToken in the next list request. Subsequent list
+	// requests will have their own nextPageToken to continue paging through
+	// the results.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
-	// SelfLink: [Output Only] Server defined URL for this resource.
+	// SelfLink: [Output Only] Server-defined URL for this resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -4223,9 +4358,9 @@ func (s *InstanceList) MarshalJSON() ([]byte, error) {
 }
 
 type InstanceMoveRequest struct {
-	// DestinationZone: The URL of the destination zone to move the instance
-	// to. This can be a full or partial URL. For example, the following are
-	// all valid URLs to a zone:
+	// DestinationZone: The URL of the destination zone to move the
+	// instance. This can be a full or partial URL. For example, the
+	// following are all valid URLs to a zone:
 	// - https://www.googleapis.com/compute/v1/projects/project/zones/zone
 	//
 	// - projects/project/zones/zone
@@ -4502,6 +4637,7 @@ type InstancesScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -4547,7 +4683,7 @@ type InstancesScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -4567,6 +4703,27 @@ type InstancesScopedListWarningData struct {
 
 func (s *InstancesScopedListWarningData) MarshalJSON() ([]byte, error) {
 	type noMethod InstancesScopedListWarningData
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
+type InstancesSetMachineTypeRequest struct {
+	// MachineType: Full or partial URL of the machine type resource. See
+	// Machine Types for a full list of machine types. For example:
+	// zones/us-central1-f/machineTypes/n1-standard-1
+	MachineType string `json:"machineType,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "MachineType") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *InstancesSetMachineTypeRequest) MarshalJSON() ([]byte, error) {
+	type noMethod InstancesSetMachineTypeRequest
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
@@ -4745,7 +4902,7 @@ func (s *MachineTypeAggregatedList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// MachineTypeList: Contains a list of Machine Type resources.
+// MachineTypeList: Contains a list of machine types.
 type MachineTypeList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
@@ -4820,6 +4977,7 @@ type MachineTypesScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -4865,7 +5023,7 @@ type MachineTypesScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -4894,7 +5052,13 @@ type ManagedInstance struct {
 	// instance group has scheduled for the instance. Possible values:
 	// - NONE The instance is running, and the managed instance group does
 	// not have any scheduled actions for this instance.
-	// - CREATING The managed instance group is creating this instance.
+	// - CREATING The managed instance group is creating this instance. If
+	// the group fails to create this instance, it will try again until it
+	// is successful.
+	// - CREATING_WITHOUT_RETRIES The managed instance group is attempting
+	// to create this instance only once. If the group fails to create this
+	// instance, it does not try again and the group's target_size value is
+	// decreased.
 	// - RECREATING The managed instance group is recreating this instance.
 	//
 	// - DELETING The managed instance group is permanently deleting this
@@ -5006,7 +5170,7 @@ type ManagedInstanceLastAttemptErrorsErrors struct {
 	// Code: [Output Only] The error type identifier for this error.
 	Code string `json:"code,omitempty"`
 
-	// Location: [Output Only] Indicates the field in the request which
+	// Location: [Output Only] Indicates the field in the request that
 	// caused the error. This property is optional.
 	Location string `json:"location,omitempty"`
 
@@ -5114,12 +5278,22 @@ func (s *NamedPort) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// Network: A network resource.
+// Network: Represents a Network resource. Read Networks and Firewalls
+// for more information.
 type Network struct {
 	// IPv4Range: The range of internal addresses that are legal on this
 	// network. This range is a CIDR specification, for example:
 	// 192.168.0.0/16. Provided by the client when the network is created.
 	IPv4Range string `json:"IPv4Range,omitempty"`
+
+	// AutoCreateSubnetworks: When set to true, the network is created in
+	// "auto subnet mode". When set to false, the network is in "custom
+	// subnet mode".
+	//
+	// In "auto subnet mode", a newly created network is assigned the
+	// default CIDR of 10.128.0.0/9 and it automatically creates one
+	// subnetwork per region.
+	AutoCreateSubnetworks bool `json:"autoCreateSubnetworks,omitempty"`
 
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
 	// format.
@@ -5153,6 +5327,10 @@ type Network struct {
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
+
+	// Subnetworks: [Output Only] Server-defined fully-qualified URLs for
+	// all subnetworks in this network.
+	Subnetworks []string `json:"subnetworks,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
@@ -5201,9 +5379,22 @@ type NetworkInterface struct {
 	// - global/networks/default
 	Network string `json:"network,omitempty"`
 
-	// NetworkIP: [Output Only] An optional IPV4 internal network address
-	// assigned to the instance for this network interface.
+	// NetworkIP: An IPV4 internal network address to assign to the instance
+	// for this network interface. If not specified by user an unused
+	// internal IP is assigned by system.
 	NetworkIP string `json:"networkIP,omitempty"`
+
+	// Subnetwork: The URL of the Subnetwork resource for this instance. If
+	// the network resource is in legacy mode, do not provide this property.
+	// If the network is in auto subnet mode, providing the subnetwork is
+	// optional. If the network is in custom subnet mode, then this field
+	// should be specified. If you specify this property, you can specify
+	// the subnetwork as a full or partial URL. For example, the following
+	// are all valid URLs:
+	// -
+	// https://www.googleapis.com/compute/v1/projects/project/regions/region/subnetworks/subnetwork
+	// - regions/region/subnetworks/subnetwork
+	Subnetwork string `json:"subnetwork,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "AccessConfigs") to
 	// unconditionally include in API requests. By default, fields with
@@ -5220,7 +5411,7 @@ func (s *NetworkInterface) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// NetworkList: Contains a list of Network resources.
+// NetworkList: Contains a list of networks.
 type NetworkList struct {
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
@@ -5266,8 +5457,7 @@ func (s *NetworkList) MarshalJSON() ([]byte, error) {
 // Operation: An Operation resource, used to manage asynchronous API
 // requests.
 type Operation struct {
-	// ClientOperationId: [Output Only] A unique client ID generated by the
-	// server.
+	// ClientOperationId: [Output Only] Reserved for future use.
 	ClientOperationId string `json:"clientOperationId,omitempty"`
 
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
@@ -5291,8 +5481,8 @@ type Operation struct {
 	HttpErrorMessage string `json:"httpErrorMessage,omitempty"`
 
 	// HttpErrorStatusCode: [Output Only] If the operation fails, this field
-	// contains the HTTP error message that was returned. For example, a 404
-	// means the resource was not found.
+	// contains the HTTP error status code that was returned. For example, a
+	// 404 means the resource was not found.
 	HttpErrorStatusCode int64 `json:"httpErrorStatusCode,omitempty"`
 
 	// Id: [Output Only] The unique identifier for the resource. This
@@ -5310,19 +5500,19 @@ type Operation struct {
 	// Name: [Output Only] Name of the resource.
 	Name string `json:"name,omitempty"`
 
-	// OperationType: [Output Only] The type of operation, which can be
-	// insert, update, or delete.
+	// OperationType: [Output Only] The type of operation, such as insert,
+	// update, or delete, and so on.
 	OperationType string `json:"operationType,omitempty"`
 
 	// Progress: [Output Only] An optional progress indicator that ranges
 	// from 0 to 100. There is no requirement that this be linear or support
-	// any granularity of operations. This should not be used to guess at
-	// when the operation will be complete. This number should monotonically
+	// any granularity of operations. This should not be used to guess when
+	// the operation will be complete. This number should monotonically
 	// increase as the operation progresses.
 	Progress int64 `json:"progress,omitempty"`
 
-	// Region: [Output Only] URL of the region where the operation resides.
-	// Only applicable for regional resources.
+	// Region: [Output Only] The URL of the region where the operation
+	// resides. Only available when performing regional operations.
 	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -5350,7 +5540,7 @@ type Operation struct {
 	TargetId uint64 `json:"targetId,omitempty,string"`
 
 	// TargetLink: [Output Only] The URL of the resource that the operation
-	// is modifying.
+	// modifies.
 	TargetLink string `json:"targetLink,omitempty"`
 
 	// User: [Output Only] User who requested the operation, for example:
@@ -5361,7 +5551,8 @@ type Operation struct {
 	// processing of the operation, this field will be populated.
 	Warnings []*OperationWarnings `json:"warnings,omitempty"`
 
-	// Zone: [Output Only] URL of the zone where the operation resides.
+	// Zone: [Output Only] The URL of the zone where the operation resides.
+	// Only available when performing per-zone operations.
 	Zone string `json:"zone,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -5409,7 +5600,7 @@ type OperationErrorErrors struct {
 	// Code: [Output Only] The error type identifier for this error.
 	Code string `json:"code,omitempty"`
 
-	// Location: [Output Only] Indicates the field in the request which
+	// Location: [Output Only] Indicates the field in the request that
 	// caused the error. This property is optional.
 	Location string `json:"location,omitempty"`
 
@@ -5437,6 +5628,7 @@ type OperationWarnings struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -5482,7 +5674,7 @@ type OperationWarningsData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -5554,7 +5746,7 @@ type OperationList struct {
 	// identifier is defined by the server.
 	Id string `json:"id,omitempty"`
 
-	// Items: [Output Only] The Operation resources.
+	// Items: [Output Only] A list of Operation resources.
 	Items []*Operation `json:"items,omitempty"`
 
 	// Kind: [Output Only] Type of resource. Always compute#operations for
@@ -5622,6 +5814,7 @@ type OperationsScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -5667,7 +5860,7 @@ type OperationsScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -5695,9 +5888,15 @@ func (s *OperationsScopedListWarningData) MarshalJSON() ([]byte, error) {
 // BackendService from the longest-matched rule will serve the URL. If
 // no rule was matched, the default service will be used.
 type PathMatcher struct {
-	// DefaultService: The URL to the BackendService resource. This will be
-	// used if none of the pathRules defined by this PathMatcher is met by
-	// the URL's path portion.
+	// DefaultService: The full or partial URL to the BackendService
+	// resource. This will be used if none of the pathRules defined by this
+	// PathMatcher is matched by the URL's path portion. For example, the
+	// following are all valid URLs to a BackendService resource:
+	// -
+	// https://www.googleapis.com/compute/v1/projects/project/global/backendServices/backendService
+	// - compute/v1/projects/project/global/backendServices/backendService
+	//
+	// - global/backendServices/backendService
 	DefaultService string `json:"defaultService,omitempty"`
 
 	// Description: An optional description of this resource. Provide this
@@ -5754,8 +5953,8 @@ func (s *PathRule) MarshalJSON() ([]byte, error) {
 }
 
 // Project: A Project resource. Projects can only be created in the
-// Google Developers Console. Unless marked otherwise, values can only
-// be modified in the console.
+// Google Cloud Platform Console. Unless marked otherwise, values can
+// only be modified in the console.
 type Project struct {
 	// CommonInstanceMetadata: Metadata key/value pairs available to all
 	// instances contained in this project. See Custom metadata for more
@@ -5791,8 +5990,8 @@ type Project struct {
 	// SelfLink: [Output Only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
-	// UsageExportLocation: The location in Cloud Storage and naming method
-	// of the daily usage report.
+	// UsageExportLocation: The naming prefix for daily usage reports and
+	// the Google Cloud Storage bucket where they are stored.
 	UsageExportLocation *UsageExportLocation `json:"usageExportLocation,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -5823,6 +6022,7 @@ type Quota struct {
 	// Metric: [Output Only] Name of the quota metric.
 	//
 	// Possible values:
+	//   "AUTOSCALERS"
 	//   "BACKEND_SERVICES"
 	//   "CPUS"
 	//   "DISKS_TOTAL_GB"
@@ -5842,6 +6042,7 @@ type Quota struct {
 	//   "SSD_TOTAL_GB"
 	//   "SSL_CERTIFICATES"
 	//   "STATIC_ADDRESSES"
+	//   "SUBNETWORKS"
 	//   "TARGET_HTTPS_PROXIES"
 	//   "TARGET_HTTP_PROXIES"
 	//   "TARGET_INSTANCES"
@@ -5992,21 +6193,24 @@ func (s *ResourceGroupReference) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// Route: The route resource. A Route is a rule that specifies how
-// certain packets should be handled by the virtual network. Routes are
-// associated with instances by tag and the set of Routes for a
-// particular instance is called its routing table. For each packet
-// leaving a instance, the system searches that instance's routing table
-// for a single best matching Route. Routes match packets by destination
-// IP address, preferring smaller or more specific ranges over larger
-// ones. If there is a tie, the system selects the Route with the
-// smallest priority value. If there is still a tie, it uses the layer
-// three and four packet headers to select just one of the remaining
-// matching Routes. The packet is then forwarded as specified by the
-// nextHop field of the winning Route -- either to another instance
-// destination, a instance gateway or a Google Compute Engien-operated
-// gateway. Packets that do not match any Route in the sending
-// instance's routing table are dropped.
+// Route: Represents a Route resource. A route specifies how certain
+// packets should be handled by the network. Routes are associated with
+// instances by tags and the set of routes for a particular instance is
+// called its routing table.
+//
+// For each packet leaving a instance, the system searches that
+// instance's routing table for a single best matching route. Routes
+// match packets by destination IP address, preferring smaller or more
+// specific ranges over larger ones. If there is a tie, the system
+// selects the route with the smallest priority value. If there is still
+// a tie, it uses the layer three and four packet headers to select just
+// one of the remaining matching routes. The packet is then forwarded as
+// specified by the nextHop field of the winning route - either to
+// another instance destination, a instance gateway or a Google Compute
+// Engine-operated gateway.
+//
+// Packets that do not match any route in the sending instance's routing
+// table are dropped.
 type Route struct {
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
 	// format.
@@ -6028,7 +6232,7 @@ type Route struct {
 	// Route resources.
 	Kind string `json:"kind,omitempty"`
 
-	// Name: Name of the resource; provided by the client when the resource
+	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
 	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
@@ -6042,12 +6246,13 @@ type Route struct {
 	Network string `json:"network,omitempty"`
 
 	// NextHopGateway: The URL to a gateway that should handle matching
-	// packets. Currently, this is only the internet gateway:
+	// packets. You can only specify the internet gateway using a full or
+	// partial valid URL:
 	// projects/<project-id>/global/gateways/default-internet-gateway
 	NextHopGateway string `json:"nextHopGateway,omitempty"`
 
-	// NextHopInstance: The fully-qualified URL to an instance that should
-	// handle matching packets. For
+	// NextHopInstance: The URL to an instance that should handle matching
+	// packets. You can specify this as a full or partial URL. For
 	// example:
 	// https://www.googleapis.com/compute/v1/projects/project/zones/
 	// zone/instances/
@@ -6065,9 +6270,11 @@ type Route struct {
 	// packets.
 	NextHopVpnTunnel string `json:"nextHopVpnTunnel,omitempty"`
 
-	// Priority: Breaks ties between Routes of equal specificity. Routes
-	// with smaller values win when tied with routes with larger values.
-	// Default value is 1000. A valid range is between 0 and 65535.
+	// Priority: The priority of this route. Priority is used to break ties
+	// in cases where there is more than one matching route of equal prefix
+	// length. In the case of two routes with equal prefix length, the one
+	// with the lowest-numbered priority value wins. Default value is 1000.
+	// Valid range is 0 through 65535.
 	Priority int64 `json:"priority,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined fully-qualified URL for this
@@ -6106,6 +6313,7 @@ type RouteWarnings struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -6151,7 +6359,7 @@ type RouteWarningsData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -6175,13 +6383,13 @@ func (s *RouteWarningsData) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
-// RouteList: Contains a list of route resources.
+// RouteList: Contains a list of Route resources.
 type RouteList struct {
 	// Id: [Output Only] Unique identifier for the resource. Defined by the
 	// server.
 	Id string `json:"id,omitempty"`
 
-	// Items: A list of Route resources.
+	// Items: [Output Only] A list of Route resources.
 	Items []*Route `json:"items,omitempty"`
 
 	// Kind: Type of resource.
@@ -6229,7 +6437,8 @@ type Scheduling struct {
 	// OnHostMaintenance: Defines the maintenance behavior for this
 	// instance. For standard instances, the default behavior is MIGRATE.
 	// For preemptible instances, the default and only possible behavior is
-	// TERMINATE. For more information, see Setting maintenance behavior.
+	// TERMINATE. For more information, see Setting Instance Scheduling
+	// Options.
 	//
 	// Possible values:
 	//   "MIGRATE"
@@ -6263,7 +6472,7 @@ type SerialPortOutput struct {
 	// compute#serialPortOutput for serial port output.
 	Kind string `json:"kind,omitempty"`
 
-	// SelfLink: [Output Only] Server defined URL for the resource.
+	// SelfLink: [Output Only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -6330,7 +6539,9 @@ type Snapshot struct {
 	// Snapshot resources.
 	Kind string `json:"kind,omitempty"`
 
-	// Licenses: Public visible licenses.
+	// Licenses: [Output Only] A list of public visible licenses that apply
+	// to this snapshot. This can be because the original image had licenses
+	// attached (such as a Windows image).
 	Licenses []string `json:"licenses,omitempty"`
 
 	// Name: Name of the resource; provided by the client when the resource
@@ -6345,7 +6556,8 @@ type Snapshot struct {
 	// SelfLink: [Output Only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
-	// SourceDisk: The source disk used to create this snapshot.
+	// SourceDisk: [Output Only] The source disk used to create this
+	// snapshot.
 	SourceDisk string `json:"sourceDisk,omitempty"`
 
 	// SourceDiskId: [Output Only] The ID value of the disk used to create
@@ -6354,7 +6566,8 @@ type Snapshot struct {
 	// disk name.
 	SourceDiskId string `json:"sourceDiskId,omitempty"`
 
-	// Status: [Output Only] The status of the snapshot.
+	// Status: [Output Only] The status of the snapshot. This can be
+	// CREATING, DELETING, FAILED, READY, or UPLOADING.
 	//
 	// Possible values:
 	//   "CREATING"
@@ -6371,7 +6584,9 @@ type Snapshot struct {
 
 	// StorageBytesStatus: [Output Only] An indicator whether storageBytes
 	// is in a stable state or it is being adjusted as a result of shared
-	// storage reallocation.
+	// storage reallocation. This status can either be UPDATING, meaning the
+	// size of the snapshot is being updated, or UP_TO_DATE, meaning the
+	// size of the snapshot is up-to-date.
 	//
 	// Possible values:
 	//   "UPDATING"
@@ -6403,7 +6618,7 @@ type SnapshotList struct {
 	// identifier is defined by the server.
 	Id string `json:"id,omitempty"`
 
-	// Items: A list of Snapshot resources.
+	// Items: [Output Only] A list of Snapshot resources.
 	Items []*Snapshot `json:"items,omitempty"`
 
 	// Kind: Type of resource.
@@ -6440,8 +6655,8 @@ func (s *SnapshotList) MarshalJSON() ([]byte, error) {
 }
 
 // SslCertificate: An SslCertificate resource. This resource provides a
-// mechanism to upload an SSL key and certificate to global HTTPS
-// loadbalancer to serve secure connections.
+// mechanism to upload an SSL key and certificate to the load balancer
+// to serve secure connections from the user.
 type SslCertificate struct {
 	// Certificate: A local certificate file. The certificate must be in PEM
 	// format. The certificate chain must be no greater than 5 certs long.
@@ -6541,6 +6756,259 @@ func (s *SslCertificateList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
+// Subnetwork: A Subnetwork resource.
+type Subnetwork struct {
+	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
+	// format.
+	CreationTimestamp string `json:"creationTimestamp,omitempty"`
+
+	// Description: An optional description of this resource. Provide this
+	// property when you create the resource.
+	Description string `json:"description,omitempty"`
+
+	// GatewayAddress: [Output Only] The gateway address for default routes
+	// to reach destination addresses outside this subnetwork.
+	GatewayAddress string `json:"gatewayAddress,omitempty"`
+
+	// Id: [Output Only] The unique identifier for the resource. This
+	// identifier is defined by the server.
+	Id uint64 `json:"id,omitempty,string"`
+
+	// IpCidrRange: The range of internal addresses that are owned by this
+	// subnetwork. Provide this property when you create the subnetwork. For
+	// example, 10.0.0.0/8 or 192.168.0.0/16. Ranges must be unique and
+	// non-overlapping within a network.
+	IpCidrRange string `json:"ipCidrRange,omitempty"`
+
+	// Kind: [Output Only] Type of the resource. Always compute#subnetwork
+	// for Subnetwork resources.
+	Kind string `json:"kind,omitempty"`
+
+	// Name: The name of the resource, provided by the client when initially
+	// creating the resource. The name must be 1-63 characters long, and
+	// comply with RFC1035. Specifically, the name must be 1-63 characters
+	// long and match the regular expression [a-z]([-a-z0-9]*[a-z0-9])?
+	// which means the first character must be a lowercase letter, and all
+	// following characters must be a dash, lowercase letter, or digit,
+	// except the last character, which cannot be a dash.
+	Name string `json:"name,omitempty"`
+
+	// Network: The URL of the network to which this subnetwork belongs,
+	// provided by the client when initially creating the subnetwork. Only
+	// networks that are in the distributed mode can have subnetworks.
+	Network string `json:"network,omitempty"`
+
+	// Region: URL of the region where the Subnetwork resides.
+	Region string `json:"region,omitempty"`
+
+	// SelfLink: [Output Only] Server-defined URL for the resource.
+	SelfLink string `json:"selfLink,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "CreationTimestamp")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *Subnetwork) MarshalJSON() ([]byte, error) {
+	type noMethod Subnetwork
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
+type SubnetworkAggregatedList struct {
+	// Id: [Output Only] The unique identifier for the resource. This
+	// identifier is defined by the server.
+	Id string `json:"id,omitempty"`
+
+	// Items: [Output] A map of scoped Subnetwork lists.
+	Items map[string]SubnetworksScopedList `json:"items,omitempty"`
+
+	// Kind: [Output Only] Type of resource. Always
+	// compute#subnetworkAggregatedList for aggregated lists of subnetworks.
+	Kind string `json:"kind,omitempty"`
+
+	// NextPageToken: [Output Only] This token allows you to get the next
+	// page of results for list requests. If the number of results is larger
+	// than maxResults, use the nextPageToken as a value for the query
+	// parameter pageToken in the next list request. Subsequent list
+	// requests will have their own nextPageToken to continue paging through
+	// the results.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// SelfLink: [Output Only] Server-defined URL for this resource.
+	SelfLink string `json:"selfLink,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Id") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *SubnetworkAggregatedList) MarshalJSON() ([]byte, error) {
+	type noMethod SubnetworkAggregatedList
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
+// SubnetworkList: Contains a list of Subnetwork resources.
+type SubnetworkList struct {
+	// Id: [Output Only] The unique identifier for the resource. This
+	// identifier is defined by the server.
+	Id string `json:"id,omitempty"`
+
+	// Items: The Subnetwork resources.
+	Items []*Subnetwork `json:"items,omitempty"`
+
+	// Kind: [Output Only] Type of resource. Always compute#subnetworkList
+	// for lists of subnetworks.
+	Kind string `json:"kind,omitempty"`
+
+	// NextPageToken: [Output Only] This token allows you to get the next
+	// page of results for list requests. If the number of results is larger
+	// than maxResults, use the nextPageToken as a value for the query
+	// parameter pageToken in the next list request. Subsequent list
+	// requests will have their own nextPageToken to continue paging through
+	// the results.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// SelfLink: [Output Only] Server-defined URL for this resource.
+	SelfLink string `json:"selfLink,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Id") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *SubnetworkList) MarshalJSON() ([]byte, error) {
+	type noMethod SubnetworkList
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
+type SubnetworksScopedList struct {
+	// Subnetworks: List of subnetworks contained in this scope.
+	Subnetworks []*Subnetwork `json:"subnetworks,omitempty"`
+
+	// Warning: An informational warning that appears when the list of
+	// addresses is empty.
+	Warning *SubnetworksScopedListWarning `json:"warning,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Subnetworks") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *SubnetworksScopedList) MarshalJSON() ([]byte, error) {
+	type noMethod SubnetworksScopedList
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
+// SubnetworksScopedListWarning: An informational warning that appears
+// when the list of addresses is empty.
+type SubnetworksScopedListWarning struct {
+	// Code: [Output Only] A warning code, if applicable. For example,
+	// Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in
+	// the response.
+	//
+	// Possible values:
+	//   "CLEANUP_FAILED"
+	//   "DEPRECATED_RESOURCE_USED"
+	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
+	//   "INJECTED_KERNELS_DEPRECATED"
+	//   "NEXT_HOP_ADDRESS_NOT_ASSIGNED"
+	//   "NEXT_HOP_CANNOT_IP_FORWARD"
+	//   "NEXT_HOP_INSTANCE_NOT_FOUND"
+	//   "NEXT_HOP_INSTANCE_NOT_ON_NETWORK"
+	//   "NEXT_HOP_NOT_RUNNING"
+	//   "NOT_CRITICAL_ERROR"
+	//   "NO_RESULTS_ON_PAGE"
+	//   "REQUIRED_TOS_AGREEMENT"
+	//   "RESOURCE_NOT_DELETED"
+	//   "SINGLE_INSTANCE_PROPERTY_TEMPLATE"
+	//   "UNREACHABLE"
+	Code string `json:"code,omitempty"`
+
+	// Data: [Output Only] Metadata about this warning in key: value format.
+	// For example:
+	// "data": [ { "key": "scope", "value": "zones/us-east1-d" }
+	Data []*SubnetworksScopedListWarningData `json:"data,omitempty"`
+
+	// Message: [Output Only] A human-readable description of the warning
+	// code.
+	Message string `json:"message,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Code") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *SubnetworksScopedListWarning) MarshalJSON() ([]byte, error) {
+	type noMethod SubnetworksScopedListWarning
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
+type SubnetworksScopedListWarningData struct {
+	// Key: [Output Only] A key that provides more detail on the warning
+	// being returned. For example, for warnings where there are no results
+	// in a list request for a particular zone, this key might be scope and
+	// the key value might be the zone name. Other examples might be a key
+	// indicating a deprecated resource and a suggested replacement, or a
+	// warning about invalid network settings (for example, if an instance
+	// attempts to perform IP forwarding but is not enabled for IP
+	// forwarding).
+	Key string `json:"key,omitempty"`
+
+	// Value: [Output Only] A warning data value corresponding to the key.
+	Value string `json:"value,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Key") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *SubnetworksScopedListWarningData) MarshalJSON() ([]byte, error) {
+	type noMethod SubnetworksScopedListWarningData
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}
+
 // Tags: A set of instance tags.
 type Tags struct {
 	// Fingerprint: Specifies a fingerprint for this request, which is
@@ -6591,7 +7059,7 @@ type TargetHttpProxy struct {
 	// for target HTTP proxies.
 	Kind string `json:"kind,omitempty"`
 
-	// Name: Name of the resource; provided by the client when the resource
+	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
 	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
@@ -6636,7 +7104,7 @@ type TargetHttpProxyList struct {
 	Items []*TargetHttpProxy `json:"items,omitempty"`
 
 	// Kind: Type of resource. Always compute#targetHttpProxyList for lists
-	// of Target HTTP proxies.
+	// of target HTTP proxies.
 	Kind string `json:"kind,omitempty"`
 
 	// NextPageToken: [Output Only] This token allows you to get the next
@@ -6670,9 +7138,9 @@ func (s *TargetHttpProxyList) MarshalJSON() ([]byte, error) {
 }
 
 type TargetHttpsProxiesSetSslCertificatesRequest struct {
-	// SslCertificates: New set of URLs to SslCertificate resources to
-	// associate with this TargetHttpProxy. Currently exactly one ssl
-	// certificate must be specified.
+	// SslCertificates: New set of SslCertificate resources to associate
+	// with this TargetHttpsProxy resource. Currently exactly one
+	// SslCertificate resource must be specified.
 	SslCertificates []string `json:"sslCertificates,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "SslCertificates") to
@@ -6705,8 +7173,8 @@ type TargetHttpsProxy struct {
 	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
 
-	// Kind: [Output Only] Type of the resource. Always
-	// compute#targetHttpsProxy for target HTTPS proxies.
+	// Kind: [Output Only] Type of resource. Always compute#targetHttpsProxy
+	// for target HTTPS proxies.
 	Kind string `json:"kind,omitempty"`
 
 	// Name: Name of the resource. Provided by the client when the resource
@@ -6722,12 +7190,17 @@ type TargetHttpsProxy struct {
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// SslCertificates: URLs to SslCertificate resources that are used to
-	// authenticate connections to Backends. Currently exactly one SSL
-	// certificate must be specified.
+	// authenticate connections between users and the load balancer.
+	// Currently, exactly one SSL certificate must be specified.
 	SslCertificates []string `json:"sslCertificates,omitempty"`
 
-	// UrlMap: URL to the UrlMap resource that defines the mapping from URL
-	// to the BackendService.
+	// UrlMap: A fully-qualified or valid partial URL to the UrlMap resource
+	// that defines the mapping from URL to the BackendService. For example,
+	// the following are all valid URLs for specifying a URL map:
+	// -
+	// https://www.googleapis.compute/v1/projects/project/global/urlMaps/url-map
+	// - projects/project/global/urlMaps/url-map
+	// - global/urlMaps/url-map
 	UrlMap string `json:"urlMap,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -6758,7 +7231,8 @@ type TargetHttpsProxyList struct {
 	// Items: A list of TargetHttpsProxy resources.
 	Items []*TargetHttpsProxy `json:"items,omitempty"`
 
-	// Kind: Type of resource.
+	// Kind: Type of resource. Always compute#targetHttpsProxyList for lists
+	// of target HTTPS proxies.
 	Kind string `json:"kind,omitempty"`
 
 	// NextPageToken: [Output Only] This token allows you to get the next
@@ -6806,8 +7280,14 @@ type TargetInstance struct {
 	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
 
-	// Instance: The URL to the instance that terminates the relevant
-	// traffic.
+	// Instance: A URL to the virtual machine instance that handles traffic
+	// for this target instance. When creating a target instance, you can
+	// provide the fully-qualified URL or a valid partial URL to the desired
+	// virtual machine. For example, the following are all valid URLs:
+	// -
+	// https://www.googleapis.com/compute/v1/projects/project/zones/zone/instances/instance
+	// - projects/project/zones/zone/instances/instance
+	// - zones/zone/instances/instance
 	Instance string `json:"instance,omitempty"`
 
 	// Kind: [Output Only] The type of the resource. Always
@@ -6970,6 +7450,7 @@ type TargetInstancesScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -7015,7 +7496,7 @@ type TargetInstancesScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -7041,7 +7522,7 @@ func (s *TargetInstancesScopedListWarningData) MarshalJSON() ([]byte, error) {
 
 // TargetPool: A TargetPool resource. This resource defines a pool of
 // instances, associated HttpHealthCheck resources, and the fallback
-// TargetPool.
+// target pool.
 type TargetPool struct {
 	// BackupPool: This field is applicable only when the containing target
 	// pool is serving a forwarding rule as the primary pool, and its
@@ -7096,7 +7577,7 @@ type TargetPool struct {
 	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
 
-	// Instances: A list of resource URLs to the member virtual machines
+	// Instances: A list of resource URLs to the virtual machine instances
 	// serving this pool. They must live in zones contained in the same
 	// region as this pool.
 	Instances []string `json:"instances,omitempty"`
@@ -7162,10 +7643,12 @@ type TargetPoolAggregatedList struct {
 	// server.
 	Id string `json:"id,omitempty"`
 
-	// Items: A map of scoped target pool lists.
+	// Items: [Output Only] A map of scoped target pool lists.
 	Items map[string]TargetPoolsScopedList `json:"items,omitempty"`
 
-	// Kind: Type of resource.
+	// Kind: [Output Only] Type of resource. Always
+	// compute#targetPoolAggregatedList for aggregated lists of target
+	// pools.
 	Kind string `json:"kind,omitempty"`
 
 	// NextPageToken: [Output Only] This token allows you to get the next
@@ -7201,7 +7684,9 @@ func (s *TargetPoolAggregatedList) MarshalJSON() ([]byte, error) {
 type TargetPoolInstanceHealth struct {
 	HealthStatus []*HealthStatus `json:"healthStatus,omitempty"`
 
-	// Kind: Type of resource.
+	// Kind: [Output Only] Type of resource. Always
+	// compute#targetPoolInstanceHealth when checking the health of an
+	// instance.
 	Kind string `json:"kind,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -7232,7 +7717,8 @@ type TargetPoolList struct {
 	// Items: A list of TargetPool resources.
 	Items []*TargetPool `json:"items,omitempty"`
 
-	// Kind: Type of resource.
+	// Kind: [Output Only] Type of resource. Always compute#targetPoolList
+	// for lists of target pools.
 	Kind string `json:"kind,omitempty"`
 
 	// NextPageToken: [Output Only] This token allows you to get the next
@@ -7266,7 +7752,8 @@ func (s *TargetPoolList) MarshalJSON() ([]byte, error) {
 }
 
 type TargetPoolsAddHealthCheckRequest struct {
-	// HealthChecks: Health check URLs to be added to targetPool.
+	// HealthChecks: A list of HttpHealthCheck resources to add to the
+	// target pool.
 	HealthChecks []*HealthCheckReference `json:"healthChecks,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "HealthChecks") to
@@ -7285,7 +7772,13 @@ func (s *TargetPoolsAddHealthCheckRequest) MarshalJSON() ([]byte, error) {
 }
 
 type TargetPoolsAddInstanceRequest struct {
-	// Instances: URLs of the instances to be added to targetPool.
+	// Instances: A full or partial URL to an instance to add to this target
+	// pool. This can be a full or partial URL. For example, the following
+	// are valid URLs:
+	// -
+	// https://www.googleapis.com/compute/v1/projects/project-id/zones/zone/instances/instance-name
+	// - projects/project-id/zones/zone/instances/instance-name
+	// - zones/zone/instances/instance-name
 	Instances []*InstanceReference `json:"instances,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Instances") to
@@ -7304,7 +7797,12 @@ func (s *TargetPoolsAddInstanceRequest) MarshalJSON() ([]byte, error) {
 }
 
 type TargetPoolsRemoveHealthCheckRequest struct {
-	// HealthChecks: Health check URLs to be removed from targetPool.
+	// HealthChecks: Health check URL to be removed. This can be a full or
+	// valid partial URL. For example, the following are valid URLs:
+	// -
+	// https://www.googleapis.com/compute/beta/projects/project/global/httpHealthChecks/health-check
+	// - projects/project/global/httpHealthChecks/health-check
+	// - global/httpHealthChecks/health-check
 	HealthChecks []*HealthCheckReference `json:"healthChecks,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "HealthChecks") to
@@ -7323,7 +7821,7 @@ func (s *TargetPoolsRemoveHealthCheckRequest) MarshalJSON() ([]byte, error) {
 }
 
 type TargetPoolsRemoveInstanceRequest struct {
-	// Instances: URLs of the instances to be removed from targetPool.
+	// Instances: URLs of the instances to be removed from target pool.
 	Instances []*InstanceReference `json:"instances,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Instances") to
@@ -7372,6 +7870,7 @@ type TargetPoolsScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -7417,7 +7916,7 @@ type TargetPoolsScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -7459,6 +7958,7 @@ func (s *TargetReference) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
+// TargetVpnGateway: Represents a Target VPN gateway resource.
 type TargetVpnGateway struct {
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
 	// format.
@@ -7481,7 +7981,7 @@ type TargetVpnGateway struct {
 	// for target VPN gateways.
 	Kind string `json:"kind,omitempty"`
 
-	// Name: Name of the resource; provided by the client when the resource
+	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
 	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
@@ -7511,8 +8011,8 @@ type TargetVpnGateway struct {
 	Status string `json:"status,omitempty"`
 
 	// Tunnels: [Output Only] A list of URLs to VpnTunnel resources.
-	// VpnTunnels are created using compute.vpntunnels.insert and associated
-	// to a VPN gateway.
+	// VpnTunnels are created using compute.vpntunnels.insert method and
+	// associated to a VPN gateway.
 	Tunnels []string `json:"tunnels,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -7651,6 +8151,7 @@ type TargetVpnGatewaysScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -7696,7 +8197,7 @@ type TargetVpnGatewaysScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -7793,7 +8294,7 @@ type UrlMap struct {
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// Tests: The list of expected URL mappings. Request to update this
-	// UrlMap will succeed only all of the test cases pass.
+	// UrlMap will succeed only if all of the test cases pass.
 	Tests []*UrlMapTest `json:"tests,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -7983,8 +8484,10 @@ func (s *UrlMapsValidateResponse) MarshalJSON() ([]byte, error) {
 type UsageExportLocation struct {
 	// BucketName: The name of an existing bucket in Cloud Storage where the
 	// usage report object is stored. The Google Service Account is granted
-	// write access to this bucket. This is just the bucket name, with no
-	// gs:// or https://storage.googleapis.com/ in front of it.
+	// write access to this bucket. This can either be the bucket name by
+	// itself, such as example-bucket, or the bucket name with gs:// or
+	// https://storage.googleapis.com/ in front of it, such as
+	// gs://example-bucket.
 	BucketName string `json:"bucketName,omitempty"`
 
 	// ReportNamePrefix: An optional prefix for the name of the usage report
@@ -8036,7 +8539,13 @@ type VpnTunnel struct {
 	// VPN tunnels.
 	Kind string `json:"kind,omitempty"`
 
-	// Name: Name of the resource; provided by the client when the resource
+	// LocalTrafficSelector: Local traffic selector to use when establishing
+	// the VPN tunnel with peer VPN gateway. The value should be a CIDR
+	// formatted string, for example: 192.168.0.0/16. The ranges should be
+	// disjoint.
+	LocalTrafficSelector []string `json:"localTrafficSelector,omitempty"`
+
+	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
 	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
@@ -8055,7 +8564,7 @@ type VpnTunnel struct {
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// SharedSecret: Shared secret used to set the secure session between
-	// the GCE VPN gateway and the peer VPN gateway.
+	// the Cloud VPN gateway and the peer VPN gateway.
 	SharedSecret string `json:"sharedSecret,omitempty"`
 
 	// SharedSecretHash: Hash of the shared secret.
@@ -8064,6 +8573,7 @@ type VpnTunnel struct {
 	// Status: [Output Only] The status of the VPN tunnel.
 	//
 	// Possible values:
+	//   "ALLOCATING_RESOURCES"
 	//   "AUTHORIZATION_ERROR"
 	//   "DEPROVISIONING"
 	//   "ESTABLISHED"
@@ -8077,8 +8587,8 @@ type VpnTunnel struct {
 	//   "WAITING_FOR_FULL_CONFIG"
 	Status string `json:"status,omitempty"`
 
-	// TargetVpnGateway: URL of the VPN gateway to which this VPN tunnel is
-	// associated. Provided by the client when the VPN tunnel is created.
+	// TargetVpnGateway: URL of the VPN gateway with which this VPN tunnel
+	// is associated. Provided by the client when the VPN tunnel is created.
 	TargetVpnGateway string `json:"targetVpnGateway,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -8216,6 +8726,7 @@ type VpnTunnelsScopedListWarning struct {
 	// the response.
 	//
 	// Possible values:
+	//   "CLEANUP_FAILED"
 	//   "DEPRECATED_RESOURCE_USED"
 	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
 	//   "INJECTED_KERNELS_DEPRECATED"
@@ -8261,7 +8772,7 @@ type VpnTunnelsScopedListWarningData struct {
 	// being returned. For example, for warnings where there are no results
 	// in a list request for a particular zone, this key might be scope and
 	// the key value might be the zone name. Other examples might be a key
-	// indicating a deprecated resource, and a suggested replacement, or a
+	// indicating a deprecated resource and a suggested replacement, or a
 	// warning about invalid network settings (for example, if an instance
 	// attempts to perform IP forwarding but is not enabled for IP
 	// forwarding).
@@ -8306,12 +8817,6 @@ type Zone struct {
 	// zones.
 	Kind string `json:"kind,omitempty"`
 
-	// MaintenanceWindows: [Output Only] Any scheduled maintenance windows
-	// for this zone. When the zone is in a maintenance window, all
-	// resources which reside in the zone will be unavailable. For more
-	// information, see Maintenance Windows
-	MaintenanceWindows []*ZoneMaintenanceWindows `json:"maintenanceWindows,omitempty"`
-
 	// Name: [Output Only] Name of the resource.
 	Name string `json:"name,omitempty"`
 
@@ -8344,37 +8849,6 @@ type Zone struct {
 
 func (s *Zone) MarshalJSON() ([]byte, error) {
 	type noMethod Zone
-	raw := noMethod(*s)
-	return gensupport.MarshalJSON(raw, s.ForceSendFields)
-}
-
-type ZoneMaintenanceWindows struct {
-	// BeginTime: [Output Only] Starting time of the maintenance window, in
-	// RFC3339 format.
-	BeginTime string `json:"beginTime,omitempty"`
-
-	// Description: [Output Only] Textual description of the maintenance
-	// window.
-	Description string `json:"description,omitempty"`
-
-	// EndTime: [Output Only] Ending time of the maintenance window, in
-	// RFC3339 format.
-	EndTime string `json:"endTime,omitempty"`
-
-	// Name: [Output Only] Name of the maintenance window.
-	Name string `json:"name,omitempty"`
-
-	// ForceSendFields is a list of field names (e.g. "BeginTime") to
-	// unconditionally include in API requests. By default, fields with
-	// empty values are omitted from API requests. However, any non-pointer,
-	// non-interface field appearing in ForceSendFields will be sent to the
-	// server regardless of whether the field is empty or not. This may be
-	// used to include empty fields in Patch requests.
-	ForceSendFields []string `json:"-"`
-}
-
-func (s *ZoneMaintenanceWindows) MarshalJSON() ([]byte, error) {
-	type noMethod ZoneMaintenanceWindows
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
@@ -8431,7 +8905,7 @@ type AddressesAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of addresses grouped by scope.
+// AggregatedList: Retrieves an aggregated list of addresses.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/addresses/aggregatedList
 func (r *AddressesService) AggregatedList(project string) *AddressesAggregatedListCall {
 	c := &AddressesAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -8453,19 +8927,20 @@ func (r *AddressesService) AggregatedList(project string) *AddressesAggregatedLi
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *AddressesAggregatedListCall) Filter(filter string) *AddressesAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -8473,10 +8948,10 @@ func (c *AddressesAggregatedListCall) Filter(filter string) *AddressesAggregated
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *AddressesAggregatedListCall) MaxResults(maxResults int64) *AddressesAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -8487,23 +8962,6 @@ func (c *AddressesAggregatedListCall) MaxResults(maxResults int64) *AddressesAgg
 // previous list request to get the next page of results.
 func (c *AddressesAggregatedListCall) PageToken(pageToken string) *AddressesAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AddressesAggregatedListCall) QuotaUser(quotaUser string) *AddressesAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AddressesAggregatedListCall) UserIP(userIP string) *AddressesAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -8559,7 +9017,8 @@ func (c *AddressesAggregatedListCall) doRequest(alt string) (*http.Response, err
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *AddressesAggregatedListCall) Do() (*AddressAggregatedList, error) {
+func (c *AddressesAggregatedListCall) Do(opts ...googleapi.CallOption) (*AddressAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -8588,7 +9047,7 @@ func (c *AddressesAggregatedListCall) Do() (*AddressAggregatedList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of addresses grouped by scope.",
+	//   "description": "Retrieves an aggregated list of addresses.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.addresses.aggregatedList",
 	//   "parameterOrder": [
@@ -8596,13 +9055,13 @@ func (c *AddressesAggregatedListCall) Do() (*AddressAggregatedList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -8635,6 +9094,27 @@ func (c *AddressesAggregatedListCall) Do() (*AddressAggregatedList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *AddressesAggregatedListCall) Pages(ctx context.Context, f func(*AddressAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.addresses.delete":
 
 type AddressesDeleteCall struct {
@@ -8653,23 +9133,6 @@ func (r *AddressesService) Delete(project string, region string, address string)
 	c.project = project
 	c.region = region
 	c.address = address
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AddressesDeleteCall) QuotaUser(quotaUser string) *AddressesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AddressesDeleteCall) UserIP(userIP string) *AddressesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -8714,7 +9177,8 @@ func (c *AddressesDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AddressesDeleteCall) Do() (*Operation, error) {
+func (c *AddressesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -8767,7 +9231,7 @@ func (c *AddressesDeleteCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -8805,23 +9269,6 @@ func (r *AddressesService) Get(project string, region string, address string) *A
 	c.project = project
 	c.region = region
 	c.address = address
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AddressesGetCall) QuotaUser(quotaUser string) *AddressesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AddressesGetCall) UserIP(userIP string) *AddressesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -8879,7 +9326,8 @@ func (c *AddressesGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *AddressesGetCall) Do() (*Address, error) {
+func (c *AddressesGetCall) Do(opts ...googleapi.CallOption) (*Address, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -8932,7 +9380,7 @@ func (c *AddressesGetCall) Do() (*Address, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -8971,23 +9419,6 @@ func (r *AddressesService) Insert(project string, region string, address *Addres
 	c.project = project
 	c.region = region
 	c.address = address
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AddressesInsertCall) QuotaUser(quotaUser string) *AddressesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AddressesInsertCall) UserIP(userIP string) *AddressesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -9037,7 +9468,8 @@ func (c *AddressesInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AddressesInsertCall) Do() (*Operation, error) {
+func (c *AddressesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -9082,7 +9514,7 @@ func (c *AddressesInsertCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -9115,8 +9547,8 @@ type AddressesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of address resources contained within the
-// specified region.
+// List: Retrieves a list of addresses contained within the specified
+// region.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/addresses/list
 func (r *AddressesService) List(project string, region string) *AddressesListCall {
 	c := &AddressesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -9139,19 +9571,20 @@ func (r *AddressesService) List(project string, region string) *AddressesListCal
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *AddressesListCall) Filter(filter string) *AddressesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -9159,10 +9592,10 @@ func (c *AddressesListCall) Filter(filter string) *AddressesListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *AddressesListCall) MaxResults(maxResults int64) *AddressesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -9173,23 +9606,6 @@ func (c *AddressesListCall) MaxResults(maxResults int64) *AddressesListCall {
 // previous list request to get the next page of results.
 func (c *AddressesListCall) PageToken(pageToken string) *AddressesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AddressesListCall) QuotaUser(quotaUser string) *AddressesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AddressesListCall) UserIP(userIP string) *AddressesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -9246,7 +9662,8 @@ func (c *AddressesListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AddressesListCall) Do() (*AddressList, error) {
+func (c *AddressesListCall) Do(opts ...googleapi.CallOption) (*AddressList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -9275,7 +9692,7 @@ func (c *AddressesListCall) Do() (*AddressList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of address resources contained within the specified region.",
+	//   "description": "Retrieves a list of addresses contained within the specified region.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.addresses.list",
 	//   "parameterOrder": [
@@ -9284,13 +9701,13 @@ func (c *AddressesListCall) Do() (*AddressList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -9310,7 +9727,7 @@ func (c *AddressesListCall) Do() (*AddressList, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -9330,6 +9747,27 @@ func (c *AddressesListCall) Do() (*AddressList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *AddressesListCall) Pages(ctx context.Context, f func(*AddressList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.autoscalers.aggregatedList":
 
 type AutoscalersAggregatedListCall struct {
@@ -9340,7 +9778,7 @@ type AutoscalersAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of autoscalers grouped by scope.
+// AggregatedList: Retrieves an aggregated list of autoscalers.
 func (r *AutoscalersService) AggregatedList(project string) *AutoscalersAggregatedListCall {
 	c := &AutoscalersAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
@@ -9361,19 +9799,20 @@ func (r *AutoscalersService) AggregatedList(project string) *AutoscalersAggregat
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *AutoscalersAggregatedListCall) Filter(filter string) *AutoscalersAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -9381,10 +9820,10 @@ func (c *AutoscalersAggregatedListCall) Filter(filter string) *AutoscalersAggreg
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *AutoscalersAggregatedListCall) MaxResults(maxResults int64) *AutoscalersAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -9395,23 +9834,6 @@ func (c *AutoscalersAggregatedListCall) MaxResults(maxResults int64) *Autoscaler
 // previous list request to get the next page of results.
 func (c *AutoscalersAggregatedListCall) PageToken(pageToken string) *AutoscalersAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AutoscalersAggregatedListCall) QuotaUser(quotaUser string) *AutoscalersAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AutoscalersAggregatedListCall) UserIP(userIP string) *AutoscalersAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -9467,7 +9889,8 @@ func (c *AutoscalersAggregatedListCall) doRequest(alt string) (*http.Response, e
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *AutoscalersAggregatedListCall) Do() (*AutoscalerAggregatedList, error) {
+func (c *AutoscalersAggregatedListCall) Do(opts ...googleapi.CallOption) (*AutoscalerAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -9496,7 +9919,7 @@ func (c *AutoscalersAggregatedListCall) Do() (*AutoscalerAggregatedList, error) 
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of autoscalers grouped by scope.",
+	//   "description": "Retrieves an aggregated list of autoscalers.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.autoscalers.aggregatedList",
 	//   "parameterOrder": [
@@ -9504,13 +9927,13 @@ func (c *AutoscalersAggregatedListCall) Do() (*AutoscalerAggregatedList, error) 
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -9543,6 +9966,27 @@ func (c *AutoscalersAggregatedListCall) Do() (*AutoscalerAggregatedList, error) 
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *AutoscalersAggregatedListCall) Pages(ctx context.Context, f func(*AutoscalerAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.autoscalers.delete":
 
 type AutoscalersDeleteCall struct {
@@ -9554,29 +9998,12 @@ type AutoscalersDeleteCall struct {
 	ctx_       context.Context
 }
 
-// Delete: Deletes the specified autoscaler resource.
+// Delete: Deletes the specified autoscaler.
 func (r *AutoscalersService) Delete(project string, zone string, autoscaler string) *AutoscalersDeleteCall {
 	c := &AutoscalersDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.autoscaler = autoscaler
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AutoscalersDeleteCall) QuotaUser(quotaUser string) *AutoscalersDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AutoscalersDeleteCall) UserIP(userIP string) *AutoscalersDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -9621,7 +10048,8 @@ func (c *AutoscalersDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AutoscalersDeleteCall) Do() (*Operation, error) {
+func (c *AutoscalersDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -9650,7 +10078,7 @@ func (c *AutoscalersDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified autoscaler resource.",
+	//   "description": "Deletes the specified autoscaler.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.autoscalers.delete",
 	//   "parameterOrder": [
@@ -9660,7 +10088,7 @@ func (c *AutoscalersDeleteCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "autoscaler": {
-	//       "description": "Name of the persistent autoscaler resource to delete.",
+	//       "description": "Name of the autoscaler to delete.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -9674,7 +10102,7 @@ func (c *AutoscalersDeleteCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -9705,29 +10133,13 @@ type AutoscalersGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified autoscaler resource.
+// Get: Returns the specified autoscaler resource. Get a list of
+// available autoscalers by making a list() request.
 func (r *AutoscalersService) Get(project string, zone string, autoscaler string) *AutoscalersGetCall {
 	c := &AutoscalersGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.autoscaler = autoscaler
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AutoscalersGetCall) QuotaUser(quotaUser string) *AutoscalersGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AutoscalersGetCall) UserIP(userIP string) *AutoscalersGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -9785,7 +10197,8 @@ func (c *AutoscalersGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AutoscalersGetCall) Do() (*Autoscaler, error) {
+func (c *AutoscalersGetCall) Do(opts ...googleapi.CallOption) (*Autoscaler, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -9814,7 +10227,7 @@ func (c *AutoscalersGetCall) Do() (*Autoscaler, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified autoscaler resource.",
+	//   "description": "Returns the specified autoscaler resource. Get a list of available autoscalers by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.autoscalers.get",
 	//   "parameterOrder": [
@@ -9824,7 +10237,7 @@ func (c *AutoscalersGetCall) Do() (*Autoscaler, error) {
 	//   ],
 	//   "parameters": {
 	//     "autoscaler": {
-	//       "description": "Name of the persistent autoscaler resource to return.",
+	//       "description": "Name of the autoscaler to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -9838,7 +10251,7 @@ func (c *AutoscalersGetCall) Do() (*Autoscaler, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -9869,30 +10282,13 @@ type AutoscalersInsertCall struct {
 	ctx_       context.Context
 }
 
-// Insert: Creates an autoscaler resource in the specified project using
-// the data included in the request.
+// Insert: Creates an autoscaler in the specified project using the data
+// included in the request.
 func (r *AutoscalersService) Insert(project string, zone string, autoscaler *Autoscaler) *AutoscalersInsertCall {
 	c := &AutoscalersInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.autoscaler = autoscaler
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AutoscalersInsertCall) QuotaUser(quotaUser string) *AutoscalersInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AutoscalersInsertCall) UserIP(userIP string) *AutoscalersInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -9942,7 +10338,8 @@ func (c *AutoscalersInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AutoscalersInsertCall) Do() (*Operation, error) {
+func (c *AutoscalersInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -9971,7 +10368,7 @@ func (c *AutoscalersInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates an autoscaler resource in the specified project using the data included in the request.",
+	//   "description": "Creates an autoscaler in the specified project using the data included in the request.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.autoscalers.insert",
 	//   "parameterOrder": [
@@ -9987,7 +10384,7 @@ func (c *AutoscalersInsertCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -10020,8 +10417,8 @@ type AutoscalersListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of autoscaler resources contained within the
-// specified zone.
+// List: Retrieves a list of autoscalers contained within the specified
+// zone.
 func (r *AutoscalersService) List(project string, zone string) *AutoscalersListCall {
 	c := &AutoscalersListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
@@ -10043,19 +10440,20 @@ func (r *AutoscalersService) List(project string, zone string) *AutoscalersListC
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *AutoscalersListCall) Filter(filter string) *AutoscalersListCall {
 	c.urlParams_.Set("filter", filter)
@@ -10063,10 +10461,10 @@ func (c *AutoscalersListCall) Filter(filter string) *AutoscalersListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *AutoscalersListCall) MaxResults(maxResults int64) *AutoscalersListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -10077,23 +10475,6 @@ func (c *AutoscalersListCall) MaxResults(maxResults int64) *AutoscalersListCall 
 // previous list request to get the next page of results.
 func (c *AutoscalersListCall) PageToken(pageToken string) *AutoscalersListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AutoscalersListCall) QuotaUser(quotaUser string) *AutoscalersListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AutoscalersListCall) UserIP(userIP string) *AutoscalersListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -10150,7 +10531,8 @@ func (c *AutoscalersListCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *AutoscalersListCall) Do() (*AutoscalerList, error) {
+func (c *AutoscalersListCall) Do(opts ...googleapi.CallOption) (*AutoscalerList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -10179,7 +10561,7 @@ func (c *AutoscalersListCall) Do() (*AutoscalerList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of autoscaler resources contained within the specified zone.",
+	//   "description": "Retrieves a list of autoscalers contained within the specified zone.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.autoscalers.list",
 	//   "parameterOrder": [
@@ -10188,13 +10570,13 @@ func (c *AutoscalersListCall) Do() (*AutoscalerList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -10214,7 +10596,7 @@ func (c *AutoscalersListCall) Do() (*AutoscalerList, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -10234,6 +10616,27 @@ func (c *AutoscalersListCall) Do() (*AutoscalerList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *AutoscalersListCall) Pages(ctx context.Context, f func(*AutoscalerList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.autoscalers.patch":
 
 type AutoscalersPatchCall struct {
@@ -10245,32 +10648,14 @@ type AutoscalersPatchCall struct {
 	ctx_        context.Context
 }
 
-// Patch: Updates an autoscaler resource in the specified project using
-// the data included in the request. This method supports patch
-// semantics.
+// Patch: Updates an autoscaler in the specified project using the data
+// included in the request. This method supports patch semantics.
 func (r *AutoscalersService) Patch(project string, zone string, autoscaler string, autoscaler2 *Autoscaler) *AutoscalersPatchCall {
 	c := &AutoscalersPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.urlParams_.Set("autoscaler", autoscaler)
 	c.autoscaler2 = autoscaler2
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AutoscalersPatchCall) QuotaUser(quotaUser string) *AutoscalersPatchCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AutoscalersPatchCall) UserIP(userIP string) *AutoscalersPatchCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -10320,7 +10705,8 @@ func (c *AutoscalersPatchCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AutoscalersPatchCall) Do() (*Operation, error) {
+func (c *AutoscalersPatchCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -10349,7 +10735,7 @@ func (c *AutoscalersPatchCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates an autoscaler resource in the specified project using the data included in the request. This method supports patch semantics.",
+	//   "description": "Updates an autoscaler in the specified project using the data included in the request. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "compute.autoscalers.patch",
 	//   "parameterOrder": [
@@ -10359,7 +10745,7 @@ func (c *AutoscalersPatchCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "autoscaler": {
-	//       "description": "Name of the autoscaler resource to update.",
+	//       "description": "Name of the autoscaler to update.",
 	//       "location": "query",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -10373,7 +10759,7 @@ func (c *AutoscalersPatchCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -10406,8 +10792,8 @@ type AutoscalersUpdateCall struct {
 	ctx_       context.Context
 }
 
-// Update: Updates an autoscaler resource in the specified project using
-// the data included in the request.
+// Update: Updates an autoscaler in the specified project using the data
+// included in the request.
 func (r *AutoscalersService) Update(project string, zone string, autoscaler *Autoscaler) *AutoscalersUpdateCall {
 	c := &AutoscalersUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
@@ -10417,26 +10803,9 @@ func (r *AutoscalersService) Update(project string, zone string, autoscaler *Aut
 }
 
 // Autoscaler sets the optional parameter "autoscaler": Name of the
-// autoscaler resource to update.
+// autoscaler to update.
 func (c *AutoscalersUpdateCall) Autoscaler(autoscaler string) *AutoscalersUpdateCall {
 	c.urlParams_.Set("autoscaler", autoscaler)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *AutoscalersUpdateCall) QuotaUser(quotaUser string) *AutoscalersUpdateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *AutoscalersUpdateCall) UserIP(userIP string) *AutoscalersUpdateCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -10486,7 +10855,8 @@ func (c *AutoscalersUpdateCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *AutoscalersUpdateCall) Do() (*Operation, error) {
+func (c *AutoscalersUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -10515,7 +10885,7 @@ func (c *AutoscalersUpdateCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates an autoscaler resource in the specified project using the data included in the request.",
+	//   "description": "Updates an autoscaler in the specified project using the data included in the request.",
 	//   "httpMethod": "PUT",
 	//   "id": "compute.autoscalers.update",
 	//   "parameterOrder": [
@@ -10524,7 +10894,7 @@ func (c *AutoscalersUpdateCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "autoscaler": {
-	//       "description": "Name of the autoscaler resource to update.",
+	//       "description": "Name of the autoscaler to update.",
 	//       "location": "query",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "type": "string"
@@ -10537,7 +10907,7 @@ func (c *AutoscalersUpdateCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -10575,23 +10945,6 @@ func (r *BackendServicesService) Delete(project string, backendService string) *
 	c := &BackendServicesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.backendService = backendService
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *BackendServicesDeleteCall) QuotaUser(quotaUser string) *BackendServicesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *BackendServicesDeleteCall) UserIP(userIP string) *BackendServicesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -10635,7 +10988,8 @@ func (c *BackendServicesDeleteCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *BackendServicesDeleteCall) Do() (*Operation, error) {
+func (c *BackendServicesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -10710,29 +11064,13 @@ type BackendServicesGetCall struct {
 	ctx_           context.Context
 }
 
-// Get: Returns the specified BackendService resource.
+// Get: Returns the specified BackendService resource. Get a list of
+// available backend services by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/backendServices/get
 func (r *BackendServicesService) Get(project string, backendService string) *BackendServicesGetCall {
 	c := &BackendServicesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.backendService = backendService
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *BackendServicesGetCall) QuotaUser(quotaUser string) *BackendServicesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *BackendServicesGetCall) UserIP(userIP string) *BackendServicesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -10789,7 +11127,8 @@ func (c *BackendServicesGetCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *BackendServicesGetCall) Do() (*BackendService, error) {
+func (c *BackendServicesGetCall) Do(opts ...googleapi.CallOption) (*BackendService, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -10818,7 +11157,7 @@ func (c *BackendServicesGetCall) Do() (*BackendService, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified BackendService resource.",
+	//   "description": "Returns the specified BackendService resource. Get a list of available backend services by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.backendServices.get",
 	//   "parameterOrder": [
@@ -10876,23 +11215,6 @@ func (r *BackendServicesService) GetHealth(project string, backendService string
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *BackendServicesGetHealthCall) QuotaUser(quotaUser string) *BackendServicesGetHealthCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *BackendServicesGetHealthCall) UserIP(userIP string) *BackendServicesGetHealthCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -10939,7 +11261,8 @@ func (c *BackendServicesGetHealthCall) doRequest(alt string) (*http.Response, er
 // was returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *BackendServicesGetHealthCall) Do() (*BackendServiceGroupHealth, error) {
+func (c *BackendServicesGetHealthCall) Do(opts ...googleapi.CallOption) (*BackendServiceGroupHealth, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -11017,29 +11340,14 @@ type BackendServicesInsertCall struct {
 }
 
 // Insert: Creates a BackendService resource in the specified project
-// using the data included in the request.
+// using the data included in the request. There are several
+// restrictions and guidelines to keep in mind when creating a backend
+// service. Read  Restrictions and Guidelines for more information.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/backendServices/insert
 func (r *BackendServicesService) Insert(project string, backendservice *BackendService) *BackendServicesInsertCall {
 	c := &BackendServicesInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.backendservice = backendservice
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *BackendServicesInsertCall) QuotaUser(quotaUser string) *BackendServicesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *BackendServicesInsertCall) UserIP(userIP string) *BackendServicesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -11088,7 +11396,8 @@ func (c *BackendServicesInsertCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *BackendServicesInsertCall) Do() (*Operation, error) {
+func (c *BackendServicesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -11117,7 +11426,7 @@ func (c *BackendServicesInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a BackendService resource in the specified project using the data included in the request.",
+	//   "description": "Creates a BackendService resource in the specified project using the data included in the request. There are several restrictions and guidelines to keep in mind when creating a backend service. Read  Restrictions and Guidelines for more information.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.backendServices.insert",
 	//   "parameterOrder": [
@@ -11180,19 +11489,20 @@ func (r *BackendServicesService) List(project string) *BackendServicesListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *BackendServicesListCall) Filter(filter string) *BackendServicesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -11200,10 +11510,10 @@ func (c *BackendServicesListCall) Filter(filter string) *BackendServicesListCall
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *BackendServicesListCall) MaxResults(maxResults int64) *BackendServicesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -11214,23 +11524,6 @@ func (c *BackendServicesListCall) MaxResults(maxResults int64) *BackendServicesL
 // previous list request to get the next page of results.
 func (c *BackendServicesListCall) PageToken(pageToken string) *BackendServicesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *BackendServicesListCall) QuotaUser(quotaUser string) *BackendServicesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *BackendServicesListCall) UserIP(userIP string) *BackendServicesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -11286,7 +11579,8 @@ func (c *BackendServicesListCall) doRequest(alt string) (*http.Response, error) 
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *BackendServicesListCall) Do() (*BackendServiceList, error) {
+func (c *BackendServicesListCall) Do(opts ...googleapi.CallOption) (*BackendServiceList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -11323,13 +11617,13 @@ func (c *BackendServicesListCall) Do() (*BackendServiceList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -11362,6 +11656,27 @@ func (c *BackendServicesListCall) Do() (*BackendServiceList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *BackendServicesListCall) Pages(ctx context.Context, f func(*BackendServiceList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.backendServices.patch":
 
 type BackendServicesPatchCall struct {
@@ -11373,31 +11688,16 @@ type BackendServicesPatchCall struct {
 	ctx_           context.Context
 }
 
-// Patch: Update the entire content of the BackendService resource. This
-// method supports patch semantics.
+// Patch: Updates the entire content of the BackendService resource.
+// There are several restrictions and guidelines to keep in mind when
+// updating a backend service. Read  Restrictions and Guidelines for
+// more information. This method supports patch semantics.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/backendServices/patch
 func (r *BackendServicesService) Patch(project string, backendService string, backendservice *BackendService) *BackendServicesPatchCall {
 	c := &BackendServicesPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.backendService = backendService
 	c.backendservice = backendservice
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *BackendServicesPatchCall) QuotaUser(quotaUser string) *BackendServicesPatchCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *BackendServicesPatchCall) UserIP(userIP string) *BackendServicesPatchCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -11447,7 +11747,8 @@ func (c *BackendServicesPatchCall) doRequest(alt string) (*http.Response, error)
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *BackendServicesPatchCall) Do() (*Operation, error) {
+func (c *BackendServicesPatchCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -11476,7 +11777,7 @@ func (c *BackendServicesPatchCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Update the entire content of the BackendService resource. This method supports patch semantics.",
+	//   "description": "Updates the entire content of the BackendService resource. There are several restrictions and guidelines to keep in mind when updating a backend service. Read  Restrictions and Guidelines for more information. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "compute.backendServices.patch",
 	//   "parameterOrder": [
@@ -11525,30 +11826,16 @@ type BackendServicesUpdateCall struct {
 	ctx_           context.Context
 }
 
-// Update: Update the entire content of the BackendService resource.
+// Update: Updates the entire content of the BackendService resource.
+// There are several restrictions and guidelines to keep in mind when
+// updating a backend service. Read  Restrictions and Guidelines for
+// more information.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/backendServices/update
 func (r *BackendServicesService) Update(project string, backendService string, backendservice *BackendService) *BackendServicesUpdateCall {
 	c := &BackendServicesUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.backendService = backendService
 	c.backendservice = backendservice
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *BackendServicesUpdateCall) QuotaUser(quotaUser string) *BackendServicesUpdateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *BackendServicesUpdateCall) UserIP(userIP string) *BackendServicesUpdateCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -11598,7 +11885,8 @@ func (c *BackendServicesUpdateCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *BackendServicesUpdateCall) Do() (*Operation, error) {
+func (c *BackendServicesUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -11627,7 +11915,7 @@ func (c *BackendServicesUpdateCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Update the entire content of the BackendService resource.",
+	//   "description": "Updates the entire content of the BackendService resource. There are several restrictions and guidelines to keep in mind when updating a backend service. Read  Restrictions and Guidelines for more information.",
 	//   "httpMethod": "PUT",
 	//   "id": "compute.backendServices.update",
 	//   "parameterOrder": [
@@ -11675,8 +11963,7 @@ type DiskTypesAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of disk type resources grouped by
-// scope.
+// AggregatedList: Retrieves an aggregated list of disk types.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/diskTypes/aggregatedList
 func (r *DiskTypesService) AggregatedList(project string) *DiskTypesAggregatedListCall {
 	c := &DiskTypesAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -11698,19 +11985,20 @@ func (r *DiskTypesService) AggregatedList(project string) *DiskTypesAggregatedLi
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *DiskTypesAggregatedListCall) Filter(filter string) *DiskTypesAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -11718,10 +12006,10 @@ func (c *DiskTypesAggregatedListCall) Filter(filter string) *DiskTypesAggregated
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *DiskTypesAggregatedListCall) MaxResults(maxResults int64) *DiskTypesAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -11732,23 +12020,6 @@ func (c *DiskTypesAggregatedListCall) MaxResults(maxResults int64) *DiskTypesAgg
 // previous list request to get the next page of results.
 func (c *DiskTypesAggregatedListCall) PageToken(pageToken string) *DiskTypesAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DiskTypesAggregatedListCall) QuotaUser(quotaUser string) *DiskTypesAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DiskTypesAggregatedListCall) UserIP(userIP string) *DiskTypesAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -11804,7 +12075,8 @@ func (c *DiskTypesAggregatedListCall) doRequest(alt string) (*http.Response, err
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *DiskTypesAggregatedListCall) Do() (*DiskTypeAggregatedList, error) {
+func (c *DiskTypesAggregatedListCall) Do(opts ...googleapi.CallOption) (*DiskTypeAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -11833,7 +12105,7 @@ func (c *DiskTypesAggregatedListCall) Do() (*DiskTypeAggregatedList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of disk type resources grouped by scope.",
+	//   "description": "Retrieves an aggregated list of disk types.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.diskTypes.aggregatedList",
 	//   "parameterOrder": [
@@ -11841,13 +12113,13 @@ func (c *DiskTypesAggregatedListCall) Do() (*DiskTypeAggregatedList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -11880,6 +12152,27 @@ func (c *DiskTypesAggregatedListCall) Do() (*DiskTypeAggregatedList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *DiskTypesAggregatedListCall) Pages(ctx context.Context, f func(*DiskTypeAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.diskTypes.get":
 
 type DiskTypesGetCall struct {
@@ -11892,30 +12185,14 @@ type DiskTypesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified disk type resource.
+// Get: Returns the specified disk type. Get a list of available disk
+// types by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/diskTypes/get
 func (r *DiskTypesService) Get(project string, zone string, diskType string) *DiskTypesGetCall {
 	c := &DiskTypesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.diskType = diskType
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DiskTypesGetCall) QuotaUser(quotaUser string) *DiskTypesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DiskTypesGetCall) UserIP(userIP string) *DiskTypesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -11973,7 +12250,8 @@ func (c *DiskTypesGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *DiskTypesGetCall) Do() (*DiskType, error) {
+func (c *DiskTypesGetCall) Do(opts ...googleapi.CallOption) (*DiskType, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -12002,7 +12280,7 @@ func (c *DiskTypesGetCall) Do() (*DiskType, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified disk type resource.",
+	//   "description": "Returns the specified disk type. Get a list of available disk types by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.diskTypes.get",
 	//   "parameterOrder": [
@@ -12012,7 +12290,7 @@ func (c *DiskTypesGetCall) Do() (*DiskType, error) {
 	//   ],
 	//   "parameters": {
 	//     "diskType": {
-	//       "description": "Name of the disk type resource to return.",
+	//       "description": "Name of the disk type to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -12057,8 +12335,8 @@ type DiskTypesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of disk type resources available to the
-// specified project.
+// List: Retrieves a list of disk types available to the specified
+// project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/diskTypes/list
 func (r *DiskTypesService) List(project string, zone string) *DiskTypesListCall {
 	c := &DiskTypesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -12081,19 +12359,20 @@ func (r *DiskTypesService) List(project string, zone string) *DiskTypesListCall 
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *DiskTypesListCall) Filter(filter string) *DiskTypesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -12101,10 +12380,10 @@ func (c *DiskTypesListCall) Filter(filter string) *DiskTypesListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *DiskTypesListCall) MaxResults(maxResults int64) *DiskTypesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -12115,23 +12394,6 @@ func (c *DiskTypesListCall) MaxResults(maxResults int64) *DiskTypesListCall {
 // previous list request to get the next page of results.
 func (c *DiskTypesListCall) PageToken(pageToken string) *DiskTypesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DiskTypesListCall) QuotaUser(quotaUser string) *DiskTypesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DiskTypesListCall) UserIP(userIP string) *DiskTypesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -12188,7 +12450,8 @@ func (c *DiskTypesListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *DiskTypesListCall) Do() (*DiskTypeList, error) {
+func (c *DiskTypesListCall) Do(opts ...googleapi.CallOption) (*DiskTypeList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -12217,7 +12480,7 @@ func (c *DiskTypesListCall) Do() (*DiskTypeList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of disk type resources available to the specified project.",
+	//   "description": "Retrieves a list of disk types available to the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.diskTypes.list",
 	//   "parameterOrder": [
@@ -12226,13 +12489,13 @@ func (c *DiskTypesListCall) Do() (*DiskTypeList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -12272,6 +12535,27 @@ func (c *DiskTypesListCall) Do() (*DiskTypeList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *DiskTypesListCall) Pages(ctx context.Context, f func(*DiskTypeList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.disks.aggregatedList":
 
 type DisksAggregatedListCall struct {
@@ -12282,8 +12566,7 @@ type DisksAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of persistent disks grouped by
-// scope.
+// AggregatedList: Retrieves an aggregated list of persistent disks.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/disks/aggregatedList
 func (r *DisksService) AggregatedList(project string) *DisksAggregatedListCall {
 	c := &DisksAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -12305,19 +12588,20 @@ func (r *DisksService) AggregatedList(project string) *DisksAggregatedListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *DisksAggregatedListCall) Filter(filter string) *DisksAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -12325,10 +12609,10 @@ func (c *DisksAggregatedListCall) Filter(filter string) *DisksAggregatedListCall
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *DisksAggregatedListCall) MaxResults(maxResults int64) *DisksAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -12339,23 +12623,6 @@ func (c *DisksAggregatedListCall) MaxResults(maxResults int64) *DisksAggregatedL
 // previous list request to get the next page of results.
 func (c *DisksAggregatedListCall) PageToken(pageToken string) *DisksAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DisksAggregatedListCall) QuotaUser(quotaUser string) *DisksAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DisksAggregatedListCall) UserIP(userIP string) *DisksAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -12411,7 +12678,8 @@ func (c *DisksAggregatedListCall) doRequest(alt string) (*http.Response, error) 
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *DisksAggregatedListCall) Do() (*DiskAggregatedList, error) {
+func (c *DisksAggregatedListCall) Do(opts ...googleapi.CallOption) (*DiskAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -12440,7 +12708,7 @@ func (c *DisksAggregatedListCall) Do() (*DiskAggregatedList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of persistent disks grouped by scope.",
+	//   "description": "Retrieves an aggregated list of persistent disks.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.disks.aggregatedList",
 	//   "parameterOrder": [
@@ -12448,13 +12716,13 @@ func (c *DisksAggregatedListCall) Do() (*DiskAggregatedList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -12487,6 +12755,27 @@ func (c *DisksAggregatedListCall) Do() (*DiskAggregatedList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *DisksAggregatedListCall) Pages(ctx context.Context, f func(*DiskAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.disks.createSnapshot":
 
 type DisksCreateSnapshotCall struct {
@@ -12507,23 +12796,6 @@ func (r *DisksService) CreateSnapshot(project string, zone string, disk string, 
 	c.zone = zone
 	c.disk = disk
 	c.snapshot = snapshot
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DisksCreateSnapshotCall) QuotaUser(quotaUser string) *DisksCreateSnapshotCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DisksCreateSnapshotCall) UserIP(userIP string) *DisksCreateSnapshotCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -12574,7 +12846,8 @@ func (c *DisksCreateSnapshotCall) doRequest(alt string) (*http.Response, error) 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *DisksCreateSnapshotCall) Do() (*Operation, error) {
+func (c *DisksCreateSnapshotCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -12673,23 +12946,6 @@ func (r *DisksService) Delete(project string, zone string, disk string) *DisksDe
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DisksDeleteCall) QuotaUser(quotaUser string) *DisksDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DisksDeleteCall) UserIP(userIP string) *DisksDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -12731,7 +12987,8 @@ func (c *DisksDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *DisksDeleteCall) Do() (*Operation, error) {
+func (c *DisksDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -12815,30 +13072,14 @@ type DisksGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns a specified persistent disk.
+// Get: Returns a specified persistent disk. Get a list of available
+// persistent disks by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/disks/get
 func (r *DisksService) Get(project string, zone string, disk string) *DisksGetCall {
 	c := &DisksGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.disk = disk
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DisksGetCall) QuotaUser(quotaUser string) *DisksGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DisksGetCall) UserIP(userIP string) *DisksGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -12896,7 +13137,8 @@ func (c *DisksGetCall) doRequest(alt string) (*http.Response, error) {
 // error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
 // whether the returned error was because http.StatusNotModified was
 // returned.
-func (c *DisksGetCall) Do() (*Disk, error) {
+func (c *DisksGetCall) Do(opts ...googleapi.CallOption) (*Disk, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -12925,7 +13167,7 @@ func (c *DisksGetCall) Do() (*Disk, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns a specified persistent disk.",
+	//   "description": "Returns a specified persistent disk. Get a list of available persistent disks by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.disks.get",
 	//   "parameterOrder": [
@@ -12981,7 +13223,10 @@ type DisksInsertCall struct {
 }
 
 // Insert: Creates a persistent disk in the specified project using the
-// data included in the request.
+// data in the request. You can create a disk with a sourceImage, a
+// sourceSnapshot, or create an empty 500 GB data disk by omitting all
+// properties. You can also create a disk that is larger than the
+// default size by specifying the sizeGb property.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/disks/insert
 func (r *DisksService) Insert(project string, zone string, disk *Disk) *DisksInsertCall {
 	c := &DisksInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -12991,27 +13236,10 @@ func (r *DisksService) Insert(project string, zone string, disk *Disk) *DisksIns
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DisksInsertCall) QuotaUser(quotaUser string) *DisksInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
 // SourceImage sets the optional parameter "sourceImage": Source image
 // to restore onto a disk.
 func (c *DisksInsertCall) SourceImage(sourceImage string) *DisksInsertCall {
 	c.urlParams_.Set("sourceImage", sourceImage)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DisksInsertCall) UserIP(userIP string) *DisksInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -13061,7 +13289,8 @@ func (c *DisksInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *DisksInsertCall) Do() (*Operation, error) {
+func (c *DisksInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -13090,7 +13319,7 @@ func (c *DisksInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a persistent disk in the specified project using the data included in the request.",
+	//   "description": "Creates a persistent disk in the specified project using the data in the request. You can create a disk with a sourceImage, a sourceSnapshot, or create an empty 500 GB data disk by omitting all properties. You can also create a disk that is larger than the default size by specifying the sizeGb property.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.disks.insert",
 	//   "parameterOrder": [
@@ -13144,7 +13373,7 @@ type DisksListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of persistent disks contained within the
+// List: Retrieves a list of persistent disks contained within the
 // specified zone.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/disks/list
 func (r *DisksService) List(project string, zone string) *DisksListCall {
@@ -13168,19 +13397,20 @@ func (r *DisksService) List(project string, zone string) *DisksListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *DisksListCall) Filter(filter string) *DisksListCall {
 	c.urlParams_.Set("filter", filter)
@@ -13188,10 +13418,10 @@ func (c *DisksListCall) Filter(filter string) *DisksListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *DisksListCall) MaxResults(maxResults int64) *DisksListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -13202,23 +13432,6 @@ func (c *DisksListCall) MaxResults(maxResults int64) *DisksListCall {
 // previous list request to get the next page of results.
 func (c *DisksListCall) PageToken(pageToken string) *DisksListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *DisksListCall) QuotaUser(quotaUser string) *DisksListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *DisksListCall) UserIP(userIP string) *DisksListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -13275,7 +13488,8 @@ func (c *DisksListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *DisksListCall) Do() (*DiskList, error) {
+func (c *DisksListCall) Do(opts ...googleapi.CallOption) (*DiskList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -13304,7 +13518,7 @@ func (c *DisksListCall) Do() (*DiskList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of persistent disks contained within the specified zone.",
+	//   "description": "Retrieves a list of persistent disks contained within the specified zone.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.disks.list",
 	//   "parameterOrder": [
@@ -13313,13 +13527,13 @@ func (c *DisksListCall) Do() (*DiskList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -13359,6 +13573,172 @@ func (c *DisksListCall) Do() (*DiskList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *DisksListCall) Pages(ctx context.Context, f func(*DiskList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "compute.disks.resize":
+
+type DisksResizeCall struct {
+	s                  *Service
+	project            string
+	zone               string
+	disk               string
+	disksresizerequest *DisksResizeRequest
+	urlParams_         gensupport.URLParams
+	ctx_               context.Context
+}
+
+// Resize: Resizes the specified persistent disk.
+func (r *DisksService) Resize(project string, zone string, disk string, disksresizerequest *DisksResizeRequest) *DisksResizeCall {
+	c := &DisksResizeCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.zone = zone
+	c.disk = disk
+	c.disksresizerequest = disksresizerequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *DisksResizeCall) Fields(s ...googleapi.Field) *DisksResizeCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *DisksResizeCall) Context(ctx context.Context) *DisksResizeCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *DisksResizeCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.disksresizerequest)
+	if err != nil {
+		return nil, err
+	}
+	ctype := "application/json"
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/zones/{zone}/disks/{disk}/resize")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project": c.project,
+		"zone":    c.zone,
+		"disk":    c.disk,
+	})
+	req.Header.Set("Content-Type", ctype)
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.disks.resize" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *DisksResizeCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Resizes the specified persistent disk.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.disks.resize",
+	//   "parameterOrder": [
+	//     "project",
+	//     "zone",
+	//     "disk"
+	//   ],
+	//   "parameters": {
+	//     "disk": {
+	//       "description": "The name of the persistent disk.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "zone": {
+	//       "description": "The name of the zone for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/zones/{zone}/disks/{disk}/resize",
+	//   "request": {
+	//     "$ref": "DisksResizeRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
 // method id "compute.firewalls.delete":
 
 type FirewallsDeleteCall struct {
@@ -13369,29 +13749,12 @@ type FirewallsDeleteCall struct {
 	ctx_       context.Context
 }
 
-// Delete: Deletes the specified firewall resource.
+// Delete: Deletes the specified firewall.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/firewalls/delete
 func (r *FirewallsService) Delete(project string, firewall string) *FirewallsDeleteCall {
 	c := &FirewallsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.firewall = firewall
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *FirewallsDeleteCall) QuotaUser(quotaUser string) *FirewallsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *FirewallsDeleteCall) UserIP(userIP string) *FirewallsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -13435,7 +13798,8 @@ func (c *FirewallsDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *FirewallsDeleteCall) Do() (*Operation, error) {
+func (c *FirewallsDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -13464,7 +13828,7 @@ func (c *FirewallsDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified firewall resource.",
+	//   "description": "Deletes the specified firewall.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.firewalls.delete",
 	//   "parameterOrder": [
@@ -13473,7 +13837,7 @@ func (c *FirewallsDeleteCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "firewall": {
-	//       "description": "Name of the firewall resource to delete.",
+	//       "description": "Name of the firewall rule to delete.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -13510,29 +13874,12 @@ type FirewallsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified firewall resource.
+// Get: Returns the specified firewall.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/firewalls/get
 func (r *FirewallsService) Get(project string, firewall string) *FirewallsGetCall {
 	c := &FirewallsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.firewall = firewall
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *FirewallsGetCall) QuotaUser(quotaUser string) *FirewallsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *FirewallsGetCall) UserIP(userIP string) *FirewallsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -13589,7 +13936,8 @@ func (c *FirewallsGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *FirewallsGetCall) Do() (*Firewall, error) {
+func (c *FirewallsGetCall) Do(opts ...googleapi.CallOption) (*Firewall, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -13618,7 +13966,7 @@ func (c *FirewallsGetCall) Do() (*Firewall, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified firewall resource.",
+	//   "description": "Returns the specified firewall.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.firewalls.get",
 	//   "parameterOrder": [
@@ -13627,7 +13975,7 @@ func (c *FirewallsGetCall) Do() (*Firewall, error) {
 	//   ],
 	//   "parameters": {
 	//     "firewall": {
-	//       "description": "Name of the firewall resource to return.",
+	//       "description": "Name of the firewall rule to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -13664,30 +14012,13 @@ type FirewallsInsertCall struct {
 	ctx_       context.Context
 }
 
-// Insert: Creates a firewall resource in the specified project using
-// the data included in the request.
+// Insert: Creates a firewall rule in the specified project using the
+// data included in the request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/firewalls/insert
 func (r *FirewallsService) Insert(project string, firewall *Firewall) *FirewallsInsertCall {
 	c := &FirewallsInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.firewall = firewall
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *FirewallsInsertCall) QuotaUser(quotaUser string) *FirewallsInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *FirewallsInsertCall) UserIP(userIP string) *FirewallsInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -13736,7 +14067,8 @@ func (c *FirewallsInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *FirewallsInsertCall) Do() (*Operation, error) {
+func (c *FirewallsInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -13765,7 +14097,7 @@ func (c *FirewallsInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a firewall resource in the specified project using the data included in the request.",
+	//   "description": "Creates a firewall rule in the specified project using the data included in the request.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.firewalls.insert",
 	//   "parameterOrder": [
@@ -13805,8 +14137,8 @@ type FirewallsListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of firewall resources available to the
-// specified project.
+// List: Retrieves the list of firewall rules available to the specified
+// project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/firewalls/list
 func (r *FirewallsService) List(project string) *FirewallsListCall {
 	c := &FirewallsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -13828,19 +14160,20 @@ func (r *FirewallsService) List(project string) *FirewallsListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *FirewallsListCall) Filter(filter string) *FirewallsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -13848,10 +14181,10 @@ func (c *FirewallsListCall) Filter(filter string) *FirewallsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *FirewallsListCall) MaxResults(maxResults int64) *FirewallsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -13862,23 +14195,6 @@ func (c *FirewallsListCall) MaxResults(maxResults int64) *FirewallsListCall {
 // previous list request to get the next page of results.
 func (c *FirewallsListCall) PageToken(pageToken string) *FirewallsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *FirewallsListCall) QuotaUser(quotaUser string) *FirewallsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *FirewallsListCall) UserIP(userIP string) *FirewallsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -13934,7 +14250,8 @@ func (c *FirewallsListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *FirewallsListCall) Do() (*FirewallList, error) {
+func (c *FirewallsListCall) Do(opts ...googleapi.CallOption) (*FirewallList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -13963,7 +14280,7 @@ func (c *FirewallsListCall) Do() (*FirewallList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of firewall resources available to the specified project.",
+	//   "description": "Retrieves the list of firewall rules available to the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.firewalls.list",
 	//   "parameterOrder": [
@@ -13971,13 +14288,13 @@ func (c *FirewallsListCall) Do() (*FirewallList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -14010,6 +14327,27 @@ func (c *FirewallsListCall) Do() (*FirewallList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *FirewallsListCall) Pages(ctx context.Context, f func(*FirewallList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.firewalls.patch":
 
 type FirewallsPatchCall struct {
@@ -14021,31 +14359,14 @@ type FirewallsPatchCall struct {
 	ctx_       context.Context
 }
 
-// Patch: Updates the specified firewall resource with the data included
-// in the request. This method supports patch semantics.
+// Patch: Updates the specified firewall rule with the data included in
+// the request. This method supports patch semantics.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/firewalls/patch
 func (r *FirewallsService) Patch(project string, firewall string, firewall2 *Firewall) *FirewallsPatchCall {
 	c := &FirewallsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.firewall = firewall
 	c.firewall2 = firewall2
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *FirewallsPatchCall) QuotaUser(quotaUser string) *FirewallsPatchCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *FirewallsPatchCall) UserIP(userIP string) *FirewallsPatchCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -14095,7 +14416,8 @@ func (c *FirewallsPatchCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *FirewallsPatchCall) Do() (*Operation, error) {
+func (c *FirewallsPatchCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -14124,7 +14446,7 @@ func (c *FirewallsPatchCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the specified firewall resource with the data included in the request. This method supports patch semantics.",
+	//   "description": "Updates the specified firewall rule with the data included in the request. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "compute.firewalls.patch",
 	//   "parameterOrder": [
@@ -14133,7 +14455,7 @@ func (c *FirewallsPatchCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "firewall": {
-	//       "description": "Name of the firewall resource to update.",
+	//       "description": "Name of the firewall rule to update.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -14173,31 +14495,14 @@ type FirewallsUpdateCall struct {
 	ctx_       context.Context
 }
 
-// Update: Updates the specified firewall resource with the data
-// included in the request.
+// Update: Updates the specified firewall rule with the data included in
+// the request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/firewalls/update
 func (r *FirewallsService) Update(project string, firewall string, firewall2 *Firewall) *FirewallsUpdateCall {
 	c := &FirewallsUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.firewall = firewall
 	c.firewall2 = firewall2
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *FirewallsUpdateCall) QuotaUser(quotaUser string) *FirewallsUpdateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *FirewallsUpdateCall) UserIP(userIP string) *FirewallsUpdateCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -14247,7 +14552,8 @@ func (c *FirewallsUpdateCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *FirewallsUpdateCall) Do() (*Operation, error) {
+func (c *FirewallsUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -14276,7 +14582,7 @@ func (c *FirewallsUpdateCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the specified firewall resource with the data included in the request.",
+	//   "description": "Updates the specified firewall rule with the data included in the request.",
 	//   "httpMethod": "PUT",
 	//   "id": "compute.firewalls.update",
 	//   "parameterOrder": [
@@ -14285,7 +14591,7 @@ func (c *FirewallsUpdateCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "firewall": {
-	//       "description": "Name of the firewall resource to update.",
+	//       "description": "Name of the firewall rule to update.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -14324,8 +14630,7 @@ type ForwardingRulesAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of forwarding rules grouped by
-// scope.
+// AggregatedList: Retrieves an aggregated list of forwarding rules.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/forwardingRules/aggregatedList
 func (r *ForwardingRulesService) AggregatedList(project string) *ForwardingRulesAggregatedListCall {
 	c := &ForwardingRulesAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -14347,19 +14652,20 @@ func (r *ForwardingRulesService) AggregatedList(project string) *ForwardingRules
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *ForwardingRulesAggregatedListCall) Filter(filter string) *ForwardingRulesAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -14367,10 +14673,10 @@ func (c *ForwardingRulesAggregatedListCall) Filter(filter string) *ForwardingRul
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *ForwardingRulesAggregatedListCall) MaxResults(maxResults int64) *ForwardingRulesAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -14381,23 +14687,6 @@ func (c *ForwardingRulesAggregatedListCall) MaxResults(maxResults int64) *Forwar
 // previous list request to get the next page of results.
 func (c *ForwardingRulesAggregatedListCall) PageToken(pageToken string) *ForwardingRulesAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ForwardingRulesAggregatedListCall) QuotaUser(quotaUser string) *ForwardingRulesAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ForwardingRulesAggregatedListCall) UserIP(userIP string) *ForwardingRulesAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -14453,7 +14742,8 @@ func (c *ForwardingRulesAggregatedListCall) doRequest(alt string) (*http.Respons
 // response was returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *ForwardingRulesAggregatedListCall) Do() (*ForwardingRuleAggregatedList, error) {
+func (c *ForwardingRulesAggregatedListCall) Do(opts ...googleapi.CallOption) (*ForwardingRuleAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -14482,7 +14772,7 @@ func (c *ForwardingRulesAggregatedListCall) Do() (*ForwardingRuleAggregatedList,
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of forwarding rules grouped by scope.",
+	//   "description": "Retrieves an aggregated list of forwarding rules.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.forwardingRules.aggregatedList",
 	//   "parameterOrder": [
@@ -14490,13 +14780,13 @@ func (c *ForwardingRulesAggregatedListCall) Do() (*ForwardingRuleAggregatedList,
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -14529,6 +14819,27 @@ func (c *ForwardingRulesAggregatedListCall) Do() (*ForwardingRuleAggregatedList,
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ForwardingRulesAggregatedListCall) Pages(ctx context.Context, f func(*ForwardingRuleAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.forwardingRules.delete":
 
 type ForwardingRulesDeleteCall struct {
@@ -14547,23 +14858,6 @@ func (r *ForwardingRulesService) Delete(project string, region string, forwardin
 	c.project = project
 	c.region = region
 	c.forwardingRule = forwardingRule
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ForwardingRulesDeleteCall) QuotaUser(quotaUser string) *ForwardingRulesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ForwardingRulesDeleteCall) UserIP(userIP string) *ForwardingRulesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -14608,7 +14902,8 @@ func (c *ForwardingRulesDeleteCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ForwardingRulesDeleteCall) Do() (*Operation, error) {
+func (c *ForwardingRulesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -14702,23 +14997,6 @@ func (r *ForwardingRulesService) Get(project string, region string, forwardingRu
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ForwardingRulesGetCall) QuotaUser(quotaUser string) *ForwardingRulesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ForwardingRulesGetCall) UserIP(userIP string) *ForwardingRulesGetCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -14773,7 +15051,8 @@ func (c *ForwardingRulesGetCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *ForwardingRulesGetCall) Do() (*ForwardingRule, error) {
+func (c *ForwardingRulesGetCall) Do(opts ...googleapi.CallOption) (*ForwardingRule, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -14868,23 +15147,6 @@ func (r *ForwardingRulesService) Insert(project string, region string, forwardin
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ForwardingRulesInsertCall) QuotaUser(quotaUser string) *ForwardingRulesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ForwardingRulesInsertCall) UserIP(userIP string) *ForwardingRulesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -14931,7 +15193,8 @@ func (c *ForwardingRulesInsertCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ForwardingRulesInsertCall) Do() (*Operation, error) {
+func (c *ForwardingRulesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -15009,7 +15272,7 @@ type ForwardingRulesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of ForwardingRule resources available to the
+// List: Retrieves a list of ForwardingRule resources available to the
 // specified project and region.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/forwardingRules/list
 func (r *ForwardingRulesService) List(project string, region string) *ForwardingRulesListCall {
@@ -15033,19 +15296,20 @@ func (r *ForwardingRulesService) List(project string, region string) *Forwarding
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *ForwardingRulesListCall) Filter(filter string) *ForwardingRulesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -15053,10 +15317,10 @@ func (c *ForwardingRulesListCall) Filter(filter string) *ForwardingRulesListCall
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *ForwardingRulesListCall) MaxResults(maxResults int64) *ForwardingRulesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -15067,23 +15331,6 @@ func (c *ForwardingRulesListCall) MaxResults(maxResults int64) *ForwardingRulesL
 // previous list request to get the next page of results.
 func (c *ForwardingRulesListCall) PageToken(pageToken string) *ForwardingRulesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ForwardingRulesListCall) QuotaUser(quotaUser string) *ForwardingRulesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ForwardingRulesListCall) UserIP(userIP string) *ForwardingRulesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -15140,7 +15387,8 @@ func (c *ForwardingRulesListCall) doRequest(alt string) (*http.Response, error) 
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *ForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
+func (c *ForwardingRulesListCall) Do(opts ...googleapi.CallOption) (*ForwardingRuleList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -15169,7 +15417,7 @@ func (c *ForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of ForwardingRule resources available to the specified project and region.",
+	//   "description": "Retrieves a list of ForwardingRule resources available to the specified project and region.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.forwardingRules.list",
 	//   "parameterOrder": [
@@ -15178,13 +15426,13 @@ func (c *ForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -15224,6 +15472,27 @@ func (c *ForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ForwardingRulesListCall) Pages(ctx context.Context, f func(*ForwardingRuleList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.forwardingRules.setTarget":
 
 type ForwardingRulesSetTargetCall struct {
@@ -15245,23 +15514,6 @@ func (r *ForwardingRulesService) SetTarget(project string, region string, forwar
 	c.region = region
 	c.forwardingRule = forwardingRule
 	c.targetreference = targetreference
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ForwardingRulesSetTargetCall) QuotaUser(quotaUser string) *ForwardingRulesSetTargetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ForwardingRulesSetTargetCall) UserIP(userIP string) *ForwardingRulesSetTargetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -15312,7 +15564,8 @@ func (c *ForwardingRulesSetTargetCall) doRequest(alt string) (*http.Response, er
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ForwardingRulesSetTargetCall) Do() (*Operation, error) {
+func (c *ForwardingRulesSetTargetCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -15406,23 +15659,6 @@ func (r *GlobalAddressesService) Delete(project string, address string) *GlobalA
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalAddressesDeleteCall) QuotaUser(quotaUser string) *GlobalAddressesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalAddressesDeleteCall) UserIP(userIP string) *GlobalAddressesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -15463,7 +15699,8 @@ func (c *GlobalAddressesDeleteCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *GlobalAddressesDeleteCall) Do() (*Operation, error) {
+func (c *GlobalAddressesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -15538,29 +15775,13 @@ type GlobalAddressesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified address resource.
+// Get: Returns the specified address resource. Get a list of available
+// addresses by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/globalAddresses/get
 func (r *GlobalAddressesService) Get(project string, address string) *GlobalAddressesGetCall {
 	c := &GlobalAddressesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.address = address
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalAddressesGetCall) QuotaUser(quotaUser string) *GlobalAddressesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalAddressesGetCall) UserIP(userIP string) *GlobalAddressesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -15617,7 +15838,8 @@ func (c *GlobalAddressesGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *GlobalAddressesGetCall) Do() (*Address, error) {
+func (c *GlobalAddressesGetCall) Do(opts ...googleapi.CallOption) (*Address, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -15646,7 +15868,7 @@ func (c *GlobalAddressesGetCall) Do() (*Address, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified address resource.",
+	//   "description": "Returns the specified address resource. Get a list of available addresses by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.globalAddresses.get",
 	//   "parameterOrder": [
@@ -15702,23 +15924,6 @@ func (r *GlobalAddressesService) Insert(project string, address *Address) *Globa
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalAddressesInsertCall) QuotaUser(quotaUser string) *GlobalAddressesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalAddressesInsertCall) UserIP(userIP string) *GlobalAddressesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -15764,7 +15969,8 @@ func (c *GlobalAddressesInsertCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *GlobalAddressesInsertCall) Do() (*Operation, error) {
+func (c *GlobalAddressesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -15833,7 +16039,7 @@ type GlobalAddressesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of global address resources.
+// List: Retrieves a list of global addresses.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/globalAddresses/list
 func (r *GlobalAddressesService) List(project string) *GlobalAddressesListCall {
 	c := &GlobalAddressesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -15855,19 +16061,20 @@ func (r *GlobalAddressesService) List(project string) *GlobalAddressesListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *GlobalAddressesListCall) Filter(filter string) *GlobalAddressesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -15875,10 +16082,10 @@ func (c *GlobalAddressesListCall) Filter(filter string) *GlobalAddressesListCall
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *GlobalAddressesListCall) MaxResults(maxResults int64) *GlobalAddressesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -15889,23 +16096,6 @@ func (c *GlobalAddressesListCall) MaxResults(maxResults int64) *GlobalAddressesL
 // previous list request to get the next page of results.
 func (c *GlobalAddressesListCall) PageToken(pageToken string) *GlobalAddressesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalAddressesListCall) QuotaUser(quotaUser string) *GlobalAddressesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalAddressesListCall) UserIP(userIP string) *GlobalAddressesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -15961,7 +16151,8 @@ func (c *GlobalAddressesListCall) doRequest(alt string) (*http.Response, error) 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *GlobalAddressesListCall) Do() (*AddressList, error) {
+func (c *GlobalAddressesListCall) Do(opts ...googleapi.CallOption) (*AddressList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -15990,7 +16181,7 @@ func (c *GlobalAddressesListCall) Do() (*AddressList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of global address resources.",
+	//   "description": "Retrieves a list of global addresses.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.globalAddresses.list",
 	//   "parameterOrder": [
@@ -15998,13 +16189,13 @@ func (c *GlobalAddressesListCall) Do() (*AddressList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -16037,6 +16228,27 @@ func (c *GlobalAddressesListCall) Do() (*AddressList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *GlobalAddressesListCall) Pages(ctx context.Context, f func(*AddressList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.globalForwardingRules.delete":
 
 type GlobalForwardingRulesDeleteCall struct {
@@ -16053,23 +16265,6 @@ func (r *GlobalForwardingRulesService) Delete(project string, forwardingRule str
 	c := &GlobalForwardingRulesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.forwardingRule = forwardingRule
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalForwardingRulesDeleteCall) QuotaUser(quotaUser string) *GlobalForwardingRulesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalForwardingRulesDeleteCall) UserIP(userIP string) *GlobalForwardingRulesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -16113,7 +16308,8 @@ func (c *GlobalForwardingRulesDeleteCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *GlobalForwardingRulesDeleteCall) Do() (*Operation, error) {
+func (c *GlobalForwardingRulesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -16188,29 +16384,13 @@ type GlobalForwardingRulesGetCall struct {
 	ctx_           context.Context
 }
 
-// Get: Returns the specified ForwardingRule resource.
+// Get: Returns the specified ForwardingRule resource. Get a list of
+// available forwarding rules by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/globalForwardingRules/get
 func (r *GlobalForwardingRulesService) Get(project string, forwardingRule string) *GlobalForwardingRulesGetCall {
 	c := &GlobalForwardingRulesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.forwardingRule = forwardingRule
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalForwardingRulesGetCall) QuotaUser(quotaUser string) *GlobalForwardingRulesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalForwardingRulesGetCall) UserIP(userIP string) *GlobalForwardingRulesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -16267,7 +16447,8 @@ func (c *GlobalForwardingRulesGetCall) doRequest(alt string) (*http.Response, er
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *GlobalForwardingRulesGetCall) Do() (*ForwardingRule, error) {
+func (c *GlobalForwardingRulesGetCall) Do(opts ...googleapi.CallOption) (*ForwardingRule, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -16296,7 +16477,7 @@ func (c *GlobalForwardingRulesGetCall) Do() (*ForwardingRule, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified ForwardingRule resource.",
+	//   "description": "Returns the specified ForwardingRule resource. Get a list of available forwarding rules by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.globalForwardingRules.get",
 	//   "parameterOrder": [
@@ -16352,23 +16533,6 @@ func (r *GlobalForwardingRulesService) Insert(project string, forwardingrule *Fo
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalForwardingRulesInsertCall) QuotaUser(quotaUser string) *GlobalForwardingRulesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalForwardingRulesInsertCall) UserIP(userIP string) *GlobalForwardingRulesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -16414,7 +16578,8 @@ func (c *GlobalForwardingRulesInsertCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *GlobalForwardingRulesInsertCall) Do() (*Operation, error) {
+func (c *GlobalForwardingRulesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -16483,7 +16648,7 @@ type GlobalForwardingRulesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of ForwardingRule resources available to the
+// List: Retrieves a list of ForwardingRule resources available to the
 // specified project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/globalForwardingRules/list
 func (r *GlobalForwardingRulesService) List(project string) *GlobalForwardingRulesListCall {
@@ -16506,19 +16671,20 @@ func (r *GlobalForwardingRulesService) List(project string) *GlobalForwardingRul
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *GlobalForwardingRulesListCall) Filter(filter string) *GlobalForwardingRulesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -16526,10 +16692,10 @@ func (c *GlobalForwardingRulesListCall) Filter(filter string) *GlobalForwardingR
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *GlobalForwardingRulesListCall) MaxResults(maxResults int64) *GlobalForwardingRulesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -16540,23 +16706,6 @@ func (c *GlobalForwardingRulesListCall) MaxResults(maxResults int64) *GlobalForw
 // previous list request to get the next page of results.
 func (c *GlobalForwardingRulesListCall) PageToken(pageToken string) *GlobalForwardingRulesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalForwardingRulesListCall) QuotaUser(quotaUser string) *GlobalForwardingRulesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalForwardingRulesListCall) UserIP(userIP string) *GlobalForwardingRulesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -16612,7 +16761,8 @@ func (c *GlobalForwardingRulesListCall) doRequest(alt string) (*http.Response, e
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *GlobalForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
+func (c *GlobalForwardingRulesListCall) Do(opts ...googleapi.CallOption) (*ForwardingRuleList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -16641,7 +16791,7 @@ func (c *GlobalForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of ForwardingRule resources available to the specified project.",
+	//   "description": "Retrieves a list of ForwardingRule resources available to the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.globalForwardingRules.list",
 	//   "parameterOrder": [
@@ -16649,13 +16799,13 @@ func (c *GlobalForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -16688,6 +16838,27 @@ func (c *GlobalForwardingRulesListCall) Do() (*ForwardingRuleList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *GlobalForwardingRulesListCall) Pages(ctx context.Context, f func(*ForwardingRuleList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.globalForwardingRules.setTarget":
 
 type GlobalForwardingRulesSetTargetCall struct {
@@ -16707,23 +16878,6 @@ func (r *GlobalForwardingRulesService) SetTarget(project string, forwardingRule 
 	c.project = project
 	c.forwardingRule = forwardingRule
 	c.targetreference = targetreference
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalForwardingRulesSetTargetCall) QuotaUser(quotaUser string) *GlobalForwardingRulesSetTargetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalForwardingRulesSetTargetCall) UserIP(userIP string) *GlobalForwardingRulesSetTargetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -16773,7 +16927,8 @@ func (c *GlobalForwardingRulesSetTargetCall) doRequest(alt string) (*http.Respon
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *GlobalForwardingRulesSetTargetCall) Do() (*Operation, error) {
+func (c *GlobalForwardingRulesSetTargetCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -16850,8 +17005,7 @@ type GlobalOperationsAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of all operations grouped by
-// scope.
+// AggregatedList: Retrieves an aggregated list of all operations.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/globalOperations/aggregatedList
 func (r *GlobalOperationsService) AggregatedList(project string) *GlobalOperationsAggregatedListCall {
 	c := &GlobalOperationsAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -16873,19 +17027,20 @@ func (r *GlobalOperationsService) AggregatedList(project string) *GlobalOperatio
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *GlobalOperationsAggregatedListCall) Filter(filter string) *GlobalOperationsAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -16893,10 +17048,10 @@ func (c *GlobalOperationsAggregatedListCall) Filter(filter string) *GlobalOperat
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *GlobalOperationsAggregatedListCall) MaxResults(maxResults int64) *GlobalOperationsAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -16907,23 +17062,6 @@ func (c *GlobalOperationsAggregatedListCall) MaxResults(maxResults int64) *Globa
 // previous list request to get the next page of results.
 func (c *GlobalOperationsAggregatedListCall) PageToken(pageToken string) *GlobalOperationsAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalOperationsAggregatedListCall) QuotaUser(quotaUser string) *GlobalOperationsAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalOperationsAggregatedListCall) UserIP(userIP string) *GlobalOperationsAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -16979,7 +17117,8 @@ func (c *GlobalOperationsAggregatedListCall) doRequest(alt string) (*http.Respon
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *GlobalOperationsAggregatedListCall) Do() (*OperationAggregatedList, error) {
+func (c *GlobalOperationsAggregatedListCall) Do(opts ...googleapi.CallOption) (*OperationAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -17008,7 +17147,7 @@ func (c *GlobalOperationsAggregatedListCall) Do() (*OperationAggregatedList, err
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of all operations grouped by scope.",
+	//   "description": "Retrieves an aggregated list of all operations.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.globalOperations.aggregatedList",
 	//   "parameterOrder": [
@@ -17016,13 +17155,13 @@ func (c *GlobalOperationsAggregatedListCall) Do() (*OperationAggregatedList, err
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -17055,6 +17194,27 @@ func (c *GlobalOperationsAggregatedListCall) Do() (*OperationAggregatedList, err
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *GlobalOperationsAggregatedListCall) Pages(ctx context.Context, f func(*OperationAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.globalOperations.delete":
 
 type GlobalOperationsDeleteCall struct {
@@ -17071,23 +17231,6 @@ func (r *GlobalOperationsService) Delete(project string, operation string) *Glob
 	c := &GlobalOperationsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.operation = operation
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalOperationsDeleteCall) QuotaUser(quotaUser string) *GlobalOperationsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalOperationsDeleteCall) UserIP(userIP string) *GlobalOperationsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -17125,7 +17268,8 @@ func (c *GlobalOperationsDeleteCall) doRequest(alt string) (*http.Response, erro
 }
 
 // Do executes the "compute.globalOperations.delete" call.
-func (c *GlobalOperationsDeleteCall) Do() error {
+func (c *GlobalOperationsDeleteCall) Do(opts ...googleapi.CallOption) error {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if err != nil {
 		return err
@@ -17179,29 +17323,13 @@ type GlobalOperationsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Retrieves the specified Operations resource.
+// Get: Retrieves the specified Operations resource. Get a list of
+// operations by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/globalOperations/get
 func (r *GlobalOperationsService) Get(project string, operation string) *GlobalOperationsGetCall {
 	c := &GlobalOperationsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.operation = operation
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalOperationsGetCall) QuotaUser(quotaUser string) *GlobalOperationsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalOperationsGetCall) UserIP(userIP string) *GlobalOperationsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -17258,7 +17386,8 @@ func (c *GlobalOperationsGetCall) doRequest(alt string) (*http.Response, error) 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *GlobalOperationsGetCall) Do() (*Operation, error) {
+func (c *GlobalOperationsGetCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -17287,7 +17416,7 @@ func (c *GlobalOperationsGetCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the specified Operations resource.",
+	//   "description": "Retrieves the specified Operations resource. Get a list of operations by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.globalOperations.get",
 	//   "parameterOrder": [
@@ -17333,7 +17462,7 @@ type GlobalOperationsListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of Operation resources contained within the
+// List: Retrieves a list of Operation resources contained within the
 // specified project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/globalOperations/list
 func (r *GlobalOperationsService) List(project string) *GlobalOperationsListCall {
@@ -17356,19 +17485,20 @@ func (r *GlobalOperationsService) List(project string) *GlobalOperationsListCall
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *GlobalOperationsListCall) Filter(filter string) *GlobalOperationsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -17376,10 +17506,10 @@ func (c *GlobalOperationsListCall) Filter(filter string) *GlobalOperationsListCa
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *GlobalOperationsListCall) MaxResults(maxResults int64) *GlobalOperationsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -17390,23 +17520,6 @@ func (c *GlobalOperationsListCall) MaxResults(maxResults int64) *GlobalOperation
 // previous list request to get the next page of results.
 func (c *GlobalOperationsListCall) PageToken(pageToken string) *GlobalOperationsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *GlobalOperationsListCall) QuotaUser(quotaUser string) *GlobalOperationsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *GlobalOperationsListCall) UserIP(userIP string) *GlobalOperationsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -17462,7 +17575,8 @@ func (c *GlobalOperationsListCall) doRequest(alt string) (*http.Response, error)
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *GlobalOperationsListCall) Do() (*OperationList, error) {
+func (c *GlobalOperationsListCall) Do(opts ...googleapi.CallOption) (*OperationList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -17491,7 +17605,7 @@ func (c *GlobalOperationsListCall) Do() (*OperationList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of Operation resources contained within the specified project.",
+	//   "description": "Retrieves a list of Operation resources contained within the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.globalOperations.list",
 	//   "parameterOrder": [
@@ -17499,13 +17613,13 @@ func (c *GlobalOperationsListCall) Do() (*OperationList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -17538,6 +17652,27 @@ func (c *GlobalOperationsListCall) Do() (*OperationList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *GlobalOperationsListCall) Pages(ctx context.Context, f func(*OperationList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.httpHealthChecks.delete":
 
 type HttpHealthChecksDeleteCall struct {
@@ -17554,23 +17689,6 @@ func (r *HttpHealthChecksService) Delete(project string, httpHealthCheck string)
 	c := &HttpHealthChecksDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.httpHealthCheck = httpHealthCheck
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpHealthChecksDeleteCall) QuotaUser(quotaUser string) *HttpHealthChecksDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpHealthChecksDeleteCall) UserIP(userIP string) *HttpHealthChecksDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -17614,7 +17732,8 @@ func (c *HttpHealthChecksDeleteCall) doRequest(alt string) (*http.Response, erro
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpHealthChecksDeleteCall) Do() (*Operation, error) {
+func (c *HttpHealthChecksDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -17689,29 +17808,13 @@ type HttpHealthChecksGetCall struct {
 	ctx_            context.Context
 }
 
-// Get: Returns the specified HttpHealthCheck resource.
+// Get: Returns the specified HttpHealthCheck resource. Get a list of
+// available HTTP health checks by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/httpHealthChecks/get
 func (r *HttpHealthChecksService) Get(project string, httpHealthCheck string) *HttpHealthChecksGetCall {
 	c := &HttpHealthChecksGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.httpHealthCheck = httpHealthCheck
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpHealthChecksGetCall) QuotaUser(quotaUser string) *HttpHealthChecksGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpHealthChecksGetCall) UserIP(userIP string) *HttpHealthChecksGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -17768,7 +17871,8 @@ func (c *HttpHealthChecksGetCall) doRequest(alt string) (*http.Response, error) 
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *HttpHealthChecksGetCall) Do() (*HttpHealthCheck, error) {
+func (c *HttpHealthChecksGetCall) Do(opts ...googleapi.CallOption) (*HttpHealthCheck, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -17797,7 +17901,7 @@ func (c *HttpHealthChecksGetCall) Do() (*HttpHealthCheck, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified HttpHealthCheck resource.",
+	//   "description": "Returns the specified HttpHealthCheck resource. Get a list of available HTTP health checks by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.httpHealthChecks.get",
 	//   "parameterOrder": [
@@ -17853,23 +17957,6 @@ func (r *HttpHealthChecksService) Insert(project string, httphealthcheck *HttpHe
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpHealthChecksInsertCall) QuotaUser(quotaUser string) *HttpHealthChecksInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpHealthChecksInsertCall) UserIP(userIP string) *HttpHealthChecksInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -17915,7 +18002,8 @@ func (c *HttpHealthChecksInsertCall) doRequest(alt string) (*http.Response, erro
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpHealthChecksInsertCall) Do() (*Operation, error) {
+func (c *HttpHealthChecksInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -18007,19 +18095,20 @@ func (r *HttpHealthChecksService) List(project string) *HttpHealthChecksListCall
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *HttpHealthChecksListCall) Filter(filter string) *HttpHealthChecksListCall {
 	c.urlParams_.Set("filter", filter)
@@ -18027,10 +18116,10 @@ func (c *HttpHealthChecksListCall) Filter(filter string) *HttpHealthChecksListCa
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *HttpHealthChecksListCall) MaxResults(maxResults int64) *HttpHealthChecksListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -18041,23 +18130,6 @@ func (c *HttpHealthChecksListCall) MaxResults(maxResults int64) *HttpHealthCheck
 // previous list request to get the next page of results.
 func (c *HttpHealthChecksListCall) PageToken(pageToken string) *HttpHealthChecksListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpHealthChecksListCall) QuotaUser(quotaUser string) *HttpHealthChecksListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpHealthChecksListCall) UserIP(userIP string) *HttpHealthChecksListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -18113,7 +18185,8 @@ func (c *HttpHealthChecksListCall) doRequest(alt string) (*http.Response, error)
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *HttpHealthChecksListCall) Do() (*HttpHealthCheckList, error) {
+func (c *HttpHealthChecksListCall) Do(opts ...googleapi.CallOption) (*HttpHealthCheckList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -18150,13 +18223,13 @@ func (c *HttpHealthChecksListCall) Do() (*HttpHealthCheckList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -18189,6 +18262,27 @@ func (c *HttpHealthChecksListCall) Do() (*HttpHealthCheckList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *HttpHealthChecksListCall) Pages(ctx context.Context, f func(*HttpHealthCheckList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.httpHealthChecks.patch":
 
 type HttpHealthChecksPatchCall struct {
@@ -18209,23 +18303,6 @@ func (r *HttpHealthChecksService) Patch(project string, httpHealthCheck string, 
 	c.project = project
 	c.httpHealthCheck = httpHealthCheck
 	c.httphealthcheck = httphealthcheck
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpHealthChecksPatchCall) QuotaUser(quotaUser string) *HttpHealthChecksPatchCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpHealthChecksPatchCall) UserIP(userIP string) *HttpHealthChecksPatchCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -18275,7 +18352,8 @@ func (c *HttpHealthChecksPatchCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpHealthChecksPatchCall) Do() (*Operation, error) {
+func (c *HttpHealthChecksPatchCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -18364,23 +18442,6 @@ func (r *HttpHealthChecksService) Update(project string, httpHealthCheck string,
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpHealthChecksUpdateCall) QuotaUser(quotaUser string) *HttpHealthChecksUpdateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpHealthChecksUpdateCall) UserIP(userIP string) *HttpHealthChecksUpdateCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -18427,7 +18488,8 @@ func (c *HttpHealthChecksUpdateCall) doRequest(alt string) (*http.Response, erro
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpHealthChecksUpdateCall) Do() (*Operation, error) {
+func (c *HttpHealthChecksUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -18512,23 +18574,6 @@ func (r *HttpsHealthChecksService) Delete(project string, httpsHealthCheck strin
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpsHealthChecksDeleteCall) QuotaUser(quotaUser string) *HttpsHealthChecksDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpsHealthChecksDeleteCall) UserIP(userIP string) *HttpsHealthChecksDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -18569,7 +18614,8 @@ func (c *HttpsHealthChecksDeleteCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpsHealthChecksDeleteCall) Do() (*Operation, error) {
+func (c *HttpsHealthChecksDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -18644,28 +18690,12 @@ type HttpsHealthChecksGetCall struct {
 	ctx_             context.Context
 }
 
-// Get: Returns the specified HttpsHealthCheck resource.
+// Get: Returns the specified HttpsHealthCheck resource. Get a list of
+// available HTTPS health checks by making a list() request.
 func (r *HttpsHealthChecksService) Get(project string, httpsHealthCheck string) *HttpsHealthChecksGetCall {
 	c := &HttpsHealthChecksGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.httpsHealthCheck = httpsHealthCheck
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpsHealthChecksGetCall) QuotaUser(quotaUser string) *HttpsHealthChecksGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpsHealthChecksGetCall) UserIP(userIP string) *HttpsHealthChecksGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -18722,7 +18752,8 @@ func (c *HttpsHealthChecksGetCall) doRequest(alt string) (*http.Response, error)
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *HttpsHealthChecksGetCall) Do() (*HttpsHealthCheck, error) {
+func (c *HttpsHealthChecksGetCall) Do(opts ...googleapi.CallOption) (*HttpsHealthCheck, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -18751,7 +18782,7 @@ func (c *HttpsHealthChecksGetCall) Do() (*HttpsHealthCheck, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified HttpsHealthCheck resource.",
+	//   "description": "Returns the specified HttpsHealthCheck resource. Get a list of available HTTPS health checks by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.httpsHealthChecks.get",
 	//   "parameterOrder": [
@@ -18806,23 +18837,6 @@ func (r *HttpsHealthChecksService) Insert(project string, httpshealthcheck *Http
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpsHealthChecksInsertCall) QuotaUser(quotaUser string) *HttpsHealthChecksInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpsHealthChecksInsertCall) UserIP(userIP string) *HttpsHealthChecksInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -18868,7 +18882,8 @@ func (c *HttpsHealthChecksInsertCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpsHealthChecksInsertCall) Do() (*Operation, error) {
+func (c *HttpsHealthChecksInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -18959,19 +18974,20 @@ func (r *HttpsHealthChecksService) List(project string) *HttpsHealthChecksListCa
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *HttpsHealthChecksListCall) Filter(filter string) *HttpsHealthChecksListCall {
 	c.urlParams_.Set("filter", filter)
@@ -18979,10 +18995,10 @@ func (c *HttpsHealthChecksListCall) Filter(filter string) *HttpsHealthChecksList
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *HttpsHealthChecksListCall) MaxResults(maxResults int64) *HttpsHealthChecksListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -18993,23 +19009,6 @@ func (c *HttpsHealthChecksListCall) MaxResults(maxResults int64) *HttpsHealthChe
 // previous list request to get the next page of results.
 func (c *HttpsHealthChecksListCall) PageToken(pageToken string) *HttpsHealthChecksListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpsHealthChecksListCall) QuotaUser(quotaUser string) *HttpsHealthChecksListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpsHealthChecksListCall) UserIP(userIP string) *HttpsHealthChecksListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -19065,7 +19064,8 @@ func (c *HttpsHealthChecksListCall) doRequest(alt string) (*http.Response, error
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *HttpsHealthChecksListCall) Do() (*HttpsHealthCheckList, error) {
+func (c *HttpsHealthChecksListCall) Do(opts ...googleapi.CallOption) (*HttpsHealthCheckList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -19102,13 +19102,13 @@ func (c *HttpsHealthChecksListCall) Do() (*HttpsHealthCheckList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -19141,6 +19141,27 @@ func (c *HttpsHealthChecksListCall) Do() (*HttpsHealthCheckList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *HttpsHealthChecksListCall) Pages(ctx context.Context, f func(*HttpsHealthCheckList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.httpsHealthChecks.patch":
 
 type HttpsHealthChecksPatchCall struct {
@@ -19160,23 +19181,6 @@ func (r *HttpsHealthChecksService) Patch(project string, httpsHealthCheck string
 	c.project = project
 	c.httpsHealthCheck = httpsHealthCheck
 	c.httpshealthcheck = httpshealthcheck
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpsHealthChecksPatchCall) QuotaUser(quotaUser string) *HttpsHealthChecksPatchCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpsHealthChecksPatchCall) UserIP(userIP string) *HttpsHealthChecksPatchCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -19226,7 +19230,8 @@ func (c *HttpsHealthChecksPatchCall) doRequest(alt string) (*http.Response, erro
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpsHealthChecksPatchCall) Do() (*Operation, error) {
+func (c *HttpsHealthChecksPatchCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -19314,23 +19319,6 @@ func (r *HttpsHealthChecksService) Update(project string, httpsHealthCheck strin
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *HttpsHealthChecksUpdateCall) QuotaUser(quotaUser string) *HttpsHealthChecksUpdateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *HttpsHealthChecksUpdateCall) UserIP(userIP string) *HttpsHealthChecksUpdateCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -19377,7 +19365,8 @@ func (c *HttpsHealthChecksUpdateCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *HttpsHealthChecksUpdateCall) Do() (*Operation, error) {
+func (c *HttpsHealthChecksUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -19454,29 +19443,12 @@ type ImagesDeleteCall struct {
 	ctx_       context.Context
 }
 
-// Delete: Deletes the specified image resource.
+// Delete: Deletes the specified image.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/images/delete
 func (r *ImagesService) Delete(project string, image string) *ImagesDeleteCall {
 	c := &ImagesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.image = image
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ImagesDeleteCall) QuotaUser(quotaUser string) *ImagesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ImagesDeleteCall) UserIP(userIP string) *ImagesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -19520,7 +19492,8 @@ func (c *ImagesDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ImagesDeleteCall) Do() (*Operation, error) {
+func (c *ImagesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -19549,7 +19522,7 @@ func (c *ImagesDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified image resource.",
+	//   "description": "Deletes the specified image.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.images.delete",
 	//   "parameterOrder": [
@@ -19608,23 +19581,6 @@ func (r *ImagesService) Deprecate(project string, image string, deprecationstatu
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ImagesDeprecateCall) QuotaUser(quotaUser string) *ImagesDeprecateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ImagesDeprecateCall) UserIP(userIP string) *ImagesDeprecateCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -19671,7 +19627,8 @@ func (c *ImagesDeprecateCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ImagesDeprecateCall) Do() (*Operation, error) {
+func (c *ImagesDeprecateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -19749,29 +19706,13 @@ type ImagesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified image resource.
+// Get: Returns the specified image. Get a list of available images by
+// making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/images/get
 func (r *ImagesService) Get(project string, image string) *ImagesGetCall {
 	c := &ImagesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.image = image
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ImagesGetCall) QuotaUser(quotaUser string) *ImagesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ImagesGetCall) UserIP(userIP string) *ImagesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -19828,7 +19769,8 @@ func (c *ImagesGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *ImagesGetCall) Do() (*Image, error) {
+func (c *ImagesGetCall) Do(opts ...googleapi.CallOption) (*Image, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -19857,7 +19799,7 @@ func (c *ImagesGetCall) Do() (*Image, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified image resource.",
+	//   "description": "Returns the specified image. Get a list of available images by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.images.get",
 	//   "parameterOrder": [
@@ -19893,6 +19835,145 @@ func (c *ImagesGetCall) Do() (*Image, error) {
 
 }
 
+// method id "compute.images.getFromFamily":
+
+type ImagesGetFromFamilyCall struct {
+	s            *Service
+	project      string
+	family       string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+}
+
+// GetFromFamily: Returns the latest image that is part of an image
+// family and is not deprecated.
+func (r *ImagesService) GetFromFamily(project string, family string) *ImagesGetFromFamilyCall {
+	c := &ImagesGetFromFamilyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.family = family
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ImagesGetFromFamilyCall) Fields(s ...googleapi.Field) *ImagesGetFromFamilyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ImagesGetFromFamilyCall) IfNoneMatch(entityTag string) *ImagesGetFromFamilyCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ImagesGetFromFamilyCall) Context(ctx context.Context) *ImagesGetFromFamilyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *ImagesGetFromFamilyCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/global/images/family/{family}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project": c.project,
+		"family":  c.family,
+	})
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		req.Header.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.images.getFromFamily" call.
+// Exactly one of *Image or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Image.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *ImagesGetFromFamilyCall) Do(opts ...googleapi.CallOption) (*Image, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Image{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Returns the latest image that is part of an image family and is not deprecated.",
+	//   "httpMethod": "GET",
+	//   "id": "compute.images.getFromFamily",
+	//   "parameterOrder": [
+	//     "project",
+	//     "family"
+	//   ],
+	//   "parameters": {
+	//     "family": {
+	//       "description": "Name of the image resource to return.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/global/images/family/{family}",
+	//   "response": {
+	//     "$ref": "Image"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute",
+	//     "https://www.googleapis.com/auth/compute.readonly"
+	//   ]
+	// }
+
+}
+
 // method id "compute.images.insert":
 
 type ImagesInsertCall struct {
@@ -19903,30 +19984,13 @@ type ImagesInsertCall struct {
 	ctx_       context.Context
 }
 
-// Insert: Creates an image resource in the specified project using the
-// data included in the request.
+// Insert: Creates an image in the specified project using the data
+// included in the request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/images/insert
 func (r *ImagesService) Insert(project string, image *Image) *ImagesInsertCall {
 	c := &ImagesInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.image = image
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ImagesInsertCall) QuotaUser(quotaUser string) *ImagesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ImagesInsertCall) UserIP(userIP string) *ImagesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -19975,7 +20039,8 @@ func (c *ImagesInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ImagesInsertCall) Do() (*Operation, error) {
+func (c *ImagesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -20004,7 +20069,7 @@ func (c *ImagesInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates an image resource in the specified project using the data included in the request.",
+	//   "description": "Creates an image in the specified project using the data included in the request.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.images.insert",
 	//   "parameterOrder": [
@@ -20077,19 +20142,20 @@ func (r *ImagesService) List(project string) *ImagesListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *ImagesListCall) Filter(filter string) *ImagesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -20097,10 +20163,10 @@ func (c *ImagesListCall) Filter(filter string) *ImagesListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *ImagesListCall) MaxResults(maxResults int64) *ImagesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -20111,23 +20177,6 @@ func (c *ImagesListCall) MaxResults(maxResults int64) *ImagesListCall {
 // previous list request to get the next page of results.
 func (c *ImagesListCall) PageToken(pageToken string) *ImagesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ImagesListCall) QuotaUser(quotaUser string) *ImagesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ImagesListCall) UserIP(userIP string) *ImagesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -20183,7 +20232,8 @@ func (c *ImagesListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ImagesListCall) Do() (*ImageList, error) {
+func (c *ImagesListCall) Do(opts ...googleapi.CallOption) (*ImageList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -20220,13 +20270,13 @@ func (c *ImagesListCall) Do() (*ImageList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -20259,6 +20309,27 @@ func (c *ImagesListCall) Do() (*ImageList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ImagesListCall) Pages(ctx context.Context, f func(*ImageList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instanceGroupManagers.abandonInstances":
 
 type InstanceGroupManagersAbandonInstancesCall struct {
@@ -20286,23 +20357,6 @@ func (r *InstanceGroupManagersService) AbandonInstances(project string, zone str
 	c.zone = zone
 	c.instanceGroupManager = instanceGroupManager
 	c.instancegroupmanagersabandoninstancesrequest = instancegroupmanagersabandoninstancesrequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersAbandonInstancesCall) QuotaUser(quotaUser string) *InstanceGroupManagersAbandonInstancesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersAbandonInstancesCall) UserIP(userIP string) *InstanceGroupManagersAbandonInstancesCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -20353,7 +20407,8 @@ func (c *InstanceGroupManagersAbandonInstancesCall) doRequest(alt string) (*http
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersAbandonInstancesCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersAbandonInstancesCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -20458,19 +20513,20 @@ func (r *InstanceGroupManagersService) AggregatedList(project string) *InstanceG
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstanceGroupManagersAggregatedListCall) Filter(filter string) *InstanceGroupManagersAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -20478,10 +20534,10 @@ func (c *InstanceGroupManagersAggregatedListCall) Filter(filter string) *Instanc
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstanceGroupManagersAggregatedListCall) MaxResults(maxResults int64) *InstanceGroupManagersAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -20492,23 +20548,6 @@ func (c *InstanceGroupManagersAggregatedListCall) MaxResults(maxResults int64) *
 // previous list request to get the next page of results.
 func (c *InstanceGroupManagersAggregatedListCall) PageToken(pageToken string) *InstanceGroupManagersAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersAggregatedListCall) QuotaUser(quotaUser string) *InstanceGroupManagersAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersAggregatedListCall) UserIP(userIP string) *InstanceGroupManagersAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -20565,7 +20604,8 @@ func (c *InstanceGroupManagersAggregatedListCall) doRequest(alt string) (*http.R
 // error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
 // whether the returned error was because http.StatusNotModified was
 // returned.
-func (c *InstanceGroupManagersAggregatedListCall) Do() (*InstanceGroupManagerAggregatedList, error) {
+func (c *InstanceGroupManagersAggregatedListCall) Do(opts ...googleapi.CallOption) (*InstanceGroupManagerAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -20602,13 +20642,13 @@ func (c *InstanceGroupManagersAggregatedListCall) Do() (*InstanceGroupManagerAgg
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -20641,6 +20681,27 @@ func (c *InstanceGroupManagersAggregatedListCall) Do() (*InstanceGroupManagerAgg
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstanceGroupManagersAggregatedListCall) Pages(ctx context.Context, f func(*InstanceGroupManagerAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instanceGroupManagers.delete":
 
 type InstanceGroupManagersDeleteCall struct {
@@ -20653,29 +20714,14 @@ type InstanceGroupManagersDeleteCall struct {
 }
 
 // Delete: Deletes the specified managed instance group and all of the
-// instances in that group.
+// instances in that group. Note that the instance group must not belong
+// to a backend service. Read  Deleting an instance group for more
+// information.
 func (r *InstanceGroupManagersService) Delete(project string, zone string, instanceGroupManager string) *InstanceGroupManagersDeleteCall {
 	c := &InstanceGroupManagersDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instanceGroupManager = instanceGroupManager
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersDeleteCall) QuotaUser(quotaUser string) *InstanceGroupManagersDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersDeleteCall) UserIP(userIP string) *InstanceGroupManagersDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -20720,7 +20766,8 @@ func (c *InstanceGroupManagersDeleteCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersDeleteCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -20749,7 +20796,7 @@ func (c *InstanceGroupManagersDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified managed instance group and all of the instances in that group.",
+	//   "description": "Deletes the specified managed instance group and all of the instances in that group. Note that the instance group must not belong to a backend service. Read  Deleting an instance group for more information.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.instanceGroupManagers.delete",
 	//   "parameterOrder": [
@@ -20819,23 +20866,6 @@ func (r *InstanceGroupManagersService) DeleteInstances(project string, zone stri
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersDeleteInstancesCall) QuotaUser(quotaUser string) *InstanceGroupManagersDeleteInstancesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersDeleteInstancesCall) UserIP(userIP string) *InstanceGroupManagersDeleteInstancesCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -20883,7 +20913,8 @@ func (c *InstanceGroupManagersDeleteInstancesCall) doRequest(alt string) (*http.
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersDeleteInstancesCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersDeleteInstancesCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -20969,29 +21000,13 @@ type InstanceGroupManagersGetCall struct {
 }
 
 // Get: Returns all of the details about the specified managed instance
-// group.
+// group. Get a list of available managed instance groups by making a
+// list() request.
 func (r *InstanceGroupManagersService) Get(project string, zone string, instanceGroupManager string) *InstanceGroupManagersGetCall {
 	c := &InstanceGroupManagersGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instanceGroupManager = instanceGroupManager
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersGetCall) QuotaUser(quotaUser string) *InstanceGroupManagersGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersGetCall) UserIP(userIP string) *InstanceGroupManagersGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -21049,7 +21064,8 @@ func (c *InstanceGroupManagersGetCall) doRequest(alt string) (*http.Response, er
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceGroupManagersGetCall) Do() (*InstanceGroupManager, error) {
+func (c *InstanceGroupManagersGetCall) Do(opts ...googleapi.CallOption) (*InstanceGroupManager, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -21078,7 +21094,7 @@ func (c *InstanceGroupManagersGetCall) Do() (*InstanceGroupManager, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns all of the details about the specified managed instance group.",
+	//   "description": "Returns all of the details about the specified managed instance group. Get a list of available managed instance groups by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.instanceGroupManagers.get",
 	//   "parameterOrder": [
@@ -21146,23 +21162,6 @@ func (r *InstanceGroupManagersService) Insert(project string, zone string, insta
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersInsertCall) QuotaUser(quotaUser string) *InstanceGroupManagersInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersInsertCall) UserIP(userIP string) *InstanceGroupManagersInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -21209,7 +21208,8 @@ func (c *InstanceGroupManagersInsertCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersInsertCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -21309,19 +21309,20 @@ func (r *InstanceGroupManagersService) List(project string, zone string) *Instan
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstanceGroupManagersListCall) Filter(filter string) *InstanceGroupManagersListCall {
 	c.urlParams_.Set("filter", filter)
@@ -21329,10 +21330,10 @@ func (c *InstanceGroupManagersListCall) Filter(filter string) *InstanceGroupMana
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstanceGroupManagersListCall) MaxResults(maxResults int64) *InstanceGroupManagersListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -21343,23 +21344,6 @@ func (c *InstanceGroupManagersListCall) MaxResults(maxResults int64) *InstanceGr
 // previous list request to get the next page of results.
 func (c *InstanceGroupManagersListCall) PageToken(pageToken string) *InstanceGroupManagersListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersListCall) QuotaUser(quotaUser string) *InstanceGroupManagersListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersListCall) UserIP(userIP string) *InstanceGroupManagersListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -21416,7 +21400,8 @@ func (c *InstanceGroupManagersListCall) doRequest(alt string) (*http.Response, e
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceGroupManagersListCall) Do() (*InstanceGroupManagerList, error) {
+func (c *InstanceGroupManagersListCall) Do(opts ...googleapi.CallOption) (*InstanceGroupManagerList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -21454,13 +21439,13 @@ func (c *InstanceGroupManagersListCall) Do() (*InstanceGroupManagerList, error) 
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -21499,6 +21484,27 @@ func (c *InstanceGroupManagersListCall) Do() (*InstanceGroupManagerList, error) 
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstanceGroupManagersListCall) Pages(ctx context.Context, f func(*InstanceGroupManagerList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instanceGroupManagers.listManagedInstances":
 
 type InstanceGroupManagersListManagedInstancesCall struct {
@@ -21521,23 +21527,6 @@ func (r *InstanceGroupManagersService) ListManagedInstances(project string, zone
 	c.project = project
 	c.zone = zone
 	c.instanceGroupManager = instanceGroupManager
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersListManagedInstancesCall) QuotaUser(quotaUser string) *InstanceGroupManagersListManagedInstancesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersListManagedInstancesCall) UserIP(userIP string) *InstanceGroupManagersListManagedInstancesCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -21584,7 +21573,8 @@ func (c *InstanceGroupManagersListManagedInstancesCall) doRequest(alt string) (*
 // error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
 // whether the returned error was because http.StatusNotModified was
 // returned.
-func (c *InstanceGroupManagersListManagedInstancesCall) Do() (*InstanceGroupManagersListManagedInstancesResponse, error) {
+func (c *InstanceGroupManagersListManagedInstancesCall) Do(opts ...googleapi.CallOption) (*InstanceGroupManagersListManagedInstancesResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -21683,23 +21673,6 @@ func (r *InstanceGroupManagersService) RecreateInstances(project string, zone st
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersRecreateInstancesCall) QuotaUser(quotaUser string) *InstanceGroupManagersRecreateInstancesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersRecreateInstancesCall) UserIP(userIP string) *InstanceGroupManagersRecreateInstancesCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -21747,7 +21720,8 @@ func (c *InstanceGroupManagersRecreateInstancesCall) doRequest(alt string) (*htt
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersRecreateInstancesCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersRecreateInstancesCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -21847,23 +21821,6 @@ func (r *InstanceGroupManagersService) Resize(project string, zone string, insta
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersResizeCall) QuotaUser(quotaUser string) *InstanceGroupManagersResizeCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersResizeCall) UserIP(userIP string) *InstanceGroupManagersResizeCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -21905,7 +21862,8 @@ func (c *InstanceGroupManagersResizeCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersResizeCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersResizeCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -22007,23 +21965,6 @@ func (r *InstanceGroupManagersService) SetInstanceTemplate(project string, zone 
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersSetInstanceTemplateCall) QuotaUser(quotaUser string) *InstanceGroupManagersSetInstanceTemplateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersSetInstanceTemplateCall) UserIP(userIP string) *InstanceGroupManagersSetInstanceTemplateCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -22071,7 +22012,8 @@ func (c *InstanceGroupManagersSetInstanceTemplateCall) doRequest(alt string) (*h
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersSetInstanceTemplateCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersSetInstanceTemplateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -22172,23 +22114,6 @@ func (r *InstanceGroupManagersService) SetTargetPools(project string, zone strin
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupManagersSetTargetPoolsCall) QuotaUser(quotaUser string) *InstanceGroupManagersSetTargetPoolsCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupManagersSetTargetPoolsCall) UserIP(userIP string) *InstanceGroupManagersSetTargetPoolsCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -22236,7 +22161,8 @@ func (c *InstanceGroupManagersSetTargetPoolsCall) doRequest(alt string) (*http.R
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupManagersSetTargetPoolsCall) Do() (*Operation, error) {
+func (c *InstanceGroupManagersSetTargetPoolsCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -22323,30 +22249,13 @@ type InstanceGroupsAddInstancesCall struct {
 
 // AddInstances: Adds a list of instances to the specified instance
 // group. All of the instances in the instance group must be in the same
-// network/subnetwork.
+// network/subnetwork. Read  Adding instances for more information.
 func (r *InstanceGroupsService) AddInstances(project string, zone string, instanceGroup string, instancegroupsaddinstancesrequest *InstanceGroupsAddInstancesRequest) *InstanceGroupsAddInstancesCall {
 	c := &InstanceGroupsAddInstancesCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instanceGroup = instanceGroup
 	c.instancegroupsaddinstancesrequest = instancegroupsaddinstancesrequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsAddInstancesCall) QuotaUser(quotaUser string) *InstanceGroupsAddInstancesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsAddInstancesCall) UserIP(userIP string) *InstanceGroupsAddInstancesCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -22397,7 +22306,8 @@ func (c *InstanceGroupsAddInstancesCall) doRequest(alt string) (*http.Response, 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupsAddInstancesCall) Do() (*Operation, error) {
+func (c *InstanceGroupsAddInstancesCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -22426,7 +22336,7 @@ func (c *InstanceGroupsAddInstancesCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Adds a list of instances to the specified instance group. All of the instances in the instance group must be in the same network/subnetwork.",
+	//   "description": "Adds a list of instances to the specified instance group. All of the instances in the instance group must be in the same network/subnetwork. Read  Adding instances for more information.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.instanceGroups.addInstances",
 	//   "parameterOrder": [
@@ -22502,19 +22412,20 @@ func (r *InstanceGroupsService) AggregatedList(project string) *InstanceGroupsAg
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstanceGroupsAggregatedListCall) Filter(filter string) *InstanceGroupsAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -22522,10 +22433,10 @@ func (c *InstanceGroupsAggregatedListCall) Filter(filter string) *InstanceGroups
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstanceGroupsAggregatedListCall) MaxResults(maxResults int64) *InstanceGroupsAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -22536,23 +22447,6 @@ func (c *InstanceGroupsAggregatedListCall) MaxResults(maxResults int64) *Instanc
 // previous list request to get the next page of results.
 func (c *InstanceGroupsAggregatedListCall) PageToken(pageToken string) *InstanceGroupsAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsAggregatedListCall) QuotaUser(quotaUser string) *InstanceGroupsAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsAggregatedListCall) UserIP(userIP string) *InstanceGroupsAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -22608,7 +22502,8 @@ func (c *InstanceGroupsAggregatedListCall) doRequest(alt string) (*http.Response
 // was returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceGroupsAggregatedListCall) Do() (*InstanceGroupAggregatedList, error) {
+func (c *InstanceGroupsAggregatedListCall) Do(opts ...googleapi.CallOption) (*InstanceGroupAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -22645,13 +22540,13 @@ func (c *InstanceGroupsAggregatedListCall) Do() (*InstanceGroupAggregatedList, e
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -22684,6 +22579,27 @@ func (c *InstanceGroupsAggregatedListCall) Do() (*InstanceGroupAggregatedList, e
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstanceGroupsAggregatedListCall) Pages(ctx context.Context, f func(*InstanceGroupAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instanceGroups.delete":
 
 type InstanceGroupsDeleteCall struct {
@@ -22696,29 +22612,14 @@ type InstanceGroupsDeleteCall struct {
 }
 
 // Delete: Deletes the specified instance group. The instances in the
-// group are not deleted.
+// group are not deleted. Note that instance group must not belong to a
+// backend service. Read  Deleting an instance group for more
+// information.
 func (r *InstanceGroupsService) Delete(project string, zone string, instanceGroup string) *InstanceGroupsDeleteCall {
 	c := &InstanceGroupsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instanceGroup = instanceGroup
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsDeleteCall) QuotaUser(quotaUser string) *InstanceGroupsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsDeleteCall) UserIP(userIP string) *InstanceGroupsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -22763,7 +22664,8 @@ func (c *InstanceGroupsDeleteCall) doRequest(alt string) (*http.Response, error)
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupsDeleteCall) Do() (*Operation, error) {
+func (c *InstanceGroupsDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -22792,7 +22694,7 @@ func (c *InstanceGroupsDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified instance group. The instances in the group are not deleted.",
+	//   "description": "Deletes the specified instance group. The instances in the group are not deleted. Note that instance group must not belong to a backend service. Read  Deleting an instance group for more information.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.instanceGroups.delete",
 	//   "parameterOrder": [
@@ -22845,29 +22747,13 @@ type InstanceGroupsGetCall struct {
 	ctx_          context.Context
 }
 
-// Get: Returns the specified instance group resource.
+// Get: Returns the specified instance group. Get a list of available
+// instance groups by making a list() request.
 func (r *InstanceGroupsService) Get(project string, zone string, instanceGroup string) *InstanceGroupsGetCall {
 	c := &InstanceGroupsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instanceGroup = instanceGroup
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsGetCall) QuotaUser(quotaUser string) *InstanceGroupsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsGetCall) UserIP(userIP string) *InstanceGroupsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -22925,7 +22811,8 @@ func (c *InstanceGroupsGetCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceGroupsGetCall) Do() (*InstanceGroup, error) {
+func (c *InstanceGroupsGetCall) Do(opts ...googleapi.CallOption) (*InstanceGroup, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -22954,7 +22841,7 @@ func (c *InstanceGroupsGetCall) Do() (*InstanceGroup, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified instance group resource.",
+	//   "description": "Returns the specified instance group. Get a list of available instance groups by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.instanceGroups.get",
 	//   "parameterOrder": [
@@ -23017,23 +22904,6 @@ func (r *InstanceGroupsService) Insert(project string, zone string, instancegrou
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsInsertCall) QuotaUser(quotaUser string) *InstanceGroupsInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsInsertCall) UserIP(userIP string) *InstanceGroupsInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -23080,7 +22950,8 @@ func (c *InstanceGroupsInsertCall) doRequest(alt string) (*http.Response, error)
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupsInsertCall) Do() (*Operation, error) {
+func (c *InstanceGroupsInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -23180,19 +23051,20 @@ func (r *InstanceGroupsService) List(project string, zone string) *InstanceGroup
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstanceGroupsListCall) Filter(filter string) *InstanceGroupsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -23200,10 +23072,10 @@ func (c *InstanceGroupsListCall) Filter(filter string) *InstanceGroupsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstanceGroupsListCall) MaxResults(maxResults int64) *InstanceGroupsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -23214,23 +23086,6 @@ func (c *InstanceGroupsListCall) MaxResults(maxResults int64) *InstanceGroupsLis
 // previous list request to get the next page of results.
 func (c *InstanceGroupsListCall) PageToken(pageToken string) *InstanceGroupsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsListCall) QuotaUser(quotaUser string) *InstanceGroupsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsListCall) UserIP(userIP string) *InstanceGroupsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -23287,7 +23142,8 @@ func (c *InstanceGroupsListCall) doRequest(alt string) (*http.Response, error) {
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceGroupsListCall) Do() (*InstanceGroupList, error) {
+func (c *InstanceGroupsListCall) Do(opts ...googleapi.CallOption) (*InstanceGroupList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -23325,13 +23181,13 @@ func (c *InstanceGroupsListCall) Do() (*InstanceGroupList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -23370,6 +23226,27 @@ func (c *InstanceGroupsListCall) Do() (*InstanceGroupList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstanceGroupsListCall) Pages(ctx context.Context, f func(*InstanceGroupList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instanceGroups.listInstances":
 
 type InstanceGroupsListInstancesCall struct {
@@ -23406,19 +23283,20 @@ func (r *InstanceGroupsService) ListInstances(project string, zone string, insta
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstanceGroupsListInstancesCall) Filter(filter string) *InstanceGroupsListInstancesCall {
 	c.urlParams_.Set("filter", filter)
@@ -23426,10 +23304,10 @@ func (c *InstanceGroupsListInstancesCall) Filter(filter string) *InstanceGroupsL
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstanceGroupsListInstancesCall) MaxResults(maxResults int64) *InstanceGroupsListInstancesCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -23440,23 +23318,6 @@ func (c *InstanceGroupsListInstancesCall) MaxResults(maxResults int64) *Instance
 // previous list request to get the next page of results.
 func (c *InstanceGroupsListInstancesCall) PageToken(pageToken string) *InstanceGroupsListInstancesCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsListInstancesCall) QuotaUser(quotaUser string) *InstanceGroupsListInstancesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsListInstancesCall) UserIP(userIP string) *InstanceGroupsListInstancesCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -23507,7 +23368,8 @@ func (c *InstanceGroupsListInstancesCall) doRequest(alt string) (*http.Response,
 // was returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceGroupsListInstancesCall) Do() (*InstanceGroupsListInstances, error) {
+func (c *InstanceGroupsListInstancesCall) Do(opts ...googleapi.CallOption) (*InstanceGroupsListInstances, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -23546,7 +23408,7 @@ func (c *InstanceGroupsListInstancesCall) Do() (*InstanceGroupsListInstances, er
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -23558,7 +23420,7 @@ func (c *InstanceGroupsListInstancesCall) Do() (*InstanceGroupsListInstances, er
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -23623,23 +23485,6 @@ func (r *InstanceGroupsService) RemoveInstances(project string, zone string, ins
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsRemoveInstancesCall) QuotaUser(quotaUser string) *InstanceGroupsRemoveInstancesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsRemoveInstancesCall) UserIP(userIP string) *InstanceGroupsRemoveInstancesCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -23687,7 +23532,8 @@ func (c *InstanceGroupsRemoveInstancesCall) doRequest(alt string) (*http.Respons
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupsRemoveInstancesCall) Do() (*Operation, error) {
+func (c *InstanceGroupsRemoveInstancesCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -23782,23 +23628,6 @@ func (r *InstanceGroupsService) SetNamedPorts(project string, zone string, insta
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceGroupsSetNamedPortsCall) QuotaUser(quotaUser string) *InstanceGroupsSetNamedPortsCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceGroupsSetNamedPortsCall) UserIP(userIP string) *InstanceGroupsSetNamedPortsCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -23846,7 +23675,8 @@ func (c *InstanceGroupsSetNamedPortsCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceGroupsSetNamedPortsCall) Do() (*Operation, error) {
+func (c *InstanceGroupsSetNamedPortsCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -23929,29 +23759,16 @@ type InstanceTemplatesDeleteCall struct {
 	ctx_             context.Context
 }
 
-// Delete: Deletes the specified instance template.
+// Delete: Deletes the specified instance template. If you delete an
+// instance template that is being referenced from another instance
+// group, the instance group will not be able to create or recreate
+// virtual machine instances. Deleting an instance template is permanent
+// and cannot be undone.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instanceTemplates/delete
 func (r *InstanceTemplatesService) Delete(project string, instanceTemplate string) *InstanceTemplatesDeleteCall {
 	c := &InstanceTemplatesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.instanceTemplate = instanceTemplate
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceTemplatesDeleteCall) QuotaUser(quotaUser string) *InstanceTemplatesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceTemplatesDeleteCall) UserIP(userIP string) *InstanceTemplatesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -23995,7 +23812,8 @@ func (c *InstanceTemplatesDeleteCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceTemplatesDeleteCall) Do() (*Operation, error) {
+func (c *InstanceTemplatesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -24024,7 +23842,7 @@ func (c *InstanceTemplatesDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified instance template.",
+	//   "description": "Deletes the specified instance template. If you delete an instance template that is being referenced from another instance group, the instance group will not be able to create or recreate virtual machine instances. Deleting an instance template is permanent and cannot be undone.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.instanceTemplates.delete",
 	//   "parameterOrder": [
@@ -24070,29 +23888,13 @@ type InstanceTemplatesGetCall struct {
 	ctx_             context.Context
 }
 
-// Get: Returns the specified instance template resource.
+// Get: Returns the specified instance template. Get a list of available
+// instance templates by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instanceTemplates/get
 func (r *InstanceTemplatesService) Get(project string, instanceTemplate string) *InstanceTemplatesGetCall {
 	c := &InstanceTemplatesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.instanceTemplate = instanceTemplate
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceTemplatesGetCall) QuotaUser(quotaUser string) *InstanceTemplatesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceTemplatesGetCall) UserIP(userIP string) *InstanceTemplatesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -24149,7 +23951,8 @@ func (c *InstanceTemplatesGetCall) doRequest(alt string) (*http.Response, error)
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceTemplatesGetCall) Do() (*InstanceTemplate, error) {
+func (c *InstanceTemplatesGetCall) Do(opts ...googleapi.CallOption) (*InstanceTemplate, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -24178,7 +23981,7 @@ func (c *InstanceTemplatesGetCall) Do() (*InstanceTemplate, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified instance template resource.",
+	//   "description": "Returns the specified instance template. Get a list of available instance templates by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.instanceTemplates.get",
 	//   "parameterOrder": [
@@ -24225,29 +24028,15 @@ type InstanceTemplatesInsertCall struct {
 }
 
 // Insert: Creates an instance template in the specified project using
-// the data that is included in the request.
+// the data that is included in the request. If you are creating a new
+// template to update an existing instance group, your new instance
+// template must use the same network or, if applicable, the same
+// subnetwork as the original template.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instanceTemplates/insert
 func (r *InstanceTemplatesService) Insert(project string, instancetemplate *InstanceTemplate) *InstanceTemplatesInsertCall {
 	c := &InstanceTemplatesInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.instancetemplate = instancetemplate
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceTemplatesInsertCall) QuotaUser(quotaUser string) *InstanceTemplatesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceTemplatesInsertCall) UserIP(userIP string) *InstanceTemplatesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -24296,7 +24085,8 @@ func (c *InstanceTemplatesInsertCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstanceTemplatesInsertCall) Do() (*Operation, error) {
+func (c *InstanceTemplatesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -24325,7 +24115,7 @@ func (c *InstanceTemplatesInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates an instance template in the specified project using the data that is included in the request.",
+	//   "description": "Creates an instance template in the specified project using the data that is included in the request. If you are creating a new template to update an existing instance group, your new instance template must use the same network or, if applicable, the same subnetwork as the original template.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.instanceTemplates.insert",
 	//   "parameterOrder": [
@@ -24388,19 +24178,20 @@ func (r *InstanceTemplatesService) List(project string) *InstanceTemplatesListCa
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstanceTemplatesListCall) Filter(filter string) *InstanceTemplatesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -24408,10 +24199,10 @@ func (c *InstanceTemplatesListCall) Filter(filter string) *InstanceTemplatesList
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstanceTemplatesListCall) MaxResults(maxResults int64) *InstanceTemplatesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -24422,23 +24213,6 @@ func (c *InstanceTemplatesListCall) MaxResults(maxResults int64) *InstanceTempla
 // previous list request to get the next page of results.
 func (c *InstanceTemplatesListCall) PageToken(pageToken string) *InstanceTemplatesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstanceTemplatesListCall) QuotaUser(quotaUser string) *InstanceTemplatesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstanceTemplatesListCall) UserIP(userIP string) *InstanceTemplatesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -24494,7 +24268,8 @@ func (c *InstanceTemplatesListCall) doRequest(alt string) (*http.Response, error
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstanceTemplatesListCall) Do() (*InstanceTemplateList, error) {
+func (c *InstanceTemplatesListCall) Do(opts ...googleapi.CallOption) (*InstanceTemplateList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -24531,13 +24306,13 @@ func (c *InstanceTemplatesListCall) Do() (*InstanceTemplateList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -24570,6 +24345,27 @@ func (c *InstanceTemplatesListCall) Do() (*InstanceTemplateList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstanceTemplatesListCall) Pages(ctx context.Context, f func(*InstanceTemplateList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instances.addAccessConfig":
 
 type InstancesAddAccessConfigCall struct {
@@ -24592,23 +24388,6 @@ func (r *InstancesService) AddAccessConfig(project string, zone string, instance
 	c.instance = instance
 	c.urlParams_.Set("networkInterface", networkInterface)
 	c.accessconfig = accessconfig
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesAddAccessConfigCall) QuotaUser(quotaUser string) *InstancesAddAccessConfigCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesAddAccessConfigCall) UserIP(userIP string) *InstancesAddAccessConfigCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -24659,7 +24438,8 @@ func (c *InstancesAddAccessConfigCall) doRequest(alt string) (*http.Response, er
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesAddAccessConfigCall) Do() (*Operation, error) {
+func (c *InstancesAddAccessConfigCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -24751,7 +24531,7 @@ type InstancesAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves aggregated list of instance resources.
+// AggregatedList: Retrieves aggregated list of instances.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instances/aggregatedList
 func (r *InstancesService) AggregatedList(project string) *InstancesAggregatedListCall {
 	c := &InstancesAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -24773,19 +24553,20 @@ func (r *InstancesService) AggregatedList(project string) *InstancesAggregatedLi
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstancesAggregatedListCall) Filter(filter string) *InstancesAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -24793,10 +24574,10 @@ func (c *InstancesAggregatedListCall) Filter(filter string) *InstancesAggregated
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstancesAggregatedListCall) MaxResults(maxResults int64) *InstancesAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -24807,23 +24588,6 @@ func (c *InstancesAggregatedListCall) MaxResults(maxResults int64) *InstancesAgg
 // previous list request to get the next page of results.
 func (c *InstancesAggregatedListCall) PageToken(pageToken string) *InstancesAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesAggregatedListCall) QuotaUser(quotaUser string) *InstancesAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesAggregatedListCall) UserIP(userIP string) *InstancesAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -24879,7 +24643,8 @@ func (c *InstancesAggregatedListCall) doRequest(alt string) (*http.Response, err
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstancesAggregatedListCall) Do() (*InstanceAggregatedList, error) {
+func (c *InstancesAggregatedListCall) Do(opts ...googleapi.CallOption) (*InstanceAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -24908,7 +24673,7 @@ func (c *InstancesAggregatedListCall) Do() (*InstanceAggregatedList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves aggregated list of instance resources.",
+	//   "description": "Retrieves aggregated list of instances.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.instances.aggregatedList",
 	//   "parameterOrder": [
@@ -24916,13 +24681,13 @@ func (c *InstancesAggregatedListCall) Do() (*InstanceAggregatedList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -24955,6 +24720,27 @@ func (c *InstancesAggregatedListCall) Do() (*InstanceAggregatedList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstancesAggregatedListCall) Pages(ctx context.Context, f func(*InstanceAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instances.attachDisk":
 
 type InstancesAttachDiskCall struct {
@@ -24975,23 +24761,6 @@ func (r *InstancesService) AttachDisk(project string, zone string, instance stri
 	c.zone = zone
 	c.instance = instance
 	c.attacheddisk = attacheddisk
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesAttachDiskCall) QuotaUser(quotaUser string) *InstancesAttachDiskCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesAttachDiskCall) UserIP(userIP string) *InstancesAttachDiskCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -25042,7 +24811,8 @@ func (c *InstancesAttachDiskCall) doRequest(alt string) (*http.Response, error) 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesAttachDiskCall) Do() (*Operation, error) {
+func (c *InstancesAttachDiskCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -25081,7 +24851,7 @@ func (c *InstancesAttachDiskCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "instance": {
-	//       "description": "Instance name.",
+	//       "description": "The instance name for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -25139,23 +24909,6 @@ func (r *InstancesService) Delete(project string, zone string, instance string) 
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesDeleteCall) QuotaUser(quotaUser string) *InstancesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesDeleteCall) UserIP(userIP string) *InstancesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -25197,7 +24950,8 @@ func (c *InstancesDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesDeleteCall) Do() (*Operation, error) {
+func (c *InstancesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -25293,23 +25047,6 @@ func (r *InstancesService) DeleteAccessConfig(project string, zone string, insta
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesDeleteAccessConfigCall) QuotaUser(quotaUser string) *InstancesDeleteAccessConfigCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesDeleteAccessConfigCall) UserIP(userIP string) *InstancesDeleteAccessConfigCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -25351,7 +25088,8 @@ func (c *InstancesDeleteAccessConfigCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesDeleteAccessConfigCall) Do() (*Operation, error) {
+func (c *InstancesDeleteAccessConfigCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -25459,23 +25197,6 @@ func (r *InstancesService) DetachDisk(project string, zone string, instance stri
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesDetachDiskCall) QuotaUser(quotaUser string) *InstancesDetachDiskCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesDetachDiskCall) UserIP(userIP string) *InstancesDetachDiskCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -25517,7 +25238,8 @@ func (c *InstancesDetachDiskCall) doRequest(alt string) (*http.Response, error) 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesDetachDiskCall) Do() (*Operation, error) {
+func (c *InstancesDetachDiskCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -25609,30 +25331,14 @@ type InstancesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified instance resource.
+// Get: Returns the specified Instance resource. Get a list of available
+// instances by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instances/get
 func (r *InstancesService) Get(project string, zone string, instance string) *InstancesGetCall {
 	c := &InstancesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instance = instance
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesGetCall) QuotaUser(quotaUser string) *InstancesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesGetCall) UserIP(userIP string) *InstancesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -25690,7 +25396,8 @@ func (c *InstancesGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesGetCall) Do() (*Instance, error) {
+func (c *InstancesGetCall) Do(opts ...googleapi.CallOption) (*Instance, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -25719,7 +25426,7 @@ func (c *InstancesGetCall) Do() (*Instance, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified instance resource.",
+	//   "description": "Returns the specified Instance resource. Get a list of available instances by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.instances.get",
 	//   "parameterOrder": [
@@ -25793,23 +25500,6 @@ func (c *InstancesGetSerialPortOutputCall) Port(port int64) *InstancesGetSerialP
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesGetSerialPortOutputCall) QuotaUser(quotaUser string) *InstancesGetSerialPortOutputCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesGetSerialPortOutputCall) UserIP(userIP string) *InstancesGetSerialPortOutputCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -25864,7 +25554,8 @@ func (c *InstancesGetSerialPortOutputCall) doRequest(alt string) (*http.Response
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *InstancesGetSerialPortOutputCall) Do() (*SerialPortOutput, error) {
+func (c *InstancesGetSerialPortOutputCall) Do(opts ...googleapi.CallOption) (*SerialPortOutput, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -25968,23 +25659,6 @@ func (r *InstancesService) Insert(project string, zone string, instance *Instanc
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesInsertCall) QuotaUser(quotaUser string) *InstancesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesInsertCall) UserIP(userIP string) *InstancesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -26031,7 +25705,8 @@ func (c *InstancesInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesInsertCall) Do() (*Operation, error) {
+func (c *InstancesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -26109,8 +25784,8 @@ type InstancesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of instance resources contained within the
-// specified zone.
+// List: Retrieves the list of instances contained within the specified
+// zone.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instances/list
 func (r *InstancesService) List(project string, zone string) *InstancesListCall {
 	c := &InstancesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -26133,19 +25808,20 @@ func (r *InstancesService) List(project string, zone string) *InstancesListCall 
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *InstancesListCall) Filter(filter string) *InstancesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -26153,10 +25829,10 @@ func (c *InstancesListCall) Filter(filter string) *InstancesListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *InstancesListCall) MaxResults(maxResults int64) *InstancesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -26167,23 +25843,6 @@ func (c *InstancesListCall) MaxResults(maxResults int64) *InstancesListCall {
 // previous list request to get the next page of results.
 func (c *InstancesListCall) PageToken(pageToken string) *InstancesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesListCall) QuotaUser(quotaUser string) *InstancesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesListCall) UserIP(userIP string) *InstancesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -26240,7 +25899,8 @@ func (c *InstancesListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesListCall) Do() (*InstanceList, error) {
+func (c *InstancesListCall) Do(opts ...googleapi.CallOption) (*InstanceList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -26269,7 +25929,7 @@ func (c *InstancesListCall) Do() (*InstanceList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of instance resources contained within the specified zone.",
+	//   "description": "Retrieves the list of instances contained within the specified zone.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.instances.list",
 	//   "parameterOrder": [
@@ -26278,13 +25938,13 @@ func (c *InstancesListCall) Do() (*InstanceList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -26324,6 +25984,27 @@ func (c *InstancesListCall) Do() (*InstanceList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstancesListCall) Pages(ctx context.Context, f func(*InstanceList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instances.reset":
 
 type InstancesResetCall struct {
@@ -26342,23 +26023,6 @@ func (r *InstancesService) Reset(project string, zone string, instance string) *
 	c.project = project
 	c.zone = zone
 	c.instance = instance
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesResetCall) QuotaUser(quotaUser string) *InstancesResetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesResetCall) UserIP(userIP string) *InstancesResetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -26403,7 +26067,8 @@ func (c *InstancesResetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesResetCall) Do() (*Operation, error) {
+func (c *InstancesResetCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -26499,23 +26164,6 @@ func (r *InstancesService) SetDiskAutoDelete(project string, zone string, instan
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesSetDiskAutoDeleteCall) QuotaUser(quotaUser string) *InstancesSetDiskAutoDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesSetDiskAutoDeleteCall) UserIP(userIP string) *InstancesSetDiskAutoDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -26557,7 +26205,8 @@ func (c *InstancesSetDiskAutoDeleteCall) doRequest(alt string) (*http.Response, 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesSetDiskAutoDeleteCall) Do() (*Operation, error) {
+func (c *InstancesSetDiskAutoDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -26644,6 +26293,152 @@ func (c *InstancesSetDiskAutoDeleteCall) Do() (*Operation, error) {
 
 }
 
+// method id "compute.instances.setMachineType":
+
+type InstancesSetMachineTypeCall struct {
+	s                              *Service
+	project                        string
+	zone                           string
+	instance                       string
+	instancessetmachinetyperequest *InstancesSetMachineTypeRequest
+	urlParams_                     gensupport.URLParams
+	ctx_                           context.Context
+}
+
+// SetMachineType: Changes the machine type for a stopped instance to
+// the machine type specified in the request.
+func (r *InstancesService) SetMachineType(project string, zone string, instance string, instancessetmachinetyperequest *InstancesSetMachineTypeRequest) *InstancesSetMachineTypeCall {
+	c := &InstancesSetMachineTypeCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.zone = zone
+	c.instance = instance
+	c.instancessetmachinetyperequest = instancessetmachinetyperequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *InstancesSetMachineTypeCall) Fields(s ...googleapi.Field) *InstancesSetMachineTypeCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *InstancesSetMachineTypeCall) Context(ctx context.Context) *InstancesSetMachineTypeCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *InstancesSetMachineTypeCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.instancessetmachinetyperequest)
+	if err != nil {
+		return nil, err
+	}
+	ctype := "application/json"
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/zones/{zone}/instances/{instance}/setMachineType")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project":  c.project,
+		"zone":     c.zone,
+		"instance": c.instance,
+	})
+	req.Header.Set("Content-Type", ctype)
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.instances.setMachineType" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *InstancesSetMachineTypeCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Changes the machine type for a stopped instance to the machine type specified in the request.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.instances.setMachineType",
+	//   "parameterOrder": [
+	//     "project",
+	//     "zone",
+	//     "instance"
+	//   ],
+	//   "parameters": {
+	//     "instance": {
+	//       "description": "Name of the instance scoping this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "zone": {
+	//       "description": "The name of the zone for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/zones/{zone}/instances/{instance}/setMachineType",
+	//   "request": {
+	//     "$ref": "InstancesSetMachineTypeRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
 // method id "compute.instances.setMetadata":
 
 type InstancesSetMetadataCall struct {
@@ -26665,23 +26460,6 @@ func (r *InstancesService) SetMetadata(project string, zone string, instance str
 	c.zone = zone
 	c.instance = instance
 	c.metadata = metadata
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesSetMetadataCall) QuotaUser(quotaUser string) *InstancesSetMetadataCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesSetMetadataCall) UserIP(userIP string) *InstancesSetMetadataCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -26732,7 +26510,8 @@ func (c *InstancesSetMetadataCall) doRequest(alt string) (*http.Response, error)
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesSetMetadataCall) Do() (*Operation, error) {
+func (c *InstancesSetMetadataCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -26830,23 +26609,6 @@ func (r *InstancesService) SetScheduling(project string, zone string, instance s
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesSetSchedulingCall) QuotaUser(quotaUser string) *InstancesSetSchedulingCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesSetSchedulingCall) UserIP(userIP string) *InstancesSetSchedulingCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -26894,7 +26656,8 @@ func (c *InstancesSetSchedulingCall) doRequest(alt string) (*http.Response, erro
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesSetSchedulingCall) Do() (*Operation, error) {
+func (c *InstancesSetSchedulingCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -26993,23 +26756,6 @@ func (r *InstancesService) SetTags(project string, zone string, instance string,
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesSetTagsCall) QuotaUser(quotaUser string) *InstancesSetTagsCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesSetTagsCall) UserIP(userIP string) *InstancesSetTagsCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -27057,7 +26803,8 @@ func (c *InstancesSetTagsCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesSetTagsCall) Do() (*Operation, error) {
+func (c *InstancesSetTagsCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -27143,32 +26890,15 @@ type InstancesStartCall struct {
 	ctx_       context.Context
 }
 
-// Start: This method starts an instance that was stopped using the
-// using the instances().stop method. For more information, see Restart
-// an instance.
+// Start: Starts an instance that was stopped using the using the
+// instances().stop method. For more information, see Restart an
+// instance.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instances/start
 func (r *InstancesService) Start(project string, zone string, instance string) *InstancesStartCall {
 	c := &InstancesStartCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instance = instance
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesStartCall) QuotaUser(quotaUser string) *InstancesStartCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesStartCall) UserIP(userIP string) *InstancesStartCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -27213,7 +26943,8 @@ func (c *InstancesStartCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesStartCall) Do() (*Operation, error) {
+func (c *InstancesStartCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -27242,7 +26973,7 @@ func (c *InstancesStartCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "This method starts an instance that was stopped using the using the instances().stop method. For more information, see Restart an instance.",
+	//   "description": "Starts an instance that was stopped using the using the instances().stop method. For more information, see Restart an instance.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.instances.start",
 	//   "parameterOrder": [
@@ -27296,36 +27027,19 @@ type InstancesStopCall struct {
 	ctx_       context.Context
 }
 
-// Stop: This method stops a running instance, shutting it down cleanly,
-// and allows you to restart the instance at a later time. Stopped
-// instances do not incur per-minute, virtual machine usage charges
-// while they are stopped, but any resources that the virtual machine is
-// using, such as persistent disks and static IP addresses,will continue
-// to be charged until they are deleted. For more information, see
-// Stopping an instance.
+// Stop: Stops a running instance, shutting it down cleanly, and allows
+// you to restart the instance at a later time. Stopped instances do not
+// incur per-minute, virtual machine usage charges while they are
+// stopped, but any resources that the virtual machine is using, such as
+// persistent disks and static IP addresses, will continue to be charged
+// until they are deleted. For more information, see Stopping an
+// instance.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instances/stop
 func (r *InstancesService) Stop(project string, zone string, instance string) *InstancesStopCall {
 	c := &InstancesStopCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.instance = instance
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *InstancesStopCall) QuotaUser(quotaUser string) *InstancesStopCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *InstancesStopCall) UserIP(userIP string) *InstancesStopCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -27370,7 +27084,8 @@ func (c *InstancesStopCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *InstancesStopCall) Do() (*Operation, error) {
+func (c *InstancesStopCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -27399,7 +27114,7 @@ func (c *InstancesStopCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "This method stops a running instance, shutting it down cleanly, and allows you to restart the instance at a later time. Stopped instances do not incur per-minute, virtual machine usage charges while they are stopped, but any resources that the virtual machine is using, such as persistent disks and static IP addresses,will continue to be charged until they are deleted. For more information, see Stopping an instance.",
+	//   "description": "Stops a running instance, shutting it down cleanly, and allows you to restart the instance at a later time. Stopped instances do not incur per-minute, virtual machine usage charges while they are stopped, but any resources that the virtual machine is using, such as persistent disks and static IP addresses, will continue to be charged until they are deleted. For more information, see Stopping an instance.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.instances.stop",
 	//   "parameterOrder": [
@@ -27453,29 +27168,13 @@ type LicensesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified license resource.
+// Get: Returns the specified License resource. Get a list of available
+// licenses by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/licenses/get
 func (r *LicensesService) Get(project string, license string) *LicensesGetCall {
 	c := &LicensesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.license = license
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *LicensesGetCall) QuotaUser(quotaUser string) *LicensesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *LicensesGetCall) UserIP(userIP string) *LicensesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -27532,7 +27231,8 @@ func (c *LicensesGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *LicensesGetCall) Do() (*License, error) {
+func (c *LicensesGetCall) Do(opts ...googleapi.CallOption) (*License, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -27561,7 +27261,7 @@ func (c *LicensesGetCall) Do() (*License, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified license resource.",
+	//   "description": "Returns the specified License resource. Get a list of available licenses by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.licenses.get",
 	//   "parameterOrder": [
@@ -27570,7 +27270,7 @@ func (c *LicensesGetCall) Do() (*License, error) {
 	//   ],
 	//   "parameters": {
 	//     "license": {
-	//       "description": "Name of the license resource to return.",
+	//       "description": "Name of the License resource to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -27607,8 +27307,7 @@ type MachineTypesAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of machine type resources grouped
-// by scope.
+// AggregatedList: Retrieves an aggregated list of machine types.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/machineTypes/aggregatedList
 func (r *MachineTypesService) AggregatedList(project string) *MachineTypesAggregatedListCall {
 	c := &MachineTypesAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -27630,19 +27329,20 @@ func (r *MachineTypesService) AggregatedList(project string) *MachineTypesAggreg
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *MachineTypesAggregatedListCall) Filter(filter string) *MachineTypesAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -27650,10 +27350,10 @@ func (c *MachineTypesAggregatedListCall) Filter(filter string) *MachineTypesAggr
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *MachineTypesAggregatedListCall) MaxResults(maxResults int64) *MachineTypesAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -27664,23 +27364,6 @@ func (c *MachineTypesAggregatedListCall) MaxResults(maxResults int64) *MachineTy
 // previous list request to get the next page of results.
 func (c *MachineTypesAggregatedListCall) PageToken(pageToken string) *MachineTypesAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *MachineTypesAggregatedListCall) QuotaUser(quotaUser string) *MachineTypesAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *MachineTypesAggregatedListCall) UserIP(userIP string) *MachineTypesAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -27736,7 +27419,8 @@ func (c *MachineTypesAggregatedListCall) doRequest(alt string) (*http.Response, 
 // was returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *MachineTypesAggregatedListCall) Do() (*MachineTypeAggregatedList, error) {
+func (c *MachineTypesAggregatedListCall) Do(opts ...googleapi.CallOption) (*MachineTypeAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -27765,7 +27449,7 @@ func (c *MachineTypesAggregatedListCall) Do() (*MachineTypeAggregatedList, error
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of machine type resources grouped by scope.",
+	//   "description": "Retrieves an aggregated list of machine types.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.machineTypes.aggregatedList",
 	//   "parameterOrder": [
@@ -27773,13 +27457,13 @@ func (c *MachineTypesAggregatedListCall) Do() (*MachineTypeAggregatedList, error
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -27812,6 +27496,27 @@ func (c *MachineTypesAggregatedListCall) Do() (*MachineTypeAggregatedList, error
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *MachineTypesAggregatedListCall) Pages(ctx context.Context, f func(*MachineTypeAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.machineTypes.get":
 
 type MachineTypesGetCall struct {
@@ -27824,30 +27529,14 @@ type MachineTypesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified machine type resource.
+// Get: Returns the specified machine type. Get a list of available
+// machine types by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/machineTypes/get
 func (r *MachineTypesService) Get(project string, zone string, machineType string) *MachineTypesGetCall {
 	c := &MachineTypesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.machineType = machineType
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *MachineTypesGetCall) QuotaUser(quotaUser string) *MachineTypesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *MachineTypesGetCall) UserIP(userIP string) *MachineTypesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -27905,7 +27594,8 @@ func (c *MachineTypesGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *MachineTypesGetCall) Do() (*MachineType, error) {
+func (c *MachineTypesGetCall) Do(opts ...googleapi.CallOption) (*MachineType, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -27934,7 +27624,7 @@ func (c *MachineTypesGetCall) Do() (*MachineType, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified machine type resource.",
+	//   "description": "Returns the specified machine type. Get a list of available machine types by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.machineTypes.get",
 	//   "parameterOrder": [
@@ -27944,7 +27634,7 @@ func (c *MachineTypesGetCall) Do() (*MachineType, error) {
 	//   ],
 	//   "parameters": {
 	//     "machineType": {
-	//       "description": "Name of the machine type resource to return.",
+	//       "description": "Name of the machine type to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -27989,8 +27679,8 @@ type MachineTypesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of machine type resources available to the
-// specified project.
+// List: Retrieves a list of machine types available to the specified
+// project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/machineTypes/list
 func (r *MachineTypesService) List(project string, zone string) *MachineTypesListCall {
 	c := &MachineTypesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -28013,19 +27703,20 @@ func (r *MachineTypesService) List(project string, zone string) *MachineTypesLis
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *MachineTypesListCall) Filter(filter string) *MachineTypesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -28033,10 +27724,10 @@ func (c *MachineTypesListCall) Filter(filter string) *MachineTypesListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *MachineTypesListCall) MaxResults(maxResults int64) *MachineTypesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -28047,23 +27738,6 @@ func (c *MachineTypesListCall) MaxResults(maxResults int64) *MachineTypesListCal
 // previous list request to get the next page of results.
 func (c *MachineTypesListCall) PageToken(pageToken string) *MachineTypesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *MachineTypesListCall) QuotaUser(quotaUser string) *MachineTypesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *MachineTypesListCall) UserIP(userIP string) *MachineTypesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -28120,7 +27794,8 @@ func (c *MachineTypesListCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *MachineTypesListCall) Do() (*MachineTypeList, error) {
+func (c *MachineTypesListCall) Do(opts ...googleapi.CallOption) (*MachineTypeList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -28149,7 +27824,7 @@ func (c *MachineTypesListCall) Do() (*MachineTypeList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of machine type resources available to the specified project.",
+	//   "description": "Retrieves a list of machine types available to the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.machineTypes.list",
 	//   "parameterOrder": [
@@ -28158,13 +27833,13 @@ func (c *MachineTypesListCall) Do() (*MachineTypeList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -28204,6 +27879,27 @@ func (c *MachineTypesListCall) Do() (*MachineTypeList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *MachineTypesListCall) Pages(ctx context.Context, f func(*MachineTypeList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.networks.delete":
 
 type NetworksDeleteCall struct {
@@ -28214,29 +27910,12 @@ type NetworksDeleteCall struct {
 	ctx_       context.Context
 }
 
-// Delete: Deletes the specified network resource.
+// Delete: Deletes the specified network.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/networks/delete
 func (r *NetworksService) Delete(project string, network string) *NetworksDeleteCall {
 	c := &NetworksDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.network = network
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *NetworksDeleteCall) QuotaUser(quotaUser string) *NetworksDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *NetworksDeleteCall) UserIP(userIP string) *NetworksDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -28280,7 +27959,8 @@ func (c *NetworksDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *NetworksDeleteCall) Do() (*Operation, error) {
+func (c *NetworksDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -28309,7 +27989,7 @@ func (c *NetworksDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified network resource.",
+	//   "description": "Deletes the specified network.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.networks.delete",
 	//   "parameterOrder": [
@@ -28318,7 +27998,7 @@ func (c *NetworksDeleteCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "network": {
-	//       "description": "Name of the network resource to delete.",
+	//       "description": "Name of the network to delete.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -28355,29 +28035,13 @@ type NetworksGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified network resource.
+// Get: Returns the specified network. Get a list of available networks
+// by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/networks/get
 func (r *NetworksService) Get(project string, network string) *NetworksGetCall {
 	c := &NetworksGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.network = network
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *NetworksGetCall) QuotaUser(quotaUser string) *NetworksGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *NetworksGetCall) UserIP(userIP string) *NetworksGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -28434,7 +28098,8 @@ func (c *NetworksGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *NetworksGetCall) Do() (*Network, error) {
+func (c *NetworksGetCall) Do(opts ...googleapi.CallOption) (*Network, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -28463,7 +28128,7 @@ func (c *NetworksGetCall) Do() (*Network, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified network resource.",
+	//   "description": "Returns the specified network. Get a list of available networks by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.networks.get",
 	//   "parameterOrder": [
@@ -28472,7 +28137,7 @@ func (c *NetworksGetCall) Do() (*Network, error) {
 	//   ],
 	//   "parameters": {
 	//     "network": {
-	//       "description": "Name of the network resource to return.",
+	//       "description": "Name of the network to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -28509,30 +28174,13 @@ type NetworksInsertCall struct {
 	ctx_       context.Context
 }
 
-// Insert: Creates a network resource in the specified project using the
-// data included in the request.
+// Insert: Creates a network in the specified project using the data
+// included in the request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/networks/insert
 func (r *NetworksService) Insert(project string, network *Network) *NetworksInsertCall {
 	c := &NetworksInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.network = network
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *NetworksInsertCall) QuotaUser(quotaUser string) *NetworksInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *NetworksInsertCall) UserIP(userIP string) *NetworksInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -28581,7 +28229,8 @@ func (c *NetworksInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *NetworksInsertCall) Do() (*Operation, error) {
+func (c *NetworksInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -28610,7 +28259,7 @@ func (c *NetworksInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a network resource in the specified project using the data included in the request.",
+	//   "description": "Creates a network in the specified project using the data included in the request.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.networks.insert",
 	//   "parameterOrder": [
@@ -28650,8 +28299,8 @@ type NetworksListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of network resources available to the
-// specified project.
+// List: Retrieves the list of networks available to the specified
+// project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/networks/list
 func (r *NetworksService) List(project string) *NetworksListCall {
 	c := &NetworksListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -28673,19 +28322,20 @@ func (r *NetworksService) List(project string) *NetworksListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *NetworksListCall) Filter(filter string) *NetworksListCall {
 	c.urlParams_.Set("filter", filter)
@@ -28693,10 +28343,10 @@ func (c *NetworksListCall) Filter(filter string) *NetworksListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *NetworksListCall) MaxResults(maxResults int64) *NetworksListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -28707,23 +28357,6 @@ func (c *NetworksListCall) MaxResults(maxResults int64) *NetworksListCall {
 // previous list request to get the next page of results.
 func (c *NetworksListCall) PageToken(pageToken string) *NetworksListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *NetworksListCall) QuotaUser(quotaUser string) *NetworksListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *NetworksListCall) UserIP(userIP string) *NetworksListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -28779,7 +28412,8 @@ func (c *NetworksListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *NetworksListCall) Do() (*NetworkList, error) {
+func (c *NetworksListCall) Do(opts ...googleapi.CallOption) (*NetworkList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -28808,7 +28442,7 @@ func (c *NetworksListCall) Do() (*NetworkList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of network resources available to the specified project.",
+	//   "description": "Retrieves the list of networks available to the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.networks.list",
 	//   "parameterOrder": [
@@ -28816,13 +28450,13 @@ func (c *NetworksListCall) Do() (*NetworkList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -28855,6 +28489,27 @@ func (c *NetworksListCall) Do() (*NetworkList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *NetworksListCall) Pages(ctx context.Context, f func(*NetworkList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.projects.get":
 
 type ProjectsGetCall struct {
@@ -28865,28 +28520,11 @@ type ProjectsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified project resource.
+// Get: Returns the specified Project resource.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/projects/get
 func (r *ProjectsService) Get(project string) *ProjectsGetCall {
 	c := &ProjectsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ProjectsGetCall) QuotaUser(quotaUser string) *ProjectsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ProjectsGetCall) UserIP(userIP string) *ProjectsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -28942,7 +28580,8 @@ func (c *ProjectsGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *ProjectsGetCall) Do() (*Project, error) {
+func (c *ProjectsGetCall) Do(opts ...googleapi.CallOption) (*Project, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -28971,7 +28610,7 @@ func (c *ProjectsGetCall) Do() (*Project, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified project resource.",
+	//   "description": "Returns the specified Project resource.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.projects.get",
 	//   "parameterOrder": [
@@ -29014,23 +28653,6 @@ func (r *ProjectsService) MoveDisk(project string, diskmoverequest *DiskMoveRequ
 	c := &ProjectsMoveDiskCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.diskmoverequest = diskmoverequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ProjectsMoveDiskCall) QuotaUser(quotaUser string) *ProjectsMoveDiskCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ProjectsMoveDiskCall) UserIP(userIP string) *ProjectsMoveDiskCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -29079,7 +28701,8 @@ func (c *ProjectsMoveDiskCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ProjectsMoveDiskCall) Do() (*Operation, error) {
+func (c *ProjectsMoveDiskCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -29157,23 +28780,6 @@ func (r *ProjectsService) MoveInstance(project string, instancemoverequest *Inst
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ProjectsMoveInstanceCall) QuotaUser(quotaUser string) *ProjectsMoveInstanceCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ProjectsMoveInstanceCall) UserIP(userIP string) *ProjectsMoveInstanceCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -29219,7 +28825,8 @@ func (c *ProjectsMoveInstanceCall) doRequest(alt string) (*http.Response, error)
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ProjectsMoveInstanceCall) Do() (*Operation, error) {
+func (c *ProjectsMoveInstanceCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -29298,23 +28905,6 @@ func (r *ProjectsService) SetCommonInstanceMetadata(project string, metadata *Me
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ProjectsSetCommonInstanceMetadataCall) QuotaUser(quotaUser string) *ProjectsSetCommonInstanceMetadataCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ProjectsSetCommonInstanceMetadataCall) UserIP(userIP string) *ProjectsSetCommonInstanceMetadataCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -29360,7 +28950,8 @@ func (c *ProjectsSetCommonInstanceMetadataCall) doRequest(alt string) (*http.Res
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ProjectsSetCommonInstanceMetadataCall) Do() (*Operation, error) {
+func (c *ProjectsSetCommonInstanceMetadataCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -29441,23 +29032,6 @@ func (r *ProjectsService) SetUsageExportBucket(project string, usageexportlocati
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ProjectsSetUsageExportBucketCall) QuotaUser(quotaUser string) *ProjectsSetUsageExportBucketCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ProjectsSetUsageExportBucketCall) UserIP(userIP string) *ProjectsSetUsageExportBucketCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -29503,7 +29077,8 @@ func (c *ProjectsSetUsageExportBucketCall) doRequest(alt string) (*http.Response
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ProjectsSetUsageExportBucketCall) Do() (*Operation, error) {
+func (c *ProjectsSetUsageExportBucketCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -29586,23 +29161,6 @@ func (r *RegionOperationsService) Delete(project string, region string, operatio
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RegionOperationsDeleteCall) QuotaUser(quotaUser string) *RegionOperationsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RegionOperationsDeleteCall) UserIP(userIP string) *RegionOperationsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -29638,7 +29196,8 @@ func (c *RegionOperationsDeleteCall) doRequest(alt string) (*http.Response, erro
 }
 
 // Do executes the "compute.regionOperations.delete" call.
-func (c *RegionOperationsDeleteCall) Do() error {
+func (c *RegionOperationsDeleteCall) Do(opts ...googleapi.CallOption) error {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if err != nil {
 		return err
@@ -29673,7 +29232,7 @@ func (c *RegionOperationsDeleteCall) Do() error {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "Name of the region scoping this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -29708,23 +29267,6 @@ func (r *RegionOperationsService) Get(project string, region string, operation s
 	c.project = project
 	c.region = region
 	c.operation = operation
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RegionOperationsGetCall) QuotaUser(quotaUser string) *RegionOperationsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RegionOperationsGetCall) UserIP(userIP string) *RegionOperationsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -29782,7 +29324,8 @@ func (c *RegionOperationsGetCall) doRequest(alt string) (*http.Response, error) 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *RegionOperationsGetCall) Do() (*Operation, error) {
+func (c *RegionOperationsGetCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -29835,7 +29378,7 @@ func (c *RegionOperationsGetCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -29866,7 +29409,7 @@ type RegionOperationsListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of Operation resources contained within the
+// List: Retrieves a list of Operation resources contained within the
 // specified region.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/regionOperations/list
 func (r *RegionOperationsService) List(project string, region string) *RegionOperationsListCall {
@@ -29890,19 +29433,20 @@ func (r *RegionOperationsService) List(project string, region string) *RegionOpe
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *RegionOperationsListCall) Filter(filter string) *RegionOperationsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -29910,10 +29454,10 @@ func (c *RegionOperationsListCall) Filter(filter string) *RegionOperationsListCa
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *RegionOperationsListCall) MaxResults(maxResults int64) *RegionOperationsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -29924,23 +29468,6 @@ func (c *RegionOperationsListCall) MaxResults(maxResults int64) *RegionOperation
 // previous list request to get the next page of results.
 func (c *RegionOperationsListCall) PageToken(pageToken string) *RegionOperationsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RegionOperationsListCall) QuotaUser(quotaUser string) *RegionOperationsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RegionOperationsListCall) UserIP(userIP string) *RegionOperationsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -29997,7 +29524,8 @@ func (c *RegionOperationsListCall) doRequest(alt string) (*http.Response, error)
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *RegionOperationsListCall) Do() (*OperationList, error) {
+func (c *RegionOperationsListCall) Do(opts ...googleapi.CallOption) (*OperationList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -30026,7 +29554,7 @@ func (c *RegionOperationsListCall) Do() (*OperationList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of Operation resources contained within the specified region.",
+	//   "description": "Retrieves a list of Operation resources contained within the specified region.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.regionOperations.list",
 	//   "parameterOrder": [
@@ -30035,13 +29563,13 @@ func (c *RegionOperationsListCall) Do() (*OperationList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -30061,7 +29589,7 @@ func (c *RegionOperationsListCall) Do() (*OperationList, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "Name of the region scoping this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -30081,6 +29609,27 @@ func (c *RegionOperationsListCall) Do() (*OperationList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *RegionOperationsListCall) Pages(ctx context.Context, f func(*OperationList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.regions.get":
 
 type RegionsGetCall struct {
@@ -30092,29 +29641,13 @@ type RegionsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified region resource.
+// Get: Returns the specified Region resource. Get a list of available
+// regions by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/regions/get
 func (r *RegionsService) Get(project string, region string) *RegionsGetCall {
 	c := &RegionsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RegionsGetCall) QuotaUser(quotaUser string) *RegionsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RegionsGetCall) UserIP(userIP string) *RegionsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -30171,7 +29704,8 @@ func (c *RegionsGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *RegionsGetCall) Do() (*Region, error) {
+func (c *RegionsGetCall) Do(opts ...googleapi.CallOption) (*Region, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -30200,7 +29734,7 @@ func (c *RegionsGetCall) Do() (*Region, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified region resource.",
+	//   "description": "Returns the specified Region resource. Get a list of available regions by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.regions.get",
 	//   "parameterOrder": [
@@ -30269,19 +29803,20 @@ func (r *RegionsService) List(project string) *RegionsListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *RegionsListCall) Filter(filter string) *RegionsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -30289,10 +29824,10 @@ func (c *RegionsListCall) Filter(filter string) *RegionsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *RegionsListCall) MaxResults(maxResults int64) *RegionsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -30303,23 +29838,6 @@ func (c *RegionsListCall) MaxResults(maxResults int64) *RegionsListCall {
 // previous list request to get the next page of results.
 func (c *RegionsListCall) PageToken(pageToken string) *RegionsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RegionsListCall) QuotaUser(quotaUser string) *RegionsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RegionsListCall) UserIP(userIP string) *RegionsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -30375,7 +29893,8 @@ func (c *RegionsListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *RegionsListCall) Do() (*RegionList, error) {
+func (c *RegionsListCall) Do(opts ...googleapi.CallOption) (*RegionList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -30412,13 +29931,13 @@ func (c *RegionsListCall) Do() (*RegionList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -30451,6 +29970,27 @@ func (c *RegionsListCall) Do() (*RegionList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *RegionsListCall) Pages(ctx context.Context, f func(*RegionList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.routes.delete":
 
 type RoutesDeleteCall struct {
@@ -30461,29 +30001,12 @@ type RoutesDeleteCall struct {
 	ctx_       context.Context
 }
 
-// Delete: Deletes the specified route resource.
+// Delete: Deletes the specified Route resource.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/routes/delete
 func (r *RoutesService) Delete(project string, route string) *RoutesDeleteCall {
 	c := &RoutesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.route = route
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RoutesDeleteCall) QuotaUser(quotaUser string) *RoutesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RoutesDeleteCall) UserIP(userIP string) *RoutesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -30527,7 +30050,8 @@ func (c *RoutesDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *RoutesDeleteCall) Do() (*Operation, error) {
+func (c *RoutesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -30556,7 +30080,7 @@ func (c *RoutesDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified route resource.",
+	//   "description": "Deletes the specified Route resource.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.routes.delete",
 	//   "parameterOrder": [
@@ -30572,7 +30096,7 @@ func (c *RoutesDeleteCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "route": {
-	//       "description": "Name of the route resource to delete.",
+	//       "description": "Name of the Route resource to delete.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -30602,29 +30126,13 @@ type RoutesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified route resource.
+// Get: Returns the specified Route resource. Get a list of available
+// routes by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/routes/get
 func (r *RoutesService) Get(project string, route string) *RoutesGetCall {
 	c := &RoutesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.route = route
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RoutesGetCall) QuotaUser(quotaUser string) *RoutesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RoutesGetCall) UserIP(userIP string) *RoutesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -30681,7 +30189,8 @@ func (c *RoutesGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *RoutesGetCall) Do() (*Route, error) {
+func (c *RoutesGetCall) Do(opts ...googleapi.CallOption) (*Route, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -30710,7 +30219,7 @@ func (c *RoutesGetCall) Do() (*Route, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified route resource.",
+	//   "description": "Returns the specified Route resource. Get a list of available routes by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.routes.get",
 	//   "parameterOrder": [
@@ -30726,7 +30235,7 @@ func (c *RoutesGetCall) Do() (*Route, error) {
 	//       "type": "string"
 	//     },
 	//     "route": {
-	//       "description": "Name of the route resource to return.",
+	//       "description": "Name of the Route resource to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -30756,30 +30265,13 @@ type RoutesInsertCall struct {
 	ctx_       context.Context
 }
 
-// Insert: Creates a route resource in the specified project using the
+// Insert: Creates a Route resource in the specified project using the
 // data included in the request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/routes/insert
 func (r *RoutesService) Insert(project string, route *Route) *RoutesInsertCall {
 	c := &RoutesInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.route = route
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RoutesInsertCall) QuotaUser(quotaUser string) *RoutesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RoutesInsertCall) UserIP(userIP string) *RoutesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -30828,7 +30320,8 @@ func (c *RoutesInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *RoutesInsertCall) Do() (*Operation, error) {
+func (c *RoutesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -30857,7 +30350,7 @@ func (c *RoutesInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a route resource in the specified project using the data included in the request.",
+	//   "description": "Creates a Route resource in the specified project using the data included in the request.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.routes.insert",
 	//   "parameterOrder": [
@@ -30897,7 +30390,7 @@ type RoutesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of route resources available to the
+// List: Retrieves the list of Route resources available to the
 // specified project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/routes/list
 func (r *RoutesService) List(project string) *RoutesListCall {
@@ -30920,19 +30413,20 @@ func (r *RoutesService) List(project string) *RoutesListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *RoutesListCall) Filter(filter string) *RoutesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -30940,10 +30434,10 @@ func (c *RoutesListCall) Filter(filter string) *RoutesListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *RoutesListCall) MaxResults(maxResults int64) *RoutesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -30954,23 +30448,6 @@ func (c *RoutesListCall) MaxResults(maxResults int64) *RoutesListCall {
 // previous list request to get the next page of results.
 func (c *RoutesListCall) PageToken(pageToken string) *RoutesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *RoutesListCall) QuotaUser(quotaUser string) *RoutesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *RoutesListCall) UserIP(userIP string) *RoutesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -31026,7 +30503,8 @@ func (c *RoutesListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *RoutesListCall) Do() (*RouteList, error) {
+func (c *RoutesListCall) Do(opts ...googleapi.CallOption) (*RouteList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -31055,7 +30533,7 @@ func (c *RoutesListCall) Do() (*RouteList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of route resources available to the specified project.",
+	//   "description": "Retrieves the list of Route resources available to the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.routes.list",
 	//   "parameterOrder": [
@@ -31063,13 +30541,13 @@ func (c *RoutesListCall) Do() (*RouteList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -31102,6 +30580,27 @@ func (c *RoutesListCall) Do() (*RouteList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *RoutesListCall) Pages(ctx context.Context, f func(*RouteList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.snapshots.delete":
 
 type SnapshotsDeleteCall struct {
@@ -31124,23 +30623,6 @@ func (r *SnapshotsService) Delete(project string, snapshot string) *SnapshotsDel
 	c := &SnapshotsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.snapshot = snapshot
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *SnapshotsDeleteCall) QuotaUser(quotaUser string) *SnapshotsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *SnapshotsDeleteCall) UserIP(userIP string) *SnapshotsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -31184,7 +30666,8 @@ func (c *SnapshotsDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *SnapshotsDeleteCall) Do() (*Operation, error) {
+func (c *SnapshotsDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -31259,29 +30742,13 @@ type SnapshotsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified Snapshot resource.
+// Get: Returns the specified Snapshot resource. Get a list of available
+// snapshots by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/snapshots/get
 func (r *SnapshotsService) Get(project string, snapshot string) *SnapshotsGetCall {
 	c := &SnapshotsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.snapshot = snapshot
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *SnapshotsGetCall) QuotaUser(quotaUser string) *SnapshotsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *SnapshotsGetCall) UserIP(userIP string) *SnapshotsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -31338,7 +30805,8 @@ func (c *SnapshotsGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *SnapshotsGetCall) Do() (*Snapshot, error) {
+func (c *SnapshotsGetCall) Do(opts ...googleapi.CallOption) (*Snapshot, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -31367,7 +30835,7 @@ func (c *SnapshotsGetCall) Do() (*Snapshot, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified Snapshot resource.",
+	//   "description": "Returns the specified Snapshot resource. Get a list of available snapshots by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.snapshots.get",
 	//   "parameterOrder": [
@@ -31436,19 +30904,20 @@ func (r *SnapshotsService) List(project string) *SnapshotsListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *SnapshotsListCall) Filter(filter string) *SnapshotsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -31456,10 +30925,10 @@ func (c *SnapshotsListCall) Filter(filter string) *SnapshotsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *SnapshotsListCall) MaxResults(maxResults int64) *SnapshotsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -31470,23 +30939,6 @@ func (c *SnapshotsListCall) MaxResults(maxResults int64) *SnapshotsListCall {
 // previous list request to get the next page of results.
 func (c *SnapshotsListCall) PageToken(pageToken string) *SnapshotsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *SnapshotsListCall) QuotaUser(quotaUser string) *SnapshotsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *SnapshotsListCall) UserIP(userIP string) *SnapshotsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -31542,7 +30994,8 @@ func (c *SnapshotsListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *SnapshotsListCall) Do() (*SnapshotList, error) {
+func (c *SnapshotsListCall) Do(opts ...googleapi.CallOption) (*SnapshotList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -31579,13 +31032,13 @@ func (c *SnapshotsListCall) Do() (*SnapshotList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -31618,6 +31071,27 @@ func (c *SnapshotsListCall) Do() (*SnapshotList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *SnapshotsListCall) Pages(ctx context.Context, f func(*SnapshotList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.sslCertificates.delete":
 
 type SslCertificatesDeleteCall struct {
@@ -31633,23 +31107,6 @@ func (r *SslCertificatesService) Delete(project string, sslCertificate string) *
 	c := &SslCertificatesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.sslCertificate = sslCertificate
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *SslCertificatesDeleteCall) QuotaUser(quotaUser string) *SslCertificatesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *SslCertificatesDeleteCall) UserIP(userIP string) *SslCertificatesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -31693,7 +31150,8 @@ func (c *SslCertificatesDeleteCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *SslCertificatesDeleteCall) Do() (*Operation, error) {
+func (c *SslCertificatesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -31768,28 +31226,12 @@ type SslCertificatesGetCall struct {
 	ctx_           context.Context
 }
 
-// Get: Returns the specified SslCertificate resource.
+// Get: Returns the specified SslCertificate resource. Get a list of
+// available SSL certificates by making a list() request.
 func (r *SslCertificatesService) Get(project string, sslCertificate string) *SslCertificatesGetCall {
 	c := &SslCertificatesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.sslCertificate = sslCertificate
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *SslCertificatesGetCall) QuotaUser(quotaUser string) *SslCertificatesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *SslCertificatesGetCall) UserIP(userIP string) *SslCertificatesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -31846,7 +31288,8 @@ func (c *SslCertificatesGetCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *SslCertificatesGetCall) Do() (*SslCertificate, error) {
+func (c *SslCertificatesGetCall) Do(opts ...googleapi.CallOption) (*SslCertificate, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -31875,7 +31318,7 @@ func (c *SslCertificatesGetCall) Do() (*SslCertificate, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified SslCertificate resource.",
+	//   "description": "Returns the specified SslCertificate resource. Get a list of available SSL certificates by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.sslCertificates.get",
 	//   "parameterOrder": [
@@ -31930,23 +31373,6 @@ func (r *SslCertificatesService) Insert(project string, sslcertificate *SslCerti
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *SslCertificatesInsertCall) QuotaUser(quotaUser string) *SslCertificatesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *SslCertificatesInsertCall) UserIP(userIP string) *SslCertificatesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -31992,7 +31418,8 @@ func (c *SslCertificatesInsertCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *SslCertificatesInsertCall) Do() (*Operation, error) {
+func (c *SslCertificatesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -32083,19 +31510,20 @@ func (r *SslCertificatesService) List(project string) *SslCertificatesListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *SslCertificatesListCall) Filter(filter string) *SslCertificatesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -32103,10 +31531,10 @@ func (c *SslCertificatesListCall) Filter(filter string) *SslCertificatesListCall
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *SslCertificatesListCall) MaxResults(maxResults int64) *SslCertificatesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -32117,23 +31545,6 @@ func (c *SslCertificatesListCall) MaxResults(maxResults int64) *SslCertificatesL
 // previous list request to get the next page of results.
 func (c *SslCertificatesListCall) PageToken(pageToken string) *SslCertificatesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *SslCertificatesListCall) QuotaUser(quotaUser string) *SslCertificatesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *SslCertificatesListCall) UserIP(userIP string) *SslCertificatesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -32189,7 +31600,8 @@ func (c *SslCertificatesListCall) doRequest(alt string) (*http.Response, error) 
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *SslCertificatesListCall) Do() (*SslCertificateList, error) {
+func (c *SslCertificatesListCall) Do(opts ...googleapi.CallOption) (*SslCertificateList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -32226,13 +31638,13 @@ func (c *SslCertificatesListCall) Do() (*SslCertificateList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -32265,6 +31677,896 @@ func (c *SslCertificatesListCall) Do() (*SslCertificateList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *SslCertificatesListCall) Pages(ctx context.Context, f func(*SslCertificateList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "compute.subnetworks.aggregatedList":
+
+type SubnetworksAggregatedListCall struct {
+	s            *Service
+	project      string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+}
+
+// AggregatedList: Retrieves an aggregated list of subnetworks.
+func (r *SubnetworksService) AggregatedList(project string) *SubnetworksAggregatedListCall {
+	c := &SubnetworksAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	return c
+}
+
+// Filter sets the optional parameter "filter": Sets a filter expression
+// for filtering listed resources, in the form filter={expression}. Your
+// {expression} must be in the format: field_name comparison_string
+// literal_string.
+//
+// The field_name is the name of the field you want to compare. Only
+// atomic field types are supported (string, number, boolean). The
+// comparison_string must be either eq (equals) or ne (not equals). The
+// literal_string is the string value to filter to. The literal value
+// must be valid for the type of field you are filtering by (string,
+// number, boolean). For string fields, the literal value is interpreted
+// as a regular expression using RE2 syntax. The literal value must
+// match the entire field.
+//
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
+//
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
+//
+// The Beta API also supports filtering on multiple expressions by
+// providing each separate expression within parentheses. For example,
+// (scheduling.automaticRestart eq true) (zone eq us-central1-f).
+// Multiple expressions are treated as AND expressions, meaning that
+// resources must match all expressions to pass the filters.
+func (c *SubnetworksAggregatedListCall) Filter(filter string) *SubnetworksAggregatedListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// MaxResults sets the optional parameter "maxResults": The maximum
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
+func (c *SubnetworksAggregatedListCall) MaxResults(maxResults int64) *SubnetworksAggregatedListCall {
+	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": Specifies a page
+// token to use. Set pageToken to the nextPageToken returned by a
+// previous list request to get the next page of results.
+func (c *SubnetworksAggregatedListCall) PageToken(pageToken string) *SubnetworksAggregatedListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *SubnetworksAggregatedListCall) Fields(s ...googleapi.Field) *SubnetworksAggregatedListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *SubnetworksAggregatedListCall) IfNoneMatch(entityTag string) *SubnetworksAggregatedListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *SubnetworksAggregatedListCall) Context(ctx context.Context) *SubnetworksAggregatedListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *SubnetworksAggregatedListCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/aggregated/subnetworks")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project": c.project,
+	})
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		req.Header.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.subnetworks.aggregatedList" call.
+// Exactly one of *SubnetworkAggregatedList or error will be non-nil.
+// Any non-2xx status code is an error. Response headers are in either
+// *SubnetworkAggregatedList.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *SubnetworksAggregatedListCall) Do(opts ...googleapi.CallOption) (*SubnetworkAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &SubnetworkAggregatedList{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Retrieves an aggregated list of subnetworks.",
+	//   "httpMethod": "GET",
+	//   "id": "compute.subnetworks.aggregatedList",
+	//   "parameterOrder": [
+	//     "project"
+	//   ],
+	//   "parameters": {
+	//     "filter": {
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "maxResults": {
+	//       "default": "500",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "format": "uint32",
+	//       "location": "query",
+	//       "maximum": "500",
+	//       "minimum": "0",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/aggregated/subnetworks",
+	//   "response": {
+	//     "$ref": "SubnetworkAggregatedList"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute",
+	//     "https://www.googleapis.com/auth/compute.readonly"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *SubnetworksAggregatedListCall) Pages(ctx context.Context, f func(*SubnetworkAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "compute.subnetworks.delete":
+
+type SubnetworksDeleteCall struct {
+	s          *Service
+	project    string
+	region     string
+	subnetwork string
+	urlParams_ gensupport.URLParams
+	ctx_       context.Context
+}
+
+// Delete: Deletes the specified subnetwork.
+func (r *SubnetworksService) Delete(project string, region string, subnetwork string) *SubnetworksDeleteCall {
+	c := &SubnetworksDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.region = region
+	c.subnetwork = subnetwork
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *SubnetworksDeleteCall) Fields(s ...googleapi.Field) *SubnetworksDeleteCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *SubnetworksDeleteCall) Context(ctx context.Context) *SubnetworksDeleteCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *SubnetworksDeleteCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/regions/{region}/subnetworks/{subnetwork}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("DELETE", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project":    c.project,
+		"region":     c.region,
+		"subnetwork": c.subnetwork,
+	})
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.subnetworks.delete" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *SubnetworksDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Deletes the specified subnetwork.",
+	//   "httpMethod": "DELETE",
+	//   "id": "compute.subnetworks.delete",
+	//   "parameterOrder": [
+	//     "project",
+	//     "region",
+	//     "subnetwork"
+	//   ],
+	//   "parameters": {
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "region": {
+	//       "description": "Name of the region scoping this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "subnetwork": {
+	//       "description": "Name of the Subnetwork resource to delete.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/regions/{region}/subnetworks/{subnetwork}",
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.subnetworks.get":
+
+type SubnetworksGetCall struct {
+	s            *Service
+	project      string
+	region       string
+	subnetwork   string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+}
+
+// Get: Returns the specified subnetwork. Get a list of available
+// subnetworks list() request.
+func (r *SubnetworksService) Get(project string, region string, subnetwork string) *SubnetworksGetCall {
+	c := &SubnetworksGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.region = region
+	c.subnetwork = subnetwork
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *SubnetworksGetCall) Fields(s ...googleapi.Field) *SubnetworksGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *SubnetworksGetCall) IfNoneMatch(entityTag string) *SubnetworksGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *SubnetworksGetCall) Context(ctx context.Context) *SubnetworksGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *SubnetworksGetCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/regions/{region}/subnetworks/{subnetwork}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project":    c.project,
+		"region":     c.region,
+		"subnetwork": c.subnetwork,
+	})
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		req.Header.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.subnetworks.get" call.
+// Exactly one of *Subnetwork or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Subnetwork.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *SubnetworksGetCall) Do(opts ...googleapi.CallOption) (*Subnetwork, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Subnetwork{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Returns the specified subnetwork. Get a list of available subnetworks list() request.",
+	//   "httpMethod": "GET",
+	//   "id": "compute.subnetworks.get",
+	//   "parameterOrder": [
+	//     "project",
+	//     "region",
+	//     "subnetwork"
+	//   ],
+	//   "parameters": {
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "region": {
+	//       "description": "Name of the region scoping this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "subnetwork": {
+	//       "description": "Name of the Subnetwork resource to return.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/regions/{region}/subnetworks/{subnetwork}",
+	//   "response": {
+	//     "$ref": "Subnetwork"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute",
+	//     "https://www.googleapis.com/auth/compute.readonly"
+	//   ]
+	// }
+
+}
+
+// method id "compute.subnetworks.insert":
+
+type SubnetworksInsertCall struct {
+	s          *Service
+	project    string
+	region     string
+	subnetwork *Subnetwork
+	urlParams_ gensupport.URLParams
+	ctx_       context.Context
+}
+
+// Insert: Creates a subnetwork in the specified project using the data
+// included in the request.
+func (r *SubnetworksService) Insert(project string, region string, subnetwork *Subnetwork) *SubnetworksInsertCall {
+	c := &SubnetworksInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.region = region
+	c.subnetwork = subnetwork
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *SubnetworksInsertCall) Fields(s ...googleapi.Field) *SubnetworksInsertCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *SubnetworksInsertCall) Context(ctx context.Context) *SubnetworksInsertCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *SubnetworksInsertCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.subnetwork)
+	if err != nil {
+		return nil, err
+	}
+	ctype := "application/json"
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/regions/{region}/subnetworks")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project": c.project,
+		"region":  c.region,
+	})
+	req.Header.Set("Content-Type", ctype)
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.subnetworks.insert" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *SubnetworksInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Creates a subnetwork in the specified project using the data included in the request.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.subnetworks.insert",
+	//   "parameterOrder": [
+	//     "project",
+	//     "region"
+	//   ],
+	//   "parameters": {
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "region": {
+	//       "description": "Name of the region scoping this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/regions/{region}/subnetworks",
+	//   "request": {
+	//     "$ref": "Subnetwork"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.subnetworks.list":
+
+type SubnetworksListCall struct {
+	s            *Service
+	project      string
+	region       string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+}
+
+// List: Retrieves a list of subnetworks available to the specified
+// project.
+func (r *SubnetworksService) List(project string, region string) *SubnetworksListCall {
+	c := &SubnetworksListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.region = region
+	return c
+}
+
+// Filter sets the optional parameter "filter": Sets a filter expression
+// for filtering listed resources, in the form filter={expression}. Your
+// {expression} must be in the format: field_name comparison_string
+// literal_string.
+//
+// The field_name is the name of the field you want to compare. Only
+// atomic field types are supported (string, number, boolean). The
+// comparison_string must be either eq (equals) or ne (not equals). The
+// literal_string is the string value to filter to. The literal value
+// must be valid for the type of field you are filtering by (string,
+// number, boolean). For string fields, the literal value is interpreted
+// as a regular expression using RE2 syntax. The literal value must
+// match the entire field.
+//
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
+//
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
+//
+// The Beta API also supports filtering on multiple expressions by
+// providing each separate expression within parentheses. For example,
+// (scheduling.automaticRestart eq true) (zone eq us-central1-f).
+// Multiple expressions are treated as AND expressions, meaning that
+// resources must match all expressions to pass the filters.
+func (c *SubnetworksListCall) Filter(filter string) *SubnetworksListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// MaxResults sets the optional parameter "maxResults": The maximum
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
+func (c *SubnetworksListCall) MaxResults(maxResults int64) *SubnetworksListCall {
+	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": Specifies a page
+// token to use. Set pageToken to the nextPageToken returned by a
+// previous list request to get the next page of results.
+func (c *SubnetworksListCall) PageToken(pageToken string) *SubnetworksListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *SubnetworksListCall) Fields(s ...googleapi.Field) *SubnetworksListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *SubnetworksListCall) IfNoneMatch(entityTag string) *SubnetworksListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *SubnetworksListCall) Context(ctx context.Context) *SubnetworksListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *SubnetworksListCall) doRequest(alt string) (*http.Response, error) {
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/regions/{region}/subnetworks")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	googleapi.Expand(req.URL, map[string]string{
+		"project": c.project,
+		"region":  c.region,
+	})
+	req.Header.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		req.Header.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "compute.subnetworks.list" call.
+// Exactly one of *SubnetworkList or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *SubnetworkList.ServerResponse.Header or (if a response was returned
+// at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *SubnetworksListCall) Do(opts ...googleapi.CallOption) (*SubnetworkList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &SubnetworkList{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Retrieves a list of subnetworks available to the specified project.",
+	//   "httpMethod": "GET",
+	//   "id": "compute.subnetworks.list",
+	//   "parameterOrder": [
+	//     "project",
+	//     "region"
+	//   ],
+	//   "parameters": {
+	//     "filter": {
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "maxResults": {
+	//       "default": "500",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "format": "uint32",
+	//       "location": "query",
+	//       "maximum": "500",
+	//       "minimum": "0",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "region": {
+	//       "description": "Name of the region scoping this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/regions/{region}/subnetworks",
+	//   "response": {
+	//     "$ref": "SubnetworkList"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute",
+	//     "https://www.googleapis.com/auth/compute.readonly"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *SubnetworksListCall) Pages(ctx context.Context, f func(*SubnetworkList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetHttpProxies.delete":
 
 type TargetHttpProxiesDeleteCall struct {
@@ -32281,23 +32583,6 @@ func (r *TargetHttpProxiesService) Delete(project string, targetHttpProxy string
 	c := &TargetHttpProxiesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.targetHttpProxy = targetHttpProxy
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpProxiesDeleteCall) QuotaUser(quotaUser string) *TargetHttpProxiesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpProxiesDeleteCall) UserIP(userIP string) *TargetHttpProxiesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -32341,7 +32626,8 @@ func (c *TargetHttpProxiesDeleteCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetHttpProxiesDeleteCall) Do() (*Operation, error) {
+func (c *TargetHttpProxiesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -32416,29 +32702,13 @@ type TargetHttpProxiesGetCall struct {
 	ctx_            context.Context
 }
 
-// Get: Returns the specified TargetHttpProxy resource.
+// Get: Returns the specified TargetHttpProxy resource. Get a list of
+// available target HTTP proxies by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetHttpProxies/get
 func (r *TargetHttpProxiesService) Get(project string, targetHttpProxy string) *TargetHttpProxiesGetCall {
 	c := &TargetHttpProxiesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.targetHttpProxy = targetHttpProxy
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpProxiesGetCall) QuotaUser(quotaUser string) *TargetHttpProxiesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpProxiesGetCall) UserIP(userIP string) *TargetHttpProxiesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -32495,7 +32765,8 @@ func (c *TargetHttpProxiesGetCall) doRequest(alt string) (*http.Response, error)
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetHttpProxiesGetCall) Do() (*TargetHttpProxy, error) {
+func (c *TargetHttpProxiesGetCall) Do(opts ...googleapi.CallOption) (*TargetHttpProxy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -32524,7 +32795,7 @@ func (c *TargetHttpProxiesGetCall) Do() (*TargetHttpProxy, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified TargetHttpProxy resource.",
+	//   "description": "Returns the specified TargetHttpProxy resource. Get a list of available target HTTP proxies by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetHttpProxies.get",
 	//   "parameterOrder": [
@@ -32580,23 +32851,6 @@ func (r *TargetHttpProxiesService) Insert(project string, targethttpproxy *Targe
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpProxiesInsertCall) QuotaUser(quotaUser string) *TargetHttpProxiesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpProxiesInsertCall) UserIP(userIP string) *TargetHttpProxiesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -32642,7 +32896,8 @@ func (c *TargetHttpProxiesInsertCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetHttpProxiesInsertCall) Do() (*Operation, error) {
+func (c *TargetHttpProxiesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -32734,19 +32989,20 @@ func (r *TargetHttpProxiesService) List(project string) *TargetHttpProxiesListCa
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetHttpProxiesListCall) Filter(filter string) *TargetHttpProxiesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -32754,10 +33010,10 @@ func (c *TargetHttpProxiesListCall) Filter(filter string) *TargetHttpProxiesList
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetHttpProxiesListCall) MaxResults(maxResults int64) *TargetHttpProxiesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -32768,23 +33024,6 @@ func (c *TargetHttpProxiesListCall) MaxResults(maxResults int64) *TargetHttpProx
 // previous list request to get the next page of results.
 func (c *TargetHttpProxiesListCall) PageToken(pageToken string) *TargetHttpProxiesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpProxiesListCall) QuotaUser(quotaUser string) *TargetHttpProxiesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpProxiesListCall) UserIP(userIP string) *TargetHttpProxiesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -32840,7 +33079,8 @@ func (c *TargetHttpProxiesListCall) doRequest(alt string) (*http.Response, error
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetHttpProxiesListCall) Do() (*TargetHttpProxyList, error) {
+func (c *TargetHttpProxiesListCall) Do(opts ...googleapi.CallOption) (*TargetHttpProxyList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -32877,13 +33117,13 @@ func (c *TargetHttpProxiesListCall) Do() (*TargetHttpProxyList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -32916,6 +33156,27 @@ func (c *TargetHttpProxiesListCall) Do() (*TargetHttpProxyList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetHttpProxiesListCall) Pages(ctx context.Context, f func(*TargetHttpProxyList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetHttpProxies.setUrlMap":
 
 type TargetHttpProxiesSetUrlMapCall struct {
@@ -32934,23 +33195,6 @@ func (r *TargetHttpProxiesService) SetUrlMap(project string, targetHttpProxy str
 	c.project = project
 	c.targetHttpProxy = targetHttpProxy
 	c.urlmapreference = urlmapreference
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpProxiesSetUrlMapCall) QuotaUser(quotaUser string) *TargetHttpProxiesSetUrlMapCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpProxiesSetUrlMapCall) UserIP(userIP string) *TargetHttpProxiesSetUrlMapCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -33000,7 +33244,8 @@ func (c *TargetHttpProxiesSetUrlMapCall) doRequest(alt string) (*http.Response, 
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetHttpProxiesSetUrlMapCall) Do() (*Operation, error) {
+func (c *TargetHttpProxiesSetUrlMapCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -33045,7 +33290,7 @@ func (c *TargetHttpProxiesSetUrlMapCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "targetHttpProxy": {
-	//       "description": "Name of the TargetHttpProxy resource whose URL map is to be set.",
+	//       "description": "Name of the TargetHttpProxy to set a URL map for.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -33082,23 +33327,6 @@ func (r *TargetHttpsProxiesService) Delete(project string, targetHttpsProxy stri
 	c := &TargetHttpsProxiesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.targetHttpsProxy = targetHttpsProxy
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpsProxiesDeleteCall) QuotaUser(quotaUser string) *TargetHttpsProxiesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpsProxiesDeleteCall) UserIP(userIP string) *TargetHttpsProxiesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -33142,7 +33370,8 @@ func (c *TargetHttpsProxiesDeleteCall) doRequest(alt string) (*http.Response, er
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetHttpsProxiesDeleteCall) Do() (*Operation, error) {
+func (c *TargetHttpsProxiesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -33217,28 +33446,12 @@ type TargetHttpsProxiesGetCall struct {
 	ctx_             context.Context
 }
 
-// Get: Returns the specified TargetHttpsProxy resource.
+// Get: Returns the specified TargetHttpsProxy resource. Get a list of
+// available target HTTPS proxies by making a list() request.
 func (r *TargetHttpsProxiesService) Get(project string, targetHttpsProxy string) *TargetHttpsProxiesGetCall {
 	c := &TargetHttpsProxiesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.targetHttpsProxy = targetHttpsProxy
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpsProxiesGetCall) QuotaUser(quotaUser string) *TargetHttpsProxiesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpsProxiesGetCall) UserIP(userIP string) *TargetHttpsProxiesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -33295,7 +33508,8 @@ func (c *TargetHttpsProxiesGetCall) doRequest(alt string) (*http.Response, error
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetHttpsProxiesGetCall) Do() (*TargetHttpsProxy, error) {
+func (c *TargetHttpsProxiesGetCall) Do(opts ...googleapi.CallOption) (*TargetHttpsProxy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -33324,7 +33538,7 @@ func (c *TargetHttpsProxiesGetCall) Do() (*TargetHttpsProxy, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified TargetHttpsProxy resource.",
+	//   "description": "Returns the specified TargetHttpsProxy resource. Get a list of available target HTTPS proxies by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetHttpsProxies.get",
 	//   "parameterOrder": [
@@ -33379,23 +33593,6 @@ func (r *TargetHttpsProxiesService) Insert(project string, targethttpsproxy *Tar
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpsProxiesInsertCall) QuotaUser(quotaUser string) *TargetHttpsProxiesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpsProxiesInsertCall) UserIP(userIP string) *TargetHttpsProxiesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -33441,7 +33638,8 @@ func (c *TargetHttpsProxiesInsertCall) doRequest(alt string) (*http.Response, er
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetHttpsProxiesInsertCall) Do() (*Operation, error) {
+func (c *TargetHttpsProxiesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -33532,19 +33730,20 @@ func (r *TargetHttpsProxiesService) List(project string) *TargetHttpsProxiesList
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetHttpsProxiesListCall) Filter(filter string) *TargetHttpsProxiesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -33552,10 +33751,10 @@ func (c *TargetHttpsProxiesListCall) Filter(filter string) *TargetHttpsProxiesLi
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetHttpsProxiesListCall) MaxResults(maxResults int64) *TargetHttpsProxiesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -33566,23 +33765,6 @@ func (c *TargetHttpsProxiesListCall) MaxResults(maxResults int64) *TargetHttpsPr
 // previous list request to get the next page of results.
 func (c *TargetHttpsProxiesListCall) PageToken(pageToken string) *TargetHttpsProxiesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpsProxiesListCall) QuotaUser(quotaUser string) *TargetHttpsProxiesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpsProxiesListCall) UserIP(userIP string) *TargetHttpsProxiesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -33638,7 +33820,8 @@ func (c *TargetHttpsProxiesListCall) doRequest(alt string) (*http.Response, erro
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetHttpsProxiesListCall) Do() (*TargetHttpsProxyList, error) {
+func (c *TargetHttpsProxiesListCall) Do(opts ...googleapi.CallOption) (*TargetHttpsProxyList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -33675,13 +33858,13 @@ func (c *TargetHttpsProxiesListCall) Do() (*TargetHttpsProxyList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -33714,6 +33897,27 @@ func (c *TargetHttpsProxiesListCall) Do() (*TargetHttpsProxyList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetHttpsProxiesListCall) Pages(ctx context.Context, f func(*TargetHttpsProxyList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetHttpsProxies.setSslCertificates":
 
 type TargetHttpsProxiesSetSslCertificatesCall struct {
@@ -33731,23 +33935,6 @@ func (r *TargetHttpsProxiesService) SetSslCertificates(project string, targetHtt
 	c.project = project
 	c.targetHttpsProxy = targetHttpsProxy
 	c.targethttpsproxiessetsslcertificatesrequest = targethttpsproxiessetsslcertificatesrequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpsProxiesSetSslCertificatesCall) QuotaUser(quotaUser string) *TargetHttpsProxiesSetSslCertificatesCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpsProxiesSetSslCertificatesCall) UserIP(userIP string) *TargetHttpsProxiesSetSslCertificatesCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -33797,7 +33984,8 @@ func (c *TargetHttpsProxiesSetSslCertificatesCall) doRequest(alt string) (*http.
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetHttpsProxiesSetSslCertificatesCall) Do() (*Operation, error) {
+func (c *TargetHttpsProxiesSetSslCertificatesCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -33842,7 +34030,7 @@ func (c *TargetHttpsProxiesSetSslCertificatesCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "targetHttpsProxy": {
-	//       "description": "Name of the TargetHttpsProxy resource whose SSLCertificate is to be set.",
+	//       "description": "Name of the TargetHttpsProxy resource to set an SslCertificates resource for.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -33881,23 +34069,6 @@ func (r *TargetHttpsProxiesService) SetUrlMap(project string, targetHttpsProxy s
 	c.project = project
 	c.targetHttpsProxy = targetHttpsProxy
 	c.urlmapreference = urlmapreference
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetHttpsProxiesSetUrlMapCall) QuotaUser(quotaUser string) *TargetHttpsProxiesSetUrlMapCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetHttpsProxiesSetUrlMapCall) UserIP(userIP string) *TargetHttpsProxiesSetUrlMapCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -33947,7 +34118,8 @@ func (c *TargetHttpsProxiesSetUrlMapCall) doRequest(alt string) (*http.Response,
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetHttpsProxiesSetUrlMapCall) Do() (*Operation, error) {
+func (c *TargetHttpsProxiesSetUrlMapCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -34024,8 +34196,7 @@ type TargetInstancesAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of target instances grouped by
-// scope.
+// AggregatedList: Retrieves an aggregated list of target instances.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetInstances/aggregatedList
 func (r *TargetInstancesService) AggregatedList(project string) *TargetInstancesAggregatedListCall {
 	c := &TargetInstancesAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -34047,19 +34218,20 @@ func (r *TargetInstancesService) AggregatedList(project string) *TargetInstances
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetInstancesAggregatedListCall) Filter(filter string) *TargetInstancesAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -34067,10 +34239,10 @@ func (c *TargetInstancesAggregatedListCall) Filter(filter string) *TargetInstanc
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetInstancesAggregatedListCall) MaxResults(maxResults int64) *TargetInstancesAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -34081,23 +34253,6 @@ func (c *TargetInstancesAggregatedListCall) MaxResults(maxResults int64) *Target
 // previous list request to get the next page of results.
 func (c *TargetInstancesAggregatedListCall) PageToken(pageToken string) *TargetInstancesAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetInstancesAggregatedListCall) QuotaUser(quotaUser string) *TargetInstancesAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetInstancesAggregatedListCall) UserIP(userIP string) *TargetInstancesAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -34153,7 +34308,8 @@ func (c *TargetInstancesAggregatedListCall) doRequest(alt string) (*http.Respons
 // response was returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetInstancesAggregatedListCall) Do() (*TargetInstanceAggregatedList, error) {
+func (c *TargetInstancesAggregatedListCall) Do(opts ...googleapi.CallOption) (*TargetInstanceAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -34182,7 +34338,7 @@ func (c *TargetInstancesAggregatedListCall) Do() (*TargetInstanceAggregatedList,
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of target instances grouped by scope.",
+	//   "description": "Retrieves an aggregated list of target instances.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetInstances.aggregatedList",
 	//   "parameterOrder": [
@@ -34190,13 +34346,13 @@ func (c *TargetInstancesAggregatedListCall) Do() (*TargetInstanceAggregatedList,
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -34229,6 +34385,27 @@ func (c *TargetInstancesAggregatedListCall) Do() (*TargetInstanceAggregatedList,
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetInstancesAggregatedListCall) Pages(ctx context.Context, f func(*TargetInstanceAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetInstances.delete":
 
 type TargetInstancesDeleteCall struct {
@@ -34247,23 +34424,6 @@ func (r *TargetInstancesService) Delete(project string, zone string, targetInsta
 	c.project = project
 	c.zone = zone
 	c.targetInstance = targetInstance
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetInstancesDeleteCall) QuotaUser(quotaUser string) *TargetInstancesDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetInstancesDeleteCall) UserIP(userIP string) *TargetInstancesDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -34308,7 +34468,8 @@ func (c *TargetInstancesDeleteCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetInstancesDeleteCall) Do() (*Operation, error) {
+func (c *TargetInstancesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -34392,30 +34553,14 @@ type TargetInstancesGetCall struct {
 	ctx_           context.Context
 }
 
-// Get: Returns the specified TargetInstance resource.
+// Get: Returns the specified TargetInstance resource. Get a list of
+// available target instances by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetInstances/get
 func (r *TargetInstancesService) Get(project string, zone string, targetInstance string) *TargetInstancesGetCall {
 	c := &TargetInstancesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
 	c.targetInstance = targetInstance
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetInstancesGetCall) QuotaUser(quotaUser string) *TargetInstancesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetInstancesGetCall) UserIP(userIP string) *TargetInstancesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -34473,7 +34618,8 @@ func (c *TargetInstancesGetCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetInstancesGetCall) Do() (*TargetInstance, error) {
+func (c *TargetInstancesGetCall) Do(opts ...googleapi.CallOption) (*TargetInstance, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -34502,7 +34648,7 @@ func (c *TargetInstancesGetCall) Do() (*TargetInstance, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified TargetInstance resource.",
+	//   "description": "Returns the specified TargetInstance resource. Get a list of available target instances by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetInstances.get",
 	//   "parameterOrder": [
@@ -34568,23 +34714,6 @@ func (r *TargetInstancesService) Insert(project string, zone string, targetinsta
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetInstancesInsertCall) QuotaUser(quotaUser string) *TargetInstancesInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetInstancesInsertCall) UserIP(userIP string) *TargetInstancesInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -34631,7 +34760,8 @@ func (c *TargetInstancesInsertCall) doRequest(alt string) (*http.Response, error
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetInstancesInsertCall) Do() (*Operation, error) {
+func (c *TargetInstancesInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -34709,7 +34839,7 @@ type TargetInstancesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of TargetInstance resources available to the
+// List: Retrieves a list of TargetInstance resources available to the
 // specified project and zone.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetInstances/list
 func (r *TargetInstancesService) List(project string, zone string) *TargetInstancesListCall {
@@ -34733,19 +34863,20 @@ func (r *TargetInstancesService) List(project string, zone string) *TargetInstan
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetInstancesListCall) Filter(filter string) *TargetInstancesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -34753,10 +34884,10 @@ func (c *TargetInstancesListCall) Filter(filter string) *TargetInstancesListCall
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetInstancesListCall) MaxResults(maxResults int64) *TargetInstancesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -34767,23 +34898,6 @@ func (c *TargetInstancesListCall) MaxResults(maxResults int64) *TargetInstancesL
 // previous list request to get the next page of results.
 func (c *TargetInstancesListCall) PageToken(pageToken string) *TargetInstancesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetInstancesListCall) QuotaUser(quotaUser string) *TargetInstancesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetInstancesListCall) UserIP(userIP string) *TargetInstancesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -34840,7 +34954,8 @@ func (c *TargetInstancesListCall) doRequest(alt string) (*http.Response, error) 
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetInstancesListCall) Do() (*TargetInstanceList, error) {
+func (c *TargetInstancesListCall) Do(opts ...googleapi.CallOption) (*TargetInstanceList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -34869,7 +34984,7 @@ func (c *TargetInstancesListCall) Do() (*TargetInstanceList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of TargetInstance resources available to the specified project and zone.",
+	//   "description": "Retrieves a list of TargetInstance resources available to the specified project and zone.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetInstances.list",
 	//   "parameterOrder": [
@@ -34878,13 +34993,13 @@ func (c *TargetInstancesListCall) Do() (*TargetInstanceList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -34924,6 +35039,27 @@ func (c *TargetInstancesListCall) Do() (*TargetInstanceList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetInstancesListCall) Pages(ctx context.Context, f func(*TargetInstanceList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetPools.addHealthCheck":
 
 type TargetPoolsAddHealthCheckCall struct {
@@ -34936,7 +35072,7 @@ type TargetPoolsAddHealthCheckCall struct {
 	ctx_                             context.Context
 }
 
-// AddHealthCheck: Adds health check URL to targetPool.
+// AddHealthCheck: Adds health check URLs to a target pool.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/addHealthCheck
 func (r *TargetPoolsService) AddHealthCheck(project string, region string, targetPool string, targetpoolsaddhealthcheckrequest *TargetPoolsAddHealthCheckRequest) *TargetPoolsAddHealthCheckCall {
 	c := &TargetPoolsAddHealthCheckCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -34944,23 +35080,6 @@ func (r *TargetPoolsService) AddHealthCheck(project string, region string, targe
 	c.region = region
 	c.targetPool = targetPool
 	c.targetpoolsaddhealthcheckrequest = targetpoolsaddhealthcheckrequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsAddHealthCheckCall) QuotaUser(quotaUser string) *TargetPoolsAddHealthCheckCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsAddHealthCheckCall) UserIP(userIP string) *TargetPoolsAddHealthCheckCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -35011,7 +35130,8 @@ func (c *TargetPoolsAddHealthCheckCall) doRequest(alt string) (*http.Response, e
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsAddHealthCheckCall) Do() (*Operation, error) {
+func (c *TargetPoolsAddHealthCheckCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -35040,7 +35160,7 @@ func (c *TargetPoolsAddHealthCheckCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Adds health check URL to targetPool.",
+	//   "description": "Adds health check URLs to a target pool.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetPools.addHealthCheck",
 	//   "parameterOrder": [
@@ -35050,6 +35170,7 @@ func (c *TargetPoolsAddHealthCheckCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "project": {
+	//       "description": "Project ID for this request.",
 	//       "location": "path",
 	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
 	//       "required": true,
@@ -35063,7 +35184,7 @@ func (c *TargetPoolsAddHealthCheckCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "targetPool": {
-	//       "description": "Name of the TargetPool resource to which health_check_url is to be added.",
+	//       "description": "Name of the target pool to add a health check to.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -35097,7 +35218,7 @@ type TargetPoolsAddInstanceCall struct {
 	ctx_                          context.Context
 }
 
-// AddInstance: Adds instance URL to targetPool.
+// AddInstance: Adds an instance to a target pool.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/addInstance
 func (r *TargetPoolsService) AddInstance(project string, region string, targetPool string, targetpoolsaddinstancerequest *TargetPoolsAddInstanceRequest) *TargetPoolsAddInstanceCall {
 	c := &TargetPoolsAddInstanceCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -35105,23 +35226,6 @@ func (r *TargetPoolsService) AddInstance(project string, region string, targetPo
 	c.region = region
 	c.targetPool = targetPool
 	c.targetpoolsaddinstancerequest = targetpoolsaddinstancerequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsAddInstanceCall) QuotaUser(quotaUser string) *TargetPoolsAddInstanceCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsAddInstanceCall) UserIP(userIP string) *TargetPoolsAddInstanceCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -35172,7 +35276,8 @@ func (c *TargetPoolsAddInstanceCall) doRequest(alt string) (*http.Response, erro
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsAddInstanceCall) Do() (*Operation, error) {
+func (c *TargetPoolsAddInstanceCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -35201,7 +35306,7 @@ func (c *TargetPoolsAddInstanceCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Adds instance URL to targetPool.",
+	//   "description": "Adds an instance to a target pool.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetPools.addInstance",
 	//   "parameterOrder": [
@@ -35211,6 +35316,7 @@ func (c *TargetPoolsAddInstanceCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "project": {
+	//       "description": "Project ID for this request.",
 	//       "location": "path",
 	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
 	//       "required": true,
@@ -35224,7 +35330,7 @@ func (c *TargetPoolsAddInstanceCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "targetPool": {
-	//       "description": "Name of the TargetPool resource to which instance_url is to be added.",
+	//       "description": "Name of the TargetPool resource to add instances to.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -35256,7 +35362,7 @@ type TargetPoolsAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of target pools grouped by scope.
+// AggregatedList: Retrieves an aggregated list of target pools.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/aggregatedList
 func (r *TargetPoolsService) AggregatedList(project string) *TargetPoolsAggregatedListCall {
 	c := &TargetPoolsAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -35278,19 +35384,20 @@ func (r *TargetPoolsService) AggregatedList(project string) *TargetPoolsAggregat
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetPoolsAggregatedListCall) Filter(filter string) *TargetPoolsAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -35298,10 +35405,10 @@ func (c *TargetPoolsAggregatedListCall) Filter(filter string) *TargetPoolsAggreg
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetPoolsAggregatedListCall) MaxResults(maxResults int64) *TargetPoolsAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -35312,23 +35419,6 @@ func (c *TargetPoolsAggregatedListCall) MaxResults(maxResults int64) *TargetPool
 // previous list request to get the next page of results.
 func (c *TargetPoolsAggregatedListCall) PageToken(pageToken string) *TargetPoolsAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsAggregatedListCall) QuotaUser(quotaUser string) *TargetPoolsAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsAggregatedListCall) UserIP(userIP string) *TargetPoolsAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -35384,7 +35474,8 @@ func (c *TargetPoolsAggregatedListCall) doRequest(alt string) (*http.Response, e
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetPoolsAggregatedListCall) Do() (*TargetPoolAggregatedList, error) {
+func (c *TargetPoolsAggregatedListCall) Do(opts ...googleapi.CallOption) (*TargetPoolAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -35413,7 +35504,7 @@ func (c *TargetPoolsAggregatedListCall) Do() (*TargetPoolAggregatedList, error) 
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of target pools grouped by scope.",
+	//   "description": "Retrieves an aggregated list of target pools.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetPools.aggregatedList",
 	//   "parameterOrder": [
@@ -35421,13 +35512,13 @@ func (c *TargetPoolsAggregatedListCall) Do() (*TargetPoolAggregatedList, error) 
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -35460,6 +35551,27 @@ func (c *TargetPoolsAggregatedListCall) Do() (*TargetPoolAggregatedList, error) 
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetPoolsAggregatedListCall) Pages(ctx context.Context, f func(*TargetPoolAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetPools.delete":
 
 type TargetPoolsDeleteCall struct {
@@ -35471,30 +35583,13 @@ type TargetPoolsDeleteCall struct {
 	ctx_       context.Context
 }
 
-// Delete: Deletes the specified TargetPool resource.
+// Delete: Deletes the specified target pool.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/delete
 func (r *TargetPoolsService) Delete(project string, region string, targetPool string) *TargetPoolsDeleteCall {
 	c := &TargetPoolsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
 	c.targetPool = targetPool
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsDeleteCall) QuotaUser(quotaUser string) *TargetPoolsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsDeleteCall) UserIP(userIP string) *TargetPoolsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -35539,7 +35634,8 @@ func (c *TargetPoolsDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsDeleteCall) Do() (*Operation, error) {
+func (c *TargetPoolsDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -35568,7 +35664,7 @@ func (c *TargetPoolsDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified TargetPool resource.",
+	//   "description": "Deletes the specified target pool.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.targetPools.delete",
 	//   "parameterOrder": [
@@ -35623,30 +35719,14 @@ type TargetPoolsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified TargetPool resource.
+// Get: Returns the specified target pool. Get a list of available
+// target pools by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/get
 func (r *TargetPoolsService) Get(project string, region string, targetPool string) *TargetPoolsGetCall {
 	c := &TargetPoolsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
 	c.targetPool = targetPool
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsGetCall) QuotaUser(quotaUser string) *TargetPoolsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsGetCall) UserIP(userIP string) *TargetPoolsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -35704,7 +35784,8 @@ func (c *TargetPoolsGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsGetCall) Do() (*TargetPool, error) {
+func (c *TargetPoolsGetCall) Do(opts ...googleapi.CallOption) (*TargetPool, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -35733,7 +35814,7 @@ func (c *TargetPoolsGetCall) Do() (*TargetPool, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified TargetPool resource.",
+	//   "description": "Returns the specified target pool. Get a list of available target pools by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetPools.get",
 	//   "parameterOrder": [
@@ -35790,7 +35871,7 @@ type TargetPoolsGetHealthCall struct {
 }
 
 // GetHealth: Gets the most recent health check results for each IP for
-// the given instance that is referenced by given TargetPool.
+// the instance that is referenced by the given target pool.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/getHealth
 func (r *TargetPoolsService) GetHealth(project string, region string, targetPool string, instancereference *InstanceReference) *TargetPoolsGetHealthCall {
 	c := &TargetPoolsGetHealthCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -35798,23 +35879,6 @@ func (r *TargetPoolsService) GetHealth(project string, region string, targetPool
 	c.region = region
 	c.targetPool = targetPool
 	c.instancereference = instancereference
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsGetHealthCall) QuotaUser(quotaUser string) *TargetPoolsGetHealthCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsGetHealthCall) UserIP(userIP string) *TargetPoolsGetHealthCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -35865,7 +35929,8 @@ func (c *TargetPoolsGetHealthCall) doRequest(alt string) (*http.Response, error)
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetPoolsGetHealthCall) Do() (*TargetPoolInstanceHealth, error) {
+func (c *TargetPoolsGetHealthCall) Do(opts ...googleapi.CallOption) (*TargetPoolInstanceHealth, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -35894,7 +35959,7 @@ func (c *TargetPoolsGetHealthCall) Do() (*TargetPoolInstanceHealth, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Gets the most recent health check results for each IP for the given instance that is referenced by given TargetPool.",
+	//   "description": "Gets the most recent health check results for each IP for the instance that is referenced by the given target pool.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetPools.getHealth",
 	//   "parameterOrder": [
@@ -35904,6 +35969,7 @@ func (c *TargetPoolsGetHealthCall) Do() (*TargetPoolInstanceHealth, error) {
 	//   ],
 	//   "parameters": {
 	//     "project": {
+	//       "description": "Project ID for this request.",
 	//       "location": "path",
 	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
 	//       "required": true,
@@ -35951,31 +36017,14 @@ type TargetPoolsInsertCall struct {
 	ctx_       context.Context
 }
 
-// Insert: Creates a TargetPool resource in the specified project and
-// region using the data included in the request.
+// Insert: Creates a target pool in the specified project and region
+// using the data included in the request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/insert
 func (r *TargetPoolsService) Insert(project string, region string, targetpool *TargetPool) *TargetPoolsInsertCall {
 	c := &TargetPoolsInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
 	c.targetpool = targetpool
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsInsertCall) QuotaUser(quotaUser string) *TargetPoolsInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsInsertCall) UserIP(userIP string) *TargetPoolsInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -36025,7 +36074,8 @@ func (c *TargetPoolsInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsInsertCall) Do() (*Operation, error) {
+func (c *TargetPoolsInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -36054,7 +36104,7 @@ func (c *TargetPoolsInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a TargetPool resource in the specified project and region using the data included in the request.",
+	//   "description": "Creates a target pool in the specified project and region using the data included in the request.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetPools.insert",
 	//   "parameterOrder": [
@@ -36103,8 +36153,8 @@ type TargetPoolsListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of TargetPool resources available to the
-// specified project and region.
+// List: Retrieves a list of target pools available to the specified
+// project and region.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/list
 func (r *TargetPoolsService) List(project string, region string) *TargetPoolsListCall {
 	c := &TargetPoolsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -36127,19 +36177,20 @@ func (r *TargetPoolsService) List(project string, region string) *TargetPoolsLis
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetPoolsListCall) Filter(filter string) *TargetPoolsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -36147,10 +36198,10 @@ func (c *TargetPoolsListCall) Filter(filter string) *TargetPoolsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetPoolsListCall) MaxResults(maxResults int64) *TargetPoolsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -36161,23 +36212,6 @@ func (c *TargetPoolsListCall) MaxResults(maxResults int64) *TargetPoolsListCall 
 // previous list request to get the next page of results.
 func (c *TargetPoolsListCall) PageToken(pageToken string) *TargetPoolsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsListCall) QuotaUser(quotaUser string) *TargetPoolsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsListCall) UserIP(userIP string) *TargetPoolsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -36234,7 +36268,8 @@ func (c *TargetPoolsListCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetPoolsListCall) Do() (*TargetPoolList, error) {
+func (c *TargetPoolsListCall) Do(opts ...googleapi.CallOption) (*TargetPoolList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -36263,7 +36298,7 @@ func (c *TargetPoolsListCall) Do() (*TargetPoolList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of TargetPool resources available to the specified project and region.",
+	//   "description": "Retrieves a list of target pools available to the specified project and region.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetPools.list",
 	//   "parameterOrder": [
@@ -36272,13 +36307,13 @@ func (c *TargetPoolsListCall) Do() (*TargetPoolList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -36318,6 +36353,27 @@ func (c *TargetPoolsListCall) Do() (*TargetPoolList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetPoolsListCall) Pages(ctx context.Context, f func(*TargetPoolList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetPools.removeHealthCheck":
 
 type TargetPoolsRemoveHealthCheckCall struct {
@@ -36330,7 +36386,7 @@ type TargetPoolsRemoveHealthCheckCall struct {
 	ctx_                                context.Context
 }
 
-// RemoveHealthCheck: Removes health check URL from targetPool.
+// RemoveHealthCheck: Removes health check URL from a target pool.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/removeHealthCheck
 func (r *TargetPoolsService) RemoveHealthCheck(project string, region string, targetPool string, targetpoolsremovehealthcheckrequest *TargetPoolsRemoveHealthCheckRequest) *TargetPoolsRemoveHealthCheckCall {
 	c := &TargetPoolsRemoveHealthCheckCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -36338,23 +36394,6 @@ func (r *TargetPoolsService) RemoveHealthCheck(project string, region string, ta
 	c.region = region
 	c.targetPool = targetPool
 	c.targetpoolsremovehealthcheckrequest = targetpoolsremovehealthcheckrequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsRemoveHealthCheckCall) QuotaUser(quotaUser string) *TargetPoolsRemoveHealthCheckCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsRemoveHealthCheckCall) UserIP(userIP string) *TargetPoolsRemoveHealthCheckCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -36405,7 +36444,8 @@ func (c *TargetPoolsRemoveHealthCheckCall) doRequest(alt string) (*http.Response
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsRemoveHealthCheckCall) Do() (*Operation, error) {
+func (c *TargetPoolsRemoveHealthCheckCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -36434,7 +36474,7 @@ func (c *TargetPoolsRemoveHealthCheckCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Removes health check URL from targetPool.",
+	//   "description": "Removes health check URL from a target pool.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetPools.removeHealthCheck",
 	//   "parameterOrder": [
@@ -36444,20 +36484,21 @@ func (c *TargetPoolsRemoveHealthCheckCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "project": {
+	//       "description": "Project ID for this request.",
 	//       "location": "path",
 	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "Name of the region scoping this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "targetPool": {
-	//       "description": "Name of the TargetPool resource to which health_check_url is to be removed.",
+	//       "description": "Name of the target pool to remove health checks from.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -36491,7 +36532,7 @@ type TargetPoolsRemoveInstanceCall struct {
 	ctx_                             context.Context
 }
 
-// RemoveInstance: Removes instance URL from targetPool.
+// RemoveInstance: Removes instance URL from a target pool.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/removeInstance
 func (r *TargetPoolsService) RemoveInstance(project string, region string, targetPool string, targetpoolsremoveinstancerequest *TargetPoolsRemoveInstanceRequest) *TargetPoolsRemoveInstanceCall {
 	c := &TargetPoolsRemoveInstanceCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -36499,23 +36540,6 @@ func (r *TargetPoolsService) RemoveInstance(project string, region string, targe
 	c.region = region
 	c.targetPool = targetPool
 	c.targetpoolsremoveinstancerequest = targetpoolsremoveinstancerequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsRemoveInstanceCall) QuotaUser(quotaUser string) *TargetPoolsRemoveInstanceCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsRemoveInstanceCall) UserIP(userIP string) *TargetPoolsRemoveInstanceCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -36566,7 +36590,8 @@ func (c *TargetPoolsRemoveInstanceCall) doRequest(alt string) (*http.Response, e
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsRemoveInstanceCall) Do() (*Operation, error) {
+func (c *TargetPoolsRemoveInstanceCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -36595,7 +36620,7 @@ func (c *TargetPoolsRemoveInstanceCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Removes instance URL from targetPool.",
+	//   "description": "Removes instance URL from a target pool.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetPools.removeInstance",
 	//   "parameterOrder": [
@@ -36605,6 +36630,7 @@ func (c *TargetPoolsRemoveInstanceCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "project": {
+	//       "description": "Project ID for this request.",
 	//       "location": "path",
 	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
 	//       "required": true,
@@ -36618,7 +36644,7 @@ func (c *TargetPoolsRemoveInstanceCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "targetPool": {
-	//       "description": "Name of the TargetPool resource to which instance_url is to be removed.",
+	//       "description": "Name of the TargetPool resource to remove instances from.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -36652,7 +36678,7 @@ type TargetPoolsSetBackupCall struct {
 	ctx_            context.Context
 }
 
-// SetBackup: Changes backup pool configurations.
+// SetBackup: Changes a backup target pool's configurations.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/targetPools/setBackup
 func (r *TargetPoolsService) SetBackup(project string, region string, targetPool string, targetreference *TargetReference) *TargetPoolsSetBackupCall {
 	c := &TargetPoolsSetBackupCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -36664,26 +36690,9 @@ func (r *TargetPoolsService) SetBackup(project string, region string, targetPool
 }
 
 // FailoverRatio sets the optional parameter "failoverRatio": New
-// failoverRatio value for the containing target pool.
+// failoverRatio value for the target pool.
 func (c *TargetPoolsSetBackupCall) FailoverRatio(failoverRatio float64) *TargetPoolsSetBackupCall {
 	c.urlParams_.Set("failoverRatio", fmt.Sprint(failoverRatio))
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetPoolsSetBackupCall) QuotaUser(quotaUser string) *TargetPoolsSetBackupCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetPoolsSetBackupCall) UserIP(userIP string) *TargetPoolsSetBackupCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -36734,7 +36743,8 @@ func (c *TargetPoolsSetBackupCall) doRequest(alt string) (*http.Response, error)
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetPoolsSetBackupCall) Do() (*Operation, error) {
+func (c *TargetPoolsSetBackupCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -36763,7 +36773,7 @@ func (c *TargetPoolsSetBackupCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Changes backup pool configurations.",
+	//   "description": "Changes a backup target pool's configurations.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetPools.setBackup",
 	//   "parameterOrder": [
@@ -36773,7 +36783,7 @@ func (c *TargetPoolsSetBackupCall) Do() (*Operation, error) {
 	//   ],
 	//   "parameters": {
 	//     "failoverRatio": {
-	//       "description": "New failoverRatio value for the containing target pool.",
+	//       "description": "New failoverRatio value for the target pool.",
 	//       "format": "float",
 	//       "location": "query",
 	//       "type": "number"
@@ -36793,7 +36803,7 @@ func (c *TargetPoolsSetBackupCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "targetPool": {
-	//       "description": "Name of the TargetPool resource for which the backup is to be set.",
+	//       "description": "Name of the TargetPool resource to set a backup pool for.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -36825,8 +36835,7 @@ type TargetVpnGatewaysAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of target VPN gateways grouped by
-// scope.
+// AggregatedList: Retrieves an aggregated list of target VPN gateways.
 func (r *TargetVpnGatewaysService) AggregatedList(project string) *TargetVpnGatewaysAggregatedListCall {
 	c := &TargetVpnGatewaysAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
@@ -36847,19 +36856,20 @@ func (r *TargetVpnGatewaysService) AggregatedList(project string) *TargetVpnGate
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetVpnGatewaysAggregatedListCall) Filter(filter string) *TargetVpnGatewaysAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -36867,10 +36877,10 @@ func (c *TargetVpnGatewaysAggregatedListCall) Filter(filter string) *TargetVpnGa
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetVpnGatewaysAggregatedListCall) MaxResults(maxResults int64) *TargetVpnGatewaysAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -36881,23 +36891,6 @@ func (c *TargetVpnGatewaysAggregatedListCall) MaxResults(maxResults int64) *Targ
 // previous list request to get the next page of results.
 func (c *TargetVpnGatewaysAggregatedListCall) PageToken(pageToken string) *TargetVpnGatewaysAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetVpnGatewaysAggregatedListCall) QuotaUser(quotaUser string) *TargetVpnGatewaysAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetVpnGatewaysAggregatedListCall) UserIP(userIP string) *TargetVpnGatewaysAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -36953,7 +36946,8 @@ func (c *TargetVpnGatewaysAggregatedListCall) doRequest(alt string) (*http.Respo
 // response was returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetVpnGatewaysAggregatedListCall) Do() (*TargetVpnGatewayAggregatedList, error) {
+func (c *TargetVpnGatewaysAggregatedListCall) Do(opts ...googleapi.CallOption) (*TargetVpnGatewayAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -36982,7 +36976,7 @@ func (c *TargetVpnGatewaysAggregatedListCall) Do() (*TargetVpnGatewayAggregatedL
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of target VPN gateways grouped by scope.",
+	//   "description": "Retrieves an aggregated list of target VPN gateways.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetVpnGateways.aggregatedList",
 	//   "parameterOrder": [
@@ -36990,13 +36984,13 @@ func (c *TargetVpnGatewaysAggregatedListCall) Do() (*TargetVpnGatewayAggregatedL
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -37029,6 +37023,27 @@ func (c *TargetVpnGatewaysAggregatedListCall) Do() (*TargetVpnGatewayAggregatedL
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetVpnGatewaysAggregatedListCall) Pages(ctx context.Context, f func(*TargetVpnGatewayAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.targetVpnGateways.delete":
 
 type TargetVpnGatewaysDeleteCall struct {
@@ -37040,29 +37055,12 @@ type TargetVpnGatewaysDeleteCall struct {
 	ctx_             context.Context
 }
 
-// Delete: Deletes the specified TargetVpnGateway resource.
+// Delete: Deletes the specified target VPN gateway.
 func (r *TargetVpnGatewaysService) Delete(project string, region string, targetVpnGateway string) *TargetVpnGatewaysDeleteCall {
 	c := &TargetVpnGatewaysDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
 	c.targetVpnGateway = targetVpnGateway
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetVpnGatewaysDeleteCall) QuotaUser(quotaUser string) *TargetVpnGatewaysDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetVpnGatewaysDeleteCall) UserIP(userIP string) *TargetVpnGatewaysDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -37107,7 +37105,8 @@ func (c *TargetVpnGatewaysDeleteCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetVpnGatewaysDeleteCall) Do() (*Operation, error) {
+func (c *TargetVpnGatewaysDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -37136,7 +37135,7 @@ func (c *TargetVpnGatewaysDeleteCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified TargetVpnGateway resource.",
+	//   "description": "Deletes the specified target VPN gateway.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.targetVpnGateways.delete",
 	//   "parameterOrder": [
@@ -37153,14 +37152,14 @@ func (c *TargetVpnGatewaysDeleteCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "targetVpnGateway": {
-	//       "description": "Name of the TargetVpnGateway resource to delete.",
+	//       "description": "Name of the target VPN gateway to delete.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -37191,29 +37190,13 @@ type TargetVpnGatewaysGetCall struct {
 	ctx_             context.Context
 }
 
-// Get: Returns the specified TargetVpnGateway resource.
+// Get: Returns the specified target VPN gateway. Get a list of
+// available target VPN gateways by making a list() request.
 func (r *TargetVpnGatewaysService) Get(project string, region string, targetVpnGateway string) *TargetVpnGatewaysGetCall {
 	c := &TargetVpnGatewaysGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
 	c.targetVpnGateway = targetVpnGateway
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetVpnGatewaysGetCall) QuotaUser(quotaUser string) *TargetVpnGatewaysGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetVpnGatewaysGetCall) UserIP(userIP string) *TargetVpnGatewaysGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -37271,7 +37254,8 @@ func (c *TargetVpnGatewaysGetCall) doRequest(alt string) (*http.Response, error)
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetVpnGatewaysGetCall) Do() (*TargetVpnGateway, error) {
+func (c *TargetVpnGatewaysGetCall) Do(opts ...googleapi.CallOption) (*TargetVpnGateway, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -37300,7 +37284,7 @@ func (c *TargetVpnGatewaysGetCall) Do() (*TargetVpnGateway, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified TargetVpnGateway resource.",
+	//   "description": "Returns the specified target VPN gateway. Get a list of available target VPN gateways by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetVpnGateways.get",
 	//   "parameterOrder": [
@@ -37317,14 +37301,14 @@ func (c *TargetVpnGatewaysGetCall) Do() (*TargetVpnGateway, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "targetVpnGateway": {
-	//       "description": "Name of the TargetVpnGateway resource to return.",
+	//       "description": "Name of the target VPN gateway to return.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -37355,30 +37339,13 @@ type TargetVpnGatewaysInsertCall struct {
 	ctx_             context.Context
 }
 
-// Insert: Creates a TargetVpnGateway resource in the specified project
-// and region using the data included in the request.
+// Insert: Creates a target VPN gateway in the specified project and
+// region using the data included in the request.
 func (r *TargetVpnGatewaysService) Insert(project string, region string, targetvpngateway *TargetVpnGateway) *TargetVpnGatewaysInsertCall {
 	c := &TargetVpnGatewaysInsertCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
 	c.targetvpngateway = targetvpngateway
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetVpnGatewaysInsertCall) QuotaUser(quotaUser string) *TargetVpnGatewaysInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetVpnGatewaysInsertCall) UserIP(userIP string) *TargetVpnGatewaysInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -37428,7 +37395,8 @@ func (c *TargetVpnGatewaysInsertCall) doRequest(alt string) (*http.Response, err
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *TargetVpnGatewaysInsertCall) Do() (*Operation, error) {
+func (c *TargetVpnGatewaysInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -37457,7 +37425,7 @@ func (c *TargetVpnGatewaysInsertCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a TargetVpnGateway resource in the specified project and region using the data included in the request.",
+	//   "description": "Creates a target VPN gateway in the specified project and region using the data included in the request.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.targetVpnGateways.insert",
 	//   "parameterOrder": [
@@ -37473,7 +37441,7 @@ func (c *TargetVpnGatewaysInsertCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -37506,8 +37474,8 @@ type TargetVpnGatewaysListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of TargetVpnGateway resources available to
-// the specified project and region.
+// List: Retrieves a list of target VPN gateways available to the
+// specified project and region.
 func (r *TargetVpnGatewaysService) List(project string, region string) *TargetVpnGatewaysListCall {
 	c := &TargetVpnGatewaysListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
@@ -37529,19 +37497,20 @@ func (r *TargetVpnGatewaysService) List(project string, region string) *TargetVp
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *TargetVpnGatewaysListCall) Filter(filter string) *TargetVpnGatewaysListCall {
 	c.urlParams_.Set("filter", filter)
@@ -37549,10 +37518,10 @@ func (c *TargetVpnGatewaysListCall) Filter(filter string) *TargetVpnGatewaysList
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *TargetVpnGatewaysListCall) MaxResults(maxResults int64) *TargetVpnGatewaysListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -37563,23 +37532,6 @@ func (c *TargetVpnGatewaysListCall) MaxResults(maxResults int64) *TargetVpnGatew
 // previous list request to get the next page of results.
 func (c *TargetVpnGatewaysListCall) PageToken(pageToken string) *TargetVpnGatewaysListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *TargetVpnGatewaysListCall) QuotaUser(quotaUser string) *TargetVpnGatewaysListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *TargetVpnGatewaysListCall) UserIP(userIP string) *TargetVpnGatewaysListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -37636,7 +37588,8 @@ func (c *TargetVpnGatewaysListCall) doRequest(alt string) (*http.Response, error
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *TargetVpnGatewaysListCall) Do() (*TargetVpnGatewayList, error) {
+func (c *TargetVpnGatewaysListCall) Do(opts ...googleapi.CallOption) (*TargetVpnGatewayList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -37665,7 +37618,7 @@ func (c *TargetVpnGatewaysListCall) Do() (*TargetVpnGatewayList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of TargetVpnGateway resources available to the specified project and region.",
+	//   "description": "Retrieves a list of target VPN gateways available to the specified project and region.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.targetVpnGateways.list",
 	//   "parameterOrder": [
@@ -37674,13 +37627,13 @@ func (c *TargetVpnGatewaysListCall) Do() (*TargetVpnGatewayList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -37700,7 +37653,7 @@ func (c *TargetVpnGatewaysListCall) Do() (*TargetVpnGatewayList, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -37720,6 +37673,27 @@ func (c *TargetVpnGatewaysListCall) Do() (*TargetVpnGatewayList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *TargetVpnGatewaysListCall) Pages(ctx context.Context, f func(*TargetVpnGatewayList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.urlMaps.delete":
 
 type UrlMapsDeleteCall struct {
@@ -37736,23 +37710,6 @@ func (r *UrlMapsService) Delete(project string, urlMap string) *UrlMapsDeleteCal
 	c := &UrlMapsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.urlMap = urlMap
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *UrlMapsDeleteCall) QuotaUser(quotaUser string) *UrlMapsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *UrlMapsDeleteCall) UserIP(userIP string) *UrlMapsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -37796,7 +37753,8 @@ func (c *UrlMapsDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *UrlMapsDeleteCall) Do() (*Operation, error) {
+func (c *UrlMapsDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -37871,29 +37829,13 @@ type UrlMapsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified UrlMap resource.
+// Get: Returns the specified UrlMap resource. Get a list of available
+// URL maps by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/urlMaps/get
 func (r *UrlMapsService) Get(project string, urlMap string) *UrlMapsGetCall {
 	c := &UrlMapsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.urlMap = urlMap
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *UrlMapsGetCall) QuotaUser(quotaUser string) *UrlMapsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *UrlMapsGetCall) UserIP(userIP string) *UrlMapsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -37950,7 +37892,8 @@ func (c *UrlMapsGetCall) doRequest(alt string) (*http.Response, error) {
 // in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
 // check whether the returned error was because http.StatusNotModified
 // was returned.
-func (c *UrlMapsGetCall) Do() (*UrlMap, error) {
+func (c *UrlMapsGetCall) Do(opts ...googleapi.CallOption) (*UrlMap, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -37979,7 +37922,7 @@ func (c *UrlMapsGetCall) Do() (*UrlMap, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified UrlMap resource.",
+	//   "description": "Returns the specified UrlMap resource. Get a list of available URL maps by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.urlMaps.get",
 	//   "parameterOrder": [
@@ -38035,23 +37978,6 @@ func (r *UrlMapsService) Insert(project string, urlmap *UrlMap) *UrlMapsInsertCa
 	return c
 }
 
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *UrlMapsInsertCall) QuotaUser(quotaUser string) *UrlMapsInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *UrlMapsInsertCall) UserIP(userIP string) *UrlMapsInsertCall {
-	c.urlParams_.Set("userIp", userIP)
-	return c
-}
-
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -38097,7 +38023,8 @@ func (c *UrlMapsInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *UrlMapsInsertCall) Do() (*Operation, error) {
+func (c *UrlMapsInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -38189,19 +38116,20 @@ func (r *UrlMapsService) List(project string) *UrlMapsListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *UrlMapsListCall) Filter(filter string) *UrlMapsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -38209,10 +38137,10 @@ func (c *UrlMapsListCall) Filter(filter string) *UrlMapsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *UrlMapsListCall) MaxResults(maxResults int64) *UrlMapsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -38223,23 +38151,6 @@ func (c *UrlMapsListCall) MaxResults(maxResults int64) *UrlMapsListCall {
 // previous list request to get the next page of results.
 func (c *UrlMapsListCall) PageToken(pageToken string) *UrlMapsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *UrlMapsListCall) QuotaUser(quotaUser string) *UrlMapsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *UrlMapsListCall) UserIP(userIP string) *UrlMapsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -38295,7 +38206,8 @@ func (c *UrlMapsListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *UrlMapsListCall) Do() (*UrlMapList, error) {
+func (c *UrlMapsListCall) Do(opts ...googleapi.CallOption) (*UrlMapList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -38332,13 +38244,13 @@ func (c *UrlMapsListCall) Do() (*UrlMapList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -38371,6 +38283,27 @@ func (c *UrlMapsListCall) Do() (*UrlMapList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *UrlMapsListCall) Pages(ctx context.Context, f func(*UrlMapList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.urlMaps.patch":
 
 type UrlMapsPatchCall struct {
@@ -38382,7 +38315,7 @@ type UrlMapsPatchCall struct {
 	ctx_       context.Context
 }
 
-// Patch: Update the entire content of the UrlMap resource. This method
+// Patch: Updates the entire content of the UrlMap resource. This method
 // supports patch semantics.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/urlMaps/patch
 func (r *UrlMapsService) Patch(project string, urlMap string, urlmap *UrlMap) *UrlMapsPatchCall {
@@ -38390,23 +38323,6 @@ func (r *UrlMapsService) Patch(project string, urlMap string, urlmap *UrlMap) *U
 	c.project = project
 	c.urlMap = urlMap
 	c.urlmap = urlmap
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *UrlMapsPatchCall) QuotaUser(quotaUser string) *UrlMapsPatchCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *UrlMapsPatchCall) UserIP(userIP string) *UrlMapsPatchCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -38456,7 +38372,8 @@ func (c *UrlMapsPatchCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *UrlMapsPatchCall) Do() (*Operation, error) {
+func (c *UrlMapsPatchCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -38485,7 +38402,7 @@ func (c *UrlMapsPatchCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Update the entire content of the UrlMap resource. This method supports patch semantics.",
+	//   "description": "Updates the entire content of the UrlMap resource. This method supports patch semantics.",
 	//   "httpMethod": "PATCH",
 	//   "id": "compute.urlMaps.patch",
 	//   "parameterOrder": [
@@ -38534,30 +38451,13 @@ type UrlMapsUpdateCall struct {
 	ctx_       context.Context
 }
 
-// Update: Update the entire content of the UrlMap resource.
+// Update: Updates the entire content of the UrlMap resource.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/urlMaps/update
 func (r *UrlMapsService) Update(project string, urlMap string, urlmap *UrlMap) *UrlMapsUpdateCall {
 	c := &UrlMapsUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.urlMap = urlMap
 	c.urlmap = urlmap
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *UrlMapsUpdateCall) QuotaUser(quotaUser string) *UrlMapsUpdateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *UrlMapsUpdateCall) UserIP(userIP string) *UrlMapsUpdateCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -38607,7 +38507,8 @@ func (c *UrlMapsUpdateCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *UrlMapsUpdateCall) Do() (*Operation, error) {
+func (c *UrlMapsUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -38636,7 +38537,7 @@ func (c *UrlMapsUpdateCall) Do() (*Operation, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Update the entire content of the UrlMap resource.",
+	//   "description": "Updates the entire content of the UrlMap resource.",
 	//   "httpMethod": "PUT",
 	//   "id": "compute.urlMaps.update",
 	//   "parameterOrder": [
@@ -38685,7 +38586,7 @@ type UrlMapsValidateCall struct {
 	ctx_                   context.Context
 }
 
-// Validate: Run static validation for the UrlMap. In particular, the
+// Validate: Runs static validation for the UrlMap. In particular, the
 // tests of the provided UrlMap will be run. Calling this method does
 // NOT create the UrlMap.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/urlMaps/validate
@@ -38694,23 +38595,6 @@ func (r *UrlMapsService) Validate(project string, urlMap string, urlmapsvalidate
 	c.project = project
 	c.urlMap = urlMap
 	c.urlmapsvalidaterequest = urlmapsvalidaterequest
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *UrlMapsValidateCall) QuotaUser(quotaUser string) *UrlMapsValidateCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *UrlMapsValidateCall) UserIP(userIP string) *UrlMapsValidateCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -38760,7 +38644,8 @@ func (c *UrlMapsValidateCall) doRequest(alt string) (*http.Response, error) {
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *UrlMapsValidateCall) Do() (*UrlMapsValidateResponse, error) {
+func (c *UrlMapsValidateCall) Do(opts ...googleapi.CallOption) (*UrlMapsValidateResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -38789,7 +38674,7 @@ func (c *UrlMapsValidateCall) Do() (*UrlMapsValidateResponse, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Run static validation for the UrlMap. In particular, the tests of the provided UrlMap will be run. Calling this method does NOT create the UrlMap.",
+	//   "description": "Runs static validation for the UrlMap. In particular, the tests of the provided UrlMap will be run. Calling this method does NOT create the UrlMap.",
 	//   "httpMethod": "POST",
 	//   "id": "compute.urlMaps.validate",
 	//   "parameterOrder": [
@@ -38837,7 +38722,7 @@ type VpnTunnelsAggregatedListCall struct {
 	ctx_         context.Context
 }
 
-// AggregatedList: Retrieves the list of VPN tunnels grouped by scope.
+// AggregatedList: Retrieves an aggregated list of VPN tunnels.
 func (r *VpnTunnelsService) AggregatedList(project string) *VpnTunnelsAggregatedListCall {
 	c := &VpnTunnelsAggregatedListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
@@ -38858,19 +38743,20 @@ func (r *VpnTunnelsService) AggregatedList(project string) *VpnTunnelsAggregated
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *VpnTunnelsAggregatedListCall) Filter(filter string) *VpnTunnelsAggregatedListCall {
 	c.urlParams_.Set("filter", filter)
@@ -38878,10 +38764,10 @@ func (c *VpnTunnelsAggregatedListCall) Filter(filter string) *VpnTunnelsAggregat
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *VpnTunnelsAggregatedListCall) MaxResults(maxResults int64) *VpnTunnelsAggregatedListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -38892,23 +38778,6 @@ func (c *VpnTunnelsAggregatedListCall) MaxResults(maxResults int64) *VpnTunnelsA
 // previous list request to get the next page of results.
 func (c *VpnTunnelsAggregatedListCall) PageToken(pageToken string) *VpnTunnelsAggregatedListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *VpnTunnelsAggregatedListCall) QuotaUser(quotaUser string) *VpnTunnelsAggregatedListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *VpnTunnelsAggregatedListCall) UserIP(userIP string) *VpnTunnelsAggregatedListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -38964,7 +38833,8 @@ func (c *VpnTunnelsAggregatedListCall) doRequest(alt string) (*http.Response, er
 // returned at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *VpnTunnelsAggregatedListCall) Do() (*VpnTunnelAggregatedList, error) {
+func (c *VpnTunnelsAggregatedListCall) Do(opts ...googleapi.CallOption) (*VpnTunnelAggregatedList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -38993,7 +38863,7 @@ func (c *VpnTunnelsAggregatedListCall) Do() (*VpnTunnelAggregatedList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of VPN tunnels grouped by scope.",
+	//   "description": "Retrieves an aggregated list of VPN tunnels.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.vpnTunnels.aggregatedList",
 	//   "parameterOrder": [
@@ -39001,13 +38871,13 @@ func (c *VpnTunnelsAggregatedListCall) Do() (*VpnTunnelAggregatedList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -39040,6 +38910,27 @@ func (c *VpnTunnelsAggregatedListCall) Do() (*VpnTunnelAggregatedList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *VpnTunnelsAggregatedListCall) Pages(ctx context.Context, f func(*VpnTunnelAggregatedList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.vpnTunnels.delete":
 
 type VpnTunnelsDeleteCall struct {
@@ -39057,23 +38948,6 @@ func (r *VpnTunnelsService) Delete(project string, region string, vpnTunnel stri
 	c.project = project
 	c.region = region
 	c.vpnTunnel = vpnTunnel
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *VpnTunnelsDeleteCall) QuotaUser(quotaUser string) *VpnTunnelsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *VpnTunnelsDeleteCall) UserIP(userIP string) *VpnTunnelsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -39118,7 +38992,8 @@ func (c *VpnTunnelsDeleteCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *VpnTunnelsDeleteCall) Do() (*Operation, error) {
+func (c *VpnTunnelsDeleteCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -39164,7 +39039,7 @@ func (c *VpnTunnelsDeleteCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -39202,29 +39077,13 @@ type VpnTunnelsGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified VpnTunnel resource.
+// Get: Returns the specified VpnTunnel resource. Get a list of
+// available VPN tunnels by making a list() request.
 func (r *VpnTunnelsService) Get(project string, region string, vpnTunnel string) *VpnTunnelsGetCall {
 	c := &VpnTunnelsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.region = region
 	c.vpnTunnel = vpnTunnel
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *VpnTunnelsGetCall) QuotaUser(quotaUser string) *VpnTunnelsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *VpnTunnelsGetCall) UserIP(userIP string) *VpnTunnelsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -39282,7 +39141,8 @@ func (c *VpnTunnelsGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *VpnTunnelsGetCall) Do() (*VpnTunnel, error) {
+func (c *VpnTunnelsGetCall) Do(opts ...googleapi.CallOption) (*VpnTunnel, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -39311,7 +39171,7 @@ func (c *VpnTunnelsGetCall) Do() (*VpnTunnel, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified VpnTunnel resource.",
+	//   "description": "Returns the specified VpnTunnel resource. Get a list of available VPN tunnels by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.vpnTunnels.get",
 	//   "parameterOrder": [
@@ -39328,7 +39188,7 @@ func (c *VpnTunnelsGetCall) Do() (*VpnTunnel, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -39373,23 +39233,6 @@ func (r *VpnTunnelsService) Insert(project string, region string, vpntunnel *Vpn
 	c.project = project
 	c.region = region
 	c.vpntunnel = vpntunnel
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *VpnTunnelsInsertCall) QuotaUser(quotaUser string) *VpnTunnelsInsertCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *VpnTunnelsInsertCall) UserIP(userIP string) *VpnTunnelsInsertCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -39439,7 +39282,8 @@ func (c *VpnTunnelsInsertCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *VpnTunnelsInsertCall) Do() (*Operation, error) {
+func (c *VpnTunnelsInsertCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -39484,7 +39328,7 @@ func (c *VpnTunnelsInsertCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -39517,7 +39361,7 @@ type VpnTunnelsListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of VpnTunnel resources contained in the
+// List: Retrieves a list of VpnTunnel resources contained in the
 // specified project and region.
 func (r *VpnTunnelsService) List(project string, region string) *VpnTunnelsListCall {
 	c := &VpnTunnelsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -39540,19 +39384,20 @@ func (r *VpnTunnelsService) List(project string, region string) *VpnTunnelsListC
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *VpnTunnelsListCall) Filter(filter string) *VpnTunnelsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -39560,10 +39405,10 @@ func (c *VpnTunnelsListCall) Filter(filter string) *VpnTunnelsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *VpnTunnelsListCall) MaxResults(maxResults int64) *VpnTunnelsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -39574,23 +39419,6 @@ func (c *VpnTunnelsListCall) MaxResults(maxResults int64) *VpnTunnelsListCall {
 // previous list request to get the next page of results.
 func (c *VpnTunnelsListCall) PageToken(pageToken string) *VpnTunnelsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *VpnTunnelsListCall) QuotaUser(quotaUser string) *VpnTunnelsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *VpnTunnelsListCall) UserIP(userIP string) *VpnTunnelsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -39647,7 +39475,8 @@ func (c *VpnTunnelsListCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *VpnTunnelsListCall) Do() (*VpnTunnelList, error) {
+func (c *VpnTunnelsListCall) Do(opts ...googleapi.CallOption) (*VpnTunnelList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -39676,7 +39505,7 @@ func (c *VpnTunnelsListCall) Do() (*VpnTunnelList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of VpnTunnel resources contained in the specified project and region.",
+	//   "description": "Retrieves a list of VpnTunnel resources contained in the specified project and region.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.vpnTunnels.list",
 	//   "parameterOrder": [
@@ -39685,13 +39514,13 @@ func (c *VpnTunnelsListCall) Do() (*VpnTunnelList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -39711,7 +39540,7 @@ func (c *VpnTunnelsListCall) Do() (*VpnTunnelList, error) {
 	//       "type": "string"
 	//     },
 	//     "region": {
-	//       "description": "The name of the region for this request.",
+	//       "description": "Name of the region for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -39729,6 +39558,27 @@ func (c *VpnTunnelsListCall) Do() (*VpnTunnelList, error) {
 	//   ]
 	// }
 
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *VpnTunnelsListCall) Pages(ctx context.Context, f func(*VpnTunnelList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
 }
 
 // method id "compute.zoneOperations.delete":
@@ -39749,23 +39599,6 @@ func (r *ZoneOperationsService) Delete(project string, zone string, operation st
 	c.project = project
 	c.zone = zone
 	c.operation = operation
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ZoneOperationsDeleteCall) QuotaUser(quotaUser string) *ZoneOperationsDeleteCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ZoneOperationsDeleteCall) UserIP(userIP string) *ZoneOperationsDeleteCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -39804,7 +39637,8 @@ func (c *ZoneOperationsDeleteCall) doRequest(alt string) (*http.Response, error)
 }
 
 // Do executes the "compute.zoneOperations.delete" call.
-func (c *ZoneOperationsDeleteCall) Do() error {
+func (c *ZoneOperationsDeleteCall) Do(opts ...googleapi.CallOption) error {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if err != nil {
 		return err
@@ -39839,7 +39673,7 @@ func (c *ZoneOperationsDeleteCall) Do() error {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -39874,23 +39708,6 @@ func (r *ZoneOperationsService) Get(project string, zone string, operation strin
 	c.project = project
 	c.zone = zone
 	c.operation = operation
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ZoneOperationsGetCall) QuotaUser(quotaUser string) *ZoneOperationsGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ZoneOperationsGetCall) UserIP(userIP string) *ZoneOperationsGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -39948,7 +39765,8 @@ func (c *ZoneOperationsGetCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ZoneOperationsGetCall) Do() (*Operation, error) {
+func (c *ZoneOperationsGetCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -40001,7 +39819,7 @@ func (c *ZoneOperationsGetCall) Do() (*Operation, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for this request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -40032,7 +39850,7 @@ type ZoneOperationsListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of Operation resources contained within the
+// List: Retrieves a list of Operation resources contained within the
 // specified zone.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/zoneOperations/list
 func (r *ZoneOperationsService) List(project string, zone string) *ZoneOperationsListCall {
@@ -40056,19 +39874,20 @@ func (r *ZoneOperationsService) List(project string, zone string) *ZoneOperation
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *ZoneOperationsListCall) Filter(filter string) *ZoneOperationsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -40076,10 +39895,10 @@ func (c *ZoneOperationsListCall) Filter(filter string) *ZoneOperationsListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *ZoneOperationsListCall) MaxResults(maxResults int64) *ZoneOperationsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -40090,23 +39909,6 @@ func (c *ZoneOperationsListCall) MaxResults(maxResults int64) *ZoneOperationsLis
 // previous list request to get the next page of results.
 func (c *ZoneOperationsListCall) PageToken(pageToken string) *ZoneOperationsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ZoneOperationsListCall) QuotaUser(quotaUser string) *ZoneOperationsListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ZoneOperationsListCall) UserIP(userIP string) *ZoneOperationsListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -40163,7 +39965,8 @@ func (c *ZoneOperationsListCall) doRequest(alt string) (*http.Response, error) {
 // at all) in error.(*googleapi.Error).Header. Use
 // googleapi.IsNotModified to check whether the returned error was
 // because http.StatusNotModified was returned.
-func (c *ZoneOperationsListCall) Do() (*OperationList, error) {
+func (c *ZoneOperationsListCall) Do(opts ...googleapi.CallOption) (*OperationList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -40192,7 +39995,7 @@ func (c *ZoneOperationsListCall) Do() (*OperationList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of Operation resources contained within the specified zone.",
+	//   "description": "Retrieves a list of Operation resources contained within the specified zone.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.zoneOperations.list",
 	//   "parameterOrder": [
@@ -40201,13 +40004,13 @@ func (c *ZoneOperationsListCall) Do() (*OperationList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -40227,7 +40030,7 @@ func (c *ZoneOperationsListCall) Do() (*OperationList, error) {
 	//       "type": "string"
 	//     },
 	//     "zone": {
-	//       "description": "Name of the zone scoping this request.",
+	//       "description": "Name of the zone for request.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -40247,6 +40050,27 @@ func (c *ZoneOperationsListCall) Do() (*OperationList, error) {
 
 }
 
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ZoneOperationsListCall) Pages(ctx context.Context, f func(*OperationList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.zones.get":
 
 type ZonesGetCall struct {
@@ -40258,29 +40082,13 @@ type ZonesGetCall struct {
 	ctx_         context.Context
 }
 
-// Get: Returns the specified zone resource.
+// Get: Returns the specified Zone resource. Get a list of available
+// zones by making a list() request.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/zones/get
 func (r *ZonesService) Get(project string, zone string) *ZonesGetCall {
 	c := &ZonesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.zone = zone
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ZonesGetCall) QuotaUser(quotaUser string) *ZonesGetCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ZonesGetCall) UserIP(userIP string) *ZonesGetCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -40337,7 +40145,8 @@ func (c *ZonesGetCall) doRequest(alt string) (*http.Response, error) {
 // error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
 // whether the returned error was because http.StatusNotModified was
 // returned.
-func (c *ZonesGetCall) Do() (*Zone, error) {
+func (c *ZonesGetCall) Do(opts ...googleapi.CallOption) (*Zone, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -40366,7 +40175,7 @@ func (c *ZonesGetCall) Do() (*Zone, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns the specified zone resource.",
+	//   "description": "Returns the specified Zone resource. Get a list of available zones by making a list() request.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.zones.get",
 	//   "parameterOrder": [
@@ -40412,7 +40221,7 @@ type ZonesListCall struct {
 	ctx_         context.Context
 }
 
-// List: Retrieves the list of zone resources available to the specified
+// List: Retrieves the list of Zone resources available to the specified
 // project.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/zones/list
 func (r *ZonesService) List(project string) *ZonesListCall {
@@ -40435,19 +40244,20 @@ func (r *ZonesService) List(project string) *ZonesListCall {
 // as a regular expression using RE2 syntax. The literal value must
 // match the entire field.
 //
-// For example, filter=name ne example-instance.
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use filter=name ne
+// example-instance.
 //
-// Compute Engine Beta API Only: If you use filtering in the Beta API,
-// you can also filter on nested fields. For example, you could filter
-// on instances that have set the scheduling.automaticRestart field to
-// true. In particular, use filtering on nested fields to take advantage
-// of instance labels to organize and filter results based on label
-// values.
+// Compute Engine Beta API Only: When filtering in the Beta API, you can
+// also filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
 //
 // The Beta API also supports filtering on multiple expressions by
 // providing each separate expression within parentheses. For example,
 // (scheduling.automaticRestart eq true) (zone eq us-central1-f).
-// Multiple expressions are treated as AND expressions meaning that
+// Multiple expressions are treated as AND expressions, meaning that
 // resources must match all expressions to pass the filters.
 func (c *ZonesListCall) Filter(filter string) *ZonesListCall {
 	c.urlParams_.Set("filter", filter)
@@ -40455,10 +40265,10 @@ func (c *ZonesListCall) Filter(filter string) *ZonesListCall {
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results per page that Compute Engine should return. If the
-// number of available results is larger than maxResults, Compute Engine
-// returns a nextPageToken that can be used to get the next page of
-// results in subsequent list requests.
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests.
 func (c *ZonesListCall) MaxResults(maxResults int64) *ZonesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
@@ -40469,23 +40279,6 @@ func (c *ZonesListCall) MaxResults(maxResults int64) *ZonesListCall {
 // previous list request to get the next page of results.
 func (c *ZonesListCall) PageToken(pageToken string) *ZonesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// QuotaUser sets the optional parameter "quotaUser": Available to use
-// for quota purposes for server-side applications. Can be any arbitrary
-// string assigned to a user, but should not exceed 40 characters.
-// Overrides userIp if both are provided.
-func (c *ZonesListCall) QuotaUser(quotaUser string) *ZonesListCall {
-	c.urlParams_.Set("quotaUser", quotaUser)
-	return c
-}
-
-// UserIP sets the optional parameter "userIp": IP address of the site
-// where the request originates. Use this if you want to enforce
-// per-user limits.
-func (c *ZonesListCall) UserIP(userIP string) *ZonesListCall {
-	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -40541,7 +40334,8 @@ func (c *ZonesListCall) doRequest(alt string) (*http.Response, error) {
 // all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
 // to check whether the returned error was because
 // http.StatusNotModified was returned.
-func (c *ZonesListCall) Do() (*ZoneList, error) {
+func (c *ZonesListCall) Do(opts ...googleapi.CallOption) (*ZoneList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
 		if res.Body != nil {
@@ -40570,7 +40364,7 @@ func (c *ZonesListCall) Do() (*ZoneList, error) {
 	}
 	return ret, nil
 	// {
-	//   "description": "Retrieves the list of zone resources available to the specified project.",
+	//   "description": "Retrieves the list of Zone resources available to the specified project.",
 	//   "httpMethod": "GET",
 	//   "id": "compute.zones.list",
 	//   "parameterOrder": [
@@ -40578,13 +40372,13 @@ func (c *ZonesListCall) Do() (*ZoneList, error) {
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, filter=name ne example-instance.\n\nCompute Engine Beta API Only: If you use filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. In particular, use filtering on nested fields to take advantage of instance labels to organize and filter results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions meaning that resources must match all expressions to pass the filters.",
+	//       "description": "Sets a filter expression for filtering listed resources, in the form filter={expression}. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use filter=name ne example-instance.\n\nCompute Engine Beta API Only: When filtering in the Beta API, you can also filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nThe Beta API also supports filtering on multiple expressions by providing each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
 	//       "default": "500",
-	//       "description": "The maximum number of results per page that Compute Engine should return. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "maximum": "500",
@@ -40615,4 +40409,25 @@ func (c *ZonesListCall) Do() (*ZoneList, error) {
 	//   ]
 	// }
 
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ZonesListCall) Pages(ctx context.Context, f func(*ZoneList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
 }

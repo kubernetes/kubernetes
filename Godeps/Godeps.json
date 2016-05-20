@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v63",
+	"GodepVersion": "v67",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -2003,27 +2003,27 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v1",
-			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
 			"ImportPath": "google.golang.org/api/container/v1",
-			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
 			"ImportPath": "google.golang.org/api/gensupport",
-			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi",
-			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi/internal/uritemplates",
-			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
 			"ImportPath": "google.golang.org/cloud/compute/metadata",
