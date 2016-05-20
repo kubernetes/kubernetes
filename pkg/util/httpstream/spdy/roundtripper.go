@@ -125,6 +125,10 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return nil, err
 	}
 
+	if s.tlsConfig == nil {
+		s.tlsConfig = &tls.Config{}
+	}
+
 	if len(s.tlsConfig.ServerName) == 0 {
 		s.tlsConfig.ServerName = host
 	}
