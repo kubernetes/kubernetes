@@ -148,7 +148,7 @@ func getRequestedCPU(pod api.Pod) int64 {
 func verifyResult(c *client.Client, podName string, expectedScheduled int, expectedNotScheduled int, ns string) {
 	allPods, err := c.Pods(ns).List(api.ListOptions{})
 	framework.ExpectNoError(err)
-	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
+	scheduledPods, notScheduledPods := framework.GetPodsScheduled(masterNodes, allPods)
 
 	printed := false
 	printOnce := func(msg string) string {
@@ -172,37 +172,6 @@ func cleanupPods(c *client.Client, ns string) {
 	for _, p := range pods.Items {
 		framework.ExpectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
 	}
-}
-
-// Waits until all existing pods are scheduled and returns their amount.
-func waitForStableCluster(c *client.Client) int {
-	timeout := 10 * time.Minute
-	startTime := time.Now()
-
-	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-	framework.ExpectNoError(err)
-	// API server returns also Pods that succeeded. We need to filter them out.
-	currentPods := make([]api.Pod, 0, len(allPods.Items))
-	for _, pod := range allPods.Items {
-		if pod.Status.Phase != api.PodSucceeded && pod.Status.Phase != api.PodFailed {
-			currentPods = append(currentPods, pod)
-		}
-	}
-	allPods.Items = currentPods
-	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
-	for len(currentlyNotScheduledPods) != 0 {
-		time.Sleep(2 * time.Second)
-
-		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-		framework.ExpectNoError(err)
-		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
-
-		if startTime.Add(timeout).Before(time.Now()) {
-			framework.Failf("Timed out after %v waiting for stable cluster.", timeout)
-			break
-		}
-	}
-	return len(scheduledPods)
 }
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
@@ -279,7 +248,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			totalPodCapacity += podCapacity.Value()
 		}
 
-		currentlyScheduledPods := waitForStableCluster(c)
+		currentlyScheduledPods := framework.WaitForStableCluster(c, masterNodes)
 		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
@@ -349,7 +318,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				nodeMaxCapacity = capacity.MilliValue()
 			}
 		}
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		framework.ExpectNoError(err)
@@ -444,7 +413,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -597,7 +566,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -853,7 +822,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to schedule Pod with nonempty Pod Affinity.")
 		podName := "without-label-" + string(uuid.NewUUID())
 
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
