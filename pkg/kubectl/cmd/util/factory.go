@@ -352,6 +352,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		ClientForMapping: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 			cfg, err := clientConfig.ClientConfig()
+			fmt.Printf("Mapping version: %#v", mappingVersion)
 			if err != nil {
 				return nil, err
 			}
