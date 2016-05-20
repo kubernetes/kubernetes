@@ -97,3 +97,6 @@ network_closure.sh
 
 # Downloaded kubernetes binary release tar ball
 kubernetes.tar.gz
+
+# generated files in any directory
+zz_generated.*
