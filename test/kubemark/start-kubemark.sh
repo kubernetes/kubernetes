@@ -36,6 +36,7 @@ sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/scheduler_flags"
 ${CONTROLLER_MANAGER_TEST_ARGS}
 --allocate-node-cidrs="${ALLOCATE_NODE_CIDRS}"
 --cluster-cidr="${CLUSTER_IP_RANGE}"
+--service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
 --terminated-pod-gc-threshold="${TERMINATED_POD_GC_THRESHOLD}"
 EOF
 sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/controllers_flags"
