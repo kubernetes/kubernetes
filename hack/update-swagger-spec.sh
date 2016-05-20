@@ -58,7 +58,7 @@ API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 
-kube::etcd::start
+kube::etcd::ensure
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"

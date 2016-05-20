@@ -41,8 +41,6 @@ kube::etcd::start() {
   local port=${ETCD_PORT:-4001}
   local proto=${ETCD_PROTO:-http}
 
-  local sec_args=$(kube::etcd::sec)
-
   which etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"
     exit 1
@@ -55,14 +53,15 @@ kube::etcd::start() {
 
   if pgrep etcd >/dev/null 2>&1; then
     kube::log::usage "etcd appears to already be running on this machine (`pgrep -l etcd`) (or its a zombie and you need to kill its parent)."
-  else 
+    kube::log::usage "retry after you resolve this error"
+    exit 1
+  fi 
     # Start etcd
   
-    ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
-    kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null"
-    etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null &
-    ETCD_PID=$!
-  fi
+  ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
+  kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null"
+  etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null &
+  ETCD_PID=$!
 
   version=$(etcd -version | cut -d " " -f 3)
   if [[ "${version}" < "${ETCD_VERSION}" ]]; then
@@ -82,11 +81,24 @@ kube::etcd::start() {
   etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
+  kube::etcd::check
+}
+
+kube::etcd::check() {
   echo "Waiting for etcd to come up."
-  kube::util::wait_for_cmd 0.25 80 etcdctl $sec_args --endpoint="${proto}://${host}:${port}" ls || {
+  kube::util::wait_for_cmd 0.25 80 etcdctl $(kube::etcd::sec) --endpoint="${ETCD_PROTO}://${ETCD_HOST}:${ETCD_PORT}" ls || {
     kube::log::usage "etcdctl could not communicate with the etcd cluster."
     exit 1
   }
+}
+
+kube::etcd::ensure() {
+  if [[ "${ETCD_USE_EXISTING:-false}" == "true" ]]; then
+    kube::etcd::check
+  else
+    echo "Starting etcd"
+    kube::etcd::start
+  fi
 }
 
 kube::etcd::stop() {
