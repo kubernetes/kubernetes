@@ -467,8 +467,8 @@ type cacheWatcher struct {
 
 func newCacheWatcher(resourceVersion uint64, initEvents []watchCacheEvent, filter FilterFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
-		input:   make(chan watchCacheEvent, 10),
-		result:  make(chan watch.Event, 10),
+		input:   make(chan watchCacheEvent, 100),
+		result:  make(chan watch.Event, 100),
 		filter:  filter,
 		stopped: false,
 		forget:  forget,
@@ -497,37 +497,15 @@ func (c *cacheWatcher) stop() {
 	}
 }
 
-var timerPool sync.Pool
-
 func (c *cacheWatcher) add(event watchCacheEvent) {
-	// Try to send the event immediately, without blocking.
+	// We cannot block here if the input channel capacity is full, otherwise
+	// cache will hang. input channel capacity is full when the rate of
+	// notifications are higher than our send rate.
+	// If this happens, we close the channel.
 	select {
 	case c.input <- event:
 		return
 	default:
-	}
-
-	// OK, block sending, but only for up to 5 seconds.
-	// cacheWatcher.add is called very often, so arrange
-	// to reuse timers instead of constantly allocating.
-	const timeout = 5 * time.Second
-	t, ok := timerPool.Get().(*time.Timer)
-	if ok {
-		t.Reset(timeout)
-	} else {
-		t = time.NewTimer(timeout)
-	}
-	defer timerPool.Put(t)
-
-	select {
-	case c.input <- event:
-		stopped := t.Stop()
-		if !stopped {
-			// Consume triggered (but not yet received) timer event
-			// so that future reuse does not get a spurious timeout.
-			<-t.C
-		}
-	case <-t.C:
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
