@@ -43,8 +43,6 @@ define how those pods should be allowed to communicate with each other.  The
 implementation of that policy at the network layer is left up to the
 chosen networking solution.
 
-> Note that this proposal does not yet include egress / cidr-based policy, which is still actively undergoing discussion in the SIG. These are expected to augment this proposal in a backwards compatible way.
-
 ## Implementation
 
 The implmentation in Kubernetes consists of:
@@ -58,12 +56,18 @@ The following objects will be defined on a Namespace Spec.
 
 ```go
 type IngressIsolationPolicy string
+type EgressIsolationPolicy string
 
 const (
 	// Deny all ingress traffic to pods in this namespace. Ingress means 
 	// any incoming traffic to pods, whether that be from other pods within this namespace
 	// or any source outside of this namespace.
 	DefaultDeny IngressIsolationPolicy = "DefaultDeny"
+
+	// Deny all egress traffic from pods in this namespace. Egress means 
+	// any outgoing traffic from pods, whether that be to other pods within this namespace
+	// or any destination outside of this namespace.
+	DefaultDeny EgressIsolationPolicy = "DefaultDeny"
 ) 
 
 // Standard NamespaceSpec object, modified to include a new
@@ -79,17 +83,33 @@ type NamespaceNetworkPolicy struct {
 	// ingress is supported.  This field is optional - if not 
 	// defined, then the cluster default for ingress is applied.
 	Ingress *NamespaceIngressPolicy `json:"ingress,omitempty"`
+
+	// Egress configuration for this namespace.  This config is 
+	// applied to all pods within this namespace. This field is optional -
+	// if not  defined, then the cluster default for egress is applied.
+	Egress *NamespaceEgressPolicy `json:"egress,omitempty"`
 }
 
 // Configuration for ingress to pods within this namespace.
-// For now, this only supports specifying an isolation policy.
+// For now, this only supports specifying an ingress isolation policy.
 type NamespaceIngressPolicy struct {
-	// The isolation policy to apply to pods in this namespace.
+	// The ingress isolation policy to apply to pods in this namespace.
 	// Currently this field only supports "DefaultDeny", but could 
 	// be extended to support other policies in the future.  When set to DefaultDeny,
 	// pods in this namespace are denied ingress traffic by default.  When not defined,
 	// the cluster default ingress isolation policy is applied (currently allow all). 
 	Isolation *IngressIsolationPolicy `json:"isolation,omitempty"` 
+}
+
+// Configuration for egress from pods within this namespace.
+// For now, this only supports specifying an egress isolation policy.
+type NamespaceEgressPolicy struct {
+	// The egress isolation policy to apply to pods in this namespace.
+	// Currently this field only supports "DefaultDeny", but could 
+	// be extended to support other policies in the future.  When set to DefaultDeny,
+	// pods in this namespace are denied egress traffic by default.  When not defined,
+	// the cluster default egress isolation policy is applied (currently allow all). 
+	Isolation *EgressIsolationPolicy `json:"isolation,omitempty"` 
 }
 ```
 
@@ -99,6 +119,8 @@ apiVersion: v1
 spec:
   networkPolicy:
     ingress:
+      isolation: DefaultDeny
+    egress:
       isolation: DefaultDeny
 ```
 
@@ -113,6 +135,9 @@ metadata:
       {
         "ingress": {
           "isolation": "DefaultDeny"
+        },
+        "egress": {
+          "isolation": "DefaultDeny"
         }
       }
 ```
@@ -126,6 +151,9 @@ This is accomplished through ingress rules on `NetworkPolicy`
 objects (of which there can be multiple in a single namespace).  Pods selected by
 one or more NetworkPolicy objects should allow any incoming connections that match any
 ingress rule on those NetworkPolicy objects, per the network plugin’s capabilities.
+
+For a namespace with egress isolation, connections from pods in that namespace (to any destination) are prevented.
+The user needs a way to explicitly declare which connections are allowed from pods of that namespace.
 
 NetworkPolicy objects and the above namespace isolation both act on _connections_ rather than individual packets.  That is to say that if traffic from pod A to pod B is allowed by the configured
 policy, then the return packets for that connection from B -> A are also allowed, even if the policy in place would not allow B to initiate a connection to A.  NetworkPolicy objects act on a broad definition of _connection_ which includes both TCP and UDP streams.   If new network policy is applied that would block an existing connection between two endpoints, the enforcer of policy
@@ -163,6 +191,16 @@ type NetworkPolicySpec struct {
 	// If this field is present and contains at least one rule, this policy allows any traffic
 	// which matches at least one of the ingress rules in this list.
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty"`
+
+	// List of egress rules to be applied to the selected pods.
+	// Traffic is allowed to exit a pod if namespace.networkPolicy.egress.isolation is undefined and cluster policy allows it,
+	// OR if the traffic destination is the pod's local node, 
+	// OR if the traffic matches at least one egress rule across all of the NetworkPolicy 
+	// objects whose podSelector matches the pod.  
+	// If this field is empty then this NetworkPolicy does not affect egress isolation.
+	// If this field is present and contains at least one rule, this policy allows any traffic
+	// which matches at least one of the egress rules in this list.
+	Egress []NetworkPolicyEgressRule `json:"egress,omitempty"`
 }
 
 // This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from. 
@@ -184,6 +222,25 @@ type NetworkPolicyIngressRule struct {
 	From *[]NetworkPolicyPeer `json:"from,omitempty"`
 }
 
+// This NetworkPolicyEgressRule matches traffic if and only if the traffic matches both ports AND to.
+type NetworkPolicyEgressRule struct {
+	// List of ports which should be made accessible on the pods selected for this rule. 
+	// Each item in this list is combined using a logical OR.  
+	// If this field is not provided, this rule matches all ports (traffic not restricted by port). 
+	// If this field is empty, this rule matches no ports (no traffic matches).
+	// If this field is present and contains at least one item, then this rule allows traffic 
+	// only if the traffic matches at least one port in the ports list. 
+	Ports *[]NetworkPolicyPort `json:"ports,omitempty"`
+	
+	// List of destinations to which the selected pod for this rule should be able to send traffic.
+	// Items in this list are combined using a logical OR operation.
+	// If this field is not provided, this rule matches all destinations (traffic not restricted by destination).
+	// If this field is empty, this rule matches no destinations (no traffic matches). 
+	// If this field is present and contains at least one item, this rule allows traffic only if the 
+	// traffic matches at least one item in the to list. 
+	To *[]NetworkPolicyPeer `json:"to,omitempty"`
+}
+
 type NetworkPolicyPort struct {
 	// Optional.  The protocol (TCP or UDP) which traffic must match.
 	// If not specified, this field defaults to TCP. 
@@ -195,6 +252,36 @@ type NetworkPolicyPort struct {
 	// If present, only traffic on the specified protocol AND port
 	// will be matched.
 	Port *intstr.IntOrString `json:"port,omitempty"`
+}
+
+type NetworkCIDRRange struct {
+	// QUESTION: we could just do "Start" and "End" without a prefix to
+	// specify the range.  While this provides a simpler structure, it may
+	// be more error-prone since its less easily validated, and isn't very
+	// nice for IPv6 addresses.
+
+	// An IPv4 or IPv6 address (eg "192.168.1.0" or 2001:db8::) which
+	// together with the Prefix identifies an IP network. If the optional
+	// End property is non-empty, this object selects all IP addresses from
+	// Start through End, inclusive. For example, if Start is "192.168.1.0",
+	// Prefix is "24", and End is "192.168.15.0" this object would select
+	// all IP addresses between 192.168.1.0 and 192.168.15.255 inclusive.
+	// If Start is 192.168.1.0, Prefix is 24, and End is empty, this object
+	// selects only addresses between 192.168.1.0 and 192.168.1.255.
+	Start net.IP `json:"start"`
+
+	// The CIDR prefix for Start and (if End is non-empty) End. Must
+	// be between 1 and 32 inclusive for IPv4 addresses, and between 1
+	// and 128 for IPv6 addresses.
+	Prefix uint `json:"prefix"`
+
+	// (Optional) An IPv4 or IPv6 address which together with the Prefix
+	// identifies an IP network. Must be the same IP version
+	// (either v4 or v6) as Start and numerically greater than Start.
+	// End will be evaluated with respect to Prefix when determining
+	// the CIDR range end. When End is non-empty this object selects all IP
+	// addresses from Start through End, inclusive.
+	End net.IP `json:"end,omitempty"`
 }
 
 type NetworkPolicyPeer struct {
@@ -212,6 +299,12 @@ type NetworkPolicyPeer struct {
 	// If omited, this selector selects no namespaces.
 	// If present but empty, this selector selects all namespaces.
 	NamespaceSelector *unversioned.LabelSelector `json:"namespaceSelector,omitempty"`
+
+	// Selects a specific IP address range that the pod is allowed to accept
+	// traffic from (for ingress) or is allowed to send traffic to (for egress).
+	// If omitted, this selector selects no IP addresses.
+	// If present but empty, this selector selects all IP addresses.
+	CIDRSelector *[]NetworkCIDRRange `json:"cidrSelector,omitempty"`
 }
 ```
 
