@@ -14,6 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-perl -pi -e "s/%%ip%%/$(hostname -I)/g" /etc/cassandra/cassandra.yaml
+perl -pi -e "s/%%ip%%/$(hostname -i)/g" /etc/cassandra/cassandra.yaml
 export CLASSPATH=/kubernetes-cassandra.jar
 cassandra -f
