@@ -32,6 +32,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -3979,24 +3980,27 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 	}
 }
 
+func verifyContainerStatuses(statuses []api.ContainerStatus, state, lastTerminationState map[string]api.ContainerState) error {
+	for _, s := range statuses {
+		if !reflect.DeepEqual(s.State, state[s.Name]) {
+			return fmt.Errorf("unexpected state: %s", diff.ObjectDiff(state[s.Name], s.State))
+		}
+		if !reflect.DeepEqual(s.LastTerminationState, lastTerminationState[s.Name]) {
+			return fmt.Errorf("unexpected last termination state %s", diff.ObjectDiff(
+				lastTerminationState[s.Name], s.LastTerminationState))
+		}
+	}
+	return nil
+}
+
+// Test generateAPIPodStatus with different reason cache and old api pod status.
 func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 	// The following waiting reason and message  are generated in convertStatusToAPIStatus()
 	startWaitingReason := "ContainerCreating"
+	initWaitingReason := "PodInitializing"
 	testTimestamp := time.Unix(123456789, 987654321)
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
-	verifyStatus := func(t *testing.T, c int, podStatus api.PodStatus, state, lastTerminationState map[string]api.ContainerState) {
-		statuses := podStatus.ContainerStatuses
-		for _, s := range statuses {
-			if !reflect.DeepEqual(s.State, state[s.Name]) {
-				t.Errorf("case #%d, unexpected state: %s", c, diff.ObjectDiff(state[s.Name], s.State))
-			}
-			if !reflect.DeepEqual(s.LastTerminationState, lastTerminationState[s.Name]) {
-				t.Errorf("case #%d, unexpected last termination state %s", c, diff.ObjectDiff(
-					lastTerminationState[s.Name], s.LastTerminationState))
-			}
-		}
-	}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	pod := podWithUidNameNs("12345678", "foo", "new")
@@ -4008,24 +4012,26 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		Namespace: pod.Namespace,
 	}
 	tests := []struct {
-		containers                   []api.Container
-		statuses                     []*kubecontainer.ContainerStatus
-		reasons                      map[string]error
-		oldStatuses                  []api.ContainerStatus
-		expectedState                map[string]api.ContainerState
+		containers    []api.Container
+		statuses      []*kubecontainer.ContainerStatus
+		reasons       map[string]error
+		oldStatuses   []api.ContainerStatus
+		expectedState map[string]api.ContainerState
+		// Only set expectedInitState when it is different from expectedState
+		expectedInitState            map[string]api.ContainerState
 		expectedLastTerminationState map[string]api.ContainerState
 	}{
 		// For container with no historical record, State should be Waiting, LastTerminationState should be retrieved from
 		// old status from apiserver.
 		{
-			[]api.Container{{Name: "without-old-record"}, {Name: "with-old-record"}},
-			[]*kubecontainer.ContainerStatus{},
-			map[string]error{},
-			[]api.ContainerStatus{{
+			containers: []api.Container{{Name: "without-old-record"}, {Name: "with-old-record"}},
+			statuses:   []*kubecontainer.ContainerStatus{},
+			reasons:    map[string]error{},
+			oldStatuses: []api.ContainerStatus{{
 				Name:                 "with-old-record",
 				LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
 			}},
-			map[string]api.ContainerState{
+			expectedState: map[string]api.ContainerState{
 				"without-old-record": {Waiting: &api.ContainerStateWaiting{
 					Reason: startWaitingReason,
 				}},
@@ -4033,14 +4039,22 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 					Reason: startWaitingReason,
 				}},
 			},
-			map[string]api.ContainerState{
+			expectedInitState: map[string]api.ContainerState{
+				"without-old-record": {Waiting: &api.ContainerStateWaiting{
+					Reason: initWaitingReason,
+				}},
+				"with-old-record": {Waiting: &api.ContainerStateWaiting{
+					Reason: initWaitingReason,
+				}},
+			},
+			expectedLastTerminationState: map[string]api.ContainerState{
 				"with-old-record": {Terminated: &api.ContainerStateTerminated{}},
 			},
 		},
 		// For running container, State should be Running, LastTerminationState should be retrieved from latest terminated status.
 		{
-			[]api.Container{{Name: "running"}},
-			[]*kubecontainer.ContainerStatus{
+			containers: []api.Container{{Name: "running"}},
+			statuses: []*kubecontainer.ContainerStatus{
 				{
 					Name:      "running",
 					State:     kubecontainer.ContainerStateRunning,
@@ -4052,14 +4066,14 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 					ExitCode: 1,
 				},
 			},
-			map[string]error{},
-			[]api.ContainerStatus{},
-			map[string]api.ContainerState{
+			reasons:     map[string]error{},
+			oldStatuses: []api.ContainerStatus{},
+			expectedState: map[string]api.ContainerState{
 				"running": {Running: &api.ContainerStateRunning{
 					StartedAt: unversioned.NewTime(testTimestamp),
 				}},
 			},
-			map[string]api.ContainerState{
+			expectedLastTerminationState: map[string]api.ContainerState{
 				"running": {Terminated: &api.ContainerStateTerminated{
 					ExitCode:    1,
 					ContainerID: emptyContainerID,
@@ -4075,8 +4089,8 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		// recent start error or not, State should be Terminated, LastTerminationState should be retrieved from second latest
 		// terminated status.
 		{
-			[]api.Container{{Name: "without-reason"}, {Name: "with-reason"}},
-			[]*kubecontainer.ContainerStatus{
+			containers: []api.Container{{Name: "without-reason"}, {Name: "with-reason"}},
+			statuses: []*kubecontainer.ContainerStatus{
 				{
 					Name:     "without-reason",
 					State:    kubecontainer.ContainerStateExited,
@@ -4108,9 +4122,9 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 					ExitCode: 5,
 				},
 			},
-			map[string]error{"with-reason": testErrorReason, "succeed": testErrorReason},
-			[]api.ContainerStatus{},
-			map[string]api.ContainerState{
+			reasons:     map[string]error{"with-reason": testErrorReason, "succeed": testErrorReason},
+			oldStatuses: []api.ContainerStatus{},
+			expectedState: map[string]api.ContainerState{
 				"without-reason": {Terminated: &api.ContainerStateTerminated{
 					ExitCode:    1,
 					ContainerID: emptyContainerID,
@@ -4121,7 +4135,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 					ContainerID: emptyContainerID,
 				}},
 			},
-			map[string]api.ContainerState{
+			expectedLastTerminationState: map[string]api.ContainerState{
 				"without-reason": {Terminated: &api.ContainerStateTerminated{
 					ExitCode:    3,
 					ContainerID: emptyContainerID,
@@ -4147,7 +4161,172 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		pod.Status.ContainerStatuses = test.oldStatuses
 		podStatus.ContainerStatuses = test.statuses
 		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus)
-		verifyStatus(t, i, apiStatus, test.expectedState, test.expectedLastTerminationState)
+		assert.NoError(t, verifyContainerStatuses(apiStatus.ContainerStatuses, test.expectedState, test.expectedLastTerminationState), "case %d", i)
+	}
+
+	// Everything should be the same for init containers
+	for i, test := range tests {
+		kubelet.reasonCache = NewReasonCache()
+		for n, e := range test.reasons {
+			kubelet.reasonCache.add(pod.UID, n, e, "")
+		}
+		pod.Spec.InitContainers = test.containers
+		pod.Status.InitContainerStatuses = test.oldStatuses
+		podStatus.ContainerStatuses = test.statuses
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus)
+		expectedState := test.expectedState
+		if test.expectedInitState != nil {
+			expectedState = test.expectedInitState
+		}
+		assert.NoError(t, verifyContainerStatuses(apiStatus.InitContainerStatuses, expectedState, test.expectedLastTerminationState), "case %d", i)
+	}
+}
+
+// Test generateAPIPodStatus with different restart policies.
+func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
+	testErrorReason := fmt.Errorf("test-error")
+	emptyContainerID := (&kubecontainer.ContainerID{}).String()
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	pod := podWithUidNameNs("12345678", "foo", "new")
+	containers := []api.Container{{Name: "succeed"}, {Name: "failed"}}
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.ContainerStatus{
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+			},
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 2,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 3,
+			},
+		},
+	}
+	kubelet.reasonCache.add(pod.UID, "succeed", testErrorReason, "")
+	kubelet.reasonCache.add(pod.UID, "failed", testErrorReason, "")
+	for c, test := range []struct {
+		restartPolicy                api.RestartPolicy
+		expectedState                map[string]api.ContainerState
+		expectedLastTerminationState map[string]api.ContainerState
+		// Only set expectedInitState when it is different from expectedState
+		expectedInitState map[string]api.ContainerState
+		// Only set expectedInitLastTerminationState when it is different from expectedLastTerminationState
+		expectedInitLastTerminationState map[string]api.ContainerState
+	}{
+		{
+			restartPolicy: api.RestartPolicyNever,
+			expectedState: map[string]api.ContainerState{
+				"succeed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			expectedLastTerminationState: map[string]api.ContainerState{
+				"succeed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			restartPolicy: api.RestartPolicyOnFailure,
+			expectedState: map[string]api.ContainerState{
+				"succeed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Waiting: &api.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]api.ContainerState{
+				"succeed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			restartPolicy: api.RestartPolicyAlways,
+			expectedState: map[string]api.ContainerState{
+				"succeed": {Waiting: &api.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+				"failed":  {Waiting: &api.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]api.ContainerState{
+				"succeed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			// If the init container is terminated with exit code 0, it won't be restarted even when the
+			// restart policy is RestartAlways.
+			expectedInitState: map[string]api.ContainerState{
+				"succeed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Waiting: &api.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedInitLastTerminationState: map[string]api.ContainerState{
+				"succeed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &api.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+	} {
+		pod.Spec.RestartPolicy = test.restartPolicy
+		// Test normal containers
+		pod.Spec.Containers = containers
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus)
+		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
+		assert.NoError(t, verifyContainerStatuses(apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState), "case %d", c)
+		pod.Spec.Containers = nil
+
+		// Test init containers
+		pod.Spec.InitContainers = containers
+		apiStatus = kubelet.generateAPIPodStatus(pod, podStatus)
+		if test.expectedInitState != nil {
+			expectedState = test.expectedInitState
+		}
+		if test.expectedInitLastTerminationState != nil {
+			expectedLastTerminationState = test.expectedInitLastTerminationState
+		}
+		assert.NoError(t, verifyContainerStatuses(apiStatus.InitContainerStatuses, expectedState, expectedLastTerminationState), "case %d", c)
+		pod.Spec.InitContainers = nil
 	}
 }
 
