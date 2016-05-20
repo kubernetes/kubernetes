@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
       - name: nfs-server
-        image: hchen/nfs3-server:latest #gcr.io/google-samples/nfs-server:1.0
+        image: gcr.io/google-samples/nfs-server:1.1
         ports:
           - name: nfs
             containerPort: 2049
