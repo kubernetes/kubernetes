@@ -255,7 +255,6 @@ function set_service_accounts {
 }
 
 function start_apiserver {
-    echo "START API"
     # Admission Controllers to invoke prior to persisting objects in cluster
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
       ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
