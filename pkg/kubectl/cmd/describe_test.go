@@ -140,3 +140,63 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 		t.Errorf("ShowEvents = false expected, got ShowEvents = %v", d.Settings.ShowEvents)
 	}
 }
+
+func TestDescribeObjectShowAll(t *testing.T) {
+	pods, _, _ := testData()
+	f, tf, codec := NewAPIFactory()
+	d := &testDescriber{Output: "test output"}
+	tf.Describer = d
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf)
+	cmd.Flags().Set("show-all", "true")
+	cmd.Run(cmd, []string{"pods"})
+	if d.Settings.ShowAll != true {
+		t.Errorf("ShowAll = true expected, got ShowAll = %v", d.Settings.ShowAll)
+	}
+}
+
+func TestDescribeObjectDontShowAll(t *testing.T) {
+	pods, _, _ := testData()
+	f, tf, codec := NewAPIFactory()
+	d := &testDescriber{Output: "test output"}
+	tf.Describer = d
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf)
+	cmd.Flags().Set("show-all", "false")
+	cmd.Run(cmd, []string{"pods"})
+	if d.Settings.ShowAll != false {
+		t.Errorf("ShowAll = false expected, got ShowAll = %v", d.Settings.ShowAll)
+	}
+}
+
+func TestDescribeObjectDefaultValueShowAll(t *testing.T) {
+	pods, _, _ := testData()
+	f, tf, codec := NewAPIFactory()
+	d := &testDescriber{Output: "test output"}
+	tf.Describer = d
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf)
+	cmd.Flags().Set("show-all", "false")
+	cmd.Run(cmd, []string{"pods"})
+	if d.Settings.ShowAll != false {
+		t.Errorf("ShowAll = false default value expected, got ShowAll = %v", d.Settings.ShowAll)
+	}
+}

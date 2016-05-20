@@ -95,6 +95,7 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", true, "If true, display events related to the described object.")
+	cmd.Flags().BoolVar(&describerSettings.ShowAll, "show-all", false, "If true, display all hidden fields.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
