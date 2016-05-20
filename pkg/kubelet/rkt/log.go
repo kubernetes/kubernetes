@@ -18,6 +18,7 @@ package rkt
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,6 +41,8 @@ const (
 	journalSinceLayout = "2006-01-02 15:04:05"
 )
 
+var journalNoEntriesLine = []byte(`"-- No entries --"`)
+
 // pipeLog reads and parses the journal json object from r,
 // and writes the logs line by line to w.
 func pipeLog(wg *sync.WaitGroup, logOptions *api.PodLogOptions, r io.ReadCloser, w io.Writer) {
@@ -52,9 +55,12 @@ func pipeLog(wg *sync.WaitGroup, logOptions *api.PodLogOptions, r io.ReadCloser,
 	for scanner.Scan() {
 		var data interface{}
 		b := scanner.Bytes()
+		if bytes.Equal(b, journalNoEntriesLine) {
+			continue
+		}
 
 		if err := json.Unmarshal(b, &data); err != nil {
-			glog.Warningf("rkt: Cannot unmarshal journal log, skipping line: %v", err)
+			glog.Warningf("rkt: Cannot unmarshal journal log %q, skipping line: %v", string(b), err)
 			continue
 		}
 
@@ -142,6 +148,7 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 		}
 	}
 
+	glog.V(4).Infof("rkt: gettings logs with command %q", cmd.Args)
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		glog.Errorf("rkt: cannot create pipe for journalctl's stdout: %v", err)
