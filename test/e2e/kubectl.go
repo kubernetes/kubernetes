@@ -312,7 +312,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			// Build the static kubectl
 			By("Finding a static kubectl for upload")
-			testStaticKubectlPath, err := findBinary("kubectl", "linux/386")
+			testStaticKubectlPath, err := findBinary("kubectl", "linux/amd64")
 			if err != nil {
 				framework.Logf("No kubectl found: %v.\nAttempting a local build...", err)
 				// Fall back to trying to build a local static kubectl
