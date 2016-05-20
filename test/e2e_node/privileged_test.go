@@ -42,7 +42,6 @@ const (
 	notPrivilegedHttpPort      = 9090
 	notPrivilegedUdpPort       = 9091
 	notPrivilegedContainerName = "not-privileged-container"
-	privilegedContainerImage   = "gcr.io/google_containers/netexec:1.4"
 	privilegedCommand          = "ip link add dummy1 type dummy"
 )
 
@@ -98,7 +97,7 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:            privilegedContainerName,
-					Image:           privilegedContainerImage,
+					Image:           ImageRegistry[netExecImage],
 					ImagePullPolicy: api.PullIfNotPresent,
 					SecurityContext: &api.SecurityContext{Privileged: &isPrivileged},
 					Command: []string{
@@ -109,7 +108,7 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
 				},
 				{
 					Name:            notPrivilegedContainerName,
-					Image:           privilegedContainerImage,
+					Image:           ImageRegistry[netExecImage],
 					ImagePullPolicy: api.PullIfNotPresent,
 					SecurityContext: &api.SecurityContext{Privileged: &notPrivileged},
 					Command: []string{
@@ -168,7 +167,7 @@ func newHostExecPodSpec(ns, name string) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:            "hostexec",
-					Image:           "gcr.io/google_containers/hostexec:1.2",
+					Image:           ImageRegistry[hostExecImage],
 					ImagePullPolicy: api.PullIfNotPresent,
 				},
 			},

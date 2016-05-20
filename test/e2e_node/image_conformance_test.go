@@ -27,8 +27,10 @@ import (
 )
 
 const (
-	imageRetryTimeout = time.Minute * 2
-	imagePullInterval = time.Second * 15
+	imageRetryTimeout         = time.Minute * 10 // Image pulls can take a long time and shouldn't cause flakes
+	imagePullInterval         = time.Second * 15
+	imageConsistentlyTimeout  = time.Second * 30
+	imageConsistentlyInterval = time.Second * 5
 )
 
 var _ = Describe("Image Container Conformance Test", func() {
@@ -44,8 +46,8 @@ var _ = Describe("Image Container Conformance Test", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {
 				existImageTags := []string{
-					"gcr.io/google_containers/busybox:1.24",
-					"gcr.io/google_containers/mounttest:0.2",
+					NoPullImagRegistry[pullTestExecHealthz],
+					NoPullImagRegistry[pullTestAlpineWithBash],
 				}
 				for _, existImageTag := range existImageTags {
 					conformImage, _ := NewConformanceImage("docker", existImageTag)
@@ -84,55 +86,45 @@ var _ = Describe("Image Container Conformance Test", func() {
 		})
 		Context("when testing image that does not exist", func() {
 			var conformImages []ConformanceImage
-			BeforeEach(func() {
-				invalidImageTags := []string{
-					// nonexistent image registry
-					"foo.com/foo/fooimage",
-					// nonexistent image
-					"gcr.io/google_containers/not_exist",
-					// TODO(random-liu): Add test for image pulling credential
-				}
+			invalidImageTags := []string{
+				// nonexistent image registry
+				"foo.com/foo/fooimage",
+				// nonexistent image
+				"gcr.io/google_containers/not_exist",
+				// TODO(random-liu): Add test for image pulling credential
+			}
+			It("should ignore pull failures", func() {
 				for _, invalidImageTag := range invalidImageTags {
 					conformImage, _ := NewConformanceImage("docker", invalidImageTag)
 					// Pulling images from gcr.io is flaky, so retry to make sure failure is not caused by flaky.
-					Consistently(func() error {
-						return conformImage.Pull()
-					}, imageRetryTimeout, imagePullInterval).Should(HaveOccurred())
+					Expect(conformImage.Pull()).Should(HaveOccurred())
 					conformImages = append(conformImages, conformImage)
 				}
-			})
 
-			It("it should not present images [Conformance]", func() {
-				for _, conformImage := range conformImages {
-					present, err := conformImage.Present()
+				By("not presenting images [Conformance]", func() {
+					for _, conformImage := range conformImages {
+						present, err := conformImage.Present()
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(present).To(BeFalse())
+					}
+				})
+
+				By("not listing pulled images [Conformance]", func() {
+					image, _ := NewConformanceImage("docker", "")
+					tags, err := image.List()
 					Expect(err).ShouldNot(HaveOccurred())
-					Expect(present).To(BeFalse())
-				}
-			})
+					for _, conformImage := range conformImages {
+						Expect(tags).NotTo(ContainElement(conformImage.GetTag()))
+					}
+				})
 
-			It("it should not list pulled images [Conformance]", func() {
-				image, _ := NewConformanceImage("docker", "")
-				tags, err := image.List()
-				Expect(err).ShouldNot(HaveOccurred())
-				for _, conformImage := range conformImages {
-					Expect(tags).NotTo(ContainElement(conformImage.GetTag()))
-				}
+				By("not removing non-exist images [Conformance]", func() {
+					for _, conformImage := range conformImages {
+						err := conformImage.Remove()
+						Expect(err).Should(HaveOccurred())
+					}
+				})
 			})
-
-			It("it should not remove non-exist images [Conformance]", func() {
-				for _, conformImage := range conformImages {
-					err := conformImage.Remove()
-					Expect(err).Should(HaveOccurred())
-				}
-			})
-
-			AfterEach(func() {
-				for _, conformImage := range conformImages {
-					conformImage.Remove()
-				}
-				conformImages = []ConformanceImage{}
-			})
-
 		})
 	})
 })
