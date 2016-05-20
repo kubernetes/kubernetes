@@ -1,6 +1,7 @@
 name: rolling-update
 synopsis: Perform a rolling update of the given ReplicationController.
-description: |-
+description: |2-
+
   Perform a rolling update of the given ReplicationController.
 
   Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
@@ -143,7 +144,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |
+example: |2
+
   # Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
   kubectl rolling-update frontend-v1 -f frontend-v2.json
 

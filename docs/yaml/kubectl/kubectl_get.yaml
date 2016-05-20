@@ -1,6 +1,7 @@
 name: get
 synopsis: Display one or many resources
-description: |-
+description: |2-
+
   Display one or many resources.
 
   Possible resource types include (case insensitive): pods (po), services (svc), deployments,
@@ -136,7 +137,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # List all pods in ps output format.
   kubectl get pods
 

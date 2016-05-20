@@ -78,11 +78,16 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: "# Get output from running 'date' from pod 123456-7890, using the first container
-  by default\nkubectl exec 123456-7890 date\n\t\n# Get output from running 'date'
-  in ruby-container from pod 123456-7890\nkubectl exec 123456-7890 -c ruby-container
-  date\n\n# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from
-  pod 123456-7890\n# and sends stdout/stderr from 'bash' back to the client\nkubectl
-  exec 123456-7890 -c ruby-container -i -t -- bash -il"
+example: |2-
+
+  # Get output from running 'date' from pod 123456-7890, using the first container by default
+  kubectl exec 123456-7890 date
+
+  # Get output from running 'date' in ruby-container from pod 123456-7890
+  kubectl exec 123456-7890 -c ruby-container date
+
+  # Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
+  # and sends stdout/stderr from 'bash' back to the client
+  kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
 see_also:
 - kubectl

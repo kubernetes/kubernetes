@@ -1,6 +1,7 @@
 name: patch
 synopsis: Update field(s) of a resource using strategic merge patch.
-description: |-
+description: |2-
+
   Update field(s) of a resource using strategic merge patch
 
   JSON and YAML formats are accepted.
@@ -96,6 +97,7 @@ inherited_options:
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
 example: |2-
+
 
   # Partially update a node using strategic merge patch
   kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'

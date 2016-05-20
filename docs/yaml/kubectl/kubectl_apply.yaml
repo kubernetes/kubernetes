@@ -1,9 +1,12 @@
 name: apply
 synopsis: Apply a configuration to a resource by filename or stdin
-description: "Apply a configuration to a resource by filename or stdin.\nThe resource
-  will be created if it doesn't exist yet. \nTo use 'apply', always create the resource
-  initially with either 'apply' or 'create --save-config'.\n\nJSON and YAML formats
-  are accepted."
+description: |2-
+
+  Apply a configuration to a resource by filename or stdin.
+  The resource will be created if it doesn't exist yet.
+  To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
+
+  JSON and YAML formats are accepted.
 options:
 - name: filename
   shorthand: f
@@ -94,7 +97,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Apply the configuration in pod.json to a pod.
   kubectl apply -f ./pod.json
 

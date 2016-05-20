@@ -19,15 +19,17 @@ package set
 import (
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	set_long = `Configure application resources
+var (
+	set_long = dedent.Dedent(`
+		Configure application resources
 	
-These commands help you make changes to existing application resources.`
-	set_example = ``
+		These commands help you make changes to existing application resources.`)
+	set_example = dedent.Dedent(``)
 )
 
 func NewCmdSet(f *cmdutil.Factory, out io.Writer) *cobra.Command {

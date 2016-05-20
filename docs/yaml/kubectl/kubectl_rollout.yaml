@@ -1,6 +1,7 @@
 name: rollout
 synopsis: rollout manages a deployment
-description: |
+description: |2-
+
   Manages a deployment using subcommands like "kubectl rollout undo deployment/abc"
 inherited_options:
 - name: alsologtostderr
@@ -63,7 +64,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Rollback to the previous deployment
   kubectl rollout undo deployment/abc
 see_also:

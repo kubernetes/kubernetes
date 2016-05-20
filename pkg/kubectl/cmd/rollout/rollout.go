@@ -19,17 +19,21 @@ package rollout
 import (
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	rollout_long    = `Manages a deployment using subcommands like "kubectl rollout undo deployment/abc"`
-	rollout_example = `# Rollback to the previous deployment
-kubectl rollout undo deployment/abc`
-	rollout_valid_resources = `Valid resource types include:
-   * deployments
-`
+var (
+	rollout_long = dedent.Dedent(`
+		Manages a deployment using subcommands like "kubectl rollout undo deployment/abc"`)
+	rollout_example = dedent.Dedent(`
+		# Rollback to the previous deployment
+		kubectl rollout undo deployment/abc`)
+	rollout_valid_resources = dedent.Dedent(`
+		Valid resource types include:
+		   * deployments
+		`)
 )
 
 func NewCmdRollout(f *cmdutil.Factory, out io.Writer) *cobra.Command {

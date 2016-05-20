@@ -1,6 +1,7 @@
 name: proxy
 synopsis: Run a proxy to the Kubernetes API server
-description: |
+description: |2
+
   To proxy all of the kubernetes api and nothing else, use:
 
   kubectl proxy --api-prefix=/
@@ -118,7 +119,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
   kubectl proxy --port=8011 --www=./local/www/
 

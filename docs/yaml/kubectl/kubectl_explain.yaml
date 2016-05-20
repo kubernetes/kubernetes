@@ -1,6 +1,7 @@
 name: explain
 synopsis: Documentation of resources.
-description: |-
+description: |2-
+
   Documentation of resources.
 
   Possible resource types include (case insensitive): pods (po), services (svc), deployments,
@@ -77,7 +78,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Get the documentation of the resource and its fields
   kubectl explain pods
 

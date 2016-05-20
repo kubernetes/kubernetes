@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
+
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -35,17 +37,19 @@ type AutoscaleOptions struct {
 	Recursive bool
 }
 
-const (
-	autoscaleLong = `Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
+var (
+	autoscaleLong = dedent.Dedent(`
+		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
-Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
-An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`
+		Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
+		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`)
 
-	autoscaleExample = `# Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
-kubectl autoscale deployment foo --min=2 --max=10
+	autoscaleExample = dedent.Dedent(`
+		# Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
+		kubectl autoscale deployment foo --min=2 --max=10
 
-# Auto scale a replication controller "foo", with the number of pods between 1 to 5, target CPU utilization at 80%:
-kubectl autoscale rc foo --max=5 --cpu-percent=80`
+		# Auto scale a replication controller "foo", with the number of pods between 1 to 5, target CPU utilization at 80%:
+		kubectl autoscale rc foo --max=5 --cpu-percent=80`)
 )
 
 func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {

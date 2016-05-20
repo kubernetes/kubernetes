@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -38,15 +39,17 @@ type CreateOptions struct {
 	Recursive bool
 }
 
-const (
-	create_long = `Create a resource by filename or stdin.
+var (
+	create_long = dedent.Dedent(`
+		Create a resource by filename or stdin.
 
-JSON and YAML formats are accepted.`
-	create_example = `# Create a pod using the data in pod.json.
-kubectl create -f ./pod.json
+		JSON and YAML formats are accepted.`)
+	create_example = dedent.Dedent(`
+		# Create a pod using the data in pod.json.
+		kubectl create -f ./pod.json
 
-# Create a pod based on the JSON passed into stdin.
-cat pod.json | kubectl create -f -`
+		# Create a pod based on the JSON passed into stdin.
+		cat pod.json | kubectl create -f -`)
 )
 
 func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {

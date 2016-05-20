@@ -1,6 +1,7 @@
 name: edit
 synopsis: Edit a resource on the server
-description: |-
+description: |2-
+
   Edit a resource from the default editor.
 
   The edit command allows you to directly edit any API resource you can retrieve via the
@@ -113,13 +114,14 @@ inherited_options:
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
 example: |2-
-    # Edit the service named 'docker-registry':
-    kubectl edit svc/docker-registry
 
-    # Use an alternative editor
-    KUBE_EDITOR="nano" kubectl edit svc/docker-registry
+  # Edit the service named 'docker-registry':
+  kubectl edit svc/docker-registry
 
-    # Edit the service 'docker-registry' in JSON using the v1 API format:
-    kubectl edit svc/docker-registry --output-version=v1 -o json
+  # Use an alternative editor
+  KUBE_EDITOR="nano" kubectl edit svc/docker-registry
+
+  # Edit the service 'docker-registry' in JSON using the v1 API format:
+  kubectl edit svc/docker-registry --output-version=v1 -o json
 see_also:
 - kubectl

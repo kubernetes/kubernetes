@@ -100,7 +100,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Return snapshot logs from pod nginx with only one container
   kubectl logs nginx
 

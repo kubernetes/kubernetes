@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -38,17 +39,20 @@ type ApplyOptions struct {
 	Recursive bool
 }
 
-const (
-	apply_long = `Apply a configuration to a resource by filename or stdin.
-The resource will be created if it doesn't exist yet. 
-To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
+var (
+	apply_long = dedent.Dedent(`
+		Apply a configuration to a resource by filename or stdin.
+		The resource will be created if it doesn't exist yet.
+		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
-JSON and YAML formats are accepted.`
-	apply_example = `# Apply the configuration in pod.json to a pod.
-kubectl apply -f ./pod.json
+		JSON and YAML formats are accepted.`)
 
-# Apply the JSON passed into stdin to a pod.
-cat pod.json | kubectl apply -f -`
+	apply_example = dedent.Dedent(`
+		# Apply the configuration in pod.json to a pod.
+		kubectl apply -f ./pod.json
+
+		# Apply the JSON passed into stdin to a pod.
+		cat pod.json | kubectl apply -f -`)
 )
 
 func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {

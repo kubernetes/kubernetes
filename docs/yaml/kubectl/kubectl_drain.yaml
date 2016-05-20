@@ -1,6 +1,7 @@
 name: drain
 synopsis: Drain node in preparation for maintenance
-description: |
+description: |2
+
   Drain node in preparation for maintenance.
 
   The given node will be marked unschedulable to prevent new pods from arriving.
@@ -88,7 +89,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |
+example: |2
+
   # Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet on it.
   $ kubectl drain foo --force
 

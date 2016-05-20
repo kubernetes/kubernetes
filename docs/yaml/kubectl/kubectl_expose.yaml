@@ -1,7 +1,7 @@
 name: expose
 synopsis: |
   Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service
-description: "Expose a resource as a new Kubernetes service.\n\nLooks up a deployment,
+description: "\nExpose a resource as a new Kubernetes service.\n\nLooks up a deployment,
   service, replica set, replication controller or pod by name and uses the selector\nfor
   that resource as the selector for a new service on the specified port. A deployment
   or replica set\nwill be exposed as a service only if its selector is convertible
@@ -9,8 +9,8 @@ description: "Expose a resource as a new Kubernetes service.\n\nLooks up a deplo
   component. Note that if no port is specified via\n--port and the exposed resource
   has multiple ports, all will be re-used by the new service. Also if no \nlabels
   are specified, the new service will re-use the labels from the resource it exposes.\n\nPossible
-  resources include (case insensitive):\n  pod (po), service (svc), replicationcontroller
-  (rc),\n  deployment, replicaset (rs)\n"
+  resources include (case insensitive): \npod (po), service (svc), replicationcontroller
+  (rc),\ndeployment, replicaset (rs)\n"
 options:
 - name: container-port
   usage: Synonym for --target-port
@@ -160,7 +160,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
   kubectl expose rc nginx --port=80 --target-port=8000
 

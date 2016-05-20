@@ -1,6 +1,7 @@
 name: convert
 synopsis: Convert config files between different API versions
-description: |
+description: |2
+
   Convert config files between different API versions. Both YAML
   and JSON formats are accepted.
 
@@ -122,7 +123,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |
+example: |2
+
   # Convert 'pod.yaml' to latest version and print to stdout.
   kubectl convert -f pod.yaml
 

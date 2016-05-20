@@ -1,6 +1,7 @@
 name: run
 synopsis: Run a particular image on the cluster.
-description: |-
+description: |2-
+
   Create and run a particular image, possibly replicated.
   Creates a deployment or job to manage the created container(s).
 options:
@@ -178,7 +179,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Start a single instance of nginx.
   kubectl run nginx --image=nginx
 
