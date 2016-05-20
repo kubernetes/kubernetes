@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -42,28 +43,30 @@ type RollingUpdateOptions struct {
 	Filenames []string
 }
 
-const (
-	rollingUpdate_long = `Perform a rolling update of the given ReplicationController.
+var (
+	rollingUpdate_long = dedent.Dedent(`
+		Perform a rolling update of the given ReplicationController.
 
-Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
-new PodTemplate. The new-controller.json must specify the same namespace as the
-existing replication controller and overwrite at least one (common) label in its replicaSelector.`
-	rollingUpdate_example = `# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
-kubectl rolling-update frontend-v1 -f frontend-v2.json
+		Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
+		new PodTemplate. The new-controller.json must specify the same namespace as the
+		existing replication controller and overwrite at least one (common) label in its replicaSelector.`)
+	rollingUpdate_example = dedent.Dedent(`
+		# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
+		kubectl rolling-update frontend-v1 -f frontend-v2.json
 
-# Update pods of frontend-v1 using JSON data passed into stdin.
-cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
+		# Update pods of frontend-v1 using JSON data passed into stdin.
+		cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
 
-# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the
-# name of the replication controller.
-kubectl rolling-update frontend-v1 frontend-v2 --image=image:v2
+		# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the
+		# name of the replication controller.
+		kubectl rolling-update frontend-v1 frontend-v2 --image=image:v2
 
-# Update the pods of frontend by just changing the image, and keeping the old name.
-kubectl rolling-update frontend --image=image:v2
+		# Update the pods of frontend by just changing the image, and keeping the old name.
+		kubectl rolling-update frontend --image=image:v2
 
-# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).
-kubectl rolling-update frontend-v1 frontend-v2 --rollback
-`
+		# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).
+		kubectl rolling-update frontend-v1 frontend-v2 --rollback
+		`)
 )
 
 var (

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -37,36 +38,38 @@ type GetOptions struct {
 	Recursive bool
 }
 
-const (
-	get_long = `Display one or many resources.
+var (
+	get_long = dedent.Dedent(`
+		Display one or many resources.
 
-` + kubectl.PossibleResourceTypes + `
+		`) + kubectl.PossibleResourceTypes + dedent.Dedent(`
 
-By specifying the output as 'template' and providing a Go template as the value
-of the --template flag, you can filter the attributes of the fetched resource(s).`
-	get_example = `# List all pods in ps output format.
-kubectl get pods
+		By specifying the output as 'template' and providing a Go template as the value
+		of the --template flag, you can filter the attributes of the fetched resource(s).`)
+	get_example = dedent.Dedent(`
+		# List all pods in ps output format.
+		kubectl get pods
 
-# List all pods in ps output format with more information (such as node name).
-kubectl get pods -o wide
+		# List all pods in ps output format with more information (such as node name).
+		kubectl get pods -o wide
 
-# List a single replication controller with specified NAME in ps output format.
-kubectl get replicationcontroller web
+		# List a single replication controller with specified NAME in ps output format.
+		kubectl get replicationcontroller web
 
-# List a single pod in JSON output format.
-kubectl get -o json pod web-pod-13je7
+		# List a single pod in JSON output format.
+		kubectl get -o json pod web-pod-13je7
 
-# List a pod identified by type and name specified in "pod.yaml" in JSON output format.
-kubectl get -f pod.yaml -o json
+		# List a pod identified by type and name specified in "pod.yaml" in JSON output format.
+		kubectl get -f pod.yaml -o json
 
-# Return only the phase value of the specified pod.
-kubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}
+		# Return only the phase value of the specified pod.
+		kubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}
 
-# List all replication controllers and services together in ps output format.
-kubectl get rc,services
+		# List all replication controllers and services together in ps output format.
+		kubectl get rc,services
 
-# List one or more resources by their type and names.
-kubectl get rc/web service/frontend pods/web-pod-13je7`
+		# List one or more resources by their type and names.
+		kubectl get rc/web service/frontend pods/web-pod-13je7`)
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which

@@ -23,6 +23,7 @@ import (
 
 	"encoding/json"
 	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -49,19 +50,21 @@ type TaintOptions struct {
 	cmd             *cobra.Command
 }
 
-const (
-	taint_long = `Update the taints on one or more nodes.
+var (
+	taint_long = dedent.Dedent(`
+		Update the taints on one or more nodes.
 
-A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
-The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-The effect must be NoSchedule or PreferNoSchedule.
-Currently taint can only apply to node.`
-	taint_example = `# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
-# If a taint with that key already exists, its value and effect are replaced as specified.
-kubectl taint nodes foo dedicated=special-user:NoSchedule
-# Remove from node 'foo' the taint with key 'dedicated' if one exists.
-kubectl taint nodes foo dedicated-`
+		A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
+		The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		The effect must be NoSchedule or PreferNoSchedule.
+		Currently taint can only apply to node.`)
+	taint_example = dedent.Dedent(`
+		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
+		# If a taint with that key already exists, its value and effect are replaced as specified.
+		kubectl taint nodes foo dedicated=special-user:NoSchedule
+		# Remove from node 'foo' the taint with key 'dedicated' if one exists.
+		kubectl taint nodes foo dedicated-`)
 )
 
 func NewCmdTaint(f *cmdutil.Factory, out io.Writer) *cobra.Command {

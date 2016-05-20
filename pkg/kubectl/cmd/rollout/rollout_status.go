@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -35,10 +36,12 @@ type StatusOptions struct {
 	Recursive bool
 }
 
-const (
-	status_long    = `Watch the status of current rollout, until it's done.`
-	status_example = `# Watch the rollout status of a deployment
-kubectl rollout status deployment/nginx`
+var (
+	status_long = dedent.Dedent(`
+		Watch the status of current rollout, until it's done.`)
+	status_example = dedent.Dedent(`
+		# Watch the rollout status of a deployment
+		kubectl rollout status deployment/nginx`)
 )
 
 func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
