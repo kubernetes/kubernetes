@@ -114,14 +114,12 @@ function create-master-auth {
     echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
     echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
   fi
-  # Do not create /etc/gce.conf unless specified.
-  if [[ -z ${CLOUD_CONFIG:-} ]]; then
-    return
-  fi
+  local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
 EOF
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
+    use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
@@ -130,14 +128,19 @@ network-name = ${NODE_NETWORK}
 EOF
   fi
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+    use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 node-tags = ${NODE_INSTANCE_PREFIX}
 EOF
   fi
   if [[ -n "${MULTIZONE:-}" ]]; then
+    use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 multizone = ${MULTIZONE}
 EOF
+  fi
+  if [[ "${use_cloud_config}" != "true" ]]; then
+    rm -f /etc/gce.conf
   fi
 }
 

@@ -29,12 +29,12 @@ Broken (or in progress) Kubernetes node setup! Check the cluster initialization 
 using the following commands.
 
 Master instance:
-  - systemctl status kube-master-installation
-  - systemctl status kube-master-configuration
+  - sudo systemctl status kube-master-installation
+  - sudo systemctl status kube-master-configuration
 
 Node instance:
-  - systemctl status kube-node-installation
-  - systemctl status kube-node-configuration
+  - sudo systemctl status kube-node-installation
+  - sudo systemctl status kube-node-configuration
 EOF
 }
 
