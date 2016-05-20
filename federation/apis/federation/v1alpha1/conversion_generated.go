@@ -275,13 +275,7 @@ func autoConvert_v1alpha1_ClusterStatus_To_federation_ClusterStatus(in *ClusterS
 	if err := Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta(&in.ClusterMeta, &out.ClusterMeta, s); err != nil {
 		return err
 	}
-	if in.Zones != nil {
-		in, out := &in.Zones, &out.Zones
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Zones = nil
-	}
+	out.Zones = in.Zones
 	out.Region = in.Region
 	return nil
 }
@@ -331,13 +325,7 @@ func autoConvert_federation_ClusterStatus_To_v1alpha1_ClusterStatus(in *federati
 	if err := Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(&in.ClusterMeta, &out.ClusterMeta, s); err != nil {
 		return err
 	}
-	if in.Zones != nil {
-		in, out := &in.Zones, &out.Zones
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Zones = nil
-	}
+	out.Zones = in.Zones
 	out.Region = in.Region
 	return nil
 }

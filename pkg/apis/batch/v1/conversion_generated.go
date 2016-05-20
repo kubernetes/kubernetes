@@ -180,27 +180,9 @@ func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s conv
 }
 
 func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	if in.Parallelism != nil {
-		in, out := &in.Parallelism, &out.Parallelism
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.Parallelism = nil
-	}
-	if in.Completions != nil {
-		in, out := &in.Completions, &out.Completions
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.Completions = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = new(int64)
-		**out = **in
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(unversioned.LabelSelector)
@@ -210,13 +192,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 	} else {
 		out.Selector = nil
 	}
-	if in.ManualSelector != nil {
-		in, out := &in.ManualSelector, &out.ManualSelector
-		*out = new(bool)
-		**out = **in
-	} else {
-		out.ManualSelector = nil
-	}
+	out.ManualSelector = in.ManualSelector
 	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -224,27 +200,9 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 }
 
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	if in.Parallelism != nil {
-		in, out := &in.Parallelism, &out.Parallelism
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.Parallelism = nil
-	}
-	if in.Completions != nil {
-		in, out := &in.Completions, &out.Completions
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.Completions = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = new(int64)
-		**out = **in
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(LabelSelector)
@@ -254,13 +212,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 	} else {
 		out.Selector = nil
 	}
-	if in.ManualSelector != nil {
-		in, out := &in.ManualSelector, &out.ManualSelector
-		*out = new(bool)
-		**out = **in
-	} else {
-		out.ManualSelector = nil
-	}
+	out.ManualSelector = in.ManualSelector
 	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -279,24 +231,8 @@ func autoConvert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobSt
 	} else {
 		out.Conditions = nil
 	}
-	if in.StartTime != nil {
-		in, out := &in.StartTime, &out.StartTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.StartTime = nil
-	}
-	if in.CompletionTime != nil {
-		in, out := &in.CompletionTime, &out.CompletionTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.CompletionTime = nil
-	}
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -319,24 +255,8 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobSt
 	} else {
 		out.Conditions = nil
 	}
-	if in.StartTime != nil {
-		in, out := &in.StartTime, &out.StartTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.StartTime = nil
-	}
-	if in.CompletionTime != nil {
-		in, out := &in.CompletionTime, &out.CompletionTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.CompletionTime = nil
-	}
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -348,15 +268,7 @@ func Convert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobStatus
 }
 
 func autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	if in.MatchLabels != nil {
-		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	} else {
-		out.MatchLabels = nil
-	}
+	out.MatchLabels = in.MatchLabels
 	if in.MatchExpressions != nil {
 		in, out := &in.MatchExpressions, &out.MatchExpressions
 		*out = make([]unversioned.LabelSelectorRequirement, len(*in))
@@ -376,15 +288,7 @@ func Convert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, ou
 }
 
 func autoConvert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	if in.MatchLabels != nil {
-		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	} else {
-		out.MatchLabels = nil
-	}
+	out.MatchLabels = in.MatchLabels
 	if in.MatchExpressions != nil {
 		in, out := &in.MatchExpressions, &out.MatchExpressions
 		*out = make([]LabelSelectorRequirement, len(*in))
@@ -406,13 +310,7 @@ func Convert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.Label
 func autoConvert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	if in.Values != nil {
-		in, out := &in.Values, &out.Values
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Values = nil
-	}
+	out.Values = in.Values
 	return nil
 }
 
@@ -423,13 +321,7 @@ func Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement
 func autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Operator = LabelSelectorOperator(in.Operator)
-	if in.Values != nil {
-		in, out := &in.Values, &out.Values
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Values = nil
-	}
+	out.Values = in.Values
 	return nil
 }
 

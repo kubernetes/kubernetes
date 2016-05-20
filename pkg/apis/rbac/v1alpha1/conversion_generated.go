@@ -268,44 +268,14 @@ func Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(in *rbac.ClusterRo
 }
 
 func autoConvert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
-	if in.Verbs != nil {
-		in, out := &in.Verbs, &out.Verbs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Verbs = nil
-	}
+	out.Verbs = in.Verbs
 	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.AttributeRestrictions, &out.AttributeRestrictions, s); err != nil {
 		return err
 	}
-	if in.APIGroups != nil {
-		in, out := &in.APIGroups, &out.APIGroups
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.APIGroups = nil
-	}
-	if in.Resources != nil {
-		in, out := &in.Resources, &out.Resources
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Resources = nil
-	}
-	if in.ResourceNames != nil {
-		in, out := &in.ResourceNames, &out.ResourceNames
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.ResourceNames = nil
-	}
-	if in.NonResourceURLs != nil {
-		in, out := &in.NonResourceURLs, &out.NonResourceURLs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.NonResourceURLs = nil
-	}
+	out.APIGroups = in.APIGroups
+	out.Resources = in.Resources
+	out.ResourceNames = in.ResourceNames
+	out.NonResourceURLs = in.NonResourceURLs
 	return nil
 }
 
@@ -314,44 +284,14 @@ func Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *PolicyRule, out *rbac.Po
 }
 
 func autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *PolicyRule, s conversion.Scope) error {
-	if in.Verbs != nil {
-		in, out := &in.Verbs, &out.Verbs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Verbs = nil
-	}
+	out.Verbs = in.Verbs
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.AttributeRestrictions, &out.AttributeRestrictions, s); err != nil {
 		return err
 	}
-	if in.APIGroups != nil {
-		in, out := &in.APIGroups, &out.APIGroups
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.APIGroups = nil
-	}
-	if in.Resources != nil {
-		in, out := &in.Resources, &out.Resources
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Resources = nil
-	}
-	if in.ResourceNames != nil {
-		in, out := &in.ResourceNames, &out.ResourceNames
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.ResourceNames = nil
-	}
-	if in.NonResourceURLs != nil {
-		in, out := &in.NonResourceURLs, &out.NonResourceURLs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.NonResourceURLs = nil
-	}
+	out.APIGroups = in.APIGroups
+	out.Resources = in.Resources
+	out.ResourceNames = in.ResourceNames
+	out.NonResourceURLs = in.NonResourceURLs
 	return nil
 }
 
