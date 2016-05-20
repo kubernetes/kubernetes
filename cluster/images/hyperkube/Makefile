@@ -20,6 +20,7 @@
 REGISTRY?="gcr.io/google_containers"
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
+CNI_RELEASE=c864f0e1ea73719b8f4582402b0847064f9883b0
 
 UNAME_S:=$(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -28,6 +29,7 @@ endif
 ifeq ($(UNAME_S),Linux)
 	SED_CMD?=sed -i
 endif
+
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:jessie
 endif
@@ -51,27 +53,32 @@ build:
 ifndef VERSION
     $(error VERSION is undefined)
 endif
-	cp ./* ${TEMP_DIR}
+	cp -r ./* ${TEMP_DIR}
+	mkdir -p ${TEMP_DIR}/cni
 	cp ../../saltbase/salt/helpers/safe_format_and_mount ${TEMP_DIR}
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
-	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" master-multi.json master.json kube-proxy.json
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" master-multi.json master.json kube-proxy.json etcd.json
+
+	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/*.yaml static-pods/*.json
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" addons/*.yaml static-pods/*.json
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
-	rm ${TEMP_DIR}/*.back
+	rm ${TEMP_DIR}/addons/*.back
 
 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer
 	# they'll take up twice the space because the new executable binary differs from the old one, but everything is cached in layers.
 	cd ${TEMP_DIR} && chmod a+rx \
-        hyperkube \
-        safe_format_and_mount \
-        setup-files.sh \
-        make-ca-cert.sh
+		hyperkube \
+		safe_format_and_mount \
+		setup-files.sh \
+		make-ca-cert.sh \
+		copy-addons.sh
 
 ifeq ($(ARCH),amd64)
 	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
 	cd ${TEMP_DIR} && ${SED_CMD} "/CROSS_BUILD_/d" Dockerfile
+	# Download CNI
+	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni
 else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel

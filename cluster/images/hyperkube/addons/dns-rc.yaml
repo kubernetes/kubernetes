@@ -1,4 +1,18 @@
-# This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
+# Copyright 2016 The Kubernetes Authors All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This file should be kept in sync with cluster/addons/dns/skydns-rc.yaml.in
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -9,7 +23,7 @@ metadata:
     version: v11
     kubernetes.io/cluster-service: "true"
 spec:
-  replicas: {{ pillar['dns_replicas'] }}
+  replicas: 1
   selector:
     k8s-app: kube-dns
     version: v11
@@ -22,7 +36,8 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: gcr.io/google_containers/etcd-amd64:2.2.1
+        # ARCH will be replaced with the architecture it's built for. Check out the Makefile for more details
+        image: gcr.io/google_containers/etcd-ARCH:2.2.5
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -48,7 +63,7 @@ spec:
         - name: etcd-storage
           mountPath: /var/etcd/data
       - name: kube2sky
-        image: gcr.io/google_containers/kube2sky-amd64:1.15
+        image: gcr.io/google_containers/kube2sky-ARCH:1.15
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -81,9 +96,9 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube2sky"
-        - --domain={{ pillar['dns_domain'] }}
+        - --domain=cluster.local
       - name: skydns
-        image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
+        image: gcr.io/google_containers/skydns-ARCH:1.0
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -96,11 +111,10 @@ spec:
             cpu: 100m
             memory: 50Mi
         args:
-        # command = "/skydns"
         - -machines=http://127.0.0.1:4001
         - -addr=0.0.0.0:53
         - -ns-rotate=false
-        - -domain={{ pillar['dns_domain'] }}.
+        - -domain=cluster.local.
         ports:
         - containerPort: 53
           name: dns
@@ -109,7 +123,7 @@ spec:
           name: dns-tcp
           protocol: TCP
       - name: healthz
-        image: gcr.io/google_containers/exechealthz:1.0
+        image: gcr.io/google_containers/exechealthz-ARCH:1.0
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
@@ -119,7 +133,7 @@ spec:
             cpu: 10m
             memory: 20Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.{{ pillar['dns_domain'] }} 127.0.0.1 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.cluster.local 127.0.0.1 >/dev/null
         - -port=8080
         ports:
         - containerPort: 8080

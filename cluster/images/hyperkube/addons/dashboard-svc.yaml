@@ -12,17 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
-
-# If we're building for another architecture than amd64, the CROSS_BUILD_ placeholder is removed so e.g. CROSS_BUILD_COPY turns into COPY
-# If we're building normally, for amd64, CROSS_BUILD lines are removed
-CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
-
-RUN pip install pyyaml
-
-ADD kube-addons.sh /opt/
-ADD kube-addon-update.sh /opt/
-ADD namespace.yaml /opt/
-ADD kubectl /usr/local/bin/
-
-CMD ["/opt/kube-addons.sh"]
+# This file should be kept in sync with cluster/addons/dashboard/dashboard-service.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: kubernetes-dashboard
+  namespace: kube-system
+  labels:
+    app: kubernetes-dashboard
+    kubernetes.io/cluster-service: "true"
+spec:
+  ports:
+  - port: 80
+    targetPort: 9090
+  selector:
+    app: kubernetes-dashboard
