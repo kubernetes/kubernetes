@@ -1615,6 +1615,11 @@ func NewKubectlCommand(args ...string) *kubectlBuilder {
 	return b
 }
 
+func (b *kubectlBuilder) WithEnv(env []string) *kubectlBuilder {
+	b.cmd.Env = env
+	return b
+}
+
 func (b *kubectlBuilder) WithTimeout(t <-chan time.Time) *kubectlBuilder {
 	b.timeout = t
 	return b
