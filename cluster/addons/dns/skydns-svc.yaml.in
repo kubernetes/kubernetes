@@ -1,3 +1,4 @@
+# This file should be kept in sync with cluster/images/hyperkube/dns-svc.yaml
 apiVersion: v1
 kind: Service
 metadata:
