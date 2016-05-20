@@ -26,6 +26,7 @@ SILENT=true
 # Excluded checks are always skipped.
 EXCLUDED_CHECKS=(
   "verify-linkcheck.sh"  # runs in separate Jenkins job once per day due to high network usage
+  "verify-godeps.sh"  # failing due to expired certificate, https://github.com/kubernetes/kubernetes/issues/25979
   )
 
 function is-excluded {
