@@ -113,7 +113,7 @@ function get_latest_trusty_image() {
     # Retry the gsutil command a couple times to mitigate the effect of
     # transient server errors.
     for n in $(seq 3); do
-      image="$(gsutil cat "gs://${image_project}/image-indices/latest-test-image-${image_index}")" && break || sleep 1
+      image="$(gsutil cat "gs://${image_project}/image-indices/latest-base-image-${image_index}")" && break || sleep 1
     done
     if [[ -z "${image}" ]]; then
       echo "Failed to find Trusty image for ${image_type}"
