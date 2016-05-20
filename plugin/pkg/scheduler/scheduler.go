@@ -101,10 +101,9 @@ func (s *Scheduler) scheduleOne() {
 		s.config.Error(pod, err)
 		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
 		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
-			Type:    api.PodScheduled,
-			Status:  api.ConditionFalse,
-			Reason:  "Unschedulable",
-			Message: err.Error(),
+			Type:   api.PodScheduled,
+			Status: api.ConditionFalse,
+			Reason: "Unschedulable",
 		})
 		return
 	}
@@ -142,10 +141,9 @@ func (s *Scheduler) scheduleOne() {
 			s.config.Error(pod, err)
 			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
-				Type:    api.PodScheduled,
-				Status:  api.ConditionFalse,
-				Reason:  "BindingRejected",
-				Message: err.Error(),
+				Type:   api.PodScheduled,
+				Status: api.ConditionFalse,
+				Reason: "BindingRejected",
 			})
 			return
 		}
