@@ -33,13 +33,20 @@ RUN gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D && \
   rm -rf /usr/share/doc/ && \
   rm -rf /usr/share/doc-base/ && \
   rm -rf /usr/share/man/ && \
-  rm -rf /tmp/* 
+  rm -rf /tmp/*
 
 COPY cassandra.yaml /etc/cassandra/cassandra.yaml
 COPY logback.xml /etc/cassandra/logback.xml
 COPY kubernetes-cassandra.jar /kubernetes-cassandra.jar
 
-VOLUME ["/cassandra_data/data"]    
+VOLUME ["/cassandra_data/data"]
+
+# 7000: intra-node communication
+# 7001: TLS intra-node communication
+# 7199: JMX
+# 9042: CQL
+# 9160: thrift service not included cause it is going away
+EXPOSE 7000 7001 7199 9042
 
 USER cassandra
 
