@@ -358,6 +358,7 @@ func benchmarkItems() []v1.Pod {
 	for i := range items {
 		var pod api.Pod
 		apiObjectFuzzer.Fuzz(&pod)
+		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
 		out, err := api.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
 		if err != nil {
 			panic(err)
