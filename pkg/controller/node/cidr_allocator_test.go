@@ -336,6 +336,7 @@ func TestOccupy(t *testing.T) {
 		}
 		if err != nil && !tc.expectErr {
 			t.Errorf("unexpected error: %v", err)
+			continue
 		}
 
 		expectedUsed := big.Int{}

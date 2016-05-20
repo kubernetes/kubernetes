@@ -110,7 +110,11 @@ func (r *rangeAllocator) Occupy(cidr *net.IPNet) (err error) {
 	cidrMask := cidr.Mask
 	maskSize, _ := cidrMask.Size()
 
-	if r.clusterCIDR.Contains(cidr.IP.Mask(r.clusterCIDR.Mask)) && r.clusterMaskSize < maskSize {
+	if !r.clusterCIDR.Contains(cidr.IP.Mask(r.clusterCIDR.Mask)) && !cidr.Contains(r.clusterCIDR.IP.Mask(cidr.Mask)) {
+		return fmt.Errorf("cidr %v is out the range of cluster cidr %v", cidr, r.clusterCIDR)
+	}
+
+	if r.clusterMaskSize < maskSize {
 		subNetMask := net.CIDRMask(r.subNetMaskSize, 32)
 		begin, err = r.getIndexForCIDR(&net.IPNet{
 			IP:   cidr.IP.To4().Mask(subNetMask),
@@ -127,7 +131,6 @@ func (r *rangeAllocator) Occupy(cidr *net.IPNet) (err error) {
 			IP:   net.IP(ip).To4().Mask(subNetMask),
 			Mask: subNetMask,
 		})
-
 		if err != nil {
 			return err
 		}
