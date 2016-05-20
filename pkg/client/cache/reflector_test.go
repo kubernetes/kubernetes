@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -375,7 +376,24 @@ func TestReflectorResync(t *testing.T) {
 	}
 	resyncPeriod := 1 * time.Millisecond
 	r := NewReflector(lw, &api.Pod{}, s, resyncPeriod)
-	r.ListAndWatch(stopCh)
+	clock := util.NewFakeClock(time.Now())
+	r.clock = clock
+
+	go r.ListAndWatch(stopCh)
+
+	// advance the clock until the reflector stops
+Loop:
+	for {
+		clock.Step(1 * time.Millisecond)
+		select {
+		case <-stopCh:
+			break Loop
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("timed out")
+		default:
+		}
+	}
+
 	if iteration != 2 {
 		t.Errorf("exactly 2 iterations were expected, got: %v", iteration)
 	}
