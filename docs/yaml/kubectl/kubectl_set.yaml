@@ -65,3 +65,4 @@ inherited_options:
     comma-separated list of pattern=N settings for file-filtered logging
 see_also:
 - kubectl
+- image

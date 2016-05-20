@@ -42,7 +42,8 @@ func NewCmdSet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 
-	// TODO: add subcommands
+	// add subcommands
+	cmd.AddCommand(NewCmdImage(f, out))
 
 	return cmd
 }
