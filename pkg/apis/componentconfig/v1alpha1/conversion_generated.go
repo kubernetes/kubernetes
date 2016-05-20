@@ -50,39 +50,18 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
-	if in.IPTablesMasqueradeBit != nil {
-		in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.IPTablesMasqueradeBit = nil
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, 0); err != nil {
-		return err
-	}
+	out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
-	if in.OOMScoreAdj != nil {
-		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.OOMScoreAdj = nil
-	}
+	out.OOMScoreAdj = in.OOMScoreAdj
 	out.Mode = componentconfig.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.UDPIdleTimeout, &out.UDPIdleTimeout, 0); err != nil {
-		return err
-	}
+	out.UDPIdleTimeout = in.UDPIdleTimeout
 	out.ConntrackMax = in.ConntrackMax
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, 0); err != nil {
-		return err
-	}
+	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 	return nil
 }
 
@@ -99,39 +78,18 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
-	if in.IPTablesMasqueradeBit != nil {
-		in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.IPTablesMasqueradeBit = nil
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, 0); err != nil {
-		return err
-	}
+	out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
-	if in.OOMScoreAdj != nil {
-		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.OOMScoreAdj = nil
-	}
+	out.OOMScoreAdj = in.OOMScoreAdj
 	out.Mode = ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.UDPIdleTimeout, &out.UDPIdleTimeout, 0); err != nil {
-		return err
-	}
+	out.UDPIdleTimeout = in.UDPIdleTimeout
 	out.ConntrackMax = in.ConntrackMax
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, 0); err != nil {
-		return err
-	}
+	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 	return nil
 }
 
@@ -199,18 +157,9 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderE
 	if err := api.Convert_Pointer_bool_To_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.LeaseDuration, &out.LeaseDuration, 0); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.RenewDeadline, &out.RenewDeadline, 0); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.RetryPeriod, &out.RetryPeriod, 0); err != nil {
-		return err
-	}
+	out.LeaseDuration = in.LeaseDuration
+	out.RenewDeadline = in.RenewDeadline
+	out.RetryPeriod = in.RetryPeriod
 	return nil
 }
 
@@ -222,18 +171,9 @@ func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderE
 	if err := api.Convert_bool_To_Pointer_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.LeaseDuration, &out.LeaseDuration, 0); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.RenewDeadline, &out.RenewDeadline, 0); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.RetryPeriod, &out.RetryPeriod, 0); err != nil {
-		return err
-	}
+	out.LeaseDuration = in.LeaseDuration
+	out.RenewDeadline = in.RenewDeadline
+	out.RetryPeriod = in.RetryPeriod
 	return nil
 }
 

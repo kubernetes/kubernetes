@@ -22,7 +22,6 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
@@ -139,16 +138,7 @@ func autoConvert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetS
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
 		return err
 	}
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(unversioned.LabelSelector)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	return nil
 }
 
@@ -160,16 +150,7 @@ func autoConvert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetS
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
 		return err
 	}
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(unversioned.LabelSelector)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	return nil
 }
 
