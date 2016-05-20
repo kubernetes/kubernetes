@@ -215,7 +215,7 @@
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
-			"Comment": "v0.1.0-62-g8d75e11",
+			"Comment": "v0.1-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
@@ -743,78 +743,6 @@
 			"Rev": "7dd4489c2eb6073e5a9d7746c3274c5b5f0387df"
 		},
 		{
-			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/Sirupsen/logrus",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/opts",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/archive",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/fileutils",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/homedir",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/idtools",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/ioutils",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/longpath",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/pools",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/promise",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/stdcopy",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/system",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/docker/go-units",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/hashicorp/go-cleanhttp",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/github.com/opencontainers/runc/libcontainer/user",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/golang.org/x/net/context",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
-			"ImportPath": "github.com/fsouza/go-dockerclient/external/golang.org/x/sys/unix",
-			"Rev": "bf97c77db7c945cbcdbf09d56c6f87a66f54537b"
-		},
-		{
 			"ImportPath": "github.com/garyburd/redigo/internal",
 			"Rev": "535138d7bcd717d6531c701ef5933d98b1866257"
 		},
@@ -978,173 +906,203 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/api",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/cache/memory",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/collector",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/common",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/docker",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/libcontainer",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/raw",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/rkt",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/systemd",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/devicemapper",
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/events",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/fs",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/healthz",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/http",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/http/mux",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v1",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v1/test",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v2",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/machine",
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/manager",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/manager/watcher",
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/manager/watcher/raw",
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/manager/watcher/rkt",
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/metrics",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/pages",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/pages/static",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/storage",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/summary",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/cloudinfo",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/cpuload",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/cpuload/netlink",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
-			"ImportPath": "github.com/google/cadvisor/utils/machine",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"ImportPath": "github.com/google/cadvisor/utils/docker",
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/oomparser",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/sysfs",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/sysinfo",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/utils/tail",
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/validate",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/version",
-			"Comment": "v0.23.0",
-			"Rev": "750f18e5eac3f6193b354fc14c03d92d4318a0ec"
+			"Comment": "v0.23.2",
+			"Rev": "7ddf6eb5d1f84363fbc181a498313a880b12ba07"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
@@ -1767,6 +1725,7 @@
 		},
 		{
 			"ImportPath": "github.com/robfig/cron",
+			"Comment": "v1-16-g0f39cf7",
 			"Rev": "0f39cf7ebc65a602f45692f9894bd6a193faf8fa"
 		},
 		{

@@ -99,10 +99,6 @@ raw.githubusercontent.com/evanphx/json-patch/master/NOTICE
 raw.githubusercontent.com/evanphx/json-patch/master/NOTICE.txt
 raw.githubusercontent.com/evanphx/json-patch/master/README
 raw.githubusercontent.com/evanphx/json-patch/master/README.md
-raw.githubusercontent.com/fsouza/go-dockerclient/master/NOTICE
-raw.githubusercontent.com/fsouza/go-dockerclient/master/NOTICE.txt
-raw.githubusercontent.com/fsouza/go-dockerclient/master/README
-raw.githubusercontent.com/fsouza/go-dockerclient/master/README.md
 raw.githubusercontent.com/garyburd/redigo/master/LICENSE.code
 raw.githubusercontent.com/garyburd/redigo/master/LICENSE.txt
 raw.githubusercontent.com/garyburd/redigo/master/LICENSE.md
@@ -265,6 +261,10 @@ raw.githubusercontent.com/rackspace/gophercloud/master/NOTICE
 raw.githubusercontent.com/rackspace/gophercloud/master/NOTICE.txt
 raw.githubusercontent.com/rackspace/gophercloud/master/README
 raw.githubusercontent.com/rackspace/gophercloud/master/README.md
+raw.githubusercontent.com/robfig/cron/master/NOTICE
+raw.githubusercontent.com/robfig/cron/master/NOTICE.txt
+raw.githubusercontent.com/robfig/cron/master/README
+raw.githubusercontent.com/robfig/cron/master/README.md
 raw.githubusercontent.com/russross/blackfriday/master/NOTICE
 raw.githubusercontent.com/russross/blackfriday/master/NOTICE.txt
 raw.githubusercontent.com/russross/blackfriday/master/README
