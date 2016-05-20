@@ -135,7 +135,7 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 	for i := range n.pods {
 		k2, err := getPodKey(n.pods[i])
 		if err != nil {
-			glog.Errorf("Cannot get node.pod(%s/%s) key, err: %v", n.pods[i].Namespace, n.pods[i].Name, err)
+			glog.Errorf("Cannot get pod key, err: %v", err)
 			continue
 		}
 		if k1 == k2 {
@@ -152,7 +152,7 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("no corresponding pod(%s/%s) in pods of node(%s)", pod.Namespace, pod.Name, n.node.Name)
+	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
 func calculateResource(pod *api.Pod) (cpu int64, mem int64, nvidia_gpu int64, non0_cpu int64, non0_mem int64) {
