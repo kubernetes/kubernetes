@@ -300,6 +300,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				},
 				KindPriority: []unversioned.GroupVersionKind{
 					{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					// Ensure that types like "Job" from "v1" batch group gets picked first
+					{Group: batch.GroupName, Version: "v1", Kind: meta.AnyKind},
 					{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
 					{Group: metrics.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
 					{Group: federation.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
