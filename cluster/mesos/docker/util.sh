@@ -284,6 +284,13 @@ function kube-up {
   detect-nodes
   create-kubeconfig
 
+  echo "Checking local directory"
+  ls -laF ${KUBE_ROOT}
+
+  echo "Checking server version"
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  ${kubectl} version
+
   echo "Deploying Addons" 1>&2
   KUBE_SERVER=${KUBE_SERVER} "${provider_root}/deploy-addons.sh"
 
