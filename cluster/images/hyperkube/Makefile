@@ -21,7 +21,13 @@ REGISTRY?="gcr.io/google_containers"
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 
-
+UNAME_S:=$(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	SED_CMD?=sed -i ""
+endif
+ifeq ($(UNAME_S),Linux)
+	SED_CMD?=sed -i
+endif
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:jessie
 endif
@@ -65,13 +71,13 @@ endif
 
 ifeq ($(ARCH),amd64)
 	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
-	cd ${TEMP_DIR} && sed -i "/CROSS_BUILD_/d" Dockerfile
+	cd ${TEMP_DIR} && ${SED_CMD} "/CROSS_BUILD_/d" Dockerfile
 else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	curl -sSL --retry 5 https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${QEMUARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
-	cd ${TEMP_DIR} && sed -i "s/CROSS_BUILD_//g" Dockerfile
+	cd ${TEMP_DIR} && ${SED_CMD} "s/CROSS_BUILD_//g" Dockerfile
 endif
 
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
