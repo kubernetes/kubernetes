@@ -485,7 +485,7 @@ Volume path names are examples only and not necessarily as specified.
 | memory_request | requests.memory |
 
 Volumes are pod scoped, the container name must be specified as part of
-`containerSpecFieldRef` with them.
+`resourceFieldRef` with them.
 
 #### Examples
 
