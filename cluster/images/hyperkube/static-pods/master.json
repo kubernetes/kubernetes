@@ -34,9 +34,9 @@
               "/hyperkube",
               "apiserver",
               "--service-cluster-ip-range=10.0.0.1/24",
-              "--insecure-bind-address=0.0.0.0",
+              "--insecure-bind-address=127.0.0.1",
               "--etcd-servers=http://127.0.0.1:4001",
-              "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota",
+              "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota",
               "--client-ca-file=/srv/kubernetes/ca.crt",
               "--basic-auth-file=/srv/kubernetes/basic_auth.csv",
               "--min-request-timeout=300",
@@ -44,7 +44,7 @@
               "--tls-private-key-file=/srv/kubernetes/server.key",
               "--token-auth-file=/srv/kubernetes/known_tokens.csv",
               "--allow-privileged=true",
-              "--v=4"
+              "--v=2"
       ],
       "volumeMounts": [
         {

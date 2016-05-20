@@ -1,8 +1,8 @@
+# This file should be kept in sync with cluster/images/hyperkube/dashboard-rc.yaml
+# and cluster/gce/coreos/kube-manifests/addons/dashboard/dashboard-controller.yaml
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  # Keep the name in sync with image version and
-  # gce/coreos/kube-manifests/addons/dashboard counterparts
   name: kubernetes-dashboard-v1.0.1
   namespace: kube-system
   labels:

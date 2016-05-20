@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tears down an existing cluster.  Warning destroys _all_ docker containers on the machine
-
-set -o errexit
-set -o nounset
-set -o pipefail
-
-echo "Warning, this will delete all Docker containers on this machine."
-echo "Proceed? [Y/n]"
-
-read resp
-if [[ $resp == "n" || $resp == "N" ]]; then
-  exit 0
-fi
-
-docker ps -aq | xargs docker rm -f
+# This file should be kept in sync with cluster/addons/dns/skydns-svc.yaml.in
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "KubeDNS"
+spec:
+  selector:
+    k8s-app: kube-dns
+  clusterIP: 10.0.0.10
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
