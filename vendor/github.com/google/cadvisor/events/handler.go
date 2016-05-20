@@ -281,13 +281,18 @@ func (self *events) updateEventStore(e *info.Event) {
 	self.eventsLock.Lock()
 	defer self.eventsLock.Unlock()
 	if _, ok := self.eventStore[e.EventType]; !ok {
-		maxAge := self.storagePolicy.DefaultMaxAge
 		maxNumEvents := self.storagePolicy.DefaultMaxNumEvents
-		if age, ok := self.storagePolicy.PerTypeMaxAge[e.EventType]; ok {
-			maxAge = age
-		}
 		if numEvents, ok := self.storagePolicy.PerTypeMaxNumEvents[e.EventType]; ok {
 			maxNumEvents = numEvents
+		}
+		if maxNumEvents == 0 {
+			// Event storage is disabled for e.EventType
+			return
+		}
+
+		maxAge := self.storagePolicy.DefaultMaxAge
+		if age, ok := self.storagePolicy.PerTypeMaxAge[e.EventType]; ok {
+			maxAge = age
 		}
 
 		self.eventStore[e.EventType] = utils.NewTimedStore(maxAge, maxNumEvents)

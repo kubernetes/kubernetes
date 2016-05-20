@@ -16,12 +16,12 @@ package rkt
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/manager/watcher"
 
 	"github.com/golang/glog"
 )
@@ -58,14 +58,9 @@ func (self *rktFactory) NewContainerHandler(name string, inHostNamespace bool) (
 }
 
 func (self *rktFactory) CanHandleAndAccept(name string) (bool, bool, error) {
-	// will ignore all cgroup names that don't either correspond to the machine.slice that is the pod or the containers that belong to the pod
-	// only works for machined rkt pods at the moment
+	accept, err := verifyPod(name)
 
-	if strings.HasPrefix(name, "/machine.slice/machine-rkt\\x2d") {
-		accept, err := verifyName(name)
-		return true, accept, err
-	}
-	return false, false, fmt.Errorf("%s not handled by rkt handler", name)
+	return accept, accept, err
 }
 
 func (self *rktFactory) DebugInfo() map[string][]string {
@@ -99,6 +94,6 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, igno
 		ignoreMetrics:      ignoreMetrics,
 		rktPath:            rktPath,
 	}
-	container.RegisterContainerHandlerFactory(factory)
+	container.RegisterContainerHandlerFactory(factory, []watcher.ContainerWatchSource{watcher.Rkt})
 	return nil
 }
