@@ -133,6 +133,18 @@ func (q *UniqueQueue) Head() (TimedValue, bool) {
 	return *result, true
 }
 
+// Clear removes all items from the queue and duplication preventing set.
+func (q *UniqueQueue) Clear() {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	if q.queue.Len() > 0 {
+		q.queue = make(TimedQueue, 0)
+	}
+	if len(q.set) > 0 {
+		q.set = sets.NewString()
+	}
+}
+
 // RateLimitedTimedQueue is a unique item priority queue ordered by the expected next time
 // of execution. It is also rate limited.
 type RateLimitedTimedQueue struct {
@@ -198,4 +210,9 @@ func (q *RateLimitedTimedQueue) Add(value string) bool {
 // Removes Node from the Evictor. The Node won't be processed until added again.
 func (q *RateLimitedTimedQueue) Remove(value string) bool {
 	return q.queue.Remove(value)
+}
+
+// Removes all items from the queue
+func (q *RateLimitedTimedQueue) Clear() {
+	q.queue.Clear()
 }
