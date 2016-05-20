@@ -78,14 +78,10 @@ type cachedService struct {
 	// key clusterName
 	// value is a flag that if there is ready address, 1 means there is ready address, 0 means no ready address
 	endpointMap map[string]int
-	// cluster service map hold serivice status info from kubernetes clusters
-	// key clusterName
-
+	// serviceStatusMap map holds service status info from kubernetes clusters, keyed on clusterName
 	serviceStatusMap map[string]api.LoadBalancerStatus
-
 	// Ensures only one goroutine can operate on this service at any given time.
 	rwlock sync.Mutex
-
 	// Controls error back-off for procceeding federation service to k8s clusters
 	lastRetryDelay time.Duration
 	// Controls error back-off for updating federation service back to federation apiserver
@@ -104,9 +100,11 @@ type serviceCache struct {
 type ServiceController struct {
 	dns              dnsprovider.Interface
 	federationClient federationclientset.Interface
-	zones            []dnsprovider.Zone
-	serviceCache     *serviceCache
-	clusterCache     *clusterClientCache
+	federationName   string
+	// each federation should be configured with a single zone (e.g. "mycompany.com")
+	dnsZones     dnsprovider.Zones
+	serviceCache *serviceCache
+	clusterCache *clusterClientCache
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
@@ -690,7 +688,7 @@ func (s *ServiceController) lockedUpdateDNSRecords(service *cachedService, clust
 	for key := range s.clusterCache.clientMap {
 		for _, clusterName := range clusterNames {
 			if key == clusterName {
-				ensureDNSRecords(clusterName, service)
+				s.ensureDnsRecords(clusterName, service)
 			}
 		}
 	}

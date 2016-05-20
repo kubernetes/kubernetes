@@ -17,22 +17,38 @@ limitations under the License.
 package service
 
 import (
+	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestGetClusterConditionPredicate(t *testing.T) {
+	fakedns, _ := clouddns.NewFakeInterface() // No need to check for unsupported interfaces, as the fake interface supports everything that's required.
+	serviceController := ServiceController{
+		dns:          fakedns,
+		serviceCache: &serviceCache{fedServiceMap: make(map[string]*cachedService)},
+		clusterCache: &clusterClientCache{
+			rwlock:    sync.Mutex{},
+			clientMap: make(map[string]*clusterCache),
+		},
+		knownClusterSet: make(sets.String),
+	}
+
 	tests := []struct {
-		cluster      federation.Cluster
-		expectAccept bool
-		name         string
+		cluster           federation.Cluster
+		expectAccept      bool
+		name              string
+		serviceController *ServiceController
 	}{
 		{
-			cluster:      federation.Cluster{},
-			expectAccept: false,
-			name:         "empty",
+			cluster:           federation.Cluster{},
+			expectAccept:      false,
+			name:              "empty",
+			serviceController: &serviceController,
 		},
 		{
 			cluster: federation.Cluster{
@@ -42,8 +58,9 @@ func TestGetClusterConditionPredicate(t *testing.T) {
 					},
 				},
 			},
-			expectAccept: true,
-			name:         "basic",
+			expectAccept:      true,
+			name:              "basic",
+			serviceController: &serviceController,
 		},
 		{
 			cluster: federation.Cluster{
@@ -53,8 +70,9 @@ func TestGetClusterConditionPredicate(t *testing.T) {
 					},
 				},
 			},
-			expectAccept: false,
-			name:         "notready",
+			expectAccept:      false,
+			name:              "notready",
+			serviceController: &serviceController,
 		},
 	}
 	pred := getClusterConditionPredicate()
