@@ -148,6 +148,7 @@ func NewNodeController(
 	nodeMonitorPeriod time.Duration,
 	clusterCIDR *net.IPNet,
 	serviceCIDR *net.IPNet,
+	nodeCIDRMaskSize int,
 	allocateNodeCIDRs bool) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
@@ -168,11 +169,8 @@ func NewNodeController(
 			glog.Fatal("NodeController: Must specify clusterCIDR if allocateNodeCIDRs == true.")
 		}
 		mask := clusterCIDR.Mask
-		// TODO(mqliang): Make pod CIDR mask size configurable.
-		// For now, we assume podCIDR mask size is 24, so make sure the
-		// clusterCIDR mask size is larger than 24.
-		if maskSize, _ := mask.Size(); maskSize > 24 {
-			glog.Fatal("NodeController: Invalid clusterCIDR, mask size must be less than 24.")
+		if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
+			glog.Fatal("NodeController: Invalid clusterCIDR, mask size of clusterCIDR must be less than nodeCIDRMaskSize.")
 		}
 	}
 	evictorLock := sync.Mutex{}
@@ -258,8 +256,7 @@ func NewNodeController(
 	)
 
 	if allocateNodeCIDRs {
-		// TODO(mqliang): make pod CIDR mask size configurable, for now set it to 24.
-		nc.cidrAllocator = NewCIDRRangeAllocator(clusterCIDR, 24)
+		nc.cidrAllocator = NewCIDRRangeAllocator(clusterCIDR, nodeCIDRMaskSize)
 	}
 
 	return nc
@@ -267,8 +264,9 @@ func NewNodeController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
-
-	nc.filterOutServiceRange()
+	if nc.allocateNodeCIDRs {
+		nc.filterOutServiceRange()
+	}
 
 	go nc.nodeController.Run(wait.NeverStop)
 	go nc.podController.Run(wait.NeverStop)
@@ -341,7 +339,7 @@ func (nc *NodeController) Run(period time.Duration) {
 }
 
 func (nc *NodeController) filterOutServiceRange() {
-	if !nc.clusterCIDR.Contains(nc.serviceCIDR.IP.Mask(nc.clusterCIDR.Mask)) {
+	if !nc.clusterCIDR.Contains(nc.serviceCIDR.IP.Mask(nc.clusterCIDR.Mask)) && !nc.serviceCIDR.Contains(nc.clusterCIDR.IP.Mask(nc.serviceCIDR.Mask)) {
 		return
 	}
 
