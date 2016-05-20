@@ -1413,6 +1413,12 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 }
 
 func (dm *DockerManager) applyOOMScoreAdj(container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
+	if containerInfo.State.Pid == 0 {
+		// Container exited. We cannot do anything about it. Ignore this error.
+		glog.V(2).Infof("Failed to apply OOM score adj on container %q with ID %q. Init process does not exist.", containerInfo.Name, containerInfo.ID)
+		return nil
+	}
+
 	cgroupName, err := dm.procFs.GetFullContainerName(containerInfo.State.Pid)
 	if err != nil {
 		if err == os.ErrNotExist {
@@ -1494,14 +1500,10 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if err != nil {
 		return kubecontainer.ContainerID{}, fmt.Errorf("InspectContainer: %v", err)
 	}
-	// Ensure the PID actually exists, else we'll move ourselves.
-	if containerInfo.State.Pid == 0 {
-		return kubecontainer.ContainerID{}, fmt.Errorf("can't get init PID for container %q", id)
-	}
 
 	// Check if current docker version is higher than 1.10. Otherwise, we have to apply OOMScoreAdj instead of using docker API.
-	err = dm.applyOOMScoreAdjIfNeeded(container, containerInfo)
-	if err != nil {
+	// TODO: Remove this logic after we stop supporting docker version < 1.10.
+	if err := dm.applyOOMScoreAdjIfNeeded(container, containerInfo); err != nil {
 		return kubecontainer.ContainerID{}, err
 	}
 
