@@ -19,4 +19,5 @@ package plugins
 import (
 	// Initialize all known client auth plugins.
 	_ "k8s.io/kubernetes/plugin/pkg/client/auth/gcp"
+	_ "k8s.io/kubernetes/plugin/pkg/client/auth/oidc"
 )

@@ -20,7 +20,7 @@ type PublicKey struct {
 }
 
 func (k *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(k.jwk)
+	return json.Marshal(&k.jwk)
 }
 
 func (k *PublicKey) UnmarshalJSON(data []byte) error {
