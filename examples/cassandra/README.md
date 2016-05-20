@@ -80,7 +80,14 @@ computer.
 The pods use the [```gcr.io/google-samples/cassandra:v9```](image/Dockerfile)
 image from Google's [container registry](https://cloud.google.com/container-registry/docs/).
 The docker is based on `debian:jessie` and includes OpenJDK 8. This image
-includes a standard Cassandra installation from the Apache Debian repo.
+includes a standard Cassandra installation from the Apache Debian repo.  Through the use
+of environment variables you are able to change values that are inserted into the `cassandra.yaml`.
+
+| ENV VAR       | DEFAULT VALUE  |
+| ------------- |:-------------: |
+| CASSANDRA_CLUSTER_NAME | 'Test Cluster'  |
+| CASSANDRA_NUM_TOKENS  | 32               |
+| CASSANDRA_RPC_ADDRESS | 0.0.0.0          |
 
 ### Custom Seed Provider
 
@@ -229,7 +236,7 @@ spec:
             - /run.sh
           resources:
             limits:
-              cpu: 0.1
+              cpu: 0.5
           env:
             - name: MAX_HEAP_SIZE
               value: 512M
@@ -239,13 +246,24 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google-samples/cassandra:v8
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          image: gcr.io/google-samples/cassandra:v9
           name: cassandra
           ports:
+            - containerPort: 7000
+              name: intra-node
+            - containerPort: 7001
+              name: tls-intra-node
+            - containerPort: 7199
+              name: jmx
             - containerPort: 9042
               name: cql
-            - containerPort: 9160
-              name: thrift
+            # If you need it it is going away in C* 4.0
+            #- containerPort: 9160
+            #  name: thrift
           volumeMounts:
             - mountPath: /cassandra_data
               name: data
@@ -286,7 +304,7 @@ You can list the new controller:
 
 $ kubectl get rc -o wide
 NAME        DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)                             SELECTOR
-cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v8   app=cassandra
+cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v9   app=cassandra
 
 ```
 
@@ -457,16 +475,27 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google-samples/cassandra:v8
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          image: gcr.io/google-samples/cassandra:v9
           name: cassandra
           ports:
+            - containerPort: 7000
+              name: intra-node
+            - containerPort: 7001
+              name: tls-intra-node
+            - containerPort: 7199
+              name: jmx
             - containerPort: 9042
               name: cql
-            - containerPort: 9160
-              name: thrift
+              # If you need it it is going away in C* 4.0
+              #- containerPort: 9160
+              #  name: thrift
           resources:
             request:
-              cpu: 0.1
+              cpu: 0.5
           volumeMounts:
             - mountPath: /cassandra_data
               name: data

@@ -62,6 +62,7 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  re
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
+examples/cassandra/image/run.sh:	cluster_name \
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/vitess/env.sh:    node_ip=$(get_node_ip)
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
@@ -85,6 +86,7 @@ test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
 test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
 test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
 test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
+test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
