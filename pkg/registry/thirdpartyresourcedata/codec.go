@@ -378,11 +378,6 @@ func (t *thirdPartyResourceDataDecoder) populateListResource(objIn *extensions.T
 	return nil
 }
 
-const template = `{
-  "kind": "%s",
-  "items": [ %s ]
-}`
-
 type thirdPartyResourceDataEncoder struct {
 	delegate runtime.Encoder
 	kind     string
@@ -413,17 +408,38 @@ func (t *thirdPartyResourceDataEncoder) EncodeToStream(obj runtime.Object, strea
 	case *extensions.ThirdPartyResourceData:
 		return encodeToJSON(obj, stream)
 	case *extensions.ThirdPartyResourceDataList:
-		// TODO: There must be a better way to do this...
-		dataStrings := make([]string, len(obj.Items))
+		// TODO: There are likely still better ways to do this...
+		listItems := make([]json.RawMessage, len(obj.Items))
+
 		for ix := range obj.Items {
 			buff := &bytes.Buffer{}
 			err := encodeToJSON(&obj.Items[ix], buff)
 			if err != nil {
 				return err
 			}
-			dataStrings[ix] = buff.String()
+			listItems[ix] = json.RawMessage(buff.Bytes())
 		}
-		fmt.Fprintf(stream, template, t.kind+"List", strings.Join(dataStrings, ","))
+
+		encMap := struct {
+			Kind       string               `json:"kind,omitempty"`
+			Items      []json.RawMessage    `json:"items"`
+			Metadata   unversioned.ListMeta `json:"metadata,omitempty"`
+			APIVersion string               `json:"apiVersion,omitempty"`
+		}{
+			Kind:       t.kind + "List",
+			Items:      listItems,
+			Metadata:   obj.ListMeta,
+			APIVersion: obj.APIVersion,
+		}
+
+		encBytes, err := json.Marshal(encMap)
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprint(stream, string(encBytes))
+
 		return nil
 	case *unversioned.Status, *unversioned.APIResourceList:
 		return t.delegate.EncodeToStream(obj, stream, overrides...)
