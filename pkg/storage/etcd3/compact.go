@@ -51,7 +51,7 @@ func StartCompactor(ctx context.Context, client *clientv3.Client) {
 	var emptyStruct struct{}
 	for _, ep := range client.Endpoints() {
 		if _, ok := endpointsMap[ep]; ok {
-			glog.V(4).Infof("compactor already exists for endpoints %v")
+			glog.V(4).Infof("compactor already exists for endpoints %v", client.Endpoints())
 			return
 		}
 	}
