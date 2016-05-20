@@ -25,9 +25,6 @@
 # - centos 7
 # - debian jessie
 
-set -e
-set -x
-
 # Fixup sudoers require tty
 sudo grep -q "# Defaults    requiretty" /etc/sudoers
 if [ $? -ne 0 ] ; then
@@ -52,6 +49,9 @@ if [ $? -ne 0 ]; then
   sudo systemctl enable docker.service
 fi
 
+# Allow jenkins access to docker
+sudo usermod -a -G docker jenkins
+
 # install lxc
 cat /etc/*-release | grep "ID=debian"
 if [ $? -ne 0 ]; then
@@ -59,4 +59,9 @@ if [ $? -ne 0 ]; then
   lxc-checkconfig
   sudo sed -i 's/GRUB_CMDLINE_LINUX="\(.*\)"/GRUB_CMDLINE_LINUX="\1 cgroup_enable=memory"/' /etc/default/grub
   sudo update-grub
+fi
+
+# delete init kubelet from containervm so that is doesn't startup
+if [ -f /etc/init.d/kubelet ]; then
+  sudo rm /etc/init.d/kubelet
 fi
