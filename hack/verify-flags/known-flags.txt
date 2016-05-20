@@ -419,6 +419,7 @@ system-reserved
 target-port
 tcp-services
 terminated-pod-gc-threshold
+test-timeout
 tls-cert-file
 tls-private-key-file
 to-version

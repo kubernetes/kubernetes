@@ -32,6 +32,7 @@ import (
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
+var testTimeoutSeconds = flag.Int("test-timeout", 45*60, "How long (in seconds) to wait for ginkgo tests to complete.")
 
 var sshOptionsMap map[string]string
 
@@ -120,6 +121,7 @@ func CreateTestArchive() string {
 // RunRemote copies the archive file to a /tmp file on host, unpacks it, and runs the e2e_node.test
 func RunRemote(archive string, host string, cleanup bool) (string, error) {
 	// Create the temp staging directory
+	glog.Infof("Staging test binaries on %s", host)
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
 	_, err := RunSshCommand("ssh", host, "--", "mkdir", tmp)
 	if err != nil {
@@ -149,14 +151,16 @@ func RunRemote(archive string, host string, cleanup bool) (string, error) {
 	// No need to log an error if pkill fails since pkill will fail if the commands are not running.
 	// If we are unable to stop existing running k8s processes, we should see messages in the kubelet/apiserver/etcd
 	// logs about failing to bind the required ports.
+	glog.Infof("Killing any existing node processes on %s", host)
 	RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
 
 	// Extract the archive and run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
-		fmt.Sprintf("./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s", cleanup, host),
+		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s", *testTimeoutSeconds, cleanup, host),
 	)
+	glog.Infof("Starting tests on %s", host)
 	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
 	if err != nil {
 		return "", err
