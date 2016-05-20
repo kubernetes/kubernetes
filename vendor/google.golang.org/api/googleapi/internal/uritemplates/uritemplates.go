@@ -2,26 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package uritemplates is a level 4 implementation of RFC 6570 (URI
+// Package uritemplates is a level 3 implementation of RFC 6570 (URI
 // Template, http://tools.ietf.org/html/rfc6570).
-//
-// To use uritemplates, parse a template string and expand it with a value
-// map:
-//
-//	template, _ := uritemplates.Parse("https://api.github.com/repos{/user,repo}")
-//	values := make(map[string]interface{})
-//	values["user"] = "jtacoma"
-//	values["repo"] = "uritemplates"
-//	expanded, _ := template.ExpandString(values)
-//	fmt.Printf(expanded)
-//
+// uritemplates does not support composite values (in Go: slices or maps)
+// and so does not qualify as a level 4 implementation.
 package uritemplates
 
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -45,52 +34,47 @@ func pctEncode(src []byte) []byte {
 	return dst
 }
 
-func escape(s string, allowReserved bool) (escaped string) {
+func escape(s string, allowReserved bool) string {
 	if allowReserved {
-		escaped = string(reserved.ReplaceAllFunc([]byte(s), pctEncode))
-	} else {
-		escaped = string(unreserved.ReplaceAllFunc([]byte(s), pctEncode))
+		return string(reserved.ReplaceAllFunc([]byte(s), pctEncode))
 	}
-	return escaped
+	return string(unreserved.ReplaceAllFunc([]byte(s), pctEncode))
 }
 
-// A UriTemplate is a parsed representation of a URI template.
-type UriTemplate struct {
+// A uriTemplate is a parsed representation of a URI template.
+type uriTemplate struct {
 	raw   string
 	parts []templatePart
 }
 
-// Parse parses a URI template string into a UriTemplate object.
-func Parse(rawtemplate string) (template *UriTemplate, err error) {
-	template = new(UriTemplate)
-	template.raw = rawtemplate
-	split := strings.Split(rawtemplate, "{")
-	template.parts = make([]templatePart, len(split)*2-1)
+// parse parses a URI template string into a uriTemplate object.
+func parse(rawTemplate string) (*uriTemplate, error) {
+	split := strings.Split(rawTemplate, "{")
+	parts := make([]templatePart, len(split)*2-1)
 	for i, s := range split {
 		if i == 0 {
 			if strings.Contains(s, "}") {
-				err = errors.New("unexpected }")
-				break
+				return nil, errors.New("unexpected }")
 			}
-			template.parts[i].raw = s
-		} else {
-			subsplit := strings.Split(s, "}")
-			if len(subsplit) != 2 {
-				err = errors.New("malformed template")
-				break
-			}
-			expression := subsplit[0]
-			template.parts[i*2-1], err = parseExpression(expression)
-			if err != nil {
-				break
-			}
-			template.parts[i*2].raw = subsplit[1]
+			parts[i].raw = s
+			continue
 		}
+		subsplit := strings.Split(s, "}")
+		if len(subsplit) != 2 {
+			return nil, errors.New("malformed template")
+		}
+		expression := subsplit[0]
+		var err error
+		parts[i*2-1], err = parseExpression(expression)
+		if err != nil {
+			return nil, err
+		}
+		parts[i*2].raw = subsplit[1]
 	}
-	if err != nil {
-		template = nil
-	}
-	return template, err
+	return &uriTemplate{
+		raw:   rawTemplate,
+		parts: parts,
+	}, nil
 }
 
 type templatePart struct {
@@ -160,6 +144,8 @@ func parseExpression(expression string) (result templatePart, err error) {
 }
 
 func parseTerm(term string) (result templateTerm, err error) {
+	// TODO(djd): Remove "*" suffix parsing once we check that no APIs have
+	// mistakenly used that attribute.
 	if strings.HasSuffix(term, "*") {
 		result.explode = true
 		term = term[:len(term)-1]
@@ -185,175 +171,50 @@ func parseTerm(term string) (result templateTerm, err error) {
 }
 
 // Expand expands a URI template with a set of values to produce a string.
-func (self *UriTemplate) Expand(value interface{}) (string, error) {
-	values, ismap := value.(map[string]interface{})
-	if !ismap {
-		if m, ismap := struct2map(value); !ismap {
-			return "", errors.New("expected map[string]interface{}, struct, or pointer to struct.")
-		} else {
-			return self.Expand(m)
-		}
-	}
+func (t *uriTemplate) Expand(values map[string]string) string {
 	var buf bytes.Buffer
-	for _, p := range self.parts {
-		err := p.expand(&buf, values)
-		if err != nil {
-			return "", err
-		}
+	for _, p := range t.parts {
+		p.expand(&buf, values)
 	}
-	return buf.String(), nil
+	return buf.String()
 }
 
-func (self *templatePart) expand(buf *bytes.Buffer, values map[string]interface{}) error {
-	if len(self.raw) > 0 {
-		buf.WriteString(self.raw)
-		return nil
+func (tp *templatePart) expand(buf *bytes.Buffer, values map[string]string) {
+	if len(tp.raw) > 0 {
+		buf.WriteString(tp.raw)
+		return
 	}
-	var zeroLen = buf.Len()
-	buf.WriteString(self.first)
-	var firstLen = buf.Len()
-	for _, term := range self.terms {
+	var first = true
+	for _, term := range tp.terms {
 		value, exists := values[term.name]
 		if !exists {
 			continue
 		}
-		if buf.Len() != firstLen {
-			buf.WriteString(self.sep)
+		if first {
+			buf.WriteString(tp.first)
+			first = false
+		} else {
+			buf.WriteString(tp.sep)
 		}
-		switch v := value.(type) {
-		case string:
-			self.expandString(buf, term, v)
-		case []interface{}:
-			self.expandArray(buf, term, v)
-		case map[string]interface{}:
-			if term.truncate > 0 {
-				return errors.New("cannot truncate a map expansion")
-			}
-			self.expandMap(buf, term, v)
-		default:
-			if m, ismap := struct2map(value); ismap {
-				if term.truncate > 0 {
-					return errors.New("cannot truncate a map expansion")
-				}
-				self.expandMap(buf, term, m)
-			} else {
-				str := fmt.Sprintf("%v", value)
-				self.expandString(buf, term, str)
-			}
-		}
+		tp.expandString(buf, term, value)
 	}
-	if buf.Len() == firstLen {
-		original := buf.Bytes()[:zeroLen]
-		buf.Reset()
-		buf.Write(original)
-	}
-	return nil
 }
 
-func (self *templatePart) expandName(buf *bytes.Buffer, name string, empty bool) {
-	if self.named {
+func (tp *templatePart) expandName(buf *bytes.Buffer, name string, empty bool) {
+	if tp.named {
 		buf.WriteString(name)
 		if empty {
-			buf.WriteString(self.ifemp)
+			buf.WriteString(tp.ifemp)
 		} else {
 			buf.WriteString("=")
 		}
 	}
 }
 
-func (self *templatePart) expandString(buf *bytes.Buffer, t templateTerm, s string) {
+func (tp *templatePart) expandString(buf *bytes.Buffer, t templateTerm, s string) {
 	if len(s) > t.truncate && t.truncate > 0 {
 		s = s[:t.truncate]
 	}
-	self.expandName(buf, t.name, len(s) == 0)
-	buf.WriteString(escape(s, self.allowReserved))
-}
-
-func (self *templatePart) expandArray(buf *bytes.Buffer, t templateTerm, a []interface{}) {
-	if len(a) == 0 {
-		return
-	} else if !t.explode {
-		self.expandName(buf, t.name, false)
-	}
-	for i, value := range a {
-		if t.explode && i > 0 {
-			buf.WriteString(self.sep)
-		} else if i > 0 {
-			buf.WriteString(",")
-		}
-		var s string
-		switch v := value.(type) {
-		case string:
-			s = v
-		default:
-			s = fmt.Sprintf("%v", v)
-		}
-		if len(s) > t.truncate && t.truncate > 0 {
-			s = s[:t.truncate]
-		}
-		if self.named && t.explode {
-			self.expandName(buf, t.name, len(s) == 0)
-		}
-		buf.WriteString(escape(s, self.allowReserved))
-	}
-}
-
-func (self *templatePart) expandMap(buf *bytes.Buffer, t templateTerm, m map[string]interface{}) {
-	if len(m) == 0 {
-		return
-	}
-	if !t.explode {
-		self.expandName(buf, t.name, len(m) == 0)
-	}
-	var firstLen = buf.Len()
-	for k, value := range m {
-		if firstLen != buf.Len() {
-			if t.explode {
-				buf.WriteString(self.sep)
-			} else {
-				buf.WriteString(",")
-			}
-		}
-		var s string
-		switch v := value.(type) {
-		case string:
-			s = v
-		default:
-			s = fmt.Sprintf("%v", v)
-		}
-		if t.explode {
-			buf.WriteString(escape(k, self.allowReserved))
-			buf.WriteRune('=')
-			buf.WriteString(escape(s, self.allowReserved))
-		} else {
-			buf.WriteString(escape(k, self.allowReserved))
-			buf.WriteRune(',')
-			buf.WriteString(escape(s, self.allowReserved))
-		}
-	}
-}
-
-func struct2map(v interface{}) (map[string]interface{}, bool) {
-	value := reflect.ValueOf(v)
-	switch value.Type().Kind() {
-	case reflect.Ptr:
-		return struct2map(value.Elem().Interface())
-	case reflect.Struct:
-		m := make(map[string]interface{})
-		for i := 0; i < value.NumField(); i++ {
-			tag := value.Type().Field(i).Tag
-			var name string
-			if strings.Contains(string(tag), ":") {
-				name = tag.Get("uri")
-			} else {
-				name = strings.TrimSpace(string(tag))
-			}
-			if len(name) == 0 {
-				name = value.Type().Field(i).Name
-			}
-			m[name] = value.Field(i).Interface()
-		}
-		return m, true
-	}
-	return nil, false
+	tp.expandName(buf, t.name, len(s) == 0)
+	buf.WriteString(escape(s, tp.allowReserved))
 }
