@@ -134,6 +134,7 @@ experimental-nvidia-gpus
 experimental-prefix
 external-hostname
 external-ip
+exit-on-lock-contention
 failover-timeout
 failure-domains
 fake-clientset

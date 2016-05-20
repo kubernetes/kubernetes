@@ -17,8 +17,9 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/kubernetes/pkg/util/config"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
