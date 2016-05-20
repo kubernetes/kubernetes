@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
+	"os"
 )
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -393,10 +394,12 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if err := crypto.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
-			return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
+		if shouldGenSelfSignedCerts(s.TLSCertFile, s.TLSPrivateKeyFile) {
+			if err := crypto.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
+				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
+			}
+			glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
 		}
-		glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
 	}
 	tlsOptions := &server.TLSOptions{
 		Config: &tls.Config{
@@ -409,6 +412,28 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 		KeyFile:  s.TLSPrivateKeyFile,
 	}
 	return tlsOptions, nil
+}
+
+// If the file represented by path exists and
+// readable, return true otherwise return false.
+func canReadFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+
+	defer f.Close()
+
+	return true
+}
+
+func shouldGenSelfSignedCerts(certPath, keyPath string) bool {
+	if canReadFile(certPath) || canReadFile(keyPath) {
+		glog.Infof("using existing kubelet.crt and kubelet.key files")
+		return false
+	}
+
+	return true
 }
 
 func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclient.Config, error) {
