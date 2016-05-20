@@ -14,7 +14,7 @@ options:
 - name: dry-run
   default_value: "false"
   usage: |
-    If true, only print the object that would be sent, without creating it.
+    If true, only print the object that would be sent, without sending it.
 - name: filename
   shorthand: f
   default_value: '[]'

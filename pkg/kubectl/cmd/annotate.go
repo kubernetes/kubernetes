@@ -148,22 +148,11 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
-	annotationArgs := []string{}
-	metAnnotaionArg := false
-	for _, s := range args {
-		isAnnotation := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
-		switch {
-		case !metAnnotaionArg && isAnnotation:
-			metAnnotaionArg = true
-			fallthrough
-		case metAnnotaionArg && isAnnotation:
-			annotationArgs = append(annotationArgs, s)
-		case !metAnnotaionArg && !isAnnotation:
-			o.resources = append(o.resources, s)
-		case metAnnotaionArg && !isAnnotation:
-			return fmt.Errorf("all resources must be specified before annotation changes: %s", s)
-		}
+	resources, annotationArgs, err := cmdutil.GetResourcesAndPairs(args, "annotation")
+	if err != nil {
+		return err
 	}
+	o.resources = resources
 	if len(o.resources) < 1 && len(o.filenames) == 0 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
@@ -277,34 +266,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 
 // parseAnnotations retrieves new and remove annotations from annotation args
 func parseAnnotations(annotationArgs []string) (map[string]string, []string, error) {
-	var invalidBuf bytes.Buffer
-	newAnnotations := map[string]string{}
-	removeAnnotations := []string{}
-	for _, annotationArg := range annotationArgs {
-		if strings.Index(annotationArg, "=") != -1 {
-			parts := strings.SplitN(annotationArg, "=", 2)
-			if len(parts) != 2 || len(parts[1]) == 0 {
-				if invalidBuf.Len() > 0 {
-					invalidBuf.WriteString(", ")
-				}
-				invalidBuf.WriteString(fmt.Sprintf(annotationArg))
-			} else {
-				newAnnotations[parts[0]] = parts[1]
-			}
-		} else if strings.HasSuffix(annotationArg, "-") {
-			removeAnnotations = append(removeAnnotations, annotationArg[:len(annotationArg)-1])
-		} else {
-			if invalidBuf.Len() > 0 {
-				invalidBuf.WriteString(", ")
-			}
-			invalidBuf.WriteString(fmt.Sprintf(annotationArg))
-		}
-	}
-	if invalidBuf.Len() > 0 {
-		return newAnnotations, removeAnnotations, fmt.Errorf("invalid annotation format: %s", invalidBuf.String())
-	}
-
-	return newAnnotations, removeAnnotations, nil
+	return cmdutil.ParsePairs(annotationArgs, "annotation", true)
 }
 
 // validateAnnotations checks the format of annotation args and checks removed annotations aren't in the new annotations map

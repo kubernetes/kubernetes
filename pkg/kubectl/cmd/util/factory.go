@@ -139,6 +139,9 @@ type Factory struct {
 	CanBeAutoscaled func(kind unversioned.GroupKind) error
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject func(object runtime.Object) (*api.Pod, error)
+	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
+	// return false if no pod spec is supported, or return an error.
+	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
 	// EditorEnvs returns a group of environment variables that the edit command
 	// can range over in order to determine if the user has specified an editor
 	// of their choice.
@@ -706,6 +709,31 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, err
 				}
 				return nil, fmt.Errorf("cannot attach to %v: not implemented", gvk)
+			}
+		},
+		// UpdatePodSpecForObject update the pod specification for the provided object
+		UpdatePodSpecForObject: func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
+			// TODO: replace with a swagger schema based approach (identify pod template via schema introspection)
+			switch t := obj.(type) {
+			case *api.Pod:
+				return true, fn(&t.Spec)
+			case *api.ReplicationController:
+				if t.Spec.Template == nil {
+					t.Spec.Template = &api.PodTemplateSpec{}
+				}
+				return true, fn(&t.Spec.Template.Spec)
+			case *extensions.Deployment:
+				return true, fn(&t.Spec.Template.Spec)
+			case *extensions.DaemonSet:
+				return true, fn(&t.Spec.Template.Spec)
+			case *extensions.ReplicaSet:
+				return true, fn(&t.Spec.Template.Spec)
+			case *apps.PetSet:
+				return true, fn(&t.Spec.Template.Spec)
+			case *batch.Job:
+				return true, fn(&t.Spec.Template.Spec)
+			default:
+				return false, fmt.Errorf("the object is not a pod or does not have a pod template")
 			}
 		},
 		EditorEnvs: func() []string {
