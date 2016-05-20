@@ -18,7 +18,6 @@ package testing
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	. "k8s.io/kubernetes/pkg/volume"
 )
 
@@ -370,7 +370,7 @@ func (fc *FakeProvisioner) Provision() (*api.PersistentVolume, error) {
 // FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
 // a tmpfs filesystem on this system.
 func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "metrics_du_test")
+	tmpDir, err := utiltesting.MkTmpdir("metrics_du_test")
 	if err != nil {
 		return nil, err
 	}
