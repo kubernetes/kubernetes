@@ -68,26 +68,33 @@ func (sp *summaryProviderImpl) Get() (*stats.Summary, error) {
 	}
 	infos, err := sp.provider.GetContainerInfoV2("/", options)
 	if err != nil {
-		return nil, err
+		if _, ok := infos["/"]; ok {
+			// If the failure is partial, log it and return a best-effort response.
+			glog.Errorf("Partial failure issuing GetContainerInfoV2: %v", err)
+		} else {
+			return nil, fmt.Errorf("failed GetContainerInfoV2: %v", err)
+		}
 	}
 
+	// TODO(timstclair): Consider returning a best-effort response if any of the following errors
+	// occur.
 	node, err := sp.provider.GetNode()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed GetNode: %v", err)
 	}
 
 	nodeConfig := sp.provider.GetNodeConfig()
 	rootFsInfo, err := sp.provider.RootFsInfo()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed RootFsInfo: %v", err)
 	}
 	imageFsInfo, err := sp.provider.DockerImagesFsInfo()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed DockerImagesFsInfo: %v", err)
 	}
 	imageStats, err := sp.runtime.ImageStats()
 	if err != nil || imageStats == nil {
-		return nil, err
+		return nil, fmt.Errorf("failed ImageStats: %v", err)
 	}
 	sb := &summaryBuilder{sp.fsResourceAnalyzer, node, nodeConfig, rootFsInfo, imageFsInfo, *imageStats, infos}
 	return sb.build()
