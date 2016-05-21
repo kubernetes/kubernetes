@@ -21,6 +21,8 @@ import (
 )
 
 // TokenReview attempts to authenticate a token to a known user.
+// Note: TokenReview requests may be cached by the webhook token authenticator
+// plugin in the kube-apiserver.
 type TokenReview struct {
 	unversioned.TypeMeta `json:",inline"`
 
