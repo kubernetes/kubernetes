@@ -104,6 +104,11 @@ func NewCodec(
 			}
 			internal.encodeVersion[v.Group] = v
 		}
+		if len(internal.encodeVersion) == 1 {
+			for _, v := range internal.encodeVersion {
+				internal.preferredEncodeVersion = []unversioned.GroupVersion{v}
+			}
+		}
 	}
 	if decodeVersion != nil {
 		internal.decodeVersion = make(map[string]unversioned.GroupVersion)
@@ -129,6 +134,8 @@ type codec struct {
 
 	encodeVersion map[string]unversioned.GroupVersion
 	decodeVersion map[string]unversioned.GroupVersion
+
+	preferredEncodeVersion []unversioned.GroupVersion
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
@@ -248,13 +255,16 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 	}
 
 	// attempt a conversion to the sole encode version
-	if !ok && len(c.encodeVersion) == 1 {
+	if !ok && c.preferredEncodeVersion != nil {
 		ok = true
-		for _, v := range c.encodeVersion {
-			targetGV = v
+		targetGV = c.preferredEncodeVersion[0]
+		if len(overrides) > 0 {
+			// ensure the target override is first
+			overrides = promoteOrPrependGroupVersion(targetGV, overrides)
+		} else {
+			// avoids allocating a new array for each call to EncodeToVersion
+			overrides = c.preferredEncodeVersion
 		}
-		// ensure the target override is first
-		overrides = promoteOrPrependGroupVersion(targetGV, overrides)
 	}
 
 	// if no fallback is available, error
