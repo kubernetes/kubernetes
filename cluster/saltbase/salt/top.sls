@@ -16,7 +16,7 @@ base:
 {% if pillar.get('network_provider', '').lower() == 'flannel' %}
     - flannel
 {% endif %}
-{% if pillar.get('policy_provider', '').lower() == 'calico' %}
+{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - cni
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
     - cni
@@ -47,7 +47,7 @@ base:
 {% endif %}
     - logrotate
     - supervisor
-{% if pillar.get('policy_provider', '').lower() == 'calico' %}
+{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - calico.node
 {% endif %}
 
@@ -94,6 +94,6 @@ base:
 {% if pillar.get('enable_node_autoscaler', '').lower() == 'true' %}
     - cluster-autoscaler
 {% endif %}
-{% if pillar.get('policy_provider', '').lower() == 'calico' %}
+{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - calico.master
 {% endif %}
