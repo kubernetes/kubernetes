@@ -16359,6 +16359,10 @@
       "$ref": "v1.AzureFileVolumeSource",
       "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod."
      },
+     "vsphereVolume": {
+      "$ref": "v1.VsphereVirtualDiskVolumeSource",
+      "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -16731,6 +16735,23 @@
      }
     }
    },
+   "v1.VsphereVirtualDiskVolumeSource": {
+    "id": "v1.VsphereVirtualDiskVolumeSource",
+    "description": "Represents a vSphere volume resource.",
+    "required": [
+     "volumePath"
+    ],
+    "properties": {
+     "volumePath": {
+      "type": "string",
+      "description": "Path that identifies vSphere volume vmdk"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -16977,6 +16998,10 @@
      "configMap": {
       "$ref": "v1.ConfigMapVolumeSource",
       "description": "ConfigMap represents a configMap that should populate this volume"
+     },
+     "vsphereVolume": {
+      "$ref": "v1.VsphereVirtualDiskVolumeSource",
+      "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
      }
     }
    },

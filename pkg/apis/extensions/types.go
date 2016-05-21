@@ -710,6 +710,7 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	VsphereVolume         FSType = "vsphereVolume"
 	All                   FSType = "*"
 )
 
