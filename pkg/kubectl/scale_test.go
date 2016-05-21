@@ -249,7 +249,7 @@ func TestValidateReplicationController(t *testing.T) {
 }
 
 type ErrorJobs struct {
-	testclient.FakeJobs
+	testclient.FakeJobsV1
 	invalid bool
 }
 
@@ -270,16 +270,16 @@ func (c *ErrorJobs) Get(name string) (*batch.Job, error) {
 }
 
 type ErrorJobClient struct {
-	testclient.FakeExperimental
+	testclient.FakeBatch
 	invalid bool
 }
 
 func (c *ErrorJobClient) Jobs(namespace string) client.JobInterface {
-	return &ErrorJobs{testclient.FakeJobs{Fake: &c.FakeExperimental, Namespace: namespace}, c.invalid}
+	return &ErrorJobs{testclient.FakeJobsV1{Fake: &c.FakeBatch, Namespace: namespace}, c.invalid}
 }
 
 func TestJobScaleRetry(t *testing.T) {
-	fake := &ErrorJobClient{FakeExperimental: testclient.FakeExperimental{}, invalid: false}
+	fake := &ErrorJobClient{FakeBatch: testclient.FakeBatch{}, invalid: false}
 	scaler := JobScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -303,7 +303,7 @@ func TestJobScaleRetry(t *testing.T) {
 }
 
 func TestJobScale(t *testing.T) {
-	fake := &testclient.FakeExperimental{Fake: &testclient.Fake{}}
+	fake := &testclient.FakeBatch{Fake: &testclient.Fake{}}
 	scaler := JobScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -323,7 +323,7 @@ func TestJobScale(t *testing.T) {
 }
 
 func TestJobScaleInvalid(t *testing.T) {
-	fake := &ErrorJobClient{FakeExperimental: testclient.FakeExperimental{}, invalid: true}
+	fake := &ErrorJobClient{FakeBatch: testclient.FakeBatch{}, invalid: true}
 	scaler := JobScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -348,7 +348,7 @@ func TestJobScaleFailsPreconditions(t *testing.T) {
 			Parallelism: &ten,
 		},
 	})
-	scaler := JobScaler{&testclient.FakeExperimental{Fake: fake}}
+	scaler := JobScaler{&testclient.FakeBatch{Fake: fake}}
 	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"

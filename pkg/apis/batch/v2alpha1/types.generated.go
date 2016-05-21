@@ -3597,20 +3597,14 @@ func (x *ScheduledJobSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.JobTemplate == nil {
-					r.EncodeNil()
-				} else {
-					x.JobTemplate.CodecEncodeSelf(e)
-				}
+				yy18 := &x.JobTemplate
+				yy18.CodecEncodeSelf(e)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("jobTemplate"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.JobTemplate == nil {
-					r.EncodeNil()
-				} else {
-					x.JobTemplate.CodecEncodeSelf(e)
-				}
+				yy20 := &x.JobTemplate
+				yy20.CodecEncodeSelf(e)
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
@@ -3709,14 +3703,10 @@ func (x *ScheduledJobSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "jobTemplate":
 			if r.TryDecodeAsNil() {
-				if x.JobTemplate != nil {
-					x.JobTemplate = nil
-				}
+				x.JobTemplate = JobTemplateSpec{}
 			} else {
-				if x.JobTemplate == nil {
-					x.JobTemplate = new(JobTemplateSpec)
-				}
-				x.JobTemplate.CodecDecodeSelf(d)
+				yyv9 := &x.JobTemplate
+				yyv9.CodecDecodeSelf(d)
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -3818,14 +3808,10 @@ func (x *ScheduledJobSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		if x.JobTemplate != nil {
-			x.JobTemplate = nil
-		}
+		x.JobTemplate = JobTemplateSpec{}
 	} else {
-		if x.JobTemplate == nil {
-			x.JobTemplate = new(JobTemplateSpec)
-		}
-		x.JobTemplate.CodecDecodeSelf(d)
+		yyv16 := &x.JobTemplate
+		yyv16.CodecDecodeSelf(d)
 	}
 	for {
 		yyj10++
@@ -4975,7 +4961,7 @@ func (x codecSelfer1234) decSliceScheduledJob(v *[]ScheduledJob, d *codec1978.De
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 328)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 1024)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

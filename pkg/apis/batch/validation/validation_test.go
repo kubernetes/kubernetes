@@ -26,16 +26,35 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
-func TestValidateJob(t *testing.T) {
-	validManualSelector := &unversioned.LabelSelector{
+func getValidManualSelector() *unversioned.LabelSelector {
+	return &unversioned.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
-	validGeneratedSelector := &unversioned.LabelSelector{
+}
+
+func getValidPodTemplateSpecForManual(selector *unversioned.LabelSelector) api.PodTemplateSpec {
+	return api.PodTemplateSpec{
+		ObjectMeta: api.ObjectMeta{
+			Labels: selector.MatchLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+		},
+	}
+}
+
+func getValidGeneratedSelector() *unversioned.LabelSelector {
+	return &unversioned.LabelSelector{
 		MatchLabels: map[string]string{"controller-uid": "1a2b3c", "job-name": "myjob"},
 	}
-	validPodTemplateSpecForManual := api.PodTemplateSpec{
+}
+
+func getValidPodTemplateSpecForGenerated(selector *unversioned.LabelSelector) api.PodTemplateSpec {
+	return api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
-			Labels: validManualSelector.MatchLabels,
+			Labels: selector.MatchLabels,
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
@@ -43,16 +62,14 @@ func TestValidateJob(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	validPodTemplateSpecForGenerated := api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
-			Labels: validGeneratedSelector.MatchLabels,
-		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-		},
-	}
+}
+
+func TestValidateJob(t *testing.T) {
+	validManualSelector := getValidManualSelector()
+	validPodTemplateSpecForManual := getValidPodTemplateSpecForManual(validManualSelector)
+	validGeneratedSelector := getValidGeneratedSelector()
+	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+
 	successCases := map[string]batch.Job{
 		"manual selector": {
 			ObjectMeta: api.ObjectMeta{
@@ -73,9 +90,8 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
-				Selector:       validGeneratedSelector,
-				ManualSelector: newBool(false),
-				Template:       validPodTemplateSpecForGenerated,
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGenerated,
 			},
 		},
 	}
@@ -94,9 +110,9 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
-				Parallelism:    &negative,
-				ManualSelector: newBool(true),
-				Template:       validPodTemplateSpecForGenerated,
+				Parallelism: &negative,
+				Selector:    validGeneratedSelector,
+				Template:    validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.completions:must be greater than or equal to 0": {
@@ -106,10 +122,9 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
-				Completions:    &negative,
-				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
-				Template:       validPodTemplateSpecForGenerated,
+				Completions: &negative,
+				Selector:    validGeneratedSelector,
+				Template:    validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.activeDeadlineSeconds:must be greater than or equal to 0": {
@@ -120,8 +135,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				ActiveDeadlineSeconds: &negative64,
-				Selector:              validManualSelector,
-				ManualSelector:        newBool(true),
+				Selector:              validGeneratedSelector,
 				Template:              validPodTemplateSpecForGenerated,
 			},
 		},
@@ -286,6 +300,276 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 		}
 		if errs.ToAggregate().Error() != testName {
 			t.Errorf("expected '%s' got '%s'", errs.ToAggregate().Error(), testName)
+		}
+	}
+}
+
+func TestValidateScheduledJob(t *testing.T) {
+	validManualSelector := getValidManualSelector()
+	validGeneratedSelector := getValidGeneratedSelector()
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+
+	successCases := map[string]batch.ScheduledJob{
+		"basic scheduled job": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector: validGeneratedSelector,
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+	}
+	for k, v := range successCases {
+		if errs := ValidateScheduledJob(&v); len(errs) != 0 {
+			t.Errorf("expected success for %s: %v", k, errs)
+		}
+	}
+
+	negative := int32(-1)
+	negative64 := int64(-1)
+
+	errorCases := map[string]batch.ScheduledJob{
+		"spec.schedule: Invalid value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "error",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector: validGeneratedSelector,
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.schedule: Required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector: validGeneratedSelector,
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.startingDeadlineSeconds:must be greater than or equal to 0": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:                "* * * * * ?",
+				ConcurrencyPolicy:       batch.AllowConcurrent,
+				StartingDeadlineSeconds: &negative64,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector: validGeneratedSelector,
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.concurrencyPolicy: Required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule: "* * * * * ?",
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector: validGeneratedSelector,
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.parallelism:must be greater than or equal to 0": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector:    validGeneratedSelector,
+						Parallelism: &negative,
+						Template:    validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.completions:must be greater than or equal to 0": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+
+					Spec: batch.JobSpec{
+						Completions: &negative,
+						Selector:    validGeneratedSelector,
+						Template:    validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.activeDeadlineSeconds:must be greater than or equal to 0": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						ActiveDeadlineSeconds: &negative64,
+						Selector:              validGeneratedSelector,
+						Template:              validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.selector:Required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector:       validManualSelector,
+						ManualSelector: newBool(true),
+						Template: api.PodTemplateSpec{
+							ObjectMeta: api.ObjectMeta{
+								Labels: map[string]string{"y": "z"},
+							},
+							Spec: api.PodSpec{
+								RestartPolicy: api.RestartPolicyOnFailure,
+								DNSPolicy:     api.DNSClusterFirst,
+								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+							},
+						},
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.template.metadata.labels: Invalid value: {\"controller-uid\":\"4d5e6f\"}: `selector` does not match template `labels`": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector:       validManualSelector,
+						ManualSelector: newBool(true),
+						Template: api.PodTemplateSpec{
+							ObjectMeta: api.ObjectMeta{
+								Labels: map[string]string{"controller-uid": "4d5e6f"},
+							},
+							Spec: api.PodSpec{
+								RestartPolicy: api.RestartPolicyOnFailure,
+								DNSPolicy:     api.DNSClusterFirst,
+								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+							},
+						},
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.template.spec.restartPolicy: Unsupported value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "* * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Selector:       validManualSelector,
+						ManualSelector: newBool(true),
+						Template: api.PodTemplateSpec{
+							ObjectMeta: api.ObjectMeta{
+								Labels: validManualSelector.MatchLabels,
+							},
+							Spec: api.PodSpec{
+								RestartPolicy: api.RestartPolicyAlways,
+								DNSPolicy:     api.DNSClusterFirst,
+								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for k, v := range errorCases {
+		errs := ValidateScheduledJob(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0]
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %v, expected: %s", err, k)
+			}
 		}
 	}
 }
