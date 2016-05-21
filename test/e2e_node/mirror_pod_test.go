@@ -47,7 +47,7 @@ var _ = Describe("MirrorPod", func() {
 			mirrorPodName = staticPodName + "-" + e2es.nodeName
 
 			By("create the static pod")
-			err := createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, "gcr.io/google_containers/nginx:1.7.9", api.RestartPolicyAlways)
+			err := createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, ImageRegistry[nginxImage], api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")
@@ -62,7 +62,7 @@ var _ = Describe("MirrorPod", func() {
 			uid := pod.UID
 
 			By("update the static pod container image")
-			image := "gcr.io/google_containers/pause-amd64:3.0"
+			image := ImageRegistry[pauseImage]
 			err = createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, image, api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 

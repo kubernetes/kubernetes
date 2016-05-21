@@ -38,6 +38,8 @@ import (
 
 var e2es *e2eService
 
+var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+
 func TestE2eNode(t *testing.T) {
 	flag.Parse()
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -57,6 +59,14 @@ var _ = BeforeSuite(func() {
 			glog.Fatalf("Could not get node name from hostname %v.  Output:\n%s", err, output)
 		}
 		*nodeName = strings.TrimSpace(fmt.Sprintf("%s", output))
+	}
+
+	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
+	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
+	if *prePullImages {
+		glog.Infof("Pre-pulling images so that they are cached for the tests.")
+		err := PrePullAllImages()
+		Expect(err).ShouldNot(HaveOccurred())
 	}
 
 	// TODO(yifan): Temporary workaround to disable coreos from auto restart
