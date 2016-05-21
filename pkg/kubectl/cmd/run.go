@@ -443,10 +443,11 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 	}
 
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	groupVersionKind, err := typer.ObjectKind(obj)
+	groupVersionKinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
+	groupVersionKind := groupVersionKinds[0]
 
 	if len(overrides) > 0 {
 		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))

@@ -30,15 +30,6 @@ const (
 	APIVersionInternal = "__internal"
 )
 
-// Typer retrieves information about an object's group, version, and kind.
-type Typer interface {
-	// ObjectKind returns the version and kind of the provided object, or an
-	// error if the object is not recognized (IsNotRegisteredError will return true).
-	// It returns whether the object is considered unversioned at the same time.
-	// TODO: align the signature of ObjectTyper with this interface
-	ObjectKind(Object) (*unversioned.GroupVersionKind, bool, error)
-}
-
 type Encoder interface {
 	// EncodeToStream writes an object to a stream. Override versions may be provided for each group
 	// that enforce a certain versioning. Implementations may return errors if the versions are incompatible,
@@ -178,20 +169,14 @@ type ObjectConvertor interface {
 // ObjectTyper contains methods for extracting the APIVersion and Kind
 // of objects.
 type ObjectTyper interface {
-	// ObjectKind returns the default group,version,kind of the provided object, or an
-	// error if the object is not recognized (IsNotRegisteredError will return true).
-	ObjectKind(Object) (unversioned.GroupVersionKind, error)
-	// ObjectKinds returns the all possible group,version,kind of the provided object, or an
-	// error if the object is not recognized (IsNotRegisteredError will return true).
-	ObjectKinds(Object) ([]unversioned.GroupVersionKind, error)
+	// ObjectKinds returns the all possible group,version,kind of the provided object, true if
+	// the object is unversioned, or an error if the object is not recognized
+	// (IsNotRegisteredError will return true).
+	ObjectKinds(Object) ([]unversioned.GroupVersionKind, bool, error)
 	// Recognizes returns true if the scheme is able to handle the provided version and kind,
 	// or more precisely that the provided version is a possible conversion or decoding
 	// target.
 	Recognizes(gvk unversioned.GroupVersionKind) bool
-	// IsUnversioned returns true if the provided object is considered unversioned and thus
-	// should have Version and Group suppressed in the output. If the object is not recognized
-	// in the scheme, ok is false.
-	IsUnversioned(Object) (unversioned bool, ok bool)
 }
 
 // ObjectCreater contains methods for instantiating an object by kind and version.

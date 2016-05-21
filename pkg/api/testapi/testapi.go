@@ -354,10 +354,11 @@ func ExternalGroupVersions() []unversioned.GroupVersion {
 
 // Get codec based on runtime.Object
 func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
-	kind, err := api.Scheme.ObjectKind(obj)
+	kinds, _, err := api.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected encoding error: %v", err)
 	}
+	kind := kinds[0]
 
 	for _, group := range Groups {
 		if group.GroupVersion().Group != kind.Group {

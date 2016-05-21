@@ -37,7 +37,7 @@ import (
 
 func init() {
 	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
-		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
+		s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
 		return api.Codecs.CodecForVersions(s, s, testapi.ExternalGroupVersions(), nil), nil
 	})
 }
@@ -138,7 +138,7 @@ func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {
 func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
 	items := benchmarkItems()
 	width := len(items)
-	s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
+	s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
 	encoder := api.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
 	var encoded [][]byte
 	for i := range items {
