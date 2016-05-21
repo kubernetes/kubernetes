@@ -729,6 +729,11 @@
 			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
 		},
 		{
+			"ImportPath": "github.com/emicklei/go-restful/examples/msgpack",
+			"Comment": "v1.2-54-g7c47e25",
+			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
+		},
+		{
 			"ImportPath": "github.com/emicklei/go-restful/log",
 			"Comment": "v1.2-54-g7c47e25",
 			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
@@ -2043,6 +2048,10 @@
 			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
+			"ImportPath": "google.golang.org/api/dns/v1",
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
+		},
+		{
 			"ImportPath": "google.golang.org/api/gensupport",
 			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
@@ -2118,6 +2127,16 @@
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
 			"Comment": "v1.0-16-g20b71e5",
 			"Rev": "20b71e5b60d756d3d2f80def009790325acc2b23"
+		},
+		{
+			"ImportPath": "gopkg.in/vmihailenco/msgpack.v2",
+			"Comment": "v2.5.1",
+			"Rev": "005134bfb4bf69b74e05382eddacea6a4585e4aa"
+		},
+		{
+			"ImportPath": "gopkg.in/vmihailenco/msgpack.v2/codes",
+			"Comment": "v2.5.1",
+			"Rev": "005134bfb4bf69b74e05382eddacea6a4585e4aa"
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",

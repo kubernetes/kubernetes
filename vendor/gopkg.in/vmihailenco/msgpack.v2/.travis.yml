@@ -1,0 +1,18 @@
+sudo: false
+language: go
+
+go:
+  - 1.5
+  - 1.6
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+install:
+  - go get gopkg.in/check.v1
+  - go get github.com/ugorji/go-msgpack
+  - go get github.com/ugorji/go/codec
+  - mkdir -p $HOME/gopath/src/gopkg.in/vmihailenco
+  - mv `pwd` $HOME/gopath/src/gopkg.in/vmihailenco/msgpack.v2
