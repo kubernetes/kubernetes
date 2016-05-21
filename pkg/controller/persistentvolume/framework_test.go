@@ -882,6 +882,9 @@ type mockVolumePlugin struct {
 }
 
 var _ vol.VolumePlugin = &mockVolumePlugin{}
+var _ vol.RecyclableVolumePlugin = &mockVolumePlugin{}
+var _ vol.DeletableVolumePlugin = &mockVolumePlugin{}
+var _ vol.ProvisionableVolumePlugin = &mockVolumePlugin{}
 
 func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
 	return nil
@@ -981,7 +984,7 @@ func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
 
 // Recycler interfaces
 
-func (plugin *mockVolumePlugin) NewRecycler(spec *vol.Spec) (vol.Recycler, error) {
+func (plugin *mockVolumePlugin) NewRecycler(pvName string, spec *vol.Spec) (vol.Recycler, error) {
 	if len(plugin.recycleCalls) > 0 {
 		// mockVolumePlugin directly implements Recycler interface
 		glog.V(4).Infof("mock plugin NewRecycler called, returning mock recycler")

@@ -199,7 +199,7 @@ func (plugin *FakeVolumePlugin) NewDetacher() (Detacher, error) {
 	return plugin.getFakeVolume(&plugin.Detachers), nil
 }
 
-func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
+func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler, error) {
 	return &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}, nil
 }
 
@@ -312,7 +312,7 @@ func (fr *fakeRecycler) GetPath() string {
 	return fr.path
 }
 
-func NewFakeRecycler(spec *Spec, host VolumeHost, config VolumeConfig) (Recycler, error) {
+func NewFakeRecycler(pvName string, spec *Spec, host VolumeHost, config VolumeConfig) (Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("fakeRecycler only supports spec.PersistentVolume.Spec.HostPath")
 	}

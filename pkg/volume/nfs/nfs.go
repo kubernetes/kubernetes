@@ -46,7 +46,7 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 type nfsPlugin struct {
 	host volume.VolumeHost
 	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
+	newRecyclerFunc func(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	config          volume.VolumeConfig
 }
 
@@ -120,8 +120,8 @@ func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	}}, nil
 }
 
-func (plugin *nfsPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(spec, plugin.host, plugin.config)
+func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec) (volume.Recycler, error) {
+	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
 }
 
 // NFS volumes represent a bare host file or directory mount of an NFS export.
@@ -250,7 +250,7 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	return nil
 }
 
-func newRecycler(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error) {
+func newRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.NFS == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.NFS is nil")
 	}
@@ -261,6 +261,7 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.
 		host:    host,
 		config:  volumeConfig,
 		timeout: volume.CalculateTimeoutForVolume(volumeConfig.RecyclerMinimumTimeout, volumeConfig.RecyclerTimeoutIncrement, spec.PersistentVolume),
+		pvName:  pvName,
 	}, nil
 }
 
@@ -273,6 +274,7 @@ type nfsRecycler struct {
 	config  volume.VolumeConfig
 	timeout int64
 	volume.MetricsNil
+	pvName string
 }
 
 func (r *nfsRecycler) GetPath() string {
@@ -292,5 +294,5 @@ func (r *nfsRecycler) Recycle() error {
 			Path:   r.path,
 		},
 	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(pod, r.host.GetKubeClient())
+	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient())
 }
