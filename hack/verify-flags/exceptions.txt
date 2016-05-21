@@ -72,9 +72,9 @@ hack/test-update-storage-objects.sh:  local storage_versions=${1:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
-pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
-pkg/kubelet/qos/memory_policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
-pkg/kubelet/qos/memory_policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
+pkg/kubelet/qos/policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
+pkg/kubelet/qos/policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
+pkg/kubelet/qos/policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
 pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
 pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.

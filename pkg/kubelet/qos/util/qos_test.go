@@ -65,35 +65,63 @@ func TestGetPodQos(t *testing.T) {
 		expected string
 	}{
 		{
+			pod: newPod("guaranteed", []api.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: Guaranteed,
+		},
+		{
+			pod: newPod("guaranteed-guaranteed", []api.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: Guaranteed,
+		},
+		{
+			pod: newPod("best-effort-best-effort", []api.Container{
+				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+			}),
+			expected: BestEffort,
+		},
+		{
 			pod: newPod("best-effort", []api.Container{
 				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
 			}),
 			expected: BestEffort,
 		},
 		{
+			pod: newPod("best-effort-burstable", []api.Container{
+				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				newContainer("burstable", getResourceList("1", ""), getResourceList("2", "")),
+			}),
+			expected: Burstable,
+		},
+		{
 			pod: newPod("best-effort-guaranteed", []api.Container{
 				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
 				newContainer("guaranteed", getResourceList("10m", "100Mi"), getResourceList("10m", "100Mi")),
 			}),
-			expected: BestEffort,
+			expected: Burstable,
 		},
 		{
-			pod: newPod("best-effort-cpu-guaranteed-memory", []api.Container{
-				newContainer("best-effort", getResourceList("", "100Mi"), getResourceList("", "100Mi")),
+			pod: newPod("burstable-cpu-guaranteed-memory", []api.Container{
+				newContainer("burstable", getResourceList("", "100Mi"), getResourceList("", "100Mi")),
 			}),
-			expected: BestEffort,
+			expected: Burstable,
+		},
+		{
+			pod: newPod("burstable-guaranteed", []api.Container{
+				newContainer("burstable", getResourceList("1", "100Mi"), getResourceList("2", "100Mi")),
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: Burstable,
 		},
 		{
 			pod: newPod("burstable", []api.Container{
 				newContainer("burstable", getResourceList("10m", "100Mi"), getResourceList("100m", "200Mi")),
 			}),
 			expected: Burstable,
-		},
-		{
-			pod: newPod("guaranteed", []api.Container{
-				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
-			}),
-			expected: Guaranteed,
 		},
 	}
 	for _, testCase := range testCases {
