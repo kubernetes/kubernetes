@@ -214,7 +214,7 @@ func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialpro
 
 	authDir := path.Join(configDir, "auth.d")
 	if _, err := os.Stat(authDir); os.IsNotExist(err) {
-		if err := os.Mkdir(authDir, 0600); err != nil {
+		if err := os.MkdirAll(authDir, 0600); err != nil {
 			glog.Errorf("rkt: Cannot create auth dir: %v", err)
 			return err
 		}
