@@ -204,8 +204,8 @@ func TestResourceListConversion(t *testing.T) {
 		},
 	}
 
-	output := api.ResourceList{}
 	for i, test := range tests {
+		output := api.ResourceList{}
 		err := api.Scheme.Convert(&test.input, &output)
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", i, err)
