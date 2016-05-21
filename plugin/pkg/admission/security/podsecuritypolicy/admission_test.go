@@ -44,6 +44,12 @@ func NewTestAdmission(store cache.Store, kclient clientset.Interface) kadmission
 	}
 }
 
+func useInitContainers(pod *kapi.Pod) *kapi.Pod {
+	pod.Spec.InitContainers = pod.Spec.Containers
+	pod.Spec.Containers = []kapi.Container{}
+	return pod
+}
+
 func TestAdmitPrivileged(t *testing.T) {
 	createPodWithPriv := func(priv bool) *kapi.Pod {
 		pod := goodPod()
@@ -203,6 +209,18 @@ func TestAdmitCaps(t *testing.T) {
 			}
 		}
 	}
+
+	for k, v := range tc {
+		useInitContainers(v.pod)
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+
+		if v.expectedCapabilities != nil {
+			if !reflect.DeepEqual(v.expectedCapabilities, v.pod.Spec.InitContainers[0].SecurityContext.Capabilities) {
+				t.Errorf("%s resulted in caps that were not expected - expected: %v, received: %v", k, v.expectedCapabilities, v.pod.Spec.InitContainers[0].SecurityContext.Capabilities)
+			}
+		}
+	}
+
 }
 
 func TestAdmitVolumes(t *testing.T) {
@@ -233,6 +251,10 @@ func TestAdmitVolumes(t *testing.T) {
 		psp := restrictivePSP()
 
 		// expect a denial for this PSP
+		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, false, "", t)
+
+		// also expect a denial for this PSP if it's an init container
+		useInitContainers(pod)
 		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*extensions.PodSecurityPolicy{psp}, pod, false, "", t)
 
 		// now add the fstype directly to the psp and it should validate
@@ -296,6 +318,18 @@ func TestAdmitHostNetwork(t *testing.T) {
 	}
 
 	for k, v := range tests {
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+
+		if v.shouldPass {
+			if v.pod.Spec.SecurityContext.HostNetwork != v.expectedHostNetwork {
+				t.Errorf("%s expected hostNetwork to be %t", k, v.expectedHostNetwork)
+			}
+		}
+	}
+
+	// test again with init containers
+	for k, v := range tests {
+		useInitContainers(v.pod)
 		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
 
 		if v.shouldPass {

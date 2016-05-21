@@ -32,6 +32,12 @@ func TestAdmission(t *testing.T) {
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{Name: "init1", Image: "image"},
+				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
 			Containers: []api.Container{
 				{Name: "ctr1", Image: "image"},
 				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullNever},
@@ -43,6 +49,11 @@ func TestAdmission(t *testing.T) {
 	err := handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
+	}
+	for _, c := range pod.Spec.InitContainers {
+		if c.ImagePullPolicy != api.PullAlways {
+			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
+		}
 	}
 	for _, c := range pod.Spec.Containers {
 		if c.ImagePullPolicy != api.PullAlways {

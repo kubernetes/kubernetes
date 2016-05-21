@@ -78,11 +78,25 @@ func TestAdmission(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		pod := pod()
-		pod.Spec.SecurityContext = tc.podSc
-		pod.Spec.Containers[0].SecurityContext = tc.sc
+		p := pod()
+		p.Spec.SecurityContext = tc.podSc
+		p.Spec.Containers[0].SecurityContext = tc.sc
 
-		err := handler.Admit(admission.NewAttributesRecord(pod, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		err := handler.Admit(admission.NewAttributesRecord(p, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		if err != nil && !tc.expectError {
+			t.Errorf("%v: unexpected error: %v", tc.name, err)
+		} else if err == nil && tc.expectError {
+			t.Errorf("%v: expected error", tc.name)
+		}
+
+		// verify init containers are also checked
+		p = pod()
+		p.Spec.SecurityContext = tc.podSc
+		p.Spec.Containers[0].SecurityContext = tc.sc
+		p.Spec.InitContainers = p.Spec.Containers
+		p.Spec.Containers = nil
+
+		err = handler.Admit(admission.NewAttributesRecord(p, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 		if err != nil && !tc.expectError {
 			t.Errorf("%v: unexpected error: %v", tc.name, err)
 		} else if err == nil && tc.expectError {

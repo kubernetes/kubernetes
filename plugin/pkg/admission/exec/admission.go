@@ -108,6 +108,14 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 
 // isPrivileged will return true a pod has any privileged containers
 func isPrivileged(pod *api.Pod) bool {
+	for _, c := range pod.Spec.InitContainers {
+		if c.SecurityContext == nil {
+			continue
+		}
+		if *c.SecurityContext.Privileged {
+			return true
+		}
+	}
 	for _, c := range pod.Spec.Containers {
 		if c.SecurityContext == nil {
 			continue

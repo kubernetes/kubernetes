@@ -56,6 +56,10 @@ func (a *alwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
+	for i := range pod.Spec.InitContainers {
+		pod.Spec.InitContainers[i].ImagePullPolicy = api.PullAlways
+	}
+
 	for i := range pod.Spec.Containers {
 		pod.Spec.Containers[i].ImagePullPolicy = api.PullAlways
 	}
