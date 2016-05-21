@@ -6019,6 +6019,17 @@ func Convert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *SecretList
 
 func autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSource, out *api.SecretVolumeSource, s conversion.Scope) error {
 	out.SecretName = in.SecretName
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]api.KeyToPath, len(*in))
+		for i := range *in {
+			if err := Convert_v1_KeyToPath_To_api_KeyToPath(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -6028,6 +6039,17 @@ func Convert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSou
 
 func autoConvert_api_SecretVolumeSource_To_v1_SecretVolumeSource(in *api.SecretVolumeSource, out *SecretVolumeSource, s conversion.Scope) error {
 	out.SecretName = in.SecretName
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]KeyToPath, len(*in))
+		for i := range *in {
+			if err := Convert_api_KeyToPath_To_v1_KeyToPath(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
