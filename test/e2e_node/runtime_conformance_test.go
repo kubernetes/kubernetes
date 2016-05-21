@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	consistentCheckTimeout = time.Second * 20
+	consistentCheckTimeout = time.Second * 10
 	retryTimeout           = time.Minute * 5
 	pollInterval           = time.Second * 5
 )
@@ -66,7 +66,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 		Context("when start a container that exits successfully", func() {
 			It("it should run with the expected status [Conformance]", func() {
 				testContainer := api.Container{
-					Image: "gcr.io/google_containers/busybox",
+					Image: ImageRegistry[busyBoxImage],
 					VolumeMounts: []api.VolumeMount{
 						{
 							MountPath: "/restart-count",
@@ -145,7 +145,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 		Context("when start a container that keeps running", func() {
 			It("it should run with the expected status [Conformance]", func() {
 				testContainer := api.Container{
-					Image:           "gcr.io/google_containers/busybox",
+					Image:           ImageRegistry[busyBoxImage],
 					Command:         []string{"sh", "-c", "while true; do echo hello; sleep 1; done"},
 					ImagePullPolicy: api.PullIfNotPresent,
 				}
@@ -203,7 +203,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 		Context("when start a container that exits failure", func() {
 			It("it should run with the expected status [Conformance]", func() {
 				testContainer := api.Container{
-					Image:           "gcr.io/google_containers/busybox",
+					Image:           ImageRegistry[busyBoxImage],
 					Command:         []string{"false"},
 					ImagePullPolicy: api.PullIfNotPresent,
 				}
