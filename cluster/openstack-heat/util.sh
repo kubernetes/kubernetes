@@ -32,7 +32,7 @@ fi
 # Verify prereqs on host machine
 function verify-prereqs() {
  # Check the OpenStack command-line clients
- for client in swift glance nova openstack;
+ for client in swift glance nova heat openstack;
  do
   if which $client >/dev/null 2>&1; then
     echo "${client} client installed"
