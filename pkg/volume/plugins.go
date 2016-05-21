@@ -101,7 +101,7 @@ type RecyclableVolumePlugin interface {
 	VolumePlugin
 	// NewRecycler creates a new volume.Recycler which knows how to reclaim this resource
 	// after the volume's release from a PersistentVolumeClaim
-	NewRecycler(spec *Spec) (Recycler, error)
+	NewRecycler(pvName string, spec *Spec) (Recycler, error)
 }
 
 // DeletableVolumePlugin is an extended interface of VolumePlugin and is used by persistent volumes that want
@@ -237,6 +237,9 @@ type VolumeConfig struct {
 	// Gi of capacity in the persistent volume.
 	// Example: 5Gi volume x 30s increment = 150s + 30s minimum = 180s ActiveDeadlineSeconds for recycler pod
 	RecyclerTimeoutIncrement int
+
+	// PVName is name of the PersistentVolume instance that is being recycled. It is used to generate unique recycler pod name.
+	PVName string
 
 	// OtherAttributes stores config as strings.  These strings are opaque to the system and only understood by the binary
 	// hosting the plugin and the plugin itself.

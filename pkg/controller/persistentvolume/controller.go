@@ -865,7 +865,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	}
 
 	// Plugin found
-	recycler, err := plugin.NewRecycler(spec)
+	recycler, err := plugin.NewRecycler(volume.Name, spec)
 	if err != nil {
 		// Cannot create recycler
 		strerr := fmt.Sprintf("Failed to create recycler: %v", err)
