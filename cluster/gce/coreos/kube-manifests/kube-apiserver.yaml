@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: kube-apiserver-kubernetes-master
+  name: kube-apiserver
   namespace: kube-system
 spec:
   containers:
