@@ -253,7 +253,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			podPath = framework.ReadOrDie(path.Join(kubeCtlManifestPath, "pod-with-readiness-probe.yaml"))
 			By(fmt.Sprintf("creating the pod from %v", string(podPath)))
 			framework.RunKubectlOrDieInput(string(podPath[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)
+			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
 		AfterEach(func() {
 			cleanupKubectlInputs(string(podPath[:]), ns, simplePodSelector)
@@ -647,7 +647,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(string(pod), "create", "-f", "-", nsFlag)
-			framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)
+			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
 		AfterEach(func() {
 			cleanupKubectlInputs(string(pod[:]), ns, simplePodSelector)
