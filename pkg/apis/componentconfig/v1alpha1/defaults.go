@@ -80,6 +80,9 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 	if obj.AlgorithmProvider == "" {
 		obj.AlgorithmProvider = "DefaultProvider"
 	}
+	if obj.ContentType == "" {
+		obj.ContentType = "application/vnd.kubernetes.protobuf"
+	}
 	if obj.KubeAPIQPS == 0 {
 		obj.KubeAPIQPS = 50.0
 	}
