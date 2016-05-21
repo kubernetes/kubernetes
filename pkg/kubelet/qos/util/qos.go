@@ -105,9 +105,12 @@ func GetPodQos(pod *api.Pod) string {
 	return Burstable
 }
 
-// GetQos returns a mapping of resource name to QoS class of a container
-func GetQoS(container *api.Container) map[api.ResourceName]string {
-	resourceToQoS := map[api.ResourceName]string{}
+// QoSList is a set of (resource name, QoS class) pairs.
+type QoSList map[api.ResourceName]string
+
+// GetQoS returns a mapping of resource name to QoS class of a container
+func GetQoS(container *api.Container) QoSList {
+	resourceToQoS := QoSList{}
 	for resource := range allResources(container) {
 		switch {
 		case isResourceGuaranteed(container, resource):

@@ -842,21 +842,25 @@ func describeContainers(label string, containers []api.Container, containerStatu
 		if len(resourceToQoS) > 0 {
 			fmt.Fprintf(out, "    QoS Tier:\n")
 		}
-		for resource, qos := range resourceToQoS {
+		for _, resource := range SortedQoSResourceNames(resourceToQoS) {
+			qos := resourceToQoS[resource]
 			fmt.Fprintf(out, "      %s:\t%s\n", resource, qos)
 		}
 
-		if len(container.Resources.Limits) > 0 {
+		resources := container.Resources
+		if len(resources.Limits) > 0 {
 			fmt.Fprintf(out, "    Limits:\n")
 		}
-		for name, quantity := range container.Resources.Limits {
+		for _, name := range SortedResourceNames(resources.Limits) {
+			quantity := resources.Limits[name]
 			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
 		}
 
-		if len(container.Resources.Requests) > 0 {
+		if len(resources.Requests) > 0 {
 			fmt.Fprintf(out, "    Requests:\n")
 		}
-		for name, quantity := range container.Resources.Requests {
+		for _, name := range SortedResourceNames(resources.Requests) {
+			quantity := resources.Requests[name]
 			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
 		}
 
