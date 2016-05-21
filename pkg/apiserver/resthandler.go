@@ -23,7 +23,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	gpath "path"
 	"strings"
 	"time"
 
@@ -962,7 +961,7 @@ func setSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) err
 
 	newURL := *req.Request.URL
 	// use only canonical paths
-	newURL.Path = gpath.Clean(path)
+	newURL.Path = path
 	newURL.RawQuery = query
 	newURL.Fragment = ""
 
