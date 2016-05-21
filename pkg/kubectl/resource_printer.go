@@ -444,6 +444,7 @@ var deploymentColumns = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AV
 var configMapColumns = []string{"NAME", "DATA", "AGE"}
 var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS", "SELINUX", "RUNASUSER"}
 var clusterColumns = []string{"NAME", "STATUS", "VERSION", "AGE"}
+var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -501,6 +502,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(thirdPartyResourceDataColumns, printThirdPartyResourceDataList)
 	h.Handler(clusterColumns, printCluster)
 	h.Handler(clusterColumns, printClusterList)
+	h.Handler(networkPolicyColumns, printNetworkPolicy)
+	h.Handler(networkPolicyColumns, printNetworkPolicyList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1772,6 +1775,34 @@ func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, w io.Wri
 		}
 	}
 
+	return nil
+}
+
+func printNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, options PrintOptions) error {
+	name := networkPolicy.Name
+	namespace := networkPolicy.Namespace
+
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, unversioned.FormatLabelSelector(&networkPolicy.Spec.PodSelector), translateTimestamp(networkPolicy.CreationTimestamp)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, appendLabels(networkPolicy.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendAllLabels(options.ShowLabels, networkPolicy.Labels))
+	return err
+}
+
+func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, options PrintOptions) error {
+	for i := range list.Items {
+		if err := printNetworkPolicy(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

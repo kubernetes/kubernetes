@@ -378,6 +378,10 @@ func (c *FakeExperimental) ReplicaSets(namespace string) client.ReplicaSetInterf
 	return &FakeReplicaSets{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) NetworkPolicies(namespace string) client.NetworkPolicyInterface {
+	return &FakeNetworkPolicies{Fake: c, Namespace: namespace}
+}
+
 type FakeDiscovery struct {
 	*Fake
 }

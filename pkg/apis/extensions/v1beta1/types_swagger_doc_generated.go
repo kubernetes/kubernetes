@@ -456,6 +456,62 @@ func (ListOptions) SwaggerDoc() map[string]string {
 	return map_ListOptions
 }
 
+var map_NetworkPolicy = map[string]string{
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Specification of the desired behavior for this NetworkPolicy.",
+}
+
+func (NetworkPolicy) SwaggerDoc() map[string]string {
+	return map_NetworkPolicy
+}
+
+var map_NetworkPolicyIngressRule = map[string]string{
+	"":      "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
+	"ports": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is not provided, this rule matches all ports (traffic not restricted by port). If this field is empty, this rule matches no ports (no traffic matches). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
+	"from":  "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is not provided, this rule matches all sources (traffic not restricted by source). If this field is empty, this rule matches no sources (no traffic matches). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list.",
+}
+
+func (NetworkPolicyIngressRule) SwaggerDoc() map[string]string {
+	return map_NetworkPolicyIngressRule
+}
+
+var map_NetworkPolicyList = map[string]string{
+	"":         "Network Policy List is a list of NetworkPolicy objects.",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is a list of schema objects.",
+}
+
+func (NetworkPolicyList) SwaggerDoc() map[string]string {
+	return map_NetworkPolicyList
+}
+
+var map_NetworkPolicyPeer = map[string]string{
+	"podSelector":       "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace.",
+	"namespaceSelector": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omited, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
+}
+
+func (NetworkPolicyPeer) SwaggerDoc() map[string]string {
+	return map_NetworkPolicyPeer
+}
+
+var map_NetworkPolicyPort = map[string]string{
+	"protocol": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP.",
+	"port":     "If specified, the port on the given protocol.  This can either be a numerical or named port on a pod.  If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
+}
+
+func (NetworkPolicyPort) SwaggerDoc() map[string]string {
+	return map_NetworkPolicyPort
+}
+
+var map_NetworkPolicySpec = map[string]string{
+	"podSelector": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.",
+	"ingress":     "List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if namespace.networkPolicy.ingress.isolation is undefined and cluster policy allows it, OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not affect ingress isolation. If this field is present and contains at least one rule, this policy allows any traffic which matches at least one of the ingress rules in this list.",
+}
+
+func (NetworkPolicySpec) SwaggerDoc() map[string]string {
+	return map_NetworkPolicySpec
+}
+
 var map_PodSecurityPolicy = map[string]string{
 	"":         "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
