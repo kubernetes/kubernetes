@@ -165,6 +165,8 @@ type JobCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// +genclient=true
+
 // ScheduledJob represents the configuration of a single scheduled job.
 type ScheduledJob struct {
 	unversioned.TypeMeta `json:",inline"`
