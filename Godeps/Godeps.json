@@ -52,18 +52,18 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.7.4-43-gd22f52b",
-			"Rev": "d22f52bfeba06614d37c7aa1ad6fd76d8fdb2ba8"
+			"Comment": "v0.8.1",
+			"Rev": "b889d03467ae08bb6c13241762a64305b69bcf82"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/common",
-			"Comment": "v0.7.4-43-gd22f52b",
-			"Rev": "d22f52bfeba06614d37c7aa1ad6fd76d8fdb2ba8"
+			"Comment": "v0.8.1",
+			"Rev": "b889d03467ae08bb6c13241762a64305b69bcf82"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/types",
-			"Comment": "v0.7.4-43-gd22f52b",
-			"Rev": "d22f52bfeba06614d37c7aa1ad6fd76d8fdb2ba8"
+			"Comment": "v0.8.1",
+			"Rev": "b889d03467ae08bb6c13241762a64305b69bcf82"
 		},
 		{
 			"ImportPath": "github.com/armon/go-metrics",
@@ -545,8 +545,8 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/rkt/api/v1alpha",
-			"Comment": "v1.4.0",
-			"Rev": "f5b69782d120a7ae5ada8f2ebad97a014a98ebd5"
+			"Comment": "v1.6.0",
+			"Rev": "14437382a98e5ebeb6cafb57cff445370e3f7d56"
 		},
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
