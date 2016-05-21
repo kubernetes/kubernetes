@@ -98,12 +98,19 @@ func TestMemoryPressure(t *testing.T) {
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
+		MaxPodGracePeriodSeconds: 5,
 		PressureTransitionPeriod: time.Minute * 5,
 		Thresholds: []Threshold{
 			{
 				Signal:   SignalMemoryAvailable,
 				Operator: OpLessThan,
 				Value:    quantityMustParse("1Gi"),
+			},
+			{
+				Signal:      SignalMemoryAvailable,
+				Operator:    OpLessThan,
+				Value:       quantityMustParse("2Gi"),
+				GracePeriod: time.Minute * 2,
 			},
 		},
 	}
@@ -139,6 +146,56 @@ func TestMemoryPressure(t *testing.T) {
 		}
 	}
 
+	// induce soft threshold
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
+	manager.synchronize(activePodsFunc)
+
+	// we should have memory pressure
+	if !manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should report memory pressure since soft threshold was met")
+	}
+
+	// verify no pod was yet killed because there has not yet been enough time passed.
+	if podKiller.pod != nil {
+		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod)
+	}
+
+	// step forward in time pass the grace period
+	fakeClock.Step(3 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
+	manager.synchronize(activePodsFunc)
+
+	// we should have memory pressure
+	if !manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should report memory pressure since soft threshold was met")
+	}
+
+	// verify the right pod was killed with the right grace period.
+	if podKiller.pod != pods[0] {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	}
+	if podKiller.gracePeriodOverride == nil {
+		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+	}
+	observedGracePeriod := *podKiller.gracePeriodOverride
+	if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
+	}
+	// reset state
+	podKiller.pod = nil
+	podKiller.gracePeriodOverride = nil
+
+	// remove memory pressure
+	fakeClock.Step(20 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("3Gi", podStats)
+	manager.synchronize(activePodsFunc)
+
+	// we should not have memory pressure
+	if manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should not report memory pressure")
+	}
+
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
@@ -152,6 +209,10 @@ func TestMemoryPressure(t *testing.T) {
 	// check the right pod was killed
 	if podKiller.pod != pods[0] {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	}
+	observedGracePeriod = *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
 	}
 
 	// the best-effort pod should not admit, burstable should

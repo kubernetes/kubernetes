@@ -158,7 +158,7 @@ func (m *managerImpl) synchronize(podFunc ActivePodsFunc) {
 	// determine the set of resources under starvation
 	starvedResources := reclaimResources(thresholds)
 	if len(starvedResources) == 0 {
-		glog.Infof("eviction manager: no resources are starved")
+		glog.V(3).Infof("eviction manager: no resources are starved")
 		return
 	}
 
@@ -166,6 +166,9 @@ func (m *managerImpl) synchronize(podFunc ActivePodsFunc) {
 	sort.Sort(byEvictionPriority(starvedResources))
 	resourceToReclaim := starvedResources[0]
 	glog.Warningf("eviction manager: attempting to reclaim %v", resourceToReclaim)
+
+	// determine if this is a soft or hard eviction associated with the resource
+	softEviction := isSoftEviction(thresholds, resourceToReclaim)
 
 	// record an event about the resources we are now attempting to reclaim via eviction
 	m.recorder.Eventf(m.nodeRef, api.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
@@ -199,8 +202,10 @@ func (m *managerImpl) synchronize(podFunc ActivePodsFunc) {
 		}
 		// record that we are evicting the pod
 		m.recorder.Eventf(pod, api.EventTypeWarning, reason, message)
-		// TODO this needs to be based on soft or hard eviction threshold being met, soft eviction will allow a configured value.
 		gracePeriodOverride := int64(0)
+		if softEviction {
+			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
+		}
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := m.killPodFunc(pod, status, &gracePeriodOverride)
 		if err != nil {
