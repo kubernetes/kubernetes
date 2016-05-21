@@ -36,7 +36,9 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 	s := scopeNaming{
 		meta.RESTScopeNamespace,
 		selfLinker,
-		"/api/v1/namespaces/{namespace}/services/{name}",
+		func(name, namespace string) string {
+			return "/api/v1/namespaces/" + namespace + "/services/" + name
+		},
 		true,
 	}
 	service := &api.Service{
