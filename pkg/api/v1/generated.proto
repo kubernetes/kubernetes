@@ -1676,6 +1676,9 @@ message PersistentVolumeSource {
 
   // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
   optional AzureFileVolumeSource azureFile = 13;
+
+  // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+  optional VsphereVirtualDiskVolumeSource vsphereVolume = 14;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2844,6 +2847,20 @@ message VolumeSource {
 
   // ConfigMap represents a configMap that should populate this volume
   optional ConfigMapVolumeSource configMap = 19;
+
+  // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+  optional VsphereVirtualDiskVolumeSource vsphereVolume = 20;
+}
+
+// Represents a vSphere volume resource.
+message VsphereVirtualDiskVolumeSource {
+  // Path that identifies vSphere volume vmdk
+  optional string volumePath = 1;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 2;
 }
 
 // The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)

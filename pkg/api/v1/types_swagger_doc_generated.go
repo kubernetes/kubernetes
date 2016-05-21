@@ -1050,6 +1050,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",
 	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
 	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1673,19 +1674,30 @@ var map_VolumeSource = map[string]string{
 	"iscsi":                 "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/iscsi/README.md",
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims",
-	"rbd":         "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md",
-	"flexVolume":  "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
-	"cinder":      "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
-	"cephfs":      "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
-	"flocker":     "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
-	"downwardAPI": "DownwardAPI represents downward API about the pod that should populate this volume",
-	"fc":          "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
-	"azureFile":   "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-	"configMap":   "ConfigMap represents a configMap that should populate this volume",
+	"rbd":           "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md",
+	"flexVolume":    "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+	"cinder":        "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cephfs":        "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+	"flocker":       "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
+	"downwardAPI":   "DownwardAPI represents downward API about the pod that should populate this volume",
+	"fc":            "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+	"azureFile":     "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"configMap":     "ConfigMap represents a configMap that should populate this volume",
+	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {
 	return map_VolumeSource
+}
+
+var map_VsphereVirtualDiskVolumeSource = map[string]string{
+	"":           "Represents a vSphere volume resource.",
+	"volumePath": "Path that identifies vSphere volume vmdk",
+	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+}
+
+func (VsphereVirtualDiskVolumeSource) SwaggerDoc() map[string]string {
+	return map_VsphereVirtualDiskVolumeSource
 }
 
 var map_WeightedPodAffinityTerm = map[string]string{
