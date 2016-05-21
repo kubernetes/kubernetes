@@ -25,7 +25,7 @@ import (
 // OSInterface collects system level operations that need to be mocked out
 // during tests.
 type OSInterface interface {
-	Mkdir(path string, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
 	Symlink(oldname string, newname string) error
 	Stat(path string) (os.FileInfo, error)
 	Remove(path string) error
@@ -40,8 +40,8 @@ type OSInterface interface {
 type RealOS struct{}
 
 // MkDir will will call os.Mkdir to create a directory.
-func (RealOS) Mkdir(path string, perm os.FileMode) error {
-	return os.Mkdir(path, perm)
+func (RealOS) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
 }
 
 // Symlink will call os.Symlink to create a symbolic link.

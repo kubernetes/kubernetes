@@ -41,7 +41,7 @@ func NewFakeOS() *FakeOS {
 }
 
 // Mkdir is a fake call that just returns nil.
-func (FakeOS) Mkdir(path string, perm os.FileMode) error {
+func (FakeOS) MkdirAll(path string, perm os.FileMode) error {
 	return nil
 }
 
