@@ -623,6 +623,166 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 	}
 }
 
+func TestGetPersistentVolumeBySpec(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{}}).ReactionChain
+
+	// Test claim does not exist
+	_, err := kubelet.getPersistentVolumeByClaimName("myclaim", "test")
+	if err == nil {
+		t.Errorf("Expected claim to not be found")
+	}
+
+	// Test claim found not bound.
+	claim := api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "myclaim",
+			Namespace: "test",
+		},
+	}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{
+		claim,
+	}}).ReactionChain
+
+	_, err = kubelet.getPersistentVolumeByClaimName("myclaim", "test")
+	if err == nil {
+		t.Errorf("Expected a claim not bound error to occur")
+	}
+
+	// Test claim found, bound but PV does not exist
+	claim = api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "myclaim",
+			Namespace: "test",
+			UID:       types.UID("myclaimUID123"),
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "myrealvol",
+		},
+	}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{
+		claim,
+	}}).ReactionChain
+
+	_, err = kubelet.getPersistentVolumeByClaimName("myclaim", "test")
+	if err == nil {
+		t.Errorf("Expected PV not found error to occur")
+	}
+
+	// Test volume found but not bound.
+	volume := api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "myrealvol",
+		},
+	}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(
+		&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{
+			claim,
+		}},
+		&api.PersistentVolumeList{Items: []api.PersistentVolume{
+			volume,
+		}},
+	).ReactionChain
+	_, err = kubelet.getPersistentVolumeByClaimName("myclaim", "test")
+	if err == nil {
+		t.Errorf("Expected PV not bound error to occur")
+	}
+
+	// Test volume found and incorrectly bound
+	volume = api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "myrealvol",
+		},
+		Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{
+				Name:      "myclaim",
+				Namespace: "test",
+				UID:       types.UID("veryWrongUID"),
+			},
+		},
+	}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(
+		&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{
+			claim,
+		}},
+		&api.PersistentVolumeList{Items: []api.PersistentVolume{
+			volume,
+		}},
+	).ReactionChain
+	_, err = kubelet.getPersistentVolumeByClaimName("myclaim", "test")
+	if err == nil {
+		t.Errorf("Expected wrong UID error to occur")
+	}
+
+	// Test volume found and correctly bound
+	volume = api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "myrealvol",
+		},
+		Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{
+				Name:      "myclaim",
+				Namespace: "test",
+				UID:       types.UID("myclaimUID123"),
+			},
+		},
+	}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(
+		&api.PersistentVolumeClaimList{Items: []api.PersistentVolumeClaim{
+			claim,
+		}},
+		&api.PersistentVolumeList{Items: []api.PersistentVolume{
+			volume,
+		}},
+	).ReactionChain
+
+	foundVolume, err := kubelet.getPersistentVolumeByClaimName("myclaim", "test")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if foundVolume.Name != volume.Name {
+		t.Errorf("Found incorrect volume expected %v, but got %v", volume, foundVolume)
+	}
+}
+
+func TestApplyPersistentVolumeAnnotations(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+
+	pod := &api.Pod{}
+
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				volumeGidAnnotationKey: "12345",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			},
+			ClaimRef: &api.ObjectReference{
+				Name: "claim",
+				UID:  types.UID("abc123"),
+			},
+		},
+	}
+
+	kubelet.applyPersistentVolumeAnnotations(pv, pod)
+
+	if pod.Spec.SecurityContext == nil {
+		t.Errorf("Pod SecurityContext was not set")
+	}
+
+	if pod.Spec.SecurityContext.SupplementalGroups[0] != 12345 {
+		t.Errorf("Pod's SupplementalGroups list does not contain expect group")
+	}
+}
+
 type stubVolume struct {
 	path string
 	volume.MetricsNil
