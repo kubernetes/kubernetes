@@ -73,6 +73,8 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&api.ExportOptions{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
+		&NetworkPolicy{},
+		&NetworkPolicyList{},
 	)
 }
 
@@ -93,3 +95,5 @@ func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                 { 
 func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
 func (obj *PodSecurityPolicy) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
 func (obj *PodSecurityPolicyList) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
+func (obj *NetworkPolicy) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
+func (obj *NetworkPolicyList) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
