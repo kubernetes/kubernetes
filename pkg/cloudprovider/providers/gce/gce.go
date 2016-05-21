@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/gcfg.v1"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -47,7 +49,6 @@ import (
 	container "google.golang.org/api/container/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/cloud/compute/metadata"
-	"gopkg.in/gcfg.v1"
 )
 
 const (
@@ -252,7 +253,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			}
 		}
 		if cfg.Global.TokenURL != "" {
-			tokenSource = newAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
+			tokenSource = NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
 		nodeTags = cfg.Global.NodeTags
 		if cfg.Global.Multizone {

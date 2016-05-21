@@ -57,14 +57,14 @@ func init() {
 	prometheus.MustRegister(getTokenFailCounter)
 }
 
-type altTokenSource struct {
+type AltTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
 	tokenBody   string
 	throttle    flowcontrol.RateLimiter
 }
 
-func (a *altTokenSource) Token() (*oauth2.Token, error) {
+func (a *AltTokenSource) Token() (*oauth2.Token, error) {
 	a.throttle.Accept()
 	getTokenCounter.Inc()
 	t, err := a.token()
@@ -74,7 +74,7 @@ func (a *altTokenSource) Token() (*oauth2.Token, error) {
 	return t, err
 }
 
-func (a *altTokenSource) token() (*oauth2.Token, error) {
+func (a *AltTokenSource) token() (*oauth2.Token, error) {
 	req, err := http.NewRequest("POST", a.tokenURL, strings.NewReader(a.tokenBody))
 	if err != nil {
 		return nil, err
@@ -100,9 +100,9 @@ func (a *altTokenSource) token() (*oauth2.Token, error) {
 	}, nil
 }
 
-func newAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
+func NewAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
 	client := oauth2.NewClient(oauth2.NoContext, google.ComputeTokenSource(""))
-	a := &altTokenSource{
+	a := &AltTokenSource{
 		oauthClient: client,
 		tokenURL:    tokenURL,
 		tokenBody:   tokenBody,
