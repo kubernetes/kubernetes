@@ -90,10 +90,10 @@ detect_lsb() {
     lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
 
     case "${lsb_dist}" in
-        amzn|centos|debian|ubuntu)
+        amzn|centos|debian|ubuntu|fedora)
             ;;
         *)
-            echo "Error: We currently only support ubuntu|debian|amzn|centos."
+            echo "Error: We currently only support ubuntu|debian|amzn|centos|fedora."
             exit 1
             ;;
     esac
@@ -174,7 +174,7 @@ start_k8s(){
             ifconfig docker0 down
             yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
             ;;
-        centos)
+        centos|fedora)
             DOCKER_CONF="/etc/sysconfig/docker"
             echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             if ! command_exists ifconfig; then
