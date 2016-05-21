@@ -509,6 +509,9 @@ function start-kube-controller-manager {
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
   fi
+  if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
+    params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
+  fi
   if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
     params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
   fi
