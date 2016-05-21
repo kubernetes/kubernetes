@@ -26,28 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/errors"
 )
 
-type objectTyperToTyper struct {
-	typer ObjectTyper
-}
-
-func (t objectTyperToTyper) ObjectKind(obj Object) (*unversioned.GroupVersionKind, bool, error) {
-	gvk, err := t.typer.ObjectKind(obj)
-	if err != nil {
-		return nil, false, err
-	}
-	unversionedType, ok := t.typer.IsUnversioned(obj)
-	if !ok {
-		// ObjectTyper violates its contract
-		return nil, false, fmt.Errorf("typer returned a kind for %v, but then reported it was not in the scheme with IsUnversioned", reflect.TypeOf(obj))
-	}
-	return &gvk, unversionedType, nil
-}
-
-// ObjectTyperToTyper casts the old typer interface to the new typer interface
-func ObjectTyperToTyper(typer ObjectTyper) Typer {
-	return objectTyperToTyper{typer: typer}
-}
-
 // unsafeObjectConvertor implements ObjectConvertor using the unsafe conversion path.
 type unsafeObjectConvertor struct {
 	*Scheme
@@ -195,19 +173,9 @@ type MultiObjectTyper []ObjectTyper
 
 var _ ObjectTyper = MultiObjectTyper{}
 
-func (m MultiObjectTyper) ObjectKind(obj Object) (gvk unversioned.GroupVersionKind, err error) {
+func (m MultiObjectTyper) ObjectKinds(obj Object) (gvks []unversioned.GroupVersionKind, unversionedType bool, err error) {
 	for _, t := range m {
-		gvk, err = t.ObjectKind(obj)
-		if err == nil {
-			return
-		}
-	}
-	return
-}
-
-func (m MultiObjectTyper) ObjectKinds(obj Object) (gvks []unversioned.GroupVersionKind, err error) {
-	for _, t := range m {
-		gvks, err = t.ObjectKinds(obj)
+		gvks, unversionedType, err = t.ObjectKinds(obj)
 		if err == nil {
 			return
 		}
@@ -222,15 +190,6 @@ func (m MultiObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
 		}
 	}
 	return false
-}
-
-func (m MultiObjectTyper) IsUnversioned(obj Object) (bool, bool) {
-	for _, t := range m {
-		if unversioned, ok := t.IsUnversioned(obj); ok {
-			return unversioned, true
-		}
-	}
-	return false, false
 }
 
 // SetZeroValue would set the object of objPtr to zero value of its type.

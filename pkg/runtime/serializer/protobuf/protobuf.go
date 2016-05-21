@@ -59,7 +59,7 @@ func IsNotMarshalable(err error) bool {
 // as-is (any type info passed with the object will be used).
 //
 // This encoding scheme is experimental, and is subject to change at any time.
-func NewSerializer(creater runtime.ObjectCreater, typer runtime.Typer, defaultContentType string) *Serializer {
+func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper, defaultContentType string) *Serializer {
 	return &Serializer{
 		prefix:      protoEncodingPrefix,
 		creater:     creater,
@@ -71,7 +71,7 @@ func NewSerializer(creater runtime.ObjectCreater, typer runtime.Typer, defaultCo
 type Serializer struct {
 	prefix      []byte
 	creater     runtime.ObjectCreater
-	typer       runtime.Typer
+	typer       runtime.ObjectTyper
 	contentType string
 }
 
@@ -131,7 +131,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 	}
 
 	if into != nil {
-		typed, _, err := s.typer.ObjectKind(into)
+		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err):
 			pb, ok := into.(proto.Message)
@@ -145,12 +145,12 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 		case err != nil:
 			return nil, &actual, err
 		default:
-			copyKindDefaults(&actual, typed)
+			copyKindDefaults(&actual, &types[0])
 			// if the result of defaulting did not set a version or group, ensure that at least group is set
 			// (copyKindDefaults will not assign Group if version is already set). This guarantees that the group
 			// of into is set if there is no better information from the caller or object.
 			if len(actual.Version) == 0 && len(actual.Group) == 0 {
-				actual.Group = typed.Group
+				actual.Group = types[0].Group
 			}
 		}
 	}
@@ -277,7 +277,7 @@ func estimateUnknownSize(unk *runtime.Unknown, byteSize uint64) uint64 {
 // encoded object, and thus is not self describing (callers must know what type is being described in order to decode).
 //
 // This encoding scheme is experimental, and is subject to change at any time.
-func NewRawSerializer(creater runtime.ObjectCreater, typer runtime.Typer, defaultContentType string) *RawSerializer {
+func NewRawSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper, defaultContentType string) *RawSerializer {
 	return &RawSerializer{
 		creater:     creater,
 		typer:       typer,
@@ -289,7 +289,7 @@ func NewRawSerializer(creater runtime.ObjectCreater, typer runtime.Typer, defaul
 // type).
 type RawSerializer struct {
 	creater     runtime.ObjectCreater
-	typer       runtime.Typer
+	typer       runtime.ObjectTyper
 	contentType string
 }
 
@@ -337,7 +337,7 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *unversioned.GroupVersio
 		return intoUnknown, actual, nil
 	}
 
-	typed, _, err := s.typer.ObjectKind(into)
+	types, _, err := s.typer.ObjectKinds(into)
 	switch {
 	case runtime.IsNotRegisteredError(err):
 		pb, ok := into.(proto.Message)
@@ -351,12 +351,12 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *unversioned.GroupVersio
 	case err != nil:
 		return nil, actual, err
 	default:
-		copyKindDefaults(actual, typed)
+		copyKindDefaults(actual, &types[0])
 		// if the result of defaulting did not set a version or group, ensure that at least group is set
 		// (copyKindDefaults will not assign Group if version is already set). This guarantees that the group
 		// of into is set if there is no better information from the caller or object.
 		if len(actual.Version) == 0 && len(actual.Group) == 0 {
-			actual.Group = typed.Group
+			actual.Group = types[0].Group
 		}
 	}
 
@@ -371,7 +371,7 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *unversioned.GroupVersio
 }
 
 // unmarshalToObject is the common code between decode in the raw and normal serializer.
-func unmarshalToObject(typer runtime.Typer, creater runtime.ObjectCreater, actual *unversioned.GroupVersionKind, into runtime.Object, data []byte) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater, actual *unversioned.GroupVersionKind, into runtime.Object, data []byte) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	// use the target if necessary
 	obj, err := runtime.UseOrCreateObject(typer, creater, *actual, into)
 	if err != nil {

@@ -220,11 +220,11 @@ func validateFields(a, b string) bool {
 
 func (c *Client) body(t *testing.T, obj runtime.Object, raw *string) *string {
 	if obj != nil {
-		fqKind, err := api.Scheme.ObjectKind(obj)
+		fqKinds, _, err := api.Scheme.ObjectKinds(obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}
-		groupName := fqKind.GroupVersion().Group
+		groupName := fqKinds[0].GroupVersion().Group
 		if c.ResourceGroup != "" {
 			groupName = c.ResourceGroup
 		}

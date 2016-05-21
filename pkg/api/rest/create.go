@@ -112,11 +112,11 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.Obje
 	if err != nil {
 		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	kind, err := typer.ObjectKind(obj)
+	kinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	return objectMeta, kind, nil
+	return objectMeta, kinds[0], nil
 }
 
 // NamespaceScopedStrategy has a method to tell if the object must be in a namespace.

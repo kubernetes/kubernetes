@@ -76,44 +76,19 @@ func NewObjectTyper(resources []*unversioned.APIResourceList) (runtime.ObjectTyp
 	return ot, nil
 }
 
-// ObjectKind returns the group,version,kind of the provided object,
-// or an error if the object in not *runtime.Unstructured or has no
-// group,version,kind information.
-func (ot *ObjectTyper) ObjectKind(obj runtime.Object) (unversioned.GroupVersionKind, error) {
-	if _, ok := obj.(*runtime.Unstructured); !ok {
-		return unversioned.GroupVersionKind{}, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
-	}
-
-	return obj.GetObjectKind().GroupVersionKind(), nil
-}
-
 // ObjectKinds returns a slice of one element with the
 // group,version,kind of the provided object, or an error if the
 // object is not *runtime.Unstructured or has no group,version,kind
 // information.
-func (ot *ObjectTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionKind, error) {
-	gvk, err := ot.ObjectKind(obj)
-	if err != nil {
-		return nil, err
+func (ot *ObjectTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionKind, bool, error) {
+	if _, ok := obj.(*runtime.Unstructured); !ok {
+		return nil, false, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
 	}
-
-	return []unversioned.GroupVersionKind{gvk}, nil
+	return []unversioned.GroupVersionKind{obj.GetObjectKind().GroupVersionKind()}, false, nil
 }
 
 // Recognizes returns true if the provided group,version,kind was in
 // the discovery information.
 func (ot *ObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
 	return ot.registered[gvk]
-}
-
-// IsUnversioned returns false always because *runtime.Unstructured
-// objects should always have group,version,kind information set. ok
-// will be true if the object's group,version,kind is registered.
-func (ot *ObjectTyper) IsUnversioned(obj runtime.Object) (unversioned bool, ok bool) {
-	gvk, err := ot.ObjectKind(obj)
-	if err != nil {
-		return false, false
-	}
-
-	return false, ot.registered[gvk]
 }

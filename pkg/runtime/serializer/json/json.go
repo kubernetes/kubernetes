@@ -31,7 +31,7 @@ import (
 
 // NewSerializer creates a JSON serializer that handles encoding versioned objects into the proper JSON form. If typer
 // is not nil, the object has the group, version, and kind fields set.
-func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer, pretty bool) *Serializer {
+func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
 	return &Serializer{
 		meta:    meta,
 		creater: creater,
@@ -44,7 +44,7 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
 // is not nil, the object has the group, version, and kind fields set. This serializer supports only the subset of YAML that
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
-func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer) *Serializer {
+func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
 	return &Serializer{
 		meta:    meta,
 		creater: creater,
@@ -56,7 +56,7 @@ func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer ru
 type Serializer struct {
 	meta    MetaFactory
 	creater runtime.ObjectCreater
-	typer   runtime.Typer
+	typer   runtime.ObjectTyper
 	yaml    bool
 	pretty  bool
 }
@@ -116,7 +116,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 	}
 
 	if into != nil {
-		typed, _, err := s.typer.ObjectKind(into)
+		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err):
 			if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(into); err != nil {
@@ -126,6 +126,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 		case err != nil:
 			return nil, actual, err
 		default:
+			typed := types[0]
 			if len(actual.Kind) == 0 {
 				actual.Kind = typed.Kind
 			}

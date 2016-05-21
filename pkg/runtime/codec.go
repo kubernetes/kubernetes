@@ -78,13 +78,13 @@ func EncodeOrDie(e Encoder, obj Object) string {
 
 // UseOrCreateObject returns obj if the canonical ObjectKind returned by the provided typer matches gvk, or
 // invokes the ObjectCreator to instantiate a new gvk. Returns an error if the typer cannot find the object.
-func UseOrCreateObject(t Typer, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
+func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
 	if obj != nil {
-		into, _, err := t.ObjectKind(obj)
+		into, _, err := t.ObjectKinds(obj)
 		if err != nil {
 			return nil, err
 		}
-		if gvk == *into {
+		if gvk == into[0] {
 			return obj, nil
 		}
 	}
@@ -116,7 +116,7 @@ func (n NoopDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into
 // NewParameterCodec creates a ParameterCodec capable of transforming url values into versioned objects and back.
 func NewParameterCodec(scheme *Scheme) ParameterCodec {
 	return &parameterCodec{
-		typer:     ObjectTyperToTyper(scheme),
+		typer:     scheme,
 		convertor: scheme,
 		creator:   scheme,
 	}
@@ -124,7 +124,7 @@ func NewParameterCodec(scheme *Scheme) ParameterCodec {
 
 // parameterCodec implements conversion to and from query parameters and objects.
 type parameterCodec struct {
-	typer     Typer
+	typer     ObjectTyper
 	convertor ObjectConvertor
 	creator   ObjectCreater
 }
@@ -137,10 +137,11 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 	if len(parameters) == 0 {
 		return nil
 	}
-	targetGVK, _, err := c.typer.ObjectKind(into)
+	targetGVKs, _, err := c.typer.ObjectKinds(into)
 	if err != nil {
 		return err
 	}
+	targetGVK := targetGVKs[0]
 	if targetGVK.GroupVersion() == from {
 		return c.convertor.Convert(&parameters, into)
 	}
@@ -157,10 +158,11 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 // EncodeParameters converts the provided object into the to version, then converts that object to url.Values.
 // Returns an error if conversion is not possible.
 func (c *parameterCodec) EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error) {
-	gvk, _, err := c.typer.ObjectKind(obj)
+	gvks, _, err := c.typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, err
 	}
+	gvk := gvks[0]
 	if to != gvk.GroupVersion() {
 		out, err := c.convertor.ConvertToVersion(obj, to)
 		if err != nil {

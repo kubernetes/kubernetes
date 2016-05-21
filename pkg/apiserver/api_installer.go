@@ -118,7 +118,7 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (unver
 	}
 
 	object := storage.New()
-	fqKinds, err := a.group.Typer.ObjectKinds(object)
+	fqKinds, _, err := a.group.Typer.ObjectKinds(object)
 	if err != nil {
 		return unversioned.GroupVersionKind{}, err
 	}
@@ -233,8 +233,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
-		listGVK, err := a.group.Typer.ObjectKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVK.Kind))
+		listGVKs, _, err := a.group.Typer.ObjectKinds(list)
+		if err != nil {
+			return nil, err
+		}
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVKs[0].Kind))
 		if err != nil {
 			return nil, err
 		}
@@ -272,10 +275,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, _ = getterWithOptions.NewGetOptions()
-		getOptionsInternalKind, err = a.group.Typer.ObjectKind(getOptions)
+		getOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(getOptions)
 		if err != nil {
 			return nil, err
 		}
+		getOptionsInternalKind = getOptionsInternalKinds[0]
 		versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
 		if err != nil {
 			return nil, err
@@ -300,12 +304,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isConnecter {
 		connectOptions, connectSubpath, _ = connecter.NewConnectOptions()
 		if connectOptions != nil {
-			connectOptionsInternalKind, err = a.group.Typer.ObjectKind(connectOptions)
+			connectOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(connectOptions)
 			if err != nil {
 				return nil, err
 			}
 
+			connectOptionsInternalKind = connectOptionsInternalKinds[0]
 			versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

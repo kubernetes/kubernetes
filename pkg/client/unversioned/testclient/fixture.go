@@ -204,11 +204,11 @@ func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.O
 }
 
 func (o objects) Add(obj runtime.Object) error {
-	gvk, err := o.scheme.ObjectKind(obj)
+	gvks, _, err := o.scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
 	}
-	kind := gvk.Kind
+	kind := gvks[0].Kind
 
 	switch {
 	case meta.IsListType(obj):
