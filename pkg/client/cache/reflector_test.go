@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -354,11 +355,12 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 func TestReflectorResync(t *testing.T) {
 	iteration := 0
 	stopCh := make(chan struct{})
+	rerr := errors.New("expected resync reached")
 	s := &FakeCustomStore{
 		ResyncFunc: func() error {
 			iteration++
 			if iteration == 2 {
-				close(stopCh)
+				return rerr
 			}
 			return nil
 		},
@@ -375,7 +377,10 @@ func TestReflectorResync(t *testing.T) {
 	}
 	resyncPeriod := 1 * time.Millisecond
 	r := NewReflector(lw, &api.Pod{}, s, resyncPeriod)
-	r.ListAndWatch(stopCh)
+	err := r.ListAndWatch(stopCh)
+	if err != rerr {
+		t.Errorf("expected exiting from err %v, got: %v", rerr, err)
+	}
 	if iteration != 2 {
 		t.Errorf("exactly 2 iterations were expected, got: %v", iteration)
 	}
