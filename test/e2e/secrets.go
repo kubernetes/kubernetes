@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 				Containers: []api.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.2",
+						Image: "gcr.io/google_containers/mounttest:0.7",
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 		framework.TestContainerOutput("consume secrets", f.Client, pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
-			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
+			"mode of file \"/etc/secret-volume/data-1\": -rw-r--r--",
 		}, f.Namespace.Name)
 	})
 
