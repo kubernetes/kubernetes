@@ -21,6 +21,8 @@ package integration
 import (
 	"fmt"
 	"math/rand"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -47,36 +49,15 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	defer s.Close()
 
 	deleteAllEtcdKeys()
-	// Use higher QPS and Burst, there is a test for race condition below, which
-	// creates many claims and default values were too low.
-	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
-	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	testClient, ctrl := createClients(s)
 
-	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0, nil, nil, nil, nil}}
-	cloud := &fake_cloud.FakeCloud{}
-
-	ctrl := persistentvolumecontroller.NewPersistentVolumeController(testClient, 10*time.Second, nil, plugins, cloud, "", nil, nil, nil)
 	ctrl.Run()
 	defer ctrl.Stop()
 
 	// This PV will be claimed, released, and recycled.
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{Name: "fake-pv"},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource:        api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/tmp/foo"}},
-			Capacity:                      api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
-			AccessModes:                   []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
-		},
-	}
+	pv := createPV("fake-pv", "/tmp/foo", "10G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRecycle)
 
-	pvc := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{Name: "fake-pvc"},
-		Spec: api.PersistentVolumeClaimSpec{
-			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("5G")}},
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-		},
-	}
+	pvc := createPVC("fake-pvc", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 
 	w, _ := testClient.PersistentVolumes().Watch(api.ListOptions{})
 	defer w.Stop()
@@ -84,7 +65,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	_, _ = testClient.PersistentVolumes().Create(pv)
 	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
 
-	// wait until the binder pairs the volume and claim
+	// wait until the controller pairs the volume and claim
 	waitForPersistentVolumePhase(w, api.VolumeBound)
 
 	// deleting a claim releases the volume, after which it can be recycled
@@ -171,6 +152,130 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	}
 }
 
+func TestPersistentVolumeMultiPVs(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, controller := createClients(s)
+	controller.Run()
+	defer controller.Stop()
+
+	maxPVs := 100
+	pvs := make([]*api.PersistentVolume, maxPVs)
+	for i := 0; i < maxPVs; i++ {
+		// This PV will be claimed, released, and deleted
+		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), strconv.Itoa(i)+"G",
+			[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimDelete)
+	}
+
+	pvc := createPVC("pvc-2", strconv.Itoa(maxPVs/2)+"G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+
+	w, _ := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	defer w.Stop()
+
+	for i := 0; i < maxPVs; i++ {
+		_, _ = testClient.PersistentVolumes().Create(pvs[i])
+	}
+
+	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+
+	// wait until the controller pairs the volume and claim
+	waitForPersistentVolumePhase(w, api.VolumeBound)
+
+	// only one PV is bound
+	bound := 0
+	for i := 0; i < maxPVs; i++ {
+		pv, err := testClient.PersistentVolumes().Get(pvs[i].Name)
+		if err != nil {
+			t.Fatalf("Unexpected error getting pv: %v", err)
+		}
+		if pv.Spec.ClaimRef == nil {
+			continue
+		}
+		// found a bounded PV
+		p := pv.Spec.Capacity[api.ResourceStorage]
+		pvCap := p.Value()
+		expectedCap := resource.MustParse(strconv.Itoa(maxPVs/2) + "G")
+		expectedCapVal := expectedCap.Value()
+		if pv.Spec.ClaimRef.Name != pvc.Name || pvCap != expectedCapVal {
+			t.Fatalf("Bind mismatch! Expected %s capacity %d but got %s capacity %d", pvc.Name, expectedCapVal, pv.Spec.ClaimRef.Name, pvCap)
+		}
+		t.Logf("claim bounded to %s capacity %v", pv.Name, pv.Spec.Capacity[api.ResourceStorage])
+		bound += 1
+	}
+
+	if bound != 1 {
+		t.Fatalf("Only 1 PV should be bound but got %d", bound)
+	}
+
+	// deleting a claim releases the volume
+	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
+		t.Errorf("error deleting claim %s", pvc.Name)
+	}
+
+	waitForPersistentVolumePhase(w, api.VolumeReleased)
+
+	deleteAllEtcdKeys()
+}
+
+func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, controller := createClients(s)
+	controller.Run()
+	defer controller.Stop()
+
+	// This PV will be claimed, released, and deleted
+	pv_rwo := createPV("pv-rwo", "/tmp/foo", "10G",
+		[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimDelete)
+	pv_rwm := createPV("pv-rwm", "/tmp/bar", "10G",
+		[]api.PersistentVolumeAccessMode{api.ReadWriteMany}, api.PersistentVolumeReclaimDelete)
+
+	pvc := createPVC("pvc-rwm", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteMany})
+
+	w, _ := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	defer w.Stop()
+
+	_, _ = testClient.PersistentVolumes().Create(pv_rwm)
+	_, _ = testClient.PersistentVolumes().Create(pv_rwo)
+
+	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+
+	// wait until the controller pairs the volume and claim
+	waitForPersistentVolumePhase(w, api.VolumeBound)
+
+	// only RWM PV is bound
+	pv, err := testClient.PersistentVolumes().Get("pv-rwo")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef != nil {
+		t.Fatalf("ReadWriteOnce PV shouldn't be bound")
+	}
+	pv, err = testClient.PersistentVolumes().Get("pv-rwm")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef == nil {
+		t.Fatalf("ReadWriteMany PV should be bound")
+	}
+	if pv.Spec.ClaimRef.Name != pvc.Name {
+		t.Fatalf("Bind mismatch! Expected %s but got %s", pvc.Name, pv.Spec.ClaimRef.Name)
+	}
+
+	// deleting a claim releases the volume
+	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
+		t.Errorf("error deleting claim %s", pvc.Name)
+	}
+
+	waitForPersistentVolumePhase(w, api.VolumeReleased)
+
+	deleteAllEtcdKeys()
+}
+
 func waitForPersistentVolumePhase(w watch.Interface, phase api.PersistentVolumePhase) {
 	for {
 		event := <-w.ResultChan()
@@ -178,5 +283,38 @@ func waitForPersistentVolumePhase(w watch.Interface, phase api.PersistentVolumeP
 		if volume.Status.Phase == phase {
 			break
 		}
+	}
+}
+
+func createClients(s *httptest.Server) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController) {
+	// Use higher QPS and Burst, there is a test for race condition below, which
+	// creates many claims and default values were too low.
+	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
+	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0, nil, nil, nil, nil}}
+	cloud := &fake_cloud.FakeCloud{}
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(testClient, 10*time.Second, nil, plugins, cloud, "", nil, nil, nil)
+	return testClient, ctrl
+}
+
+func createPV(name, path, cap string, mode []api.PersistentVolumeAccessMode, reclaim api.PersistentVolumeReclaimPolicy) *api.PersistentVolume {
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{Name: name},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource:        api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: path}},
+			Capacity:                      api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(cap)},
+			AccessModes:                   mode,
+			PersistentVolumeReclaimPolicy: reclaim,
+		},
+	}
+}
+
+func createPVC(name, cap string, mode []api.PersistentVolumeAccessMode) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: name},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(cap)}},
+			AccessModes: mode,
+		},
 	}
 }
