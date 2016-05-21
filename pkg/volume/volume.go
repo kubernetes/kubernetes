@@ -140,7 +140,7 @@ type Attacher interface {
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
 	// point which should be bind mounted for individual volumes.
-	GetDeviceMountPath(host VolumeHost, spec *Spec) string
+	GetDeviceMountPath(spec *Spec) string
 
 	// MountDevice mounts the disk to a global path which
 	// individual pods can then bind mount
