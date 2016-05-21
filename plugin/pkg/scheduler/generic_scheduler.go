@@ -180,7 +180,7 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 				}
 				if !nodeIn {
 					if re, ok := extender.(*HTTPExtender); ok {
-						failedPredicateMap[filteredNode.Name] = re.extenderURL + ", " + re.filterVerb
+						failedPredicateMap[filteredNode.Name] = fmt.Sprintf("%s, %s", re.extenderURL, re.filterVerb)
 					} else {
 						failedPredicateMap[filteredNode.Name] = "extender failed"
 					}
