@@ -19,7 +19,6 @@ package scheduler
 import (
 	"fmt"
 	"math"
-	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
@@ -114,7 +113,7 @@ func makeNodeList(nodeNames []string) api.NodeList {
 }
 
 func TestSelectHost(t *testing.T) {
-	scheduler := genericScheduler{random: rand.New(rand.NewSource(0))}
+	scheduler := genericScheduler{}
 	tests := []struct {
 		list          schedulerapi.HostPriorityList
 		possibleHosts sets.String
@@ -277,7 +276,6 @@ func TestGenericScheduler(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		random := rand.New(rand.NewSource(0))
 		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
 		for _, pod := range test.pods {
 			cache.AddPod(pod)
@@ -285,7 +283,7 @@ func TestGenericScheduler(t *testing.T) {
 		for _, name := range test.nodes {
 			cache.AddNode(&api.Node{ObjectMeta: api.ObjectMeta{Name: name}})
 		}
-		scheduler := NewGenericScheduler(cache, test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, random)
+		scheduler := NewGenericScheduler(cache, test.predicates, test.prioritizers, []algorithm.SchedulerExtender{})
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
