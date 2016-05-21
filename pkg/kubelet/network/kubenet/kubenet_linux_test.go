@@ -17,6 +17,8 @@ limitations under the License.
 package kubenet
 
 import (
+	"fmt"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
@@ -37,9 +39,6 @@ func TestGetPodNetworkStatus(t *testing.T) {
 	podIPMap := make(map[kubecontainer.ContainerID]string)
 	podIPMap[kubecontainer.ContainerID{ID: "1"}] = "10.245.0.2/32"
 	podIPMap[kubecontainer.ContainerID{ID: "2"}] = "10.245.0.3/32"
-
-	fhost := nettest.NewFakeHost(nil)
-	fakeKubenet := newFakeKubenetPlugin(podIPMap, nil, fhost)
 
 	testCases := []struct {
 		id          string
@@ -65,6 +64,34 @@ func TestGetPodNetworkStatus(t *testing.T) {
 		},
 		//TODO: add test cases for retrieving ip inside container network namespace
 	}
+
+	fakeCmds := make([]exec.FakeCommandAction, 0)
+	for _, t := range testCases {
+		// the fake commands return the IP from the given index, or an error
+		fCmd := exec.FakeCmd{
+			CombinedOutputScript: []exec.FakeCombinedOutputAction{
+				func() ([]byte, error) {
+					ip, ok := podIPMap[kubecontainer.ContainerID{ID: t.id}]
+					if !ok {
+						return nil, fmt.Errorf("Pod IP %q not found", t.id)
+					}
+					return []byte(ip), nil
+				},
+			},
+		}
+		fakeCmds = append(fakeCmds, func(cmd string, args ...string) exec.Cmd {
+			return exec.InitFakeCmd(&fCmd, cmd, args...)
+		})
+	}
+	fexec := exec.FakeExec{
+		CommandScript: fakeCmds,
+		LookPathFunc: func(file string) (string, error) {
+			return fmt.Sprintf("/fake-bin/%s", file), nil
+		},
+	}
+
+	fhost := nettest.NewFakeHost(nil)
+	fakeKubenet := newFakeKubenetPlugin(podIPMap, &fexec, fhost)
 
 	for i, tc := range testCases {
 		out, err := fakeKubenet.GetPodNetworkStatus("", "", kubecontainer.ContainerID{ID: tc.id})
