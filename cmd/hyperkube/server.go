@@ -35,6 +35,7 @@ type Server struct {
 	SimpleUsage string        // One line description of the server.
 	Long        string        // Longer free form description of the server
 	Run         serverRunFunc // Run the server.  This is not expected to return.
+	ParseArgs   bool          // Not all commands have their flags defined during parsing. Make it explicit.
 
 	flags *pflag.FlagSet // Flags for the command (and all dependents)
 	name  string
