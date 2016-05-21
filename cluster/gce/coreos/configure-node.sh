@@ -79,6 +79,11 @@ function configure-etcd-events() {
   evaluate-manifest ${MANIFESTS_DIR}/etcd-events.yaml /etc/kubernetes/manifests/etcd-events.yaml
 }
 
+function configure-addon-manager() {
+  echo "Configuring addon-manager"
+  evaluate-manifest ${MANIFESTS_DIR}/kube-addon-manager.yaml /etc/kubernetes/manifests/kube-addon-manager.yaml
+}
+
 function configure-kube-apiserver() {
   echo "Configuring kube-apiserver"
   
@@ -136,6 +141,10 @@ function configure-master-addons() {
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/dashboard ${addon_dir}/dashboard
   fi
 
+  if [[ "${ENABLE_CLUSTER_LOGGING}" == "true" ]]; then
+    evaluate-manifests-dir ${MANIFESTS_DIR}/addons/fluentd-elasticsearch  ${addon_dir}/fluentd-elasticsearch
+  fi
+
   if [[ "${ENABLE_CLUSTER_MONITORING}" == "influxdb" ]]; then
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/cluster-monitoring/influxdb  ${addon_dir}/cluster-monitoring/influxdb
   elif [[ "${ENABLE_CLUSTER_MONITORING}" == "google" ]]; then
@@ -160,6 +169,7 @@ function configure-master-components() {
   configure-kube-apiserver
   configure-kube-scheduler
   configure-kube-controller-manager
+  configure-addon-manager
   configure-master-addons
 }
 
