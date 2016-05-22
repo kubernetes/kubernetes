@@ -1209,6 +1209,16 @@ __EOF__
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
+  ### Create a tls secret
+  # Pre-condition: no SECRET exists
+  kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create secret tls test-secret --namespace=test-secrets --key=hack/testdata/tls.key --cert=hack/testdata/tls.crt
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
+  # Clean-up
+  kubectl delete secret test-secret --namespace=test-secrets
+
   ### Create a secret using output flags
   # Pre-condition: no secret exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -2101,7 +2111,7 @@ __EOF__
   object="all -l'app=cassandra'"
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"
 
-  # all 4 cassandra's might not be in the request immediately... 
+  # all 4 cassandra's might not be in the request immediately...
   kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:cassandra:' || \
   kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:' || \
   kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:'
