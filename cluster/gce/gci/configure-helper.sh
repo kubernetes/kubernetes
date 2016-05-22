@@ -142,6 +142,46 @@ EOF
   if [[ "${use_cloud_config}" != "true" ]]; then
     rm -f /etc/gce.conf
   fi
+
+  if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
+    cat <<EOF >/etc/gcp_authn.config
+clusters:
+  - name: gcp-authentication-server
+    cluster:
+      server: ${GCP_AUTHN_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-authentication-server
+    user: kube-apiserver
+  name: webhook
+EOF
+  fi
+
+  if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
+    cat <<EOF >/etc/gcp_authz.config
+clusters:
+  - name: gcp-authorization-server
+    cluster:
+      server: ${GCP_AUTHZ_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-authorization-server
+    user: kube-apiserver
+  name: webhook
+EOF
+  fi
 }
 
 function create-kubelet-kubeconfig {
@@ -430,7 +470,6 @@ function start-kube-apiserver {
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
-  params+=" --authorization-mode=ABAC"
   params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   params+=" --cloud-provider=gce"
@@ -460,13 +499,29 @@ function start-kube-apiserver {
     params+=" --ssh-user=${PROXY_SSH_USER}"
     params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
   fi
-  local -r kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
 
+  webhook_authn_config_mount=""
+  webhook_authn_config_volume=""
+  if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
+    params+=" --authentication-token-webhook-config-file=/etc/gcp_authn.config"
+    webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": false},"
+    webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
+  fi
+
+  params+=" --authorization-mode=ABAC"
+  webhook_config_mount=""
+  webhook_config_volume=""
+  if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
+    params+=",Webhook --authorization-webhook-config-file=/etc/gcp_authz.config"
+    webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
+    webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
+  fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   cp "${src_dir}/abac-authz-policy.jsonl" /etc/srv/kubernetes/
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
+  local -r kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
@@ -479,6 +534,10 @@ function start-kube-apiserver {
   sed -i -e "s@{{secure_port}}@8080@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  sed -i -e "s@{{webhook_authn_config_mount}}@${webhook_authn_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{webhook_authn_config_volume}}@${webhook_authn_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{webhook_config_mount}}@${webhook_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{webhook_config_volume}}@${webhook_config_volume}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
