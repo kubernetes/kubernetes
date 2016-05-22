@@ -188,9 +188,10 @@ func (UnstructuredObjectConverter) Convert(in, out interface{}) error {
 	return nil
 }
 
-func (UnstructuredObjectConverter) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
-	if gvk := in.GetObjectKind().GroupVersionKind(); gvk.GroupVersion() != outVersion {
-		return nil, errors.New("unstructured converter cannot convert versions")
+func (UnstructuredObjectConverter) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
+	if gv, ok := PreferredGroupVersion(target); ok {
+		kind := in.GetObjectKind().GroupVersionKind()
+		in.GetObjectKind().SetGroupVersionKind(gv.WithKind(kind.Kind))
 	}
 	return in, nil
 }

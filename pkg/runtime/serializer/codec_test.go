@@ -254,7 +254,7 @@ func TestVersionedEncoding(t *testing.T) {
 	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
 	encoder, _ := cf.SerializerForFileExtension("json")
 
-	codec := cf.CodecForVersions(encoder, nil, []unversioned.GroupVersion{{Version: "v2"}}, nil)
+	codec := cf.CodecForVersions(encoder, nil, unversioned.GroupVersion{Version: "v2"}, nil)
 	out, err := runtime.Encode(codec, &TestType1{})
 	if err != nil {
 		t.Fatal(err)
@@ -263,19 +263,19 @@ func TestVersionedEncoding(t *testing.T) {
 		t.Fatal(string(out))
 	}
 
-	codec = cf.CodecForVersions(encoder, nil, []unversioned.GroupVersion{{Version: "v3"}}, nil)
+	codec = cf.CodecForVersions(encoder, nil, unversioned.GroupVersion{Version: "v3"}, nil)
 	_, err = runtime.Encode(codec, &TestType1{})
 	if err == nil {
 		t.Fatal(err)
 	}
 
 	// unversioned encode with no versions is written directly to wire
-	codec = cf.CodecForVersions(encoder, nil, nil, nil)
+	codec = cf.CodecForVersions(encoder, nil, runtime.InternalGroupVersioner, nil)
 	out, err = runtime.Encode(codec, &TestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(out) != `{"myVersionKey":"__internal","myKindKey":"TestType1"}`+"\n" {
+	if string(out) != `{}`+"\n" {
 		t.Fatal(string(out))
 	}
 }
