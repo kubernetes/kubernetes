@@ -407,6 +407,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 func TestMountExternalVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
+	kubelet.mounter = &mount.FakeMounter{}
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
 
