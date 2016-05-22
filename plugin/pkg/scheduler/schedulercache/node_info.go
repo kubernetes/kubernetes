@@ -132,13 +132,6 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 		return err
 	}
 
-	cpu, mem, nvidia_gpu, non0_cpu, non0_mem := calculateResource(pod)
-	n.requestedResource.MilliCPU -= cpu
-	n.requestedResource.Memory -= mem
-	n.requestedResource.NvidiaGPU -= nvidia_gpu
-	n.nonzeroRequest.MilliCPU -= non0_cpu
-	n.nonzeroRequest.Memory -= non0_mem
-
 	for i := range n.pods {
 		k2, err := getPodKey(n.pods[i])
 		if err != nil {
@@ -149,10 +142,17 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 			// delete the element
 			n.pods[i] = n.pods[len(n.pods)-1]
 			n.pods = n.pods[:len(n.pods)-1]
+			// reduce the resource data
+			cpu, mem, nvidia_gpu, non0_cpu, non0_mem := calculateResource(pod)
+			n.requestedResource.MilliCPU -= cpu
+			n.requestedResource.Memory -= mem
+			n.requestedResource.NvidiaGPU -= nvidia_gpu
+			n.nonzeroRequest.MilliCPU -= non0_cpu
+			n.nonzeroRequest.Memory -= non0_mem
 			return nil
 		}
 	}
-	return fmt.Errorf("no corresponding pod in pods")
+	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
 func calculateResource(pod *api.Pod) (cpu int64, mem int64, nvidia_gpu int64, non0_cpu int64, non0_mem int64) {
