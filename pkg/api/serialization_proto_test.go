@@ -51,7 +51,7 @@ func TestUniversalDeserializer(t *testing.T) {
 			t.Fatal(mediaType)
 		}
 		buf := &bytes.Buffer{}
-		if err := e.EncodeToStream(expected, buf); err != nil {
+		if err := e.Encode(expected, buf); err != nil {
 			t.Fatalf("%s: %v", mediaType, err)
 		}
 		obj, _, err := d.Decode(buf.Bytes(), &unversioned.GroupVersionKind{Kind: "Pod", Version: "v1"}, nil)

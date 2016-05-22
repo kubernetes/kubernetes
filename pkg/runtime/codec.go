@@ -40,10 +40,10 @@ func NewCodec(e Encoder, d Decoder) Codec {
 }
 
 // Encode is a convenience wrapper for encoding to a []byte from an Encoder
-func Encode(e Encoder, obj Object, overrides ...unversioned.GroupVersion) ([]byte, error) {
+func Encode(e Encoder, obj Object) ([]byte, error) {
 	// TODO: reuse buffer
 	buf := &bytes.Buffer{}
-	if err := e.EncodeToStream(obj, buf, overrides...); err != nil {
+	if err := e.Encode(obj, buf); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -98,7 +98,7 @@ type NoopEncoder struct {
 
 var _ Serializer = NoopEncoder{}
 
-func (n NoopEncoder) EncodeToStream(obj Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+func (n NoopEncoder) Encode(obj Object, w io.Writer) error {
 	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
 }
 
@@ -181,9 +181,9 @@ func NewBase64Serializer(s Serializer) Serializer {
 	return &base64Serializer{s}
 }
 
-func (s base64Serializer) EncodeToStream(obj Object, stream io.Writer, overrides ...unversioned.GroupVersion) error {
+func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
 	e := base64.NewEncoder(base64.StdEncoding, stream)
-	err := s.Serializer.EncodeToStream(obj, e, overrides...)
+	err := s.Serializer.Encode(obj, e)
 	e.Close()
 	return err
 }

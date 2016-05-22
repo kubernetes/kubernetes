@@ -2372,7 +2372,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := runtime.Encode(codec, simple, testGroupVersion)
+	data, err := runtime.Encode(testCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2598,7 +2598,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := runtime.Encode(codec, simple, testGroupVersion)
+	data, err := runtime.Encode(testCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3292,4 +3292,47 @@ func readBodyOrDie(r io.Reader) []byte {
 		panic(err)
 	}
 	return body
+}
+
+// BenchmarkUpdateProtobuf measures the cost of processing an update on the server in proto
+func BenchmarkUpdateProtobuf(b *testing.B) {
+	items := benchmarkItems()
+
+	simpleStorage := &SimpleRESTStorage{}
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
+	dest.RawQuery = ""
+
+	info, _ := api.Codecs.SerializerForMediaType("application/vnd.kubernetes.protobuf", nil)
+	e := api.Codecs.EncoderForVersion(info.Serializer, newGroupVersion)
+	data, err := runtime.Encode(e, &items[0])
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		request, err := http.NewRequest("PUT", dest.String(), bytes.NewReader(data))
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
+		request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
+		response, err := client.Do(request)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		if response.StatusCode != http.StatusBadRequest {
+			body, _ := ioutil.ReadAll(response.Body)
+			b.Fatalf("Unexpected response %#v\n%s", response, body)
+		}
+		_, _ = ioutil.ReadAll(response.Body)
+		response.Body.Close()
+	}
+	b.StopTimer()
 }
