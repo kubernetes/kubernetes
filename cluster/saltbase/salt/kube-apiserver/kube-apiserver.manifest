@@ -83,6 +83,25 @@
   {% set abac_policy_file = " --authorization-policy-file=/srv/kubernetes/abac-authz-policy.jsonl" -%}
 {% endif -%}
 
+{% set webhook_authentication_config = "" -%}
+{% set webhook_authn_config_mount = "" -%}
+{% set webhook_authn_config_volume = "" -%}
+{% if grains.webhook_authentication_config is defined -%}
+  {% set webhook_authentication_config = " --authentication-token-webhook-config-file=" + grains.webhook_authentication_config -%}
+  {% set webhook_authn_config_mount = "{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"" + grains.webhook_authentication_config + "\", \"readOnly\": false}," -%}
+  {% set webhook_authn_config_volume = "{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"" + grains.webhook_authentication_config + "\"}}," -%}
+{% endif -%}
+
+{% set webhook_authorization_config = "" -%}
+{% set webhook_config_mount = "" -%}
+{% set webhook_config_volume = "" -%}
+{% if grains.webhook_authorization_config is defined -%}
+  {% set webhook_authorization_config = " --authorization-webhook-config-file=" + grains.webhook_authorization_config -%}
+  {% set webhook_config_mount = "{\"name\": \"webhookconfigmount\",\"mountPath\": \"" + grains.webhook_authorization_config + "\", \"readOnly\": false}," -%}
+  {% set webhook_config_volume = "{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"" + grains.webhook_authorization_config + "\"}}," -%}
+  {% set authz_mode = authz_mode + ",Webhook" -%}
+{% endif -%}
+
 {% set admission_control = "" -%}
 {% if pillar['admission_control'] is defined -%}
  {% set admission_control = "--admission-control=" + pillar['admission_control'] -%}
@@ -99,7 +118,7 @@
 {% endif -%}
 
 {% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout -%}
-{% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file -%}
+{% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['apiserver_test_args'] is defined -%}
@@ -153,6 +172,8 @@
     "volumeMounts": [
         {{cloud_config_mount}}
         {{additional_cloud_config_mount}}
+        {{webhook_config_mount}}
+        {{webhook_authn_config_mount}}
         { "name": "srvkube",
         "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
@@ -180,6 +201,8 @@
 "volumes":[
   {{cloud_config_volume}}
   {{additional_cloud_config_volume}}
+  {{webhook_config_volume}}
+  {{webhook_authn_config_volume}}
   { "name": "srvkube",
     "hostPath": {
         "path": "{{srv_kube_path}}"}
