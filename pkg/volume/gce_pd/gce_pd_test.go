@@ -182,7 +182,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 	if !fakeManager.attachCalled {
-		t.Errorf("Attach watch not called")
+		t.Errorf("Attach was not called")
 	}
 
 	fakeManager = &fakePDManager{}
@@ -203,7 +203,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
 	if !fakeManager.detachCalled {
-		t.Errorf("Detach watch not called")
+		t.Errorf("Detach was not called")
 	}
 
 	// Test Provisioner
