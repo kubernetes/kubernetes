@@ -60,7 +60,7 @@ func init() {
 		Scheme,
 		yamlSerializer,
 		yamlSerializer,
-		[]unversioned.GroupVersion{{Version: Version}},
-		[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
+		unversioned.GroupVersion{Version: Version},
+		runtime.InternalGroupVersioner,
 	)
 }
