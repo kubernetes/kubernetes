@@ -187,9 +187,14 @@ func (UnstructuredObjectConverter) Convert(in, out interface{}) error {
 	return nil
 }
 
-func (UnstructuredObjectConverter) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
-	if gvk := in.GetObjectKind().GroupVersionKind(); gvk.GroupVersion() != outVersion {
-		return nil, errors.New("unstructured converter cannot convert versions")
+func (UnstructuredObjectConverter) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
+	if kind := in.GetObjectKind().GroupVersionKind(); !kind.IsEmpty() {
+		gvk, ok := target.KindForGroupVersionKinds([]unversioned.GroupVersionKind{kind})
+		if !ok {
+			// TODO: should this be a typed error?
+			return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
+		}
+		in.GetObjectKind().SetGroupVersionKind(gvk)
 	}
 	return in, nil
 }

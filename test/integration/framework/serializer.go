@@ -17,7 +17,6 @@ limitations under the License.
 package framework
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
@@ -58,10 +57,10 @@ func (s *wrappedSerializer) UniversalDeserializer() runtime.Decoder {
 	return s.serializer
 }
 
-func (s *wrappedSerializer) EncoderForVersion(encoder runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
-	return versioning.NewCodec(encoder, nil, s.scheme, s.scheme, s.scheme, s.scheme, []unversioned.GroupVersion{gv}, nil)
+func (s *wrappedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return versioning.NewCodec(encoder, nil, s.scheme, s.scheme, s.scheme, s.scheme, gv, nil)
 }
 
-func (s *wrappedSerializer) DecoderToVersion(decoder runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
-	return versioning.NewCodec(nil, decoder, s.scheme, s.scheme, s.scheme, s.scheme, nil, []unversioned.GroupVersion{gv})
+func (s *wrappedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return versioning.NewCodec(nil, decoder, s.scheme, s.scheme, s.scheme, s.scheme, nil, gv)
 }
