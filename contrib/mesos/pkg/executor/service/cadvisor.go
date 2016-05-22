@@ -28,8 +28,8 @@ type MesosCadvisor struct {
 	mem   uint64
 }
 
-func NewMesosCadvisor(cores int, mem uint64, port uint) (*MesosCadvisor, error) {
-	c, err := cadvisor.New(port)
+func NewMesosCadvisor(cores int, mem uint64, port uint, runtime string) (*MesosCadvisor, error) {
+	c, err := cadvisor.New(port, runtime)
 	if err != nil {
 		return nil, err
 	}

@@ -62,7 +62,7 @@ func (c *Fake) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return new(cadvisorapi.VersionInfo), nil
 }
 
-func (c *Fake) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (c *Fake) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 
