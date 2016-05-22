@@ -153,6 +153,9 @@ func defaultPredicates() sets.String {
 				return predicates.NewTolerationMatchPredicate(args.NodeInfo)
 			},
 		),
+
+		// Fit is determined by node memory pressure condition.
+		factory.RegisterFitPredicate("CheckNodeMemoryPressure", predicates.CheckNodeMemoryPressurePredicate),
 	)
 }
 
