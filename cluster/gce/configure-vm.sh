@@ -798,12 +798,58 @@ EOF
     CLOUD_CONFIG=/etc/gce.conf
   fi
 
-  if [[ -n ${CLOUD_CONFIG:-} ]]; then
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  if [[ -n "${CLOUD_CONFIG:-}" ]]; then
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: ${CLOUD_CONFIG}
 EOF
   else
     rm -f /etc/gce.conf
+  fi
+
+  if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  webhook_authentication_config: /etc/gcp_authn.config
+EOF
+    cat <<EOF >/etc/gcp_authn.config
+clusters:
+  - name: gcp-authentication-server
+    cluster:
+      server: ${GCP_AUTHN_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-authentication-server
+    user: kube-apiserver
+  name: webhook
+EOF
+  fi
+
+  if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  webhook_authorization_config: /etc/gcp_authz.config
+EOF
+    cat <<EOF >/etc/gcp_authz.config
+clusters:
+  - name: gcp-authorization-server
+    cluster:
+      server: ${GCP_AUTHZ_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-authorization-server
+    user: kube-apiserver
+  name: webhook
+EOF
   fi
 
   # If the kubelet on the master is enabled, give it the same CIDR range
