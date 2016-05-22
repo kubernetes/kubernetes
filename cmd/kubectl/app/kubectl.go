@@ -23,6 +23,10 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
+/*
+WARNING: this logic is duplicated, with minor changes, in cmd/hyperkube/kubectl.go
+Any salient changes here will need to be manually reflected in that file.
+*/
 func Run() error {
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
