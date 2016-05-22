@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
+	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -85,6 +87,7 @@ type testCase struct {
 	statusUpdated       bool
 	eventCreated        bool
 	verifyEvents        bool
+	useMetricsApi       bool
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
 
@@ -278,16 +281,47 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		timestamp := time.Now()
-		metrics := heapster.MetricResultList{}
-		for _, level := range tc.reportedLevels {
-			metric := heapster.MetricResult{
-				Metrics:         []heapster.MetricPoint{{timestamp, level, nil}},
-				LatestTimestamp: timestamp,
+		var heapsterRawMemResponse []byte
+
+		if tc.useMetricsApi {
+			metrics := []*metrics_api.PodMetrics{}
+			for i, cpu := range tc.reportedLevels {
+				podMetric := &metrics_api.PodMetrics{
+					ObjectMeta: v1.ObjectMeta{
+						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
+						Namespace: namespace,
+					},
+					Timestamp: unversioned.Time{Time: time.Now()},
+					Containers: []metrics_api.ContainerMetrics{
+						{
+							Name: "container",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU: *resource.NewMilliQuantity(
+									int64(cpu),
+									resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(
+									int64(1024*1024),
+									resource.BinarySI),
+							},
+						},
+					},
+				}
+				metrics = append(metrics, podMetric)
 			}
-			metrics.Items = append(metrics.Items, metric)
+			heapsterRawMemResponse, _ = json.Marshal(&metrics)
+		} else {
+			timestamp := time.Now()
+			metrics := heapster.MetricResultList{}
+			for _, level := range tc.reportedLevels {
+				metric := heapster.MetricResult{
+					Metrics:         []heapster.MetricPoint{{timestamp, level, nil}},
+					LatestTimestamp: timestamp,
+				}
+				metrics.Items = append(metrics.Items, metric)
+			}
+			heapsterRawMemResponse, _ = json.Marshal(&metrics)
 		}
-		heapsterRawMemResponse, _ := json.Marshal(&metrics)
+
 		return true, newFakeResponseWrapper(heapsterRawMemResponse), nil
 	})
 
@@ -417,6 +451,7 @@ func TestDefaultScaleUpRC(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{900, 950, 950, 1000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -430,6 +465,7 @@ func TestDefaultScaleUpDeployment(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{900, 950, 950, 1000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 		resource: &fakeResource{
 			name:       "test-dep",
 			apiVersion: "extensions/v1beta1",
@@ -448,6 +484,7 @@ func TestDefaultScaleUpReplicaSet(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{900, 950, 950, 1000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 		resource: &fakeResource{
 			name:       "test-replicaset",
 			apiVersion: "extensions/v1beta1",
@@ -467,6 +504,7 @@ func TestScaleUp(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -481,6 +519,7 @@ func TestScaleUpDeployment(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 		resource: &fakeResource{
 			name:       "test-dep",
 			apiVersion: "extensions/v1beta1",
@@ -500,6 +539,7 @@ func TestScaleUpReplicaSet(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 		resource: &fakeResource{
 			name:       "test-replicaset",
 			apiVersion: "extensions/v1beta1",
@@ -537,6 +577,7 @@ func TestDefaultScaleDown(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{400, 500, 600, 700, 800},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -551,6 +592,7 @@ func TestScaleDown(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -582,6 +624,7 @@ func TestTolerance(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{1010, 1030, 1020},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -612,6 +655,7 @@ func TestMinReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{10, 95, 10},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -625,6 +669,7 @@ func TestZeroReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -638,6 +683,7 @@ func TestTooFewReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -651,6 +697,7 @@ func TestTooManyReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -664,6 +711,7 @@ func TestMaxReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{8000, 9500, 1000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -677,6 +725,7 @@ func TestSuperfluousMetrics(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{4000, 9500, 3000, 7000, 3200, 2000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -690,6 +739,7 @@ func TestMissingMetrics(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{400, 95},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -703,6 +753,7 @@ func TestEmptyMetrics(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -715,6 +766,7 @@ func TestEmptyCPURequest(t *testing.T) {
 		desiredReplicas: 1,
 		CPUTarget:       100,
 		reportedLevels:  []uint64{200},
+		useMetricsApi:   true,
 	}
 	tc.runTest(t)
 }
@@ -729,6 +781,7 @@ func TestEventCreated(t *testing.T) {
 		reportedLevels:      []uint64{200},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.2")},
 		verifyEvents:        true,
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -743,6 +796,7 @@ func TestEventNotCreated(t *testing.T) {
 		reportedLevels:      []uint64{200, 200},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.4"), resource.MustParse("0.4")},
 		verifyEvents:        true,
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
@@ -801,6 +855,7 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 		},
+		useMetricsApi: true,
 	}
 
 	tc.runTest(t)
