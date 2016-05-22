@@ -44,7 +44,7 @@ type StatsProvider interface {
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetNode() (*api.Node, error)
 	GetNodeConfig() cm.NodeConfig
-	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
+	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
 	GetPods() []*api.Pod
