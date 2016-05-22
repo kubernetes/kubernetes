@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	storagebackendfactory "k8s.io/kubernetes/pkg/storage/storagebackend/factory"
@@ -255,16 +254,7 @@ func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, stor
 	}
 
 	ds := recognizer.NewDecoder(s, ns.UniversalDeserializer())
-	encoder := ns.EncoderForVersion(s, storageVersion)
-	decoder := ns.DecoderToVersion(ds, memoryVersion)
-	if memoryVersion.Group != storageVersion.Group {
-		// Allow this codec to translate between groups.
-		if err := versioning.EnableCrossGroupEncoding(encoder, memoryVersion.Group, storageVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up encoder from %v to %v: %v", memoryVersion, storageVersion, err)
-		}
-		if err := versioning.EnableCrossGroupDecoding(decoder, storageVersion.Group, memoryVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up decoder from %v to %v: %v", storageVersion, memoryVersion, err)
-		}
-	}
+	encoder := ns.EncoderForVersion(s, runtime.NewMultiGroupVersioner(storageVersion, unversioned.GroupKind{Group: storageVersion.Group}, unversioned.GroupKind{Group: memoryVersion.Group}))
+	decoder := ns.DecoderToVersion(ds, runtime.NewMultiGroupVersioner(memoryVersion, unversioned.GroupKind{Group: memoryVersion.Group}, unversioned.GroupKind{Group: storageVersion.Group}))
 	return runtime.NewCodec(encoder, decoder), nil
 }
