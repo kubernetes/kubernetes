@@ -62,7 +62,7 @@ type ResourceQuotaController struct {
 	// Watches changes to all resource quota
 	rqController *framework.Controller
 	// ResourceQuota objects that need to be synchronized
-	queue *workqueue.Type
+	queue workqueue.RateLimitingInterface
 	// To allow injection of syncUsage for testing.
 	syncHandler func(key string) error
 	// function that controls full recalculation of quota usage
@@ -77,7 +77,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
 		kubeClient:               options.KubeClient,
-		queue:                    workqueue.New(),
+		queue:                    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		resyncPeriod:             options.ResyncPeriod,
 		registry:                 options.Registry,
 		replenishmentControllers: []framework.ControllerInterface{},
@@ -170,10 +170,12 @@ func (rq *ResourceQuotaController) worker() {
 		}
 		defer rq.queue.Done(key)
 		err := rq.syncHandler(key.(string))
-		if err != nil {
-			utilruntime.HandleError(err)
-			rq.queue.Add(key)
+		if err == nil {
+			rq.queue.Forget(key)
+			return false
 		}
+		utilruntime.HandleError(err)
+		rq.queue.AddRateLimited(key)
 		return false
 	}
 	for {
