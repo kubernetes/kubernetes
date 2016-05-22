@@ -213,6 +213,8 @@ type Meta struct {
 	// KeyNameMapping is an optional function which may map the listed key (field name)
 	// into a source and destination value.
 	KeyNameMapping FieldMappingFunc
+	// Context is an optional field that callers may use to pass info to conversion functions.
+	Context interface{}
 }
 
 // scope contains information about an ongoing conversion.

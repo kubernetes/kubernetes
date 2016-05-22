@@ -90,7 +90,7 @@ func NewFromFile(path string) (policyList, error) {
 			if err := runtime.DecodeInto(decoder, b, oldPolicy); err != nil {
 				return nil, policyLoadError{path, i, b, err}
 			}
-			if err := api.Scheme.Convert(oldPolicy, p); err != nil {
+			if err := api.Scheme.Convert(oldPolicy, p, nil); err != nil {
 				return nil, policyLoadError{path, i, b, err}
 			}
 			pl = append(pl, p)

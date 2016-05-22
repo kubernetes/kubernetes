@@ -67,7 +67,7 @@ func TestConversion(t *testing.T) {
 	}
 	for k, tc := range testcases {
 		internal := &api.Policy{}
-		if err := api.Scheme.Convert(tc.old, internal); err != nil {
+		if err := api.Scheme.Convert(tc.old, internal, nil); err != nil {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		}
 		if !reflect.DeepEqual(internal, tc.expected) {

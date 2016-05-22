@@ -179,6 +179,18 @@ func (gv GroupVersion) String() string {
 	return gv.Version
 }
 
+// VersionForGroupKind identifies the preferred GroupVersion for a GroupKind, or false if no
+// group version is preferred.
+func (gv GroupVersion) VersionForGroupKind(src GroupKind) (GroupVersion, bool) {
+	if src.Group == gv.Group {
+		return gv, true
+	}
+	return GroupVersion{}, false
+}
+
+// PrefersGroup always returns the current group.
+func (gv GroupVersion) PrefersGroup() (string, bool) { return gv.Group, true }
+
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
 // if it cannot parse the string.
 func ParseGroupVersion(gv string) (GroupVersion, error) {
@@ -239,6 +251,28 @@ func (gv *GroupVersion) UnmarshalJSON(value []byte) error {
 // UnmarshalTEXT implements the Ugorji's encoding.TextUnmarshaler interface.
 func (gv *GroupVersion) UnmarshalText(value []byte) error {
 	return gv.unmarshal(value)
+}
+
+// GroupVersions can be used to represent a set of desired group versions.
+type GroupVersions []GroupVersion
+
+// VersionForGroupKind identifies the preferred GroupVersion for a GroupKind, or false if no
+// group version is preferred.
+func (gvs GroupVersions) VersionForGroupKind(src GroupKind) (GroupVersion, bool) {
+	for _, gv := range gvs {
+		if src.Group == gv.Group {
+			return gv, true
+		}
+	}
+	return GroupVersion{}, false
+}
+
+// PrefersGroup returns the first group, or false.
+func (gvs GroupVersions) PrefersGroup() (string, bool) {
+	if len(gvs) == 0 {
+		return "", false
+	}
+	return gvs[0].Group, true
 }
 
 // ToAPIVersionAndKind is a convenience method for satisfying runtime.Object on types that

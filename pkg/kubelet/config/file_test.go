@@ -129,7 +129,7 @@ func TestReadPodsFromFile(t *testing.T) {
 	for _, testCase := range testCases {
 		func() {
 			var versionedPod runtime.Object
-			err := testapi.Default.Converter().Convert(&testCase.pod, &versionedPod)
+			err := testapi.Default.Converter().Convert(&testCase.pod, &versionedPod, nil)
 			if err != nil {
 				t.Fatalf("%s: error in versioning the pod: %v", testCase.desc, err)
 			}

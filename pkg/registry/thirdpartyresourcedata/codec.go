@@ -42,7 +42,7 @@ type thirdPartyObjectConverter struct {
 	converter runtime.ObjectConvertor
 }
 
-func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersion unversioned.GroupVersion) (out runtime.Object, err error) {
+func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersion runtime.GroupVersioner) (out runtime.Object, err error) {
 	switch in.(type) {
 	// This seems weird, but in this case the ThirdPartyResourceData is really just a wrapper on the raw 3rd party data.
 	// The actual thing printed/sent to server is the actual raw third party resource data, which only has one version.
@@ -53,8 +53,8 @@ func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersi
 	}
 }
 
-func (t *thirdPartyObjectConverter) Convert(in, out interface{}) error {
-	return t.converter.Convert(in, out)
+func (t *thirdPartyObjectConverter) Convert(in, out, context interface{}) error {
+	return t.converter.Convert(in, out, context)
 }
 
 func (t *thirdPartyObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
@@ -213,11 +213,14 @@ func (t *thirdPartyResourceDataCodecFactory) StreamingSerializerForMediaType(med
 	}
 }
 
-func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
-	return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv), gvk: gv.WithKind(t.kind)}
+func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	if target, ok := runtime.PreferredGroupVersion(gv); ok {
+		return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv), gvk: target.WithKind(t.kind)}
+	}
+	return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv)}
 }
 
-func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
+func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	return NewDecoder(t.delegate.DecoderToVersion(s, gv), t.kind)
 }
 
@@ -498,9 +501,12 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 			}
 			dataStrings[ix] = buff.String()
 		}
+		if t.gvk.IsEmpty() {
+			return fmt.Errorf("thirdPartyResourceDataEncoder was not given a target version")
+		}
 		gv := t.gvk.GroupVersion()
-		fmt.Fprintf(stream, template, t.gvk.Kind+"List", gv.String(), strings.Join(dataStrings, ","))
-		return nil
+		_, err = fmt.Fprintf(stream, template, t.gvk.Kind+"List", gv.String(), strings.Join(dataStrings, ","))
+		return err
 	case *versioned.InternalEvent:
 		event := &versioned.Event{}
 		err := versioned.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)

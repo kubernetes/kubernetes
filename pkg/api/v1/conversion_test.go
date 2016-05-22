@@ -127,7 +127,7 @@ func TestPodSpecConversion(t *testing.T) {
 		ServiceAccountName: name,
 	}
 	v := versioned.PodSpec{}
-	if err := api.Scheme.Convert(i, &v); err != nil {
+	if err := api.Scheme.Convert(i, &v, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if v.ServiceAccountName != name {
@@ -152,7 +152,7 @@ func TestPodSpecConversion(t *testing.T) {
 	}
 	for k, v := range testCases {
 		got := api.PodSpec{}
-		err := api.Scheme.Convert(v, &got)
+		err := api.Scheme.Convert(v, &got, nil)
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", k, err)
 		}
@@ -206,7 +206,7 @@ func TestResourceListConversion(t *testing.T) {
 
 	for i, test := range tests {
 		output := api.ResourceList{}
-		err := api.Scheme.Convert(&test.input, &output)
+		err := api.Scheme.Convert(&test.input, &output, nil)
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", i, err)
 		}

@@ -28,11 +28,11 @@ import (
 
 type fakeConvertor struct{}
 
-func (fakeConvertor) Convert(in, out interface{}) error {
+func (fakeConvertor) Convert(in, out, context interface{}) error {
 	return nil
 }
 
-func (fakeConvertor) ConvertToVersion(in runtime.Object, _ unversioned.GroupVersion) (runtime.Object, error) {
+func (fakeConvertor) ConvertToVersion(in runtime.Object, _ runtime.GroupVersioner) (runtime.Object, error) {
 	return in, nil
 }
 
