@@ -19,6 +19,7 @@ package apiserver
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -77,6 +78,10 @@ type AuthorizationConfig struct {
 
 	// Kubeconfig file for Webhook authorization plugin.
 	WebhookConfigFile string
+	// TTL for caching of authorized responses from the webhook server.
+	WebhookCacheAuthorizedTTL time.Duration
+	// TTL for caching of unauthorized responses from the webhook server.
+	WebhookCacheUnauthorizedTTL time.Duration
 }
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
@@ -114,7 +119,9 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 			if config.WebhookConfigFile == "" {
 				return nil, errors.New("Webhook's configuration file not passed")
 			}
-			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile)
+			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
+				config.WebhookCacheAuthorizedTTL,
+				config.WebhookCacheUnauthorizedTTL)
 			if err != nil {
 				return nil, err
 			}
