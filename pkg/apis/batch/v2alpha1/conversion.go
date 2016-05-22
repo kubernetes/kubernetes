@@ -39,15 +39,18 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		panic(err)
 	}
 
-	err = api.Scheme.AddFieldLabelConversionFunc("batch/v2alpha1", "Job",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name", "metadata.namespace", "status.successful":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
+	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
+	for _, kind := range []string{"Job", "JobTemplate", "ScheduledJob"} {
+		err = api.Scheme.AddFieldLabelConversionFunc("batch/v2alpha1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.name", "metadata.namespace", "status.successful":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label not supported: %s", label)
+				}
+			})
+	}
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)

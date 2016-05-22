@@ -47,6 +47,7 @@ const (
 	PodTemplates             Resource = "podtemplates"
 	Replicasets              Resource = "replicasets"
 	ResourceQuotas           Resource = "resourcequotas"
+	ScheduledJobs            Resource = "scheduledjobs"
 	Secrets                  Resource = "secrets"
 	ServiceAccounts          Resource = "serviceaccounts"
 	Services                 Resource = "services"
@@ -75,6 +76,7 @@ func init() {
 	watchCacheSizes[PodTemplates] = 100
 	watchCacheSizes[Replicasets] = 100
 	watchCacheSizes[ResourceQuotas] = 100
+	watchCacheSizes[ScheduledJobs] = 100
 	watchCacheSizes[Secrets] = 100
 	watchCacheSizes[ServiceAccounts] = 100
 	watchCacheSizes[Services] = 100
