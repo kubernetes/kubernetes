@@ -222,11 +222,11 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 	return out, gvk, nil
 }
 
-// EncodeToStream ensures the provided object is output in the right scheme. If overrides are specified, when
-// encoding the object the first override that matches the object's group is used. Other overrides are ignored.
-func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+// Encode ensures the provided object is output in the appropriate group and version, invoking
+// conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
+func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	if _, ok := obj.(*runtime.Unknown); ok {
-		return c.encoder.EncodeToStream(obj, w, overrides...)
+		return c.encoder.Encode(obj, w)
 	}
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
 	if err != nil {
@@ -234,38 +234,21 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 	}
 	gvk := gvks[0]
 
-	if (c.encodeVersion == nil && len(overrides) == 0) || isUnversioned {
+	if c.encodeVersion == nil || isUnversioned {
 		objectKind := obj.GetObjectKind()
 		old := objectKind.GroupVersionKind()
 		objectKind.SetGroupVersionKind(gvk)
-		err = c.encoder.EncodeToStream(obj, w, overrides...)
+		err = c.encoder.Encode(obj, w)
 		objectKind.SetGroupVersionKind(old)
 		return err
 	}
 
 	targetGV, ok := c.encodeVersion[gvk.Group]
-	// use override if provided
-	for i, override := range overrides {
-		if override.Group == gvk.Group {
-			ok = true
-			targetGV = override
-			// swap the position of the override
-			overrides[0], overrides[i] = targetGV, overrides[0]
-			break
-		}
-	}
 
 	// attempt a conversion to the sole encode version
 	if !ok && c.preferredEncodeVersion != nil {
 		ok = true
 		targetGV = c.preferredEncodeVersion[0]
-		if len(overrides) > 0 {
-			// ensure the target override is first
-			overrides = promoteOrPrependGroupVersion(targetGV, overrides)
-		} else {
-			// avoids allocating a new array for each call to EncodeToVersion
-			overrides = c.preferredEncodeVersion
-		}
 	}
 
 	// if no fallback is available, error
@@ -285,21 +268,8 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 		obj = out
 	}
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
-	err = c.encoder.EncodeToStream(obj, w, overrides...)
+	err = c.encoder.Encode(obj, w)
 	// restore the old GVK, in case conversion returned the same object
 	objectKind.SetGroupVersionKind(old)
 	return err
-}
-
-// promoteOrPrependGroupVersion finds the group version in the provided group versions that has the same group as target.
-// If the group is found the returned array will have that group version in the first position - if the group is not found
-// the returned array will have target in the first position.
-func promoteOrPrependGroupVersion(target unversioned.GroupVersion, gvs []unversioned.GroupVersion) []unversioned.GroupVersion {
-	for i, gv := range gvs {
-		if gv.Group == target.Group {
-			gvs[0], gvs[i] = gvs[i], gvs[0]
-			return gvs
-		}
-	}
-	return append([]unversioned.GroupVersion{target}, gvs...)
 }

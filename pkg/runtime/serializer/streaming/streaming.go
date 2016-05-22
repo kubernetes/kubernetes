@@ -30,8 +30,8 @@ import (
 // Encoder is a runtime.Encoder on a stream.
 type Encoder interface {
 	// Encode will write the provided object to the stream or return an error. It obeys the same
-	// contract as runtime.Encoder.
-	Encode(obj runtime.Object, overrides ...unversioned.GroupVersion) error
+	// contract as runtime.VersionedEncoder.
+	Encode(obj runtime.Object) error
 }
 
 // Decoder is a runtime.Decoder from a stream.
@@ -127,8 +127,8 @@ func NewEncoder(w io.Writer, e runtime.Encoder) Encoder {
 }
 
 // Encode writes the provided object to the nested writer.
-func (e *encoder) Encode(obj runtime.Object, overrides ...unversioned.GroupVersion) error {
-	if err := e.encoder.EncodeToStream(obj, e.buf, overrides...); err != nil {
+func (e *encoder) Encode(obj runtime.Object) error {
+	if err := e.encoder.Encode(obj, e.buf); err != nil {
 		return err
 	}
 	_, err := e.writer.Write(e.buf.Bytes())

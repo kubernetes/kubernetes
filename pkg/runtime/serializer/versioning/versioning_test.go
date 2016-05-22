@@ -261,9 +261,8 @@ func (c *checkConvertor) ConvertFieldLabel(version, kind, label, value string) (
 }
 
 type mockSerializer struct {
-	err      error
-	obj      runtime.Object
-	versions []unversioned.GroupVersion
+	err error
+	obj runtime.Object
 
 	defaults, actual *unversioned.GroupVersionKind
 	into             runtime.Object
@@ -275,9 +274,8 @@ func (s *mockSerializer) Decode(data []byte, defaults *unversioned.GroupVersionK
 	return s.obj, s.actual, s.err
 }
 
-func (s *mockSerializer) EncodeToStream(obj runtime.Object, w io.Writer, versions ...unversioned.GroupVersion) error {
+func (s *mockSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	s.obj = obj
-	s.versions = versions
 	return s.err
 }
 
