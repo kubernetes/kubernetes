@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v67",
+	"GodepVersion": "v69",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -2125,8 +2125,13 @@
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
-			"Comment": "v1.1.0-beta1-15-gde510e4",
-			"Rev": "de510e4bdcdea96722b5bde19ff0b7a142939485"
+			"Comment": "v1.1.0-beta2",
+			"Rev": "9cb18ac0ceb193eb530a1fe339355c94ea454d85"
+		},
+		{
+			"ImportPath": "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
+			"Comment": "v1.1.0-beta2",
+			"Rev": "9cb18ac0ceb193eb530a1fe339355c94ea454d85"
 		}
 	]
 }
