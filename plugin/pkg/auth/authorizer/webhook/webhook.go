@@ -18,11 +18,14 @@ limitations under the License.
 package webhook
 
 import (
+	"encoding/json"
 	"errors"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -37,6 +40,9 @@ var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
 
 type WebhookAuthorizer struct {
 	*webhook.GenericWebhook
+	responseCache   *cache.LRUExpireCache
+	authorizedTTL   time.Duration
+	unauthorizedTTL time.Duration
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -59,12 +65,12 @@ type WebhookAuthorizer struct {
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
-func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
+func New(kubeConfigFile string, authorizedTTL, unauthorizedTTL time.Duration) (*WebhookAuthorizer, error) {
 	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions)
 	if err != nil {
 		return nil, err
 	}
-	return &WebhookAuthorizer{gw}, nil
+	return &WebhookAuthorizer{gw, cache.NewLRUExpireCache(1024), authorizedTTL, unauthorizedTTL}, nil
 }
 
 // Authorize makes a REST request to the remote service describing the attempted action as a JSON
@@ -134,13 +140,27 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 			Verb: attr.GetVerb(),
 		}
 	}
-	result := w.RestClient.Post().Body(r).Do()
-	if err := result.Error(); err != nil {
+	key, err := json.Marshal(r.Spec)
+	if err != nil {
 		return err
 	}
-
-	if err := result.Into(r); err != nil {
-		return err
+	if entry, ok := w.responseCache.Get(string(key)); ok {
+		r.Status = entry.(v1beta1.SubjectAccessReviewStatus)
+	} else {
+		result := w.RestClient.Post().Body(r).Do()
+		if err := result.Error(); err != nil {
+			return err
+		}
+		if err := result.Into(r); err != nil {
+			return err
+		}
+		go func() {
+			if r.Status.Allowed {
+				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
+			} else {
+				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+			}
+		}()
 	}
 	if r.Status.Allowed {
 		return nil
