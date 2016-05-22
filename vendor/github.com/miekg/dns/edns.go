@@ -1,29 +1,3 @@
-// EDNS0
-//
-// EDNS0 is an extension mechanism for the DNS defined in RFC 2671 and updated
-// by RFC 6891. It defines an new RR type, the OPT RR, which is then completely
-// abused.
-// Basic use pattern for creating an (empty) OPT RR:
-//
-//	o := new(dns.OPT)
-//	o.Hdr.Name = "." // MUST be the root zone, per definition.
-//	o.Hdr.Rrtype = dns.TypeOPT
-//
-// The rdata of an OPT RR consists out of a slice of EDNS0 (RFC 6891)
-// interfaces. Currently only a few have been standardized: EDNS0_NSID
-// (RFC 5001) and EDNS0_SUBNET (draft-vandergaast-edns-client-subnet-02). Note
-// that these options may be combined in an OPT RR.
-// Basic use pattern for a server to check if (and which) options are set:
-//
-//	// o is a dns.OPT
-//	for _, s := range o.Option {
-//		switch e := s.(type) {
-//		case *dns.EDNS0_NSID:
-//			// do stuff with e.Nsid
-//		case *dns.EDNS0_SUBNET:
-//			// access e.Family, e.Address, etc.
-//		}
-//	}
 package dns
 
 import (
@@ -44,16 +18,16 @@ const (
 	EDNS0SUBNET      = 0x8     // client-subnet (RFC6891)
 	EDNS0EXPIRE      = 0x9     // EDNS0 expire
 	EDNS0SUBNETDRAFT = 0x50fa  // Don't use! Use EDNS0SUBNET
+	EDNS0LOCALSTART  = 0xFDE9  // Beginning of range reserved for local/experimental use (RFC6891)
+	EDNS0LOCALEND    = 0xFFFE  // End of range reserved for local/experimental use (RFC6891)
 	_DO              = 1 << 15 // dnssec ok
 )
 
+// OPT is the EDNS0 RR appended to messages to convey extra (meta) information.
+// See RFC 6891.
 type OPT struct {
 	Hdr    RR_Header
 	Option []EDNS0 `dns:"opt"`
-}
-
-func (rr *OPT) Header() *RR_Header {
-	return &rr.Hdr
 }
 
 func (rr *OPT) String() string {
@@ -92,6 +66,8 @@ func (rr *OPT) String() string {
 			s += "\n; DS HASH UNDERSTOOD: " + o.String()
 		case *EDNS0_N3U:
 			s += "\n; NSEC3 HASH UNDERSTOOD: " + o.String()
+		case *EDNS0_LOCAL:
+			s += "\n; LOCAL OPT: " + o.String()
 		}
 	}
 	return s
@@ -100,14 +76,11 @@ func (rr *OPT) String() string {
 func (rr *OPT) len() int {
 	l := rr.Hdr.len()
 	for i := 0; i < len(rr.Option); i++ {
+		l += 4 // Account for 2-byte option code and 2-byte option length.
 		lo, _ := rr.Option[i].pack()
-		l += 2 + len(lo)
+		l += len(lo)
 	}
 	return l
-}
-
-func (rr *OPT) copy() RR {
-	return &OPT{*rr.Hdr.copyHeader(), rr.Option}
 }
 
 // return the old value -> delete SetVersion?
@@ -195,7 +168,7 @@ func (e *EDNS0_NSID) Option() uint16        { return EDNS0NSID }
 func (e *EDNS0_NSID) unpack(b []byte) error { e.Nsid = hex.EncodeToString(b); return nil }
 func (e *EDNS0_NSID) String() string        { return string(e.Nsid) }
 
-// The subnet EDNS0 option is used to give the remote nameserver
+// EDNS0_SUBNET is the subnet option that is used to give the remote nameserver
 // an idea of where the client lives. It can then give back a different
 // answer depending on the location or network topology.
 // Basic use pattern for creating an subnet option:
@@ -211,6 +184,11 @@ func (e *EDNS0_NSID) String() string        { return string(e.Nsid) }
 //	e.Address = net.ParseIP("127.0.0.1").To4()	// for IPv4
 //	// e.Address = net.ParseIP("2001:7b8:32a::2")	// for IPV6
 //	o.Option = append(o.Option, e)
+//
+// Note: the spec (draft-ietf-dnsop-edns-client-subnet-00) has some insane logic
+// for which netmask applies to the address. This code will parse all the
+// available bits when unpacking (up to optlen). When packing it will apply
+// SourceNetmask. If you need more advanced logic, patches welcome and good luck.
 type EDNS0_SUBNET struct {
 	Code          uint16 // Always EDNS0SUBNET
 	Family        uint16 // 1 for IP, 2 for IP6
@@ -237,38 +215,22 @@ func (e *EDNS0_SUBNET) pack() ([]byte, error) {
 		if e.SourceNetmask > net.IPv4len*8 {
 			return nil, errors.New("dns: bad netmask")
 		}
-		ip := make([]byte, net.IPv4len)
-		a := e.Address.To4().Mask(net.CIDRMask(int(e.SourceNetmask), net.IPv4len*8))
-		for i := 0; i < net.IPv4len; i++ {
-			if i+1 > len(e.Address) {
-				break
-			}
-			ip[i] = a[i]
+		if len(e.Address.To4()) != net.IPv4len {
+			return nil, errors.New("dns: bad address")
 		}
-		needLength := e.SourceNetmask / 8
-		if e.SourceNetmask%8 > 0 {
-			needLength++
-		}
-		ip = ip[:needLength]
-		b = append(b, ip...)
+		ip := e.Address.To4().Mask(net.CIDRMask(int(e.SourceNetmask), net.IPv4len*8))
+		needLength := (e.SourceNetmask + 8 - 1) / 8 // division rounding up
+		b = append(b, ip[:needLength]...)
 	case 2:
 		if e.SourceNetmask > net.IPv6len*8 {
 			return nil, errors.New("dns: bad netmask")
 		}
-		ip := make([]byte, net.IPv6len)
-		a := e.Address.Mask(net.CIDRMask(int(e.SourceNetmask), net.IPv6len*8))
-		for i := 0; i < net.IPv6len; i++ {
-			if i+1 > len(e.Address) {
-				break
-			}
-			ip[i] = a[i]
+		if len(e.Address) != net.IPv6len {
+			return nil, errors.New("dns: bad address")
 		}
-		needLength := e.SourceNetmask / 8
-		if e.SourceNetmask%8 > 0 {
-			needLength++
-		}
-		ip = ip[:needLength]
-		b = append(b, ip...)
+		ip := e.Address.Mask(net.CIDRMask(int(e.SourceNetmask), net.IPv6len*8))
+		needLength := (e.SourceNetmask + 8 - 1) / 8 // division rounding up
+		b = append(b, ip[:needLength]...)
 	default:
 		return nil, errors.New("dns: bad address family")
 	}
@@ -276,8 +238,7 @@ func (e *EDNS0_SUBNET) pack() ([]byte, error) {
 }
 
 func (e *EDNS0_SUBNET) unpack(b []byte) error {
-	lb := len(b)
-	if lb < 4 {
+	if len(b) < 4 {
 		return ErrBuf
 	}
 	e.Family, _ = unpackUint16(b, 0)
@@ -285,25 +246,27 @@ func (e *EDNS0_SUBNET) unpack(b []byte) error {
 	e.SourceScope = b[3]
 	switch e.Family {
 	case 1:
-		addr := make([]byte, 4)
-		for i := 0; i < int(e.SourceNetmask/8); i++ {
-			if i >= len(addr) || 4+i >= len(b) {
-				return ErrBuf
-			}
+		if e.SourceNetmask > net.IPv4len*8 || e.SourceScope > net.IPv4len*8 {
+			return errors.New("dns: bad netmask")
+		}
+		addr := make([]byte, net.IPv4len)
+		for i := 0; i < net.IPv4len && 4+i < len(b); i++ {
 			addr[i] = b[4+i]
 		}
 		e.Address = net.IPv4(addr[0], addr[1], addr[2], addr[3])
 	case 2:
-		addr := make([]byte, 16)
-		for i := 0; i < int(e.SourceNetmask/8); i++ {
-			if i >= len(addr) || 4+i >= len(b) {
-				return ErrBuf
-			}
+		if e.SourceNetmask > net.IPv6len*8 || e.SourceScope > net.IPv6len*8 {
+			return errors.New("dns: bad netmask")
+		}
+		addr := make([]byte, net.IPv6len)
+		for i := 0; i < net.IPv6len && 4+i < len(b); i++ {
 			addr[i] = b[4+i]
 		}
 		e.Address = net.IP{addr[0], addr[1], addr[2], addr[3], addr[4],
 			addr[5], addr[6], addr[7], addr[8], addr[9], addr[10],
 			addr[11], addr[12], addr[13], addr[14], addr[15]}
+	default:
+		return errors.New("dns: bad address family")
 	}
 	return nil
 }
@@ -320,7 +283,7 @@ func (e *EDNS0_SUBNET) String() (s string) {
 	return
 }
 
-// The UL (Update Lease) EDNS0 (draft RFC) option is used to tell the server to set
+// The EDNS0_UL (Update Lease) (draft RFC) option is used to tell the server to set
 // an expiration on an update RR. This is helpful for clients that cannot clean
 // up after themselves. This is a draft RFC and more information can be found at
 // http://files.dns-sd.org/draft-sekar-dns-ul.txt
@@ -358,7 +321,7 @@ func (e *EDNS0_UL) unpack(b []byte) error {
 	return nil
 }
 
-// Long Lived Queries: http://tools.ietf.org/html/draft-sekar-dns-llq-01
+// EDNS0_LLQ stands for Long Lived Queries: http://tools.ietf.org/html/draft-sekar-dns-llq-01
 // Implemented for completeness, as the EDNS0 type code is assigned.
 type EDNS0_LLQ struct {
 	Code      uint16 // Always EDNS0LLQ
@@ -497,5 +460,46 @@ func (e *EDNS0_EXPIRE) unpack(b []byte) error {
 		return ErrBuf
 	}
 	e.Expire = uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+	return nil
+}
+
+// The EDNS0_LOCAL option is used for local/experimental purposes. The option
+// code is recommended to be within the range [EDNS0LOCALSTART, EDNS0LOCALEND]
+// (RFC6891), although any unassigned code can actually be used.  The content of
+// the option is made available in Data, unaltered.
+// Basic use pattern for creating a local option:
+//
+//	o := new(dns.OPT)
+//	o.Hdr.Name = "."
+//	o.Hdr.Rrtype = dns.TypeOPT
+//	e := new(dns.EDNS0_LOCAL)
+//	e.Code = dns.EDNS0LOCALSTART
+//	e.Data = []byte{72, 82, 74}
+//	o.Option = append(o.Option, e)
+type EDNS0_LOCAL struct {
+	Code uint16
+	Data []byte
+}
+
+func (e *EDNS0_LOCAL) Option() uint16 { return e.Code }
+func (e *EDNS0_LOCAL) String() string {
+	return strconv.FormatInt(int64(e.Code), 10) + ":0x" + hex.EncodeToString(e.Data)
+}
+
+func (e *EDNS0_LOCAL) pack() ([]byte, error) {
+	b := make([]byte, len(e.Data))
+	copied := copy(b, e.Data)
+	if copied != len(e.Data) {
+		return nil, ErrBuf
+	}
+	return b, nil
+}
+
+func (e *EDNS0_LOCAL) unpack(b []byte) error {
+	e.Data = make([]byte, len(b))
+	copied := copy(e.Data, b)
+	if copied != len(b) {
+		return ErrBuf
+	}
 	return nil
 }

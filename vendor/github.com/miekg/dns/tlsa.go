@@ -25,7 +25,8 @@ func CertificateToDANE(selector, matchingType uint8, cert *x509.Certificate) (st
 		h := sha256.New()
 		switch selector {
 		case 0:
-			return hex.EncodeToString(cert.Raw), nil
+			io.WriteString(h, string(cert.Raw))
+			return hex.EncodeToString(h.Sum(nil)), nil
 		case 1:
 			io.WriteString(h, string(cert.RawSubjectPublicKeyInfo))
 			return hex.EncodeToString(h.Sum(nil)), nil
@@ -34,7 +35,8 @@ func CertificateToDANE(selector, matchingType uint8, cert *x509.Certificate) (st
 		h := sha512.New()
 		switch selector {
 		case 0:
-			return hex.EncodeToString(cert.Raw), nil
+			io.WriteString(h, string(cert.Raw))
+			return hex.EncodeToString(h.Sum(nil)), nil
 		case 1:
 			io.WriteString(h, string(cert.RawSubjectPublicKeyInfo))
 			return hex.EncodeToString(h.Sum(nil)), nil
@@ -80,5 +82,5 @@ func TLSAName(name, service, network string) (string, error) {
 	if e != nil {
 		return "", e
 	}
-	return "_" + strconv.Itoa(p) + "_" + network + "." + name, nil
+	return "_" + strconv.Itoa(p) + "._" + network + "." + name, nil
 }
