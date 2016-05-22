@@ -39,6 +39,8 @@ import (
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/monitors"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/pools"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
+	"github.com/rackspace/gophercloud/openstack/identity/v3/extensions/trust"
+	token3 "github.com/rackspace/gophercloud/openstack/identity/v3/tokens"
 	"github.com/rackspace/gophercloud/pagination"
 	"gopkg.in/gcfg.v1"
 
@@ -112,6 +114,7 @@ type Config struct {
 		DomainId   string `gcfg:"domain-id"`
 		DomainName string `gcfg:"domain-name"`
 		Region     string
+		TrustId    string `gcfg:"trust-id"`
 	}
 	LoadBalancer LoadBalancerOpts
 }
@@ -219,8 +222,32 @@ func readInstanceID() (string, error) {
 	return instanceID, nil
 }
 
+func AuthenticatedClientV3(options gophercloud.AuthOptions) (*gophercloud.ProviderClient, error) {
+	opts := trust.AuthOptionsExt{
+		AuthOptions: token3.AuthOptions{
+			AuthOptions: options
+		},
+		TrustID: cfg.Global.TrustId,
+	}
+	client, err := openstack.NewClient(options.IdentityEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	err = trust.AuthenticateV3Trust(client, opts)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
 func newOpenStack(cfg Config) (*OpenStack, error) {
-	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
+	//Authentication through trust-id
+	if cfg.Global.TrustId != "" {
+		provider, err := AuthenticatedClientV3(cfg.toAuthOptions())
+	}
+	else {
+		provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
+	}
 	if err != nil {
 		return nil, err
 	}
