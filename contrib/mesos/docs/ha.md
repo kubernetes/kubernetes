@@ -256,6 +256,7 @@ spec:
   - hostPath:
       path: /etc/kubernetes/manifests
     name: manifest-dst
+EOF
 ```
 
 One must change `$MY_IP` to either `$K8S_1_IP` or `K8S_2_IP` depending
