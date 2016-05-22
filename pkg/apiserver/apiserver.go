@@ -277,7 +277,7 @@ type StripVersionNegotiatedSerializer struct {
 	runtime.NegotiatedSerializer
 }
 
-func (n StripVersionNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
+func (n StripVersionNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
 	serializer, ok := encoder.(runtime.Serializer)
 	if !ok {
 		// The stripVersionEncoder needs both an encoder and decoder, but is called from a context that doesn't have access to the

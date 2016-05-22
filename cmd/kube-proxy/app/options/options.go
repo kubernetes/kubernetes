@@ -50,7 +50,7 @@ type ProxyServerConfig struct {
 
 func NewProxyConfig() *ProxyServerConfig {
 	config := componentconfig.KubeProxyConfiguration{}
-	api.Scheme.Convert(&v1alpha1.KubeProxyConfiguration{}, &config)
+	api.Scheme.Convert(&v1alpha1.KubeProxyConfiguration{}, &config, nil)
 	return &ProxyServerConfig{
 		KubeProxyConfiguration: config,
 		ContentType:            "application/vnd.kubernetes.protobuf",

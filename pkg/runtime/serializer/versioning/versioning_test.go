@@ -19,6 +19,7 @@ package versioning
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"testing"
 
@@ -37,6 +38,59 @@ func (d *testDecodable) GetObjectKind() unversioned.ObjectKind                { 
 func (d *testDecodable) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
 
+type testNestedDecodable struct {
+	Other string
+	Value int `json:"value"`
+
+	gvk          unversioned.GroupVersionKind
+	nestedCalled bool
+	nestedErr    error
+}
+
+func (d *testNestedDecodable) GetObjectKind() unversioned.ObjectKind                { return d }
+func (d *testNestedDecodable) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
+func (d *testNestedDecodable) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
+
+func (n *testNestedDecodable) EncodeNestedObjects(e runtime.Encoder) error {
+	n.nestedCalled = true
+	return n.nestedErr
+}
+
+func (n *testNestedDecodable) DecodeNestedObjects(d runtime.Decoder) error {
+	n.nestedCalled = true
+	return n.nestedErr
+}
+
+func TestNestedDecode(t *testing.T) {
+	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
+	decoder := &mockSerializer{obj: n}
+	codec := NewCodec(nil, decoder, nil, nil, nil, nil, nil, nil)
+	if _, _, err := codec.Decode([]byte(`{}`), nil, n); err != n.nestedErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !n.nestedCalled {
+		t.Errorf("did not invoke nested decoder")
+	}
+}
+
+func TestNestedEncode(t *testing.T) {
+	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
+	encoder := &mockSerializer{obj: n}
+	codec := NewCodec(
+		encoder, nil,
+		&checkConvertor{obj: n, groupVersion: unversioned.GroupVersion{Group: "other"}},
+		nil, nil,
+		&mockTyper{gvks: []unversioned.GroupVersionKind{{Kind: "test"}}},
+		unversioned.GroupVersion{Group: "other"}, nil,
+	)
+	if err := codec.Encode(n, ioutil.Discard); err != n.nestedErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !n.nestedCalled {
+		t.Errorf("did not invoke nested decoder")
+	}
+}
+
 func TestDecode(t *testing.T) {
 	gvk1 := &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}
 	decodable1 := &testDecodable{}
@@ -53,7 +107,7 @@ func TestDecode(t *testing.T) {
 		yaml       bool
 		pretty     bool
 
-		encodes, decodes []unversioned.GroupVersion
+		encodes, decodes runtime.GroupVersioner
 
 		defaultGVK *unversioned.GroupVersionKind
 		into       runtime.Object
@@ -67,12 +121,14 @@ func TestDecode(t *testing.T) {
 			serializer:  &mockSerializer{actual: gvk1},
 			convertor:   &checkConvertor{groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK: gvk1,
+			decodes:     unversioned.GroupVersion{Group: "other", Version: "__internal"},
 		},
 		{
 			serializer:  &mockSerializer{actual: gvk1, obj: decodable1},
 			convertor:   &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK: gvk1,
 			sameObject:  decodable2,
+			decodes:     unversioned.GroupVersion{Group: "other", Version: "__internal"},
 		},
 		// defaultGVK.Group is allowed to force a conversion to the destination group
 		{
@@ -81,6 +137,7 @@ func TestDecode(t *testing.T) {
 			convertor:   &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "force", Version: "__internal"}},
 			expectedGVK: gvk1,
 			sameObject:  decodable2,
+			decodes:     unversioned.GroupVersion{Group: "force", Version: "__internal"},
 		},
 		// uses direct conversion for into when objects differ
 		{
@@ -121,6 +178,7 @@ func TestDecode(t *testing.T) {
 			convertor:      &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK:    gvk1,
 			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1, decodable2}},
+			decodes:        unversioned.GroupVersion{Group: "other", Version: "__internal"},
 		},
 		{
 			into: &runtime.VersionedObjects{Objects: []runtime.Object{}},
@@ -130,38 +188,45 @@ func TestDecode(t *testing.T) {
 			convertor:      &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK:    gvk1,
 			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1, decodable2}},
+			decodes:        unversioned.GroupVersion{Group: "other", Version: "__internal"},
 		},
 
 		// decode into the same version as the serialized object
 		{
-			decodes: []unversioned.GroupVersion{gvk1.GroupVersion()},
+			decodes: unversioned.GroupVersions{gvk1.GroupVersion()},
 
 			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
+			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: unversioned.GroupVersions{{Group: "other", Version: "blah"}}},
 			expectedGVK:    gvk1,
 			expectedObject: decodable1,
 		},
 		{
 			into:    &runtime.VersionedObjects{Objects: []runtime.Object{}},
-			decodes: []unversioned.GroupVersion{gvk1.GroupVersion()},
+			decodes: unversioned.GroupVersions{gvk1.GroupVersion()},
 
 			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
+			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: unversioned.GroupVersions{{Group: "other", Version: "blah"}}},
+			copier:         &checkCopy{in: decodable1, obj: decodable1, err: nil},
 			expectedGVK:    gvk1,
 			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1}},
 		},
 
 		// codec with non matching version skips conversion altogether
 		{
-			decodes: []unversioned.GroupVersion{{Group: "something", Version: "else"}},
+			decodes: unversioned.GroupVersions{{Group: "something", Version: "else"}},
 
 			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
+			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: unversioned.GroupVersions{{Group: "something", Version: "else"}}},
 			expectedGVK:    gvk1,
 			expectedObject: decodable1,
 		},
 		{
 			into:    &runtime.VersionedObjects{Objects: []runtime.Object{}},
-			decodes: []unversioned.GroupVersion{{Group: "something", Version: "else"}},
+			decodes: unversioned.GroupVersions{{Group: "something", Version: "else"}},
 
 			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
+			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: unversioned.GroupVersions{{Group: "something", Version: "else"}}},
+			copier:         &checkCopy{in: decodable1, obj: decodable1, err: nil},
 			expectedGVK:    gvk1,
 			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1}},
 		},
@@ -228,7 +293,7 @@ func (c *checkCopy) Copy(obj runtime.Object) (runtime.Object, error) {
 type checkConvertor struct {
 	err           error
 	in, obj       runtime.Object
-	groupVersion  unversioned.GroupVersion
+	groupVersion  runtime.GroupVersioner
 	directConvert bool
 }
 
@@ -244,15 +309,15 @@ func (c *checkConvertor) Convert(in, out interface{}) error {
 	}
 	return c.err
 }
-func (c *checkConvertor) ConvertToVersion(in runtime.Object, outVersion unversioned.GroupVersion) (out runtime.Object, err error) {
+func (c *checkConvertor) ConvertToVersion(in runtime.Object, outVersion runtime.GroupVersioner) (out runtime.Object, err error) {
 	if c.directConvert {
 		return nil, fmt.Errorf("unexpected call to ConvertToVersion")
 	}
 	if c.in != nil && c.in != in {
 		return nil, fmt.Errorf("unexpected in: %s", in)
 	}
-	if c.groupVersion != outVersion {
-		return nil, fmt.Errorf("unexpected outversion: %s", outVersion)
+	if !reflect.DeepEqual(c.groupVersion, outVersion) {
+		return nil, fmt.Errorf("unexpected outversion: %s (%s)", outVersion, c.groupVersion)
 	}
 	return c.obj, c.err
 }
@@ -289,10 +354,15 @@ func (c *mockCreater) New(kind unversioned.GroupVersionKind) (runtime.Object, er
 }
 
 type mockTyper struct {
-	gvk *unversioned.GroupVersionKind
-	err error
+	gvks        []unversioned.GroupVersionKind
+	unversioned bool
+	err         error
 }
 
-func (t *mockTyper) ObjectKind(obj runtime.Object) (*unversioned.GroupVersionKind, bool, error) {
-	return t.gvk, false, t.err
+func (t *mockTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionKind, bool, error) {
+	return t.gvks, t.unversioned, t.err
+}
+
+func (t *mockTyper) Recognizes(_ unversioned.GroupVersionKind) bool {
+	return true
 }

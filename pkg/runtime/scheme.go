@@ -433,23 +433,11 @@ func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 // Convert will attempt to convert in into out. Both must be pointers. For easy
 // testing of conversion functions. Returns an error if the conversion isn't
 // possible. You can call this with types that haven't been registered (for example,
-// a to test conversion of types that are nested within registered types), but in
-// that case, the conversion.Scope object passed to your conversion functions won't
-// have SrcVersion or DestVersion fields set correctly in Meta().
-func (s *Scheme) Convert(in, out interface{}) error {
-	inVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
-	outVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
-	if inObj, ok := in.(Object); ok {
-		if gvks, _, err := s.ObjectKinds(inObj); err == nil {
-			inVersion = gvks[0].GroupVersion()
-		}
-	}
-	if outObj, ok := out.(Object); ok {
-		if gvks, _, err := s.ObjectKinds(outObj); err == nil {
-			outVersion = gvks[0].GroupVersion()
-		}
-	}
-	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
+// a to test conversion of types that are nested within registered types). The
+// context interface is passed to the convertor.
+func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
+	flags, meta := s.generateConvertMeta(in)
+	meta.Context = context
 	if flags == 0 {
 		flags = conversion.AllowDifferentFieldTypeNames
 	}
@@ -473,15 +461,8 @@ func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, 
 // version within this scheme. Will return an error if the provided version does not
 // contain the inKind (or a mapping by name defined with AddKnownTypeWithName). Will also
 // return an error if the conversion does not result in a valid Object being
-// returned. The serializer handles loading/serializing nested objects.
-func (s *Scheme) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
-	switch in.(type) {
-	case *Unknown, *Unstructured, *UnstructuredList:
-		old := in.GetObjectKind().GroupVersionKind()
-		defer in.GetObjectKind().SetGroupVersionKind(old)
-		setTargetVersion(in, s, outVersion)
-		return in, nil
-	}
+// returned. Passes target down to the conversion methods as the Context on the scope.
+func (s *Scheme) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
 	t := reflect.TypeOf(in)
 	if t.Kind() != reflect.Ptr {
 		return nil, fmt.Errorf("only pointer types may be converted: %v", t)
@@ -498,48 +479,33 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion unversioned.GroupVersion
 	} else {
 		kinds, ok := s.typeToGVK[t]
 		if !ok || len(kinds) == 0 {
-			return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, outVersion)
+			return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, target)
 		}
-		kind = kinds[0]
+		kind, ok = kindForGroupVersioner(kinds, target)
+		if !ok {
+			return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
+		}
 	}
 
-	outKind := outVersion.WithKind(kind.Kind)
-
-	inKinds, _, err := s.ObjectKinds(in)
+	out, err := s.New(kind)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := s.New(outKind)
-	if err != nil {
-		return nil, err
-	}
-
-	flags, meta := s.generateConvertMeta(inKinds[0].GroupVersion(), outVersion, in)
+	flags, meta := s.generateConvertMeta(in)
+	meta.Context = target
 	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
 
-	setTargetVersion(out, s, outVersion)
+	setTargetKind(out, kind)
 	return out, nil
 }
 
-// UnsafeConvertToVersion will convert in to the provided outVersion if such a conversion is possible,
+// UnsafeConvertToVersion will convert in to the provided target if such a conversion is possible,
 // but does not guarantee the output object does not share fields with the input object. It attempts to be as
 // efficient as possible when doing conversion.
-func (s *Scheme) UnsafeConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
-	switch t := in.(type) {
-	case *Unknown:
-		t.APIVersion = outVersion.String()
-		return t, nil
-	case *Unstructured:
-		t.SetAPIVersion(outVersion.String())
-		return t, nil
-	case *UnstructuredList:
-		t.SetAPIVersion(outVersion.String())
-		return t, nil
-	}
-
+func (s *Scheme) UnsafeConvertToVersion(in Object, target GroupVersioner) (Object, error) {
 	// determine the incoming kinds with as few allocations as possible.
 	t := reflect.TypeOf(in)
 	if t.Kind() != reflect.Ptr {
@@ -551,39 +517,47 @@ func (s *Scheme) UnsafeConvertToVersion(in Object, outVersion unversioned.GroupV
 	}
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
-		return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, outVersion)
+		return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, target)
 	}
 
 	// if the Go type is also registered to the destination kind, no conversion is necessary
-	for i := range kinds {
-		if kinds[i].Version == outVersion.Version && kinds[i].Group == outVersion.Group {
-			setTargetKind(in, kinds[i])
+	if gv, ok := PreferredGroupVersion(target); ok {
+		for _, kind := range kinds {
+			if kind.Group == gv.Group && kind.Version == gv.Version {
+				setTargetKind(in, kind)
+				return in, nil
+			}
+		}
+	}
+	for _, kind := range kinds {
+		if gv, ok := target.VersionForGroupKind(kind.GroupKind()); ok && kind.Version == gv.Version {
+			setTargetKind(in, kind)
 			return in, nil
 		}
 	}
 
 	// type is unversioned, no conversion necessary
-	// it should be possible to avoid this allocation
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
-		kind := unversionedKind
-		outKind := outVersion.WithKind(kind.Kind)
-		setTargetKind(in, outKind)
+		if desiredGV, ok := target.VersionForGroupKind(unversionedKind.GroupKind()); ok {
+			setTargetKind(in, desiredGV.WithKind(unversionedKind.Kind))
+		} else {
+			setTargetKind(in, unversionedKind)
+		}
 		return in, nil
 	}
 
 	// allocate a new object as the target using the target kind
-	// TODO: this should look in the target group version and find the first kind that matches, rather than the
-	//   first kind registered in typeToGVK
-	kind := kinds[0]
-	kind.Version = outVersion.Version
-	kind.Group = outVersion.Group
+	kind, ok := kindForGroupVersioner(kinds, target)
+	if !ok {
+		return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
+	}
 	out, err := s.New(kind)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: try to avoid the allocations here - in fast paths we are not likely to need these flags or meta
-	flags, meta := s.converter.DefaultMeta(t)
+	flags, meta := s.generateConvertMeta(in)
+	meta.Context = target
 	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
@@ -593,22 +567,8 @@ func (s *Scheme) UnsafeConvertToVersion(in Object, outVersion unversioned.GroupV
 }
 
 // generateConvertMeta constructs the meta value we pass to Convert.
-func (s *Scheme) generateConvertMeta(srcGroupVersion, destGroupVersion unversioned.GroupVersion, in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
+func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
 	return s.converter.DefaultMeta(reflect.TypeOf(in))
-}
-
-// setTargetVersion is deprecated and should be replaced by use of setTargetKind
-func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
-	if gv.Version == APIVersionInternal {
-		// internal is a special case
-		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
-		return
-	}
-	if gvks, _, _ := raw.ObjectKinds(obj); len(gvks) > 0 {
-		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvks[0].Kind})
-	} else {
-		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version})
-	}
 }
 
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
