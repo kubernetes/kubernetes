@@ -1,5 +1,7 @@
-{% set metrics_memory = "200Mi" -%}
-{% set eventer_memory = "200Mi" -%}
+{% set base_metrics_memory = "200Mi" -%}
+{% set metrics_memory = base_metrics_memory -%}
+{% set base_eventer_memory = "200Mi" -%}
+{% set eventer_memory = base_eventer_memory -%}
 {% set metrics_memory_per_node = 4 -%}
 {% set eventer_memory_per_node = 500 -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
@@ -80,7 +82,7 @@ spec:
             - /pod_nanny
             - --cpu=100m
             - --extra-cpu=0m
-            - --memory={{ metrics_memory }}
+            - --memory={{ base_metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
             - --threshold=5
             - --deployment=heapster-v1.1.0.beta2
@@ -108,7 +110,7 @@ spec:
             - /pod_nanny
             - --cpu=100m
             - --extra-cpu=0m
-            - --memory={{ eventer_memory }}
+            - --memory={{ base_eventer_memory }}
             - --extra-memory={{ eventer_memory_per_node }}Ki
             - --threshold=5
             - --deployment=heapster-v1.1.0.beta2
