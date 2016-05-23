@@ -219,6 +219,8 @@ type PodSecurityContext struct {
 }
 ```
 
+Note that sysctls must be on the pod level because containers in a pod share IPC and network namespaces (if pod.spec.hostIPC and pod.spec.hostNetwork is false) and therefore cannot have conflicting sysctl values. Moreover, note that all namespaced sysctl supported by Docker/RunC are either in the IPC or network namespace.
+
 ## Examples
 
 ### Use in a pod
