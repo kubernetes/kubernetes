@@ -1,4 +1,5 @@
-{% set metrics_memory = "200Mi" -%}
+{% set base_metrics_memory = "200Mi" -%}
+{% set metrics_memory = base_metrics_memory -%}
 {% set metrics_memory_per_node = 4 -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
 {% if num_nodes >= 0 -%}
@@ -62,7 +63,7 @@ spec:
             - /pod_nanny
             - --cpu=100m
             - --extra-cpu=0m
-            - --memory={{ metrics_memory }}
+            - --memory={{ base_metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
             - --threshold=5
             - --deployment=heapster-v1.1.0.beta2
