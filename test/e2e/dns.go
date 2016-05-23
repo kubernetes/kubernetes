@@ -117,7 +117,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 	return dnsPod
 }
 
-func createProbeCommand(namesToResolve []string, hostEntries []string, fileNamePrefix, namespace string) (string, []string) {
+func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace string) (string, []string) {
 	fileNames := make([]string, 0, len(namesToResolve)*2)
 	probeCmd := "for i in `seq 1 600`; do "
 	for _, name := range namesToResolve {
@@ -149,6 +149,16 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, fileNameP
 	probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search $${podARec} A)" && echo OK > /results/%s;`, podARecByTCPFileName)
 	fileNames = append(fileNames, podARecByUDPFileName)
 	fileNames = append(fileNames, podARecByTCPFileName)
+
+	if len(ptrLookupIP) > 0 {
+		ptrLookup := fmt.Sprintf("%s.in-addr.arpa.", strings.Join(reverseArray(strings.Split(ptrLookupIP, ".")), "."))
+		ptrRecByUDPFileName := fmt.Sprintf("%s_udp@PTR", ptrLookupIP)
+		ptrRecByTCPFileName := fmt.Sprintf("%s_tcp@PTR", ptrLookupIP)
+		probeCmd += fmt.Sprintf(`test -n "$$(dig +notcp +noall +answer +search %s PTR)" && echo OK > /results/%s;`, ptrLookup, ptrRecByUDPFileName)
+		probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search %s PTR)" && echo OK > /results/%s;`, ptrLookup, ptrRecByTCPFileName)
+		fileNames = append(fileNames, ptrRecByUDPFileName)
+		fileNames = append(fileNames, ptrRecByTCPFileName)
+	}
 
 	probeCmd += "sleep 1; done"
 	return probeCmd, fileNames
@@ -256,6 +266,14 @@ func createServiceSpec(serviceName string, isHeadless bool, selector map[string]
 	return headlessService
 }
 
+func reverseArray(arr []string) []string {
+	for i := 0; i < len(arr)/2; i++ {
+		j := len(arr) - i - 1
+		arr[i], arr[j] = arr[j], arr[i]
+	}
+	return arr
+}
+
 var _ = framework.KubeDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
@@ -274,8 +292,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "jessie", f.Namespace.Name)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name)
 		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
 
@@ -301,7 +319,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 		}()
 
 		regularService := createServiceSpec("test-service-2", false, testServiceSelector)
-		_, err = f.Client.Services(f.Namespace.Name).Create(regularService)
+		regularService, err = f.Client.Services(f.Namespace.Name).Create(regularService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test service")
@@ -320,8 +338,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "jessie", f.Namespace.Name)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name)
 		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
 
@@ -353,8 +371,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", podHostname, serviceName, f.Namespace.Name)
 		hostNames := []string{hostFQDN, podHostname}
 		namesToResolve := []string{hostFQDN}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostNames, "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostNames, "jessie", f.Namespace.Name)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostNames, "", "wheezy", f.Namespace.Name)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostNames, "", "jessie", f.Namespace.Name)
 		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
 
