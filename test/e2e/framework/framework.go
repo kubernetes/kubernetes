@@ -476,6 +476,12 @@ func kubectlExecWithRetry(namespace string, podName, containerName string, args 
 				Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
 				continue
 			}
+			if strings.Contains(strings.ToLower(string(stdErrBytes)), "container not found") {
+				// Retry on "container not found" errors
+				Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				time.Sleep(2 * time.Second)
+				continue
+			}
 		}
 
 		return stdOutBytes, stdErrBytes, err
