@@ -269,6 +269,8 @@ func init() {
 		Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
 		Convert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStatus,
 		Convert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus,
+		Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector,
+		Convert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector,
 		Convert_v1_ResourceQuota_To_api_ResourceQuota,
 		Convert_api_ResourceQuota_To_v1_ResourceQuota,
 		Convert_v1_ResourceQuotaList_To_api_ResourceQuotaList,
@@ -1442,8 +1444,23 @@ func Convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *D
 
 func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *DownwardAPIVolumeFile, out *api.DownwardAPIVolumeFile, s conversion.Scope) error {
 	out.Path = in.Path
-	if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
-		return err
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(api.ObjectFieldSelector)
+		if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(api.ResourceFieldSelector)
+		if err := Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	return nil
 }
@@ -1454,8 +1471,23 @@ func Convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *DownwardA
 
 func autoConvert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.DownwardAPIVolumeFile, out *DownwardAPIVolumeFile, s conversion.Scope) error {
 	out.Path = in.Path
-	if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
-		return err
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ResourceFieldSelector)
+		if err := Convert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	return nil
 }
@@ -1811,6 +1843,15 @@ func autoConvert_v1_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *api.
 	} else {
 		out.FieldRef = nil
 	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(api.ResourceFieldSelector)
+		if err := Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
+	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
 		*out = new(api.ConfigMapKeySelector)
@@ -1845,6 +1886,15 @@ func autoConvert_api_EnvVarSource_To_v1_EnvVarSource(in *api.EnvVarSource, out *
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ResourceFieldSelector)
+		if err := Convert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
@@ -5644,6 +5694,32 @@ func autoConvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStat
 
 func Convert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus(in *api.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
 	return autoConvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus(in, out, s)
+}
+
+func autoConvert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(in *ResourceFieldSelector, out *api.ResourceFieldSelector, s conversion.Scope) error {
+	out.ContainerName = in.ContainerName
+	out.Resource = in.Resource
+	if err := api.Convert_resource_Quantity_To_resource_Quantity(&in.Divisor, &out.Divisor, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(in *ResourceFieldSelector, out *api.ResourceFieldSelector, s conversion.Scope) error {
+	return autoConvert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(in, out, s)
+}
+
+func autoConvert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector(in *api.ResourceFieldSelector, out *ResourceFieldSelector, s conversion.Scope) error {
+	out.ContainerName = in.ContainerName
+	out.Resource = in.Resource
+	if err := api.Convert_resource_Quantity_To_resource_Quantity(&in.Divisor, &out.Divisor, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector(in *api.ResourceFieldSelector, out *ResourceFieldSelector, s conversion.Scope) error {
+	return autoConvert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector(in, out, s)
 }
 
 func autoConvert_v1_ResourceQuota_To_api_ResourceQuota(in *ResourceQuota, out *api.ResourceQuota, s conversion.Scope) error {

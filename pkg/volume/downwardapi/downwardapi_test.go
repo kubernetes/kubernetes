@@ -115,7 +115,7 @@ func TestLabels(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "labels", FieldRef: api.ObjectFieldSelector{
+					{Path: "labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}}}},
 		},
 	}
@@ -179,7 +179,7 @@ func TestAnnotations(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "annotations", FieldRef: api.ObjectFieldSelector{
+					{Path: "annotations", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.annotations"}}}},
 		},
 	}
@@ -242,7 +242,7 @@ func TestName(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "name_file_name", FieldRef: api.ObjectFieldSelector{
+					{Path: "name_file_name", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.name"}}}},
 		},
 	}
@@ -305,7 +305,7 @@ func TestNamespace(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "namespace_file_name", FieldRef: api.ObjectFieldSelector{
+					{Path: "namespace_file_name", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.namespace"}}}},
 		},
 	}
@@ -383,7 +383,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "labels", FieldRef: api.ObjectFieldSelector{
+					{Path: "labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}}}},
 		},
 	}
@@ -469,7 +469,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "labels", FieldRef: api.ObjectFieldSelector{
+					{Path: "labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}}}},
 		},
 	}
@@ -575,9 +575,9 @@ func TestWriteWithUnixPath(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			DownwardAPI: &api.DownwardAPIVolumeSource{
 				Items: []api.DownwardAPIVolumeFile{
-					{Path: "this/is/mine/labels", FieldRef: api.ObjectFieldSelector{
+					{Path: "this/is/mine/labels", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.labels"}},
-					{Path: "this/is/yours/annotations", FieldRef: api.ObjectFieldSelector{
+					{Path: "this/is/yours/annotations", FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.annotations"}},
 				}}},
 	}
@@ -657,7 +657,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 				Items: []api.DownwardAPIVolumeFile{
 					{
 						Path: "this//labels",
-						FieldRef: api.ObjectFieldSelector{
+						FieldRef: &api.ObjectFieldSelector{
 							FieldPath: "metadata.labels",
 						},
 					},
