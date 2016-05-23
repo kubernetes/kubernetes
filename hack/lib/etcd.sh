@@ -68,8 +68,16 @@ kube::etcd::cleanup() {
 kube::etcd::install() {
   (
     cd "${KUBE_ROOT}/third_party"
-    curl -fsSL --retry 3 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
-    ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
+    if [[ $(uname) == "Darwin" ]]; then
+      download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
+      curl -fsSLO --retry 3 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/"${download_file}"
+      unzip -o "${download_file}"
+      ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
+      rm "${download_file}"
+    else
+      curl -fsSL --retry 3 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
+      ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
+    fi
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
     kube::log::info "export PATH=\${PATH}:$(pwd)/etcd"
   )
