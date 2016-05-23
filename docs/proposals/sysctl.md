@@ -55,8 +55,8 @@ To get a list of all parameters, you can run
 $ sudo sysctl -a
 ```
 
-A number of them are namespaced and can therefore set for each container 
-independently with today's Linux kernels. 
+A number of them are namespaced and can therefore set for each container
+independently with today's Linux kernels.
 
 *Note*: This proposal - while sharing some use-cases - does not cover ulimits
 (compare [Expose or utilize docker's rlimit support](https://github.com/kubernetes/kubernetes/issues/3595)).
@@ -82,13 +82,13 @@ Some examples are:
 - certain Java applications require "hugepages" support to perform well
   (compare [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-77426026)),
   configured through `vm.nr_hugepages`.
-- a containerized IPv6 routing daemon requires e.g. `/proc/sys/net/ipv6/conf/all/forwarding` and 
-  `/proc/sys/net/ipv6/conf/all/accept_redirects` (compare 
+- a containerized IPv6 routing daemon requires e.g. `/proc/sys/net/ipv6/conf/all/forwarding` and
+  `/proc/sys/net/ipv6/conf/all/accept_redirects` (compare
   [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-98653017)).
 
 In docker version 1.11.1 it is possible to change kernel parameters inside privileged containers.
-However, the process is purely manual and the changes are applied across all containers 
-affecting entire host system. It is not possible to set the parameters within a non-privileged 
+However, the process is purely manual and the changes are applied across all containers
+affecting entire host system. It is not possible to set the parameters within a non-privileged
 container.
 
 With [docker#19265](https://github.com/docker/docker/pull/19265) docker-run as of 1.12.0
@@ -137,7 +137,7 @@ not changing the default for all containers on a host
 
 As an administrator I would like to enable kernel features for certain
 applications while leaving them off for all other containers on a host
-- to enable containerized execution of special purpose applications without 
+- to enable containerized execution of special purpose applications without
   the need to enable those kernel features host wide, e.g. ip forwarding for
   network router daemons
 
@@ -145,10 +145,10 @@ applications while leaving them off for all other containers on a host
 
 ### Runc support for sysctl
 
-Supported sysctls (whitelist) as of RunC 0.1.1 (compare 
+Supported sysctls (whitelist) as of RunC 0.1.1 (compare
 [libcontainer config validator](https://github.com/opencontainers/runc/blob/master/libcontainer/configs/validate/validator.go#L107)):
 
-- `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`, 
+- `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
   `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
 - `fs.mqueue.*`
 - `net.*`
@@ -162,7 +162,7 @@ Applied changes:
 
 Supported sysctls (whitelist) as of Docker 1.12.0:
 
-- `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`, 
+- `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
   `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
 - `fs.mqueue.*`
 - `net.*`
@@ -182,7 +182,7 @@ Issues:
 TBD
 
 ## Proposed Design
-	
+
 ### Sysctl API Resource
 
 We should have an API resource to describe sysctl parameters.
@@ -237,6 +237,8 @@ spec:
           value: 2
 ```
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/seccomp.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/sysctl.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
