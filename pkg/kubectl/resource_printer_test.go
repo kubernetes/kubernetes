@@ -122,9 +122,9 @@ func TestPrinter(t *testing.T) {
 		{"test yaml", "yaml", "", simpleTest, "Data: foo\n"},
 		{"test template", "template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}",
 			podTest, "foo"},
-		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
-		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, "foo bar"},
-		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, ""},
+		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "[\n    \"foo\"\n]\n"},
+		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, "[\n    \"foo\",\n    \"bar\"\n]\n"},
+		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, "[]\n"},
 		{"test name", "name", "", podTest, "pod/foo\n"},
 		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
 	}
