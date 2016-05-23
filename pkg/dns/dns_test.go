@@ -23,11 +23,15 @@ import (
 	"sync"
 	"testing"
 
+	etcd "github.com/coreos/etcd/client"
 	skymsg "github.com/skynetservices/skydns/msg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	fake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/fake"
 )
 
 const (
@@ -44,6 +48,7 @@ func newKubeDNS() *KubeDNS {
 		cache:          NewTreeCache(),
 		cacheLock:      sync.RWMutex{},
 		domainPath:     reverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
+		nodesStore:     cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
 	return kd
 }
@@ -198,6 +203,101 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 	// remove service
 	kd.removeService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+}
+
+func TestFederationQueryWithoutCache(t *testing.T) {
+	kd := newKubeDNS()
+	kd.federations = map[string]string{
+		"myfederation":     "example.com",
+		"secondfederation": "second.example.com",
+	}
+	kd.kubeClient = fake.NewSimpleClientset(newNodes())
+
+	testValidFederationQueries(t, kd)
+	testInvalidFederationQueries(t, kd)
+}
+
+func TestFederationQueryWithCache(t *testing.T) {
+	kd := newKubeDNS()
+	kd.federations = map[string]string{
+		"myfederation":     "example.com",
+		"secondfederation": "second.example.com",
+	}
+
+	// Add a node to the cache.
+	nodeList := newNodes()
+	if err := kd.nodesStore.Add(&nodeList.Items[1]); err != nil {
+		t.Errorf("failed to add the node to the cache: %v", err)
+	}
+
+	testValidFederationQueries(t, kd)
+	testInvalidFederationQueries(t, kd)
+}
+
+func testValidFederationQueries(t *testing.T, kd *KubeDNS) {
+	queries := []struct {
+		q string
+		a string
+	}{
+		// Federation suffix is just a domain.
+		{
+			q: "mysvc.myns.myfederation.svc.cluster.local.",
+			a: "mysvc.myns.myfederation.svc.testcontinent-testreg-testzone.example.com.",
+		},
+		// Federation suffix is a subdomain.
+		{
+			q: "secsvc.default.secondfederation.svc.cluster.local.",
+			a: "secsvc.default.secondfederation.svc.testcontinent-testreg-testzone.second.example.com.",
+		},
+	}
+
+	for _, query := range queries {
+		records, err := kd.Records(query.q, false)
+		require.NoError(t, err)
+		assert.Equal(t, 1, len(records))
+		assert.Equal(t, query.a, records[0].Host)
+	}
+}
+
+func testInvalidFederationQueries(t *testing.T, kd *KubeDNS) {
+	noAnswerQueries := []string{
+		"mysvc.myns.svc.cluster.local.",
+		"mysvc.default.nofederation.svc.cluster.local.",
+	}
+	for _, q := range noAnswerQueries {
+		records, err := kd.Records(q, false)
+		if err == nil {
+			t.Errorf("expected not found error, got nil")
+		}
+		if etcdErr, ok := err.(etcd.Error); !ok || etcdErr.Code != etcd.ErrorCodeKeyNotFound {
+			t.Errorf("expected not found error, got %v", etcdErr)
+		}
+		assert.Equal(t, 0, len(records))
+	}
+}
+
+func newNodes() *v1.NodeList {
+	return &v1.NodeList{
+		Items: []v1.Node{
+			// Node without annotation.
+			{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "testnode-0",
+				},
+			},
+			{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "testnode-1",
+					Annotations: map[string]string{
+						// Note: The zone name here is an arbitrary string and doesn't exactly follow the
+						// format used by the cloud providers to name their zones. But that shouldn't matter
+						// for these tests here.
+						unversioned.LabelZoneFailureDomain: "testcontinent-testreg-testzone",
+					},
+				},
+			},
+		},
+	}
 }
 
 func newService(namespace, serviceName, clusterIP, portName string, portNumber int32) *kapi.Service {
