@@ -1,0 +1,226 @@
+#!/bin/bash
+
+# Copyright 2013-2015 Jérôme Petazzoni, Johan Haleby, lalyos, James Harris,
+#                     Michael Elsdörfer, Tony Hesjevik, Esben Haabendal,
+#                     Michael A. Smith, Stefan Schimanski, Karl Isenberg
+#
+# Original source: https://github.com/jpetazzo/dind
+# Modified to add docker network reservations.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Ensure that all nodes in /dev/mapper correspond to mapped devices currently loaded by the device-mapper kernel driver
+dmsetup mknodes
+
+# First, make sure that cgroups are mounted correctly.
+CGROUP=/sys/fs/cgroup
+: {LOG:=stdio}
+
+[ -d $CGROUP ] ||
+  mkdir $CGROUP
+
+mountpoint -q $CGROUP ||
+  mount -n -t tmpfs -o uid=0,gid=0,mode=0755 cgroup $CGROUP || {
+    echo "Could not make a tmpfs mount. Did you use --privileged?"
+    exit 1
+  }
+
+if [ -d /sys/kernel/security ] && ! mountpoint -q /sys/kernel/security; then
+  mount -t securityfs none /sys/kernel/security || {
+    echo "Could not mount /sys/kernel/security."
+    echo "AppArmor detection and --privileged mode might break."
+  }
+fi
+
+# Mount the cgroup hierarchies exactly as they are in the parent system.
+for SUBSYS in $(cut -d: -f2 /proc/1/cgroup); do
+  [ -d $CGROUP/$SUBSYS ] || mkdir $CGROUP/$SUBSYS
+  mountpoint -q $CGROUP/$SUBSYS ||
+    mount -n -t cgroup -o $SUBSYS cgroup $CGROUP/$SUBSYS
+
+  # The two following sections address a bug which manifests itself
+  # by a cryptic "lxc-start: no ns_cgroup option specified" when
+  # trying to start containers withina container.
+  # The bug seems to appear when the cgroup hierarchies are not
+  # mounted on the exact same directories in the host, and in the
+  # container.
+
+  # Named, control-less cgroups are mounted with "-o name=foo"
+  # (and appear as such under /proc/<pid>/cgroup) but are usually
+  # mounted on a directory named "foo" (without the "name=" prefix).
+  # Systemd and OpenRC (and possibly others) both create such a
+  # cgroup. To avoid the aforementioned bug, we symlink "foo" to
+  # "name=foo". This shouldn't have any adverse effect.
+
+  # the || true prevents the following error to quit (see https://github.com/jpetazzo/dind/pull/84#issuecomment-134236303):
+  # ln: failed to create symbolic link '/sys/fs/cgroup/systemd/name=systemd': Operation not permitted
+  echo $SUBSYS | grep -q ^name= && {
+    NAME=$(echo $SUBSYS | sed s/^name=//)
+    ln -s $SUBSYS $CGROUP/$NAME || true
+  }
+
+  # Likewise, on at least one system, it has been reported that
+  # systemd would mount the CPU and CPU accounting controllers
+  # (respectively "cpu" and "cpuacct") with "-o cpuacct,cpu"
+  # but on a directory called "cpu,cpuacct" (note the inversion
+  # in the order of the groups). This tries to work around it.
+  [ $SUBSYS = cpuacct,cpu ] && ln -s $SUBSYS $CGROUP/cpu,cpuacct
+done
+
+# Note: as I write those lines, the LXC userland tools cannot setup
+# a "sub-container" properly if the "devices" cgroup is not in its
+# own hierarchy. Let's detect this and issue a warning.
+grep -q :devices: /proc/1/cgroup ||
+  echo "WARNING: the 'devices' cgroup should be in its own hierarchy."
+grep -qw devices /proc/1/cgroup ||
+  echo "WARNING: it looks like the 'devices' cgroup is not mounted."
+
+# Now, close extraneous file descriptors.
+pushd /proc/self/fd >/dev/null
+for FD in *; do
+  case "$FD" in
+  # Keep stdin/stdout/stderr
+  [012])
+    ;;
+  # Nuke everything else
+  *)
+    eval exec "$FD>&-"
+    ;;
+  esac
+done
+popd >/dev/null
+
+# find supported filesystem to use for docker image mounts
+if grep -q overlay /proc/filesystems; then
+  STORAGE_FS=overlay
+elif grep -q aufs /proc/filesystems; then
+  STORAGE_FS=aufs
+else
+  echo "No supported filesystem found (aufs, overlay)"
+  exit 1
+fi
+
+# find filesystem below /var/lib/docker
+STORAGE_DIR="/var/lib/docker"
+mkdir -p "${STORAGE_DIR}"
+
+# Smoke test the overlay filesystem:
+# 1. create smoke dir in the storage dir being mounted (possibly on an overlay fs)
+# 2. try to mount an overlay fs on top of the smoke dir
+# 3. try to write a file in the overlay mount
+# 4. if that succeeds set OVERLAY_WORKS=true
+#
+# Rational: There are kernels with broken overlay-over-overlay support (4.2 and
+# probably 3.19). On those it's possible to mount an overlay in an overlay, but
+# writing to a file results in a "No device" error.
+OVERLAY_WORKS=true
+if [ "${STORAGE_FS}" = "overlay" ]; then
+  D="${STORAGE_DIR}/smoke"
+  mkdir -p "${D}/upper" "${D}/lower" "${D}/work" "${D}/mount"
+
+  mount -t overlay overlay -o"lowerdir=${D}/lower,upperdir=${D}/upper,workdir=${D}/work" "${D}/mount" &&
+  echo foo > "${D}/mount/probe" || OVERLAY_WORKS=false
+
+  umount -f "${D}/mount" || true
+  rm -rf "${D}" || true
+fi
+
+# If another filesystem than overlay is used or overlay does not work, create
+# an ext3 loop device as an intermediary layer. The max size of the loop device
+# is $VAR_LIB_DOCKER_SIZE in GB (default=5).
+if [ "${STORAGE_FS}" != "overlay" -o "${OVERLAY_WORKS}" == false ]; then
+  STORAGE_FILE="/data/docker"
+  VAR_LIB_DOCKER_SIZE=${VAR_LIB_DOCKER_SIZE:-5}
+  mkdir -p "$(dirname "${STORAGE_FILE}")"
+  if [ ! -f "${STORAGE_FILE}" ]; then
+    dd if=/dev/zero of="${STORAGE_FILE}" bs=1G seek=${VAR_LIB_DOCKER_SIZE} count=0
+    echo y | mkfs.ext3 "${STORAGE_FILE}"
+  fi
+  mount -o loop "${STORAGE_FILE}" "${STORAGE_DIR}"
+fi
+
+DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:-} --storage-driver=${STORAGE_FS}"
+
+# If a pidfile is still around (for example after a container restart),
+# delete it so that docker can start.
+rm -rf /var/run/docker.pid
+
+# Bridge the containerized docker network to the host docker network.
+# To enable this bridge, specify an IP offset for this container to use.
+# Other containers on the same host should have different offsets
+# such that the IPs within the range (offset <-> offset + size - 1) do not overlap.
+if [ ! -z "${DOCKER_NETWORK_OFFSET:-}" ]; then
+  # create docker0 bridge manually and attach it to the veth interface eth0
+  brctl addbr docker0
+  brctl addif docker0 eth0
+  ip link set docker0 up
+
+  # move ip to the bridge and restore routing via the old gateway
+  IP_CIDR=$(ip addr show eth0 | grep -w inet | awk '{ print $2; }')
+  IP=$(echo $IP_CIDR | sed 's,/.*,,')
+  NETWORK_SIZE=$(echo $IP_CIDR | sed 's,.*/,,')
+  DEFAULT_ROUTE=$(ip route | grep default | sed 's/eth0/docker0/')
+
+  ip addr del $IP_CIDR dev eth0
+  ip addr add $IP_CIDR dev docker0
+  ip route add $DEFAULT_ROUTE
+
+  # compute a network for the containers to live in
+  # by adding DOCKER_NETWORK_OFFSET to the current IP and cutting off
+  # non-network bits according to DOCKER_NETWORK_SIZE
+  DOCKER_NETWORK_SIZE=${DOCKER_NETWORK_SIZE:-24}
+  NETWORK=$(ip route | grep docker0 | grep -v default | sed 's,/.*,,')
+
+  IFS=. read -r i1 i2 i3 i4 <<< $IP
+  IFS=. read -r n1 n2 n3 n4 <<< $NETWORK
+  IFS=. read -r o1 o2 o3 o4 <<< $DOCKER_NETWORK_OFFSET
+  IFS=. read -r w1 w2 w3 w4 <<< $(ipcalc $IP_CIDR | grep Wildcard | awk '{print $2;}')
+
+  IP_PLUS_OFFSET=$(printf "%d.%d.%d.%d\n" \
+    "$(( n1 + ((i1 - n1 + o1) & w1) ))" \
+    "$(( n2 + ((i2 - n2 + o2) & w2) ))" \
+    "$(( n3 + ((i3 - n3 + o3) & w3) ))" \
+    "$(( n4 + ((i4 - n4 + o4) & w4) ))")
+
+  FIXED_CIDR=$(ipcalc $IP_PLUS_OFFSET/$DOCKER_NETWORK_SIZE | grep Network | awk '{print $2;}')
+  echo "Using network $FIXED_CIDR for docker containers"
+
+  # let docker reuse the given IP. If you run more than one dind slave, add
+  # --fixed-cidr=a.b.c.d/24 to DOCKER_DAEMON_ARGS with disjunct networks.
+  DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS} --bip=${IP_CIDR} --fixed-cidr=${FIXED_CIDR}"
+fi
+
+# stop docker daemon on shutdown to avoid loopback leaks
+trap "service docker stop" EXIT
+
+# start docker daemon
+if docker daemon --help &>/dev/null; then
+  DOCKER_DAEMON="docker daemon"
+else
+  DOCKER_DAEMON="docker -d"
+fi
+if [ "$LOG" == "file" ]; then
+  ${DOCKER_DAEMON} ${DOCKER_DAEMON_ARGS} &>/var/log/docker.log &
+else
+  ${DOCKER_DAEMON} ${DOCKER_DAEMON_ARGS} &
+fi
+(( timeout = 60 + SECONDS ))
+until docker info >/dev/null 2>&1; do
+  if (( SECONDS >= timeout )); then
+    echo 'Timed out trying to connect to internal docker host.' >&2
+    exit 1
+  fi
+  sleep 1
+done
+[[ $1 ]] && exec "$@"
+exec bash --login

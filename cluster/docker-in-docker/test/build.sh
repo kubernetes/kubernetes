@@ -18,12 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-IMAGE_REPO=${IMAGE_REPO:-mesosphere/kubernetes-mesos-test}
+IMAGE_REPO=${IMAGE_REPO:-k8s.io/kubernetes-dind-test}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 
 script_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
-common_bin_path=$(cd ${script_dir}/../common/bin && pwd -P)
-KUBE_ROOT=$(cd ${script_dir}/../../../.. && pwd -P)
+KUBE_ROOT=$(cd ${script_dir}/../../.. && pwd -P)
 
 cd "${KUBE_ROOT}"
 
@@ -44,7 +43,7 @@ echo "Copying files to workspace"
 
 # binaries & scripts
 mkdir -p "${workspace}/bin"
-cp -a "${common_bin_path}/"* "${workspace}/bin/"
+cp -a "${script_dir}/../bin/"* "${workspace}/bin/"
 cp -a "${script_dir}/bin/"* "${workspace}/bin/"
 
 # docker

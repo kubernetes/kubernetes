@@ -25,14 +25,13 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd)
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG_FILE-"config-default.sh"}"
 kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 bin="$(cd "$(dirname "${BASH_SOURCE}")" && pwd -P)"
 
-# create the kube-system and static-pods namespaces
-"${kubectl}" create -f "${KUBE_ROOT}/cluster/mesos/docker/kube-system-ns.yaml"
-"${kubectl}" create -f "${KUBE_ROOT}/cluster/mesos/docker/static-pods-ns.yaml"
+# create the static-pods namespaces
+"${kubectl}" create -f "${KUBE_ROOT}/cluster/docker-in-docker/static-pods-ns.yaml"
 
 if [ "${ENABLE_CLUSTER_DNS}" == "true" ]; then
   echo "Deploying DNS Addon" 1>&2

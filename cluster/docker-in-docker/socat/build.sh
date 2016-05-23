@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Deploy the Kube-UI addon
+# Builds a docker image that contains the kubernetes binaries.
 
 set -o errexit
 set -o nounset
-set -o pipefail
-set -o errtrace
+set -o pipefailscript_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG_FILE-"config-default.sh"}"
-kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+cd "${script_dir}"
 
-"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml"
-"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml"
+docker build -t k8s.io/kubernetes-dind-socat .
