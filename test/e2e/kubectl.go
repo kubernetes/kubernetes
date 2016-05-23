@@ -892,8 +892,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
 		})
 
-		// Flaky issue: #25140
-		It("should support rolling-update to same image [Conformance] [Flaky]", func() {
+		It("should support rolling-update to same image [Conformance]", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
