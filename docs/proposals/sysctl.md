@@ -34,7 +34,7 @@ for namespaced kernel parameters set for each container.
 
 In Linux, the sysctl interface allows an administrator to modify kernel
 parameters at runtime. Parameters are available via `/proc/sys/` virtual
-process file system. The parameters covers various subsystems such as:
+process file system. The parameters cover various subsystems such as:
 
 * kernel (common prefix: `kernel.`)
 * networking (common prefix: `net.`)
