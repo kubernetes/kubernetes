@@ -198,13 +198,10 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	if err != nil {
 		return err
 	}
-	ctx, cancel := getDefaultContext()
-	defer cancel()
 	opts.RegistryAuth = base64Auth
-	resp, err := d.client.ImagePull(ctx, image, opts)
-	if ctxErr := contextError(ctx); ctxErr != nil {
-		return ctxErr
-	}
+	// Don't set timeout for the context because image pulling can be
+	// take an arbitrarily long time.
+	resp, err := d.client.ImagePull(context.Background(), image, opts)
 	if err != nil {
 		return err
 	}
