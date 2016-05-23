@@ -33,6 +33,7 @@ import (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
+	expectedChanges := []int{1, 4, 1, 1}
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -121,7 +122,7 @@ func TestControllerSync(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for ix, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
 		// Initialize the controller
@@ -148,13 +149,17 @@ func TestControllerSync(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 		}
 
+		count := reactor.getChangeCount()
+
 		// Call the tested function
 		err := test.test(ctrl, reactor, test)
 		if err != nil {
 			t.Errorf("Test %q initial test call failed: %v", test.name, err)
 		}
 
-		reactor.waitTest()
+		for reactor.getChangeCount() < count+expectedChanges[ix] {
+			reactor.waitTest()
+		}
 
 		evaluateTestResults(ctrl, reactor, test, t)
 	}
