@@ -72,6 +72,19 @@ else
   NODE_INSTANCE_GROUP=""
 fi
 
+if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+  set_num_migs
+  NODE_INSTANCE_GROUP=""
+  for ((i=1; i<=${NUM_MIGS}; i++)); do
+    if [[ $i == ${NUM_MIGS} ]]; then
+      # We are assigning the same mig names as create-nodes function from cluster/gce/util.sh.
+      NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group"
+    else
+      NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group-${i},"
+    fi
+  done
+fi
+
 if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   detect-node-instance-group
 fi
