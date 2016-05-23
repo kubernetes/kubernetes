@@ -250,6 +250,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	e, err := le.config.Client.Endpoints(le.config.EndpointsMeta.Namespace).Get(le.config.EndpointsMeta.Name)
 	if err != nil {
 		if !errors.IsNotFound(err) {
+			glog.Errorf("error retrieving endpoint: %v", err)
 			return false
 		}
 
