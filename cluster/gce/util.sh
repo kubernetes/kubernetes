@@ -778,7 +778,7 @@ function create-nodes() {
         create "${group_name}" \
         --project "${PROJECT}" \
         --zone "${ZONE}" \
-        --base-instance-name "${NODE_INSTANCE_PREFIX}" \
+        --base-instance-name "${group_name}" \
         --size "${this_mig_size}" \
         --template "$template_name" || true;
     gcloud compute instance-groups managed wait-until-stable \
