@@ -379,9 +379,9 @@ func TestReflectorResync(t *testing.T) {
 	}
 	resyncPeriod := 1 * time.Millisecond
 	r := NewReflector(lw, &api.Pod{}, s, resyncPeriod)
-	err := r.ListAndWatch(stopCh)
-	if err != rerr {
-		t.Errorf("expected exiting from err %v, got: %v", rerr, err)
+	if err := r.ListAndWatch(stopCh); err != nil {
+		// error from Resync is not propaged up to here.
+		t.Errorf("expected error %v", rerr, err)
 	}
 	if iteration != 2 {
 		t.Errorf("exactly 2 iterations were expected, got: %v", iteration)
