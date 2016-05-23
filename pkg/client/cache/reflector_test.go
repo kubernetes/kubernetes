@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+var nevererrc chan error
+
 type testLW struct {
 	ListFunc  func() (runtime.Object, error)
 	WatchFunc func(options api.ListOptions) (watch.Interface, error)
@@ -84,7 +86,7 @@ func TestRunUntil(t *testing.T) {
 	// Synchronously add a dummy pod into the watch channel so we
 	// know the RunUntil go routine is in the watch handler.
 	fw.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})
-	stopCh <- struct{}{}
+	close(stopCh)
 	select {
 	case _, ok := <-fw.ResultChan():
 		if ok {
@@ -129,7 +131,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, neverExitWatch, wait.NeverStop)
+	err := g.watchHandler(fw, &resumeRV, nevererrc, wait.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -149,7 +151,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, neverExitWatch, wait.NeverStop)
+	err := g.watchHandler(fw, &resumeRV, nevererrc, wait.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -198,7 +200,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	var resumeRV string
 	stopWatch := make(chan struct{}, 1)
 	stopWatch <- struct{}{}
-	err := g.watchHandler(fw, &resumeRV, neverExitWatch, stopWatch)
+	err := g.watchHandler(fw, &resumeRV, nevererrc, stopWatch)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
