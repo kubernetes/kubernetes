@@ -40,7 +40,7 @@ type AttacherDetacher interface {
 	// responsible for implmenting this behavior).
 	// All other errors are logged and the goroutine terminates without updating
 	// actualStateOfWorld (caller is responsible for retrying as needed).
-	AttachVolume(volumeToAttach *cache.VolumeToAttach, actualStateOfWorld cache.ActualStateOfWorld) error
+	AttachVolume(volumeToAttach cache.VolumeToAttach, actualStateOfWorld cache.ActualStateOfWorld) error
 
 	// Spawns a new goroutine to execute volume-specific logic to detach the
 	// volume from the node specified in volumeToDetach.
@@ -51,7 +51,7 @@ type AttacherDetacher interface {
 	// responsible for implmenting this behavior).
 	// All other errors are logged and the goroutine terminates without updating
 	// actualStateOfWorld (caller is responsible for retrying as needed).
-	DetachVolume(volumeToDetach *cache.AttachedVolume, actualStateOfWorld cache.ActualStateOfWorld) error
+	DetachVolume(volumeToDetach cache.AttachedVolume, actualStateOfWorld cache.ActualStateOfWorld) error
 }
 
 // NewAttacherDetacher returns a new instance of AttacherDetacher.
@@ -72,29 +72,29 @@ type attacherDetacher struct {
 }
 
 func (ad *attacherDetacher) AttachVolume(
-	volumeToAttach *cache.VolumeToAttach,
+	volumeToAttach cache.VolumeToAttach,
 	actualStateOfWorld cache.ActualStateOfWorld) error {
 	attachFunc, err := ad.generateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
 
-	return ad.pendingOperations.Run(volumeToAttach.VolumeName, attachFunc)
+	return ad.pendingOperations.Run(string(volumeToAttach.VolumeName), attachFunc)
 }
 
 func (ad *attacherDetacher) DetachVolume(
-	volumeToDetach *cache.AttachedVolume,
+	volumeToDetach cache.AttachedVolume,
 	actualStateOfWorld cache.ActualStateOfWorld) error {
 	detachFunc, err := ad.generateDetachVolumeFunc(volumeToDetach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
 
-	return ad.pendingOperations.Run(volumeToDetach.VolumeName, detachFunc)
+	return ad.pendingOperations.Run(string(volumeToDetach.VolumeName), detachFunc)
 }
 
 func (ad *attacherDetacher) generateAttachVolumeFunc(
-	volumeToAttach *cache.VolumeToAttach,
+	volumeToAttach cache.VolumeToAttach,
 	actualStateOfWorld cache.ActualStateOfWorld) (func() error, error) {
 	// Get attacher plugin
 	attachableVolumePlugin, err := ad.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
@@ -119,15 +119,23 @@ func (ad *attacherDetacher) generateAttachVolumeFunc(
 
 		if attachErr != nil {
 			// On failure, just log and exit. The controller will retry
-			glog.Errorf("Attach operation for %q failed with: %v", volumeToAttach.VolumeName, attachErr)
+			glog.Errorf(
+				"Attach operation for device %q to node %q failed with: %v",
+				volumeToAttach.VolumeName, volumeToAttach.NodeName, attachErr)
 			return attachErr
 		}
+
+		glog.Infof(
+			"Successfully attached device %q to node %q. Will update actual state of world.",
+			volumeToAttach.VolumeName, volumeToAttach.NodeName)
 
 		// Update actual state of world
 		_, addVolumeNodeErr := actualStateOfWorld.AddVolumeNode(volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 		if addVolumeNodeErr != nil {
 			// On failure, just log and exit. The controller will retry
-			glog.Errorf("Attach operation for %q succeeded but updating actualStateOfWorld failed with: %v", volumeToAttach.VolumeName, addVolumeNodeErr)
+			glog.Errorf(
+				"Attach operation for device %q to node %q succeeded, but updating actualStateOfWorld failed with: %v",
+				volumeToAttach.VolumeName, volumeToAttach.NodeName, addVolumeNodeErr)
 			return addVolumeNodeErr
 		}
 
@@ -136,7 +144,7 @@ func (ad *attacherDetacher) generateAttachVolumeFunc(
 }
 
 func (ad *attacherDetacher) generateDetachVolumeFunc(
-	volumeToDetach *cache.AttachedVolume,
+	volumeToDetach cache.AttachedVolume,
 	actualStateOfWorld cache.ActualStateOfWorld) (func() error, error) {
 	// Get attacher plugin
 	attachableVolumePlugin, err := ad.volumePluginMgr.FindAttachablePluginBySpec(volumeToDetach.VolumeSpec)
@@ -150,7 +158,7 @@ func (ad *attacherDetacher) generateDetachVolumeFunc(
 	deviceName, err := attachableVolumePlugin.GetDeviceName(volumeToDetach.VolumeSpec)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to GetUniqueVolumeName from AttachablePlugin for volumeSpec %q err=%v",
+			"failed to GetDeviceName from AttachablePlugin for volumeSpec %q err=%v",
 			volumeToDetach.VolumeSpec.Name(),
 			err)
 	}
@@ -169,11 +177,15 @@ func (ad *attacherDetacher) generateDetachVolumeFunc(
 
 		if detachErr != nil {
 			// On failure, just log and exit. The controller will retry
-			glog.Errorf("Detach operation for %q failed with: %v", volumeToDetach.VolumeName, detachErr)
+			glog.Errorf(
+				"Detach operation for device %q from node %q failed with: %v",
+				volumeToDetach.VolumeName, volumeToDetach.NodeName, detachErr)
 			return detachErr
 		}
 
-		// TODO: Reset "safe to detach" annotation on Node
+		glog.Infof(
+			"Successfully detached device %q from node %q. Will update actual state of world.",
+			volumeToDetach.VolumeName, volumeToDetach.NodeName)
 
 		// Update actual state of world
 		actualStateOfWorld.DeleteVolumeNode(volumeToDetach.VolumeName, volumeToDetach.NodeName)

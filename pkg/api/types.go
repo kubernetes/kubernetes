@@ -1983,7 +1983,11 @@ type NodeStatus struct {
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 	// List of container images on this node
 	Images []ContainerImage `json:"images,omitempty"`
+	// List of attachable volume devices in use (mounted) by the node.
+	VolumesInUse []UniqueDeviceName `json:"volumesInUse,omitempty"`
 }
+
+type UniqueDeviceName string
 
 // Describe a container image
 type ContainerImage struct {

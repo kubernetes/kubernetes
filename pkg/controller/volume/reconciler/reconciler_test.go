@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/controller/volume/attacherdetacher"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/testing"
@@ -28,10 +29,12 @@ import (
 )
 
 const (
-	reconcilerLoopPeriod    time.Duration = 0 * time.Millisecond
-	maxSafeToDetachDuration time.Duration = 50 * time.Millisecond
+	reconcilerLoopPeriod      time.Duration = 0 * time.Millisecond
+	maxWaitForUnmountDuration time.Duration = 50 * time.Millisecond
 )
 
+// Calls Run()
+// Verifies there are no calls to attach or detach.
 func Test_Run_Positive_DoNothing(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
@@ -39,7 +42,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxSafeToDetachDuration, dsw, asw, ad)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
@@ -52,6 +55,9 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 }
 
+// Populates desiredStateOfWorld cache with one node/volume/pod tuple.
+// Calls Run()
+// Verifies there is one attach call and no detach calls.
 func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
@@ -59,10 +65,10 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxSafeToDetachDuration, dsw, asw, ad)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
 	podName := "pod-name"
-	volumeName := "volume-name"
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(volumeName, volumeName)
+	volumeName := api.UniqueDeviceName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
@@ -87,17 +93,23 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
 }
 
-func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMarkVolume(t *testing.T) {
+// Populates desiredStateOfWorld cache with one node/volume/pod tuple.
+// Calls Run()
+// Verifies there is one attach call and no detach calls.
+// Marks the node/volume as unmounted.
+// Deletes the node/volume/pod tuple from desiredStateOfWorld cache.
+// Verifies there is one detach call and no (new) attach calls.
+func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxSafeToDetachDuration, dsw, asw, ad)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
 	podName := "pod-name"
-	volumeName := "volume-name"
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(volumeName, volumeName)
+	volumeName := api.UniqueDeviceName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
@@ -133,9 +145,10 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMarkVolume(t *testing
 			generatedVolumeName,
 			nodeName)
 	}
-	asw.MarkVolumeNodeSafeToDetach(generatedVolumeName, nodeName)
+	asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
+	asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
 
-	// Assert -- Marked SafeToDetach
+	// Assert
 	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
@@ -143,17 +156,22 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMarkVolume(t *testing
 	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
 }
 
-func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithoutMarkVolume(t *testing.T) {
+// Populates desiredStateOfWorld cache with one node/volume/pod tuple.
+// Calls Run()
+// Verifies there is one attach call and no detach calls.
+// Deletes the node/volume/pod tuple from desiredStateOfWorld cache without first marking the node/volume as unmounted.
+// Verifies there is one detach call and no (new) attach calls.
+func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxSafeToDetachDuration, dsw, asw, ad)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
 	podName := "pod-name"
-	volumeName := "volume-name"
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(volumeName, volumeName)
+	volumeName := api.UniqueDeviceName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)

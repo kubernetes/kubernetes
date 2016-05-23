@@ -4159,6 +4159,21 @@ func (m *NodeStatus) MarshalTo(data []byte) (int, error) {
 			i += n
 		}
 	}
+	if len(m.VolumesInUse) > 0 {
+		for _, s := range m.VolumesInUse {
+			data[i] = 0x4a
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			data[i] = uint8(l)
+			i++
+			i += copy(data[i:], s)
+		}
+	}
 	return i, nil
 }
 
@@ -8863,6 +8878,12 @@ func (m *NodeStatus) Size() (n int) {
 	if len(m.Images) > 0 {
 		for _, e := range m.Images {
 			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.VolumesInUse) > 0 {
+		for _, s := range m.VolumesInUse {
+			l = len(s)
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
@@ -21584,6 +21605,35 @@ func (m *NodeStatus) Unmarshal(data []byte) error {
 			if err := m.Images[len(m.Images)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VolumesInUse", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.VolumesInUse = append(m.VolumesInUse, UniqueDeviceName(data[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

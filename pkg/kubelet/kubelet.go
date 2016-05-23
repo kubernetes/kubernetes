@@ -92,6 +92,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
+	attachdetachutil "k8s.io/kubernetes/pkg/volume/util/attachdetach"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -237,6 +238,7 @@ func NewMainKubelet(
 	babysitDaemons bool,
 	evictionConfig eviction.Config,
 	kubeOptions []Option,
+	enableControllerAttachDetach bool,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -360,6 +362,7 @@ func NewMainKubelet(
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
 		babysitDaemons:               babysitDaemons,
+		enableControllerAttachDetach: enableControllerAttachDetach,
 	}
 
 	if klet.flannelExperimentalOverlay {
@@ -823,6 +826,11 @@ type Kubelet struct {
 
 	// the number of allowed pods per core
 	podsPerCore int
+
+	// enableControllerAttachDetach indicates the Attach/Detach controller
+	// should manage attachment/detachment of volumes scheduled to this node,
+	// and disable kubelet from executing any attach/detach operations
+	enableControllerAttachDetach bool
 }
 
 // Validate given node IP belongs to the current host
@@ -1028,6 +1036,14 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 			Message:            "Node created without a route",
 			LastTransitionTime: unversioned.NewTime(kl.clock.Now()),
 		})
+	}
+
+	if kl.enableControllerAttachDetach {
+		if node.Annotations == nil {
+			node.Annotations = make(map[string]string)
+		}
+
+		node.Annotations[attachdetachutil.ControllerManagedAnnotation] = "true"
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
@@ -2110,7 +2126,11 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 
 			// volume is unmounted.  some volumes also require detachment from the node.
 			if cleaner.Detacher != nil && len(refs) == 1 {
-
+				// There is a bug in this code, where len(refs) is zero in some
+				// cases, and so RemoveVolumeInUse sometimes never gets called.
+				// The Attach/Detach Refactor should fix this, in the mean time,
+				// the controller timeout for safe mount is set to 3 minutes, so
+				// it will still detach the volume.
 				detacher := *cleaner.Detacher
 				devicePath, _, err := mount.GetDeviceNameFromMount(kl.mounter, refs[0])
 				if err != nil {
@@ -2122,9 +2142,19 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 				}
 
 				pdName := path.Base(refs[0])
-				err = detacher.Detach(pdName, kl.hostname)
-				if err != nil {
-					glog.Errorf("Could not detach volume %q at %q: %v", name, volumePath, err)
+				if kl.enableControllerAttachDetach {
+					// Attach/Detach controller is enabled and this volume type
+					// implments a detacher
+					uniqueDeviceName := attachdetachutil.GetUniqueDeviceName(
+						cleaner.PluginName, pdName)
+					kl.volumeManager.RemoveVolumeInUse(
+						api.UniqueDeviceName(uniqueDeviceName))
+				} else {
+					// Attach/Detach controller is disabled
+					err = detacher.Detach(pdName, kl.hostname)
+					if err != nil {
+						glog.Errorf("Could not detach volume %q at %q: %v", name, volumePath, err)
+					}
 				}
 
 				go func() {
@@ -3397,6 +3427,11 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *api.Node) {
 	}
 }
 
+// Update VolumesInUse field in Node Status
+func (kl *Kubelet) setNodeVolumesInUseStatus(node *api.Node) {
+	node.Status.VolumesInUse = kl.volumeManager.GetVolumesInUse()
+}
+
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
@@ -3425,6 +3460,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*api.Node) error {
 		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeMemoryPressureCondition),
 		withoutError(kl.setNodeReadyCondition),
+		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),
 	}
 }
@@ -3446,6 +3482,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
+
 	// Flannel is the authoritative source of pod CIDR, if it's running.
 	// This is a short term compromise till we get flannel working in
 	// reservation mode.

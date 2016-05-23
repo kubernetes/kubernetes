@@ -82,6 +82,7 @@ kubelet
       --cpu-cfs-quota[=true]: Enable CPU CFS quota enforcement for containers that specify CPU limits
       --docker-endpoint="": If non-empty, use this for the docker endpoint to communicate with
       --docker-exec-handler="native": Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.
+      --enable-controller-attach-detach[=true]: Enables the Attach/Detach controller to manage attachment/detachment of volumes scheduled to this node, and disables kubelet from executing any attach/detach operations
       --enable-custom-metrics[=false]: Support for gathering custom metrics.
       --enable-debugging-handlers[=true]: Enables server endpoints for log collection and local running of containers and commands
       --enable-server[=true]: Enable the Kubelet's server
