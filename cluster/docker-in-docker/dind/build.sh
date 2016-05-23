@@ -14,17 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds a docker image that contains the kubernetes-mesos binaries.
+# Builds a docker image that contains the kubernetes binaries.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-IMAGE_REPO=${IMAGE_REPO:-mesosphere/kubernetes-mesos}
+IMAGE_REPO=${IMAGE_REPO:-k8s.io/kubernetes-dind}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 
 script_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
-KUBE_ROOT=$(cd ${script_dir}/../../../.. && pwd -P)
+KUBE_ROOT=$(cd ${script_dir}/../../.. && pwd -P)
 
 # Find a platform specific binary, whether it was cross compiled, locally built, or downloaded.
 find-binary() {
@@ -39,19 +39,18 @@ find-binary() {
   echo -n "${bin}"
 }
 
-km_path=$(find-binary km linux/amd64)
-if [ -z "$km_path" ]; then
-  km_path=$(find-binary km darwin/amd64)
-  if [ -z "$km_path" ]; then
-    echo "Failed to find km binary" 1>&2
+hyperkube_path=$(find-binary hyperkube linux/amd64)
+if [ -z "$hyperkube_path" ]; then
+  hyperkube_path=$(find-binary hyperkube darwin/amd64)
+  if [ -z "$hyperkube_path" ]; then
+    echo "Failed to find hyperkube binary" 1>&2
     exit 1
   fi
 fi
-kube_bin_path=$(dirname ${km_path})
-common_bin_path=$(cd ${script_dir}/../common/bin && pwd -P)
+kube_bin_path=$(dirname ${hyperkube_path})
 
 # download nsenter and socat
-overlay_dir=${MESOS_DOCKER_OVERLAY_DIR:-${script_dir}/overlay}
+overlay_dir=${DOCKER_IN_DOCKER_OVERLAY_DIR:-${script_dir}/overlay}
 mkdir -p "${overlay_dir}"
 docker run --rm -v "${overlay_dir}:/target" jpetazzo/nsenter
 docker run --rm -v "${overlay_dir}:/target" mesosphere/kubernetes-socat
@@ -75,21 +74,13 @@ echo "Copying files to workspace"
 
 # binaries & scripts
 mkdir -p "${workspace}/bin"
+cp -a "${script_dir}/../bin/"* "${workspace}/bin/"
+cp -a "${kube_bin_path}/hyperkube" "${workspace}/bin/"
+cp -a "${overlay_dir}/nsenter" "${workspace}/bin"
+cp -a "${overlay_dir}/socat" "${workspace}/bin"
 
-#cp "${script_dir}/bin/"* "${workspace}/bin/"
-cp "${common_bin_path}/"* "${workspace}/bin/"
-cp "${kube_bin_path}/km" "${workspace}/bin/"
-
-# config
-mkdir -p "${workspace}/opt"
-cp "${script_dir}/opt/"* "${workspace}/opt/"
-
-# package up the sandbox overay
-mkdir -p "${workspace}/overlay/bin"
-cp -a "${overlay_dir}/nsenter" "${workspace}/overlay/bin"
-cp -a "${overlay_dir}/socat" "${workspace}/overlay/bin"
-chmod +x "${workspace}/overlay/bin/"*
-cd "${workspace}/overlay" && tar -czvf "${workspace}/opt/sandbox-overlay.tar.gz" . && cd -
+# static pods
+cp "${script_dir}/../static-pod.json" "${workspace}/"
 
 # docker
 cp "${script_dir}/Dockerfile" "${workspace}/"

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM golang:1.6.0
-MAINTAINER Mesosphere <support@mesosphere.io>
 
 # docker.io is suppossed to be in backports, but it's not there yet.
 # https://github.com/docker/docker/issues/13253
@@ -54,8 +53,8 @@ RUN pip install -U docker-compose==1.5.0
 
 RUN go get github.com/tools/godep
 
-RUN mkdir -p /go/src/github.com/GoogleCloudPlatform/kubernetes
-WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
+RUN mkdir -p /go/src/github.com/k8s.io/kubernetes
+WORKDIR /go/src/github.com/k8s.io/kubernetes
 
 COPY ./bin/* /usr/local/bin/
 

@@ -14,12 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds a docker image that contains the kubernetes-mesos binaries.
+## Contains configuration values for interacting with the docker-compose cluster in test mode
+#Set NUM_NODES to minimum required for testing.
+NUM_NODES=2
 
-set -o errexit
-set -o nounset
-set -o pipefailscript_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
-
-cd "${script_dir}"
-
-docker build -t mesosphere/kubernetes-socat .
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/config-default.sh"
