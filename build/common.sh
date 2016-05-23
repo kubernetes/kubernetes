@@ -326,7 +326,7 @@ function kube::build::prepare_output() {
     fi
     number=${#DOCKER_MOUNT_ARGS[@]}
     for (( i=0; i<number; i++ )); do
-      if [[ "${DOCKER_MOUNT_ARGS[i]}" =~ "${KUBE_ROOT}" ]]; then
+      if [[ "${DOCKER_MOUNT_ARGS[i]}" =~ "${KUBE_ROOT}" && "${DOCKER_MOUNT_ARGS[i]}" != *":Z" ]]; then
         DOCKER_MOUNT_ARGS[i]="${DOCKER_MOUNT_ARGS[i]}:Z"
       fi
     done
