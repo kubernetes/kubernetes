@@ -180,6 +180,7 @@ func init() {
 		DeepCopy_api_Volume,
 		DeepCopy_api_VolumeMount,
 		DeepCopy_api_VolumeSource,
+		DeepCopy_api_VsphereVirtualDiskVolumeSource,
 		DeepCopy_api_WeightedPodAffinityTerm,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
@@ -1925,6 +1926,15 @@ func DeepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 	} else {
 		out.AzureFile = nil
 	}
+	if in.VsphereVolume != nil {
+		in, out := in.VsphereVolume, &out.VsphereVolume
+		*out = new(VsphereVirtualDiskVolumeSource)
+		if err := DeepCopy_api_VsphereVirtualDiskVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.VsphereVolume = nil
+	}
 	return nil
 }
 
@@ -3183,6 +3193,21 @@ func DeepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 	} else {
 		out.ConfigMap = nil
 	}
+	if in.VsphereVolume != nil {
+		in, out := in.VsphereVolume, &out.VsphereVolume
+		*out = new(VsphereVirtualDiskVolumeSource)
+		if err := DeepCopy_api_VsphereVirtualDiskVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.VsphereVolume = nil
+	}
+	return nil
+}
+
+func DeepCopy_api_VsphereVirtualDiskVolumeSource(in VsphereVirtualDiskVolumeSource, out *VsphereVirtualDiskVolumeSource, c *conversion.Cloner) error {
+	out.VolumePath = in.VolumePath
+	out.FSType = in.FSType
 	return nil
 }
 

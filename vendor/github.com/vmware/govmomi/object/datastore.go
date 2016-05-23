@@ -220,7 +220,16 @@ func (d Datastore) UploadFile(ctx context.Context, file string, path string, par
 	return d.Client().UploadFile(file, u, p)
 }
 
-// DownloadFile via soap.Upload with an http service ticket
+// Download via soap.Download with an http service ticket
+func (d Datastore) Download(ctx context.Context, path string, param *soap.Download) (io.ReadCloser, int64, error) {
+	u, p, err := d.downloadTicket(ctx, path, param)
+	if err != nil {
+		return nil, 0, err
+	}
+	return d.Client().Download(u, p)
+}
+
+// DownloadFile via soap.Download with an http service ticket
 func (d Datastore) DownloadFile(ctx context.Context, path string, file string, param *soap.Download) error {
 	u, p, err := d.downloadTicket(ctx, path, param)
 	if err != nil {
@@ -305,8 +314,10 @@ func (d Datastore) Stat(ctx context.Context, file string) (types.BaseFileInfo, e
 
 	spec := types.HostDatastoreBrowserSearchSpec{
 		Details: &types.FileQueryFlags{
-			FileType:  true,
-			FileOwner: types.NewBool(true), // TODO: omitempty is generated, but seems to be required
+			FileType:     true,
+			FileSize:     true,
+			Modification: true,
+			FileOwner:    types.NewBool(true),
 		},
 		MatchPattern: []string{path.Base(file)},
 	}

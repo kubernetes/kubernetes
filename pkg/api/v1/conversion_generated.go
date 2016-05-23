@@ -321,6 +321,8 @@ func init() {
 		Convert_api_VolumeMount_To_v1_VolumeMount,
 		Convert_v1_VolumeSource_To_api_VolumeSource,
 		Convert_api_VolumeSource_To_v1_VolumeSource,
+		Convert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource,
+		Convert_api_VsphereVirtualDiskVolumeSource_To_v1_VsphereVirtualDiskVolumeSource,
 		Convert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm,
 		Convert_api_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm,
 	); err != nil {
@@ -4248,6 +4250,15 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	} else {
 		out.AzureFile = nil
 	}
+	if in.VsphereVolume != nil {
+		in, out := &in.VsphereVolume, &out.VsphereVolume
+		*out = new(api.VsphereVirtualDiskVolumeSource)
+		if err := Convert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.VsphereVolume = nil
+	}
 	return nil
 }
 
@@ -4372,6 +4383,15 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 		}
 	} else {
 		out.AzureFile = nil
+	}
+	if in.VsphereVolume != nil {
+		in, out := &in.VsphereVolume, &out.VsphereVolume
+		*out = new(VsphereVirtualDiskVolumeSource)
+		if err := Convert_api_VsphereVirtualDiskVolumeSource_To_v1_VsphereVirtualDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.VsphereVolume = nil
 	}
 	return nil
 }
@@ -6841,6 +6861,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.ConfigMap = nil
 	}
+	if in.VsphereVolume != nil {
+		in, out := &in.VsphereVolume, &out.VsphereVolume
+		*out = new(api.VsphereVirtualDiskVolumeSource)
+		if err := Convert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.VsphereVolume = nil
+	}
 	return nil
 }
 
@@ -7020,11 +7049,40 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	} else {
 		out.ConfigMap = nil
 	}
+	if in.VsphereVolume != nil {
+		in, out := &in.VsphereVolume, &out.VsphereVolume
+		*out = new(VsphereVirtualDiskVolumeSource)
+		if err := Convert_api_VsphereVirtualDiskVolumeSource_To_v1_VsphereVirtualDiskVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.VsphereVolume = nil
+	}
 	return nil
 }
 
 func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
 	return autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
+}
+
+func autoConvert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(in *VsphereVirtualDiskVolumeSource, out *api.VsphereVirtualDiskVolumeSource, s conversion.Scope) error {
+	out.VolumePath = in.VolumePath
+	out.FSType = in.FSType
+	return nil
+}
+
+func Convert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(in *VsphereVirtualDiskVolumeSource, out *api.VsphereVirtualDiskVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(in, out, s)
+}
+
+func autoConvert_api_VsphereVirtualDiskVolumeSource_To_v1_VsphereVirtualDiskVolumeSource(in *api.VsphereVirtualDiskVolumeSource, out *VsphereVirtualDiskVolumeSource, s conversion.Scope) error {
+	out.VolumePath = in.VolumePath
+	out.FSType = in.FSType
+	return nil
+}
+
+func Convert_api_VsphereVirtualDiskVolumeSource_To_v1_VsphereVirtualDiskVolumeSource(in *api.VsphereVirtualDiskVolumeSource, out *VsphereVirtualDiskVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_VsphereVirtualDiskVolumeSource_To_v1_VsphereVirtualDiskVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm(in *WeightedPodAffinityTerm, out *api.WeightedPodAffinityTerm, s conversion.Scope) error {

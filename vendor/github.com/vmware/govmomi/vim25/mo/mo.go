@@ -130,6 +130,10 @@ type ComputeResource struct {
 	ConfigurationEx    types.BaseComputeResourceConfigInfo `mo:"configurationEx"`
 }
 
+func (m *ComputeResource) Entity() *ManagedEntity {
+	return &m.ManagedEntity
+}
+
 func init() {
 	t["ComputeResource"] = reflect.TypeOf((*ComputeResource)(nil)).Elem()
 }
@@ -187,6 +191,10 @@ type Datacenter struct {
 	Configuration   types.DatacenterConfigInfo     `mo:"configuration"`
 }
 
+func (m *Datacenter) Entity() *ManagedEntity {
+	return &m.ManagedEntity
+}
+
 func init() {
 	t["Datacenter"] = reflect.TypeOf((*Datacenter)(nil)).Elem()
 }
@@ -201,6 +209,10 @@ type Datastore struct {
 	Browser           types.ManagedObjectReference   `mo:"browser"`
 	Capability        types.DatastoreCapability      `mo:"capability"`
 	IormConfiguration *types.StorageIORMInfo         `mo:"iormConfiguration"`
+}
+
+func (m *Datastore) Entity() *ManagedEntity {
+	return &m.ManagedEntity
 }
 
 func init() {
@@ -253,6 +265,10 @@ type DistributedVirtualSwitch struct {
 	NetworkResourcePool []types.DVSNetworkResourcePool `mo:"networkResourcePool"`
 	Portgroup           []types.ManagedObjectReference `mo:"portgroup"`
 	Runtime             *types.DVSRuntimeInfo          `mo:"runtime"`
+}
+
+func (m *DistributedVirtualSwitch) Entity() *ManagedEntity {
+	return &m.ManagedEntity
 }
 
 func init() {
@@ -357,6 +373,10 @@ type Folder struct {
 
 	ChildType   []string                       `mo:"childType"`
 	ChildEntity []types.ManagedObjectReference `mo:"childEntity"`
+}
+
+func (m *Folder) Entity() *ManagedEntity {
+	return &m.ManagedEntity
 }
 
 func init() {
@@ -878,6 +898,10 @@ type HostSystem struct {
 	SystemResources    *types.HostSystemResourceInfo    `mo:"systemResources"`
 }
 
+func (m *HostSystem) Entity() *ManagedEntity {
+	return &m.ManagedEntity
+}
+
 func init() {
 	t["HostSystem"] = reflect.TypeOf((*HostSystem)(nil)).Elem()
 }
@@ -1117,6 +1141,10 @@ type Network struct {
 	Vm      []types.ManagedObjectReference `mo:"vm"`
 }
 
+func (m *Network) Entity() *ManagedEntity {
+	return &m.ManagedEntity
+}
+
 func init() {
 	t["Network"] = reflect.TypeOf((*Network)(nil)).Elem()
 }
@@ -1284,6 +1312,10 @@ type ResourcePool struct {
 	Vm                 []types.ManagedObjectReference `mo:"vm"`
 	Config             types.ResourceConfigSpec       `mo:"config"`
 	ChildConfiguration []types.ResourceConfigSpec     `mo:"childConfiguration"`
+}
+
+func (m *ResourcePool) Entity() *ManagedEntity {
+	return &m.ManagedEntity
 }
 
 func init() {
@@ -1549,6 +1581,10 @@ type VirtualMachine struct {
 	Snapshot             *types.VirtualMachineSnapshotInfo `mo:"snapshot"`
 	RootSnapshot         []types.ManagedObjectReference    `mo:"rootSnapshot"`
 	GuestHeartbeatStatus types.ManagedEntityStatus         `mo:"guestHeartbeatStatus"`
+}
+
+func (m *VirtualMachine) Entity() *ManagedEntity {
+	return &m.ManagedEntity
 }
 
 func init() {

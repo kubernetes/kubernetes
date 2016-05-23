@@ -1,11 +1,12 @@
 sudo: false
+
 language: go
-go: 1.4
+
+go:
+   - 1.6
 
 before_install:
-  - go get golang.org/x/tools/cmd/vet
-  - go get golang.org/x/tools/cmd/goimports
-  - go get github.com/davecgh/go-spew/spew
+  - make vendor
 
 script:
   - make check test
