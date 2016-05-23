@@ -273,6 +273,8 @@ type VolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,18,opt,name=azureFile"`
 	// ConfigMap represents a configMap that should populate this volume
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
+	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -333,6 +335,8 @@ type PersistentVolumeSource struct {
 	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty" protobuf:"bytes,12,opt,name=flexVolume"`
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,13,opt,name=azureFile"`
+	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
 }
 
 // +genclient=true,nonNamespaced=true
@@ -832,6 +836,16 @@ type AzureFileVolumeSource struct {
 	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+}
+
+// Represents a vSphere volume resource.
+type VsphereVirtualDiskVolumeSource struct {
+	// Path that identifies vSphere volume vmdk
+	VolumePath string `json:"volumePath" protobuf:"bytes,1,opt,name=volumePath"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
 
 // Adapts a ConfigMap into a volume.
