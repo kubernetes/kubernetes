@@ -37,11 +37,11 @@ parameters at runtime. Parameters are available via `/proc/sys/` virtual
 process file system. The parameters covers various subsystems such as:
 
 * kernel (common prefix: `kernel.`)
-* networking (common prefixe: `net.`)
+* networking (common prefix: `net.`)
 * virtual memory (common prefix: `vm.`)
 * MDADM (common prefix: `dev.`)
 
-More subsystems are described in [Kernel docs](https://www.kernel.org/doc/Documentation/sysctl/README)).
+More subsystems are described in [Kernel docs](https://www.kernel.org/doc/Documentation/sysctl/README).
 
 To get a list of basic prefixes on your system, you can run
 
