@@ -140,7 +140,6 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 	filtered := []api.Node{}
 	failedPredicateMap := FailedPredicateMap{}
 
-	//wp:#25606
 	if len(predicateFuncs) == 0 {
 		filtered = nodes.Items
 	} else {
@@ -174,24 +173,6 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 			if err != nil {
 				return api.NodeList{}, FailedPredicateMap{}, err
 			}
-			//add the extender failed info to failedPredicateMap wp:#25797
-			for _, filteredNode := range filtered {
-				nodeIn := false
-				for _, exNode := range filteredList.Items {
-					if filteredNode.Name == exNode.Name {
-						nodeIn = true
-						break
-					}
-				}
-				if !nodeIn {
-					if re, ok := extender.(*HTTPExtender); ok {
-						failedPredicateMap[filteredNode.Name] = fmt.Sprintf("%s, %s", re.extenderURL, re.filterVerb)
-					} else {
-						failedPredicateMap[filteredNode.Name] = "extender failed"
-					}
-				}
-			}
-
 			filtered = filteredList.Items
 			if len(filtered) == 0 {
 				break
