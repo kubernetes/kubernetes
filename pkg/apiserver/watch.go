@@ -168,13 +168,14 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	buf := &bytes.Buffer{}
+	ch := s.watching.ResultChan()
 	for {
 		select {
 		case <-cn.CloseNotify():
 			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-s.watching.ResultChan():
+		case event, ok := <-ch:
 			if !ok {
 				// End of results.
 				return
@@ -196,7 +197,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
-			flusher.Flush()
+			if len(ch) == 0 {
+				flusher.Flush()
+			}
 
 			buf.Reset()
 		}
