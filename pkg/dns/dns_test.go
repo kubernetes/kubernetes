@@ -29,9 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	fake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/fake"
+	fake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
 const (
@@ -276,17 +275,17 @@ func testInvalidFederationQueries(t *testing.T, kd *KubeDNS) {
 	}
 }
 
-func newNodes() *v1.NodeList {
-	return &v1.NodeList{
-		Items: []v1.Node{
+func newNodes() *kapi.NodeList {
+	return &kapi.NodeList{
+		Items: []kapi.Node{
 			// Node without annotation.
 			{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: kapi.ObjectMeta{
 					Name: "testnode-0",
 				},
 			},
 			{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: kapi.ObjectMeta{
 					Name: "testnode-1",
 					Annotations: map[string]string{
 						// Note: The zone name here is an arbitrary string and doesn't exactly follow the
