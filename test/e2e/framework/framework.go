@@ -130,8 +130,18 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 		f.Client = c
 	}
+	if f.Client.RESTClient.Client != nil {
+		Logf("client timeout 1 %d", f.Client.RESTClient.Client.Timeout)
+	}
 	f.Clientset_1_2 = adapter_1_2.FromUnversionedClient(f.Client)
+	if f.Client.RESTClient.Client != nil {
+		Logf("client timeout 2 %d", f.Client.RESTClient.Client.Timeout)
+	}
 	f.Clientset_1_3 = adapter_1_3.FromUnversionedClient(f.Client)
+
+	if f.Client.RESTClient.Client != nil {
+		Logf("client timeout 3 %d", f.Client.RESTClient.Client.Timeout)
+	}
 
 	By("Building a namespace api object")
 	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
