@@ -633,10 +633,12 @@ func (nc *NodeController) monitorNodeStatus() error {
 	if !seenReady {
 		nc.networkSegmentationMode = true
 		nc.stopAllPodEvictions()
+		glog.V(2).Info("NodeController is entering network segmentation mode.")
 	} else {
 		if nc.networkSegmentationMode {
 			nc.forceUpdateAllProbeTimes()
 			nc.networkSegmentationMode = false
+			glog.V(2).Info("NodeController exited network segmentation mode.")
 		}
 	}
 	return nil
