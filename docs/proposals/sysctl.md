@@ -119,6 +119,7 @@ As an administrator I want to set customizable kernel parameters for a container
 ### Use Case: Set kernel parameters to limit consumed kernel resources
 
 As an administrator I would like to limit available kernel resources for a container
+
 1. so I can provide more resources to other containers
 1. to restrict system communication that slows down the host or other containers
 1. to protect against programming errors like resource leaks
@@ -128,6 +129,7 @@ As an administrator I would like to limit available kernel resources for a conta
 
 As an administrator I would like to increase limits for certain applications while
 not changing the default for all containers on a host
+
 1. to enable resource hungry applications like databases to perform well
    while the default limits for all other applications can be kept low
 1. to enable many network connections e.g. for web backends
@@ -137,6 +139,7 @@ not changing the default for all containers on a host
 
 As an administrator I would like to enable kernel features for certain
 applications while leaving them off for all other containers on a host
+
 1. to enable containerized execution of special purpose applications without
   the need to enable those kernel features host wide, e.g. ip forwarding for
   network router daemons
