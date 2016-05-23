@@ -71,7 +71,7 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.StorageConfig, s.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
-		resourceConfig, s.RuntimeConfig)
+		[]unversioned.GroupVersionResource{}, resourceConfig, s.RuntimeConfig)
 	if err != nil {
 		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
