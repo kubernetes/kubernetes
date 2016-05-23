@@ -148,10 +148,11 @@ applications while leaving them off for all other containers on a host
 Supported sysctls (whitelist) as of RunC 0.1.1 (compare
 [libcontainer config validator](https://github.com/opencontainers/runc/blob/master/libcontainer/configs/validate/validator.go#L107)):
 
-- `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
-  `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
-- `fs.mqueue.*`
-- `net.*`
+- IPC namespace
+  - System V: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
+    `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
+  - POSIX queues: `fs.mqueue.*`
+- network namespace: `net.*`
 
 Applied changes:
 
@@ -162,10 +163,11 @@ Applied changes:
 
 Supported sysctls (whitelist) as of Docker 1.12.0:
 
-- `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
-  `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
-- `fs.mqueue.*`
-- `net.*`
+- IPC namespace
+  - System V: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
+    `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
+  - POSIX queues: `fs.mqueue.*`
+- network namespace: `net.*`
 
 Applied changes:
 
@@ -188,8 +190,8 @@ TBD
 We should have an API resource to describe sysctl parameters.
 
 ```go
-// SysctlParameter defines a kernel parameter to be set
-type SysctlParameter struct {
+// Sysctl defines a kernel parameter to be set
+type Sysctl struct {
 	// Name of a property to set
 	Name string `json:"name"`
 	// Value of a property to set
@@ -202,13 +204,15 @@ type SysctlParameter struct {
 Container specification must be changed to allow the specification of kernel parameters:
 
 ```go
-// SecurityContext holds security configuration that will be applied to a container.
-// Some fields are present in both SecurityContext and PodSecurityContext.  When both
-// are set, the values in SecurityContext take precedence.
-type SecurityContext struct {
+// PodSecurityContext holds pod-level security attributes and common container settings.
+// Some fields are also present in container.securityContext.  Field values of
+// container.securityContext take precedence over field values of PodSecurityContext.
+type PodSecurityContext struct {
     ...
-	// List of Namespaced sysctls used for the container
-	SysctlParameters []SysctlParameter `json:"sysctlParameters,omitempty"`
+	// Sysctls hold a list of namespaced sysctls used for the pod. They are only allowed
+	// if the respective host namespace setting pod.spec.hostIPC or pod.spec.hostNetwork
+	// are false.
+	Sysctls []Sysctl `json:"sysctls,omitempty"`
 }
 ```
 
@@ -231,13 +235,11 @@ spec:
     image: nginx
     ports:
     - containerPort: 80
-    securityContext:
-      sysctlParameters:
-        - name: net.ipv4.ip_forward
-          value: 2
+  securityContext:
+    sysctls:
+    - name: net.ipv4.ip_forward
+      value: 2
 ```
-
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/sysctl.md?pixel)]()
