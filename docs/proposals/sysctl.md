@@ -191,7 +191,7 @@ We should have an API resource to describe sysctl parameters.
 // SysctlParameter defines a kernel parameter to be set
 type SysctlParameter struct {
 	// Name of a property to set
-	Variable string `json:"variable"`
+	Name string `json:"name"`
 	// Value of a property to set
 	Value string `json:"value"`
 }
@@ -233,7 +233,7 @@ spec:
     - containerPort: 80
     securityContext:
       sysctlParameters:
-        - variable: net.ipv4.ip_forward
+        - name: net.ipv4.ip_forward
           value: 2
 ```
 
