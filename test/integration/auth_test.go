@@ -1312,11 +1312,11 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of Alice's actions to at least get past authn/authz.
 			if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 				t.Logf("case %v", r)
