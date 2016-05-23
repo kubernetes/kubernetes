@@ -22,7 +22,7 @@
 # Default registry, arch and tag. This can be overwritten by arguments to make
 PLATFORM?=linux
 ARCH?=amd64
-TAG?=1.0
+TAG?=1.1
 REGISTRY?=gcr.io/google_containers
 
 GOLANG_VERSION=1.6

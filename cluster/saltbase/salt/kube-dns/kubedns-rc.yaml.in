@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/kubedns-amd64:1.0
+        image: gcr.io/google_containers/kubedns-amd64:1.1
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -54,6 +54,20 @@ spec:
         args:
         # command = "/kube-dns"
         - --domain={{ pillar['dns_domain'] }}.
+        - --dns-port=10053
+        ports:
+        - containerPort: 10053
+          name: dns-local
+          protocol: UDP
+        - containerPort: 10053
+          name: dns-tcp-local
+          protocol: TCP
+      - name: dnsmasq
+        image: gcr.io/google_containers/dnsmasq:1.1
+        args:
+        - --cache-size=1000
+        - --no-resolv
+        - --server=127.0.0.1#10053
         ports:
         - containerPort: 53
           name: dns
