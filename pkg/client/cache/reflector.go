@@ -38,6 +38,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -67,8 +68,8 @@ type Reflector struct {
 	// the beginning of the next one.
 	period       time.Duration
 	resyncPeriod time.Duration
-	// now() returns current time - exposed for testing purposes
-	now func() time.Time
+	// clock allows tests to manipulate time without flakiness
+	clock util.Clock
 	// nextResync is approximate time of next resync (0 if not scheduled)
 	nextResync time.Time
 	// lastSyncResourceVersion is the resource version token last
@@ -120,7 +121,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		expectedType:  reflect.TypeOf(expectedType),
 		period:        time.Second,
 		resyncPeriod:  resyncPeriod,
-		now:           time.Now,
+		clock:         util.RealClock{},
 	}
 	return r
 }
@@ -241,9 +242,9 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	// always fail so we end up listing frequently. Then, if we don't
 	// manually stop the timer, we could end up with many timers active
 	// concurrently.
-	r.nextResync = r.now().Add(r.resyncPeriod)
-	t := time.NewTimer(r.resyncPeriod)
-	return t.C, t.Stop
+	r.nextResync = r.clock.Now().Add(r.resyncPeriod)
+	t := r.clock.NewTimer(r.resyncPeriod)
+	return t.C(), t.Stop
 }
 
 // We want to avoid situations when periodic resyncing is breaking the TCP
@@ -258,7 +259,7 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // TODO: This should be parametrizable based on server load.
 func (r *Reflector) timeoutForWatch() *int64 {
 	randTimeout := time.Duration(float64(minWatchTimeout) * (rand.Float64() + 1.0))
-	timeout := r.nextResync.Sub(r.now()) - timeoutThreshold
+	timeout := r.nextResync.Sub(r.clock.Now()) - timeoutThreshold
 	if timeout < 0 || randTimeout < timeout {
 		timeout = randTimeout
 	}
@@ -272,7 +273,7 @@ func (r *Reflector) canForceResyncNow() bool {
 	if r.nextResync.IsZero() {
 		return false
 	}
-	return r.now().Add(forceResyncThreshold).After(r.nextResync)
+	return r.clock.Now().Add(forceResyncThreshold).After(r.nextResync)
 }
 
 // ListAndWatch first lists all items and get the resource version at the moment of call,
