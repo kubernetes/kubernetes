@@ -836,6 +836,10 @@ message ReplicaSetSpec {
   // insufficient replicas are detected.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
+
+  // Indicates that the replicaset is paused and will not be processed by the replicaset controller.
+  // Since replicaset controller lists replicasets from local cache, it might lag reality by some window of time.
+  optional bool paused = 4;
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.

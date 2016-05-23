@@ -8633,6 +8633,10 @@
      "template": {
       "$ref": "v1.PodTemplateSpec",
       "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template"
+     },
+     "paused": {
+      "type": "boolean",
+      "description": "Indicates that the replicaset is paused and will not be processed by the replicaset controller. Since replicaset controller lists replicasets from local cache, it might lag reality by some window of time."
      }
     }
    },

@@ -2562,6 +2562,7 @@ func DeepCopy_api_ReplicationControllerSpec(in ReplicationControllerSpec, out *R
 	} else {
 		out.Template = nil
 	}
+	out.Paused = in.Paused
 	return nil
 }
 

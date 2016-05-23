@@ -767,6 +767,7 @@ func DeepCopy_extensions_ReplicaSetSpec(in ReplicaSetSpec, out *ReplicaSetSpec, 
 	if err := api.DeepCopy_api_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
 		return err
 	}
+	out.Paused = in.Paused
 	return nil
 }
 

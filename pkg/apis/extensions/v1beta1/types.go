@@ -900,7 +900,7 @@ type ReplicaSetSpec struct {
 
 	// Indicates that the replicaset is paused and will not be processed by the replicaset controller.
 	// Since replicaset controller lists replicasets from local cache, it might lag reality by some window of time.
-	Paused bool `json:"paused,omitempty"`
+	Paused bool `json:"paused,omitempty" protobuf:"varint,4,opt,name=paused"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
