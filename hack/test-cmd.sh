@@ -705,16 +705,20 @@ __EOF__
 __EOF__
   # Post-condition: the node command succeeds
   kube::test::get_object_assert "node node-${version}-test" "{{.metadata.annotations.a}}" 'b'
-  kubectl delete node node-${version}-test
+  kubectl delete node node-${version}-test "${kube_flags[@]}"
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
   echo -e '#!/bin/bash\nsed -i "s/nginx/gcr.io\/google_containers\/serve_hostname/g" $1' > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
-  EDITOR=/tmp/tmp-editor.sh ${KUBE_OUTPUT_HOSTBIN}/kubectl edit "${kube_flags[@]}" pods/valid-pod
+  # Pre-condition: valid-pod POD has image nginx
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod
   # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/serve_hostname:'
   # cleaning
   rm /tmp/tmp-editor.sh
+
+  ## kubectl edit should work on Windows
   [ "$(EDITOR=cat kubectl edit pod/valid-pod 2>&1 | grep 'Edit cancelled')" ]
   [ "$(EDITOR=cat kubectl edit pod/valid-pod | grep 'name: valid-pod')" ]
   [ "$(EDITOR=cat kubectl edit --windows-line-endings pod/valid-pod | file - | grep CRLF)" ]
