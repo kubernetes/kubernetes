@@ -375,7 +375,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	return Quantity{d: infDecAmount{amount}, Format: format}, nil
 }
 
-// Canonicalize returns the canonical form of q and its suffix (see comment on Quantity).
+// CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:
 // * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
