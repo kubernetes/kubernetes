@@ -37,7 +37,7 @@ parameters at runtime. Parameters are available via `/proc/sys/` virtual
 process file system. The parameters covers various subsystems such as:
 
 * kernel (common prefix: `kernel.`)
-* networking (common prefixes: `net.`)
+* networking (common prefixe: `net.`)
 * virtual memory (common prefix: `vm.`)
 * MDADM (common prefix: `dev.`)
 
@@ -58,7 +58,7 @@ $ sudo sysctl -a
 A number of them are namespaced and can therefore set for each container
 independently with today's Linux kernels.
 
-*Note*: This proposal - while sharing some use-cases - does not cover ulimits
+**Note**: This proposal - while sharing some use-cases - does not cover ulimits
 (compare [Expose or utilize docker's rlimit support](https://github.com/kubernetes/kubernetes/issues/3595)).
 
 ## Motivation
@@ -70,6 +70,14 @@ A number of Linux applications need certain kernel parameter settings to
 
 In Kubernetes we want to allow to set these parameters within a pod specification
 in order to enable the use of the platform for those applications.
+
+In docker version 1.11.1 it is possible to change kernel parameters inside privileged containers.
+However, the process is purely manual and the changes are applied across all containers
+affecting entire host system. It is not possible to set the parameters within a non-privileged
+container.
+
+With [docker#19265](https://github.com/docker/docker/pull/19265) docker-run as of 1.12.0
+supports setting sysctls during the container creation process.
 
 Some examples are:
 
@@ -85,14 +93,6 @@ Some examples are:
 - a containerized IPv6 routing daemon requires e.g. `/proc/sys/net/ipv6/conf/all/forwarding` and
   `/proc/sys/net/ipv6/conf/all/accept_redirects` (compare
   [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-98653017)).
-
-In docker version 1.11.1 it is possible to change kernel parameters inside privileged containers.
-However, the process is purely manual and the changes are applied across all containers
-affecting entire host system. It is not possible to set the parameters within a non-privileged
-container.
-
-With [docker#19265](https://github.com/docker/docker/pull/19265) docker-run as of 1.12.0
-supports setting sysctls during the container creation process.
 
 ## Constraints and Assumptions
 
