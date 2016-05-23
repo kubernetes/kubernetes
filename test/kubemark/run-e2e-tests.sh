@@ -39,4 +39,4 @@ else
 	ARGS=$@
 fi
 
-go run ./hack/e2e.go -v --test --test_args="--e2e-verify-service-account=false ${ARGS}"
+go run ./hack/e2e.go -v --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
