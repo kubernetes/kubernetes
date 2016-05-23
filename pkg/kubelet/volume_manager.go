@@ -19,6 +19,7 @@ package kubelet
 import (
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -26,14 +27,19 @@ import (
 // volumeManager manages the volumes for the pods running on the kubelet.
 // Currently it only does book keeping, but it can be expanded to
 // take care of the volumePlugins.
+// TODO(saad-ali): note that volumeManager will be completley refactored as part
+// of mount/unmount refactor.
 type volumeManager struct {
-	lock       sync.RWMutex
-	volumeMaps map[types.UID]kubecontainer.VolumeMap
+	lock         sync.RWMutex
+	volumeMaps   map[types.UID]kubecontainer.VolumeMap
+	volumesInUse []api.UniqueDeviceName
 }
 
 func newVolumeManager() *volumeManager {
-	vm := &volumeManager{}
-	vm.volumeMaps = make(map[types.UID]kubecontainer.VolumeMap)
+	vm := &volumeManager{
+		volumeMaps:   make(map[types.UID]kubecontainer.VolumeMap),
+		volumesInUse: []api.UniqueDeviceName{},
+	}
 	return vm
 }
 
@@ -59,4 +65,39 @@ func (vm *volumeManager) DeleteVolumes(podUID types.UID) {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 	delete(vm.volumeMaps, podUID)
+}
+
+// AddVolumeInUse adds specified volume to volumesInUse list, if it doesn't
+// already exist
+func (vm *volumeManager) AddVolumeInUse(uniqueDeviceName api.UniqueDeviceName) {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+	for _, volume := range vm.volumesInUse {
+		if volume == uniqueDeviceName {
+			// Volume already exists in list
+			return
+		}
+	}
+
+	vm.volumesInUse = append(vm.volumesInUse, uniqueDeviceName)
+}
+
+// RemoveVolumeInUse removes the specified volume from volumesInUse list, if it
+// exists
+func (vm *volumeManager) RemoveVolumeInUse(uniqueDeviceName api.UniqueDeviceName) {
+	vm.lock.Lock()
+	defer vm.lock.Unlock()
+	for i := len(vm.volumesInUse) - 1; i >= 0; i-- {
+		if vm.volumesInUse[i] == uniqueDeviceName {
+			// Volume exists, remove it
+			vm.volumesInUse = append(vm.volumesInUse[:i], vm.volumesInUse[i+1:]...)
+		}
+	}
+}
+
+// GetVolumesInUse returns the volumesInUse list
+func (vm *volumeManager) GetVolumesInUse() []api.UniqueDeviceName {
+	vm.lock.RLock()
+	defer vm.lock.RUnlock()
+	return vm.volumesInUse
 }

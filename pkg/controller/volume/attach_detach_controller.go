@@ -20,7 +20,6 @@ package volume
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -36,28 +35,19 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/attachdetach"
 )
 
 const (
-	// ControllerManagedAnnotation is the key of the annotation on Node objects
-	// that indicates attach/detach operations for the node should be managed
-	// by the attach/detach controller
-	ControllerManagedAnnotation string = "volumes.kubernetes.io/controller-managed-attach"
-
-	// SafeToDetachAnnotation is the annotation added to the Node object by
-	// kubelet in the format "volumes.kubernetes.io/safetodetach/{volumename}"
-	// to indicate the volume has been unmounted and is safe to detach.
-	SafeToDetachAnnotation string = "volumes.kubernetes.io/safetodetach-"
-
 	// loopPeriod is the ammount of time the reconciler loop waits between
 	// successive executions
 	reconcilerLoopPeriod time.Duration = 100 * time.Millisecond
 
-	// reconcilerMaxSafeToDetachDuration is the maximum amount of time the
-	// attach detach controller will wait for a volume to be safely detached
+	// reconcilerMaxWaitForUnmountDuration is the maximum amount of time the
+	// attach detach controller will wait for a volume to be safely unmounted
 	// from its node. Once this time has expired, the controller will assume the
 	// node or kubelet are unresponsive and will detach the volume anyway.
-	reconcilerMaxSafeToDetachDuration time.Duration = 10 * time.Minute
+	reconcilerMaxWaitForUnmountDuration time.Duration = 3 * time.Minute
 )
 
 // AttachDetachController defines the operations supported by this controller.
@@ -116,7 +106,7 @@ func NewAttachDetachController(
 	adc.attacherDetacher = attacherdetacher.NewAttacherDetacher(&adc.volumePluginMgr)
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
-		reconcilerMaxSafeToDetachDuration,
+		reconcilerMaxWaitForUnmountDuration,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher)
@@ -215,13 +205,13 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	}
 
 	nodeName := node.Name
-	if _, exists := node.Annotations[ControllerManagedAnnotation]; exists {
+	if _, exists := node.Annotations[attachdetach.ControllerManagedAnnotation]; exists {
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
 
-	adc.processSafeToDetachAnnotations(nodeName, node.Annotations)
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 }
 
 func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
@@ -240,7 +230,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 		glog.V(10).Infof("%v", err)
 	}
 
-	adc.processSafeToDetachAnnotations(nodeName, node.Annotations)
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 }
 
 // processPodVolumes processes the volumes in the given pod and adds them to the
@@ -309,10 +299,11 @@ func (adc *attachDetachController) processPodVolumes(
 
 		} else {
 			// Remove volume from desired state of world
-			uniqueVolumeName, err := attachableVolumePlugin.GetUniqueVolumeName(volumeSpec)
+			uniqueVolumeName, err := attachdetach.GetUniqueDeviceNameFromSpec(
+				attachableVolumePlugin, volumeSpec)
 			if err != nil {
 				glog.V(10).Infof(
-					"Failed to delete volume %q for pod %q/%q from desiredStateOfWorld. GetUniqueVolumeName failed with %v",
+					"Failed to delete volume %q for pod %q/%q from desiredStateOfWorld. GenerateUniqueDeviceName failed with %v",
 					podVolume.Name,
 					pod.Namespace,
 					pod.Name,
@@ -332,19 +323,47 @@ func (adc *attachDetachController) processPodVolumes(
 func (adc *attachDetachController) createVolumeSpec(
 	podVolume api.Volume, podNamespace string) (*volume.Spec, error) {
 	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
+		glog.V(10).Infof(
+			"Found PVC, ClaimName: %q/%q",
+			podNamespace,
+			pvcSource.ClaimName)
+
 		// If podVolume is a PVC, fetch the real PV behind the claim
 		pvName, pvcUID, err := adc.getPVCFromCacheExtractPV(
 			podNamespace, pvcSource.ClaimName)
 		if err != nil {
-			return nil, fmt.Errorf("error processing PVC %q: %v", pvcSource.ClaimName, err)
+			return nil, fmt.Errorf(
+				"error processing PVC %q/%q: %v",
+				podNamespace,
+				pvcSource.ClaimName,
+				err)
 		}
+
+		glog.V(10).Infof(
+			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
+			podNamespace,
+			pvcSource.ClaimName,
+			pvcUID,
+			pvName)
 
 		// Fetch actual PV object
 		volumeSpec, err := adc.getPVSpecFromCache(
 			pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
-			return nil, fmt.Errorf("error processing PVC %q: %v", pvcSource.ClaimName, err)
+			return nil, fmt.Errorf(
+				"error processing PVC %q/%q: %v",
+				podNamespace,
+				pvcSource.ClaimName,
+				err)
 		}
+
+		glog.V(10).Infof(
+			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
+			volumeSpec.Name,
+			pvName,
+			podNamespace,
+			pvcSource.ClaimName,
+			pvcUID)
 
 		return volumeSpec, nil
 	}
@@ -353,7 +372,8 @@ func (adc *attachDetachController) createVolumeSpec(
 	// informer it may be mutated by another consumer.
 	clonedPodVolumeObj, err := api.Scheme.DeepCopy(podVolume)
 	if err != nil || clonedPodVolumeObj == nil {
-		return nil, fmt.Errorf("failed to deep copy %q volume object", podVolume.Name)
+		return nil, fmt.Errorf(
+			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
 	}
 
 	clonedPodVolume, ok := clonedPodVolumeObj.(api.Volume)
@@ -377,7 +397,7 @@ func (adc *attachDetachController) getPVCFromCacheExtractPV(
 		key = namespace + "/" + name
 	}
 
-	pvcObj, exists, err := adc.pvcInformer.GetStore().Get(key)
+	pvcObj, exists, err := adc.pvcInformer.GetStore().GetByKey(key)
 	if pvcObj == nil || !exists || err != nil {
 		return "", "", fmt.Errorf(
 			"failed to find PVC %q in PVCInformer cache. %v",
@@ -386,7 +406,7 @@ func (adc *attachDetachController) getPVCFromCacheExtractPV(
 	}
 
 	pvc, ok := pvcObj.(*api.PersistentVolumeClaim)
-	if ok || pvc == nil {
+	if !ok || pvc == nil {
 		return "", "", fmt.Errorf(
 			"failed to cast %q object %#v to PersistentVolumeClaim",
 			key,
@@ -414,14 +434,14 @@ func (adc *attachDetachController) getPVSpecFromCache(
 	name string,
 	pvcReadOnly bool,
 	expectedClaimUID types.UID) (*volume.Spec, error) {
-	pvObj, exists, err := adc.pvInformer.GetStore().Get(name)
+	pvObj, exists, err := adc.pvInformer.GetStore().GetByKey(name)
 	if pvObj == nil || !exists || err != nil {
 		return nil, fmt.Errorf(
 			"failed to find PV %q in PVInformer cache. %v", name, err)
 	}
 
 	pv, ok := pvObj.(*api.PersistentVolume)
-	if ok || pv == nil {
+	if !ok || pv == nil {
 		return nil, fmt.Errorf(
 			"failed to cast %q object %#v to PersistentVolume", name, pvObj)
 	}
@@ -442,9 +462,10 @@ func (adc *attachDetachController) getPVSpecFromCache(
 
 	// Do not return the object from the informer, since the store is shared it
 	// may be mutated by another consumer.
-	clonedPVObj, err := api.Scheme.DeepCopy(pv)
+	clonedPVObj, err := api.Scheme.DeepCopy(*pv)
 	if err != nil || clonedPVObj == nil {
-		return nil, fmt.Errorf("failed to deep copy %q PV object", name)
+		return nil, fmt.Errorf(
+			"failed to deep copy %q PV object. err=%v", name, err)
 	}
 
 	clonedPV, ok := clonedPVObj.(api.PersistentVolume)
@@ -456,28 +477,28 @@ func (adc *attachDetachController) getPVSpecFromCache(
 	return volume.NewSpecFromPersistentVolume(&clonedPV, pvcReadOnly), nil
 }
 
-// processSafeToDetachAnnotations processes the "safe to detach" annotations for
-// the given node. It makes calls to delete any annotations referring to volumes
-// it is not aware of. For volumes it is aware of, it marks them safe to detach
-// in the "actual state of world" data structure.
-func (adc *attachDetachController) processSafeToDetachAnnotations(
-	nodeName string, annotations map[string]string) {
-	var annotationsToRemove []string
-	for annotation := range annotations {
-		// Check annotations for "safe to detach" volumes
-		annotation = strings.ToLower(annotation)
-		if strings.HasPrefix(annotation, SafeToDetachAnnotation) {
-			// If volume exists in "actual state of world" mark it as safe to detach
-			safeToAttachVolume := strings.TrimPrefix(annotation, SafeToDetachAnnotation)
-			if err := adc.actualStateOfWorld.MarkVolumeNodeSafeToDetach(safeToAttachVolume, nodeName); err != nil {
-				// If volume doesn't exist in "actual state of world" remove
-				// the "safe to detach" annotation from the node
-				annotationsToRemove = append(annotationsToRemove, annotation)
+// processVolumesInUse processes the list of volumes marked as "in-use"
+// according to the specified Node's Status.VolumesInUse and updates the
+// corresponding volume in the actual state of the world to indicate that it is
+// mounted.
+func (adc *attachDetachController) processVolumesInUse(
+	nodeName string, volumesInUse []api.UniqueDeviceName) {
+	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
+		mounted := false
+		for _, volumeInUse := range volumesInUse {
+			if attachedVolume.VolumeName == volumeInUse {
+				mounted = true
+				break
 			}
 		}
+		err := adc.actualStateOfWorld.SetVolumeMountedByNode(
+			attachedVolume.VolumeName, nodeName, mounted)
+		if err != nil {
+			glog.Warningf(
+				"SetVolumeMountedByNode(%q, %q, %q) returned an error: %v",
+				attachedVolume.VolumeName, nodeName, mounted, err)
+		}
 	}
-
-	// TODO: Call out to API server to delete annotationsToRemove from Node
 }
 
 // getUniquePodName returns a unique name to reference pod by in memory caches

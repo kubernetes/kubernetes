@@ -111,6 +111,7 @@ dump-logs-on-failure
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+enable-controller-attach-detach
 enable-custom-metrics
 enable-debugging-handlers
 enable-garbage-collector
