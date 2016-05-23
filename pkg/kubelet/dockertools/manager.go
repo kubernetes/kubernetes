@@ -1315,8 +1315,9 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		go func() {
 			defer close(done)
 			defer utilruntime.HandleCrash()
-			if err := dm.runner.Run(containerID, pod, container, container.Lifecycle.PreStop); err != nil {
+			if msg, err := dm.runner.Run(containerID, pod, container, container.Lifecycle.PreStop); err != nil {
 				glog.Errorf("preStop hook for container %q failed: %v", name, err)
+				dm.generateFailedContainerEvent(containerID, pod.Name, kubecontainer.FailedPreStopHook, msg)
 			}
 		}()
 		select {
@@ -1360,6 +1361,15 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		dm.containerRefManager.ClearRef(containerID)
 	}
 	return err
+}
+
+func (dm *DockerManager) generateFailedContainerEvent(containerID kubecontainer.ContainerID, podName, reason, message string) {
+	ref, ok := dm.containerRefManager.GetRef(containerID)
+	if !ok {
+		glog.Warningf("No ref for pod '%q'", podName)
+		return
+	}
+	dm.recorder.Event(ref, api.EventTypeWarning, reason, message)
 }
 
 var errNoPodOnContainer = fmt.Errorf("no pod information labels on Docker container")
@@ -1477,9 +1487,10 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
-		handlerErr := dm.runner.Run(id, pod, container, container.Lifecycle.PostStart)
+		msg, handlerErr := dm.runner.Run(id, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			err := fmt.Errorf("PostStart handler: %v", handlerErr)
+			dm.generateFailedContainerEvent(id, pod.Name, kubecontainer.FailedPostStartHook, msg)
 			dm.KillContainerInPod(id, container, pod, err.Error(), nil)
 			return kubecontainer.ContainerID{}, err
 		}

@@ -52,26 +52,32 @@ func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontain
 	}
 }
 
-func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) error {
+func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) (string, error) {
 	switch {
 	case handler.Exec != nil:
-		var buffer bytes.Buffer
+		var (
+			buffer bytes.Buffer
+			msg    string
+		)
 		output := ioutils.WriteCloserWrapper(&buffer)
 		err := hr.commandRunner.ExecInContainer(containerID, handler.Exec.Command, nil, output, output, false)
 		if err != nil {
-			glog.V(1).Infof("Exec lifecycle hook (%v) for Container %q in Pod %q failed - %q", handler.Exec.Command, container.Name, format.Pod(pod), buffer.String())
+			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - %q", handler.Exec.Command, container.Name, format.Pod(pod), buffer.String())
+			glog.V(1).Infof(msg)
 		}
-		return err
+		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
-			glog.V(1).Infof("Http lifecycle hook (%s) for Container %q in Pod %q failed - %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), msg)
+			msg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), msg)
+			glog.V(1).Infof(msg)
 		}
-		return err
+		return msg, err
 	default:
 		err := fmt.Errorf("Invalid handler: %v", handler)
-		glog.Errorf("Cannot run handler: %v", err)
-		return err
+		msg := fmt.Sprintf("Cannot run handler: %v", err)
+		glog.Errorf(msg)
+		return msg, err
 	}
 }
 
