@@ -83,6 +83,10 @@ type RollingUpdaterConfig struct {
 	// further, ensuring that total number of pods running at any time during
 	// the update is atmost 130% of desired pods.
 	MaxSurge intstr.IntOrString
+	// OnProgress is invoked if set during each scale cycle, to allow the caller to perform additional logic or
+	// abort the scale. If an error is returned the cleanup method will not be invoked. The percentage value
+	// is a synthetic "progress" calculation that represents the approximate percentage completion.
+	OnProgress func(oldRc, newRc *api.ReplicationController, percentage int) error
 }
 
 // RollingUpdaterCleanupPolicy is a cleanup action to take after the
@@ -217,6 +221,26 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	fmt.Fprintf(out, "Scaling up %s from %d to %d, scaling down %s from %d to 0 (keep %d pods available, don't exceed %d pods)\n",
 		newRc.Name, newRc.Spec.Replicas, desired, oldRc.Name, oldRc.Spec.Replicas, minAvailable, desired+maxSurge)
 
+	// give a caller incremental notification and allow them to exit early
+	goal := desired - newRc.Spec.Replicas
+	if goal < 0 {
+		goal = -goal
+	}
+	progress := func(complete bool) error {
+		if config.OnProgress == nil {
+			return nil
+		}
+		progress := desired - newRc.Spec.Replicas
+		if progress < 0 {
+			progress = -progress
+		}
+		percentage := 100
+		if !complete && goal > 0 {
+			percentage = int((goal - progress) * 100 / goal)
+		}
+		return config.OnProgress(oldRc, newRc, percentage)
+	}
+
 	// Scale newRc and oldRc until newRc has the desired number of replicas and
 	// oldRc has 0 replicas.
 	progressDeadline := time.Now().UnixNano() + config.Timeout.Nanoseconds()
@@ -232,6 +256,11 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		}
 		newRc = scaledRc
 
+		// notify the caller if necessary
+		if err := progress(false); err != nil {
+			return err
+		}
+
 		// Wait between scaling operations for things to settle.
 		time.Sleep(config.UpdatePeriod)
 
@@ -242,6 +271,11 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		}
 		oldRc = scaledRc
 
+		// notify the caller if necessary
+		if err := progress(false); err != nil {
+			return err
+		}
+
 		// If we are making progress, continue to advance the progress deadline.
 		// Otherwise, time out with an error.
 		progressMade := (newRc.Spec.Replicas != newReplicas) || (oldRc.Spec.Replicas != oldReplicas)
@@ -250,6 +284,11 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		} else if time.Now().UnixNano() > progressDeadline {
 			return fmt.Errorf("timed out waiting for any update progress to be made")
 		}
+	}
+
+	// notify the caller if necessary
+	if err := progress(true); err != nil {
+		return err
 	}
 
 	// Housekeeping and cleanup policy execution.
