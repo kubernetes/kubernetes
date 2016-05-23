@@ -211,7 +211,7 @@ type ScheduledJobSpec struct {
 
 	// Suspend flag tells the controller to suspend subsequent executions, it does
 	// not apply to already started executions.  Defaults to false.
-	Suspend bool `json:"suspend" protobuf:"varint,4,opt,name=suspend"`
+	Suspend *bool `json:"suspend" protobuf:"varint,4,opt,name=suspend"`
 
 	// JobTemplate is the object that describes the job that will be created when
 	// executing a ScheduledJob.
