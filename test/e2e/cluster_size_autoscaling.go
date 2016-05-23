@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -37,11 +38,12 @@ const (
 	scaleDownTimeout = 15 * time.Minute
 )
 
-var _ = framework.KubeDescribe("Cluster size autoscaling scale up [Feature:ClusterSizeAutoscaling] [Slow]", func() {
+var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int
 	var memCapacityMb int
+	var originalSizes map[string]int
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
@@ -53,57 +55,54 @@ var _ = framework.KubeDescribe("Cluster size autoscaling scale up [Feature:Clust
 		mem := nodes.Items[0].Status.Capacity[api.ResourceMemory]
 		coresPerNode = int((&cpu).MilliValue() / 1000)
 		memCapacityMb = int((&mem).Value() / 1024 / 1024)
+
+		originalSizes = make(map[string]int)
+		sum := 0
+		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
+			size, err := GroupSize(mig)
+			framework.ExpectNoError(err)
+			By(fmt.Sprintf("Initial size of %s: %d", mig, size))
+			originalSizes[mig] = size
+			sum += size
+		}
+		Expect(nodeCount).Should(Equal(sum))
 	})
 
-	It("Should correctly handle pending pods", func() {
-		By("Too large pending pod does not increase cluster size")
+	It("shouldn't increase cluster size if pending pod it too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		ReserveMemory(f, "memory-reservation", 1, memCapacityMb, false)
 		// Verify, that cluster size is not changed.
-		// TODO: find a better way of verification that the cluster size will remain unchanged.
+		// TODO: find a better way of verification that the cluster size will remain unchanged using events.
 		time.Sleep(scaleUpTimeout)
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleUpTimeout))
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
-		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, resizeTimeout))
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
+	})
 
-		By("Small pending pods increase cluster size")
+	It("should increase cluster size if pending pods are small [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
-		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, resizeTimeout))
+		restoreSizes(originalSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
+	})
 
-		By("Handling node port pods")
+	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		CreateHostPortPods(f, "host-port", nodeCount+2, false)
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
+		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "host-port"))
+		restoreSizes(originalSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
 
-		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, resizeTimeout))
-	})
-})
-
-var _ = framework.KubeDescribe("Cluster size autoscaling scale down[Feature:ClusterSizeAutoscalingScaleDown] [Slow]", func() {
-	f := framework.NewDefaultFramework("autoscaling")
-	var nodeCount int
-	var coresPerNode int
-	var memCapacityMb int
-
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
-
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
-		nodeCount = len(nodes.Items)
-		Expect(nodeCount).NotTo(BeZero())
-		cpu := nodes.Items[0].Status.Capacity[api.ResourceCPU]
-		mem := nodes.Items[0].Status.Capacity[api.ResourceMemory]
-		coresPerNode = int((&cpu).MilliValue() / 1000)
-		memCapacityMb = int((&mem).Value() / 1024 / 1024)
 	})
 
-	It("Should correctly handle pending and scale down after deletion", func() {
+	It("should correctly handle pending and scale down after deletion [Feature:ClusterSizeAutoscalingScaleDown]", func() {
 		By("Small pending pods increase cluster size")
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
 		// Verify, that cluster size is increased
@@ -191,4 +190,17 @@ func WaitForClusterSizeFunc(c *client.Client, sizeFunc func(int) bool, timeout t
 		glog.Infof("Waiting for cluster, current size %d, not ready nodes %d", numNodes, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for appropriate cluster size", timeout)
+}
+
+func restoreSizes(sizes map[string]int) {
+	By(fmt.Sprintf("Restoring initial size of the cluster"))
+	for mig, desiredSize := range sizes {
+		currentSize, err := GroupSize(mig)
+		framework.ExpectNoError(err)
+		if desiredSize != currentSize {
+			By(fmt.Sprintf("Setting size of %s to %d", mig, desiredSize))
+			err = ResizeGroup(mig, int32(desiredSize))
+			framework.ExpectNoError(err)
+		}
+	}
 }
