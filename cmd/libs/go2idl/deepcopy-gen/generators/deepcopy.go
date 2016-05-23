@@ -76,7 +76,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	for _, p := range context.Universe {
 		copyableType := false
 		for _, t := range p.Types {
-			if copyableWithinPackage(t) && inputs.Has(t.Name.Package) {
+			if copyableWithinPackage(t) {
 				copyableType = true
 			}
 		}
@@ -145,6 +145,9 @@ func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
 }
 
 func copyableWithinPackage(t *types.Type) bool {
+	if !strings.HasPrefix(t.Name.Package, "k8s.io/kubernetes/") {
+		return false
+	}
 	if types.ExtractCommentTags("+", t.CommentLines)["gencopy"] == "false" {
 		return false
 	}
