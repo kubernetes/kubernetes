@@ -2095,7 +2095,7 @@ func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Po
 // of outstanding init containers still present. This reduces load on the container garbage collector
 // by only preserving the most recent terminated init container.
 func (dm *DockerManager) pruneInitContainersBeforeStart(pod *api.Pod, podStatus *kubecontainer.PodStatus, initContainersToKeep map[kubecontainer.DockerID]int) {
-	// only the last execution of an init container should be preserved, and only preserve it if it is in the
+	// only the last execution of each init container should be preserved, and only preserve it if it is in the
 	// list of init containers to keep.
 	initContainerNames := sets.NewString()
 	for _, container := range pod.Spec.InitContainers {
@@ -2104,11 +2104,11 @@ func (dm *DockerManager) pruneInitContainersBeforeStart(pod *api.Pod, podStatus 
 	for name := range initContainerNames {
 		count := 0
 		for _, status := range podStatus.ContainerStatuses {
-			if !initContainerNames.Has(status.Name) || status.State != kubecontainer.ContainerStateExited {
+			if status.Name != name || !initContainerNames.Has(status.Name) || status.State != kubecontainer.ContainerStateExited {
 				continue
 			}
 			count++
-			// keep the first init container we see
+			// keep the first init container for this name
 			if count == 1 {
 				continue
 			}
@@ -2125,7 +2125,7 @@ func (dm *DockerManager) pruneInitContainersBeforeStart(pod *api.Pod, podStatus 
 					count--
 					continue
 				}
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", name, err, format.Pod(pod)))
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				// TODO: report serious errors
 				continue
 			}
