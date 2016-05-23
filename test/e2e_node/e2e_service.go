@@ -17,13 +17,13 @@ limitations under the License.
 package e2e_node
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"time"
 
@@ -31,17 +31,15 @@ import (
 )
 
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
+var reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 
 type e2eService struct {
-	etcdCmd              *exec.Cmd
-	etcdCombinedOut      bytes.Buffer
-	etcdDataDir          string
-	apiServerCmd         *exec.Cmd
-	apiServerCombinedOut bytes.Buffer
-	kubeletCmd           *exec.Cmd
-	kubeletCombinedOut   bytes.Buffer
-	kubeletStaticPodDir  string
-	nodeName             string
+	etcdCmd             *exec.Cmd
+	etcdDataDir         string
+	apiServerCmd        *exec.Cmd
+	kubeletCmd          *exec.Cmd
+	kubeletStaticPodDir string
+	nodeName            string
 }
 
 func newE2eService(nodeName string) *e2eService {
@@ -123,23 +121,23 @@ func (es *e2eService) startEtcd() (*exec.Cmd, error) {
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:4001/v2/keys/", // Trailing slash is required,
 		cmd,
-		&es.etcdCombinedOut)
+		"etcd.log")
 	return cmd, es.startServer(hcc)
 }
 
 func (es *e2eService) startApiServer() (*exec.Cmd, error) {
 	cmd := exec.Command("sudo", getApiServerBin(),
-		"--v", "2", "--logtostderr", "--log_dir", "./",
 		"--etcd-servers", "http://127.0.0.1:4001",
 		"--insecure-bind-address", "0.0.0.0",
 		"--service-cluster-ip-range", "10.0.0.1/24",
 		"--kubelet-port", "10250",
 		"--allow-privileged", "true",
+		"--v", "8", "--logtostderr",
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:8080/healthz",
 		cmd,
-		&es.apiServerCombinedOut)
+		"kube-apiserver.log")
 	return cmd, es.startServer(hcc)
 }
 
@@ -150,7 +148,6 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 	}
 	es.kubeletStaticPodDir = dataDir
 	cmd := exec.Command("sudo", getKubeletServerBin(),
-		"--v", "2", "--logtostderr", "--log_dir", "./",
 		"--api-servers", "http://127.0.0.1:8080",
 		"--address", "0.0.0.0",
 		"--port", "10250",
@@ -160,22 +157,40 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 		"--serialize-image-pulls", "false",
 		"--config", es.kubeletStaticPodDir,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
+		"--v", "8", "--logtostderr",
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",
 		cmd,
-		&es.kubeletCombinedOut)
+		"kubelet.log")
 	return cmd, es.startServer(hcc)
 }
 
 func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 	cmdErrorChan := make(chan error)
 	go func() {
-		err := cmd.Run()
+		defer close(cmdErrorChan)
+
+		// Create the output filename
+		outPath := path.Join(*reportDir, cmd.outputFilename)
+		outfile, err := os.Create(outPath)
 		if err != nil {
-			cmdErrorChan <- fmt.Errorf("%s Failed with error \"%v\".  Command output:\n%s", cmd, err, cmd.OutputBuffer)
+			cmdErrorChan <- fmt.Errorf("Failed to create file %s for `%s` %v.", outPath, cmd, err)
+			return
 		}
-		close(cmdErrorChan)
+		defer outfile.Close()
+		defer outfile.Sync()
+
+		// Set the command to write the output file
+		cmd.Cmd.Stdout = outfile
+		cmd.Cmd.Stderr = outfile
+
+		// Run the command
+		err = cmd.Run()
+		if err != nil {
+			cmdErrorChan <- fmt.Errorf("%s Failed with error \"%v\".  Output written to: %s", cmd, err, outPath)
+			return
+		}
 	}()
 
 	endTime := time.Now().Add(*serverStartTimeout)
@@ -196,16 +211,14 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 type healthCheckCommand struct {
 	*exec.Cmd
 	HealthCheckUrl string
-	OutputBuffer   *bytes.Buffer
+	outputFilename string
 }
 
-func newHealthCheckCommand(healthCheckUrl string, cmd *exec.Cmd, combinedOutput *bytes.Buffer) *healthCheckCommand {
-	cmd.Stdout = combinedOutput
-	cmd.Stderr = combinedOutput
+func newHealthCheckCommand(healthCheckUrl string, cmd *exec.Cmd, filename string) *healthCheckCommand {
 	return &healthCheckCommand{
 		HealthCheckUrl: healthCheckUrl,
 		Cmd:            cmd,
-		OutputBuffer:   combinedOutput,
+		outputFilename: filename,
 	}
 }
 

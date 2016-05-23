@@ -201,6 +201,7 @@ ir-password
 ir-user
 jenkins-host
 jenkins-jobs
+junit-file-number
 k8s-bin-dir
 k8s-build-output
 keep-gogoproto
@@ -366,6 +367,7 @@ resolv-conf
 resource-container
 resource-quota-sync-period
 resource-version
+results-dir
 retry_time
 rkt-api-endpoint
 rkt-path

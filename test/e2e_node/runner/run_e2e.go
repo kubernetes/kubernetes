@@ -114,16 +114,16 @@ func main() {
 		for _, image := range strings.Split(*images, ",") {
 			running++
 			fmt.Printf("Initializing e2e tests using image %s.\n", image)
-			go func(image string) { results <- testImage(image, archive) }(image)
+			go func(image string, junitFileNum int) { results <- testImage(image, archive, junitFileNum) }(image, running)
 		}
 	}
 	if *hosts != "" {
 		for _, host := range strings.Split(*hosts, ",") {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
-			go func(host string) {
-				results <- testHost(host, archive, *cleanup)
-			}(host)
+			go func(host string, junitFileNum int) {
+				results <- testHost(host, archive, *cleanup, junitFileNum)
+			}(host, running)
 		}
 	}
 
@@ -150,8 +150,8 @@ func main() {
 }
 
 // Run tests in archive against host
-func testHost(host, archive string, deleteFiles bool) *TestResult {
-	output, err := e2e_node.RunRemote(archive, host, deleteFiles)
+func testHost(host, archive string, deleteFiles bool, junitFileNum int) *TestResult {
+	output, err := e2e_node.RunRemote(archive, host, deleteFiles, junitFileNum)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -161,7 +161,7 @@ func testHost(host, archive string, deleteFiles bool) *TestResult {
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(image, archive string) *TestResult {
+func testImage(image, archive string, junitFileNum int) *TestResult {
 	host, err := createInstance(image)
 	if *cleanup {
 		defer deleteInstance(image)
@@ -171,7 +171,7 @@ func testImage(image, archive string) *TestResult {
 			err: fmt.Errorf("Unable to create gce instance with running docker daemon for image %s.  %v", image, err),
 		}
 	}
-	return testHost(host, archive, false)
+	return testHost(host, archive, false, junitFileNum)
 }
 
 // Provision a gce instance using image
