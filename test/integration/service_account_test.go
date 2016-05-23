@@ -415,15 +415,16 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	}
 
 	// Start the service account and service account token controllers
+	stopCh := make(chan struct{})
 	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
-	tokenController.Run()
+	go tokenController.Run(1, stopCh)
 	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
 	serviceAccountController.Run()
 	// Start the admission plugin reflectors
 	serviceAccountAdmission.Run()
 
 	stop := func() {
-		tokenController.Stop()
+		close(stopCh)
 		serviceAccountController.Stop()
 		serviceAccountAdmission.Stop()
 		apiServer.Close()
