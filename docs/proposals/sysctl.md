@@ -55,7 +55,7 @@ To get a list of all parameters, you can run
 $ sudo sysctl -a
 ```
 
-A number of them are namespaced and can therefore set for each container
+A number of them are namespaced and can therefore be set for each container
 independently with today's Linux kernels.
 
 **Note**: This proposal - while sharing some use-cases - does not cover ulimits
