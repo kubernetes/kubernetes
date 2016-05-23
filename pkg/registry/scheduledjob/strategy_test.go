@@ -41,13 +41,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 		t.Errorf("ScheduledJob should not allow create on update")
 	}
 
-	validSelector := &unversioned.LabelSelector{
-		MatchLabels: map[string]string{"a": "b"},
-	}
 	validPodTemplateSpec := api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector.MatchLabels,
-		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -64,9 +58,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: newBool(true),
+					Template: validPodTemplateSpec,
 				},
 			},
 		},
@@ -110,13 +102,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("ScheduledJob should not allow create on update")
 	}
-	validSelector := &unversioned.LabelSelector{
-		MatchLabels: map[string]string{"a": "b"},
-	}
 	validPodTemplateSpec := api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector.MatchLabels,
-		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -135,9 +121,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: newBool(true),
+					Template: validPodTemplateSpec,
 				},
 			},
 		},
@@ -154,9 +138,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: newBool(true),
+					Template: validPodTemplateSpec,
 				},
 			},
 		},
