@@ -123,7 +123,7 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 	namespace := "default"
-	err = handler.Admit(admission.NewAttributesRecord(nil, api.Kind("Pod").WithVersion("version"), namespace, "name", api.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", api.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes: %v", err)
 	}
@@ -156,11 +156,11 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	}
 	indexer.Add(resourceQuota)
 	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod exceeded allowed quota")
 	}
-	err = handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "subresource", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "subresource", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the action went to a subresource: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	}
 	indexer.Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	}
 	indexer.Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error exceeding quota")
 	}
@@ -316,13 +316,13 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	indexer.Add(resourceQuota)
 	// verify all values are specified as required on the quota
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod does not specify a memory limit")
 	}
 	// verify the requests and limits are actually valid (in this case, we fail because the limits < requests)
 	newPod = validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("200m", "2Gi"), getResourceList("100m", "1Gi")))
-	err = handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod does not specify a memory limit")
 	}
@@ -369,7 +369,7 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
 	// Add to the lru cache so we do not do a live client lookup
 	liveLookupCache.Add(newPod.Namespace, liveLookupEntry{expiry: time.Now().Add(time.Duration(30 * time.Second)), items: []*api.ResourceQuota{}})
-	err = handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the pod is in a different namespace than the quota")
 	}
@@ -434,7 +434,7 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
 	activeDeadlineSeconds := int64(30)
 	newPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -534,7 +534,7 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 
 	// create a pod that is best effort because it does not make a request for anything
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -620,7 +620,7 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	}
 	indexer.Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -740,7 +740,7 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	// unset the namespace
 	newPod.ObjectMeta.Namespace = ""
 
-	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}

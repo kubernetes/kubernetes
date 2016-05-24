@@ -117,8 +117,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, obj)
+func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }
 
 type ScaleREST struct {
@@ -141,7 +141,18 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	return scaleFromRC(rc), nil
 }
 
-func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	rc, err := r.registry.GetController(ctx, name)
+	if err != nil {
+		return nil, false, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), name)
+	}
+
+	oldScale := scaleFromRC(rc)
+	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	if err != nil {
+		return nil, false, err
+	}
+
 	if obj == nil {
 		return nil, false, errors.NewBadRequest("nil update passed to Scale")
 	}
@@ -154,10 +165,6 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
 	}
 
-	rc, err := r.registry.GetController(ctx, scale.Name)
-	if err != nil {
-		return nil, false, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), scale.Name)
-	}
 	rc.Spec.Replicas = scale.Spec.Replicas
 	rc.ResourceVersion = scale.ResourceVersion
 	rc, err = r.registry.UpdateController(ctx, rc)

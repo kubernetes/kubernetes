@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -644,6 +645,105 @@ func runPatchTest(c *client.Client) {
 		}
 		if svc.Labels != nil {
 			glog.Fatalf("Failed remove all labels from patchservice with patch type %s: %v", k, svc.Labels)
+		}
+	}
+
+	// Test patch with a resource that allows create on update
+	endpointTemplate := &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: "patchendpoint"},
+		Subsets: []api.EndpointSubset{
+			{
+				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+				Ports:     []api.EndpointPort{{Port: 80, Protocol: api.ProtocolTCP}},
+			},
+		},
+	}
+
+	patchEndpoint := func(json []byte) (runtime.Object, error) {
+		return c.Patch(api.MergePatchType).Resource("endpoints").Namespace(api.NamespaceDefault).Name("patchendpoint").Body(json).Do().Get()
+	}
+
+	// Make sure patch doesn't get to CreateOnUpdate
+	{
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			glog.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if obj, err := patchEndpoint(endpointJSON); !apierrors.IsNotFound(err) {
+			glog.Fatalf("Expected notfound creating from patch, got error=%v and object: %#v", err, obj)
+		}
+	}
+
+	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
+	createdEndpoint, err := c.Endpoints(api.NamespaceDefault).Update(endpointTemplate)
+	if err != nil {
+		glog.Fatalf("Failed creating endpoint: %v", err)
+	}
+
+	// Make sure identity patch is accepted
+	{
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), createdEndpoint)
+		if err != nil {
+			glog.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); err != nil {
+			glog.Fatalf("Failed patching endpoint: %v", err)
+		}
+	}
+
+	// Make sure patch complains about a mismatched resourceVersion
+	{
+		endpointTemplate.Name = ""
+		endpointTemplate.UID = ""
+		endpointTemplate.ResourceVersion = "1"
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			glog.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); !apierrors.IsConflict(err) {
+			glog.Fatalf("Expected error, got %#v", err)
+		}
+	}
+
+	// Make sure patch complains about mutating the UID
+	{
+		endpointTemplate.Name = ""
+		endpointTemplate.UID = "abc"
+		endpointTemplate.ResourceVersion = ""
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			glog.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); !apierrors.IsInvalid(err) {
+			glog.Fatalf("Expected error, got %#v", err)
+		}
+	}
+
+	// Make sure patch complains about a mismatched name
+	{
+		endpointTemplate.Name = "changedname"
+		endpointTemplate.UID = ""
+		endpointTemplate.ResourceVersion = ""
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			glog.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); !apierrors.IsBadRequest(err) {
+			glog.Fatalf("Expected error, got %#v", err)
+		}
+	}
+
+	// Make sure patch containing originally submitted JSON is accepted
+	{
+		endpointTemplate.Name = ""
+		endpointTemplate.UID = ""
+		endpointTemplate.ResourceVersion = ""
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			glog.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); err != nil {
+			glog.Fatalf("Failed patching endpoint: %v", err)
 		}
 	}
 
