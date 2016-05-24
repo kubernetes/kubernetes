@@ -28,7 +28,7 @@ fi
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-KUBERNETES_RELEASE=$(cat ${KUBE_ROOT}/Version)
+KUBERNETES_RELEASE=$(cat ${KUBE_ROOT}/version)
 AWS_S3_BUCKET="kubernetes-artifacts-${KUBERNETES_RELEASE}"
 
 
@@ -47,9 +47,10 @@ sed -i.bak "s#SERVER_BINARY_TAR_URL:.*#SERVER_BINARY_TAR_URL: '${SERVER_BINARY_T
 sed -i.bak "s#SERVER_BINARY_TAR_HASH:.*#SERVER_BINARY_TAR_HASH: '${SERVER_BINARY_TAR_HASH}'#"  ${KUBE_TEMP}/node-user-data
 sed -i.bak "s#SALT_TAR_URL:.*#SALT_TAR_URL: '${SALT_TAR_URL}'#"  ${KUBE_TEMP}/node-user-data
 sed -i.bak "s#SALT_TAR_HASH:.*#SALT_TAR_HASH: '${SALT_TAR_HASH}'#"  ${KUBE_TEMP}/node-user-data
+sed -i.bak "s#wget -O bootstrap.*#wget -O bootstrap ${BOOTSTRAP_SCRIPT_URL}#"  ${KUBE_TEMP}/node-user-data
 
 
-aws autoscaling describe-launch-configurations \
+${AWS_ASG_CMD} describe-launch-configurations \
 --launch-configuration-names ${ASG_NAME} \
 --output json --query "LaunchConfigurations[0]" > ${KUBE_TEMP}/launch-configuration.json
 
