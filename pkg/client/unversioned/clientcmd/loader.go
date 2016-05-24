@@ -63,6 +63,40 @@ func currentMigrationRules() map[string]string {
 	return migrationRules
 }
 
+type ClientConfigLoader interface {
+	ConfigAccess
+	Load() (*clientcmdapi.Config, error)
+}
+
+type KubeconfigGetter func() (*clientcmdapi.Config, error)
+
+type ClientConfigGetter struct {
+	kubeconfigGetter KubeconfigGetter
+}
+
+// ClientConfigGetter implements the ClientConfigLoader interface.
+var _ ClientConfigLoader = &ClientConfigGetter{}
+
+func (g *ClientConfigGetter) Load() (*clientcmdapi.Config, error) {
+	return g.kubeconfigGetter()
+}
+
+func (g *ClientConfigGetter) GetLoadingPrecedence() []string {
+	return nil
+}
+func (g *ClientConfigGetter) GetStartingConfig() (*clientcmdapi.Config, error) {
+	return nil, nil
+}
+func (g *ClientConfigGetter) GetDefaultFilename() string {
+	return ""
+}
+func (g *ClientConfigGetter) IsExplicitFile() bool {
+	return false
+}
+func (g *ClientConfigGetter) GetExplicitFile() string {
+	return ""
+}
+
 // ClientConfigLoadingRules is an ExplicitPath and string slice of specific locations that are used for merging together a Config
 // Callers can put the chain together however they want, but we'd recommend:
 // EnvVarPathFiles if set (a list of files if set) OR the HomeDirectoryPath
@@ -79,6 +113,9 @@ type ClientConfigLoadingRules struct {
 	// that a default object that doesn't set this will usually get the behavior it wants.
 	DoNotResolvePaths bool
 }
+
+// ClientConfigLoadingRules implements the ClientConfigLoader interface.
+var _ ClientConfigLoader = &ClientConfigLoadingRules{}
 
 // NewDefaultClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
 // use this constructor
