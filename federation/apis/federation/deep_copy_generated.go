@@ -110,7 +110,15 @@ func DeepCopy_federation_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conver
 	} else {
 		out.ServerAddressByClientCIDRs = nil
 	}
-	out.Credential = in.Credential
+	if in.SecretRef != nil {
+		in, out := in.SecretRef, &out.SecretRef
+		*out = new(api.LocalObjectReference)
+		if err := api.DeepCopy_api_LocalObjectReference(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
 	return nil
 }
 
