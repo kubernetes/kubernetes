@@ -321,6 +321,7 @@ func testTime(base time.Time, seed int) time.Time {
 }
 
 func checkNetworkStats(t *testing.T, label string, seed int, stats *kubestats.NetworkStats) {
+	assert.NotNil(t, stats)
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Net.Time")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.RxBytes, label+".Net.RxBytes")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.RxErrors, label+".Net.RxErrors")
