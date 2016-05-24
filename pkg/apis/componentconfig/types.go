@@ -469,6 +469,12 @@ type KubeControllerManagerConfiguration struct {
 	// lookupCacheSizeForDaemonSet is the size of lookup cache for daemonsets.
 	// Larger number = more responsive daemonset, but more MEM load.
 	LookupCacheSizeForDaemonSet int32 `json:"lookupCacheSizeForDaemonSet"`
+	// LookupCacheSizeForJob is the size of lookup cache for jobs.
+	// Larger number = more responsive job, but more MEM load.
+	LookupCacheSizeForJob int32 `json:"lookupCacheSizeForJob"`
+	// LookupCacheSizeForPetSet is the size of lookup cache for petsets.
+	// Larger number = more responsive petset, but more MEM load.
+	LookupCacheSizeForPetSet int32 `json:"lookupCacheSizeForPetSet"`
 	// serviceSyncPeriod is the period for syncing services with their external
 	// load balancers.
 	ServiceSyncPeriod unversioned.Duration `json:"serviceSyncPeriod"`

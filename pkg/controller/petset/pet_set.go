@@ -47,9 +47,6 @@ const (
 	statusUpdateRetries = 2
 	// period to relist petsets and verify pets
 	petSetResyncPeriod = 30 * time.Second
-	// lookupcCache size of petset
-	// TODO(mqliang) make this configurable
-	petSetLookupCacheSize = 2048
 )
 
 // PetSetController controls petsets.
@@ -87,7 +84,7 @@ type PetSetController struct {
 }
 
 // NewPetSetController creates a new petset controller.
-func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *client.Client, resyncPeriod time.Duration) *PetSetController {
+func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *client.Client, resyncPeriod time.Duration, lookupCacheSize int) *PetSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -157,7 +154,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 	// TODO: Watch volumes
 	psc.podStoreSynced = psc.podController.HasSynced
 	psc.syncHandler = psc.Sync
-	psc.lookupCache = controller.NewMatchingCache(petSetLookupCacheSize)
+	psc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return psc
 }
 
@@ -257,10 +254,9 @@ func (psc *PetSetController) getPetSetForPod(pod *api.Pod) *apps.PetSet {
 		ps, ok := obj.(*apps.PetSet)
 		if !ok {
 			// This should not happen
-			glog.Errorf("lookup cache does not retuen a ReplicaSet object")
-			return nil
+			glog.Errorf("lookup cache does not retuen a PetSet object")
 		}
-		if cached && psc.isCacheValid(pod, ps) {
+		if cached && ok && psc.isCacheValid(pod, ps) {
 			return ps
 		}
 	}

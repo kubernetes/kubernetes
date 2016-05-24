@@ -56,6 +56,8 @@ func NewCMServer() *CMServer {
 			LookupCacheSizeForRC:              4096,
 			LookupCacheSizeForRS:              4096,
 			LookupCacheSizeForDaemonSet:       1024,
+			LookupCacheSizeForJob:             1024,
+			LookupCacheSizeForPetSet:          1024,
 			ServiceSyncPeriod:                 unversioned.Duration{Duration: 5 * time.Minute},
 			NodeSyncPeriod:                    unversioned.Duration{Duration: 10 * time.Second},
 			ResourceQuotaSyncPeriod:           unversioned.Duration{Duration: 5 * time.Minute},

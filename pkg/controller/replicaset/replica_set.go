@@ -231,9 +231,8 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.Repl
 		if !ok {
 			// This should not happen
 			glog.Errorf("lookup cache does not retuen a ReplicaSet object")
-			return nil
 		}
-		if cached && rsc.isCacheValid(pod, rs) {
+		if cached && ok && rsc.isCacheValid(pod, rs) {
 			return rs
 		}
 	}

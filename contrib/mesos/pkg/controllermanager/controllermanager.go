@@ -255,7 +255,7 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "job-controller")), s.resyncPeriod).
+			go job.NewJobControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "job-controller")), s.resyncPeriod, int(s.LookupCacheSizeForJob)).
 				Run(int(s.ConcurrentJobSyncs), wait.NeverStop)
 		}
 

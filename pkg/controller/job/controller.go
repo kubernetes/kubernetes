@@ -43,8 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const jobLookupCacheSize = 2048
-
 type JobController struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
@@ -82,7 +80,7 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface) *JobController {
+func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, lookupCacheSize int) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -135,17 +133,16 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 	})
 	jm.podStore.Indexer = podInformer.GetIndexer()
 	jm.podStoreSynced = podInformer.HasSynced
-	//TODO(mqliang): make jobLookupCacheSize configurable
-	jm.lookupCache = controller.NewMatchingCache(jobLookupCacheSize)
+	jm.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
 	return jm
 }
 
-func NewJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
+func NewJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *JobController {
 	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
-	jm := NewJobController(podInformer, kubeClient)
+	jm := NewJobController(podInformer, kubeClient, lookupCacheSize)
 	jm.internalPodInformer = podInformer
 
 	return jm
@@ -176,9 +173,8 @@ func (jm *JobController) getPodJob(pod *api.Pod) *batch.Job {
 		if !ok {
 			// This should not happen
 			glog.Errorf("lookup cache does not return a Job object")
-			return nil
 		}
-		if cached && jm.isCacheValid(pod, job) {
+		if cached && ok && jm.isCacheValid(pod, job) {
 			return job
 		}
 	}
