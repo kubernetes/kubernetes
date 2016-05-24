@@ -2264,9 +2264,21 @@ func DumpAllNamespaceInfo(c *client.Client, namespace string) {
 	// that if you delete a bunch of pods right before ending your test,
 	// you may or may not see the killing/deletion/Cleanup events.
 
-	dumpAllPodInfo(c)
-
-	dumpAllNodeInfo(c)
+	// If cluster is large, then the following logs are basically useless, because:
+	// 1. it takes tens of minutes or hours to grab all of them
+	// 2. there are so many of them that working with them are mostly impossible
+	// So we dump them only if the cluster is relatively small.
+	maxNodesForDump := 20
+	if nodes, err := c.Nodes().List(api.ListOptions{}); err == nil {
+		if len(nodes.Items) <= maxNodesForDump {
+			dumpAllPodInfo(c)
+			dumpAllNodeInfo(c)
+		} else {
+			Logf("skipping dumping cluster info - cluster too large")
+		}
+	} else {
+		Logf("unable to fetch node list: %v", err)
+	}
 }
 
 // byFirstTimestamp sorts a slice of events by first timestamp, using their involvedObject's name as a tie breaker.
