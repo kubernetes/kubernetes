@@ -936,7 +936,7 @@ func (r *Runtime) generateRunCommand(pod *api.Pod, uuid, netnsName string) (stri
 		// TODO: switch to 'ip netns exec' once we can depend on a new
 		// enough version that doesn't have bugs like
 		// https://bugzilla.redhat.com/show_bug.cgi?id=882047
-		nsenterExec := []string{r.nsenterPath, "--net=\"" + netnsPathFromName(netnsName) + "\"", "--"}
+		nsenterExec := []string{r.nsenterPath, "--net=" + netnsPathFromName(netnsName), "--"}
 		runPrepared = append(nsenterExec, runPrepared...)
 	}
 
