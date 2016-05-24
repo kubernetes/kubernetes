@@ -21,7 +21,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
@@ -29,21 +28,23 @@ import (
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1alpha1_ClusterRole,
-		DeepCopy_v1alpha1_ClusterRoleBinding,
-		DeepCopy_v1alpha1_ClusterRoleBindingList,
-		DeepCopy_v1alpha1_ClusterRoleList,
-		DeepCopy_v1alpha1_PolicyRule,
-		DeepCopy_v1alpha1_Role,
-		DeepCopy_v1alpha1_RoleBinding,
-		DeepCopy_v1alpha1_RoleBindingList,
-		DeepCopy_v1alpha1_RoleList,
-		DeepCopy_v1alpha1_Subject,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v1alpha1_ClusterRole,
+			DeepCopy_v1alpha1_ClusterRoleBinding,
+			DeepCopy_v1alpha1_ClusterRoleBindingList,
+			DeepCopy_v1alpha1_ClusterRoleList,
+			DeepCopy_v1alpha1_PolicyRule,
+			DeepCopy_v1alpha1_Role,
+			DeepCopy_v1alpha1_RoleBinding,
+			DeepCopy_v1alpha1_RoleBindingList,
+			DeepCopy_v1alpha1_RoleList,
+			DeepCopy_v1alpha1_Subject,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v1alpha1_ClusterRole(in ClusterRole, out *ClusterRole, c *conversion.Cloner) error {

@@ -21,21 +21,23 @@ limitations under the License.
 package authentication
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_authenticationk8sio_TokenReview,
-		DeepCopy_authenticationk8sio_TokenReviewSpec,
-		DeepCopy_authenticationk8sio_TokenReviewStatus,
-		DeepCopy_authenticationk8sio_UserInfo,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_authenticationk8sio_TokenReview,
+			DeepCopy_authenticationk8sio_TokenReviewSpec,
+			DeepCopy_authenticationk8sio_TokenReviewStatus,
+			DeepCopy_authenticationk8sio_UserInfo,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_authenticationk8sio_TokenReview(in TokenReview, out *TokenReview, c *conversion.Cloner) error {

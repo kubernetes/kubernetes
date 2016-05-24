@@ -24,18 +24,21 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	metrics "k8s.io/kubernetes/pkg/apis/metrics"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_RawNode_To_metrics_RawNode,
-		Convert_metrics_RawNode_To_v1alpha1_RawNode,
-		Convert_v1alpha1_RawPod_To_metrics_RawPod,
-		Convert_metrics_RawPod_To_v1alpha1_RawPod,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1alpha1_RawNode_To_metrics_RawNode,
+			Convert_metrics_RawNode_To_v1alpha1_RawNode,
+			Convert_v1alpha1_RawPod_To_metrics_RawPod,
+			Convert_metrics_RawPod_To_v1alpha1_RawPod,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1alpha1_RawNode_To_metrics_RawNode(in *RawNode, out *metrics.RawNode, s conversion.Scope) error {

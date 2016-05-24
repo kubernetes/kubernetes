@@ -21,19 +21,21 @@ limitations under the License.
 package metrics
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_metrics_RawNode,
-		DeepCopy_metrics_RawPod,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_metrics_RawNode,
+			DeepCopy_metrics_RawPod,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_metrics_RawNode(in RawNode, out *RawNode, c *conversion.Cloner) error {

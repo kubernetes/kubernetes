@@ -21,21 +21,23 @@ limitations under the License.
 package v1beta1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1beta1_TokenReview,
-		DeepCopy_v1beta1_TokenReviewSpec,
-		DeepCopy_v1beta1_TokenReviewStatus,
-		DeepCopy_v1beta1_UserInfo,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v1beta1_TokenReview,
+			DeepCopy_v1beta1_TokenReviewSpec,
+			DeepCopy_v1beta1_TokenReviewStatus,
+			DeepCopy_v1beta1_UserInfo,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v1beta1_TokenReview(in TokenReview, out *TokenReview, c *conversion.Cloner) error {

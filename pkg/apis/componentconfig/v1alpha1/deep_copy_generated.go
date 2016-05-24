@@ -21,20 +21,22 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1alpha1_KubeProxyConfiguration,
-		DeepCopy_v1alpha1_KubeSchedulerConfiguration,
-		DeepCopy_v1alpha1_LeaderElectionConfiguration,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v1alpha1_KubeProxyConfiguration,
+			DeepCopy_v1alpha1_KubeSchedulerConfiguration,
+			DeepCopy_v1alpha1_LeaderElectionConfiguration,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *KubeProxyConfiguration, c *conversion.Cloner) error {
