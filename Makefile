@@ -80,7 +80,7 @@ check test:
 #   make test_integration
 test_integration:
 	hack/test-integration.sh
-.PHONY: test_integration test_integ
+.PHONY: test_integration
 
 # Build and run end-to-end tests.
 #
@@ -98,7 +98,7 @@ test_e2e:
 # Example:
 #   make test_e2e_node FOCUS=kubelet SKIP=container
 # Build and run tests.
-test_e2e_node:
+test_e2e_node: ginkgo
 	hack/e2e-node-test.sh FOCUS=$(FOCUS) SKIP=$(SKIP)
 .PHONY: test_e2e_node
 
@@ -146,3 +146,10 @@ release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
 
+# Build ginkgo for tests
+#
+# Example:
+#   make ginkgo
+ginkgo:
+	hack/build-go.sh vendor/github.com/onsi/ginkgo/ginkgo
+.PHONY: ginkgo
