@@ -2124,16 +2124,6 @@
 			"Rev": "20b71e5b60d756d3d2f80def009790325acc2b23"
 		},
 		{
-			"ImportPath": "gopkg.in/vmihailenco/msgpack.v2",
-			"Comment": "v2.5.1",
-			"Rev": "005134bfb4bf69b74e05382eddacea6a4585e4aa"
-		},
-		{
-			"ImportPath": "gopkg.in/vmihailenco/msgpack.v2/codes",
-			"Comment": "v2.5.1",
-			"Rev": "005134bfb4bf69b74e05382eddacea6a4585e4aa"
-		},
-		{
 			"ImportPath": "gopkg.in/yaml.v2",
 			"Rev": "a83829b6f1293c91addabc89d0571c246397bbf4"
 		},
