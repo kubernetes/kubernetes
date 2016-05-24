@@ -1,6 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.5",
+	"GodepVersion": "v62",
 	"Packages": [
 		"./..."
 	],
@@ -1036,6 +1037,11 @@
 		{
 			"ImportPath": "google.golang.org/grpc",
 			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "gopkg.in/inf.v0",
+			"Comment": "v0.9.0",
+			"Rev": "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
