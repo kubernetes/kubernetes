@@ -102,7 +102,6 @@ type Unmounter interface {
 
 // Recycler provides methods to reclaim the volume resource.
 type Recycler interface {
-	Volume
 	// Recycle reclaims the resource.  Calls to this method should block until the recycling task is complete.
 	// Any error returned indicates the volume has failed to be reclaimed.  A nil return indicates success.
 	Recycle() error
@@ -121,7 +120,6 @@ type Provisioner interface {
 // the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
 // A nil return indicates success.
 type Deleter interface {
-	Volume
 	// This method should block until completion.
 	Delete() error
 }
