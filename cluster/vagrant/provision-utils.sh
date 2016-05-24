@@ -19,10 +19,6 @@ function prepare-package-manager() {
 
   # Useful if a mirror is broken or slow
   echo "fastestmirror=True" >> /etc/dnf/dnf.conf
-
-  # In Fedora 23, installed version does not work with Salt
-  # Cf. https://github.com/saltstack/salt/issues/31001
-  dnf update -y dnf dnf-plugins-core
 }
 
 
@@ -113,8 +109,10 @@ function install-salt() {
   popd
 
   if ! which salt-call >/dev/null 2>&1; then
-    # Install salt binaries
-    curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+    # Install salt from official repositories.
+    # Need to enable testing-repos to get version of salt with fix for dnf-core-plugins
+    dnf config-manager --set-enabled updates-testing
+    dnf install -y salt-minion
 
     # Fedora >= 23 includes salt packages but the bootstrap is
     # creating configuration for a (non-existent) salt repo anyway.
