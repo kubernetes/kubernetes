@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -62,13 +63,20 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 		glog.V(1).Infof("Pulling image %s without credentials", img)
 	}
 
-	// Let's update a json.
-	// TODO(yifan): Find a way to feed this to rkt.
-	if err := r.writeDockerAuthConfig(img, creds); err != nil {
+	userConfigDir, err := ioutil.TempDir("", "rktnetes-user-config-dir-")
+	if err != nil {
+		return fmt.Errorf("rkt: Cannot create a temporary user-config directory: %v", err)
+	}
+	defer os.RemoveAll(userConfigDir)
+
+	config := *r.config
+	config.UserConfigDir = userConfigDir
+
+	if err := r.writeDockerAuthConfig(img, creds, userConfigDir); err != nil {
 		return err
 	}
 
-	if _, err := r.cli.RunCommand("fetch", dockerPrefix+img); err != nil {
+	if _, err := r.cli.RunCommand(&config, "fetch", dockerPrefix+img); err != nil {
 		glog.Errorf("Failed to fetch: %v", err)
 		return err
 	}
@@ -104,7 +112,7 @@ func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 	if err != nil {
 		return err
 	}
-	if _, err := r.cli.RunCommand("image", "rm", imageID); err != nil {
+	if _, err := r.cli.RunCommand(nil, "image", "rm", imageID); err != nil {
 		return err
 	}
 	return nil
@@ -186,7 +194,7 @@ func (r *Runtime) getImageManifest(image string) (*appcschema.ImageManifest, err
 
 // TODO(yifan): This is very racy, unefficient, and unsafe, we need to provide
 // different namespaces. See: https://github.com/coreos/rkt/issues/836.
-func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialprovider.LazyAuthConfiguration) error {
+func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialprovider.LazyAuthConfiguration, userConfigDir string) error {
 	if len(credsSlice) == 0 {
 		return nil
 	}
@@ -204,15 +212,7 @@ func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialpro
 		registry = strings.Split(image, "/")[0]
 	}
 
-	configDir := r.config.UserConfigDir
-	if configDir == "" {
-		configDir = r.config.LocalConfigDir
-	}
-	if configDir == "" {
-		return fmt.Errorf("No user or local config dir is specified")
-	}
-
-	authDir := path.Join(configDir, "auth.d")
+	authDir := filepath.Join(userConfigDir, "auth.d")
 	if _, err := os.Stat(authDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(authDir, 0600); err != nil {
 			glog.Errorf("rkt: Cannot create auth dir: %v", err)
