@@ -3,24 +3,38 @@
 
 .SH NAME
 .PP
-kubectl cluster\-info \- Display cluster info
+kubectl cluster\-info dump \- Dump lots of relevant info for debugging and diagnosis.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl cluster\-info\fP [OPTIONS]
+\fBkubectl cluster\-info dump\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Display addresses of the master and services with label kubernetes.io/cluster\-service=true
-To further debug and diagnose cluster problems, use 'kubectl cluster\-info dump'.
+Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to
+stdout. You can optionally specify a directory with \-\-output\-directory.  If you specify a directory, kubernetes will
+build a set of files in that directory.  By default only dumps things in the 'kube\-system' namespace, but you can
+switch to a different namespace with the \-\-namespaces flag, or specify \-\-all\-namespaces to dump all namespaces.
+
+.PP
+The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories
+based on namespace and pod name.
 
 
 .SH OPTIONS
 .PP
-\fB\-\-include\-extended\-apis\fP=true
-    If true, include definitions of new APIs via calls to the API server. [default true]
+\fB\-\-all\-namespaces\fP=false
+    If true, dump all namespaces.  If true, \-\-namespaces is ignored.
+
+.PP
+\fB\-\-namespaces\fP=[]
+    A comma separated list of namespaces to dump.
+
+.PP
+\fB\-\-output\-directory\fP=""
+    Where to output the files.  If empty or '\-' uses stdout, otherwise creates a directory hierarchy in that directory
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -121,9 +135,30 @@ To further debug and diagnose cluster problems, use 'kubectl cluster\-info dump'
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+# Dump current cluster state to stdout
+kubectl cluster\-info dump
+  
+# Dump current cluster state to /path/to/cluster\-state
+kubectl cluster\-info dump \-\-output\-directory=/path/to/cluster\-state
+  
+# Dump all namespaces to stdout
+kubectl cluster\-info dump \-\-all\-namespaces
+  
+# Dump a set of namespaces to /path/to/cluster\-state
+kubectl cluster\-info dump \-\-namespaces default,kube\-system \-\-output\-directory=/path/to/cluster\-state
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl(1)\fP, \fBkubectl\-cluster\-info\-dump(1)\fP,
+\fBkubectl\-cluster\-info(1)\fP,
 
 
 .SH HISTORY
