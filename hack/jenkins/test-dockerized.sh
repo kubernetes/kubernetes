@@ -55,7 +55,7 @@ rm -rf Godeps/_workspace # Temporary until _workspace is fully obliterated
 go install ./cmd/...
 ./hack/install-etcd.sh
 
-./hack/test-go.sh
-./hack/test-cmd.sh
-./hack/test-integration.sh
+make test
+make test-cmd
+make test-integration
 ./hack/test-update-storage-objects.sh

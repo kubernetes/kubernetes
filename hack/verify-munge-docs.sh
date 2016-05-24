@@ -26,8 +26,7 @@ git_upstream=$(kube::util::git_upstream_remote_name)
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" \
-    cmd/mungedocs
+make -C "${KUBE_ROOT}/" WHAT=cmd/mungedocs
 
 # Find binary
 mungedocs=$(kube::util::find-binary "mungedocs")

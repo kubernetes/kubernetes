@@ -38,4 +38,4 @@ export LOG_LEVEL=4
 cd /go/src/k8s.io/kubernetes
 
 ./hack/install-etcd.sh
-./hack/verify-all.sh -v
+make verify VERBOSE=1

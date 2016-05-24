@@ -29,7 +29,7 @@ BUILD_TARGETS=(
   cmd/libs/go2idl/deepcopy-gen
   cmd/libs/go2idl/set-gen
 )
-"${KUBE_ROOT}/hack/build-go.sh" ${BUILD_TARGETS[*]}
+make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
 clientgen=$(kube::util::find-binary "client-gen")
 conversiongen=$(kube::util::find-binary "conversion-gen")

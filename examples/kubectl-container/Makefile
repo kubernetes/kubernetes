@@ -23,7 +23,8 @@ GOARCH?=$(shell go env GOARCH)
 GOOS?=$(shell go env GOOS)
 
 kubectl:
-	KUBE_STATIC_OVERRIDES="kubectl" ../../hack/build-go.sh cmd/kubectl; cp ../../_output/local/bin/$(GOOS)/$(GOARCH)/kubectl .
+	make -C ../../ WHAT=cmd/kubectl KUBE_STATIC_OVERRIDES="kubectl"; \
+	cp ../../_output/local/bin/$(GOOS)/$(GOARCH)/kubectl .
 
 .tag: kubectl
 	./kubectl version -c | grep -o 'GitVersion:"[^"]*"' | cut -f 2 -d '"' > .tag

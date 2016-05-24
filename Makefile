@@ -42,7 +42,7 @@ export KUBE_GOLDFLAGS
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
 all:
-	hack/build-go.sh $(WHAT)
+	@hack/make-rules/build.sh $(WHAT)
 .PHONY: all
 
 # Build ginkgo
@@ -50,7 +50,7 @@ all:
 # Example:
 # make ginkgo
 ginkgo:
-	hack/build-go.sh vendor/github.com/onsi/ginkgo/ginkgo	
+	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
 .PHONY: ginkgo
 
 # Runs all the presubmission verifications.
@@ -62,7 +62,7 @@ ginkgo:
 #   make verify
 #   make verify BRANCH=branch_x
 verify:
-	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/verify-all.sh -v
+	@KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 .PHONY: verify
 
 # Build and run tests.
@@ -79,24 +79,24 @@ verify:
 #   make test
 #   make check WHAT=pkg/kubelet GOFLAGS=-v
 check test:
-	hack/test-go.sh $(WHAT) $(TESTS)
+	@hack/make-rules/test.sh $(WHAT) $(TESTS)
 .PHONY: check test
 
 # Build and run integration tests.
 #
 # Example:
-#   make test_integration
-test_integration:
-	hack/test-integration.sh
-.PHONY: test_integration test_integ
+#   make test-integration
+test-integration:
+	@hack/make-rules/test-integration.sh
+.PHONY: test-integration
 
 # Build and run end-to-end tests.
 #
 # Example:
-#   make test_e2e
-test_e2e:
-	go run hack/e2e.go -v --build --up --test --down
-.PHONY: test_e2e
+#   make test-e2e
+test-e2e: ginkgo
+	@go run hack/e2e.go -v --build --up --test --down
+.PHONY: test-e2e
 
 # Build and run node end-to-end tests.
 #
@@ -116,12 +116,20 @@ test_e2e:
 #  INSTANCE_PREFIX: for REMOTE=true only.  Instances created from images will have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test"/
 #
 # Example:
-#   make test_e2e_node FOCUS=kubelet SKIP=container
-#   make test_e2e_node REMOTE=true DELETE_INSTANCES=true
+#   make test-e2e-node FOCUS=kubelet SKIP=container
+#   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
 # Build and run tests.
-test_e2e_node: ginkgo
-	hack/e2e-node-test.sh
-.PHONY: test_e2e_node
+test-e2e-node: ginkgo
+	@hack/make-rules/test-e2e-node.sh
+.PHONY: test-e2e-node
+
+# Build and run cmdline tests.
+#
+# Example:
+#   make test-cmd
+test-cmd:
+	@hack/make-rules/test-cmd.sh
+.PHONY: test-cmd
 
 # Remove all build artifacts.
 #
@@ -139,15 +147,12 @@ clean:
 #   WHAT: Directory names to vet.  All *.go files under these
 #     directories will be vetted.  If not specified, "everything" will be
 #     vetted.
-#   TESTS: Same as WHAT.
-#   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #
 # Example:
 #   make vet
 #   make vet WHAT=pkg/kubelet
 vet:
-	hack/verify-govet.sh $(WHAT) $(TESTS)
+	@hack/make-rules/vet.sh $(WHAT)
 .PHONY: vet
 
 # Build a release
@@ -155,7 +160,7 @@ vet:
 # Example:
 #   make release
 release:
-	build/release.sh
+	@build/release.sh
 .PHONY: release
 
 # Build a release, but skip tests
@@ -163,6 +168,5 @@ release:
 # Example:
 #   make release-skip-tests
 release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
+	@KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
-
