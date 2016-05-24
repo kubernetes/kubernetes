@@ -2048,7 +2048,7 @@ type ServiceSpec struct {
 
 	// This service will route traffic to pods having labels matching this selector.
 	// Label keys and values that must match in order to receive traffic for this service.
-	// If empty, all pods are selected, if not specified, endpoints must be manually specified.
+	// If not specified, endpoints must be manually specified and the system will not automatically manage them.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
