@@ -35,11 +35,20 @@ PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 
 
-OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20160321}
+# Today the cluster startup scripts asssume the master and the nodes use the
+# same OS distro, thus same set of initialization instructions (e.g., metadata,
+# startup scripts, etc.). The current workaround is the hack in util.sh that
+# reloads <os_distro>/helper.sh in the gap between when the master is created
+# and when the nodes are created.
+# TODO(#26183): Provide a way to differentiate master OS distro and node OS
+# distro.
+OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-gci}
+# For GCI, leaving it blank will auto-select the latest GCI image on the `dev`
+# channel.
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
-NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"${MASTER_IMAGE}"}
-NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-"${MASTER_IMAGE_PROJECT}"}
+NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-container-vm-v20160321}
+NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 RKT_VERSION=${KUBE_RKT_VERSION:-0.5.5}
 

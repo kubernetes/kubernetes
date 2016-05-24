@@ -35,11 +35,11 @@ if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
   # Otherwise, we respect whatever set by the user.
   gci_images=( $(gcloud compute images list --project google-containers \
       --regexp='gci-dev.*' --format='value(name)') )
-  if [[ -z "${KUBE_GCE_MASTER_IMAGE:-}" ]]; then
+  if [[ -z "${MASTER_IMAGE:-}" ]]; then
     MASTER_IMAGE="${gci_images[0]}"
     MASTER_IMAGE_PROJECT="google-containers"
   fi
-  if [[ -z "${KUBE_GCE_NODE_IMAGE:-}" ]]; then
+  if [[ -z "${NODE_IMAGE:-}" ]]; then
     NODE_IMAGE="${gci_images[0]}"
     NODE_IMAGE_PROJECT="google-containers"
   fi
