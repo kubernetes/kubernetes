@@ -118,3 +118,18 @@ func (f *FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMet
 		}
 	}
 }
+
+// Returns a HandlerFunc that handles count requests using
+// firstHandler, then passes control to nextHandler, e.g.
+// HandleNRequestsThen(3, FakeHandler(someError), FakeHandler(success))
+func HandleNRequestsThen(count int, firstHandler, nextHandler http.HandlerFunc) http.HandlerFunc {
+	calls := 0
+	return func(w http.ResponseWriter, req *http.Request) {
+		if calls < count {
+			calls++
+			firstHandler(w, req)
+			return
+		}
+		nextHandler(w, req)
+	}
+}

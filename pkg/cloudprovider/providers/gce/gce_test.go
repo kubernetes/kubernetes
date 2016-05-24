@@ -17,12 +17,14 @@ limitations under the License.
 package gce
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/rand"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -266,7 +268,16 @@ func TestComputeUpdate(t *testing.T) {
 }
 
 func TestRateLimitedRoundTripper(t *testing.T) {
-	handler := utiltesting.FakeHandler{StatusCode: 200}
+	json, err := json.Marshal(googleapi.Error{Code: http.StatusForbidden, Message: "User Rate Limit Exceeded"})
+	if err != nil {
+		t.Fatalf("Failure to marshal error: %v", err)
+	}
+	rateLimitHandler := utiltesting.FakeHandler{
+		StatusCode:   http.StatusForbidden,
+		ResponseBody: string(json),
+	}
+	successHandler := utiltesting.FakeHandler{StatusCode: 200}
+	handler := utiltesting.HandleNRequestsThen(3, rateLimitHandler.ServeHTTP, successHandler.ServeHTTP)
 	server := httptest.NewServer(&handler)
 	defer server.Close()
 
@@ -281,8 +292,9 @@ func TestRateLimitedRoundTripper(t *testing.T) {
 	// TODO(zmerlynn): Validate the rate limiter is actually getting called.
 	client := http.Client{
 		Transport: &rateLimitedRoundTripper{
-			rt:      http.DefaultTransport,
-			limiter: flowcontrol.NewFakeAlwaysRateLimiter(),
+			rt:          http.DefaultTransport,
+			getLimiter:  flowcontrol.NewFakeAlwaysRateLimiter(),
+			postLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
 		},
 	}
 	_, err = client.Do(req)
@@ -290,5 +302,7 @@ func TestRateLimitedRoundTripper(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	handler.ValidateRequest(t, path, method, nil)
+	successHandler.ValidateRequest(t, path, method, nil)
+	successHandler.ValidateRequestCount(t, 1)
+	rateLimitHandler.ValidateRequestCount(t, 3)
 }

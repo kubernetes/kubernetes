@@ -17,9 +17,11 @@ limitations under the License.
 package gce
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"path"
 	"regexp"
@@ -72,6 +74,9 @@ const (
 
 	// TargetPools can only support 1000 VMs.
 	maxInstancesPerTargetPool = 1000
+
+	rateLimitTries             = 5
+	rateLimitExceededSubstring = "Limit Exceeded"
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -113,16 +118,67 @@ func (g *GCECloud) GetComputeService() *compute.Service {
 }
 
 type rateLimitedRoundTripper struct {
-	rt      http.RoundTripper
-	limiter flowcontrol.RateLimiter
+	rt          http.RoundTripper
+	getLimiter  flowcontrol.RateLimiter
+	postLimiter flowcontrol.RateLimiter
 }
 
 func (rl *rateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	startTime := time.Now()
-	rl.limiter.Accept()
-	// TODO: Reduce verbosity once #26119 is fixed.
-	glog.V(0).Infof("GCE api call: %s %s (throttled for %v)", req.Method, req.URL.String(), time.Now().Sub(startTime))
-	return rl.rt.RoundTrip(req)
+	for tries := 1; ; tries++ {
+		startTime := time.Now()
+		// Split up the GET and POST methods and a poor man's priority
+		// queue between updates and operation polling. (This is
+		// lopsided at startup when we slam GCE with route create
+		// requests, but after that the POST requests will get rate
+		// limited much less.)
+		if req.Method == http.MethodGet || req.Method == http.MethodHead {
+			rl.getLimiter.Accept()
+		} else {
+			rl.postLimiter.Accept()
+		}
+		// TODO: Reduce verbosity once #26119 is fixed.
+		glog.V(0).Infof("GCE api call: %s %s (throttled for %v)", req.Method, req.URL.String(), time.Now().Sub(startTime))
+		res, err := rl.rt.RoundTrip(req)
+		if err != nil || res.StatusCode != http.StatusForbidden {
+			return res, err
+		}
+
+		// Okay, we know it's a 403 of some sort. Now let's try fo
+		// figure out of it's a Rate Limit Exceeded. Get the body,
+		// then reset it, because we're just an interposing
+		// RoundTripper, not the final hop.
+		slurp, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return res, err
+		}
+		res.Body.Close()
+		res.Body = ioutil.NopCloser(bytes.NewReader(slurp))
+
+		// Check the response, then immediate reset the res.Body.
+		err = googleapi.CheckResponse(res)
+		res.Body = ioutil.NopCloser(bytes.NewReader(slurp))
+		if err == nil {
+			// This shouldn't happen given the StatusCode check, but
+			// there's no harm in checking.
+			return res, err
+		}
+		gErr, ok := err.(*googleapi.Error)
+		if !ok {
+			// This implies the JSON parsing failed or something
+			// similar. Regardless, the compute library couldn't
+			// coerce it into the error type. Log the method and move
+			// on.
+			glog.Infof("GCE API StatusForbidden response cannot be coerced to error type, method %s", req.Method)
+			return res, err
+		}
+		if !strings.Contains(strings.ToLower(gErr.Body), strings.ToLower(rateLimitExceededSubstring)) {
+			return res, err
+		}
+		if tries >= rateLimitTries {
+			return res, err
+		}
+		glog.Infof("GCE API call rate limited, try %d/%d: %s %s", tries, rateLimitTries, req.Method, req.URL.String())
+	}
 }
 
 func getProjectAndZone() (string, string, error) {
@@ -297,8 +353,9 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
 	// Override the transport to make it rate-limited.
 	client.Transport = &rateLimitedRoundTripper{
-		rt:      client.Transport,
-		limiter: flowcontrol.NewTokenBucketRateLimiter(10, 100), // 10 qps, 100 bucket size.
+		rt:          client.Transport,
+		getLimiter:  flowcontrol.NewTokenBucketRateLimiter(3, 50), // 3 qps, 50 bucket size.
+		postLimiter: flowcontrol.NewTokenBucketRateLimiter(3, 50), // 3 qps, 50 bucket size.
 	}
 	svc, err := compute.New(client)
 	if err != nil {
