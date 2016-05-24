@@ -72,7 +72,4 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&unversioned.APIGroup{},
 		&unversioned.APIResourceList{},
 	)
-
-	addDefaultingFuncs(scheme)
-	addConversionFuncs(scheme)
 }
