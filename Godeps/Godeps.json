@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v69",
+	"GodepVersion": "v67",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -725,11 +725,6 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.2-54-g7c47e25",
-			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
-		},
-		{
-			"ImportPath": "github.com/emicklei/go-restful/examples/msgpack",
 			"Comment": "v1.2-54-g7c47e25",
 			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
 		},
