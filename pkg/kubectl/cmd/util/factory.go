@@ -345,6 +345,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			gvk := mapping.GroupVersionKind
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
 			c, err := clients.ClientForVersion(&mappingVersion)
+			fmt.Printf("Mapping version: %#v", mappingVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -354,6 +355,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case autoscaling.GroupName:
 				return c.AutoscalingClient.RESTClient, nil
 			case batch.GroupName:
+				// XXX mapping is correct (batch/v2alpha1), the returned client is using batch/v1.
+				//  The problem is that the unversioned batch client does not have a way to return anything but v1, I think.
+				// Tried this but it does not help.  Version negotiation appears to override the choice.
+				// c, err := clients.ClientForVersion(&unversioned.GroupVersion{Group: "batch", Version: "v2alpha1"})
 				return c.BatchClient.RESTClient, nil
 			case policy.GroupName:
 				return c.PolicyClient.RESTClient, nil
