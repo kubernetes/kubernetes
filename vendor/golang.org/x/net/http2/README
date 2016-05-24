@@ -17,4 +17,4 @@ Demo test server at https://http2.golang.org/
 Help & bug reports welcome!
 
 Contributing: https://golang.org/doc/contribute.html
-Bugs:         https://github.com/golang/go/issues/new?title=x/net/http2:+
+Bugs:         https://golang.org/issue/new?title=x/net/http2:+

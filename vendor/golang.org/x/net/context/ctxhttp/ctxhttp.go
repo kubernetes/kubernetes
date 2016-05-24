@@ -14,6 +14,14 @@ import (
 	"golang.org/x/net/context"
 )
 
+func nop() {}
+
+var (
+	testHookContextDoneBeforeHeaders = nop
+	testHookDoReturned               = nop
+	testHookDidBodyClose             = nop
+)
+
 // Do sends an HTTP request with the provided http.Client and returns an HTTP response.
 // If the client is nil, http.DefaultClient is used.
 // If the context is canceled or times out, ctx.Err() will be returned.
@@ -33,16 +41,44 @@ func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Resp
 
 	go func() {
 		resp, err := client.Do(req)
+		testHookDoReturned()
 		result <- responseAndError{resp, err}
 	}()
 
+	var resp *http.Response
+
 	select {
 	case <-ctx.Done():
+		testHookContextDoneBeforeHeaders()
 		cancel()
+		// Clean up after the goroutine calling client.Do:
+		go func() {
+			if r := <-result; r.resp != nil {
+				testHookDidBodyClose()
+				r.resp.Body.Close()
+			}
+		}()
 		return nil, ctx.Err()
 	case r := <-result:
-		return r.resp, r.err
+		var err error
+		resp, err = r.resp, r.err
+		if err != nil {
+			return resp, err
+		}
 	}
+
+	c := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			cancel()
+		case <-c:
+			// The response's Body is closed.
+		}
+	}()
+	resp.Body = &notifyingReader{resp.Body, c}
+
+	return resp, nil
 }
 
 // Get issues a GET request via the Do function.
@@ -76,4 +112,29 @@ func Post(ctx context.Context, client *http.Client, url string, bodyType string,
 // PostForm issues a POST request via the Do function.
 func PostForm(ctx context.Context, client *http.Client, url string, data url.Values) (*http.Response, error) {
 	return Post(ctx, client, url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+}
+
+// notifyingReader is an io.ReadCloser that closes the notify channel after
+// Close is called or a Read fails on the underlying ReadCloser.
+type notifyingReader struct {
+	io.ReadCloser
+	notify chan<- struct{}
+}
+
+func (r *notifyingReader) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	if err != nil && r.notify != nil {
+		close(r.notify)
+		r.notify = nil
+	}
+	return n, err
+}
+
+func (r *notifyingReader) Close() error {
+	err := r.ReadCloser.Close()
+	if r.notify != nil {
+		close(r.notify)
+		r.notify = nil
+	}
+	return err
 }

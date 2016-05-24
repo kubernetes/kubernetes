@@ -17,8 +17,15 @@ RUN apt-get install -y --no-install-recommends \
        libcunit1-dev libssl-dev libxml2-dev libevent-dev \
        automake autoconf
 
+# The list of packages nghttp2 recommends for h2load:
+RUN apt-get install -y --no-install-recommends make binutils \
+        autoconf automake autotools-dev \
+        libtool pkg-config zlib1g-dev libcunit1-dev libssl-dev libxml2-dev \
+        libev-dev libevent-dev libjansson-dev libjemalloc-dev \
+        cython python3.4-dev python-setuptools
+
 # Note: setting NGHTTP2_VER before the git clone, so an old git clone isn't cached:
-ENV NGHTTP2_VER af24f8394e43f4
+ENV NGHTTP2_VER 895da9a
 RUN cd /root && git clone https://github.com/tatsuhiro-t/nghttp2.git
 
 WORKDIR /root/nghttp2
@@ -31,9 +38,9 @@ RUN make
 RUN make install
 
 WORKDIR /root
-RUN wget http://curl.haxx.se/download/curl-7.40.0.tar.gz
-RUN tar -zxvf curl-7.40.0.tar.gz
-WORKDIR /root/curl-7.40.0
+RUN wget http://curl.haxx.se/download/curl-7.45.0.tar.gz
+RUN tar -zxvf curl-7.45.0.tar.gz
+WORKDIR /root/curl-7.45.0
 RUN ./configure --with-ssl --with-nghttp2=/usr/local
 RUN make
 RUN make install
