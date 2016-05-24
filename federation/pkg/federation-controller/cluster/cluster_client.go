@@ -17,7 +17,9 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
@@ -25,14 +27,17 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 const (
-	UserAgentName = "Cluster-Controller"
-	KubeAPIQPS    = 20.0
-	KubeAPIBurst  = 30
+	UserAgentName           = "Cluster-Controller"
+	KubeAPIQPS              = 20.0
+	KubeAPIBurst            = 30
+	KubeconfigSecretDataKey = "kubeconfig"
 )
 
 type ClusterClient struct {
@@ -59,7 +64,29 @@ func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error)
 	}
 	var clusterClientSet = ClusterClient{}
 	if serverAddress != "" {
-		clusterConfig, err := clientcmd.BuildConfigFromFlags(serverAddress, "")
+		// Get a client to talk to the k8s apiserver, to fetch secrets from it.
+		client, err := client.NewInCluster()
+		if err != nil {
+			return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
+		}
+		kubeconfigGetter := func() (*clientcmdapi.Config, error) {
+			// Get the namespace this is running in from the env variable.
+			namespace := os.Getenv("POD_NAMESPACE")
+			if namespace == "" {
+				return nil, fmt.Errorf("unexpected: POD_NAMESPACE env var returned empty string")
+			}
+			secret, err := client.Secrets(namespace).Get(c.Spec.SecretRef.Name)
+			if err != nil {
+				return nil, fmt.Errorf("error in fetching secret: %s", err)
+			}
+			data, ok := secret.Data[KubeconfigSecretDataKey]
+			if !ok {
+				return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
+			}
+			return clientcmd.Load(data)
+		}
+
+		clusterConfig, err := clientcmd.BuildConfigFromKubeconfigGetter(serverAddress, kubeconfigGetter)
 		if err != nil {
 			return nil, err
 		}
