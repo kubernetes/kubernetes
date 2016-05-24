@@ -314,6 +314,7 @@ os-distro
 out-version
 outofdisk-transition-frequency
 output-base
+output-directory
 output-package
 output-print-type
 output-version
