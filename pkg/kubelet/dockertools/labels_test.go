@@ -61,6 +61,11 @@ func TestLabels(t *testing.T) {
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",
 			DeletionGracePeriodSeconds: &deletionGracePeriod,
+			Annotations: map[string]string{
+				"annot1": "value1",
+				kubernetesAnnotationContainerLabelPrefix:           "value2",
+				kubernetesAnnotationContainerLabelPrefix + "name1": "value3",
+			},
 		},
 		Spec: api.PodSpec{
 			Containers:                    []api.Container{*container},
@@ -85,6 +90,13 @@ func TestLabels(t *testing.T) {
 	containerInfo := getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
+	}
+	if labels["name1"] != "value3" {
+		t.Errorf("wrong labels, got %v, didn't have 'name1=value3'", labels)
+	}
+	if labels["containers.label"] != "" || labels["containers.label/"] != "" ||
+		labels["annot1"] != "" {
+		t.Errorf("wrong labels, got %v - shouldn't have container.label or annot1")
 	}
 
 	// Test when DeletionGracePeriodSeconds, TerminationGracePeriodSeconds and Lifecycle are nil,
