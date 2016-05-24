@@ -279,15 +279,17 @@ type MineConfig struct {
   mineLatest bool
 }
 
-const (
-  mineLong = `Some long description
-for my command.`
+var (
+  mineLong = dedent.Dedent(`
+        mine which is described here
+        with lots of details.`)
 
-  mineExample = `  # Run my command's first action
-  $ %[1]s first
+  mineExample = dedent.Dedent(`
+          # Run my command's first action
+          kubectl mine first_action
 
-  # Run my command's second action on latest stuff
-  $ %[1]s second --latest`
+          # Run my command's second action on latest stuff
+          kubectl mine second_action --flag`)
 )
 
 // NewCmdMine implements the kubectl mine command.
