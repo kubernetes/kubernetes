@@ -188,9 +188,9 @@ TBD
 
 ## Proposed Design
 
-### Sysctl API Resource
+### Pod API changes
 
-We should have an API resource to describe sysctl parameters.
+Container specification must be changed to allow the specification of kernel parameters:
 
 ```go
 // Sysctl defines a kernel parameter to be set
@@ -200,13 +200,7 @@ type Sysctl struct {
 	// Value of a property to set
 	Value string `json:"value"`
 }
-```
 
-### Pod API changes
-
-Container specification must be changed to allow the specification of kernel parameters:
-
-```go
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
