@@ -32,7 +32,8 @@ RUN gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D && \
   mkdir -p /cassandra_data/data && \
   mv /logback.xml /etc/cassandra/ && \
   mv /cassandra.yaml /etc/cassandra/ && \
-  chown -R cassandra: /etc/cassandra /cassandra_data && \
+  chown -R cassandra: /etc/cassandra /cassandra_data /run.sh \
+    /kubernetes-cassandra.jar && \
   chmod o+w -R /etc/cassandra /cassandra_data && \
   rm -rf \
         doc \
