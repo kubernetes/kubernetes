@@ -78,11 +78,11 @@ var _ = Describe("PrivilegedPod", func() {
 
 		By("Executing privileged command on privileged container")
 		outputMap := dialFromContainer(restClientConfig, f, hostExecPod, privilegedPod.Status.PodIP, privilegedHttpPort)
-		Expect(len(outputMap["error"]) == 0).To(BeTrue(), fmt.Sprintf("Privileged command failed unexpectedly on privileged container, output: %v", outputMap))
+		Expect(outputMap["error"]).To(BeEmpty(), fmt.Sprintf("Privileged command failed unexpectedly on privileged container, output: %v", outputMap))
 
 		By("Executing privileged command on non-privileged container")
 		outputMap = dialFromContainer(restClientConfig, f, hostExecPod, privilegedPod.Status.PodIP, notPrivilegedHttpPort)
-		Expect(len(outputMap["error"]) > 0).To(BeTrue(), fmt.Sprintf("Privileged command should have failed on non-privileged container, output: %v", outputMap))
+		Expect(outputMap["error"]).To(BeEmpty(), fmt.Sprintf("Privileged command should have failed on non-privileged container, output: %v", outputMap))
 	})
 })
 
