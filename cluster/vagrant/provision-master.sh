@@ -118,8 +118,7 @@ if ! which /usr/libexec/cockpit-ws &>/dev/null; then
 
   pushd /etc/yum.repos.d
     curl -OL https://copr.fedorainfracloud.org/coprs/g/cockpit/cockpit-preview/repo/fedora-23/msuchy-cockpit-preview-fedora-23.repo
-    dnf install -y cockpit cockpit-kubernetes socat ethtool
-    dnf update -y docker
+    dnf install -y cockpit cockpit-kubernetes docker socat ethtool
   popd
 
   systemctl enable cockpit.socket
