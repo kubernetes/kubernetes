@@ -78,9 +78,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    "${KUBE_ROOT}/hack/build-go.sh" \
-        cmd/kubectl \
-        cmd/hyperkube
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
 else
     echo "skipped the build."
 fi

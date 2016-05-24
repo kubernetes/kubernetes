@@ -43,7 +43,8 @@ func buildGo() {
 	if err != nil {
 		glog.Fatalf("Failed to locate kubernetes root directory %v.", err)
 	}
-	cmd := exec.Command(filepath.Join(k8sRoot, "hack/build-go.sh"), buildTargets...)
+	targets := strings.Join(buildTargets, " ")
+	cmd := exec.Command("make", "-C", k8sRoot, fmt.Sprintf("WHAT=%s", targets))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()

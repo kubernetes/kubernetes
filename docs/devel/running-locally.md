@@ -170,7 +170,7 @@ You are running a single node setup.  This has the limitation of only supporting
 
 ```sh
 cd kubernetes
-hack/build-go.sh
+make
 hack/local-up-cluster.sh
 ```
 

@@ -45,7 +45,7 @@ fi
 
 kube::build::verify_prereqs
 kube::build::build_image
-kube::build::run_build_command hack/build-go.sh cmd/hyperkube
+kube::build::run_build_command make WHAT=cmd/hyperkube
 
 REGISTRY="${KUBE_DOCKER_REGISTRY}/${KUBE_DOCKER_OWNER}" \
 VERSION="${KUBE_DOCKER_VERSION}" \

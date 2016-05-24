@@ -33,7 +33,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/kube-apiserver
+make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
 {

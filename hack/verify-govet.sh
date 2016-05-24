@@ -14,36 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script is a vestigial redirection.  Please do not add "real" logic.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
-cd "${KUBE_ROOT}"
-
-# This is required before we run govet for the results to be correct.
-# See https://github.com/golang/go/issues/16086 for details.
-go install ./cmd/...
-
-# Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
-
-# Filter out arguments that start with "-" and move them to goflags.
-targets=()
-for arg; do
-  if [[ "${arg}" == -* ]]; then
-    goflags+=("${arg}")
-  else
-    targets+=("${arg}")
-  fi
-done
-
-if [[ ${#targets[@]} -eq 0 ]]; then
-  # Do not run on third_party directories.
-  targets=$(go list ./... | egrep -v "/(third_party|vendor)/")
+# For help output
+ARGHELP=""
+if [[ "$#" -gt 0 ]]; then
+    ARGHELP="WHAT='$@'"
 fi
 
-go vet "${goflags[@]:+${goflags[@]}}" ${targets[@]}
+echo "NOTE: $0 has been replaced by 'make vet'"
+echo
+echo "The equivalent of this invocation is: "
+echo "    make vet ${ARGHELP}"
+echo
+echo
+make --no-print-directory -C "${KUBE_ROOT}" vet WHAT="$@"

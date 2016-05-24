@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/genswaggertypedocs
+make -C "${KUBE_ROOT}" WHAT=cmd/genswaggertypedocs
 
 # Find binary
 genswaggertypedocs=$(kube::util::find-binary "genswaggertypedocs")
