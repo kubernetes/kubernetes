@@ -14,6 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+function enable-accounting() {
+  mkdir -p /etc/systemd/system.conf.d/
+  cat <<EOF >/etc/systemd/system.conf.d/kubernetes-accounting.conf
+[Manager]
+DefaultCPUAccounting=yes
+DefaultMemoryAccounting=yes  
+EOF
+  systemctl daemon-reload
+}
+
 function prepare-package-manager() {
   echo "Prepare package manager"
 
