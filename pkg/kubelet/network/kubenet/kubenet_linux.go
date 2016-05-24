@@ -339,7 +339,8 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	}
 
 	// no cached CIDR is Ok during teardown
-	if cidr, ok := plugin.podCIDRs[id]; ok {
+	cidr, hasCIDR := plugin.podCIDRs[id]
+	if hasCIDR {
 		glog.V(5).Infof("Removing pod CIDR %s from shaper", cidr)
 		// shaper wants /32
 		if addr, _, err := net.ParseCIDR(cidr); err != nil {
@@ -349,6 +350,11 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 		}
 	}
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
+		// This is to prevent returning error when TearDownPod is called twice on the same pod. This helps to reduce event pollution.
+		if !hasCIDR {
+			glog.Warningf("Failed to delete container from kubenet: %v", err)
+			return nil
+		}
 		return err
 	}
 	delete(plugin.podCIDRs, id)
