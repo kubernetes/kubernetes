@@ -658,9 +658,9 @@ function start-kube-addons {
     setup-addon-manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
     base_metrics_memory="200Mi"
-    metrics_memory="$(base_metrics_memory)"
+    metrics_memory="${base_metrics_memory}"
     base_eventer_memory="200Mi"
-    eventer_memory="$(base_eventer_memory)"
+    eventer_memory="${base_eventer_memory}"
     local -r metrics_memory_per_node="4"
     local -r eventer_memory_per_node="500"
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then
