@@ -40,6 +40,32 @@ const (
 	KubeconfigSecretDataKey = "kubeconfig"
 )
 
+// This is to inject a different kubeconfigGetter in tests.
+// We dont use the standard one which calls NewInCluster in tests to avoid having to setup service accounts and mount files with secret tokens.
+var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.KubeconfigGetter {
+	return func() (*clientcmdapi.Config, error) {
+		// Get the namespace this is running in from the env variable.
+		namespace := os.Getenv("POD_NAMESPACE")
+		if namespace == "" {
+			return nil, fmt.Errorf("unexpected: POD_NAMESPACE env var returned empty string")
+		}
+		// Get a client to talk to the k8s apiserver, to fetch secrets from it.
+		client, err := client.NewInCluster()
+		if err != nil {
+			return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
+		}
+		secret, err := client.Secrets(namespace).Get(c.Spec.SecretRef.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error in fetching secret: %s", err)
+		}
+		data, ok := secret.Data[KubeconfigSecretDataKey]
+		if !ok {
+			return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
+		}
+		return clientcmd.Load(data)
+	}
+}
+
 type ClusterClient struct {
 	discoveryClient *discovery.DiscoveryClient
 }
@@ -64,28 +90,7 @@ func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error)
 	}
 	var clusterClientSet = ClusterClient{}
 	if serverAddress != "" {
-		// Get a client to talk to the k8s apiserver, to fetch secrets from it.
-		client, err := client.NewInCluster()
-		if err != nil {
-			return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
-		}
-		kubeconfigGetter := func() (*clientcmdapi.Config, error) {
-			// Get the namespace this is running in from the env variable.
-			namespace := os.Getenv("POD_NAMESPACE")
-			if namespace == "" {
-				return nil, fmt.Errorf("unexpected: POD_NAMESPACE env var returned empty string")
-			}
-			secret, err := client.Secrets(namespace).Get(c.Spec.SecretRef.Name)
-			if err != nil {
-				return nil, fmt.Errorf("error in fetching secret: %s", err)
-			}
-			data, ok := secret.Data[KubeconfigSecretDataKey]
-			if !ok {
-				return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
-			}
-			return clientcmd.Load(data)
-		}
-
+		kubeconfigGetter := KubeconfigGetterForCluster(c)
 		clusterConfig, err := clientcmd.BuildConfigFromKubeconfigGetter(serverAddress, kubeconfigGetter)
 		if err != nil {
 			return nil, err
