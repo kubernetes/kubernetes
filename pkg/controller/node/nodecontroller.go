@@ -61,6 +61,8 @@ const (
 	podCIDRUpdateRetry = 5
 	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
 	nodeEvictionPeriod = 100 * time.Millisecond
+	// controls how often cache for known cloud instances can be refreshed.
+	cloudNodeCacheRefreshPeriod = 10 * time.Second
 )
 
 type nodeStatusData struct {
@@ -127,7 +129,10 @@ type NodeController struct {
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
 
-	forcefullyDeletePod       func(*api.Pod) error
+	forcefullyDeletePod func(*api.Pod) error
+	// A cache for keeping list of instanced known by the cloud provider, which is
+	// lazely refreshed at most every nodeExistanceChecker.refreshPeriod.
+	cloudNodeExistanceChecker *nodeExistanceChecker
 	nodeExistsInCloudProvider func(string) (bool, error)
 
 	// If in network segmentation mode NodeController won't evict Pods from unhealthy Nodes.
@@ -175,6 +180,8 @@ func NewNodeController(
 	}
 	evictorLock := sync.Mutex{}
 
+	cloudNodeExistanceChecker := &nodeExistanceChecker{refreshPeriod: cloudNodeCacheRefreshPeriod}
+
 	nc := &NodeController{
 		cloud:                     cloud,
 		knownNodeSet:              make(sets.String),
@@ -195,7 +202,10 @@ func NewNodeController(
 		serviceCIDR:               serviceCIDR,
 		allocateNodeCIDRs:         allocateNodeCIDRs,
 		forcefullyDeletePod:       func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
-		nodeExistsInCloudProvider: func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
+		cloudNodeExistanceChecker: cloudNodeExistanceChecker,
+		nodeExistsInCloudProvider: func(nodeName string) (bool, error) {
+			return cloudNodeExistanceChecker.nodeExistsInCloudProvider(cloud, nodeName)
+		},
 	}
 
 	nc.podStore.Indexer, nc.podController = framework.NewIndexerInformer(
@@ -644,16 +654,31 @@ func (nc *NodeController) monitorNodeStatus() error {
 	return nil
 }
 
-func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName string) (bool, error) {
-	instances, ok := cloud.Instances()
-	if !ok {
-		return false, fmt.Errorf("%v", ErrCloudInstance)
-	}
-	if _, err := instances.ExternalID(nodeName); err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			return false, nil
+type nodeExistanceChecker struct {
+	lock           sync.Mutex
+	instances      sets.String
+	lastUpdateTime time.Time
+	refreshPeriod  time.Duration
+}
+
+func (c *nodeExistanceChecker) nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName string) (bool, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	now := time.Now()
+	if c.instances == nil || now.After(c.lastUpdateTime.Add(c.refreshPeriod)) {
+		instances, ok := cloud.Instances()
+		if !ok {
+			return false, fmt.Errorf("%v", ErrCloudInstance)
 		}
-		return false, err
+		instanceNames, err := instances.List("")
+		if err != nil {
+			return false, err
+		}
+		c.instances = sets.NewString(instanceNames...)
+		c.lastUpdateTime = now
+	}
+	if !c.instances.Has(nodeName) {
+		return false, nil
 	}
 	return true, nil
 }
