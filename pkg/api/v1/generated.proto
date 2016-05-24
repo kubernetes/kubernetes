@@ -658,11 +658,14 @@ message EnvVarSource {
   // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
   optional ResourceFieldSelector resourceFieldRef = 2;
 
+  // Selects a field of the node; only name and IP are supported
+  optional ObjectFieldSelector nodeFieldRef = 3;
+
   // Selects a key of a ConfigMap.
-  optional ConfigMapKeySelector configMapKeyRef = 3;
+  optional ConfigMapKeySelector configMapKeyRef = 4;
 
   // Selects a key of a secret in the pod's namespace
-  optional SecretKeySelector secretKeyRef = 4;
+  optional SecretKeySelector secretKeyRef = 5;
 }
 
 // Event is a report of an event somewhere in the cluster.

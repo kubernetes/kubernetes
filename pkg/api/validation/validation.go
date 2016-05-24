@@ -714,7 +714,7 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 		}
 		allErrs = append(allErrs, validateVolumeSourcePath(downwardAPIVolumeFile.Path, fldPath.Child("path"))...)
 		if downwardAPIVolumeFile.FieldRef != nil {
-			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"), "Pod")...)
 			if downwardAPIVolumeFile.ResourceFieldRef != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
 			}
@@ -1096,6 +1096,7 @@ func validateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 
 var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "status.podIP")
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "requests.cpu", "requests.memory")
+var validNodeFieldPathExpressionsEnv = sets.NewString("metadata.name")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1108,7 +1109,11 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 
 	if ev.ValueFrom.FieldRef != nil {
 		numSources++
-		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"))...)
+		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"), "Pod")...)
+	}
+	if ev.ValueFrom.NodeFieldRef != nil {
+		numSources++
+		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.NodeFieldRef, &validNodeFieldPathExpressionsEnv, fldPath.Child("nodeFieldRef"), "Node")...)
 	}
 	if ev.ValueFrom.ResourceFieldRef != nil {
 		numSources++
@@ -1134,7 +1139,7 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path) field.ErrorList {
+func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path, resource string) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(fs.APIVersion) == 0 {
@@ -1142,7 +1147,7 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 	} else if len(fs.FieldPath) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("fieldPath"), ""))
 	} else {
-		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, resource, fs.FieldPath, "")
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
 		} else if !expressions.Has(internalFieldPath) {

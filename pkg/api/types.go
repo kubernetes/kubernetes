@@ -825,6 +825,8 @@ type EnvVarSource struct {
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty"`
+	// Selects a field of the node; only name and IP are supported.
+	NodeFieldRef *ObjectFieldSelector `json:"nodeFieldRef,omitempty"`
 	// Selects a key of a ConfigMap.
 	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
 	// Selects a key of a secret in the pod's namespace.

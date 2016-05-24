@@ -1525,6 +1525,12 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 // Make the environment variables for a pod in the given namespace.
 func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Container, podIP string) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
+
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		return nil, err
+	}
+
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
 	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
 	// api.Container is already running by its hash. (We don't want to restart a container just
@@ -1580,6 +1586,8 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 					return result, err
 				}
 				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, defaultedPod, defaultedContainer)
+			case envVar.ValueFrom.NodeFieldRef != nil:
+				runtimeVal, err = kl.nodeFieldSelectorRuntimeValue(envVar.ValueFrom.NodeFieldRef, node)
 				if err != nil {
 					return result, err
 				}
@@ -1624,6 +1632,16 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
 	}
 	return result, nil
+}
+
+// nodeFieldSelectorRuntimeValue returns the runtime value of the given
+// selector for a node.
+func (kl *Kubelet) nodeFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, node *api.Node) (string, error) {
+	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Node", fs.FieldPath, "")
+	if err != nil {
+		return "", err
+	}
+	return fieldpath.ExtractFieldPathAsString(node, internalFieldPath)
 }
 
 // podFieldSelectorRuntimeValue returns the runtime value of the given
