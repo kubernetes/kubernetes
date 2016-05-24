@@ -366,6 +366,14 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 	}
 }
 
+func SkipIfContainerRuntimeIs(runtimes ...string) {
+	for _, runtime := range runtimes {
+		if runtime == TestContext.ContainerRuntime {
+			Skipf("Not supported under container runtime %s", runtime)
+		}
+	}
+}
+
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
