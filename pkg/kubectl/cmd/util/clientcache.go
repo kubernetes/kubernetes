@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+
 	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -82,6 +84,7 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		return nil, err
 	}
 	config.GroupVersion = negotiatedVersion
+	fmt.Printf("  Negotiated version %v\n", negotiatedVersion)
 
 	if version != nil {
 		c.configs[*version] = &config
