@@ -238,45 +238,39 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Store) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	name, err := e.ObjectNameFunc(obj)
-	if err != nil {
-		return nil, false, err
-	}
+func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
 	}
-	// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
-	// then we populate it with the latest version.
-	// Else, we check that the version specified by the user matches the version of latest storage object.
-	resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
-	if err != nil {
-		return nil, false, err
+
+	var (
+		creatingObj runtime.Object
+		creating    = false
+	)
+
+	storagePreconditions := &storage.Preconditions{}
+	if preconditions := objInfo.Preconditions(); preconditions != nil {
+		storagePreconditions.UID = preconditions.UID
 	}
-	doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
-	// TODO: expose TTL
-	creating := false
+
 	out := e.NewFunc()
-	meta, err := api.ObjectMetaFor(obj)
-	if err != nil {
-		return nil, false, kubeerr.NewInternalError(err)
-	}
-	var preconditions *storage.Preconditions
-	// If the UID of the new object is specified, we use it as an Update precondition.
-	if len(meta.UID) != 0 {
-		UIDCopy := meta.UID
-		preconditions = &storage.Preconditions{UID: &UIDCopy}
-	}
-	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, preconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		// Since we return 'obj' from this function and it can be modified outside this
-		// function, we are resetting resourceVersion to the initial value here.
-		//
-		// TODO: In fact, we should probably return a DeepCopy of obj in all places.
-		err := e.Storage.Versioner().UpdateObject(obj, resourceVersion)
+
+	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		// Given the existing object, get the new object
+		obj, err := objInfo.UpdatedObject(ctx, existing)
 		if err != nil {
 			return nil, nil, err
 		}
+
+		// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
+		// then we populate it with the latest version.
+		// Else, we check that the version specified by the user matches the version of latest storage object.
+		resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+		if err != nil {
+			return nil, nil, err
+		}
+		doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
 		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
 		if err != nil {
@@ -287,6 +281,7 @@ func (e *Store) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 				return nil, nil, kubeerr.NewNotFound(e.QualifiedResource, name)
 			}
 			creating = true
+			creatingObj = obj
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 				return nil, nil, err
 			}
@@ -298,6 +293,7 @@ func (e *Store) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		}
 
 		creating = false
+		creatingObj = nil
 		if doUnconditionalUpdate {
 			// Update the object's resource version to match the latest storage object's resource version.
 			err = e.Storage.Versioner().UpdateObject(obj, res.ResourceVersion)
@@ -338,7 +334,7 @@ func (e *Store) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	if err != nil {
 		if creating {
 			err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
-			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
+			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, creatingObj)
 		} else {
 			err = storeerr.InterpretUpdateError(err, e.QualifiedResource, name)
 		}
@@ -358,7 +354,7 @@ func (e *Store) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		}
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(obj); err != nil {
+		if err := e.Decorator(out); err != nil {
 			return nil, false, err
 		}
 	}

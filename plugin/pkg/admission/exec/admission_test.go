@@ -125,7 +125,7 @@ func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept b
 	// pods/exec
 	{
 		req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/exec"}
-		err := handler.Admit(admission.NewAttributesRecord(req, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "exec", admission.Connect, nil))
+		err := handler.Admit(admission.NewAttributesRecord(req, nil, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "exec", admission.Connect, nil))
 		if shouldAccept && err != nil {
 			t.Errorf("Unexpected error returned from admission handler: %v", err)
 		}
@@ -137,7 +137,7 @@ func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept b
 	// pods/attach
 	{
 		req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/attach"}
-		err := handler.Admit(admission.NewAttributesRecord(req, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "attach", admission.Connect, nil))
+		err := handler.Admit(admission.NewAttributesRecord(req, nil, api.Kind("Pod").WithVersion("version"), "test", "name", api.Resource("pods").WithVersion("version"), "attach", admission.Connect, nil))
 		if shouldAccept && err != nil {
 			t.Errorf("Unexpected error returned from admission handler: %v", err)
 		}

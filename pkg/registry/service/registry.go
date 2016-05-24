@@ -77,7 +77,7 @@ func (s *storage) DeleteService(ctx api.Context, name string) error {
 }
 
 func (s *storage) UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
-	obj, _, err := s.Update(ctx, svc)
+	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc, api.Scheme))
 	if err != nil {
 		return nil, err
 	}

@@ -953,7 +953,7 @@ func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod
 
 	plugin := NewTestAdmission(store, tc)
 
-	attrs := kadmission.NewAttributesRecord(pod, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
+	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
 	err := plugin.Admit(attrs)
 
 	if shouldPass && err != nil {

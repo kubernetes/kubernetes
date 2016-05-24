@@ -41,6 +41,8 @@ type Attributes interface {
 	GetOperation() Operation
 	// GetObject is the object from the incoming request prior to default values being applied
 	GetObject() runtime.Object
+	// GetOldObject is the existing object. Only populated for UPDATE requests.
+	GetOldObject() runtime.Object
 	// GetKind is the type of object being manipulated.  For example: Pod
 	GetKind() unversioned.GroupVersionKind
 	// GetUserInfo is information about the requesting user

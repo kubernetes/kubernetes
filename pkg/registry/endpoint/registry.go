@@ -63,7 +63,7 @@ func (s *storage) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, er
 }
 
 func (s *storage) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) error {
-	_, _, err := s.Update(ctx, endpoints)
+	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints, api.Scheme))
 	return err
 }
 

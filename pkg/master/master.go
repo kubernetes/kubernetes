@@ -749,6 +749,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
+		Copier:    api.Scheme,
 		Typer:     api.Scheme,
 
 		Mapper:                 thirdpartyresourcedata.NewMapper(registered.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
