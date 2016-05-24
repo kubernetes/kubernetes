@@ -262,6 +262,13 @@ func testFederationResourceList(t *testing.T) {
 	found = findResource(apiResourceList.APIResources, "clusters/status")
 	assert.NotNil(t, found)
 	assert.False(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "subreplicasets")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "subreplicasets/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+
 }
 
 func testCoreResourceList(t *testing.T) {
