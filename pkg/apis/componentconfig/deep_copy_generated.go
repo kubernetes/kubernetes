@@ -73,6 +73,8 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	out.LookupCacheSizeForRC = in.LookupCacheSizeForRC
 	out.LookupCacheSizeForRS = in.LookupCacheSizeForRS
 	out.LookupCacheSizeForDaemonSet = in.LookupCacheSizeForDaemonSet
+	out.LookupCacheSizeForJob = in.LookupCacheSizeForJob
+	out.LookupCacheSizeForPetSet = in.LookupCacheSizeForPetSet
 	if err := unversioned.DeepCopy_unversioned_Duration(in.ServiceSyncPeriod, &out.ServiceSyncPeriod, c); err != nil {
 		return err
 	}
