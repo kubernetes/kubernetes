@@ -1860,10 +1860,9 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 // TODO:
 //  - match cgroups of container
 //  - should we support nsenter + socat on the host? (current impl)
-//  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
+//  - should we support nsenter (in a case of no KVM flavor) + socat in a container, running with elevated privs and --pid=host?
 //
 // TODO(yifan): Merge with the same function in dockertools.
-// TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
 func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	glog.V(4).Infof("Rkt port forwarding in container.")
 
@@ -1887,15 +1886,29 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 	if lookupErr != nil {
 		return fmt.Errorf("unable to do port forwarding: socat not found.")
 	}
-
-	args := []string{"-t", fmt.Sprintf("%d", listResp.Pods[0].Pid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
-
 	nsenterPath, lookupErr := exec.LookPath("nsenter")
 	if lookupErr != nil {
 		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
 	}
 
-	command := exec.Command(nsenterPath, args...)
+	var args []string
+	if r.config.Stage1Image != "stage1-kvm.aci" {
+		args = append(args, "-t", fmt.Sprintf("%d", listResp.Pods[0].Pid), "-n")
+	}
+
+	if r.config.Stage1Image == "stage1-kvm.aci" {
+		args = append(args, "-", fmt.Sprintf("TCP4:%s:%d", listResp.Pods[0].GetNetworks()[1].Ipv4, port))
+	} else {
+		args = append(args, socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port))
+	}
+
+	command := new(exec.Cmd)
+	if r.config.Stage1Image == "stage1-kvm.aci" {
+		command = exec.Command(socatPath, args...)
+	} else {
+		command = exec.Command(nsenterPath, args...)
+	}
+
 	command.Stdout = stream
 
 	// If we use Stdin, command.Run() won't return until the goroutine that's copying
