@@ -53,7 +53,7 @@ func PrePullAllImages() error {
 	for _, image := range ImageRegistry {
 		output, err := exec.Command("docker", "pull", image).CombinedOutput()
 		if err != nil {
-			glog.Warning("Could not pre-pull image %s %v output:  %s", image, err, output)
+			glog.Warningf("Could not pre-pull image %s %v output:  %s", image, err, output)
 			return err
 		}
 	}
