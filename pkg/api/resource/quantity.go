@@ -87,6 +87,7 @@ import (
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
 //
+// +gencopy=false
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
