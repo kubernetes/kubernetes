@@ -94,3 +94,6 @@ network_closure.sh
 
 # direnv .envrc files
 .envrc
+
+# Downloaded kubernetes binary release tar ball
+kubernetes.tar.gz
