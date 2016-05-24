@@ -42,7 +42,7 @@ func NewAPIServerCommand() *cobra.Command {
 	s := genericoptions.NewServerRunOptions()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
-		Use: "federated-apiserver",
+		Use: "federation-apiserver",
 		Long: `The Kubernetes federation API server validates and configures data
 for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the
