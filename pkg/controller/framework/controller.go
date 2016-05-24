@@ -242,10 +242,17 @@ func NewInformer(
 						}
 						h.OnUpdate(old, d.Object)
 					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
+						if d.Type != cache.Sync {
+							if err := clientState.Add(d.Object); err != nil {
+								return err
+							}
+							h.OnAdd(d.Object)
+						} else {
+							// The object was in clientState when periodic sync
+							// was scheduled and it is not there any longer.
+							// It must have been deleted in the meantime,
+							// ignore this periodic sync.
 						}
-						h.OnAdd(d.Object)
 					}
 				case cache.Deleted:
 					if err := clientState.Delete(d.Object); err != nil {
@@ -308,10 +315,17 @@ func NewIndexerInformer(
 						}
 						h.OnUpdate(old, d.Object)
 					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
+						if d.Type != cache.Sync {
+							if err := clientState.Add(d.Object); err != nil {
+								return err
+							}
+							h.OnAdd(d.Object)
+						} else {
+							// The object was in clientState when periodic sync
+							// was scheduled and it is not there any longer.
+							// It must have been deleted in the meantime,
+							// ignore this periodic sync.
 						}
-						h.OnAdd(d.Object)
 					}
 				case cache.Deleted:
 					if err := clientState.Delete(d.Object); err != nil {
