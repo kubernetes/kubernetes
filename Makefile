@@ -142,12 +142,19 @@ test-cmd:
 #
 # Example:
 #   make clean
-clean:
+clean: clean_generated
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
 .PHONY: clean
+
+# Remove all auto-generated artifacts.
+#
+# Example:
+#   make clean_generated
+clean_generated:
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+.PHONY: clean_generated
 
 # Run 'go vet'.
 #
