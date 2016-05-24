@@ -33,6 +33,29 @@ import (
 	"time"
 )
 
+// ShouldGenSelfSignedCerts returns false if the certificate or key files already exists,
+// otherwise returns true.
+func ShouldGenSelfSignedCerts(certPath, keyPath string) bool {
+	if canReadFile(certPath) || canReadFile(keyPath) {
+		return false
+	}
+
+	return true
+}
+
+// If the file represented by path exists and
+// readable, returns true otherwise returns false.
+func canReadFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+
+	defer f.Close()
+
+	return true
+}
+
 // GenerateSelfSignedCert creates a self-signed certificate and key for the given host.
 // Host may be an IP or a DNS name
 // You may also specify additional subject alt names (either ip or dns names) for the certificate
