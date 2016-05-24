@@ -37,10 +37,11 @@ type ClusterSpec struct {
 	// Clients can use the appropriate server address as per the CIDR that they match.
 	// In case of multiple matches, clients should use the longest matching CIDR.
 	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR"`
-	// the type (e.g. bearer token, client certificate etc) and data of the credential used to access cluster.
-	// It’s used for system routines (not behalf of users)
-	// TODO: string may not enough, https://github.com/kubernetes/kubernetes/pull/23847#discussion_r59301275
-	Credential string `json:"credential,omitempty"`
+	// Name of the secret containing kubeconfig to access this cluster.
+	// The secret is read from the kubernetes cluster that is hosting federation control plane.
+	// Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key "kubeconfig".
+	// This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets.
+	SecretRef *api.LocalObjectReference `json:"secretRef"`
 }
 
 type ClusterConditionType string
