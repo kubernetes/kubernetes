@@ -268,7 +268,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleaner {
 		}
 		for _, volume := range volumes {
 			identifier := fmt.Sprintf("%s/%s", podUID, volume.Name)
-			glog.V(4).Infof("Making a volume.Unmounter for volume %s/%s of pod %s", volume.Kind, volume.Name, podUID)
+			glog.V(5).Infof("Making a volume.Unmounter for volume %s/%s of pod %s", volume.Kind, volume.Name, podUID)
 			// TODO(thockin) This should instead return a reference to an extant
 			// volume object, except that we don't actually hold on to pod specs
 			// or volume objects.
