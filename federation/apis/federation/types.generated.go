@@ -64,7 +64,7 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg1_api.ConditionStatus
+		var v0 pkg1_api.LocalObjectReference
 		var v1 pkg3_resource.Quantity
 		var v2 pkg2_unversioned.Time
 		var v3 pkg4_types.UID
@@ -293,12 +293,11 @@ func (x *ClusterSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [2]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
-			yyq2[1] = x.Credential != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(2)
 			} else {
-				yynn2 = 1
+				yynn2 = 2
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -336,27 +335,19 @@ func (x *ClusterSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2[1] {
-					yym7 := z.EncBinary()
-					_ = yym7
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Credential))
-					}
+				if x.SecretRef == nil {
+					r.EncodeNil()
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
+					x.SecretRef.CodecEncodeSelf(e)
 				}
 			} else {
-				if yyq2[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("credential"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym8 := z.EncBinary()
-					_ = yym8
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Credential))
-					}
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("secretRef"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				if x.SecretRef == nil {
+					r.EncodeNil()
+				} else {
+					x.SecretRef.CodecEncodeSelf(e)
 				}
 			}
 			if yyr2 || yy2arr2 {
@@ -432,11 +423,16 @@ func (x *ClusterSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 					h.decSliceServerAddressByClientCIDR((*[]ServerAddressByClientCIDR)(yyv4), d)
 				}
 			}
-		case "credential":
+		case "secretRef":
 			if r.TryDecodeAsNil() {
-				x.Credential = ""
+				if x.SecretRef != nil {
+					x.SecretRef = nil
+				}
 			} else {
-				x.Credential = string(r.DecodeString())
+				if x.SecretRef == nil {
+					x.SecretRef = new(pkg1_api.LocalObjectReference)
+				}
+				x.SecretRef.CodecDecodeSelf(d)
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -486,9 +482,14 @@ func (x *ClusterSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Credential = ""
+		if x.SecretRef != nil {
+			x.SecretRef = nil
+		}
 	} else {
-		x.Credential = string(r.DecodeString())
+		if x.SecretRef == nil {
+			x.SecretRef = new(pkg1_api.LocalObjectReference)
+		}
+		x.SecretRef.CodecDecodeSelf(d)
 	}
 	for {
 		yyj7++
@@ -2447,7 +2448,7 @@ func (x codecSelfer1234) decSliceCluster(v *[]Cluster, d *codec1978.Decoder) {
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 336)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 328)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

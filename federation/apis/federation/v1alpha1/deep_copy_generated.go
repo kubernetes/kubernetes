@@ -111,7 +111,15 @@ func DeepCopy_v1alpha1_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conversi
 	} else {
 		out.ServerAddressByClientCIDRs = nil
 	}
-	out.Credential = in.Credential
+	if in.SecretRef != nil {
+		in, out := in.SecretRef, &out.SecretRef
+		*out = new(v1.LocalObjectReference)
+		if err := v1.DeepCopy_v1_LocalObjectReference(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
 	return nil
 }
 

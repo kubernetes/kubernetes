@@ -266,10 +266,16 @@ func (m *ClusterSpec) MarshalTo(data []byte) (int, error) {
 			i += n
 		}
 	}
-	data[i] = 0x12
-	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Credential)))
-	i += copy(data[i:], m.Credential)
+	if m.SecretRef != nil {
+		data[i] = 0x12
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.SecretRef.Size()))
+		n7, err := m.SecretRef.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n7
+	}
 	return i, nil
 }
 
@@ -315,11 +321,11 @@ func (m *ClusterStatus) MarshalTo(data []byte) (int, error) {
 			data[i] = 0x12
 			i++
 			i = encodeVarintGenerated(data, i, uint64((&v).Size()))
-			n7, err := (&v).MarshalTo(data[i:])
+			n8, err := (&v).MarshalTo(data[i:])
 			if err != nil {
 				return 0, err
 			}
-			i += n7
+			i += n8
 		}
 	}
 	if len(m.Allocatable) > 0 {
@@ -337,21 +343,21 @@ func (m *ClusterStatus) MarshalTo(data []byte) (int, error) {
 			data[i] = 0x12
 			i++
 			i = encodeVarintGenerated(data, i, uint64((&v).Size()))
-			n8, err := (&v).MarshalTo(data[i:])
+			n9, err := (&v).MarshalTo(data[i:])
 			if err != nil {
 				return 0, err
 			}
-			i += n8
+			i += n9
 		}
 	}
 	data[i] = 0x22
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ClusterMeta.Size()))
-	n9, err := m.ClusterMeta.MarshalTo(data[i:])
+	n10, err := m.ClusterMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n9
+	i += n10
 	return i, nil
 }
 
@@ -469,8 +475,10 @@ func (m *ClusterSpec) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	l = len(m.Credential)
-	n += 1 + l + sovGenerated(uint64(l))
+	if m.SecretRef != nil {
+		l = m.SecretRef.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1147,9 +1155,9 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Credential", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field SecretRef", wireType)
 			}
-			var stringLen uint64
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -1159,20 +1167,24 @@ func (m *ClusterSpec) Unmarshal(data []byte) error {
 				}
 				b := data[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthGenerated
 			}
-			postIndex := iNdEx + intStringLen
+			postIndex := iNdEx + msglen
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Credential = string(data[iNdEx:postIndex])
+			if m.SecretRef == nil {
+				m.SecretRef = &k8s_io_kubernetes_pkg_api_v1.LocalObjectReference{}
+			}
+			if err := m.SecretRef.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
