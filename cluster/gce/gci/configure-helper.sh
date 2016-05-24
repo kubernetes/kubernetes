@@ -657,8 +657,10 @@ function start-kube-addons {
     local -r file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup-addon-manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    metrics_memory="200Mi"
-    eventer_memory="200Mi"
+    base_metrics_memory="200Mi"
+    metrics_memory="$(base_metrics_memory)"
+    base_eventer_memory="200Mi"
+    eventer_memory="$(base_eventer_memory)"
     local -r metrics_memory_per_node="4"
     local -r eventer_memory_per_node="500"
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then
@@ -673,7 +675,9 @@ function start-kube-addons {
       controller_yaml="${controller_yaml}/heapster-controller.yaml"
     fi
     remove-salt-config-comments "${controller_yaml}"
+    sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
