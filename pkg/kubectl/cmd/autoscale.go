@@ -192,12 +192,9 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 
 func validateFlags(cmd *cobra.Command) error {
 	errs := []error{}
-	max, min, cpu := cmdutil.GetFlagInt(cmd, "max"), cmdutil.GetFlagInt(cmd, "min"), cmdutil.GetFlagInt(cmd, "cpu-percent")
+	max, min := cmdutil.GetFlagInt(cmd, "max"), cmdutil.GetFlagInt(cmd, "min")
 	if max < 1 || max < min {
 		errs = append(errs, fmt.Errorf("--max=MAXPODS is required, and must be at least 1 and --min=MINPODS"))
-	}
-	if cpu > 100 {
-		errs = append(errs, fmt.Errorf("CPU utilization (%%) cannot exceed 100"))
 	}
 	return utilerrors.NewAggregate(errs)
 }
