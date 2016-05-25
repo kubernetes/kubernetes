@@ -98,6 +98,7 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", true, "If true, display events related to the described object.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
@@ -105,9 +106,13 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *DescribeOptions, describerSettings *kubectl.DescriberSettings) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
+	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+	if allNamespaces {
+		enforceNamespace = false
 	}
 	if len(args) == 0 && len(options.Filenames) == 0 {
 		fmt.Fprint(out, "You must specify the type of resource to describe. ", valid_resources)
@@ -117,7 +122,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
