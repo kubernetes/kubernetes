@@ -349,7 +349,7 @@ func NewMainKubelet(
 		daemonEndpoints:            daemonEndpoints,
 		containerManager:           containerManager,
 		flannelExperimentalOverlay: flannelExperimentalOverlay,
-		flannelHelper:              NewFlannelHelper(),
+		flannelHelper:              nil,
 		nodeIP:                     nodeIP,
 		clock:                      util.RealClock{},
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
@@ -359,6 +359,7 @@ func NewMainKubelet(
 	}
 
 	if klet.flannelExperimentalOverlay {
+		klet.flannelHelper = NewFlannelHelper()
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
 	}
 	if klet.nodeIP != nil {
