@@ -184,7 +184,17 @@ Issues:
 
 ### Rocket support for sysctl
 
-TBD
+Supported sysctls (whitelist):
+
+- network namespace: `net.*` via a [CNI plugin](https://github.com/containernetworking/cni/blob/master/Documentation/tuning.md)
+
+Applied changes:
+
+* https://github.com/coreos/rkt/issues/2140
+
+Issues:
+
+* https://github.com/coreos/rkt/issues/2075
 
 ## Proposed Design
 
