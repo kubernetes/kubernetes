@@ -31,19 +31,16 @@ else
 fi
 
 if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
-  # If the master or node image is not set, we use the latest GCI dev image.
-  # Otherwise, we respect whatever set by the user.
+  # If the master image is not set, we use the latest GCI dev image.
+  # Otherwise, we respect whatever is set by the user.
   gci_images=( $(gcloud compute images list --project google-containers \
       --regexp='gci-dev.*' --format='value(name)') )
-  if [[ -z "${MASTER_IMAGE:-}" ]]; then
-    MASTER_IMAGE="${gci_images[0]}"
-    MASTER_IMAGE_PROJECT="google-containers"
-  fi
-  if [[ -z "${NODE_IMAGE:-}" ]]; then
-    NODE_IMAGE="${gci_images[0]}"
-    NODE_IMAGE_PROJECT="google-containers"
-  fi
-
+  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-"${gci_images[0]}"}
+  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+  # The default node image when using GCI is still the Debian based ContainerVM
+  # until GCI gets validated for node usage.
+  NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
+  NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
 fi
 
 # Verfiy cluster autoscaler configuration.

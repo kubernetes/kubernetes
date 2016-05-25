@@ -35,13 +35,17 @@ KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 
+# TODO(#26183): Provide a way to differentiate master OS distro and node OS
+# distro.
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-gci}
-# For GCI, leaving it blank will auto-select the latest GCI image on the `dev`
-# channel.
+# By default a cluster will be started with the master on GCI and nodes on
+# containervm. If you are updating the containervm version, update this
+# variable.
+CVM_VERSION=container-v1-3-v20160517
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
-NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-container-v1-3-v20160517}
-NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
+NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"${MASTER_IMAGE}"}
+NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-"${MASTER_IMAGE_PROJECT}"}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 RKT_VERSION=${KUBE_RKT_VERSION:-0.5.5}
 
