@@ -82,8 +82,8 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
 		ns := api.NamespaceSystem
-		if !framework.CheckPodsRunningReady(f.Client, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
-			framework.Failf("At least one pod wasn't running and ready at test start.")
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
+			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 
 		By("restarting all of the nodes")
@@ -111,7 +111,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		podNamesAfter, err := waitForNPods(ps, len(podNamesBefore), restartPodReadyAgainTimeout)
 		Expect(err).NotTo(HaveOccurred())
 		remaining := restartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !framework.CheckPodsRunningReady(f.Client, ns, podNamesAfter, remaining) {
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesAfter, remaining) {
 			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
