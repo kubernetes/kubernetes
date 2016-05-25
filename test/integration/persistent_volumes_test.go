@@ -59,11 +59,21 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 	pvc := createPVC("fake-pvc", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 
-	w, _ := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	w, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	if err != nil {
+		t.Errorf("Failed to watch PersistentVolumes: %v", err)
+	}
 	defer w.Stop()
 
-	_, _ = testClient.PersistentVolumes().Create(pv)
-	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumes().Create(pv)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolume: %v", err)
+	}
+
+	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
+	}
 
 	// wait until the controller pairs the volume and claim
 	waitForPersistentVolumePhase(w, api.VolumeBound)
@@ -85,11 +95,20 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	// change the reclamation policy of the PV for the next test
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimDelete
 
-	w, _ = testClient.PersistentVolumes().Watch(api.ListOptions{})
+	w, err = testClient.PersistentVolumes().Watch(api.ListOptions{})
+	if err != nil {
+		t.Errorf("Failed to watch PersistentVolumes: %v", err)
+	}
 	defer w.Stop()
 
-	_, _ = testClient.PersistentVolumes().Create(pv)
-	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumes().Create(pv)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolume: %v", err)
+	}
+	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
+	}
 
 	waitForPersistentVolumePhase(w, api.VolumeBound)
 
@@ -171,14 +190,23 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	pvc := createPVC("pvc-2", strconv.Itoa(maxPVs/2)+"G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 
-	w, _ := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	w, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	if err != nil {
+		t.Errorf("Failed to watch PersistentVolumes: %v", err)
+	}
 	defer w.Stop()
 
 	for i := 0; i < maxPVs; i++ {
-		_, _ = testClient.PersistentVolumes().Create(pvs[i])
+		_, err = testClient.PersistentVolumes().Create(pvs[i])
+		if err != nil {
+			t.Errorf("Failed to create PersistentVolume %d: %v", i, err)
+		}
 	}
 
-	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
+	}
 
 	// wait until the controller pairs the volume and claim
 	waitForPersistentVolumePhase(w, api.VolumeBound)
@@ -236,13 +264,25 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 	pvc := createPVC("pvc-rwm", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteMany})
 
-	w, _ := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	w, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
+	if err != nil {
+		t.Errorf("Failed to watch PersistentVolumes: %v", err)
+	}
 	defer w.Stop()
 
-	_, _ = testClient.PersistentVolumes().Create(pv_rwm)
-	_, _ = testClient.PersistentVolumes().Create(pv_rwo)
+	_, err = testClient.PersistentVolumes().Create(pv_rwm)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolume: %v", err)
+	}
+	_, err = testClient.PersistentVolumes().Create(pv_rwo)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolume: %v", err)
+	}
 
-	_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	if err != nil {
+		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
+	}
 
 	// wait until the controller pairs the volume and claim
 	waitForPersistentVolumePhase(w, api.VolumeBound)
