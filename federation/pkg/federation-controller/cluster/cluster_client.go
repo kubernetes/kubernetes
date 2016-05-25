@@ -22,15 +22,19 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang/glog"
 	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -152,4 +156,55 @@ func (self *ClusterClient) GetClusterHealthStatus() *federation_v1alpha1.Cluster
 		}
 	}
 	return &clusterStatus
+}
+
+// GetClusterZones gets the kubernetes cluster zones and region by inspecting labels on nodes in the cluster.
+func GetClusterZones(client *clientset.Clientset) (zones []string, region string, err error) {
+	return getZoneNames(client)
+}
+
+// Find the name of the zone in which a Node is running
+func getZoneNameForNode(node api.Node) (string, error) {
+	for key, value := range node.Labels {
+		if key == unversioned.LabelZoneFailureDomain {
+			return value, nil
+		}
+	}
+	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
+		node.Name, unversioned.LabelZoneFailureDomain)
+}
+
+// Find the name of the region in which a Node is running
+func getRegionNameForNode(node api.Node) (string, error) {
+	for key, value := range node.Labels {
+		if key == unversioned.LabelZoneRegion {
+			return value, nil
+		}
+	}
+	return "", fmt.Errorf("Region name for node %s not found. No label with key %s",
+		node.Name, unversioned.LabelZoneRegion)
+}
+
+// Find the names of all zones and the region in which we have nodes in this cluster.
+func getZoneNames(client *clientset.Clientset) (zones []string, region string, err error) {
+	zoneNames := sets.NewString()
+	nodes, err := client.Core().Nodes().List(api.ListOptions{})
+	if err != nil {
+		glog.Errorf("Failed to list nodes while getting zone names: %v", err)
+		return nil, "", err
+	}
+	for i, node := range nodes.Items {
+		zoneName, err := getZoneNameForNode(node)
+		if err != nil {
+			return nil, "", err
+		}
+		zoneNames.Insert(zoneName)
+		if i == 0 {
+			region, err = getRegionNameForNode(node)
+			if err != nil {
+				return nil, "", err
+			}
+		}
+	}
+	return zoneNames.List(), region, nil
 }
