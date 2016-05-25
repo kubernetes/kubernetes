@@ -46,6 +46,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -3163,12 +3164,23 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 	currentTime := unversioned.NewTime(kl.clock.Now())
 	var newNodeReadyCondition api.NodeCondition
 	if rs := kl.runtimeState.errors(); len(rs) == 0 {
-		newNodeReadyCondition = api.NodeCondition{
-			Type:              api.NodeReady,
-			Status:            api.ConditionTrue,
-			Reason:            "KubeletReady",
-			Message:           "kubelet is posting ready status",
-			LastHeartbeatTime: currentTime,
+		_, networkingCondition := api.GetNodeCondition(&node.Status, api.NodeNetworkingReady)
+		if (kl.cloud.ProviderName() == gce.ProviderName) && (networkingCondition == nil || networkingCondition.Status != api.ConditionTrue) {
+			newNodeReadyCondition = api.NodeCondition{
+				Type:              api.NodeReady,
+				Status:            api.ConditionFalse,
+				Reason:            "KubeletNotReady",
+				Message:           "networking is not ready",
+				LastHeartbeatTime: currentTime,
+			}
+		} else {
+			newNodeReadyCondition = api.NodeCondition{
+				Type:              api.NodeReady,
+				Status:            api.ConditionTrue,
+				Reason:            "KubeletReady",
+				Message:           "kubelet is posting ready status",
+				LastHeartbeatTime: currentTime,
+			}
 		}
 	} else {
 		newNodeReadyCondition = api.NodeCondition{
