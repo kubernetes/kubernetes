@@ -22,6 +22,7 @@ authentication-token-webhook-cache-ttl
 authentication-token-webhook-config-file
 authorization-mode
 authorization-policy-file
+authorization-rbac-super-user
 authorization-webhook-config-file
 authorization-webhook-cache-authorized-ttl
 authorization-webhook-cache-unauthorized-ttl
