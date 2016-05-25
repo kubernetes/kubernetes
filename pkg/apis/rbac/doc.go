@@ -15,5 +15,4 @@ limitations under the License.
 */
 
 // +groupName=rbac.authorization.k8s.io
-// +genconversion=true
-package v1alpha1
+package rbac
