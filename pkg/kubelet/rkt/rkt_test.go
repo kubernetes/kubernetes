@@ -36,8 +36,10 @@ import (
 	kubetesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
+	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_rkt"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/errors"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -1194,6 +1196,11 @@ func TestGenerateRunCommand(t *testing.T) {
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 		rkt.runtimeHelper = &fakeRuntimeHelper{tt.dnsServers, tt.dnsSearches, tt.hostName, "", tt.err}
+		rkt.execer = &utilexec.FakeExec{CommandScript: []utilexec.FakeCommandAction{func(cmd string, args ...string) utilexec.Cmd {
+			return utilexec.InitFakeCmd(&utilexec.FakeCmd{}, cmd, args...)
+		}}}
+
+		// a command should be created of this form, but the returned command shouldn't be called (asserted by having no expectations on it)
 
 		result, err := rkt.generateRunCommand(tt.pod, tt.uuid, tt.netnsName)
 		assert.Equal(t, tt.err, err, testCaseHint)
@@ -1615,5 +1622,139 @@ func TestGarbageCollect(t *testing.T) {
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
 		getter.pods = make(map[types.UID]*api.Pod)
+	}
+}
+
+type annotationsByName []appctypes.Annotation
+
+func (a annotationsByName) Len() int           { return len(a) }
+func (a annotationsByName) Less(x, y int) bool { return a[x].Name < a[y].Name }
+func (a annotationsByName) Swap(x, y int)      { a[x], a[y] = a[y], a[x] }
+
+func TestMakePodManifestAnnotations(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockVolumeGetter := mock_rkt.NewMockVolumeGetter(ctrl)
+
+	fr := newFakeRktInterface()
+	fs := newFakeSystemd()
+	r := &Runtime{apisvc: fr, systemd: fs, volumeGetter: mockVolumeGetter}
+
+	testCases := []struct {
+		in     *api.Pod
+		out    *appcschema.PodManifest
+		outerr error
+	}{
+		{
+			in: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "uid-1",
+					Name:      "name-1",
+					Namespace: "namespace-1",
+					Annotations: map[string]string{
+						k8sRktStage1NameAnno: "stage1-override-img",
+					},
+				},
+			},
+			out: &appcschema.PodManifest{
+				Annotations: []appctypes.Annotation{
+					{
+						Name:  appctypes.ACIdentifier(k8sRktStage1NameAnno),
+						Value: "stage1-override-img",
+					},
+					{
+						Name:  appctypes.ACIdentifier(k8sRktUIDAnno),
+						Value: "uid-1",
+					},
+					{
+						Name:  appctypes.ACIdentifier(k8sRktNameAnno),
+						Value: "name-1",
+					},
+					{
+						Name:  appctypes.ACIdentifier(k8sRktKubeletAnno),
+						Value: "true",
+					},
+					{
+						Name:  appctypes.ACIdentifier(k8sRktNamespaceAnno),
+						Value: "namespace-1",
+					},
+					{
+						Name:  appctypes.ACIdentifier(k8sRktRestartCountAnno),
+						Value: "0",
+					},
+				},
+			},
+		},
+	}
+
+	for i, testCase := range testCases {
+		hint := fmt.Sprintf("case #%d", i)
+		mockVolumeGetter.EXPECT().GetVolumes(gomock.Any()).Return(kubecontainer.VolumeMap{}, true)
+
+		result, err := r.makePodManifest(testCase.in, []api.Secret{})
+		assert.Equal(t, err, testCase.outerr, hint)
+		if err == nil {
+			sort.Sort(annotationsByName(result.Annotations))
+			sort.Sort(annotationsByName(testCase.out.Annotations))
+			assert.Equal(t, result.Annotations, testCase.out.Annotations, hint)
+		}
+	}
+}
+
+func TestPreparePodArgs(t *testing.T) {
+	r := &Runtime{
+		config: &Config{},
+	}
+
+	testCases := []struct {
+		manifest     appcschema.PodManifest
+		stage1Config string
+		cmd          []string
+	}{
+		{
+			appcschema.PodManifest{
+				Annotations: appctypes.Annotations{
+					{
+						Name:  k8sRktStage1NameAnno,
+						Value: "stage1-image",
+					},
+				},
+			},
+			"",
+			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-name=stage1-image"},
+		},
+		{
+			appcschema.PodManifest{
+				Annotations: appctypes.Annotations{
+					{
+						Name:  k8sRktStage1NameAnno,
+						Value: "stage1-image",
+					},
+				},
+			},
+			"stage1-path",
+			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-name=stage1-image"},
+		},
+		{
+			appcschema.PodManifest{
+				Annotations: appctypes.Annotations{},
+			},
+			"stage1-path",
+			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-path=stage1-path"},
+		},
+		{
+			appcschema.PodManifest{
+				Annotations: appctypes.Annotations{},
+			},
+			"",
+			[]string{"prepare", "--quiet", "--pod-manifest", "file"},
+		},
+	}
+
+	for i, testCase := range testCases {
+		r.config.Stage1Image = testCase.stage1Config
+		cmd := r.preparePodArgs(&testCase.manifest, "file")
+		assert.Equal(t, testCase.cmd, cmd, fmt.Sprintf("Test case #%d", i))
 	}
 }
