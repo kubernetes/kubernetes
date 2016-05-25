@@ -2412,6 +2412,8 @@ const (
 	NodeOutOfDisk NodeConditionType = "OutOfDisk"
 	// NodeMemoryPressure means the kubelet is under pressure due to insufficient available memory.
 	NodeMemoryPressure NodeConditionType = "MemoryPressure"
+	// NodeNetworkingReady means that network for the node is correctly configured.
+	NodeNetworkingReady NodeConditionType = "NetworkingReady"
 )
 
 // NodeCondition contains condition infromation for a node.

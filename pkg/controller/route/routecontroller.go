@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -36,6 +37,7 @@ const (
 	maxConcurrentRouteCreations int = 200
 	// Maximum number of retries of route creations.
 	maxRetries int = 5
+	updateNodeStatusMaxRetries = 3
 )
 
 type RouteController struct {
@@ -84,6 +86,22 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	return rc.reconcile(nodeList.Items, routeList)
 }
 
+func tryUpdateNodeStatus(node *api.Node, kubeClient clientset.Interface) error {
+	for i := 0; i < updateNodeStatusMaxRetries; i++ {
+		if _, err := kubeClient.Core().Nodes().UpdateStatus(node); err == nil {
+			break
+		} else {
+			if i+1 < updateNodeStatusMaxRetries {
+				glog.Errorf("Error updating node %s - will retry: %v", node.Name, err)
+			} else {
+				glog.Errorf("Error updating node %s - wont retry: %v", node.Name, err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.Route) error {
 	// nodeCIDRs maps nodeName->nodeCIDR
 	nodeCIDRs := make(map[string]string)
@@ -111,24 +129,6 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			}
 			nameHint := string(node.UID)
 			wg.Add(1)
-			glog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, nameHint)
-			go func(nodeName string, nameHint string, route *cloudprovider.Route) {
-				defer wg.Done()
-				for i := 0; i < maxRetries; i++ {
-					startTime := time.Now()
-					// Ensure that we don't have more than maxConcurrentRouteCreations
-					// CreateRoute calls in flight.
-					rateLimiter <- struct{}{}
-					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
-					<-rateLimiter
-					if err != nil {
-						glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
-					} else {
-						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-						return
-					}
-				}
-			}(node.Name, nameHint, route)
 		}
 		nodeCIDRs[node.Name] = node.Spec.PodCIDR
 	}
@@ -138,12 +138,12 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
 				wg.Add(1)
 				// Delete the route.
-				glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+				glog.V(2).Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 				go func(route *cloudprovider.Route, startTime time.Time) {
 					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
 						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
 					} else {
-						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
+						glog.V(2).Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
 					}
 					wg.Done()
 
