@@ -35,6 +35,9 @@ if [ "$INSTALL_GODEP" = true ] ; then
 fi
 
 go build test/e2e_node/environment/conformance.go
+ARTIFACTS=${WORKSPACE}/_artifacts
+mkdir -p ${ARTIFACTS}
 go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
   --zone="$GCE_ZONE" --project="$GCE_PROJECT"  \
-  --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" --cleanup="$CLEANUP"
+  --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" --cleanup="$CLEANUP" \
+  --results-dir="$ARTIFACTS"
