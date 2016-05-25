@@ -61,6 +61,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
+	const pkgSerializer = "k8s.io/kubernetes/pkg/runtime/serializer"
 	apiPath := func(group string) string {
 		if group == "core" {
 			return `"/api"`
@@ -93,6 +94,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
 		"apiPath":                    apiPath(g.group),
 		"codecs":                     c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
+		"directCodecFactory":         c.Universe.Variable(types.Name{Package: pkgSerializer, Name: "DirectCodecFactory"}),
 		"Errorf":                     c.Universe.Variable(types.Name{Package: "fmt", Name: "Errorf"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
@@ -240,7 +242,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.NegotiatedSerializer = $.codecs|raw$
+	config.NegotiatedSerializer = $.directCodecFactory|raw${CodecFactory: $.codecs|raw$}
 
 	if config.QPS == 0 {
 		config.QPS = 5
