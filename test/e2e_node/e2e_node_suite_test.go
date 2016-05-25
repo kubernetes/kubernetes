@@ -24,27 +24,41 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/types"
+	more_reporters "github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 )
 
 var e2es *e2eService
 
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+var junitFileNumber = flag.Int("junit-file-number", 1, "Used to create junit filename - e.g. junit_01.xml.")
 
 func TestE2eNode(t *testing.T) {
 	flag.Parse()
+
 	rand.Seed(time.Now().UTC().UnixNano())
 	RegisterFailHandler(Fail)
-	reporters := []Reporter{&LogReporter{}}
+	reporters := []Reporter{}
+	if *reportDir != "" {
+		// Create the directory if it doesn't already exists
+		if err := os.MkdirAll(*reportDir, 0755); err != nil {
+			glog.Errorf("Failed creating report directory: %v", err)
+		} else {
+			// Configure a junit reporter to write to the directory
+			junitFile := fmt.Sprintf("junit_%02d.xml", *junitFileNumber)
+			junitPath := path.Join(*reportDir, junitFile)
+			reporters = append(reporters, more_reporters.NewJUnitReporter(junitPath))
+		}
+	}
 	RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)
 }
 
@@ -93,40 +107,6 @@ var _ = AfterSuite(func() {
 	}
 	glog.Infof("Tests Finished")
 })
-
-var _ Reporter = &LogReporter{}
-
-type LogReporter struct{}
-
-func (lr *LogReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
-	b := &bytes.Buffer{}
-	b.WriteString("******************************************************\n")
-	glog.Infof(b.String())
-}
-
-func (lr *LogReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {}
-
-func (lr *LogReporter) SpecWillRun(specSummary *types.SpecSummary) {}
-
-func (lr *LogReporter) SpecDidComplete(specSummary *types.SpecSummary) {}
-
-func (lr *LogReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {}
-
-func (lr *LogReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
-	// Only log the binary output if the suite failed.
-	b := &bytes.Buffer{}
-	if e2es != nil && !summary.SuiteSucceeded {
-		b.WriteString(fmt.Sprintf("Process Log For Failed Suite On %s\n", *nodeName))
-		b.WriteString("-------------------------------------------------------------\n")
-		b.WriteString(fmt.Sprintf("kubelet output:\n%s\n", e2es.kubeletCombinedOut.String()))
-		b.WriteString("-------------------------------------------------------------\n")
-		b.WriteString(fmt.Sprintf("apiserver output:\n%s\n", e2es.apiServerCombinedOut.String()))
-		b.WriteString("-------------------------------------------------------------\n")
-		b.WriteString(fmt.Sprintf("etcd output:\n%s\n", e2es.etcdCombinedOut.String()))
-	}
-	b.WriteString("******************************************************\n")
-	glog.Infof(b.String())
-}
 
 func maskLocksmithdOnCoreos() {
 	data, err := ioutil.ReadFile("/etc/os-release")

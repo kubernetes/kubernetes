@@ -28,11 +28,13 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
 var testTimeoutSeconds = flag.Int("test-timeout", 45*60, "How long (in seconds) to wait for ginkgo tests to complete.")
+var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
 
 var sshOptionsMap map[string]string
 
@@ -119,7 +121,7 @@ func CreateTestArchive() string {
 }
 
 // RunRemote copies the archive file to a /tmp file on host, unpacks it, and runs the e2e_node.test
-func RunRemote(archive string, host string, cleanup bool) (string, error) {
+func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (string, error) {
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
@@ -158,15 +160,37 @@ func RunRemote(archive string, host string, cleanup bool) (string, error) {
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
-		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s", *testTimeoutSeconds, cleanup, host),
+		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d", *testTimeoutSeconds, cleanup, host, tmp, junitFileNumber),
 	)
 	glog.Infof("Starting tests on %s", host)
 	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
+
 	if err != nil {
+		scpErr := getTestArtifacts(host, tmp)
+
+		// Return both the testing and scp error
+		if scpErr != nil {
+			return "", utilerrors.NewAggregate([]error{err, scpErr})
+		}
 		return "", err
 	}
 
+	err = getTestArtifacts(host, tmp)
 	return output, nil
+}
+
+func getTestArtifacts(host, testDir string) error {
+	_, err := RunSshCommand("scp", "-r", fmt.Sprintf("%s:%s/results/", host, testDir), fmt.Sprintf("%s/%s", *resultsDir, host))
+	if err != nil {
+		return err
+	}
+
+	// Copy junit to the top of artifacts
+	_, err = RunSshCommand("scp", fmt.Sprintf("%s:%s/results/junit*", host, testDir), fmt.Sprintf("%s/", *resultsDir))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // getSshCommand handles proper quoting so that multiple commands are executed in the same shell over ssh

@@ -14,20 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+# Usage: copy-e2e-image.sh <image-name> <from-project-name> <to-project-name>
 
-focus=${FOCUS:-""}
-skip=${SKIP:-""}
-report=${REPORT:-"/tmp/"}
+set -e
+set -x
 
-ginkgo=$(kube::util::find-binary "ginkgo")
-if [[ -z "${ginkgo}" ]]; then
-  echo "You do not appear to have ginkgo built. Try 'make WHAT=vendor/github.com/onsi/ginkgo/ginkgo'"
-  exit 1
-fi
-
-# Provided for backwards compatibility
-"${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true --start-services=true --stop-services=true
-
-exit $?
+echo "Copying image $1 from project $2 to project $3..."
+gcloud compute --project $3 disks create $1 --image=https://www.googleapis.com/compute/v1/projects/$2/global/images/$1
+gcloud compute --project $3 images create $1 --source-disk=$1
+gcloud compute --project $3 disks delete $1
