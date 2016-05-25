@@ -151,6 +151,7 @@ func init() {
 		DeepCopy_v1_ReplicationControllerList,
 		DeepCopy_v1_ReplicationControllerSpec,
 		DeepCopy_v1_ReplicationControllerStatus,
+		DeepCopy_v1_ResourceFieldSelector,
 		DeepCopy_v1_ResourceQuota,
 		DeepCopy_v1_ResourceQuotaList,
 		DeepCopy_v1_ResourceQuotaSpec,
@@ -644,8 +645,23 @@ func DeepCopy_v1_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *conversi
 
 func DeepCopy_v1_DownwardAPIVolumeFile(in DownwardAPIVolumeFile, out *DownwardAPIVolumeFile, c *conversion.Cloner) error {
 	out.Path = in.Path
-	if err := DeepCopy_v1_ObjectFieldSelector(in.FieldRef, &out.FieldRef, c); err != nil {
-		return err
+	if in.FieldRef != nil {
+		in, out := in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_v1_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ResourceFieldSelector)
+		if err := DeepCopy_v1_ResourceFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	return nil
 }
@@ -795,6 +811,15 @@ func DeepCopy_v1_EnvVarSource(in EnvVarSource, out *EnvVarSource, c *conversion.
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ResourceFieldSelector)
+		if err := DeepCopy_v1_ResourceFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := in.ConfigMapKeyRef, &out.ConfigMapKeyRef
@@ -2523,6 +2548,15 @@ func DeepCopy_v1_ReplicationControllerStatus(in ReplicationControllerStatus, out
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ObservedGeneration = in.ObservedGeneration
+	return nil
+}
+
+func DeepCopy_v1_ResourceFieldSelector(in ResourceFieldSelector, out *ResourceFieldSelector, c *conversion.Cloner) error {
+	out.ContainerName = in.ContainerName
+	out.Resource = in.Resource
+	if err := resource.DeepCopy_resource_Quantity(in.Divisor, &out.Divisor, c); err != nil {
+		return err
+	}
 	return nil
 }
 

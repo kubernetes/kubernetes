@@ -938,10 +938,13 @@ type EnvVar struct {
 type EnvVarSource struct {
 	// Selects a field of the pod; only name and namespace are supported.
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,1,opt,name=fieldRef"`
+	// Selects a resource of the container: only resources limits and requests
+	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,2,opt,name=resourceFieldRef"`
 	// Selects a key of a ConfigMap.
-	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty" protobuf:"bytes,2,opt,name=configMapKeyRef"`
+	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`
 	// Selects a key of a secret in the pod's namespace
-	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty" protobuf:"bytes,3,opt,name=secretKeyRef"`
+	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty" protobuf:"bytes,4,opt,name=secretKeyRef"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -950,6 +953,16 @@ type ObjectFieldSelector struct {
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
 	// Path of the field to select in the specified API version.
 	FieldPath string `json:"fieldPath" protobuf:"bytes,2,opt,name=fieldPath"`
+}
+
+// ResourceFieldSelector represents container resources (cpu, memory) and their output format
+type ResourceFieldSelector struct {
+	// Container name: required for volumes, optional for env vars
+	ContainerName string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
+	// Required: resource to select
+	Resource string `json:"resource" protobuf:"bytes,2,opt,name=resource"`
+	// Specifies the output format of the exposed resources, defaults to "1"
+	Divisor resource.Quantity `json:"divisor,omitempty" protobuf:"bytes,3,opt,name=divisor"`
 }
 
 // Selects a key from a ConfigMap.
@@ -3202,7 +3215,10 @@ type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
-	FieldRef ObjectFieldSelector `json:"fieldRef" protobuf:"bytes,2,opt,name=fieldRef"`
+	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,2,opt,name=fieldRef"`
+	// Selects a resource of the container: only resources limits and requests
+	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
