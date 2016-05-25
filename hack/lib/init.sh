@@ -25,6 +25,8 @@ KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
 KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
 
+export no_proxy=127.0.0.1,localhost
+
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
