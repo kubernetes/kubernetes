@@ -17,12 +17,18 @@ limitations under the License.
 package e2e_node
 
 import (
-	"github.com/golang/glog"
 	"os/exec"
+	"time"
+
+	"github.com/golang/glog"
 )
 
 const (
-	busyBoxImage = iota
+	// Number of attempts to pull an image.
+	maxImagePullRetries = 5
+	// Sleep duration between image pull retry attempts.
+	imagePullRetryDelay = time.Second
+	busyBoxImage        = iota
 
 	hostExecImage
 	netExecImage
@@ -51,7 +57,16 @@ var NoPullImagRegistry = map[int]string{
 // Pre-fetch all images tests depend on so that we don't fail in an actual test
 func PrePullAllImages() error {
 	for _, image := range ImageRegistry {
-		output, err := exec.Command("docker", "pull", image).CombinedOutput()
+		var (
+			err    error
+			output []byte
+		)
+		for i := maxImagePullRetries; i > 0; i++ {
+			if output, err = exec.Command("docker", "pull", image).CombinedOutput(); err == nil {
+				break
+			}
+			time.Sleep(imagePullRetryDelay)
+		}
 		if err != nil {
 			glog.Warningf("Could not pre-pull image %s %v output:  %s", image, err, output)
 			return err
