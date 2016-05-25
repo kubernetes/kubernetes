@@ -21,26 +21,28 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1alpha1_Cluster,
-		DeepCopy_v1alpha1_ClusterCondition,
-		DeepCopy_v1alpha1_ClusterList,
-		DeepCopy_v1alpha1_ClusterMeta,
-		DeepCopy_v1alpha1_ClusterSpec,
-		DeepCopy_v1alpha1_ClusterStatus,
-		DeepCopy_v1alpha1_ServerAddressByClientCIDR,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v1alpha1_Cluster,
+			DeepCopy_v1alpha1_ClusterCondition,
+			DeepCopy_v1alpha1_ClusterList,
+			DeepCopy_v1alpha1_ClusterMeta,
+			DeepCopy_v1alpha1_ClusterSpec,
+			DeepCopy_v1alpha1_ClusterStatus,
+			DeepCopy_v1alpha1_ServerAddressByClientCIDR,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v1alpha1_Cluster(in Cluster, out *Cluster, c *conversion.Cloner) error {

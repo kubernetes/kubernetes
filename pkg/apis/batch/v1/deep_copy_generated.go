@@ -21,25 +21,27 @@ limitations under the License.
 package v1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1_Job,
-		DeepCopy_v1_JobCondition,
-		DeepCopy_v1_JobList,
-		DeepCopy_v1_JobSpec,
-		DeepCopy_v1_JobStatus,
-		DeepCopy_v1_LabelSelector,
-		DeepCopy_v1_LabelSelectorRequirement,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v1_Job,
+			DeepCopy_v1_JobCondition,
+			DeepCopy_v1_JobList,
+			DeepCopy_v1_JobSpec,
+			DeepCopy_v1_JobStatus,
+			DeepCopy_v1_LabelSelector,
+			DeepCopy_v1_LabelSelectorRequirement,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v1_Job(in Job, out *Job, c *conversion.Cloner) error {

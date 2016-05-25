@@ -24,22 +24,25 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	authentication_k8s_io "k8s.io/kubernetes/pkg/apis/authentication.k8s.io"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_TokenReview_To_authenticationk8sio_TokenReview,
-		Convert_authenticationk8sio_TokenReview_To_v1beta1_TokenReview,
-		Convert_v1beta1_TokenReviewSpec_To_authenticationk8sio_TokenReviewSpec,
-		Convert_authenticationk8sio_TokenReviewSpec_To_v1beta1_TokenReviewSpec,
-		Convert_v1beta1_TokenReviewStatus_To_authenticationk8sio_TokenReviewStatus,
-		Convert_authenticationk8sio_TokenReviewStatus_To_v1beta1_TokenReviewStatus,
-		Convert_v1beta1_UserInfo_To_authenticationk8sio_UserInfo,
-		Convert_authenticationk8sio_UserInfo_To_v1beta1_UserInfo,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1beta1_TokenReview_To_authenticationk8sio_TokenReview,
+			Convert_authenticationk8sio_TokenReview_To_v1beta1_TokenReview,
+			Convert_v1beta1_TokenReviewSpec_To_authenticationk8sio_TokenReviewSpec,
+			Convert_authenticationk8sio_TokenReviewSpec_To_v1beta1_TokenReviewSpec,
+			Convert_v1beta1_TokenReviewStatus_To_authenticationk8sio_TokenReviewStatus,
+			Convert_authenticationk8sio_TokenReviewStatus_To_v1beta1_TokenReviewStatus,
+			Convert_v1beta1_UserInfo_To_authenticationk8sio_UserInfo,
+			Convert_authenticationk8sio_UserInfo_To_v1beta1_UserInfo,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1beta1_TokenReview_To_authenticationk8sio_TokenReview(in *TokenReview, out *authentication_k8s_io.TokenReview, s conversion.Scope) error {

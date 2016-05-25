@@ -21,26 +21,28 @@ limitations under the License.
 package v1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1_CrossVersionObjectReference,
-		DeepCopy_v1_HorizontalPodAutoscaler,
-		DeepCopy_v1_HorizontalPodAutoscalerList,
-		DeepCopy_v1_HorizontalPodAutoscalerSpec,
-		DeepCopy_v1_HorizontalPodAutoscalerStatus,
-		DeepCopy_v1_Scale,
-		DeepCopy_v1_ScaleSpec,
-		DeepCopy_v1_ScaleStatus,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v1_CrossVersionObjectReference,
+			DeepCopy_v1_HorizontalPodAutoscaler,
+			DeepCopy_v1_HorizontalPodAutoscalerList,
+			DeepCopy_v1_HorizontalPodAutoscalerSpec,
+			DeepCopy_v1_HorizontalPodAutoscalerStatus,
+			DeepCopy_v1_Scale,
+			DeepCopy_v1_ScaleSpec,
+			DeepCopy_v1_ScaleStatus,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v1_CrossVersionObjectReference(in CrossVersionObjectReference, out *CrossVersionObjectReference, c *conversion.Cloner) error {

@@ -28,21 +28,23 @@ import (
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_rbac_ClusterRole,
-		DeepCopy_rbac_ClusterRoleBinding,
-		DeepCopy_rbac_ClusterRoleBindingList,
-		DeepCopy_rbac_ClusterRoleList,
-		DeepCopy_rbac_PolicyRule,
-		DeepCopy_rbac_Role,
-		DeepCopy_rbac_RoleBinding,
-		DeepCopy_rbac_RoleBindingList,
-		DeepCopy_rbac_RoleList,
-		DeepCopy_rbac_Subject,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_rbac_ClusterRole,
+			DeepCopy_rbac_ClusterRoleBinding,
+			DeepCopy_rbac_ClusterRoleBindingList,
+			DeepCopy_rbac_ClusterRoleList,
+			DeepCopy_rbac_PolicyRule,
+			DeepCopy_rbac_Role,
+			DeepCopy_rbac_RoleBinding,
+			DeepCopy_rbac_RoleBindingList,
+			DeepCopy_rbac_RoleList,
+			DeepCopy_rbac_Subject,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_rbac_ClusterRole(in ClusterRole, out *ClusterRole, c *conversion.Cloner) error {

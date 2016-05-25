@@ -19,13 +19,24 @@ package v1beta1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // GroupVersion is the API group and version for abac v1beta1
 var GroupVersion = unversioned.GroupVersion{Group: api.Group, Version: "v1beta1"}
 
 func init() {
-	api.Scheme.AddKnownTypes(GroupVersion,
+	// TODO: is this really necessary?
+	addKnownTypes(api.Scheme)
+}
+
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(GroupVersion,
 		&Policy{},
 	)
 }

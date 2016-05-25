@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -26,7 +27,17 @@ import (
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
 func init() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+	// TODO: is this really necessary?
+	addKnownTypes(api.Scheme)
+}
+
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Config{},
 	)
 }

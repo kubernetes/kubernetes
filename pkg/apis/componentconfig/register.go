@@ -21,9 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func AddToScheme(scheme *runtime.Scheme) {
-	addKnownTypes(scheme)
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // GroupName is the group name use in this package
 const GroupName = "componentconfig"

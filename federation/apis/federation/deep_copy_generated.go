@@ -25,21 +25,24 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_federation_Cluster,
-		DeepCopy_federation_ClusterCondition,
-		DeepCopy_federation_ClusterList,
-		DeepCopy_federation_ClusterMeta,
-		DeepCopy_federation_ClusterSpec,
-		DeepCopy_federation_ClusterStatus,
-		DeepCopy_federation_ServerAddressByClientCIDR,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_federation_Cluster,
+			DeepCopy_federation_ClusterCondition,
+			DeepCopy_federation_ClusterList,
+			DeepCopy_federation_ClusterMeta,
+			DeepCopy_federation_ClusterSpec,
+			DeepCopy_federation_ClusterStatus,
+			DeepCopy_federation_ServerAddressByClientCIDR,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_federation_Cluster(in Cluster, out *Cluster, c *conversion.Cloner) error {
