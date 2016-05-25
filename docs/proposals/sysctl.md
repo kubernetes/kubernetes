@@ -224,7 +224,7 @@ type Sysctl struct {
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
 type PodSecurityContext struct {
-    ...
+	...
 	// Sysctls hold a list of namespaced sysctls used for the pod. They are only allowed
 	// if the respective host namespace setting pod.spec.hostIPC or pod.spec.hostNetwork
 	// are false.
@@ -233,6 +233,28 @@ type PodSecurityContext struct {
 ```
 
 Note that sysctls must be on the pod level because containers in a pod share IPC and network namespaces (if pod.spec.hostIPC and pod.spec.hostNetwork is false) and therefore cannot have conflicting sysctl values. Moreover, note that all namespaced sysctl supported by Docker/RunC are either in the IPC or network namespace.
+
+### SecurityContext Enforcement
+
+A list of permissible sysctls is to be added to `pkg/apis/extensions/types.go` (compare [security-context-constraints]( https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/security-context-constraints.md)):
+
+```go
+// PodSecurityPolicySpec defines the policy enforced.
+type PodSecurityPolicySpec struct {
+	...
+	// AllowedSysctls is a white list of allowed sysctls in a pod spec. Each entry
+	// is either a plain sysctl name or ends in ".*" in which case it is considered
+	// as a prefix of allowed sysctls.
+	AllowedSysctls []string `json:"sysctls,omitempty"`
+}
+```
+
+The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.AllowedSysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
+
+### Application of the given Sysctls
+
+Finally, the container runtime will interpret the `pod.spec.securityPolicy.sysctls`,
+e.g. in the case of Docker the `DockerManager` will apply the given sysctls to the infra container in `createPodInfraContainer`.
 
 ## Examples
 
