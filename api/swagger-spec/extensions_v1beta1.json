@@ -7021,8 +7021,7 @@
     "id": "v1.DownwardAPIVolumeFile",
     "description": "DownwardAPIVolumeFile represents information to create the file containing the pod field",
     "required": [
-     "path",
-     "fieldRef"
+     "path"
     ],
     "properties": {
      "path": {
@@ -7032,6 +7031,10 @@
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
       "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ResourceFieldSelector",
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
      }
     }
    },
@@ -7049,6 +7052,27 @@
      "fieldPath": {
       "type": "string",
       "description": "Path of the field to select in the specified API version."
+     }
+    }
+   },
+   "v1.ResourceFieldSelector": {
+    "id": "v1.ResourceFieldSelector",
+    "description": "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
+    "required": [
+     "resource"
+    ],
+    "properties": {
+     "containerName": {
+      "type": "string",
+      "description": "Container name: required for volumes, optional for env vars"
+     },
+     "resource": {
+      "type": "string",
+      "description": "Required: resource to select"
+     },
+     "divisor": {
+      "type": "string",
+      "description": "Specifies the output format of the exposed resources, defaults to \"1\""
      }
     }
    },
@@ -7293,6 +7317,10 @@
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
       "description": "Selects a field of the pod; only name and namespace are supported."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ResourceFieldSelector",
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
      },
      "configMapKeyRef": {
       "$ref": "v1.ConfigMapKeySelector",

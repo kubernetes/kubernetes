@@ -700,7 +700,12 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
 func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer) {
 	fmt.Fprintf(out, "    Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
 	for _, mapping := range d.Items {
-		fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
+		if mapping.FieldRef != nil {
+			fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
+		}
+		if mapping.ResourceFieldRef != nil {
+			fmt.Fprintf(out, "      %v -> %v\n", mapping.ResourceFieldRef.Resource, mapping.Path)
+		}
 	}
 }
 
@@ -895,6 +900,12 @@ func describeContainers(label string, containers []api.Container, containerStatu
 					valueFrom = resolverFn(e)
 				}
 				fmt.Fprintf(out, "      %s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
+			case e.ValueFrom.ResourceFieldRef != nil:
+				valueFrom, err := fieldpath.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+				if err != nil {
+					valueFrom = ""
+				}
+				fmt.Fprintf(out, "      %s:\t%s (%s)\n", e.Name, valueFrom, e.ValueFrom.ResourceFieldRef.Resource)
 			case e.ValueFrom.SecretKeyRef != nil:
 				fmt.Fprintf(out, "      %s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
 			case e.ValueFrom.ConfigMapKeyRef != nil:

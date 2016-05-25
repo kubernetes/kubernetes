@@ -656,30 +656,42 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "cinder", VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{VolumeID: "29ea5088-4f60-4757-962e-dba678767887", FSType: "ext4", ReadOnly: false}}},
 		{Name: "cephfs", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{Monitors: []string{"foo"}}}},
 		{Name: "downwardapi", VolumeSource: api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{
-			{Path: "labels", FieldRef: api.ObjectFieldSelector{
+			{Path: "labels", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels"}},
-			{Path: "annotations", FieldRef: api.ObjectFieldSelector{
+			{Path: "annotations", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.annotations"}},
-			{Path: "namespace", FieldRef: api.ObjectFieldSelector{
+			{Path: "namespace", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.namespace"}},
-			{Path: "name", FieldRef: api.ObjectFieldSelector{
+			{Path: "name", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.name"}},
-			{Path: "path/withslash/andslash", FieldRef: api.ObjectFieldSelector{
+			{Path: "path/withslash/andslash", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels"}},
-			{Path: "path/./withdot", FieldRef: api.ObjectFieldSelector{
+			{Path: "path/./withdot", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels"}},
-			{Path: "path/with..dot", FieldRef: api.ObjectFieldSelector{
+			{Path: "path/with..dot", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels"}},
-			{Path: "second-level-dirent-can-have/..dot", FieldRef: api.ObjectFieldSelector{
+			{Path: "second-level-dirent-can-have/..dot", FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels"}},
+			{Path: "cpu_limit", ResourceFieldRef: &api.ResourceFieldSelector{
+				ContainerName: "test-container",
+				Resource:      "limits.cpu"}},
+			{Path: "cpu_request", ResourceFieldRef: &api.ResourceFieldSelector{
+				ContainerName: "test-container",
+				Resource:      "requests.cpu"}},
+			{Path: "memory_limit", ResourceFieldRef: &api.ResourceFieldSelector{
+				ContainerName: "test-container",
+				Resource:      "limits.memory"}},
+			{Path: "memory_request", ResourceFieldRef: &api.ResourceFieldSelector{
+				ContainerName: "test-container",
+				Resource:      "requests.memory"}},
 		}}}},
 		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"some_wwn"}, Lun: &lun, FSType: "ext4", ReadOnly: false}}},
 		{Name: "flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/blue", FSType: "ext4"}}},
@@ -705,29 +717,37 @@ func TestValidateVolumes(t *testing.T) {
 	containsDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "dots/../bar"}}
 	absPath := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "/abstarget"}}
 	emptyPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "",
-		FieldRef: api.ObjectFieldSelector{
+		FieldRef: &api.ObjectFieldSelector{
 			APIVersion: "v1",
 			FieldPath:  "metadata.labels"}}},
 	}}
 	absolutePathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "/absolutepath",
-		FieldRef: api.ObjectFieldSelector{
+		FieldRef: &api.ObjectFieldSelector{
 			APIVersion: "v1",
 			FieldPath:  "metadata.labels"}}},
 	}}
 	dotDotInPath := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "../../passwd",
-		FieldRef: api.ObjectFieldSelector{
+		FieldRef: &api.ObjectFieldSelector{
 			APIVersion: "v1",
 			FieldPath:  "metadata.labels"}}},
 	}}
 	dotDotPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badFileName",
-		FieldRef: api.ObjectFieldSelector{
+		FieldRef: &api.ObjectFieldSelector{
 			APIVersion: "v1",
 			FieldPath:  "metadata.labels"}}},
 	}}
 	dotDotFirstLevelDirent := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badDirName/goodFileName",
-		FieldRef: api.ObjectFieldSelector{
+		FieldRef: &api.ObjectFieldSelector{
 			APIVersion: "v1",
 			FieldPath:  "metadata.labels"}}},
+	}}
+	fieldRefandResourceFieldRef := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "test",
+		FieldRef: &api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"},
+		ResourceFieldRef: &api.ResourceFieldSelector{
+			ContainerName: "test-container",
+			Resource:      "requests.memory"}}},
 	}}
 	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{}, Lun: &lun, FSType: "ext4", ReadOnly: false}}
 	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"wwn"}, Lun: nil, FSType: "ext4", ReadOnly: false}}
@@ -864,6 +884,11 @@ func TestValidateVolumes(t *testing.T) {
 			[]api.Volume{{Name: "emptyaccount", VolumeSource: emptyAzureShare}},
 			field.ErrorTypeRequired,
 			"azureFile.shareName", "",
+		},
+		"fieldRef and ResourceFieldRef together": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: fieldRefandResourceFieldRef}},
+			field.ErrorTypeInvalid,
+			"downwardAPI", "fieldRef and resourceFieldRef can not be specified simultaneously",
 		},
 	}
 	for k, v := range errorCases {

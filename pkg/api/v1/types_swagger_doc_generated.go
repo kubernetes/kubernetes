@@ -307,9 +307,10 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 }
 
 var map_DownwardAPIVolumeFile = map[string]string{
-	"":         "DownwardAPIVolumeFile represents information to create the file containing the pod field",
-	"path":     "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
-	"fieldRef": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
+	"":                 "DownwardAPIVolumeFile represents information to create the file containing the pod field",
+	"path":             "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
+	"fieldRef":         "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
+	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
 }
 
 func (DownwardAPIVolumeFile) SwaggerDoc() map[string]string {
@@ -399,10 +400,11 @@ func (EnvVar) SwaggerDoc() map[string]string {
 }
 
 var map_EnvVarSource = map[string]string{
-	"":                "EnvVarSource represents a source for the value of an EnvVar.",
-	"fieldRef":        "Selects a field of the pod; only name and namespace are supported.",
-	"configMapKeyRef": "Selects a key of a ConfigMap.",
-	"secretKeyRef":    "Selects a key of a secret in the pod's namespace",
+	"":                 "EnvVarSource represents a source for the value of an EnvVar.",
+	"fieldRef":         "Selects a field of the pod; only name and namespace are supported.",
+	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+	"configMapKeyRef":  "Selects a key of a ConfigMap.",
+	"secretKeyRef":     "Selects a key of a secret in the pod's namespace",
 }
 
 func (EnvVarSource) SwaggerDoc() map[string]string {
@@ -1392,6 +1394,17 @@ var map_ReplicationControllerStatus = map[string]string{
 
 func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerStatus
+}
+
+var map_ResourceFieldSelector = map[string]string{
+	"":              "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
+	"containerName": "Container name: required for volumes, optional for env vars",
+	"resource":      "Required: resource to select",
+	"divisor":       "Specifies the output format of the exposed resources, defaults to \"1\"",
+}
+
+func (ResourceFieldSelector) SwaggerDoc() map[string]string {
+	return map_ResourceFieldSelector
 }
 
 var map_ResourceQuota = map[string]string{
