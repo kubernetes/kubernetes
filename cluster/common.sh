@@ -59,10 +59,13 @@ function create-kubeconfig() {
 
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   # KUBECONFIG determines the file we write to, but it may not exist yet
-  if [[ ! -e "${KUBECONFIG}" ]]; then
-    mkdir -p $(dirname "${KUBECONFIG}")
-    touch "${KUBECONFIG}"
-  fi
+  for cfg in ${KUBECONFIG//:/ } ; do
+    if [[ ! -e "${cfg}" ]]; then
+      mkdir -p $(dirname "${cfg}")
+      touch "${cfg}"
+    fi
+  done
+
   local cluster_args=(
       "--server=${KUBE_SERVER:-https://${KUBE_MASTER_IP}}"
   )
