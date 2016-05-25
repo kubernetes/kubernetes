@@ -85,6 +85,11 @@ type ClusterStatus struct {
 	// Allocatable represents the total resources of a cluster that are available for scheduling.
 	Allocatable v1.ResourceList `json:"allocatable,omitempty" protobuf:"bytes,3,rep,name=allocatable,casttype=k8s.io/kubernetes/pkg/api/v1.ResourceList,castkey=k8s.io/kubernetes/pkg/api/v1.ResourceName"`
 	ClusterMeta `json:",inline" protobuf:"bytes,4,opt,name=clusterMeta"`
+	// Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
+	// These will always be in the same region.
+	Zones []string `json:"zones,omitempty" protobuf:"bytes,5,rep,name=zones"`
+	// Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.
+	Region string `json:"region,omitempty" protobuf:"bytes,6,opt,name=region"`
 }
 
 // +genclient=true,nonNamespaced=true

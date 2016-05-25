@@ -106,6 +106,13 @@ message ClusterStatus {
   map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> allocatable = 3;
 
   optional ClusterMeta clusterMeta = 4;
+
+  // Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
+  // These will always be in the same region.
+  repeated string zones = 5;
+
+  // Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.
+  optional string region = 6;
 }
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
