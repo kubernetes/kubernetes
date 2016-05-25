@@ -168,9 +168,9 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
-			// Currently we assume 5 pods/second average deletion throughput.
+			// Currently we assume 10 pods/second average deletion throughput.
 			// We may want to revisit it in the future.
-			deletingTime := time.Duration(totalPods/5) * time.Second
+			deletingTime := time.Duration(totalPods/10) * time.Second
 			deleteAllRC(configs, deletingTime)
 			if createServices == "true" {
 				for _, service := range services {
