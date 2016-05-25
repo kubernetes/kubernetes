@@ -396,6 +396,14 @@ func PodRunningReady(p *api.Pod) (bool, error) {
 	return true, nil
 }
 
+func PodRunningReadyOrSucceeded(p *api.Pod) (bool, error) {
+	// Check if the phase is succeeded.
+	if p.Status.Phase == api.PodSucceeded {
+		return true, nil
+	}
+	return PodRunningReady(p)
+}
+
 // PodNotReady checks whether pod p's has a ready condition of status false.
 func PodNotReady(p *api.Pod) (bool, error) {
 	// Check the ready condition is false.
@@ -3217,16 +3225,30 @@ func GetSigner(provider string) (ssh.Signer, error) {
 	return sshutil.MakePrivateKeySignerFromFile(key)
 }
 
-// checkPodsRunning returns whether all pods whose names are listed in podNames
-// in namespace ns are running and ready, using c and waiting at most timeout.
+// CheckPodsRunningReady returns whether all pods whose names are listed in
+// podNames in namespace ns are running and ready, using c and waiting at most
+// timeout.
 func CheckPodsRunningReady(c *client.Client, ns string, podNames []string, timeout time.Duration) bool {
-	np, desc := len(podNames), "running and ready"
+	return CheckPodsCondition(c, ns, podNames, timeout, PodRunningReady, "running and ready")
+}
+
+// CheckPodsRunningReadyOrSucceeded returns whether all pods whose names are
+// listed in podNames in namespace ns are running and ready, or succeeded; use
+// c and waiting at most timeout.
+func CheckPodsRunningReadyOrSucceeded(c *client.Client, ns string, podNames []string, timeout time.Duration) bool {
+	return CheckPodsCondition(c, ns, podNames, timeout, PodRunningReadyOrSucceeded, "running and ready, or succeeded")
+}
+
+// CheckPodsCondition returns whether all pods whose names are listed in podNames
+// in namespace ns are in the condition, using c and waiting at most timeout.
+func CheckPodsCondition(c *client.Client, ns string, podNames []string, timeout time.Duration, condition podCondition, desc string) bool {
+	np := len(podNames)
 	Logf("Waiting up to %v for %d pods to be %s: %s", timeout, np, desc, podNames)
 	result := make(chan bool, len(podNames))
 	for ix := range podNames {
 		// Launch off pod readiness checkers.
 		go func(name string) {
-			err := waitForPodCondition(c, ns, name, desc, timeout, PodRunningReady)
+			err := waitForPodCondition(c, ns, name, desc, timeout, condition)
 			result <- err == nil
 		}(podNames[ix])
 	}

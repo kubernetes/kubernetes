@@ -241,11 +241,11 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 			podNames = append(podNames, p.ObjectMeta.Name)
 		}
 	}
-	framework.Logf("Node %s has %d pods: %v", name, len(podNames), podNames)
+	framework.Logf("Node %s has %d assigned pods with no liveness probes: %v", name, len(podNames), podNames)
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
-	// now, as that's what we'll be checking later.
-	if !framework.CheckPodsRunningReady(c, ns, podNames, framework.PodReadyBeforeTimeout) {
+	// or succeeded now, as that's what we'll be checking later.
+	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, framework.PodReadyBeforeTimeout) {
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, pods)
 		return false
 	}
@@ -267,8 +267,8 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
-	// running / healthy.
-	if !framework.CheckPodsRunningReady(c, ns, podNames, rebootPodReadyAgainTimeout) {
+	// running / healthy, or succeeded.
+	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, newPods)
 		return false
