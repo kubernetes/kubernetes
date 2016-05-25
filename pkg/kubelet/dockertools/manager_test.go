@@ -1892,3 +1892,37 @@ func TestGetPodStatusNoSuchContainer(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 }
+
+func TestPruneInitContainers(t *testing.T) {
+	dm, fake := newTestDockerManager()
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{Name: "init1"},
+				{Name: "init2"},
+			},
+		},
+	}
+	status := &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.ContainerStatus{
+			{Name: "init2", ID: kubecontainer.ContainerID{ID: "init2-new-1"}, State: kubecontainer.ContainerStateExited},
+			{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1-new-1"}, State: kubecontainer.ContainerStateExited},
+			{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1-new-2"}, State: kubecontainer.ContainerStateExited},
+			{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1-old-1"}, State: kubecontainer.ContainerStateExited},
+			{Name: "init2", ID: kubecontainer.ContainerID{ID: "init2-old-1"}, State: kubecontainer.ContainerStateExited},
+		},
+	}
+	fake.ExitedContainerList = []dockertypes.Container{
+		{ID: "init1-new-1"},
+		{ID: "init1-new-2"},
+		{ID: "init1-old-1"},
+		{ID: "init2-new-1"},
+		{ID: "init2-old-1"},
+	}
+	keep := map[kubecontainer.DockerID]int{}
+	dm.pruneInitContainersBeforeStart(pod, status, keep)
+	sort.Sort(sort.StringSlice(fake.Removed))
+	if !reflect.DeepEqual([]string{"init1-new-2", "init1-old-1", "init2-old-1"}, fake.Removed) {
+		t.Fatal(fake.Removed)
+	}
+}
