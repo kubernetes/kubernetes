@@ -398,3 +398,49 @@ func TestBadJSONRejection(t *testing.T) {
 		t.Errorf("Did not give error for empty data")
 	}
 }
+
+// Returns a new Scheme set up with the test objects needed by TestDirectCodec.
+func GetDirectCodecTestScheme() *runtime.Scheme {
+	internalGV := unversioned.GroupVersion{Version: runtime.APIVersionInternal}
+	externalGV := unversioned.GroupVersion{Version: "v1"}
+
+	s := runtime.NewScheme()
+	// Ordinarily, we wouldn't add TestType2, but because this is a test and
+	// both types are from the same package, we need to get it into the system
+	// so that converter will match it with ExternalType2.
+	s.AddKnownTypes(internalGV, &TestType1{})
+	s.AddKnownTypes(externalGV, &ExternalTestType1{})
+
+	s.AddUnversionedTypes(externalGV, &unversioned.Status{})
+	return s
+}
+
+func TestDirectCodec(t *testing.T) {
+	s := GetDirectCodecTestScheme()
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	serializer, _ := cf.SerializerForFileExtension("json")
+	df := DirectCodecFactory{cf}
+	ignoredGV, err := unversioned.ParseGroupVersion("ignored group/ignored version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	directEncoder := df.EncoderForVersion(serializer, ignoredGV)
+	directDecoder := df.DecoderToVersion(serializer, ignoredGV)
+	out, err := runtime.Encode(directEncoder, &ExternalTestType1{}, ignoredGV)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != `{"myVersionKey":"v1","myKindKey":"ExternalTestType1"}`+"\n" {
+		t.Fatal(string(out))
+	}
+	a, _, err := directDecoder.Decode(out, nil, nil)
+	e := &ExternalTestType1{
+		MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{
+			APIVersion: "v1",
+			ObjectKind: "ExternalTestType1",
+		},
+	}
+	if !semantic.DeepEqual(e, a) {
+		t.Fatalf("expect %v, got %v", e, a)
+	}
+}
