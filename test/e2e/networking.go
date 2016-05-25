@@ -124,7 +124,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 				"Rerun it with at least two nodes to get complete coverage.")
 		}
 
-		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.8")
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname)
 
 		// Clean up the pods
 		defer func() {
@@ -256,7 +256,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 	})
 })
 
-func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name, version string) []string {
+func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name string) []string {
 	podNames := []string{}
 
 	totalPods := len(nodes.Items)
@@ -275,7 +275,7 @@ func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name, 
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:" + version,
+						Image: "gcr.io/google_containers/nettest:1.8",
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.
