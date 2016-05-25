@@ -116,8 +116,8 @@ func TestParseAnnotations(t *testing.T) {
 			expectErr:      false,
 		},
 		{
-			annotations:    []string{"url=" + testURL, "kubernetes.io/created-by=" + testJSON},
-			expected:       map[string]string{"url": testURL, "kubernetes.io/created-by": testJSON},
+			annotations:    []string{"url=" + testURL, api.CreatedByAnnotation + "=" + testJSON},
+			expected:       map[string]string{"url": testURL, api.CreatedByAnnotation: testJSON},
 			expectedRemove: []string{},
 			scenario:       "add annotations with special characters",
 			expectErr:      false,
