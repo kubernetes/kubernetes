@@ -301,6 +301,10 @@ func (c *Fake) ConfigMaps(namespace string) client.ConfigMapsInterface {
 	return &FakeConfigMaps{Fake: c, Namespace: namespace}
 }
 
+func (c *Fake) Rbac() client.RbacInterface {
+	return &FakeRbac{Fake: c}
+}
+
 // SwaggerSchema returns an empty swagger.ApiDeclaration for testing
 func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
 	action := ActionImpl{}
@@ -384,6 +388,30 @@ func (c *FakeExperimental) ReplicaSets(namespace string) client.ReplicaSetInterf
 
 func (c *FakeExperimental) NetworkPolicies(namespace string) client.NetworkPolicyInterface {
 	return &FakeNetworkPolicies{Fake: c, Namespace: namespace}
+}
+
+func NewSimpleFakeRbac(objects ...runtime.Object) *FakeRbac {
+	return &FakeRbac{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeRbac struct {
+	*Fake
+}
+
+func (c *FakeRbac) Roles(namespace string) client.RoleInterface {
+	return &FakeRoles{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeRbac) RoleBindings(namespace string) client.RoleBindingInterface {
+	return &FakeRoleBindings{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeRbac) ClusterRoles() client.ClusterRoleInterface {
+	return &FakeClusterRoles{Fake: c}
+}
+
+func (c *FakeRbac) ClusterRoleBindings() client.ClusterRoleBindingInterface {
+	return &FakeClusterRoleBindings{Fake: c}
 }
 
 type FakeDiscovery struct {
