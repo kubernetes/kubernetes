@@ -24,6 +24,11 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/pkg/registry/clusterrole"
+	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
+	"k8s.io/kubernetes/pkg/registry/role"
+	"k8s.io/kubernetes/pkg/registry/rolebinding"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
@@ -63,10 +68,11 @@ const (
 	ModeAlwaysDeny  string = "AlwaysDeny"
 	ModeABAC        string = "ABAC"
 	ModeWebhook     string = "Webhook"
+	ModeRBAC        string = "RBAC"
 )
 
 // Keep this list in sync with constant list above.
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook}
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC}
 
 type AuthorizationConfig struct {
 	// Options for ModeABAC
@@ -82,6 +88,16 @@ type AuthorizationConfig struct {
 	WebhookCacheAuthorizedTTL time.Duration
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
+
+	// Options for RBAC
+
+	// User which can bootstrap role policies
+	RBACSuperUser string
+
+	RBACClusterRoleRegistry        clusterrole.Registry
+	RBACClusterRoleBindingRegistry clusterrolebinding.Registry
+	RBACRoleRegistry               role.Registry
+	RBACRoleBindingRegistry        rolebinding.Registry
 }
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
@@ -126,6 +142,18 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
+		case ModeRBAC:
+			rbacAuthorizer, err := rbac.New(
+				config.RBACRoleRegistry,
+				config.RBACRoleBindingRegistry,
+				config.RBACClusterRoleRegistry,
+				config.RBACClusterRoleBindingRegistry,
+				config.RBACSuperUser,
+			)
+			if err != nil {
+				return nil, err
+			}
+			authorizers = append(authorizers, rbacAuthorizer)
 		default:
 			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
 		}
@@ -137,6 +165,9 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 	}
 	if !authorizerMap[ModeWebhook] && config.WebhookConfigFile != "" {
 		return nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
+	}
+	if !authorizerMap[ModeRBAC] && config.RBACSuperUser != "" {
+		return nil, errors.New("Cannot specify --authorization-rbac-super-user without mode RBAC")
 	}
 
 	return union.New(authorizers...), nil

@@ -43,12 +43,21 @@ import (
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyapiv1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/registry/clusterrole"
+	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
+	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/clusterrole/policybased"
+	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
+	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/clusterrolebinding/etcd"
+	clusterrolebindingpolicybased "k8s.io/kubernetes/pkg/registry/clusterrolebinding/policybased"
 	"k8s.io/kubernetes/pkg/registry/componentstatus"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/configmap/etcd"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
@@ -75,6 +84,12 @@ import (
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
+	"k8s.io/kubernetes/pkg/registry/role"
+	roleetcd "k8s.io/kubernetes/pkg/registry/role/etcd"
+	rolepolicybased "k8s.io/kubernetes/pkg/registry/role/policybased"
+	"k8s.io/kubernetes/pkg/registry/rolebinding"
+	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
+	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rolebinding/policybased"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
@@ -411,6 +426,39 @@ func (m *Master) InstallAPIs(c *Config) {
 		allGroups = append(allGroups, group)
 
 	}
+
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(rbacapi.SchemeGroupVersion) {
+		rbacResources := m.getRBACResources(c)
+		rbacGroupMeta := registered.GroupOrDie(rbac.GroupName)
+
+		// Hard code preferred group version to rbac/v1alpha1
+		rbacGroupMeta.GroupVersion = rbacapi.SchemeGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *rbacGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1alpha1": rbacResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		rbacGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: rbacGroupMeta.GroupVersion.String(),
+			Version:      rbacGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             rbacGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{rbacGVForDiscovery},
+			PreferredVersion: rbacGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+
+	}
+
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
@@ -908,6 +956,43 @@ func (m *Master) getAppsResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
+func (m *Master) getRBACResources(c *Config) map[string]rest.Storage {
+	version := rbacapi.SchemeGroupVersion
+
+	once := new(sync.Once)
+	var authorizationRuleResolver rbacvalidation.AuthorizationRuleResolver
+	newRuleValidator := func() rbacvalidation.AuthorizationRuleResolver {
+		once.Do(func() {
+			authorizationRuleResolver = rbacvalidation.NewDefaultRuleResolver(
+				role.NewRegistry(roleetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("roles")))),
+				rolebinding.NewRegistry(rolebindingetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("rolebindings")))),
+				clusterrole.NewRegistry(clusterroleetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("clusterroles")))),
+				clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("clusterrolebindings")))),
+			)
+		})
+		return authorizationRuleResolver
+	}
+
+	storage := map[string]rest.Storage{}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("roles")) {
+		rolesStorage := roleetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("roles")))
+		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, newRuleValidator(), c.AuthorizerRBACSuperUser)
+	}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
+		roleBindingsStorage := rolebindingetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("rolebindings")))
+		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), c.AuthorizerRBACSuperUser)
+	}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
+		clusterRolesStorage := clusterroleetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("clusterroles")))
+		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), c.AuthorizerRBACSuperUser)
+	}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
+		clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("clusterrolebindings")))
+		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), c.AuthorizerRBACSuperUser)
+	}
+	return storage
+}
+
 // findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
 func findExternalAddress(node *api.Node) (string, error) {
 	var fallback string
@@ -960,7 +1045,7 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, policyapiv1alpha1.SchemeGroupVersion)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, policyapiv1alpha1.SchemeGroupVersion, rbacapi.SchemeGroupVersion)
 
 	// all extensions resources except these are disabled by default
 	ret.EnableResources(

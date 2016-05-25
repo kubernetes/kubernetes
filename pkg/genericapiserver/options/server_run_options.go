@@ -227,6 +227,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.AuthorizationConfig.WebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationConfig.WebhookConfigFile, "File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. The API server will query the remote service to determine access on the API server's secure port.")
 	fs.DurationVar(&s.AuthorizationConfig.WebhookCacheAuthorizedTTL, "authorization-webhook-cache-authorized-ttl", s.AuthorizationConfig.WebhookCacheAuthorizedTTL, "The duration to cache 'authorized' responses from the webhook authorizer. Default is 5m.")
 	fs.DurationVar(&s.AuthorizationConfig.WebhookCacheUnauthorizedTTL, "authorization-webhook-cache-unauthorized-ttl", s.AuthorizationConfig.WebhookCacheUnauthorizedTTL, "The duration to cache 'unauthorized' responses from the webhook authorizer. Default is 30s.")
+	fs.StringVar(&s.AuthorizationConfig.RBACSuperUser, "authorization-rbac-super-user", s.AuthorizationConfig.RBACSuperUser, "If specified, a username which avoids RBAC authorization checks and role binding privilege escalation checks, to be used with --authorization-mode=RBAC.")
 
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
 
