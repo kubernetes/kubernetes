@@ -118,10 +118,7 @@ type rateLimitedRoundTripper struct {
 }
 
 func (rl *rateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	startTime := time.Now()
 	rl.limiter.Accept()
-	// TODO: Reduce verbosity once #26119 is fixed.
-	glog.V(0).Infof("GCE api call: %s %s (throttled for %v)", req.Method, req.URL.String(), time.Now().Sub(startTime))
 	return rl.rt.RoundTrip(req)
 }
 
