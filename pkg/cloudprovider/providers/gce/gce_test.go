@@ -17,15 +17,11 @@ limitations under the License.
 package gce
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/rand"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestGetRegion(t *testing.T) {
@@ -263,32 +259,4 @@ func TestComputeUpdate(t *testing.T) {
 		// 	t.Errorf("computeTargetPool(%v, %v) => removed %v, wanted %v", tc.tp, tc.instances, gotRem, tc.wantToRemove)
 		// }
 	}
-}
-
-func TestRateLimitedRoundTripper(t *testing.T) {
-	handler := utiltesting.FakeHandler{StatusCode: 200}
-	server := httptest.NewServer(&handler)
-	defer server.Close()
-
-	method := "GET"
-	path := "/foo/bar"
-
-	req, err := http.NewRequest(method, server.URL+path, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	// TODO(zmerlynn): Validate the rate limiter is actually getting called.
-	client := http.Client{
-		Transport: &rateLimitedRoundTripper{
-			rt:      http.DefaultTransport,
-			limiter: flowcontrol.NewFakeAlwaysRateLimiter(),
-		},
-	}
-	_, err = client.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	handler.ValidateRequest(t, path, method, nil)
 }
