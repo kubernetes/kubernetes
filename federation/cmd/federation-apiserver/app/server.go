@@ -119,8 +119,10 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
-	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
-
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
+	if err != nil {
+		glog.Errorf("Failed to initialize plugins", err)
+	}
 	genericConfig := genericapiserver.NewConfig(s)
 	// TODO: Move the following to generic api server as well.
 	genericConfig.StorageFactory = storageFactory
