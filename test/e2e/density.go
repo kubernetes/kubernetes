@@ -53,7 +53,7 @@ var MaxContainerFailures = 0
 func density30AddonResourceVerifier() map[string]framework.ResourceConstraint {
 	constraints := make(map[string]framework.ResourceConstraint)
 	constraints["fluentd-elasticsearch"] = framework.ResourceConstraint{
-		CPUConstraint:    0.1,
+		CPUConstraint:    0.2,
 		MemoryConstraint: 250 * (1024 * 1024),
 	}
 	constraints["elasticsearch-logging"] = framework.ResourceConstraint{
