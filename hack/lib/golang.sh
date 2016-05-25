@@ -115,6 +115,7 @@ kube::golang::test_targets() {
     cmd/genswaggertypedocs
     cmd/linkcheck
     examples/k8petstore/web-server/src
+    federation/cmd/genfeddocs
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
     test/e2e_node/e2e_node.test
