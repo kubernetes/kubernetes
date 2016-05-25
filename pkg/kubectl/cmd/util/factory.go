@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -366,6 +367,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return clients.FederationClientForVersion(&mappingVersion)
 			case rbac.GroupName:
 				return c.RbacClient.RESTClient, nil
+			case certificates.GroupName:
+				return c.CertificatesClient.RESTClient, nil
 			default:
 				if !registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 					return nil, fmt.Errorf("unknown api group/version: %s", gvk.String())
@@ -1103,6 +1106,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 			return errors.New("unable to validate: no federation client")
 		}
 		return getSchemaAndValidate(c.fedc, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+	}
+	if gvk.Group == certificates.GroupName {
+		if c.c.CertificatesClient == nil {
+			return errors.New("unable to validate: no certificates client")
+		}
+		return getSchemaAndValidate(c.c.CertificatesClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
 	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
 }
