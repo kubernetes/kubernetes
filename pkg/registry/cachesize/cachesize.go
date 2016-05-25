@@ -28,6 +28,8 @@ import (
 type Resource string
 
 const (
+	ClusterRoles             Resource = "clusterroles"
+	ClusterRoleBindings      Resource = "clusterrolebindings"
 	Controllers              Resource = "controllers"
 	Daemonsets               Resource = "daemonsets"
 	Deployments              Resource = "deployments"
@@ -48,6 +50,8 @@ const (
 	Replicasets              Resource = "replicasets"
 	ResourceQuotas           Resource = "resourcequotas"
 	ScheduledJobs            Resource = "scheduledjobs"
+	Roles                    Resource = "roles"
+	RoleBindings             Resource = "rolebindings"
 	Secrets                  Resource = "secrets"
 	ServiceAccounts          Resource = "serviceaccounts"
 	Services                 Resource = "services"
@@ -57,6 +61,8 @@ var watchCacheSizes map[Resource]int
 
 func init() {
 	watchCacheSizes = make(map[Resource]int)
+	watchCacheSizes[ClusterRoles] = 100
+	watchCacheSizes[ClusterRoleBindings] = 100
 	watchCacheSizes[Controllers] = 100
 	watchCacheSizes[Daemonsets] = 100
 	watchCacheSizes[Deployments] = 100
@@ -77,6 +83,8 @@ func init() {
 	watchCacheSizes[Replicasets] = 100
 	watchCacheSizes[ResourceQuotas] = 100
 	watchCacheSizes[ScheduledJobs] = 100
+	watchCacheSizes[Roles] = 100
+	watchCacheSizes[RoleBindings] = 100
 	watchCacheSizes[Secrets] = 100
 	watchCacheSizes[ServiceAccounts] = 100
 	watchCacheSizes[Services] = 100
