@@ -172,6 +172,15 @@ Supported sysctls (whitelist) as of Docker 1.12.0:
   - POSIX queues: `fs.mqueue.*`
 - network namespace: `net.*`
 
+Error behaviour:
+
+- not whitelisted sysctls are rejected:
+```shell
+$ docker run --sysctl=foo=bla -it busybox /bin/sh
+invalid value "foo=bla" for flag --sysctl: sysctl 'foo=bla' is not whitelisted
+See 'docker run --help'.
+```
+
 Applied changes:
 
 * https://github.com/docker/docker#19265
