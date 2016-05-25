@@ -31,7 +31,7 @@ type FakeTestTypes struct {
 	ns   string
 }
 
-var testtypesResource = unversioned.GroupVersionResource{Group: "testgroup", Version: "", Resource: "testtypes"}
+var testtypesResource = unversioned.GroupVersionResource{Group: "testgroup.k8s.io", Version: "", Resource: "testtypes"}
 
 func (c *FakeTestTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
 	obj, err := c.Fake.
