@@ -147,7 +147,7 @@ message Subject {
   optional string kind = 1;
 
   // APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-  // expected to be API version of this API group. For example "rbac.authorization.k8s.io/v1alpha1".
+  // expected to be API version of this API group. For example "rbac/v1alpha1".
   optional string apiVersion = 2;
 
   // Name of the object being referenced.

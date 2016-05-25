@@ -55,7 +55,7 @@ type Subject struct {
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example "rbac.authorization.k8s.io/v1alpha1".
+	// expected to be API version of this API group. For example "rbac/v1alpha1".
 	APIVersion string `json:"apiVersion" protobuf:"bytes,2,opt.name=apiVersion"`
 	// Name of the object being referenced.
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
@@ -63,6 +63,8 @@ type Subject struct {
 	// the Authorizer should report an error.
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
 }
+
+// +genclient=true
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 type Role struct {
@@ -73,6 +75,8 @@ type Role struct {
 	// Rules holds all the PolicyRules for this Role
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
+
+// +genclient=true
 
 // RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace.
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
@@ -110,6 +114,8 @@ type RoleList struct {
 	Items []Role `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// +genclient=true,nonNamespaced=true
+
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 type ClusterRole struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -119,6 +125,8 @@ type ClusterRole struct {
 	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
+
+// +genclient=true,nonNamespaced=true
 
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
 // and adds who information via Subject.
