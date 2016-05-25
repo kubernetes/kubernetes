@@ -50,7 +50,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterNam
 }
 
 func (rc *RouteController) Run(syncPeriod time.Duration) {
-	go wait.Until(func() {
+	go wait.NonSlidingUntil(func() {
 		if err := rc.reconcileNodeRoutes(); err != nil {
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
