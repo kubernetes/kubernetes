@@ -40,8 +40,6 @@ import (
 )
 
 const (
-	CreatedByAnnotation = "kubernetes.io/created-by"
-
 	// If a watch drops a delete event for a pod, it'll take this long
 	// before a dormant controller waiting for those packets is woken up anyway. It is
 	// specifically targeted at the case where some problem prevents an update
@@ -392,7 +390,7 @@ func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) 
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to serialize controller reference: %v", err)
 	}
-	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
+	desiredAnnotations[api.CreatedByAnnotation] = string(createdByRefJson)
 	return desiredAnnotations, nil
 }
 
