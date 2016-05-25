@@ -62,6 +62,13 @@ func TestAddNode(t *testing.T) {
 }
 
 func TestDelNode(t *testing.T) {
+	defer func() { now = time.Now }()
+	var tick int64
+	now = func() time.Time {
+		t := time.Unix(tick, 0)
+		tick++
+		return t
+	}
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
 	evictor.Add("first")
 	evictor.Add("second")
