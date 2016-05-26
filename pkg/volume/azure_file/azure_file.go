@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -44,6 +44,10 @@ var _ volume.PersistentVolumePlugin = &azureFilePlugin{}
 const (
 	azureFilePluginName = "kubernetes.io/azure-file"
 )
+
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(azureFilePluginName), volName)
+}
 
 func (plugin *azureFilePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -84,10 +88,11 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *api.Po
 	}
 	return &azureFileMounter{
 		azureFile: &azureFile{
-			volName: spec.Name(),
-			mounter: mounter,
-			pod:     pod,
-			plugin:  plugin,
+			volName:         spec.Name(),
+			mounter:         mounter,
+			pod:             pod,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host)),
 		},
 		util:       util,
 		secretName: source.SecretName,
@@ -102,10 +107,11 @@ func (plugin *azureFilePlugin) NewUnmounter(volName string, podUID types.UID) (v
 
 func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
 	return &azureFileUnmounter{&azureFile{
-		volName: volName,
-		mounter: mounter,
-		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
-		plugin:  plugin,
+		volName:         volName,
+		mounter:         mounter,
+		pod:             &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
@@ -115,12 +121,11 @@ type azureFile struct {
 	pod     *api.Pod
 	mounter mount.Interface
 	plugin  *azureFilePlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (azureFileVolume *azureFile) GetPath() string {
-	name := azureFilePluginName
-	return azureFileVolume.plugin.host.GetPodVolumeDir(azureFileVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), azureFileVolume.volName)
+	return getPath(azureFileVolume.pod.UID, azureFileVolume.volName, azureFileVolume.plugin.host)
 }
 
 type azureFileMounter struct {

@@ -49,6 +49,10 @@ const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 )
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
+}
+
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	return nil
@@ -103,13 +107,14 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 
 	return &gcePersistentDiskMounter{
 		gcePersistentDisk: &gcePersistentDisk{
-			podUID:    podUID,
-			volName:   spec.Name(),
-			pdName:    pdName,
-			partition: partition,
-			mounter:   mounter,
-			manager:   manager,
-			plugin:    plugin,
+			podUID:          podUID,
+			volName:         spec.Name(),
+			pdName:          pdName,
+			partition:       partition,
+			mounter:         mounter,
+			manager:         manager,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		readOnly: readOnly}, nil
 }
@@ -121,11 +126,12 @@ func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types
 
 func (plugin *gcePersistentDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &gcePersistentDiskUnmounter{&gcePersistentDisk{
-		podUID:  podUID,
-		volName: volName,
-		manager: manager,
-		mounter: mounter,
-		plugin:  plugin,
+		podUID:          podUID,
+		volName:         volName,
+		manager:         manager,
+		mounter:         mounter,
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
@@ -185,7 +191,7 @@ type gcePersistentDisk struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *gcePersistentDiskPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 type gcePersistentDiskMounter struct {
@@ -270,9 +276,8 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 	return path.Join(host.GetPluginDir(gcePersistentDiskPluginName), "mounts", devName)
 }
 
-func (pd *gcePersistentDisk) GetPath() string {
-	name := gcePersistentDiskPluginName
-	return pd.plugin.host.GetPodVolumeDir(pd.podUID, strings.EscapeQualifiedNameForDisk(name), pd.volName)
+func (b *gcePersistentDiskMounter) GetPath() string {
+	return getPath(b.podUID, b.volName, b.plugin.host)
 }
 
 type gcePersistentDiskUnmounter struct {
@@ -281,7 +286,12 @@ type gcePersistentDiskUnmounter struct {
 
 var _ volume.Unmounter = &gcePersistentDiskUnmounter{}
 
-// TearDown unmounts the bind mount
+func (c *gcePersistentDiskUnmounter) GetPath() string {
+	return getPath(c.podUID, c.volName, c.plugin.host)
+}
+
+// Unmounts the bind mount, and detaches the disk only if the PD
+// resource was the last reference to that disk on the kubelet.
 func (c *gcePersistentDiskUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
@@ -316,8 +326,7 @@ type gcePersistentDiskDeleter struct {
 var _ volume.Deleter = &gcePersistentDiskDeleter{}
 
 func (d *gcePersistentDiskDeleter) GetPath() string {
-	name := gcePersistentDiskPluginName
-	return d.plugin.host.GetPodVolumeDir(d.podUID, strings.EscapeQualifiedNameForDisk(name), d.volName)
+	return getPath(d.podUID, d.volName, d.plugin.host)
 }
 
 func (d *gcePersistentDiskDeleter) Delete() error {
