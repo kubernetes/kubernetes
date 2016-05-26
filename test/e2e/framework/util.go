@@ -134,6 +134,22 @@ const (
 	// When these values are updated, also update cmd/kubelet/app/options/options.go
 	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
 	currentPodInfraContainerImageVersion = "3.0"
+
+	// How long each node is given during a process that restarts all nodes
+	// before the test is considered failed. (Note that the total time to
+	// restart all nodes will be this number times the number of nodes.)
+	RestartPerNodeTimeout = 5 * time.Minute
+
+	// How often to Poll the statues of a restart.
+	RestartPoll = 20 * time.Second
+
+	// How long a node is allowed to become "Ready" after it is restarted before
+	// the test is considered failed.
+	RestartNodeReadyAgainTimeout = 5 * time.Minute
+
+	// How long a pod is allowed to become "running" and "ready" after a node
+	// restart before test is considered failed.
+	RestartPodReadyAgainTimeout = 5 * time.Minute
 )
 
 // Label allocated to the image puller static pod that runs on each node
@@ -3505,13 +3521,29 @@ func RestartKubeProxy(host string) error {
 	return nil
 }
 
-func RestartApiserver() error {
+func RestartApiserver(c *client.Client) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
 		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
 	}
+	if ProviderIs("gce", "aws") {
+		return sshRestartMaster()
+	}
+	// GKE doesn't allow ssh accesss, so use a same-version master
+	// upgrade to teardown/recreate master.
+	v, err := c.ServerVersion()
+	if err != nil {
+		return err
+	}
+	return masterUpgradeGKE(v.GitVersion[1:]) // strip leading 'v'
+}
+
+func sshRestartMaster() error {
+	if !ProviderIs("gce", "aws") {
+		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+	}
 	var command string
-	if ProviderIs("gce", "gke") {
+	if ProviderIs("gce") {
 		command = "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
@@ -4126,4 +4158,42 @@ func GetPodsInNamespace(c *client.Client, ns string, ignoreLabels map[string]str
 		filtered = append(filtered, &p)
 	}
 	return filtered, nil
+}
+
+// RunCmd runs cmd using args and returns its stdout and stderr. It also outputs
+// cmd's stdout and stderr to their respective OS streams.
+func RunCmd(command string, args ...string) (string, string, error) {
+	Logf("Running %s %v", command, args)
+	var bout, berr bytes.Buffer
+	cmd := exec.Command(command, args...)
+	// We also output to the OS stdout/stderr to aid in debugging in case cmd
+	// hangs and never returns before the test gets killed.
+	//
+	// This creates some ugly output because gcloud doesn't always provide
+	// newlines.
+	cmd.Stdout = io.MultiWriter(os.Stdout, &bout)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &berr)
+	err := cmd.Run()
+	stdout, stderr := bout.String(), berr.String()
+	if err != nil {
+		return "", "", fmt.Errorf("error running %s %v; got error %v, stdout %q, stderr %q",
+			command, args, err, stdout, stderr)
+	}
+	return stdout, stderr, nil
+}
+
+// retryCmd runs cmd using args and retries it for up to SingleCallTimeout if
+// it returns an error. It returns stdout and stderr.
+func retryCmd(command string, args ...string) (string, string, error) {
+	var err error
+	stdout, stderr := "", ""
+	wait.Poll(Poll, SingleCallTimeout, func() (bool, error) {
+		stdout, stderr, err = RunCmd(command, args...)
+		if err != nil {
+			Logf("Got %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	return stdout, stderr, err
 }
