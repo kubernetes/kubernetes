@@ -16,14 +16,19 @@ limitations under the License.
 
 package admission
 
-import clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+import (
+	"time"
+
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
+)
 
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
 type chainAdmissionHandler []Interface
 
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string) Interface {
+func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string) (Interface, error) {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
 		plugin := InitPlugin(pluginName, client, configFilePath)
@@ -31,7 +36,17 @@ func NewFromPlugins(client clientset.Interface, pluginNames []string, configFile
 			plugins = append(plugins, plugin)
 		}
 	}
-	return chainAdmissionHandler(plugins)
+
+	informer := informers.CreateSharedNamespaceInformer(client, 5*time.Minute)
+	pluginInit := PluginInitializer{
+		NamespaceInformer: informer,
+	}
+
+	pluginInit.Initialize(plugins)
+	if err := Validate(plugins); err != nil {
+                return nil, err
+        }
+	return chainAdmissionHandler(plugins), nil
 }
 
 // NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
