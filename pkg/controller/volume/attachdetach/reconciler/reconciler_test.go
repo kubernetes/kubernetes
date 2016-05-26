@@ -55,7 +55,9 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
 
 	// Act
-	go reconciler.Run(wait.NeverStop)
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 0 /* expectedCallCount */, fakePlugin)
@@ -97,7 +99,9 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	}
 
 	// Act
-	go reconciler.Run(wait.NeverStop)
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -140,7 +144,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	}
 
 	// Act
-	go reconciler.Run(wait.NeverStop)
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -204,7 +210,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	}
 
 	// Act
-	go reconciler.Run(wait.NeverStop)
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
