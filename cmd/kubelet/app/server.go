@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -667,6 +668,42 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	}
 
 	util.ApplyRLimitForSelf(kcfg.MaxOpenFiles)
+
+	// TODO(dawnchen): remove this once we deprecated old debian containervm images.
+	// This is a workaround for issue: https://github.com/opencontainers/runc/issues/726
+	// The current chosen number is consistent with most of other os dist.
+	const maxkeysPath = "/proc/sys/kernel/keys/root_maxkeys"
+	const minKeys uint64 = 1000000
+	key, err := ioutil.ReadFile(maxkeysPath)
+	if err != nil {
+		glog.Errorf("Cannot read keys quota in %s", maxkeysPath)
+	} else {
+		fields := strings.Fields(string(key))
+		nkey, _ := strconv.ParseUint(fields[0], 10, 64)
+		if nkey < minKeys {
+			glog.Infof("Setting keys quota in %s to %d", maxkeysPath, minKeys)
+			err = ioutil.WriteFile(maxkeysPath, []byte(fmt.Sprintf("%d", uint64(minKeys))), 0644)
+			if err != nil {
+				glog.Warningf("Failed to update %s: %v", maxkeysPath, err)
+			}
+		}
+	}
+	const maxbytesPath = "/proc/sys/kernel/keys/root_maxbytes"
+	const minBytes uint64 = 25000000
+	bytes, err := ioutil.ReadFile(maxbytesPath)
+	if err != nil {
+		glog.Errorf("Cannot read keys bytes in %s", maxbytesPath)
+	} else {
+		fields := strings.Fields(string(bytes))
+		nbyte, _ := strconv.ParseUint(fields[0], 10, 64)
+		if nbyte < minBytes {
+			glog.Infof("Setting keys bytes in %s to %d", maxbytesPath, minBytes)
+			err = ioutil.WriteFile(maxbytesPath, []byte(fmt.Sprintf("%d", uint64(minBytes))), 0644)
+			if err != nil {
+				glog.Warningf("Failed to update %s: %v", maxbytesPath, err)
+			}
+		}
+	}
 
 	// process pods and exit.
 	if kcfg.Runonce {
