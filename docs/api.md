@@ -48,6 +48,34 @@ Kubernetes also stores its serialized state (currently in [etcd](https://coreos.
 
 Kubernetes itself is decomposed into multiple components, which interact through its API.
 
+## Adding APIs to Kubernetes
+
+Every API that is added to Kubernetes carries with it increased cost and complexity for all parts of the Kubernetes ecosystem.  New APIs imply new code to maintain,
+new tests that may flake, new documentation that users are required to understand, increased cognitive load for kubectl users and many other incremental costs.
+
+Of course, the addition of new APIs also enables new functionality that empowers users to simply do things that may have been previously complex, costly or both.
+
+Given this balance between increasing the complexity of the project versus the reduction of complexity in user actions, we have set out to set up a set of criteria
+to guide how we as a development community decide when an API should be added to the set of core Kubernetes APIs.
+
+The criteria for inclusion are as follows:
+   * Within the Kubernetes ecosystem, there is a single well known definition of such an API.  As an example, `cron` has a well understood and generally accepted
+specification, whereas there are countless different systems for definition workflows of dependent actions (e.g. Celery et al.).
+   * The API object is expected to be generally useful to greater than 50% of the Kubernetes users.  This is to ensure that we don't build up a collection of niche APIs
+that users rarely need.
+   * There is general consensus in the Kubernetes community that the API object is in the "Kubernetes layer".  See ["What is Kubernetes?"](whatisk8s.md) for a detailed
+explanation of what we believe the "Kubernetes layer" to be.
+
+Of course for every set of rules, we need to ensure that we are not hamstrung or limited by slavish devotion to those rules. Thus we also introduce two exceptions
+for adding APIs in Kubernetes that violate these criteria.
+
+These exceptions are:
+   * There is no other way to implement the functionality in Kubernetes. We are not sure there are any examples of this anymore, but we retain this exception just in case
+we have overlooked something.
+   * Exceptional circumstances, as judged by the Kubernetes committers and discussed in community meeting prior to inclusion of the API.  We hope (expect?) that this
+exception will be used rarely if at all.
+
+
 ## API changes
 
 In our experience, any system that is successful needs to grow and change as new use cases emerge or existing ones change. Therefore, we expect the Kubernetes API to continuously change and grow. However, we intend to not break compatibility with existing clients, for an extended period of time. In general, new API resources and new resource fields can be expected to be added frequently. Elimination of resources or fields will require following a deprecation process. The precise deprecation policy for eliminating features is TBD, but once we reach our 1.0 milestone, there will be a specific policy.
