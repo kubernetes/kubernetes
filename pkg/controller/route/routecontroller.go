@@ -24,10 +24,15 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/wait"
+)
+
+const (
+	updateNodeStatusMaxRetries = 3
 )
 
 type RouteController struct {
@@ -71,6 +76,22 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	return rc.reconcile(nodeList.Items, routeList)
 }
 
+func tryUpdateNodeStatus(node *api.Node, kubeClient clientset.Interface) error {
+	for i := 0; i < updateNodeStatusMaxRetries; i++ {
+		if _, err := kubeClient.Core().Nodes().UpdateStatus(node); err == nil {
+			break
+		} else {
+			if i+1 < updateNodeStatusMaxRetries {
+				glog.Errorf("Error updating node %s - will retry: %v", node.Name, err)
+			} else {
+				glog.Errorf("Error updating node %s - wont retry: %v", node.Name, err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.Route) error {
 	// nodeCIDRs maps nodeName->nodeCIDR
 	nodeCIDRs := make(map[string]string)
@@ -95,15 +116,71 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			}
 			nameHint := string(node.UID)
 			wg.Add(1)
-			glog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, nameHint)
-			go func(nodeName string, nameHint string, route *cloudprovider.Route, startTime time.Time) {
+			glog.V(2).Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, nameHint)
+			go func(node api.Node, nameHint string, route *cloudprovider.Route, startTime time.Time) {
+				_, networkingCondition := api.GetNodeCondition(&node.Status, api.NodeNetworkingReady)
 				if err := rc.routes.CreateRoute(rc.clusterName, nameHint, route); err != nil {
-					glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
+					currentTime := unversioned.Now()
+					if networkingCondition != nil && networkingCondition.Status != api.ConditionFalse {
+						networkingCondition.Status = api.ConditionFalse
+						networkingCondition.Reason = "NoRouteCreated"
+						networkingCondition.Message = "RouteController failed to create a route"
+						networkingCondition.LastTransitionTime = currentTime
+					} else if networkingCondition == nil {
+						node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+							Type:               api.NodeNetworkingReady,
+							Status:             api.ConditionFalse,
+							Reason:             "NoRouteCreated",
+							Message:            "RouteController failed to create a route",
+							LastTransitionTime: currentTime,
+						})
+					}
+					glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, node.Name, time.Now().Sub(startTime), err)
 				} else {
-					glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
+					currentTime := unversioned.Now()
+					if networkingCondition != nil && networkingCondition.Status != api.ConditionTrue {
+						networkingCondition.Status = api.ConditionTrue
+						networkingCondition.Reason = "RouteCreated"
+						networkingCondition.Message = "RouteController created a route"
+						networkingCondition.LastTransitionTime = currentTime
+					} else if networkingCondition == nil {
+						node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+							Type:               api.NodeNetworkingReady,
+							Status:             api.ConditionTrue,
+							Reason:             "RouteCreated",
+							Message:            "RouteController created a route",
+							LastTransitionTime: currentTime,
+						})
+					}
+					glog.V(2).Infof("Created route for node %s %s with hint %s after %v", node.Name, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
+
+				}
+				if rc.kubeClient != nil {
+					tryUpdateNodeStatus(&node, rc.kubeClient)
 				}
 				wg.Done()
-			}(node.Name, nameHint, route, time.Now())
+			}(node, nameHint, route, time.Now())
+		} else {
+			// Check if the NodeNetworking condition is correctly set and if not do it.
+			currentTime := unversioned.Now()
+			_, networkingCondition := api.GetNodeCondition(&node.Status, api.NodeNetworkingReady)
+			if networkingCondition != nil && networkingCondition.Status != api.ConditionTrue {
+				networkingCondition.Status = api.ConditionTrue
+				networkingCondition.Reason = "RouteCreated"
+				networkingCondition.Message = "RouteController created a route"
+				networkingCondition.LastTransitionTime = currentTime
+			} else if networkingCondition == nil {
+				node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+					Type:               api.NodeNetworkingReady,
+					Status:             api.ConditionTrue,
+					Reason:             "RouteCreated",
+					Message:            "RouteController created a route",
+					LastTransitionTime: currentTime,
+				})
+			}
+			if rc.kubeClient != nil {
+				tryUpdateNodeStatus(&node, rc.kubeClient)
+			}
 		}
 		nodeCIDRs[node.Name] = node.Spec.PodCIDR
 	}
@@ -113,12 +190,12 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
 				wg.Add(1)
 				// Delete the route.
-				glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+				glog.V(2).Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 				go func(route *cloudprovider.Route, startTime time.Time) {
 					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
 						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
 					} else {
-						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
+						glog.V(2).Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
 					}
 					wg.Done()
 
