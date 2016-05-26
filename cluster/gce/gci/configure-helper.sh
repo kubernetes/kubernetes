@@ -75,16 +75,22 @@ function mount-master-pd {
   mkdir -p "${mount_point}"
   /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${pd_path}" "${mount_point}" &>/var/log/master-pd-mount.log || \
     { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
+
+  # NOTE: These locations on the PD store persistent data, so to maintain
+  # upgradeability, these locations should not change.  If they do, take care
+  # to maintain a migration path from these locations to whatever new
+  # locations.
+
   # Contains all the data stored in etcd.
   mkdir -m 700 -p "${mount_point}/var/etcd"
   ln -s -f "${mount_point}/var/etcd" /var/etcd
   mkdir -p /etc/srv
   # Contains the dynamically generated apiserver auth certs and keys.
-  mkdir -p "${mount_point}/etc/srv/kubernetes"
-  ln -s -f "${mount_point}/etc/srv/kubernetes" /etc/srv/kubernetes
+  mkdir -p "${mount_point}/srv/kubernetes"
+  ln -s -f "${mount_point}/srv/kubernetes" /etc/srv/kubernetes
   # Directory for kube-apiserver to store SSH key (if necessary).
-  mkdir -p "${mount_point}/etc/srv/sshproxy"
-  ln -s -f "${mount_point}/etc/srv/sshproxy" /etc/srv/sshproxy
+  mkdir -p "${mount_point}/srv/sshproxy"
+  ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
 
   if ! id etcd &>/dev/null; then
     useradd -s /sbin/nologin -d /var/etcd etcd
