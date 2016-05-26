@@ -168,7 +168,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	// test files.
 	// Print debug info if atLeast Pods are not found before the timeout
 	waitForOrFailWithDebug := func(atLeast int) {
-		pods, err := clusterState().WaitFor(atLeast, 90*time.Second)
+		pods, err := clusterState().WaitFor(atLeast, framework.PodStartTimeout)
 		if err != nil || len(pods) < atLeast {
 			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
 			framework.DumpAllNamespaceInfo(c, ns)
