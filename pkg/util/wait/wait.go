@@ -42,9 +42,19 @@ func Forever(f func(), period time.Duration) {
 }
 
 // Until loops until stop channel is closed, running f every period.
-// Until is syntactic sugar on top of JitterUntil with zero jitter factor
+// Until is syntactic sugar on top of JitterUntil with zero jitter
+// factor, with sliding = true (which means the timer for period
+// starts after the f completes).
 func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
-	JitterUntil(f, period, 0.0, stopCh)
+	JitterUntil(f, period, 0.0, true, stopCh)
+}
+
+// NonSlidingUntil loops until stop channel is closed, running f every
+// period. NonSlidingUntil is syntactic sugar on top of JitterUntil
+// with zero jitter factor, with sliding = false (meaning the timer for
+// period starts at the same time as the function starts).
+func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
+	JitterUntil(f, period, 0.0, false, stopCh)
 }
 
 // JitterUntil loops until stop channel is closed, running f every period.
@@ -53,7 +63,7 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 // Catches any panics, and keeps going. f may not be invoked if
 // stop channel is already closed. Pass NeverStop to Until if you
 // don't want it stop.
-func JitterUntil(f func(), period time.Duration, jitterFactor float64, stopCh <-chan struct{}) {
+func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
 	select {
 	case <-stopCh:
 		return
@@ -61,20 +71,37 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, stopCh <-
 	}
 
 	for {
-		func() {
-			defer runtime.HandleCrash()
-			f()
-		}()
-
 		jitteredPeriod := period
 		if jitterFactor > 0.0 {
 			jitteredPeriod = Jitter(period, jitterFactor)
 		}
 
+		var t *time.Timer
+		if !sliding {
+			t = time.NewTimer(jitteredPeriod)
+		}
+
+		func() {
+			defer runtime.HandleCrash()
+			f()
+		}()
+
+		if sliding {
+			t = time.NewTimer(jitteredPeriod)
+		} else {
+			// The timer we created could already have fired, so be
+			// careful and check stopCh first.
+			select {
+			case <-stopCh:
+				return
+			default:
+			}
+		}
+
 		select {
 		case <-stopCh:
 			return
-		case <-time.After(jitteredPeriod):
+		case <-t.C:
 		}
 	}
 }

@@ -45,6 +45,26 @@ func TestUntil(t *testing.T) {
 	<-called
 }
 
+func TestNonSlidingUntil(t *testing.T) {
+	ch := make(chan struct{})
+	close(ch)
+	NonSlidingUntil(func() {
+		t.Fatal("should not have been invoked")
+	}, 0, ch)
+
+	ch = make(chan struct{})
+	called := make(chan struct{})
+	go func() {
+		NonSlidingUntil(func() {
+			called <- struct{}{}
+		}, 0, ch)
+		close(called)
+	}()
+	<-called
+	close(ch)
+	<-called
+}
+
 func TestUntilReturnsImmediately(t *testing.T) {
 	now := time.Now()
 	ch := make(chan struct{})
@@ -63,14 +83,14 @@ func TestJitterUntil(t *testing.T) {
 	close(ch)
 	JitterUntil(func() {
 		t.Fatal("should not have been invoked")
-	}, 0, 1.0, ch)
+	}, 0, 1.0, true, ch)
 
 	ch = make(chan struct{})
 	called := make(chan struct{})
 	go func() {
 		JitterUntil(func() {
 			called <- struct{}{}
-		}, 0, 1.0, ch)
+		}, 0, 1.0, true, ch)
 		close(called)
 	}()
 	<-called
@@ -83,7 +103,7 @@ func TestJitterUntilReturnsImmediately(t *testing.T) {
 	ch := make(chan struct{})
 	JitterUntil(func() {
 		close(ch)
-	}, 30*time.Second, 1.0, ch)
+	}, 30*time.Second, 1.0, true, ch)
 	if now.Add(25 * time.Second).Before(time.Now()) {
 		t.Errorf("JitterUntil did not return immediately when the stop chan was closed inside the func")
 	}
@@ -98,7 +118,7 @@ func TestJitterUntilNegativeFactor(t *testing.T) {
 		JitterUntil(func() {
 			called <- struct{}{}
 			<-received
-		}, time.Second, -30.0, ch)
+		}, time.Second, -30.0, true, ch)
 	}()
 	// first loop
 	<-called
