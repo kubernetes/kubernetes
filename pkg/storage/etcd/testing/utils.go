@@ -239,13 +239,13 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
-		t.Errorf("Unexpected error in NewEtcdTestClientServer (%v)", err)
 		server.Terminate(t)
+		t.Fatalf("Unexpected error in NewEtcdTestClientServer (%v)", err)
 		return nil
 	}
 	if err := server.waitUntilUp(); err != nil {
-		t.Errorf("Unexpected error in waitUntilUp (%v)", err)
 		server.Terminate(t)
+		t.Fatalf("Unexpected error in waitUntilUp (%v)", err)
 		return nil
 	}
 	return server
