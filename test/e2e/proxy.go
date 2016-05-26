@@ -243,6 +243,13 @@ func proxyContext(version string) {
 		wg.Wait()
 
 		if len(errors) != 0 {
+			body, err := f.Client.Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
+			if err != nil {
+				framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
+			} else {
+				framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+			}
+
 			Fail(strings.Join(errors, "\n"))
 		}
 	})
