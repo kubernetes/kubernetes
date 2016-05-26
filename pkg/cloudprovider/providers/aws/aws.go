@@ -127,7 +127,7 @@ type AWSServices interface {
 	Compute(region string) (EC2, error)
 	LoadBalancing(region string) (ELB, error)
 	Autoscaling(region string) (ASG, error)
-	Route53(region string) (R53, error)
+	Route53(region string) (Route53, error)
 	Metadata() (EC2Metadata, error)
 }
 
@@ -196,7 +196,7 @@ type ASG interface {
 }
 
 // This is a simple pass-through of the route 53 client interface, which allows for testing
-type R53 interface {
+type Route53 interface {
 	ChangeResourceRecordSets(*route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error)
 	ListHostedZonesByName(*route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error)
 }
@@ -262,7 +262,7 @@ type AWSCloud struct {
 	ec2      EC2
 	elb      ELB
 	asg      ASG
-	r53      R53
+	r53      Route53
 	metadata EC2Metadata
 	cfg      *AWSCloudConfig
 	region   string
@@ -275,7 +275,7 @@ type AWSCloud struct {
 	selfAWSInstance *awsInstance
 
 	mutex                    sync.Mutex
-	r53Mutex sync.Mutex
+	r53Mutex                 sync.Mutex
 	lastNodeNames            sets.String
 	lastInstancesByNodeNames []*ec2.Instance
 }
@@ -397,11 +397,14 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 	return client, nil
 }
 
-func (p *awsSDKProvider) Route53(regionName string) (R53, error) {
+func (p *awsSDKProvider) Route53(regionName string) (Route53, error) {
 	r53Client := route53.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
 	}))
+
+	p.addHandlers(regionName, &r53Client.Handlers)
+
 	return r53Client, nil
 }
 
@@ -2423,7 +2426,7 @@ func (s *AWSCloud) toStatus(lb *elb.LoadBalancerDescription, apiService *api.Ser
 	}
 
 	cname := s.getLoadBalancerCname(apiService)
-	glog.Info("CName for service %v is %v", apiService.Name, cname)
+	glog.V(4).Infof("CName for service %q is %q", apiService.Name, cname)
 	if cname != "" {
 		cname = removeDnsTrailingDot(cname)
 		cnameIngress := api.LoadBalancerIngress{Hostname: cname}

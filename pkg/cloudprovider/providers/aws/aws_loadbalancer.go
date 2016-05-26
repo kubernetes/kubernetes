@@ -30,9 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// Labels for load balancer configuration
-const LabelLoadBalancerCnameZone = "kubernetes.io/aws-lb-cname-zone"
-
 const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
 
 func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB, proxyProtocol bool) (*elb.LoadBalancerDescription, error) {
@@ -472,13 +469,14 @@ func (s *AWSCloud) updateLoadBalancerCnameEntry(service *api.Service, dnsName *s
 		return nil
 	}
 
+	// Only allow a single request to route 53
 	s.r53Mutex.Lock()
 	defer s.r53Mutex.Unlock()
 
 	zonesInput := &route53.ListHostedZonesByNameInput{DNSName: aws.String(hostedZone)}
 	zones, err := s.r53.ListHostedZonesByName(zonesInput)
 	if err != nil {
-		return err
+		return fmt.Errorf("error listing route53 zones: %v", err)
 	}
 
 	if len(zones.HostedZones) == 0 {
@@ -486,7 +484,7 @@ func (s *AWSCloud) updateLoadBalancerCnameEntry(service *api.Service, dnsName *s
 	}
 
 	zone := zones.HostedZones[0]
-	if *zone.Name != hostedZone {
+	if aws.StringValue(zone.Name) != hostedZone {
 		return fmt.Errorf("Could not find hosted zone with name %v.", hostedZone)
 	}
 
@@ -513,8 +511,7 @@ func (s *AWSCloud) updateLoadBalancerCnameEntry(service *api.Service, dnsName *s
 
 	out, err := s.r53.ChangeResourceRecordSets(recordSetsInput)
 	if err != nil {
-		glog.Warningf("Failed to create dns entry: %v, %v", recordSetsInput.String(), out.String())
-		return err
+		return fmt.Errorf("Failed to create dns entry: %v, %v", recordSetsInput.String(), out.String())
 	}
 
 	return nil

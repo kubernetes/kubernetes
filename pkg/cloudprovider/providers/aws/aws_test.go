@@ -175,7 +175,7 @@ func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
 	return s.asg, nil
 }
 
-func (s *FakeAWSServices) Route53(region string) (R53, error) {
+func (s *FakeAWSServices) Route53(region string) (Route53, error) {
 	return s.r53, nil
 }
 
