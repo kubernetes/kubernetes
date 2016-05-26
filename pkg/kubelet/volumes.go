@@ -19,7 +19,6 @@ package kubelet
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path"
 	"strconv"
 
@@ -161,27 +160,19 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 			return nil, err
 		}
 		if attacher != nil {
-			// If the device path is already mounted, avoid an expensive call to the
-			// cloud provider.
-			deviceMountPath := attacher.GetDeviceMountPath(volSpec)
-			notMountPoint, err := kl.mounter.IsLikelyNotMountPoint(deviceMountPath)
-			if err != nil && !os.IsNotExist(err) {
+			err = attacher.Attach(volSpec, kl.hostname)
+			if err != nil {
 				return nil, err
 			}
-			if notMountPoint {
-				err = attacher.Attach(volSpec, kl.hostname)
-				if err != nil {
-					return nil, err
-				}
 
-				devicePath, err := attacher.WaitForAttach(volSpec, maxWaitForVolumeOps)
-				if err != nil {
-					return nil, err
-				}
+			devicePath, err := attacher.WaitForAttach(volSpec, maxWaitForVolumeOps)
+			if err != nil {
+				return nil, err
+			}
 
-				if err = attacher.MountDevice(volSpec, devicePath, deviceMountPath, kl.mounter); err != nil {
-					return nil, err
-				}
+			deviceMountPath := attacher.GetDeviceMountPath(volSpec)
+			if err = attacher.MountDevice(volSpec, devicePath, deviceMountPath, kl.mounter); err != nil {
+				return nil, err
 			}
 		}
 
