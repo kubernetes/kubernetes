@@ -28,7 +28,7 @@ import (
 	"github.com/skynetservices/skydns/server"
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
@@ -38,6 +38,7 @@ type KubeDNSServer struct {
 	// DNS domain name.
 	domain      string
 	healthzPort int
+	dnsPort     int
 	kd          *kdns.KubeDNS
 }
 
@@ -51,6 +52,7 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 	ks.healthzPort = config.HealthzPort
+	ks.dnsPort = config.DNSPort
 	ks.kd = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
 	return &ks
 }
@@ -124,7 +126,8 @@ func setupSignalHandlers() {
 }
 
 func (d *KubeDNSServer) startSkyDNSServer() {
-	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: "0.0.0.0:53"}
+	glog.Infof("Starting SkyDNS server. Listening on port:%d", d.dnsPort)
+	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: fmt.Sprintf("0.0.0.0:%d", d.dnsPort)}
 	server.SetDefaults(skydnsConfig)
 	s := server.New(d.kd, skydnsConfig)
 	if err := metrics.Metrics(); err != nil {

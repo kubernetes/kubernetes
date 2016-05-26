@@ -31,9 +31,8 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -129,7 +128,7 @@ func (kd *KubeDNS) Start() {
 	kd.waitForKubernetesService()
 }
 
-func (kd *KubeDNS) waitForKubernetesService() (svc *v1.Service) {
+func (kd *KubeDNS) waitForKubernetesService() (svc *kapi.Service) {
 	name := fmt.Sprintf("%v/%v", kapi.NamespaceDefault, kubernetesSvcName)
 	glog.Infof("Waiting for service: %v", name)
 	var err error
@@ -158,13 +157,13 @@ func (kd *KubeDNS) setServicesStore() {
 	kd.servicesStore, kd.serviceController = kframework.NewInformer(
 		&kcache.ListWatch{
 			ListFunc: func(options kapi.ListOptions) (runtime.Object, error) {
-				return kd.kubeClient.Core().Services(v1.NamespaceAll).List(options)
+				return kd.kubeClient.Core().Services(kapi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options kapi.ListOptions) (watch.Interface, error) {
-				return kd.kubeClient.Core().Services(v1.NamespaceAll).Watch(options)
+				return kd.kubeClient.Core().Services(kapi.NamespaceAll).Watch(options)
 			},
 		},
-		&v1.Service{},
+		&kapi.Service{},
 		resyncPeriod,
 		kframework.ResourceEventHandlerFuncs{
 			AddFunc:    kd.newService,
@@ -179,13 +178,13 @@ func (kd *KubeDNS) setEndpointsStore() {
 	kd.endpointsStore, kd.endpointsController = kframework.NewInformer(
 		&kcache.ListWatch{
 			ListFunc: func(options kapi.ListOptions) (runtime.Object, error) {
-				return kd.kubeClient.Core().Endpoints(v1.NamespaceAll).List(options)
+				return kd.kubeClient.Core().Endpoints(kapi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options kapi.ListOptions) (watch.Interface, error) {
-				return kd.kubeClient.Core().Endpoints(v1.NamespaceAll).Watch(options)
+				return kd.kubeClient.Core().Endpoints(kapi.NamespaceAll).Watch(options)
 			},
 		},
-		&v1.Endpoints{},
+		&kapi.Endpoints{},
 		resyncPeriod,
 		kframework.ResourceEventHandlerFuncs{
 			AddFunc: kd.handleEndpointAdd,
@@ -565,12 +564,12 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 // simpler approach here.
 // Also note that zone here means the zone in cloud provider terminology, not the DNS zone.
 func (kd *KubeDNS) getClusterZone() (string, error) {
-	var node *v1.Node
+	var node *kapi.Node
 
 	objs := kd.nodesStore.List()
 	if len(objs) > 0 {
 		var ok bool
-		if node, ok = objs[0].(*v1.Node); !ok {
+		if node, ok = objs[0].(*kapi.Node); !ok {
 			return "", fmt.Errorf("expected node object, got: %T", objs[0])
 		}
 	} else {
