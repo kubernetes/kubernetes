@@ -223,6 +223,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.PodInfraContainerImage = in.PodInfraContainerImage
 	out.DockerEndpoint = in.DockerEndpoint
 	out.RootDirectory = in.RootDirectory
+	out.SeccompProfileRoot = in.SeccompProfileRoot
 	out.AllowPrivileged = in.AllowPrivileged
 	out.HostNetworkSources = in.HostNetworkSources
 	out.HostPIDSources = in.HostPIDSources

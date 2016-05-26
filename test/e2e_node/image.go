@@ -47,7 +47,7 @@ func dockerRuntime() kubecontainer.Runtime {
 		nil, nil, nil, pm, nil,
 		"", 0, 0, "",
 		nil, nil, nil, nil, nil, nil, nil,
-		false, nil, true, false, false,
+		false, nil, true, false, false, "",
 	)
 
 	return dm

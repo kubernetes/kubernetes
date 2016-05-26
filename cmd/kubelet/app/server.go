@@ -261,6 +261,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		RktAPIEndpoint:                 s.RktAPIEndpoint,
 		RktStage1Image:                 s.RktStage1Image,
 		RootDirectory:                  s.RootDirectory,
+		SeccompProfileRoot:             s.SeccompProfileRoot,
 		Runonce:                        s.RunOnce,
 		SerializeImagePulls:            s.SerializeImagePulls,
 		StandaloneMode:                 (len(s.APIServerList) == 0),
@@ -831,6 +832,7 @@ type KubeletConfig struct {
 	RktStage1Image                 string
 	RootDirectory                  string
 	Runonce                        bool
+	SeccompProfileRoot             string
 	SerializeImagePulls            bool
 	StandaloneMode                 bool
 	StreamingConnectionIdleTimeout time.Duration
@@ -882,6 +884,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.DockerClient,
 		kubeClient,
 		kc.RootDirectory,
+		kc.SeccompProfileRoot,
 		kc.PodInfraContainerImage,
 		kc.SyncFrequency,
 		float32(kc.RegistryPullQPS),
