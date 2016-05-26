@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -972,7 +972,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
-	clock := util.FakeClock{}
+	clock := clock.FakeClock{}
 	request.backoffMgr = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
 		Backoff: flowcontrol.NewFakeBackOff(

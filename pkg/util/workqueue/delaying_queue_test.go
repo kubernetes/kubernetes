@@ -22,12 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestSimpleQueue(t *testing.T) {
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	q := newDelayingQueue(fakeClock)
 
 	first := "foo"
@@ -69,7 +69,7 @@ func TestSimpleQueue(t *testing.T) {
 }
 
 func TestDeduping(t *testing.T) {
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	q := newDelayingQueue(fakeClock)
 
 	first := "foo"
@@ -128,7 +128,7 @@ func TestDeduping(t *testing.T) {
 }
 
 func TestAddTwoFireEarly(t *testing.T) {
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	q := newDelayingQueue(fakeClock)
 
 	first := "foo"
@@ -178,7 +178,7 @@ func TestAddTwoFireEarly(t *testing.T) {
 }
 
 func TestCopyShifting(t *testing.T) {
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	q := newDelayingQueue(fakeClock)
 
 	first := "foo"

@@ -26,7 +26,7 @@ import (
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 // mockPodKiller is used to testing which pod is killed
@@ -93,7 +93,7 @@ func TestMemoryPressure(t *testing.T) {
 		return pods
 	}
 
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 

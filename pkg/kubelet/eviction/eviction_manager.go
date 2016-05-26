@@ -28,14 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // managerImpl implements NodeStabilityManager
 type managerImpl struct {
 	//  used to track time
-	clock util.Clock
+	clock clock.Clock
 	// config is how the manager is configured
 	config Config
 	// the function to invoke to kill a pod
@@ -66,7 +66,7 @@ func NewManager(
 	killPodFunc KillPodFunc,
 	recorder record.EventRecorder,
 	nodeRef *api.ObjectReference,
-	clock util.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
+	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
 	manager := &managerImpl{
 		clock:           clock,
 		killPodFunc:     killPodFunc,
