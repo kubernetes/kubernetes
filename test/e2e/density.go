@@ -50,7 +50,57 @@ const (
 // Maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
 
-func density30AddonResourceVerifier() map[string]framework.ResourceConstraint {
+func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
+	var apiserverMem uint64
+	var controllerMem uint64
+	var schedulerMem uint64
+	apiserverCPU := math.MaxFloat32
+	apiserverMem = math.MaxUint64
+	controllerCPU := math.MaxFloat32
+	controllerMem = math.MaxUint64
+	schedulerCPU := math.MaxFloat32
+	schedulerMem = math.MaxUint64
+	if framework.ProviderIs("kubemark") {
+		if numNodes <= 5 {
+			apiserverCPU = 0.15
+			apiserverMem = 150 * (1024 * 1024)
+			controllerCPU = 0.1
+			controllerMem = 100 * (1024 * 1024)
+			schedulerCPU = 0.05
+			schedulerMem = 50 * (1024 * 1024)
+		} else if numNodes <= 100 {
+			apiserverCPU = 1.5
+			apiserverMem = 1500 * (1024 * 1024)
+			controllerCPU = 0.75
+			controllerMem = 750 * (1024 * 1024)
+			schedulerCPU = 0.75
+			schedulerMem = 500 * (1024 * 1024)
+		} else if numNodes <= 500 {
+			apiserverCPU = 2.25
+			apiserverMem = 2500 * (1024 * 1024)
+			controllerCPU = 1.0
+			controllerMem = 1100 * (1024 * 1024)
+			schedulerCPU = 0.8
+			schedulerMem = 500 * (1024 * 1024)
+		} else if numNodes <= 1000 {
+			apiserverCPU = 4
+			apiserverMem = 4000 * (1024 * 1024)
+			controllerCPU = 3
+			controllerMem = 2000 * (1024 * 1024)
+			schedulerCPU = 1.5
+			schedulerMem = 750 * (1024 * 1024)
+		}
+	} else {
+		if numNodes <= 100 {
+			apiserverCPU = 1.5
+			apiserverMem = 1300 * (1024 * 1024)
+			controllerCPU = 0.5
+			controllerMem = 300 * (1024 * 1024)
+			schedulerCPU = 0.4
+			schedulerMem = 150 * (1024 * 1024)
+		}
+	}
+
 	constraints := make(map[string]framework.ResourceConstraint)
 	constraints["fluentd-elasticsearch"] = framework.ResourceConstraint{
 		CPUConstraint:    0.2,
@@ -80,6 +130,18 @@ func density30AddonResourceVerifier() map[string]framework.ResourceConstraint {
 	constraints["influxdb"] = framework.ResourceConstraint{
 		CPUConstraint:    2,
 		MemoryConstraint: 500 * (1024 * 1024),
+	}
+	constraints["kube-apiserver"] = framework.ResourceConstraint{
+		CPUConstraint:    apiserverCPU,
+		MemoryConstraint: apiserverMem,
+	}
+	constraints["kube-controller-manager"] = framework.ResourceConstraint{
+		CPUConstraint:    controllerCPU,
+		MemoryConstraint: controllerMem,
+	}
+	constraints["kube-scheduler"] = framework.ResourceConstraint{
+		CPUConstraint:    schedulerCPU,
+		MemoryConstraint: schedulerMem,
 	}
 	return constraints
 }
@@ -213,7 +275,7 @@ var _ = framework.KubeDescribe("Density", func() {
 		switch testArg.podsPerNode {
 		case 30:
 			name = "[Feature:Performance] " + name
-			f.AddonResourceConstraints = density30AddonResourceVerifier()
+			f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
 		case 95:
 			name = "[Feature:HighDensityPerformance]" + name
 		default:
