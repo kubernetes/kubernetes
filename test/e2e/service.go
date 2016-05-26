@@ -1138,8 +1138,8 @@ func createPodOrFail(c *client.Client, ns, name string, labels map[string]string
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  "test",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Name:  "pause",
+					Image: framework.GetPauseImageName(c),
 					Ports: containerPorts,
 					// Add a dummy environment variable to work around a docker issue.
 					// https://github.com/docker/docker/issues/14203

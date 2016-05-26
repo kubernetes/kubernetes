@@ -42,6 +42,7 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -283,7 +284,7 @@ func DoTestPodScheduling(t *testing.T, restClient *client.Client) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "extender-test-pod"},
 		Spec: api.PodSpec{
-			Containers: []api.Container{{Name: "container", Image: "gcr.io/google_containers/pause-amd64:3.0"}},
+			Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(restClient)}},
 		},
 	}
 

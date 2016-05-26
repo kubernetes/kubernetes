@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -232,7 +233,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{Name: "node-scheduling-test-pod"},
 			Spec: api.PodSpec{
-				Containers: []api.Container{{Name: "container", Image: "gcr.io/google_containers/pause-amd64:3.0"}},
+				Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(restClient)}},
 			},
 		}
 		myPod, err := restClient.Pods(api.NamespaceDefault).Create(pod)
@@ -339,21 +340,21 @@ func TestMultiScheduler(t *testing.T) {
 	restClient.Nodes().Create(node)
 
 	// 3. create 3 pods for testing
-	podWithNoAnnotation := createPod("pod-with-no-annotation", nil)
+	podWithNoAnnotation := createPod(restClient, "pod-with-no-annotation", nil)
 	testPodNoAnnotation, err := restClient.Pods(api.NamespaceDefault).Create(podWithNoAnnotation)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
-	podWithAnnotationFitsDefault := createPod("pod-with-annotation-fits-default", schedulerAnnotationFitsDefault)
+	podWithAnnotationFitsDefault := createPod(restClient, "pod-with-annotation-fits-default", schedulerAnnotationFitsDefault)
 	testPodWithAnnotationFitsDefault, err := restClient.Pods(api.NamespaceDefault).Create(podWithAnnotationFitsDefault)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}
-	podWithAnnotationFitsFoo := createPod("pod-with-annotation-fits-foo", schedulerAnnotationFitsFoo)
+	podWithAnnotationFitsFoo := createPod(restClient, "pod-with-annotation-fits-foo", schedulerAnnotationFitsFoo)
 	testPodWithAnnotationFitsFoo, err := restClient.Pods(api.NamespaceDefault).Create(podWithAnnotationFitsFoo)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
@@ -456,11 +457,11 @@ func TestMultiScheduler(t *testing.T) {
 	*/
 }
 
-func createPod(name string, annotation map[string]string) *api.Pod {
+func createPod(client *client.Client, name string, annotation map[string]string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: name, Annotations: annotation},
 		Spec: api.PodSpec{
-			Containers: []api.Container{{Name: "container", Image: "gcr.io/google_containers/pause-amd64:3.0"}},
+			Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(client)}},
 		},
 	}
 }
@@ -521,7 +522,7 @@ func TestAllocatable(t *testing.T) {
 			Containers: []api.Container{
 				{
 					Name:  "container",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Image: e2e.GetPauseImageName(restClient),
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),

@@ -294,7 +294,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			for i := 0; i < numberOrRCs; i++ {
 				RCName = "density" + strconv.Itoa(totalPods) + "-" + strconv.Itoa(i) + "-" + uuid
 				RCConfigs[i] = framework.RCConfig{Client: c,
-					Image:                "gcr.io/google_containers/pause-amd64:3.0",
+					Image:                framework.GetPauseImageName(f.Client),
 					Name:                 RCName,
 					Namespace:            ns,
 					Labels:               map[string]string{"type": "densityPod"},
@@ -522,7 +522,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				}
 				for i := 1; i <= nodeCount; i++ {
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-					go createRunningPodFromRC(&wg, c, name, ns, "gcr.io/google_containers/pause-amd64:3.0", additionalPodsPrefix, cpuRequest, memRequest)
+					go createRunningPodFromRC(&wg, c, name, ns, framework.GetPauseImageName(f.Client), additionalPodsPrefix, cpuRequest, memRequest)
 					time.Sleep(200 * time.Millisecond)
 				}
 				wg.Wait()

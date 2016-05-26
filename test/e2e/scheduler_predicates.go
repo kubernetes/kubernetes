@@ -238,7 +238,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -257,7 +257,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -315,7 +315,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
@@ -342,7 +342,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
@@ -382,7 +382,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 				NodeSelector: map[string]string{
@@ -425,7 +425,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -461,7 +461,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -499,7 +499,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 				NodeSelector: map[string]string{
@@ -563,7 +563,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -598,7 +598,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -654,7 +654,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -692,7 +692,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -771,7 +771,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -822,7 +822,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -857,7 +857,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -910,7 +910,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -949,7 +949,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1002,7 +1002,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1037,7 +1037,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1098,7 +1098,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1137,7 +1137,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1201,7 +1201,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1240,7 +1240,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1304,7 +1304,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1369,7 +1369,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  tolerationPodName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1426,7 +1426,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
@@ -1481,7 +1481,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				Containers: []api.Container{
 					{
 						Name:  podNameNoTolerations,
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
