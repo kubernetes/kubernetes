@@ -18,18 +18,23 @@ package framework
 
 import "k8s.io/kubernetes/test/e2e/generated"
 
-// ReadOrDie reads a file from gobindata.  To generate gobindata, run
-//
-// # Install the program
-// go get -u github.com/jteeuwen/go-bindata/...
-//
-// # Generate the bindata file.
-// go-bindata \
-// 	-pkg generated -ignore .jpg -ignore .png -ignore .md \
-// 	./examples/* ./docs/user-guide/* test/e2e/testing-manifests/kubectl/* test/images/*
-//
-// # Copy it into the generated directory if the results are what you expected.
-// cp bindata.go test/e2e/generated
+/*
+ReadOrDie reads a file from gobindata.  To generate gobindata, run
+
+# Install the program
+go get -u github.com/jteeuwen/go-bindata/...
+
+# Generate the bindata file.
+go-bindata \
+  -pkg generated -ignore .jpg -ignore .png -ignore .md \
+  ./examples/* ./docs/user-guide/* test/e2e/testing-manifests/kubectl/* test/images/*
+
+# Copy it into the generated directory if the results are what you expected.
+cp bindata.go test/e2e/generated
+
+# Don't forget to gofmt it
+gofmt -s -w test/e2e/generated/bindata.go
+*/
 func ReadOrDie(filePath string) []byte {
 	fileBytes, err := generated.Asset(filePath)
 	if err != nil {
