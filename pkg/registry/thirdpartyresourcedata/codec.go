@@ -510,8 +510,8 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 			return err
 		}
 
-		fmt.Fprint(stream, string(encBytes))
-		return nil
+		_, err = stream.Write(encBytes)
+		return err
 	case *versioned.InternalEvent:
 		event := &versioned.Event{}
 		err := versioned.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)
