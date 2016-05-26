@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 const (
@@ -35,7 +35,7 @@ const (
 // activeDeadlineHandler knows how to enforce active deadlines on pods.
 type activeDeadlineHandler struct {
 	// the clock to use for deadline enforcement
-	clock util.Clock
+	clock clock.Clock
 	// the provider of pod status
 	podStatusProvider status.PodStatusProvider
 	// the recorder to dispatch events when we identify a pod has exceeded active deadline
@@ -46,7 +46,7 @@ type activeDeadlineHandler struct {
 func newActiveDeadlineHandler(
 	podStatusProvider status.PodStatusProvider,
 	recorder record.EventRecorder,
-	clock util.Clock,
+	clock clock.Clock,
 ) (*activeDeadlineHandler, error) {
 
 	// check for all required fields

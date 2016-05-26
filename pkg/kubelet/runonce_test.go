@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -79,7 +79,7 @@ func TestRunOnce(t *testing.T) {
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
 		reasonCache:         NewReasonCache(),
-		clock:               util.RealClock{},
+		clock:               clock.RealClock{},
 		kubeClient:          &fake.Clientset{},
 		hostname:            testKubeletHostname,
 		nodeName:            testKubeletHostname,

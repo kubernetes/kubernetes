@@ -20,7 +20,7 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -34,10 +34,10 @@ type DelayingInterface interface {
 
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability
 func NewDelayingQueue() DelayingInterface {
-	return newDelayingQueue(util.RealClock{})
+	return newDelayingQueue(clock.RealClock{})
 }
 
-func newDelayingQueue(clock util.Clock) DelayingInterface {
+func newDelayingQueue(clock clock.Clock) DelayingInterface {
 	ret := &delayingType{
 		Interface:          New(),
 		clock:              clock,
@@ -57,7 +57,7 @@ type delayingType struct {
 	Interface
 
 	// clock tracks time for delayed firing
-	clock util.Clock
+	clock clock.Clock
 
 	// stopCh lets us signal a shutdown to the waiting loop
 	stopCh chan struct{}
