@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	scaleTimeout = 2 * time.Minute
+	scaleTimeout = 5 * time.Minute
 )
 
 var _ = framework.KubeDescribe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
