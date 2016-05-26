@@ -151,6 +151,8 @@ type KubeletConfiguration struct {
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string `json:"rootDirectory"`
+	// seccompProfileRoot is the directory path for seccomp profiles.
+	SeccompProfileRoot string `json:"seccompProfileRoot"`
 	// allowPrivileged enables containers to request privileged mode.
 	// Defaults to false.
 	AllowPrivileged bool `json:"allowPrivileged"`

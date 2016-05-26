@@ -19,6 +19,7 @@ package options
 
 import (
 	_ "net/http/pprof"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -132,6 +133,7 @@ func NewKubeletServer() *KubeletServer {
 			RootDirectory:                    defaultRootDir,
 			RuntimeCgroups:                   "",
 			SerializeImagePulls:              true,
+			SeccompProfileRoot:               filepath.Join(defaultRootDir, "seccomp"),
 			StreamingConnectionIdleTimeout:   unversioned.Duration{Duration: 4 * time.Hour},
 			SyncFrequency:                    unversioned.Duration{Duration: 1 * time.Minute},
 			SystemCgroups:                    "",
@@ -171,6 +173,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.PodInfraContainerImage, "pod-infra-container-image", s.PodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
 	fs.StringVar(&s.RootDirectory, "root-dir", s.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
+	fs.StringVar(&s.SeccompProfileRoot, "seccomp-profile-root", s.SeccompProfileRoot, "Directory path for seccomp profiles.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow containers to request privileged mode. [default=false]")
 	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. [default=\"*\"]")
 	fs.StringVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. [default=\"*\"]")

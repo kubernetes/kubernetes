@@ -177,6 +177,7 @@ func NewMainKubelet(
 	dockerClient dockertools.DockerInterface,
 	kubeClient clientset.Interface,
 	rootDirectory string,
+	seccompProfileRoot string,
 	podInfraContainerImage string,
 	resyncInterval time.Duration,
 	pullQPS float32,
@@ -423,6 +424,7 @@ func NewMainKubelet(
 			serializeImagePulls,
 			enableCustomMetrics,
 			klet.hairpinMode == componentconfig.HairpinVeth,
+			seccompProfileRoot,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
