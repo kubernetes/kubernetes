@@ -784,9 +784,10 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, requiresPrivi
 	}
 
 	ra := appcschema.RuntimeApp{
-		Name:  convertToACName(c.Name),
-		Image: appcschema.RuntimeImage{ID: *hash},
-		App:   imgManifest.App,
+		Name:           convertToACName(c.Name),
+		Image:          appcschema.RuntimeImage{ID: *hash},
+		App:            imgManifest.App,
+		ReadOnlyRootFS: *c.SecurityContext.ReadOnlyRootFilesystem,
 		Annotations: []appctypes.Annotation{
 			{
 				Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
