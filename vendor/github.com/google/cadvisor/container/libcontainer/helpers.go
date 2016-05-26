@@ -299,10 +299,6 @@ func GetProcesses(cgroupManager cgroups.Manager) ([]int, error) {
 	return pids, nil
 }
 
-func DockerStateDir(dockerRoot string) string {
-	return path.Join(dockerRoot, "containers")
-}
-
 func DiskStatsCopy0(major, minor uint64) *info.PerDiskStats {
 	disk := info.PerDiskStats{
 		Major: major,

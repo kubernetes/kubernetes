@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Handler for /validate content.
-// Validates cadvisor dependencies - kernel, os, docker setup.
-
-package docker
-
-import (
-	"sync"
-
-	dclient "github.com/docker/engine-api/client"
-)
-
-var (
-	dockerClient     *dclient.Client
-	dockerClientErr  error
-	dockerClientOnce sync.Once
-)
-
-func Client() (*dclient.Client, error) {
-	dockerClientOnce.Do(func() {
-		dockerClient, dockerClientErr = dclient.NewClient(*ArgDockerEndpoint, "", nil, nil)
-	})
-	return dockerClient, dockerClientErr
-}
+// Package devicemapper contains code for working with devicemapper
+package devicemapper
