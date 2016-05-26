@@ -20,6 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/autoscaling/v1"
+	fakev1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/autoscaling/v1/fake"
+	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/batch/v1"
+	fakev1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/batch/v1/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1"
 	fakev1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/extensions/v1beta1"
@@ -69,4 +73,14 @@ func (c *Clientset) Core() v1core.CoreInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingInterface {
+	return &fakev1autoscaling.FakeAutoscaling{Fake: &c.Fake}
+}
+
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() v1batch.BatchInterface {
+	return &fakev1batch.FakeBatch{Fake: &c.Fake}
 }
