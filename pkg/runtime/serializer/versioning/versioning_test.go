@@ -19,6 +19,7 @@ package versioning
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"testing"
 
@@ -36,6 +37,60 @@ type testDecodable struct {
 func (d *testDecodable) GetObjectKind() unversioned.ObjectKind                { return d }
 func (d *testDecodable) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
+
+type testNestedDecodable struct {
+	Other string
+	Value int `json:"value"`
+
+	gvk          unversioned.GroupVersionKind
+	nestedCalled bool
+	nestedErr    error
+}
+
+func (d *testNestedDecodable) GetObjectKind() unversioned.ObjectKind                { return d }
+func (d *testNestedDecodable) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
+func (d *testNestedDecodable) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
+
+func (d *testNestedDecodable) EncodeNestedObjects(e runtime.Encoder) error {
+	d.nestedCalled = true
+	return d.nestedErr
+}
+
+func (d *testNestedDecodable) DecodeNestedObjects(_ runtime.Decoder) error {
+	d.nestedCalled = true
+	return d.nestedErr
+}
+
+func TestNestedDecode(t *testing.T) {
+	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
+	decoder := &mockSerializer{obj: n}
+	codec := NewCodec(nil, decoder, nil, nil, nil, nil, nil, nil)
+	if _, _, err := codec.Decode([]byte(`{}`), nil, n); err != n.nestedErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !n.nestedCalled {
+		t.Errorf("did not invoke nested decoder")
+	}
+}
+
+func TestNestedEncode(t *testing.T) {
+	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
+	n2 := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode 2")}
+	encoder := &mockSerializer{obj: n}
+	codec := NewCodec(
+		encoder, nil,
+		&checkConvertor{obj: n2, groupVersion: unversioned.GroupVersion{Group: "other"}},
+		nil, nil,
+		&mockTyper{gvks: []unversioned.GroupVersionKind{{Kind: "test"}}},
+		unversioned.GroupVersion{Group: "other"}, nil,
+	)
+	if err := codec.Encode(n, ioutil.Discard); err != n2.nestedErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if n.nestedCalled || !n2.nestedCalled {
+		t.Errorf("did not invoke correct nested decoder")
+	}
+}
 
 func TestDecode(t *testing.T) {
 	gvk1 := &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}
@@ -300,10 +355,15 @@ func (c *mockCreater) New(kind unversioned.GroupVersionKind) (runtime.Object, er
 }
 
 type mockTyper struct {
-	gvk *unversioned.GroupVersionKind
-	err error
+	gvks        []unversioned.GroupVersionKind
+	unversioned bool
+	err         error
 }
 
-func (t *mockTyper) ObjectKind(obj runtime.Object) (*unversioned.GroupVersionKind, bool, error) {
-	return t.gvk, false, t.err
+func (t *mockTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionKind, bool, error) {
+	return t.gvks, t.unversioned, t.err
+}
+
+func (t *mockTyper) Recognizes(_ unversioned.GroupVersionKind) bool {
+	return true
 }
