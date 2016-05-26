@@ -149,7 +149,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		mounter, err := kl.newVolumeMounterFromPlugins(volSpec, pod, volume.VolumeOptions{RootContext: rootContext})
 		if err != nil {
 			glog.Errorf("Could not create volume mounter for pod %s: %v", pod.UID, err)
-			return nil, err
+			return nil, kl.AddMountErrorHint("NoMounter", volSpec.Name(), err)
 		}
 
 		// some volumes require attachment before mounter's setup.
@@ -158,7 +158,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		attacher, err := kl.newVolumeAttacherFromPlugins(volSpec, pod)
 		if err != nil {
 			glog.Errorf("Could not create volume attacher for pod %s: %v", pod.UID, err)
-			return nil, err
+			return nil, kl.AddMountErrorHint(mounter.GetPath(), volSpec.Name(), err)
 		}
 		if attacher != nil {
 			// If the device path is already mounted, avoid an expensive call to the
@@ -166,28 +166,28 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 			deviceMountPath := attacher.GetDeviceMountPath(volSpec)
 			notMountPoint, err := kl.mounter.IsLikelyNotMountPoint(deviceMountPath)
 			if err != nil && !os.IsNotExist(err) {
-				return nil, err
+				return nil, kl.AddMountErrorHint(mounter.GetPath(), volSpec.Name(), err)
 			}
 			if notMountPoint {
 				err = attacher.Attach(volSpec, kl.hostname)
 				if err != nil {
-					return nil, err
+					return nil, kl.AddMountErrorHint(mounter.GetPath(), volSpec.Name(), err)
 				}
 
 				devicePath, err := attacher.WaitForAttach(volSpec, maxWaitForVolumeOps)
 				if err != nil {
-					return nil, err
+					return nil, kl.AddMountErrorHint(mounter.GetPath(), volSpec.Name(), err)
 				}
 
 				if err = attacher.MountDevice(volSpec, devicePath, deviceMountPath, kl.mounter); err != nil {
-					return nil, err
+					return nil, kl.AddMountErrorHint(mounter.GetPath(), volSpec.Name(), err)
 				}
 			}
 		}
 
 		err = mounter.SetUp(fsGroup)
 		if err != nil {
-			return nil, err
+			return nil, kl.AddMountErrorHint(mounter.GetPath(), volSpec.Name(), err)
 		}
 		podVolumes[pod.Spec.Volumes[i].Name] = kubecontainer.VolumeInfo{Mounter: mounter}
 	}
