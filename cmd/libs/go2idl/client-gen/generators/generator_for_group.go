@@ -18,6 +18,7 @@ package generators
 
 import (
 	"io"
+	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
@@ -32,8 +33,9 @@ type genGroup struct {
 	group         string
 	version       string
 	// types in this group
-	types   []*types.Type
-	imports namer.ImportTracker
+	types        []*types.Type
+	imports      namer.ImportTracker
+	inputPacakge string
 }
 
 var _ generator.Generator = &genGroup{}
@@ -66,17 +68,22 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		return `"/apis"`
 	}
 
-	canonize := func(group string) string {
-		if group == "core" {
-			return ""
+	groupName := g.group
+	if g.group == "core" {
+		groupName = ""
+	}
+	// allow user to define a group name that's different from the one parsed from the directory.
+	for _, comment := range c.Universe.Package(g.inputPacakge).DocComments {
+		comment = strings.TrimLeft(comment, "//")
+		if override, ok := types.ExtractCommentTags("+", comment)["groupName"]; ok && override != "" {
+			groupName = override
 		}
-		return group
 	}
 
 	m := map[string]interface{}{
 		"group":                      normalization.BeforeFirstDot(g.group),
 		"Group":                      namer.IC(normalization.BeforeFirstDot(g.group)),
-		"canonicalGroup":             canonize(g.group),
+		"groupName":                  groupName,
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
@@ -190,7 +197,7 @@ func New(c *$.RESTClient|raw$) *$.Group$Client {
 var setInternalVersionClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.canonicalGroup$")
+	g, err := $.latestGroup|raw$("$.groupName$")
 	if err != nil {
 		return err
 	}
@@ -219,7 +226,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 var setClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.canonicalGroup$")
+	g, err := $.latestGroup|raw$("$.groupName$")
 	if err != nil {
 		return err
 	}

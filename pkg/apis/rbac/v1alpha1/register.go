@@ -24,7 +24,7 @@ import (
 )
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: rbac.GroupName, Version: "v1alpha"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: rbac.GroupName, Version: "v1alpha1"}
 
 func AddToScheme(scheme *runtime.Scheme) {
 	addKnownTypes(scheme)

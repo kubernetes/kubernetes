@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/metrics"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
@@ -347,6 +348,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return c.ExtensionsClient.RESTClient, nil
 			case federation.GroupName:
 				return clients.FederationClientForVersion(&mappingVersion)
+			case rbac.GroupName:
+				return c.RbacClient.RESTClient, nil
 			default:
 				if !registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 					return nil, fmt.Errorf("unknown api group/version: %s", gvk.String())
@@ -1016,6 +1019,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 			return errors.New("unable to validate: no batch client")
 		}
 		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+	}
+	if gvk.Group == rbac.GroupName {
+		if c.c.RbacClient == nil {
+			return errors.New("unable to validate: no rbac client")
+		}
+		return getSchemaAndValidate(c.c.RbacClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
 	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 		// Don't attempt to validate third party objects
