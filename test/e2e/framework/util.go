@@ -4080,3 +4080,19 @@ func UpdatePodWithRetries(client *client.Client, ns, name string, update func(*a
 	}
 	return nil, fmt.Errorf("Too many retries updating Pod %q", name)
 }
+
+func GetPodsInNamespace(c *client.Client, ns string, ignoreLabels map[string]string) ([]*api.Pod, error) {
+	pods, err := c.Pods(ns).List(api.ListOptions{})
+	if err != nil {
+		return []*api.Pod{}, err
+	}
+	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
+	filtered := []*api.Pod{}
+	for _, p := range pods.Items {
+		if len(ignoreLabels) != 0 && ignoreSelector.Matches(labels.Set(p.Labels)) {
+			continue
+		}
+		filtered = append(filtered, &p)
+	}
+	return filtered, nil
+}
