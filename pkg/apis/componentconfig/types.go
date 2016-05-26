@@ -564,6 +564,9 @@ type VolumeConfiguration struct {
 	EnableHostPathProvisioning bool `json:"enableHostPathProvisioning"`
 	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
+	// volumePluginDir is the full path of the directory in which the flex
+	// volume plugin should search for additional third party volume plugins
+	FlexVolumePluginDir string `json:"flexVolumePluginDir"`
 }
 
 type PersistentVolumeRecyclerConfiguration struct {

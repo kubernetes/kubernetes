@@ -82,3 +82,39 @@ func CreateSharedNodeIndexInformer(client clientset.Interface, resyncPeriod time
 
 	return sharedIndexInformer
 }
+
+// CreateSharedPVCIndexInformer returns a SharedIndexInformer that lists and watches all PVCs
+func CreateSharedPVCIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+	sharedIndexInformer := framework.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.PersistentVolumeClaim{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}
+
+// CreateSharedPVIndexInformer returns a SharedIndexInformer that lists and watches all PVs
+func CreateSharedPVIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+	sharedIndexInformer := framework.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().PersistentVolumes().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().PersistentVolumes().Watch(options)
+			},
+		},
+		&api.PersistentVolume{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}

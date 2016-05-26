@@ -291,7 +291,18 @@ func createClients(s *httptest.Server) (*clientset.Clientset, *persistentvolumec
 	// creates many claims and default values were too low.
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000, Burst: 100000})
 	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
-	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}, 0, 0, nil, nil, nil, nil}}
+	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{
+		PluginName:             "plugin-name",
+		Host:                   host,
+		Config:                 volume.VolumeConfig{},
+		LastProvisionerOptions: volume.VolumeOptions{},
+		NewAttacherCallCount:   0,
+		NewDetacherCallCount:   0,
+		Mounters:               nil,
+		Unmounters:             nil,
+		Attachers:              nil,
+		Detachers:              nil,
+	}}
 	cloud := &fake_cloud.FakeCloud{}
 	ctrl := persistentvolumecontroller.NewPersistentVolumeController(testClient, 10*time.Second, nil, plugins, cloud, "", nil, nil, nil)
 	return testClient, ctrl
