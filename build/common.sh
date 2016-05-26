@@ -312,8 +312,10 @@ function kube::build::clean_output() {
 
 # Make sure the _output directory is created and mountable by docker
 function kube::build::prepare_output() {
+  # See auto-creation of host mounts: https://github.com/docker/docker/pull/21666
+  # if selinux is enabled, docker run -v /foo:/foo:Z will not autocreate the host dir
   mkdir -p "${LOCAL_OUTPUT_SUBPATH}"
-
+  mkdir -p "${LOCAL_OUTPUT_BINPATH}"
   # On RHEL/Fedora SELinux is enabled by default and currently breaks docker
   # volume mounts.  We can work around this by explicitly adding a security
   # context to the _output directory.
@@ -331,7 +333,10 @@ function kube::build::prepare_output() {
     number=${#DOCKER_MOUNT_ARGS[@]}
     for (( i=0; i<number; i++ )); do
       if [[ "${DOCKER_MOUNT_ARGS[i]}" =~ "${KUBE_ROOT}" ]]; then
-        DOCKER_MOUNT_ARGS[i]="${DOCKER_MOUNT_ARGS[i]}:Z"
+        ## Ensure we don't label the argument multiple times
+        if [[ ! "${DOCKER_MOUNT_ARGS[i]}" == *:Z ]]; then
+          DOCKER_MOUNT_ARGS[i]="${DOCKER_MOUNT_ARGS[i]}:Z"
+        fi
       fi
     done
   fi
