@@ -25,6 +25,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var _ meta.Object = &api.ObjectMeta{}
@@ -95,5 +98,77 @@ func TestAccessOwnerReferences(t *testing.T) {
 	for i := 0; i < fuzzIter; i++ {
 		testGetOwnerReferences(t)
 		testSetOwnerReferences(t)
+	}
+}
+
+func TestAccessorImplementations(t *testing.T) {
+	for _, group := range testapi.Groups {
+		for _, gv := range []unversioned.GroupVersion{*group.GroupVersion(), group.InternalGroupVersion()} {
+			for kind, knownType := range api.Scheme.KnownTypes(gv) {
+				value := reflect.New(knownType)
+				obj := value.Interface()
+				if _, ok := obj.(runtime.Object); !ok {
+					t.Errorf("%v (%v) does not implement runtime.Object", gv.WithKind(kind), knownType)
+				}
+				lm, isLM := obj.(meta.ListMetaAccessor)
+				om, isOM := obj.(meta.ObjectMetaAccessor)
+				switch {
+				case isLM && isOM:
+					t.Errorf("%v (%v) implements ListMetaAccessor and ObjectMetaAccessor", gv.WithKind(kind), knownType)
+					continue
+				case isLM:
+					m := lm.GetListMeta()
+					if m == nil {
+						t.Errorf("%v (%v) returns nil ListMeta", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetResourceVersion("102030")
+					if m.GetResourceVersion() != "102030" {
+						t.Errorf("%v (%v) did not preserve resource version", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetSelfLink("102030")
+					if m.GetSelfLink() != "102030" {
+						t.Errorf("%v (%v) did not preserve self link", gv.WithKind(kind), knownType)
+						continue
+					}
+				case isOM:
+					m := om.GetObjectMeta()
+					if m == nil {
+						t.Errorf("%v (%v) returns nil ObjectMeta", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetResourceVersion("102030")
+					if m.GetResourceVersion() != "102030" {
+						t.Errorf("%v (%v) did not preserve resource version", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetSelfLink("102030")
+					if m.GetSelfLink() != "102030" {
+						t.Errorf("%v (%v) did not preserve self link", gv.WithKind(kind), knownType)
+						continue
+					}
+					labels := map[string]string{"a": "b"}
+					m.SetLabels(labels)
+					if !reflect.DeepEqual(m.GetLabels(), labels) {
+						t.Errorf("%v (%v) did not preserve labels", gv.WithKind(kind), knownType)
+						continue
+					}
+				default:
+					if _, ok := obj.(unversioned.ListMetaAccessor); ok {
+						continue
+					}
+					if _, ok := value.Elem().Type().FieldByName("ObjectMeta"); ok {
+						t.Errorf("%v (%v) has ObjectMeta but does not implement ObjectMetaAccessor", gv.WithKind(kind), knownType)
+						continue
+					}
+					if _, ok := value.Elem().Type().FieldByName("ListMeta"); ok {
+						t.Errorf("%v (%v) has ListMeta but does not implement ListMetaAccessor", gv.WithKind(kind), knownType)
+						continue
+					}
+					t.Logf("%v (%v) does not implement ListMetaAccessor or ObjectMetaAccessor", gv.WithKind(kind), knownType)
+				}
+			}
+		}
 	}
 }

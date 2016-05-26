@@ -35,6 +35,11 @@ func ListAccessor(obj interface{}) (List, error) {
 			return om, nil
 		}
 	}
+	if listMetaAccessor, ok := obj.(unversioned.ListMetaAccessor); ok {
+		if om := listMetaAccessor.GetListMeta(); om != nil {
+			return om, nil
+		}
+	}
 	// we may get passed an object that is directly portable to List
 	if list, ok := obj.(List); ok {
 		return list, nil
