@@ -82,6 +82,7 @@ kube-apiserver
       --etcd-servers-overrides=[]: Per-resource etcd servers overrides, comma separated. The individual override format: group/resource#servers, where servers are http://ip:port, semicolon separated.
       --event-ttl=1h0m0s: Amount of time to retain events. Default 1 hour.
       --experimental-keystone-url="": If passed, activates the keystone authentication plugin
+      --experimental-ldap-config-file="": If passed, activates the ldap authentication plugin
       --external-hostname="": The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)
       --google-json-key="": The Google Cloud Platform Service Account JSON Key to use for authentication.
       --insecure-bind-address=127.0.0.1: The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). Defaults to localhost.

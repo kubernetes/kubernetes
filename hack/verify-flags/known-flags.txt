@@ -133,6 +133,7 @@ executor-path
 executor-suicide-timeout
 experimental-flannel-overlay
 experimental-keystone-url
+experimental-ldap-config-file
 experimental-nvidia-gpus
 experimental-prefix
 external-hostname

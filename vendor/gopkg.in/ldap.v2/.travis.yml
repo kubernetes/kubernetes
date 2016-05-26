@@ -1,0 +1,15 @@
+language: go
+go:
+    - 1.2
+    - 1.3
+    - 1.4
+    - 1.5
+    - tip
+go_import_path: gopkg.in/ldap.v2
+install:
+    - go get gopkg.in/asn1-ber.v1
+    - go get gopkg.in/ldap.v2
+    - go get code.google.com/p/go.tools/cmd/cover || go get golang.org/x/tools/cmd/cover
+    - go build -v ./...
+script:
+    - go test -v -cover ./... 

@@ -1,10 +1,8 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v69",
+	"GodepVersion": "v71",
 	"Packages": [
-		"github.com/ugorji/go/codec/codecgen",
-		"github.com/onsi/ginkgo/ginkgo",
 		"./..."
 	],
 	"Deps": [
@@ -2095,6 +2093,11 @@
 			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
 		},
 		{
+			"ImportPath": "gopkg.in/asn1-ber.v1",
+			"Comment": "v1.1",
+			"Rev": "4e86f4367175e39f69d9358a5f17b4dda270378d"
+		},
+		{
 			"ImportPath": "gopkg.in/gcfg.v1",
 			"Rev": "083575c3955c85df16fe9590cceab64d03f5eb6e"
 		},
@@ -2113,6 +2116,11 @@
 		{
 			"ImportPath": "gopkg.in/inf.v0",
 			"Rev": "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4"
+		},
+		{
+			"ImportPath": "gopkg.in/ldap.v2",
+			"Comment": "v2.3.0",
+			"Rev": "0e7db8eb77695b5a952f0e5d78df9ab160050c73"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",

@@ -77,6 +77,7 @@ type ServerRunOptions struct {
 	InsecurePort              int
 	KeystoneURL               string
 	KubernetesServiceNodePort int
+	LdapConfigFile            string
 	LongRunningRequestRE      string
 	MasterCount               int
 	MasterServiceNamespace    string
@@ -277,6 +278,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("port", "see --insecure-port instead")
 
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
+
+	fs.StringVar(&s.LdapConfigFile, "experimental-ldap-config-file", s.LdapConfigFile, "If passed, activates the Ldap authentication plugin")
 
 	// See #14282 for details on how to test/try this option out.  TODO remove this comment once this option is tested in CI.
 	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, "If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be of type NodePort, using this as the value of the port. If zero, the Kubernetes master service will be of type ClusterIP.")
