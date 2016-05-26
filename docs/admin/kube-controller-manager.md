@@ -73,6 +73,7 @@ kube-controller-manager
       --deleting-pods-qps=0.1: Number of nodes per second on which pods are deleted in case of node failure.
       --deployment-controller-sync-period=30s: Period for syncing the deployments.
       --enable-hostpath-provisioner[=false]: Enable HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features.  HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.
+      --flex-volume-plugin-dir="/usr/libexec/kubernetes/kubelet-plugins/volume/exec/": Full path of the directory in which the flex volume plugin should search for additional third party volume plugins.
       --google-json-key="": The Google Cloud Platform Service Account JSON Key to use for authentication.
       --horizontal-pod-autoscaler-sync-period=30s: The period for syncing the number of pods in horizontal pod autoscaler.
       --kube-api-burst=30: Burst to use while talking with kubernetes apiserver
