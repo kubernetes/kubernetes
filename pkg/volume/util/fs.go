@@ -1,4 +1,4 @@
-// +build linux
+// +build linux darwin
 
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
@@ -27,22 +27,25 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-// FSInfo linux returns (available bytes, byte capacity, error) for the filesystem that
+// FSInfo linux returns (available bytes, byte capacity, byte usage, error) for the filesystem that
 // path resides upon.
-func FsInfo(path string) (int64, int64, error) {
+func FsInfo(path string) (int64, int64, int64, error) {
 	statfs := &syscall.Statfs_t{}
 	err := syscall.Statfs(path, statfs)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
-
+	// TODO(vishh): Include inodes space
 	// Available is blocks available * fragment size
-	available := int64(statfs.Bavail) * int64(statfs.Frsize)
+	available := int64(statfs.Bavail) * int64(statfs.Bsize)
 
 	// Capacity is total block count * fragment size
-	capacity := int64(statfs.Blocks) * int64(statfs.Frsize)
+	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
 
-	return available, capacity, nil
+	// Usage is block being used * fragment size (aka block size).
+	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+
+	return available, capacity, usage, nil
 }
 
 func Du(path string) (*resource.Quantity, error) {
