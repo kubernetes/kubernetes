@@ -154,6 +154,18 @@ type StorageSerializer interface {
 	DecoderToVersion(serializer Decoder, gv GroupVersioner) Decoder
 }
 
+// NestedObjectEncoder is an optional interface that objects may implement to be given
+// an opportunity to encode any nested Objects / RawExtensions during serialization.
+type NestedObjectEncoder interface {
+	EncodeNestedObjects(e Encoder) error
+}
+
+// NestedObjectDecoder is an optional interface that objects may implement to be given
+// an opportunity to decode any nested Objects / RawExtensions during serialization.
+type NestedObjectDecoder interface {
+	DecodeNestedObjects(d Decoder) error
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Non-codec interfaces
 

@@ -17,8 +17,6 @@ limitations under the License.
 package serializer
 
 import (
-	"io"
-
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
@@ -336,47 +334,15 @@ type DirectCodecFactory struct {
 
 // EncoderForVersion returns an encoder that does not do conversion. gv is ignored.
 func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, _ runtime.GroupVersioner) runtime.Encoder {
-	return DirectCodec{
-		runtime.NewCodec(serializer, nil),
-		f.CodecFactory.scheme,
+	return versioning.DirectEncoder{
+		Encoder:     serializer,
+		ObjectTyper: f.CodecFactory.scheme,
 	}
 }
 
 // DecoderToVersion returns an decoder that does not do conversion. gv is ignored.
 func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
-	return DirectCodec{
-		runtime.NewCodec(nil, serializer),
-		nil,
+	return versioning.DirectDecoder{
+		Decoder: serializer,
 	}
-}
-
-// DirectCodec is a codec that does not do conversion. It sets the gvk during serialization, and removes the gvk during deserialization.
-type DirectCodec struct {
-	runtime.Serializer
-	runtime.ObjectTyper
-}
-
-// EncodeToStream does not do conversion. It sets the gvk during serialization. overrides are ignored.
-func (c DirectCodec) Encode(obj runtime.Object, stream io.Writer) error {
-	gvks, _, err := c.ObjectTyper.ObjectKinds(obj)
-	if err != nil {
-		return err
-	}
-	kind := obj.GetObjectKind()
-	oldGVK := kind.GroupVersionKind()
-	kind.SetGroupVersionKind(gvks[0])
-	err = c.Serializer.Encode(obj, stream)
-	kind.SetGroupVersionKind(oldGVK)
-	return err
-}
-
-// Decode does not do conversion. It removes the gvk during deserialization.
-func (c DirectCodec) Decode(data []byte, defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	obj, gvk, err := c.Serializer.Decode(data, defaults, into)
-	if obj != nil {
-		kind := obj.GetObjectKind()
-		// clearing the gvk is just a convention of a codec
-		kind.SetGroupVersionKind(unversioned.GroupVersionKind{})
-	}
-	return obj, gvk, err
 }
