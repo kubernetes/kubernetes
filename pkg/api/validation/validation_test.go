@@ -4228,14 +4228,14 @@ func TestValidateNode(t *testing.T) {
 		for i := range errs {
 			field := errs[i].Field
 			expectedFields := map[string]bool{
-				"metadata.name":                                                       true,
-				"metadata.labels":                                                     true,
-				"metadata.annotations":                                                true,
-				"metadata.namespace":                                                  true,
-				"spec.externalID":                                                     true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].key":    true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].value":  true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].effect": true,
+				"metadata.name":                                                      true,
+				"metadata.labels":                                                    true,
+				"metadata.annotations":                                               true,
+				"metadata.namespace":                                                 true,
+				"spec.externalID":                                                    true,
+				"metadata.annotations.scheduler.beta.kubernetes.io/taints[0].key":    true,
+				"metadata.annotations.scheduler.beta.kubernetes.io/taints[0].value":  true,
+				"metadata.annotations.scheduler.beta.kubernetes.io/taints[0].effect": true,
 			}
 			if val, ok := expectedFields[field]; ok {
 				if !val {

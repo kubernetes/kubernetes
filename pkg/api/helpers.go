@@ -409,11 +409,11 @@ const (
 
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
 	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
+	TolerationsAnnotationKey string = "scheduler.beta.kubernetes.io/tolerations"
 
 	// TaintsAnnotationKey represents the key of taints data (json serialized)
 	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
+	TaintsAnnotationKey string = "scheduler.beta.kubernetes.io/taints"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
