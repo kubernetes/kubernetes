@@ -73,6 +73,7 @@ kube-apiserver
       --cors-allowed-origins=[]: List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.
       --delete-collection-workers=1: Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.
       --deserialization-cache-size=50000: Number of deserialized json objects to cache in memory.
+      --enable-garbage-collector[=false]: Enables the generic garbage collector. MUST be synced with the corresponding flag of the kube-controller-manager.
       --enable-swagger-ui[=false]: Enables swagger ui on the apiserver at /swagger-ui
       --etcd-cafile="": SSL Certificate Authority file used to secure etcd communication
       --etcd-certfile="": SSL certification file used to secure etcd communication

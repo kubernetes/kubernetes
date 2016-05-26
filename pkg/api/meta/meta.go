@@ -395,6 +395,7 @@ type genericAccessor struct {
 	labels            *map[string]string
 	annotations       *map[string]string
 	ownerReferences   reflect.Value
+	finalizers        *[]string
 }
 
 func (a genericAccessor) GetNamespace() string {
@@ -527,6 +528,17 @@ func (a genericAccessor) SetAnnotations(annotations map[string]string) {
 	*a.annotations = annotations
 }
 
+func (a genericAccessor) GetFinalizers() []string {
+	if a.finalizers == nil {
+		return nil
+	}
+	return *a.finalizers
+}
+
+func (a genericAccessor) SetFinalizers(finalizers []string) {
+	*a.finalizers = finalizers
+}
+
 func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
 	var ret []metatypes.OwnerReference
 	s := a.ownerReferences
@@ -597,6 +609,9 @@ func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "Annotations", &a.annotations); err != nil {
+		return err
+	}
+	if err := runtime.FieldPtr(v, "Finalizers", &a.finalizers); err != nil {
 		return err
 	}
 	ownerReferences := v.FieldByName("OwnerReferences")

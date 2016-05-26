@@ -2100,6 +2100,7 @@ type FinalizerName string
 // These are internal finalizer values to Kubernetes, must be qualified name unless defined here
 const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
+	FinalizerOrphan     string        = "orphan"
 )
 
 // NamespaceStatus is information about the current status of a Namespace.

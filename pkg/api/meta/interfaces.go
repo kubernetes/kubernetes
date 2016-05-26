@@ -58,6 +58,8 @@ type Object interface {
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
+	GetFinalizers() []string
+	SetFinalizers(finalizers []string)
 	GetOwnerReferences() []metatypes.OwnerReference
 	SetOwnerReferences([]metatypes.OwnerReference)
 }

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
@@ -40,6 +41,10 @@ import (
 
 	"github.com/golang/glog"
 )
+
+// EnableGarbageCollector affects the handling of Update and Delete requests. It
+// must be synced with the corresponding flag in kube-controller-manager.
+var EnableGarbageCollector bool
 
 // Store implements generic.Registry.
 // It's intended to be embeddable, so that you can implement any
@@ -235,6 +240,49 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	return out, nil
 }
 
+// shouldDelete checks if a Update is removing all the object's finalizers. If so,
+// it further checks if the object's DeletionGracePeriodSeconds is 0. If so, it
+// returns true.
+func (e *Store) shouldDelete(ctx api.Context, key string, obj, existing runtime.Object) bool {
+	if !EnableGarbageCollector {
+		return false
+	}
+	newMeta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return false
+	}
+	oldMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return false
+	}
+	return len(newMeta.Finalizers) == 0 && oldMeta.DeletionGracePeriodSeconds != nil && *oldMeta.DeletionGracePeriodSeconds == 0
+}
+
+func (e *Store) deleteForEmptyFinalizers(ctx api.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
+	out := e.NewFunc()
+	glog.V(6).Infof("going to delete %s from regitry, triggered by update", name)
+	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
+		// Deletion is racy, i.e., there could be multiple update
+		// requests to remove all finalizers from the object, so we
+		// ignore the NotFound error.
+		if storage.IsNotFound(err) {
+			_, err := e.finalizeDelete(obj, true)
+			// clients are expecting an updated object if a PUT succeeded,
+			// but finalizeDelete returns a unversioned.Status, so return
+			// the object in the request instead.
+			return obj, false, err
+		}
+		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+	}
+	_, err := e.finalizeDelete(out, true)
+	// clients are expecting an updated object if a PUT succeeded, but
+	// finalizeDelete returns a unversioned.Status, so return the object in
+	// the request instead.
+	return obj, false, err
+}
+
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
@@ -255,7 +303,8 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 	}
 
 	out := e.NewFunc()
-
+	// deleteObj is only used in case a deletion is carried out
+	var deleteObj runtime.Object
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		// Given the existing object, get the new object
 		obj, err := objInfo.UpdatedObject(ctx, existing)
@@ -321,6 +370,11 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
+		delete := e.shouldDelete(ctx, key, obj, existing)
+		if delete {
+			deleteObj = obj
+			return nil, nil, errEmptiedFinalizers
+		}
 		ttl, err := e.calculateTTL(obj, res.TTL, true)
 		if err != nil {
 			return nil, nil, err
@@ -332,6 +386,10 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 	})
 
 	if err != nil {
+		// delete the object
+		if err == errEmptiedFinalizers {
+			return e.deleteForEmptyFinalizers(ctx, name, key, deleteObj, storagePreconditions)
+		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
 			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, creatingObj)
@@ -380,9 +438,173 @@ func (e *Store) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 var (
-	errAlreadyDeleting = fmt.Errorf("abort delete")
-	errDeleteNow       = fmt.Errorf("delete now")
+	errAlreadyDeleting   = fmt.Errorf("abort delete")
+	errDeleteNow         = fmt.Errorf("delete now")
+	errEmptiedFinalizers = fmt.Errorf("emptied finalizers")
 )
+
+// return if we need to update the finalizers of the object, and the desired list of finalizers
+func shouldUpdateFinalizers(accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
+	if options == nil || options.OrphanDependents == nil {
+		return false, accessor.GetFinalizers()
+	}
+	shouldOrphan := *options.OrphanDependents
+	alreadyOrphan := false
+	finalizers := accessor.GetFinalizers()
+	newFinalizers = make([]string, 0, len(finalizers))
+	for _, f := range finalizers {
+		if f == api.FinalizerOrphan {
+			alreadyOrphan = true
+			if !shouldOrphan {
+				continue
+			}
+		}
+		newFinalizers = append(newFinalizers, f)
+	}
+	if shouldOrphan && !alreadyOrphan {
+		newFinalizers = append(newFinalizers, api.FinalizerOrphan)
+	}
+	shouldUpdate = shouldOrphan != alreadyOrphan
+	return shouldUpdate, newFinalizers
+}
+
+// markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
+// DeletionTimestamp to "now". Finalizers are watching for such updates and will
+// finalize the object if their IDs are present in the object's Finalizers list.
+func markAsDeleting(obj runtime.Object) (err error) {
+	objectMeta, kerr := api.ObjectMetaFor(obj)
+	if kerr != nil {
+		return kerr
+	}
+	now := unversioned.NewTime(time.Now())
+	objectMeta.DeletionTimestamp = &now
+	var zero int64 = 0
+	objectMeta.DeletionGracePeriodSeconds = &zero
+	return nil
+}
+
+// this functions need to be kept synced with updateForGracefulDeletionAndFinalizers.
+func (e *Store) updateForGracefulDeletion(ctx api.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+	lastGraceful := int64(0)
+	out = e.NewFunc()
+	err = e.Storage.GuaranteedUpdate(
+		ctx, key, out, false, &preconditions,
+		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
+			if err != nil {
+				return nil, err
+			}
+			if pendingGraceful {
+				return nil, errAlreadyDeleting
+			}
+			if !graceful {
+				return nil, errDeleteNow
+			}
+			lastGraceful = *options.GracePeriodSeconds
+			lastExisting = existing
+			return existing, nil
+		}),
+	)
+	switch err {
+	case nil:
+		if lastGraceful > 0 {
+			return nil, false, false, out, lastExisting
+		}
+		// If we are here, the registry supports grace period mechanism and
+		// we are intentionally delete gracelessly. In this case, we may
+		// enter a race with other k8s components. If other component wins
+		// the race, the object will not be found, and we should tolerate
+		// the NotFound error. See
+		// https://github.com/kubernetes/kubernetes/issues/19403 for
+		// details.
+		return nil, true, true, out, lastExisting
+	case errDeleteNow:
+		// we've updated the object to have a zero grace period, or it's already at 0, so
+		// we should fall through and truly delete the object.
+		return nil, false, true, out, lastExisting
+	case errAlreadyDeleting:
+		out, err = e.finalizeDelete(in, true)
+		return err, false, false, out, lastExisting
+	default:
+		return storeerr.InterpretUpdateError(err, e.QualifiedResource, name), false, false, out, lastExisting
+	}
+}
+
+// this functions need to be kept synced with updateForGracefulDeletion.
+func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+	lastGraceful := int64(0)
+	var pendingFinalizers bool
+	out = e.NewFunc()
+	err = e.Storage.GuaranteedUpdate(
+		ctx, key, out, false, &preconditions,
+		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
+			if err != nil {
+				return nil, err
+			}
+			if pendingGraceful {
+				return nil, errAlreadyDeleting
+			}
+
+			// Add/remove the orphan finalizer as the options dictates.
+			// Note that this occurs after checking pendingGraceufl, so
+			// finalizers cannot be updated via DeleteOptions if deletion has
+			// started.
+			existingAccessor, err := meta.Accessor(existing)
+			if err != nil {
+				return nil, err
+			}
+			shouldUpdate, newFinalizers := shouldUpdateFinalizers(existingAccessor, options)
+			if shouldUpdate {
+				existingAccessor.SetFinalizers(newFinalizers)
+			}
+
+			if !graceful {
+				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
+				pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
+				if pendingFinalizers {
+					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
+					err = markAsDeleting(existing)
+					if err != nil {
+						return nil, err
+					}
+					return existing, nil
+				}
+				return nil, errDeleteNow
+			}
+			lastGraceful = *options.GracePeriodSeconds
+			lastExisting = existing
+			return existing, nil
+		}),
+	)
+	switch err {
+	case nil:
+		// If there are pending finalizers, we never delete the object immediately.
+		if pendingFinalizers {
+			return nil, false, false, out, lastExisting
+		}
+		if lastGraceful > 0 {
+			return nil, false, false, out, lastExisting
+		}
+		// If we are here, the registry supports grace period mechanism and
+		// we are intentionally delete gracelessly. In this case, we may
+		// enter a race with other k8s components. If other component wins
+		// the race, the object will not be found, and we should tolerate
+		// the NotFound error. See
+		// https://github.com/kubernetes/kubernetes/issues/19403 for
+		// details.
+		return nil, true, true, out, lastExisting
+	case errDeleteNow:
+		// we've updated the object to have a zero grace period, or it's already at 0, so
+		// we should fall through and truly delete the object.
+		return nil, false, true, out, lastExisting
+	case errAlreadyDeleting:
+		out, err = e.finalizeDelete(in, true)
+		return err, false, false, out, lastExisting
+	default:
+		return storeerr.InterpretUpdateError(err, e.QualifiedResource, name), false, false, out, lastExisting
+	}
+}
 
 // Delete removes the item from storage.
 func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
@@ -395,7 +617,6 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
 		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
-
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
 		options = api.NewDeleteOptions(0)
@@ -408,58 +629,39 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	if err != nil {
 		return nil, err
 	}
+	// this means finalizers cannot be updated via DeleteOptions if a deletion is already pending
 	if pendingGraceful {
 		return e.finalizeDelete(obj, false)
 	}
-	var ignoreNotFound bool = false
-	var lastExisting runtime.Object = nil
-	if graceful {
-		out := e.NewFunc()
-		lastGraceful := int64(0)
-		err := e.Storage.GuaranteedUpdate(
-			ctx, key, out, false, &preconditions,
-			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
-				graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
-				if err != nil {
-					return nil, err
-				}
-				if pendingGraceful {
-					return nil, errAlreadyDeleting
-				}
-				if !graceful {
-					return nil, errDeleteNow
-				}
-				lastGraceful = *options.GracePeriodSeconds
-				lastExisting = existing
-				return existing, nil
-			}),
-		)
-		switch err {
-		case nil:
-			if lastGraceful > 0 {
-				return out, nil
-			}
-			// If we are here, the registry supports grace period mechanism and
-			// we are intentionally delete gracelessly. In this case, we may
-			// enter a race with other k8s components. If other component wins
-			// the race, the object will not be found, and we should tolerate
-			// the NotFound error. See
-			// https://github.com/kubernetes/kubernetes/issues/19403 for
-			// details.
-			ignoreNotFound = true
-			// exit the switch and delete immediately
-		case errDeleteNow:
-			// we've updated the object to have a zero grace period, or it's already at 0, so
-			// we should fall through and truly delete the object.
-		case errAlreadyDeleting:
-			return e.finalizeDelete(obj, true)
-		default:
-			return nil, storeerr.InterpretUpdateError(err, e.QualifiedResource, name)
+	// check if obj has pending finalizers
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, kubeerr.NewInternalError(err)
+	}
+	pendingFinalizers := len(accessor.GetFinalizers()) != 0
+	var ignoreNotFound bool
+	var deleteImmediately bool = true
+	var lastExisting, out runtime.Object
+	if !EnableGarbageCollector {
+		// TODO: remove the check on graceful, because we support no-op updates now.
+		if graceful {
+			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
 		}
+	} else {
+		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(accessor, options)
+		// TODO: remove the check, because we support no-op updates now.
+		if graceful || pendingFinalizers || shouldUpdateFinalizers {
+			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
+		}
+	}
+	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
+	if !deleteImmediately || err != nil {
+		return out, err
 	}
 
 	// delete immediately, or no graceful deletion supported
-	out := e.NewFunc()
+	glog.V(6).Infof("going to delete %s from regitry: ", name)
+	out = e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .

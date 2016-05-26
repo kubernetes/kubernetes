@@ -273,7 +273,10 @@ func TestProcessEvent(t *testing.T) {
 	for _, scenario := range testScenarios {
 		propagator := &Propagator{
 			eventQueue: workqueue.New(),
-			uidToNode:  make(map[types.UID]*node),
+			uidToNode: &concurrentUIDToNode{
+				RWMutex:   &sync.RWMutex{},
+				uidToNode: make(map[types.UID]*node),
+			},
 			gc: &GarbageCollector{
 				dirtyQueue: workqueue.New(),
 			},
@@ -281,7 +284,36 @@ func TestProcessEvent(t *testing.T) {
 		for i := 0; i < len(scenario.events); i++ {
 			propagator.eventQueue.Add(scenario.events[i])
 			propagator.processEvent()
-			verifyGraphInvariants(scenario.name, propagator.uidToNode, t)
+			verifyGraphInvariants(scenario.name, propagator.uidToNode.uidToNode, t)
 		}
 	}
+}
+
+// TestDependentsRace relies on golang's data race detector to check if there is
+// data race among in the dependents field.
+func TestDependentsRace(t *testing.T) {
+	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc)
+	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
+	gc, err := NewGarbageCollector(clientPool, podResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const updates = 100
+	owner := &node{dependentsLock: &sync.RWMutex{}, dependents: make(map[*node]struct{})}
+	ownerUID := types.UID("owner")
+	gc.propagator.uidToNode.Write(owner)
+	go func() {
+		for i := 0; i < updates; i++ {
+			dependent := &node{}
+			gc.propagator.addDependentToOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+			gc.propagator.removeDependentFromOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+		}
+	}()
+	go func() {
+		gc.orphanQueue.Add(owner)
+		for i := 0; i < updates; i++ {
+			gc.orphanFinalizer()
+		}
+	}()
 }
