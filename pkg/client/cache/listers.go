@@ -76,38 +76,39 @@ type storePodsNamespacer struct {
 // Please note that selector is filtering among the pods that have gotten into
 // the store; there may have been some filtering that already happened before
 // that.
-func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, err error) {
-	list := api.PodList{}
+func (s storePodsNamespacer) List(selector labels.Selector) (api.PodList, error) {
+	pods := api.PodList{}
+
 	if s.namespace == api.NamespaceAll {
 		for _, m := range s.indexer.List() {
 			pod := m.(*api.Pod)
 			if selector.Matches(labels.Set(pod.Labels)) {
-				list.Items = append(list.Items, *pod)
+				pods.Items = append(pods.Items, *pod)
 			}
 		}
-		return list, nil
+		return pods, nil
 	}
 
 	key := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
 	items, err := s.indexer.Index(NamespaceIndex, key)
 	if err != nil {
+		// Ignore error; do slow search without index.
 		glog.Warningf("can not retrieve list of objects using index : %v", err)
 		for _, m := range s.indexer.List() {
 			pod := m.(*api.Pod)
 			if s.namespace == pod.Namespace && selector.Matches(labels.Set(pod.Labels)) {
-				list.Items = append(list.Items, *pod)
+				pods.Items = append(pods.Items, *pod)
 			}
 		}
-		return list, err
+		return pods, nil
 	}
-
 	for _, m := range items {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
-			list.Items = append(list.Items, *pod)
+			pods.Items = append(pods.Items, *pod)
 		}
 	}
-	return list, nil
+	return pods, nil
 }
 
 // Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
@@ -194,7 +195,9 @@ type storeReplicationControllersNamespacer struct {
 	namespace string
 }
 
-func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (controllers []api.ReplicationController, err error) {
+func (s storeReplicationControllersNamespacer) List(selector labels.Selector) ([]api.ReplicationController, error) {
+	controllers := []api.ReplicationController{}
+
 	if s.namespace == api.NamespaceAll {
 		for _, m := range s.indexer.List() {
 			rc := *(m.(*api.ReplicationController))
@@ -202,12 +205,13 @@ func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (c
 				controllers = append(controllers, rc)
 			}
 		}
-		return
+		return controllers, nil
 	}
 
 	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
 	items, err := s.indexer.Index(NamespaceIndex, key)
 	if err != nil {
+		// Ignore error; do slow search without index.
 		glog.Warningf("can not retrieve list of objects using index : %v", err)
 		for _, m := range s.indexer.List() {
 			rc := *(m.(*api.ReplicationController))
@@ -215,7 +219,7 @@ func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (c
 				controllers = append(controllers, rc)
 			}
 		}
-		return
+		return controllers, nil
 	}
 	for _, m := range items {
 		rc := *(m.(*api.ReplicationController))
@@ -223,7 +227,7 @@ func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (c
 			controllers = append(controllers, rc)
 		}
 	}
-	return
+	return controllers, nil
 }
 
 // GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
