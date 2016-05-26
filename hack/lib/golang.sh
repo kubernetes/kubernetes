@@ -136,6 +136,7 @@ readonly KUBE_TEST_PORTABLE=(
   hack/e2e-internal
   hack/get-build.sh
   hack/ginkgo-e2e.sh
+  hack/federated-ginkgo-e2e.sh
   hack/lib
 )
 
@@ -164,6 +165,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-scheduler
   kube-proxy
   kubectl
+  federation-apiserver
 )
 
 kube::golang::is_statically_linked_library() {

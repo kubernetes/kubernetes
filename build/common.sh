@@ -98,6 +98,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v3
+          federation-apiserver,busybox
         );;
     "arm")
         local targets=(
@@ -105,6 +106,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm:v3
+          federation-apiserver,armel/busybox
         );;
     "arm64")
         local targets=(
@@ -112,6 +114,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v3
+          federation-apiserver,aarch64/busybox
         );;
     "ppc64le")
         local targets=(
@@ -119,6 +122,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v3
+          federation-apiserver,ppc64le/busybox
         );;
   esac
 
@@ -1001,6 +1005,11 @@ function kube::release::package_full_tarball() {
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
+
+  # Include only federation/cluster and federation/manifests
+  mkdir "${release_stage}/federation"
+  cp -R "${KUBE_ROOT}/federation/cluster" "${release_stage}/federation/"
+  cp -R "${KUBE_ROOT}/federation/manifests" "${release_stage}/federation/"
 
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"

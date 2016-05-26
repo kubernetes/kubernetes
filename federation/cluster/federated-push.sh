@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Bring up a Kubernetes cluster.
+#
+# If the full release name (gs://<bucket>/<release>) is passed in then we take
+# that directly.  If not then we assume we are doing development stuff and take
+# the defaults in the release config.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
-: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+. ${KUBE_ROOT}/federation/cluster/common.sh
 
-export KUBECTL KUBE_CONFIG_FILE
+push-federated-images
 
-source "${KUBE_ROOT}/cluster/kube-util.sh"
-
-prepare-e2e
-
-#TODO(colhom): spec and implement federated version of this
-${KUBECTL} get nodes --no-headers | wc -l

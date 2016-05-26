@@ -36,6 +36,7 @@ import (
 	"sync"
 	"time"
 
+	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -322,6 +323,28 @@ func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInter
 	}
 	if !gte {
 		Skipf("Not supported for server versions before %q", v)
+	}
+}
+
+// Detects whether the federation namespace exists in the underlying cluster
+func SkipUnlessFederated() {
+	c, err := LoadClient()
+	if err != nil {
+		Failf("Unable to load client: %v", err)
+	}
+
+	federationNS := os.Getenv("FEDERATION_NAMESPACE")
+	if federationNS == "" {
+		federationNS = "federation-e2e"
+	}
+
+	_, err = c.Namespaces().Get(federationNS)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Skipf("Could not find federation namespace %s: skipping federated test", federationNS)
+		} else {
+			Failf("Unexpected error getting namespace: %v", err)
+		}
 	}
 }
 
@@ -1529,22 +1552,42 @@ func ServiceResponding(c *client.Client, ns, name string) error {
 	})
 }
 
-func LoadConfig() (*restclient.Config, error) {
-	switch {
-	case TestContext.KubeConfig != "":
-		Logf(">>> TestContext.KubeConfig: %s\n", TestContext.KubeConfig)
-		c, err := clientcmd.LoadFromFile(TestContext.KubeConfig)
-		if err != nil {
-			return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
-		}
-		if TestContext.KubeContext != "" {
-			Logf(">>> TestContext.KubeContext: %s\n", TestContext.KubeContext)
-			c.CurrentContext = TestContext.KubeContext
-		}
-		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
-	default:
+func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
+	Logf(">>> kubeConfig: %s\n", TestContext.KubeConfig)
+	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
+	c, err := clientcmd.LoadFromFile(TestContext.KubeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
+	}
+	if kubeContext != "" {
+		Logf(">>> kubeContext: %s\n", kubeContext)
+		c.CurrentContext = kubeContext
+	}
+	return c, nil
+}
+
+func LoadConfig() (*restclient.Config, error) {
+	c, err := restclientConfig(TestContext.KubeContext)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
+}
+
+func LoadFederatedConfig() (*restclient.Config, error) {
+	c, err := restclientConfig(federatedKubeContext)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if cfg != nil {
+		//TODO(colhom): this is only here because https://github.com/kubernetes/kubernetes/issues/25422
+		cfg.NegotiatedSerializer = api.Codecs
+	}
+	return cfg, err
 }
 
 func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
@@ -1556,6 +1599,25 @@ func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
 		c.Client.Timeout = SingleCallTimeout
 	}
 	return c, nil
+}
+
+func loadFederationClientFromConfig(config *restclient.Config) (*unversionedfederation.FederationClient, error) {
+	c, err := unversionedfederation.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err.Error())
+	}
+	if c.Client.Timeout == 0 {
+		c.Client.Timeout = SingleCallTimeout
+	}
+	return c, nil
+}
+
+func LoadFederationClient() (*unversionedfederation.FederationClient, error) {
+	config, err := LoadFederatedConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err.Error())
+	}
+	return loadFederationClientFromConfig(config)
 }
 
 func LoadClient() (*client.Client, error) {

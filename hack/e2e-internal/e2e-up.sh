@@ -29,4 +29,21 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-test-setup
+if [[ "${FEDERATION:-}" == "true" ]];then
+    #TODO(colhom): the last cluster that was created in the loop above is the current context.
+    # Hence, it will be the cluster that hosts the federated components.
+    # In the future, we will want to loop through the all the federated contexts,
+    # select each one and call federated-up
+    for zone in ${E2E_ZONES};do
+	(
+	    set-federated-zone-vars "$zone"
+	    test-setup
+	)
+    done
+    if [[ -f "${KUBE_ROOT}/federation/manifests/federated-image.tag" ]];then
+	export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
+    fi
+    "${KUBE_ROOT}/federation/cluster/federated-up.sh"
+else
+    test-setup
+fi

@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
-	flag "github.com/spf13/pflag"
 	"log"
 	"os"
 	"strings"
+
+	flag "github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/test/e2e"
 )
