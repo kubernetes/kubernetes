@@ -450,15 +450,15 @@ var _ = framework.KubeDescribe("Density", func() {
 	}
 
 	for _, testArg := range densityTests {
-		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerNode)
+		feature := "ManualPerformance"
 		switch testArg.podsPerNode {
 		case 30:
-			name = "[Feature:Performance] " + name
+			feature = "Performance"
 		case 95:
-			name = "[Feature:HighDensityPerformance]" + name
-		default:
-			name = "[Feature:ManualPerformance] " + name
+			feature = "HighDensityPerformance"
 		}
+
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node", feature, testArg.podsPerNode)
 		itArg := testArg
 		It(name, func() {
 			podsPerNode := itArg.podsPerNode
