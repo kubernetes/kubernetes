@@ -51,6 +51,7 @@ import (
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/gc"
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -453,6 +454,23 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	if s.EnableGarbageCollector {
+		gcClientset := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"))
+		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
+		if err != nil {
+			glog.Fatalf("Failed to get supported resources from server: %v", err)
+		}
+		clientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc)
+		garbageCollector, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
+		if err != nil {
+			glog.Errorf("Failed to start the generic garbage collector")
+		} else {
+			// TODO: make this a flag of kube-controller-manager
+			workers := 5
+			go garbageCollector.Run(workers, wait.NeverStop)
+		}
+	}
 
 	// run the shared informers
 	for _, informer := range informers {

@@ -89,6 +89,7 @@ func NewCMServer() *CMServer {
 			KubeAPIBurst:            30,
 			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
 			ControllerStartInterval: unversioned.Duration{Duration: 0 * time.Second},
+			EnableGarbageCollector:  false,
 		},
 	}
 	return &s
@@ -157,5 +158,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.ControllerStartInterval.Duration, "controller-start-interval", s.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+	fs.BoolVar(&s.EnableGarbageCollector, "enable-garbage-collector", s.EnableGarbageCollector, "Enables the generic garbage collector. MUST be synced with the corresponding flag of the kube-apiserver. WARNING: the generic garbage collector is an alpha feature.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }

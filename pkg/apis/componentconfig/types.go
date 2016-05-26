@@ -556,6 +556,10 @@ type KubeControllerManagerConfiguration struct {
 	VolumeConfiguration VolumeConfiguration `json:"volumeConfiguration"`
 	// How long to wait between starting controller managers
 	ControllerStartInterval unversioned.Duration `json:"controllerStartInterval"`
+	// enables the generic garbage collector. MUST be synced with the
+	// corresponding flag of the kube-apiserver. WARNING: the generic garbage
+	// collector is an alpha feature.
+	EnableGarbageCollector bool `json:"enableGarbageCollector"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

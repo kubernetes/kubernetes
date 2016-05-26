@@ -110,6 +110,7 @@ e2e-output-dir
 e2e-verify-service-account
 enable-custom-metrics
 enable-debugging-handlers
+enable-garbage-collector
 enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
