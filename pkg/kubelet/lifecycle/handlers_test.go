@@ -17,9 +17,12 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -109,7 +112,7 @@ func TestRunHandlerExec(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []api.Container{container}
-	err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -120,13 +123,14 @@ func TestRunHandlerExec(t *testing.T) {
 }
 
 type fakeHTTP struct {
-	url string
-	err error
+	url  string
+	err  error
+	resp *http.Response
 }
 
 func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 	f.url = url
-	return nil, f.err
+	return f.resp, f.err
 }
 
 func TestRunHandlerHttp(t *testing.T) {
@@ -152,7 +156,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []api.Container{container}
-	err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -179,8 +183,45 @@ func TestRunHandlerNil(t *testing.T) {
 	pod.ObjectMeta.Name = podName
 	pod.ObjectMeta.Namespace = podNamespace
 	pod.Spec.Containers = []api.Container{container}
-	err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
+	}
+}
+
+func TestRunHandlerHttpFailure(t *testing.T) {
+	expectedErr := fmt.Errorf("fake http error")
+	expectedResp := http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(expectedErr.Error())),
+	}
+	fakeHttp := fakeHTTP{err: expectedErr, resp: &expectedResp}
+	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
+	containerName := "containerFoo"
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	container := api.Container{
+		Name: containerName,
+		Lifecycle: &api.Lifecycle{
+			PostStart: &api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Host: "foo",
+					Port: intstr.FromInt(8080),
+					Path: "bar",
+				},
+			},
+		},
+	}
+	pod := api.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []api.Container{container}
+	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err == nil {
+		t.Errorf("expected error: %v", expectedErr)
+	}
+	if msg != expectedErr.Error() {
+		t.Errorf("unexpected error message: %q; expected %q", msg, expectedErr)
+	}
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
 	}
 }

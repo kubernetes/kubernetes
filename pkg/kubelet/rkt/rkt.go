@@ -1222,7 +1222,16 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 
 func (r *Runtime) runPreStopHook(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container) error {
 	glog.V(4).Infof("rkt: Running pre-stop hook for container %q of pod %q", container.Name, format.Pod(pod))
-	return r.runner.Run(containerID, pod, container, container.Lifecycle.PreStop)
+	msg, err := r.runner.Run(containerID, pod, container, container.Lifecycle.PreStop)
+	if err != nil {
+		ref, ok := r.containerRefManager.GetRef(containerID)
+		if !ok {
+			glog.Warningf("No ref for container %q", containerID)
+		} else {
+			r.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedPreStopHook, msg)
+		}
+	}
+	return err
 }
 
 func (r *Runtime) runPostStartHook(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container) error {
@@ -1253,7 +1262,16 @@ func (r *Runtime) runPostStartHook(containerID kubecontainer.ContainerID, pod *a
 		return fmt.Errorf("rkt: Pod %q doesn't become running in %v: %v", format.Pod(pod), timeout, err)
 	}
 
-	return r.runner.Run(containerID, pod, container, container.Lifecycle.PostStart)
+	msg, err := r.runner.Run(containerID, pod, container, container.Lifecycle.PostStart)
+	if err != nil {
+		ref, ok := r.containerRefManager.GetRef(containerID)
+		if !ok {
+			glog.Warningf("No ref for container %q", containerID)
+		} else {
+			r.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedPostStartHook, msg)
+		}
+	}
+	return err
 }
 
 type lifecycleHookType string

@@ -62,4 +62,8 @@ const (
 
 	// Config event reason list
 	FailedValidation = "FailedValidation"
+
+	// Lifecycle hooks
+	FailedPostStartHook = "FailedPostStartHook"
+	FailedPreStopHook   = "FailedPreStopHook"
 )
