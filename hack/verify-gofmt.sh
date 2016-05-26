@@ -41,7 +41,7 @@ find_files() {
     \) -name '*.go'
 }
 
-GOFMT="gofmt -s"
+GOFMT="gofmt -s -w"
 bad_files=$(find_files | xargs $GOFMT -l)
 if [[ -n "${bad_files}" ]]; then
   echo "!!! '$GOFMT' needs to be run on the following files: "
