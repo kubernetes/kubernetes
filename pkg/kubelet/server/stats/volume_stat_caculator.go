@@ -61,7 +61,7 @@ func (s *volumeStatCalculator) StartOnce() *volumeStatCalculator {
 	s.startO.Do(func() {
 		go wait.JitterUntil(func() {
 			s.calcAndStoreStats()
-		}, s.jitterPeriod, 1.0, s.stopChannel)
+		}, s.jitterPeriod, 1.0, true, s.stopChannel)
 	})
 	return s
 }
