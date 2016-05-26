@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,16 +18,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-
-: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
-
-export KUBECTL KUBE_CONFIG_FILE
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-prepare-e2e
-
-#TODO(colhom): spec and implement federated version of this
-${KUBECTL} get nodes --no-headers | wc -l
+#A little hack to get the last zone. we always deploy federated cluster to the last zone.
+#TODO(colhom): deploy federated control plane to multiple underlying clusters in robust way
+lastZone=""
+for zone in ${E2E_ZONES};do
+    lastZone="$zone"
+done
+(
+    set-federated-zone-vars "$zone"
+    "${KUBE_ROOT}/hack/ginkgo-e2e.sh" $@
+)
