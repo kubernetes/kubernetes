@@ -73,8 +73,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -351,7 +351,7 @@ func NewMainKubelet(
 		flannelExperimentalOverlay: flannelExperimentalOverlay,
 		flannelHelper:              NewFlannelHelper(),
 		nodeIP:                     nodeIP,
-		clock:                      util.RealClock{},
+		clock:                      clock.RealClock{},
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
@@ -460,7 +460,7 @@ func NewMainKubelet(
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod, klet.containerRuntime)
 
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, util.RealClock{})
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.updatePodCIDR(podCIDR)
 
@@ -780,7 +780,7 @@ type Kubelet struct {
 
 	// clock is an interface that provides time related functionality in a way that makes it
 	// easy to test the code.
-	clock util.Clock
+	clock clock.Clock
 
 	// outOfDiskTransitionFrequency specifies the amount of time the kubelet has to be actually
 	// not out of disk before it can transition the node condition status from out-of-disk to
