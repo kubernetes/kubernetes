@@ -144,12 +144,15 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	resourceQuota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -185,12 +188,15 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	}
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -265,12 +271,14 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	// start up quota system
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -353,12 +361,15 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	}
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -394,12 +405,15 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	}
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -444,13 +458,16 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
-	evaluator.liveLookupCache = liveLookupCache
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	quotaAccessor.liveLookupCache = liveLookupCache
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -508,12 +525,15 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	}
 	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -610,12 +630,15 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	}
 	kubeClient := fake.NewSimpleClientset(resourceQuotaBestEffort, resourceQuotaNotBestEffort)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -699,12 +722,15 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	}
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -814,13 +840,16 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 			podEvaluator.GroupKind(): podEvaluator,
 		},
 	}
-	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
-	evaluator.indexer = indexer
-	evaluator.registry = registry
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator.(*quotaEvaluator).registry = registry
+
 	defer utilruntime.HandleCrash()
-	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
