@@ -251,7 +251,6 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerD
 	if err != nil {
 		return fmt.Errorf("error configuring load-balancer health-check: %v", err)
 	}
-
 	return nil
 }
 
