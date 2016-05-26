@@ -117,6 +117,8 @@ type Store struct {
 	Storage storage.Interface
 }
 
+const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
+
 // NamespaceKeyRootFunc is the default function for constructing storage paths to resource directories enforcing namespace rules.
 func NamespaceKeyRootFunc(ctx api.Context, prefix string) string {
 	key := prefix
@@ -315,7 +317,7 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
 			if newVersion != version {
-				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
+				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
