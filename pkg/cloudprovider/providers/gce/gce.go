@@ -76,15 +76,16 @@ const (
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
-	service           *compute.Service
-	containerService  *container.Service
-	projectID         string
-	region            string
-	localZone         string   // The zone in which we are running
-	managedZones      []string // List of zones we are spanning (for Ubernetes-Lite, primarily when running on master)
-	networkURL        string
-	nodeTags          []string // List of tags to use on firewall rules for load balancers
-	useMetadataServer bool
+	service                  *compute.Service
+	containerService         *container.Service
+	projectID                string
+	region                   string
+	localZone                string   // The zone in which we are running
+	managedZones             []string // List of zones we are spanning (for Ubernetes-Lite, primarily when running on master)
+	networkURL               string
+	nodeTags                 []string // List of tags to use on firewall rules for load balancers
+	useMetadataServer        bool
+	operationPollRateLimiter flowcontrol.RateLimiter
 }
 
 type Config struct {
@@ -110,19 +111,6 @@ func init() {
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
 func (g *GCECloud) GetComputeService() *compute.Service {
 	return g.service
-}
-
-type rateLimitedRoundTripper struct {
-	rt      http.RoundTripper
-	limiter flowcontrol.RateLimiter
-}
-
-func (rl *rateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	startTime := time.Now()
-	rl.limiter.Accept()
-	// TODO: Reduce verbosity once #26119 is fixed.
-	glog.V(0).Infof("GCE api call: %s %s (throttled for %v)", req.Method, req.URL.String(), time.Now().Sub(startTime))
-	return rl.rt.RoundTrip(req)
 }
 
 func getProjectAndZone() (string, string, error) {
@@ -295,11 +283,6 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	}
 
 	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	// Override the transport to make it rate-limited.
-	client.Transport = &rateLimitedRoundTripper{
-		rt:      client.Transport,
-		limiter: flowcontrol.NewTokenBucketRateLimiter(10, 100), // 10 qps, 100 bucket size.
-	}
 	svc, err := compute.New(client)
 	if err != nil {
 		return nil, err
@@ -328,16 +311,19 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		glog.Infof("managing multiple zones: %v", managedZones)
 	}
 
+	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
+
 	return &GCECloud{
-		service:           svc,
-		containerService:  containerSvc,
-		projectID:         projectID,
-		region:            region,
-		localZone:         zone,
-		managedZones:      managedZones,
-		networkURL:        networkURL,
-		nodeTags:          nodeTags,
-		useMetadataServer: useMetadataServer,
+		service:                  svc,
+		containerService:         containerSvc,
+		projectID:                projectID,
+		region:                   region,
+		localZone:                zone,
+		managedZones:             managedZones,
+		networkURL:               networkURL,
+		nodeTags:                 nodeTags,
+		useMetadataServer:        useMetadataServer,
+		operationPollRateLimiter: operationPollRateLimiter,
 	}, nil
 }
 
@@ -418,6 +404,7 @@ func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operatio
 	opName := op.Name
 	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
 		start := time.Now()
+		gce.operationPollRateLimiter.Accept()
 		duration := time.Now().Sub(start)
 		if duration > 5*time.Second {
 			glog.Infof("pollOperation: waited %v for %v", duration, opName)
