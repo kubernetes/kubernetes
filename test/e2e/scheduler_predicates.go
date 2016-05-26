@@ -155,6 +155,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	var totalPodCapacity int64
 	var RCName string
 	var ns string
+	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
@@ -187,16 +188,16 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
 		// cannot be run in parallel with any other test that touches Nodes or Pods.
 		// It is so because we need to have precise control on what's running in the cluster.
-		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
+		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = 0
-		for _, pod := range systemPods.Items {
+		for _, pod := range systemPods {
 			if !masterNodes.Has(pod.Spec.NodeName) && pod.DeletionTimestamp == nil {
 				systemPodsNo++
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, framework.ImagePullerLabels)
+		err = framework.WaitForPodsRunningReady(api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {

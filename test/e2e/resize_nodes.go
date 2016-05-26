@@ -346,12 +346,14 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 	var systemPodsNo int32
 	var c *client.Client
 	var ns string
+	ignoreLabels := framework.ImagePullerLabels
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
-		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
+		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = int32(len(systemPods.Items))
+		systemPodsNo = int32(len(systemPods))
+
 	})
 
 	// Slow issue #13323 (8 min)
@@ -396,7 +398,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
 
-			err := framework.WaitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout, framework.ImagePullerLabels)
+			err := framework.WaitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout, ignoreLabels)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
