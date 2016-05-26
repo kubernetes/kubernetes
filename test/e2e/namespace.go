@@ -97,7 +97,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 			Containers: []api.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Image: framework.GetPauseImageName(f.Client),
 				},
 			},
 		},

@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	goRuntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -128,11 +129,41 @@ const (
 
 	// How long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
+
+	// When these values are updated, also update cmd/kubelet/app/options/options.go
+	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
+	currentPodInfraContainerImageVersion = "3.0"
 )
 
 // Label allocated to the image puller static pod that runs on each node
 // before e2es.
 var ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+
+// GetServerArchitecture fetches the architecture of the target cluster.
+func GetServerArchitecture(c *client.Client) string {
+	arch := ""
+	sVer, err := c.Discovery().ServerVersion()
+	if err != nil || sVer.Platform == "" {
+		// If we failed to get the server version for some reason, default to amd64.
+		arch = "amd64"
+	} else {
+		// Split the platform string into OS and Arch separately.
+		// The platform string may for example be "linux/amd64", "linux/arm" or "windows/amd64".
+		osArchArray := strings.Split(sVer.Platform, "/")
+		arch = osArchArray[1]
+	}
+	return arch
+}
+
+// GetPauseImageName fetches the architecture of the target cluster and chooses the pause image to use.
+func GetPauseImageName(c *client.Client) string {
+	return currentPodInfraContainerImageName + "-" + GetServerArchitecture(c) + ":" + currentPodInfraContainerImageVersion
+}
+
+// GetPauseImageNameForHostArch() fetches the pause image for the same architecture the machine is running on.
+func GetPauseImageNameForHostArch() string {
+	return currentPodInfraContainerImageName + "-" + goRuntime.GOARCH + ":" + currentPodInfraContainerImageVersion
+}
 
 // SubResource proxy should have been functional in v1.0.0, but SubResource
 // proxy via tunneling is known to be broken in v1.0.  See

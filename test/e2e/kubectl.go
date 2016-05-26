@@ -1429,37 +1429,6 @@ func streamingUpload(file *os.File, fileName string, postBodyWriter *multipart.W
 	}
 }
 
-var binPrefixes = []string{
-	"_output/dockerized/bin",
-	"_output/local/bin",
-	"platforms",
-}
-
-// findBinary searches through likely paths to find the specified binary.  It
-// takes the one that has been built most recently.  Platform should be
-// specified as '<os>/<arch>'.  For example: 'linux/amd64'.
-func findBinary(binName string, platform string) (string, error) {
-	var binTime time.Time
-	var binPath string
-
-	for _, pre := range binPrefixes {
-		tryPath := path.Join(framework.TestContext.RepoRoot, pre, platform, binName)
-		fi, err := os.Stat(tryPath)
-		if err != nil {
-			continue
-		}
-		if fi.ModTime().After(binTime) {
-			binPath = tryPath
-			binTime = fi.ModTime()
-		}
-	}
-
-	if len(binPath) > 0 {
-		return binPath, nil
-	}
-	return binPath, fmt.Errorf("Could not find %v for %v", binName, platform)
-}
-
 func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 	logs = &bytes.Buffer{}
 	p := goproxy.NewProxyHttpServer()

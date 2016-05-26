@@ -39,6 +39,7 @@ const (
 	defaultRootDir             = "/var/lib/kubelet"
 	experimentalFlannelOverlay = false
 
+	// When these values are updated, also update test/e2e/util.go
 	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
 	defaultPodInfraContainerImageVersion = "3.0"
 )
