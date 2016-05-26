@@ -78,6 +78,8 @@ const (
 	simplePodName            = "nginx"
 	nginxDefaultOutput       = "Welcome to nginx!"
 	simplePodPort            = 80
+	pausePodSelector         = "name=pause"
+	pausePodName             = "pause"
 	runJobTimeout            = 5 * time.Minute
 	busyboxImage             = "gcr.io/google_containers/busybox:1.24"
 	nginxImage               = "gcr.io/google_containers/nginx:1.7.9"
@@ -643,14 +645,14 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var pod []byte
 		var nsFlag string
 		BeforeEach(func() {
-			pod := framework.ReadOrDie("docs/user-guide/pod.yaml")
+			pod = readTestFileOrDie("pause-pod.yaml")
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(string(pod), "create", "-f", "-", nsFlag)
-			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())
+			Expect(framework.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
 		AfterEach(func() {
-			cleanupKubectlInputs(string(pod[:]), ns, simplePodSelector)
+			cleanupKubectlInputs(string(pod[:]), ns, pausePodSelector)
 		})
 
 		It("should update the label on a resource [Conformance]", func() {
@@ -658,19 +660,19 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			labelValue := "testing-label-value"
 
 			By("adding the label " + labelName + " with value " + labelValue + " to a pod")
-			framework.RunKubectlOrDie("label", "pods", simplePodName, labelName+"="+labelValue, nsFlag)
+			framework.RunKubectlOrDie("label", "pods", pausePodName, labelName+"="+labelValue, nsFlag)
 			By("verifying the pod has the label " + labelName + " with the value " + labelValue)
-			output := framework.RunKubectlOrDie("get", "pod", simplePodName, "-L", labelName, nsFlag)
+			output := framework.RunKubectlOrDie("get", "pod", pausePodName, "-L", labelName, nsFlag)
 			if !strings.Contains(output, labelValue) {
-				framework.Failf("Failed updating label " + labelName + " to the pod " + simplePodName)
+				framework.Failf("Failed updating label " + labelName + " to the pod " + pausePodName)
 			}
 
 			By("removing the label " + labelName + " of a pod")
-			framework.RunKubectlOrDie("label", "pods", simplePodName, labelName+"-", nsFlag)
+			framework.RunKubectlOrDie("label", "pods", pausePodName, labelName+"-", nsFlag)
 			By("verifying the pod doesn't have the label " + labelName)
-			output = framework.RunKubectlOrDie("get", "pod", simplePodName, "-L", labelName, nsFlag)
+			output = framework.RunKubectlOrDie("get", "pod", pausePodName, "-L", labelName, nsFlag)
 			if strings.Contains(output, labelValue) {
-				framework.Failf("Failed removing label " + labelName + " of the pod " + simplePodName)
+				framework.Failf("Failed removing label " + labelName + " of the pod " + pausePodName)
 			}
 		})
 	})
