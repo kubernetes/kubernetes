@@ -37,11 +37,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Proxy", func() {
-	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
-	Context("version "+version, func() { proxyContext(version) })
-})
-
 const (
 	// Try all the proxy tests this many times (to catch even rare flakes).
 	proxyAttempts = 20
@@ -53,227 +48,230 @@ const (
 	proxyHTTPCallTimeout = 30 * time.Second
 )
 
-func proxyContext(version string) {
-	options := framework.FrameworkOptions{
-		ClientQPS: -1.0,
-	}
-	f := framework.NewFramework("proxy", options, nil)
-	prefix := "/api/" + version
+var _ = framework.KubeDescribe("Proxy", func() {
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
+	Context("version "+version, func() {
+		options := framework.FrameworkOptions{
+			ClientQPS: -1.0,
+		}
+		f := framework.NewFramework("proxy", options, nil)
+		prefix := "/api/" + version
 
-	// Port here has to be kept in sync with default kubelet port.
-	It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
-	It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
-	It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
+		// Port here has to be kept in sync with default kubelet port.
+		It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
+		It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
+		It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
 
-	It("should proxy logs on node with explicit kubelet port using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
-	It("should proxy logs on node using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
-	It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
+		It("should proxy logs on node with explicit kubelet port using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
+		It("should proxy logs on node using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
+		It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
 
-	// using the porter image to serve content, access the content
-	// (of multiple pods?) from multiple (endpoints/services?)
-	It("should proxy through a service and a pod [Conformance]", func() {
-		start := time.Now()
-		labels := map[string]string{"proxy-service-target": "true"}
-		service, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
-			ObjectMeta: api.ObjectMeta{
-				GenerateName: "proxy-service-",
-			},
-			Spec: api.ServiceSpec{
-				Selector: labels,
-				Ports: []api.ServicePort{
-					{
-						Name:       "portname1",
-						Port:       80,
-						TargetPort: intstr.FromString("dest1"),
-					},
-					{
-						Name:       "portname2",
-						Port:       81,
-						TargetPort: intstr.FromInt(162),
-					},
-					{
-						Name:       "tlsportname1",
-						Port:       443,
-						TargetPort: intstr.FromString("tlsdest1"),
-					},
-					{
-						Name:       "tlsportname2",
-						Port:       444,
-						TargetPort: intstr.FromInt(462),
+		// using the porter image to serve content, access the content
+		// (of multiple pods?) from multiple (endpoints/services?)
+		It("should proxy through a service and a pod [Conformance]", func() {
+			start := time.Now()
+			labels := map[string]string{"proxy-service-target": "true"}
+			service, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
+				ObjectMeta: api.ObjectMeta{
+					GenerateName: "proxy-service-",
+				},
+				Spec: api.ServiceSpec{
+					Selector: labels,
+					Ports: []api.ServicePort{
+						{
+							Name:       "portname1",
+							Port:       80,
+							TargetPort: intstr.FromString("dest1"),
+						},
+						{
+							Name:       "portname2",
+							Port:       81,
+							TargetPort: intstr.FromInt(162),
+						},
+						{
+							Name:       "tlsportname1",
+							Port:       443,
+							TargetPort: intstr.FromString("tlsdest1"),
+						},
+						{
+							Name:       "tlsportname2",
+							Port:       444,
+							TargetPort: intstr.FromInt(462),
+						},
 					},
 				},
-			},
-		})
-		Expect(err).NotTo(HaveOccurred())
+			})
+			Expect(err).NotTo(HaveOccurred())
 
-		// Make an RC with a single pod. The 'porter' image is
-		// a simple server which serves the values of the
-		// environmental variables below.
-		By("starting an echo server on multiple ports")
-		pods := []*api.Pod{}
-		cfg := testutils.RCConfig{
-			Client:       f.Client,
-			Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
-			Name:         service.Name,
-			Namespace:    f.Namespace.Name,
-			Replicas:     1,
-			PollInterval: time.Second,
-			Env: map[string]string{
-				"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
-				"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,
-				"SERVE_PORT_160":  "foo",
-				"SERVE_PORT_162":  "bar",
+			// Make an RC with a single pod. The 'porter' image is
+			// a simple server which serves the values of the
+			// environmental variables below.
+			By("starting an echo server on multiple ports")
+			pods := []*api.Pod{}
+			cfg := testutils.RCConfig{
+				Client:       f.Client,
+				Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+				Name:         service.Name,
+				Namespace:    f.Namespace.Name,
+				Replicas:     1,
+				PollInterval: time.Second,
+				Env: map[string]string{
+					"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
+					"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,
+					"SERVE_PORT_160":  "foo",
+					"SERVE_PORT_162":  "bar",
 
-				"SERVE_TLS_PORT_443": `<a href="/tlsrewriteme">test</a>`,
-				"SERVE_TLS_PORT_460": `tls baz`,
-				"SERVE_TLS_PORT_462": `tls qux`,
-			},
-			Ports: map[string]int{
-				"dest1": 160,
-				"dest2": 162,
-
-				"tlsdest1": 460,
-				"tlsdest2": 462,
-			},
-			ReadinessProbe: &api.Probe{
-				Handler: api.Handler{
-					HTTPGet: &api.HTTPGetAction{
-						Port: intstr.FromInt(80),
-					},
+					"SERVE_TLS_PORT_443": `<a href="/tlsrewriteme">test</a>`,
+					"SERVE_TLS_PORT_460": `tls baz`,
+					"SERVE_TLS_PORT_462": `tls qux`,
 				},
-				InitialDelaySeconds: 1,
-				TimeoutSeconds:      5,
-				PeriodSeconds:       10,
-			},
-			Labels:      labels,
-			CreatedPods: &pods,
-		}
-		Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, cfg.Name)
+				Ports: map[string]int{
+					"dest1": 160,
+					"dest2": 162,
 
-		Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
+					"tlsdest1": 460,
+					"tlsdest2": 462,
+				},
+				ReadinessProbe: &api.Probe{
+					Handler: api.Handler{
+						HTTPGet: &api.HTTPGetAction{
+							Port: intstr.FromInt(80),
+						},
+					},
+					InitialDelaySeconds: 1,
+					TimeoutSeconds:      5,
+					PeriodSeconds:       10,
+				},
+				Labels:      labels,
+				CreatedPods: &pods,
+			}
+			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
+			defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, cfg.Name)
 
-		// table constructors
-		// Try proxying through the service and directly to through the pod.
-		svcProxyURL := func(scheme, port string) string {
-			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
-		}
-		subresourceServiceProxyURL := func(scheme, port string) string {
-			return prefix + "/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port) + "/proxy"
-		}
-		podProxyURL := func(scheme, port string) string {
-			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port)
-		}
-		subresourcePodProxyURL := func(scheme, port string) string {
-			return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
-		}
+			Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
 
-		// construct the table
-		expectations := map[string]string{
-			svcProxyURL("", "portname1") + "/": "foo",
-			svcProxyURL("", "80") + "/":        "foo",
-			svcProxyURL("", "portname2") + "/": "bar",
-			svcProxyURL("", "81") + "/":        "bar",
+			// table constructors
+			// Try proxying through the service and directly to through the pod.
+			svcProxyURL := func(scheme, port string) string {
+				return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
+			}
+			subresourceServiceProxyURL := func(scheme, port string) string {
+				return prefix + "/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port) + "/proxy"
+			}
+			podProxyURL := func(scheme, port string) string {
+				return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port)
+			}
+			subresourcePodProxyURL := func(scheme, port string) string {
+				return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
+			}
 
-			svcProxyURL("http", "portname1") + "/": "foo",
-			svcProxyURL("http", "80") + "/":        "foo",
-			svcProxyURL("http", "portname2") + "/": "bar",
-			svcProxyURL("http", "81") + "/":        "bar",
+			// construct the table
+			expectations := map[string]string{
+				svcProxyURL("", "portname1") + "/": "foo",
+				svcProxyURL("", "80") + "/":        "foo",
+				svcProxyURL("", "portname2") + "/": "bar",
+				svcProxyURL("", "81") + "/":        "bar",
 
-			svcProxyURL("https", "tlsportname1") + "/": "tls baz",
-			svcProxyURL("https", "443") + "/":          "tls baz",
-			svcProxyURL("https", "tlsportname2") + "/": "tls qux",
-			svcProxyURL("https", "444") + "/":          "tls qux",
+				svcProxyURL("http", "portname1") + "/": "foo",
+				svcProxyURL("http", "80") + "/":        "foo",
+				svcProxyURL("http", "portname2") + "/": "bar",
+				svcProxyURL("http", "81") + "/":        "bar",
 
-			subresourceServiceProxyURL("", "portname1") + "/":         "foo",
-			subresourceServiceProxyURL("http", "portname1") + "/":     "foo",
-			subresourceServiceProxyURL("", "portname2") + "/":         "bar",
-			subresourceServiceProxyURL("http", "portname2") + "/":     "bar",
-			subresourceServiceProxyURL("https", "tlsportname1") + "/": "tls baz",
-			subresourceServiceProxyURL("https", "tlsportname2") + "/": "tls qux",
+				svcProxyURL("https", "tlsportname1") + "/": "tls baz",
+				svcProxyURL("https", "443") + "/":          "tls baz",
+				svcProxyURL("https", "tlsportname2") + "/": "tls qux",
+				svcProxyURL("https", "444") + "/":          "tls qux",
 
-			podProxyURL("", "1080") + "/": `<a href="` + podProxyURL("", "1080") + `/rewriteme">test</a>`,
-			podProxyURL("", "160") + "/":  "foo",
-			podProxyURL("", "162") + "/":  "bar",
+				subresourceServiceProxyURL("", "portname1") + "/":         "foo",
+				subresourceServiceProxyURL("http", "portname1") + "/":     "foo",
+				subresourceServiceProxyURL("", "portname2") + "/":         "bar",
+				subresourceServiceProxyURL("http", "portname2") + "/":     "bar",
+				subresourceServiceProxyURL("https", "tlsportname1") + "/": "tls baz",
+				subresourceServiceProxyURL("https", "tlsportname2") + "/": "tls qux",
 
-			podProxyURL("http", "1080") + "/": `<a href="` + podProxyURL("http", "1080") + `/rewriteme">test</a>`,
-			podProxyURL("http", "160") + "/":  "foo",
-			podProxyURL("http", "162") + "/":  "bar",
+				podProxyURL("", "1080") + "/": `<a href="` + podProxyURL("", "1080") + `/rewriteme">test</a>`,
+				podProxyURL("", "160") + "/":  "foo",
+				podProxyURL("", "162") + "/":  "bar",
 
-			subresourcePodProxyURL("", "") + "/":         `<a href="` + subresourcePodProxyURL("", "") + `/rewriteme">test</a>`,
-			subresourcePodProxyURL("", "1080") + "/":     `<a href="` + subresourcePodProxyURL("", "1080") + `/rewriteme">test</a>`,
-			subresourcePodProxyURL("http", "1080") + "/": `<a href="` + subresourcePodProxyURL("http", "1080") + `/rewriteme">test</a>`,
-			subresourcePodProxyURL("", "160") + "/":      "foo",
-			subresourcePodProxyURL("http", "160") + "/":  "foo",
-			subresourcePodProxyURL("", "162") + "/":      "bar",
-			subresourcePodProxyURL("http", "162") + "/":  "bar",
+				podProxyURL("http", "1080") + "/": `<a href="` + podProxyURL("http", "1080") + `/rewriteme">test</a>`,
+				podProxyURL("http", "160") + "/":  "foo",
+				podProxyURL("http", "162") + "/":  "bar",
 
-			subresourcePodProxyURL("https", "443") + "/": `<a href="` + subresourcePodProxyURL("https", "443") + `/tlsrewriteme">test</a>`,
-			subresourcePodProxyURL("https", "460") + "/": "tls baz",
-			subresourcePodProxyURL("https", "462") + "/": "tls qux",
+				subresourcePodProxyURL("", "") + "/":         `<a href="` + subresourcePodProxyURL("", "") + `/rewriteme">test</a>`,
+				subresourcePodProxyURL("", "1080") + "/":     `<a href="` + subresourcePodProxyURL("", "1080") + `/rewriteme">test</a>`,
+				subresourcePodProxyURL("http", "1080") + "/": `<a href="` + subresourcePodProxyURL("http", "1080") + `/rewriteme">test</a>`,
+				subresourcePodProxyURL("", "160") + "/":      "foo",
+				subresourcePodProxyURL("http", "160") + "/":  "foo",
+				subresourcePodProxyURL("", "162") + "/":      "bar",
+				subresourcePodProxyURL("http", "162") + "/":  "bar",
 
-			// TODO: below entries don't work, but I believe we should make them work.
-			// podPrefix + ":dest1": "foo",
-			// podPrefix + ":dest2": "bar",
-		}
+				subresourcePodProxyURL("https", "443") + "/": `<a href="` + subresourcePodProxyURL("https", "443") + `/tlsrewriteme">test</a>`,
+				subresourcePodProxyURL("https", "460") + "/": "tls baz",
+				subresourcePodProxyURL("https", "462") + "/": "tls qux",
 
-		wg := sync.WaitGroup{}
-		errs := []string{}
-		errLock := sync.Mutex{}
-		recordError := func(s string) {
-			errLock.Lock()
-			defer errLock.Unlock()
-			errs = append(errs, s)
-		}
-		d := time.Since(start)
-		framework.Logf("setup took %v, starting test cases", d)
-		numberTestCases := len(expectations)
-		totalAttempts := numberTestCases * proxyAttempts
-		By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
+				// TODO: below entries don't work, but I believe we should make them work.
+				// podPrefix + ":dest1": "foo",
+				// podPrefix + ":dest2": "bar",
+			}
 
-		for i := 0; i < proxyAttempts; i++ {
-			wg.Add(numberTestCases)
-			for path, val := range expectations {
-				go func(i int, path, val string) {
-					defer wg.Done()
-					// this runs the test case
-					body, status, d, err := doProxy(f, path, i)
+			wg := sync.WaitGroup{}
+			errs := []string{}
+			errLock := sync.Mutex{}
+			recordError := func(s string) {
+				errLock.Lock()
+				defer errLock.Unlock()
+				errs = append(errs, s)
+			}
+			d := time.Since(start)
+			framework.Logf("setup took %v, starting test cases", d)
+			numberTestCases := len(expectations)
+			totalAttempts := numberTestCases * proxyAttempts
+			By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
 
-					if err != nil {
-						if serr, ok := err.(*errors.StatusError); ok {
-							recordError(fmt.Sprintf("%v (%v; %v): path %v gave status error: %+v",
-								i, status, d, path, serr.Status()))
-						} else {
-							recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
+			for i := 0; i < proxyAttempts; i++ {
+				wg.Add(numberTestCases)
+				for path, val := range expectations {
+					go func(i int, path, val string) {
+						defer wg.Done()
+						// this runs the test case
+						body, status, d, err := doProxy(f, path, i)
+
+						if err != nil {
+							if serr, ok := err.(*errors.StatusError); ok {
+								recordError(fmt.Sprintf("%v (%v; %v): path %v gave status error: %+v",
+									i, status, d, path, serr.Status()))
+							} else {
+								recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
+							}
+							return
 						}
-						return
-					}
-					if status != http.StatusOK {
-						recordError(fmt.Sprintf("%v: path %v gave status: %v", i, path, status))
-					}
-					if e, a := val, string(body); e != a {
-						recordError(fmt.Sprintf("%v: path %v: wanted %v, got %v", i, path, e, a))
-					}
-					if d > proxyHTTPCallTimeout {
-						recordError(fmt.Sprintf("%v: path %v took %v > %v", i, path, d, proxyHTTPCallTimeout))
-					}
-				}(i, path, val)
-			}
-			wg.Wait()
-		}
-
-		if len(errs) != 0 {
-			body, err := f.Client.Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
-			if err != nil {
-				framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
-			} else {
-				framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+						if status != http.StatusOK {
+							recordError(fmt.Sprintf("%v: path %v gave status: %v", i, path, status))
+						}
+						if e, a := val, string(body); e != a {
+							recordError(fmt.Sprintf("%v: path %v: wanted %v, got %v", i, path, e, a))
+						}
+						if d > proxyHTTPCallTimeout {
+							recordError(fmt.Sprintf("%v: path %v took %v > %v", i, path, d, proxyHTTPCallTimeout))
+						}
+					}(i, path, val)
+				}
+				wg.Wait()
 			}
 
-			Fail(strings.Join(errs, "\n"))
-		}
+			if len(errs) != 0 {
+				body, err := f.Client.Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
+				if err != nil {
+					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
+				} else {
+					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+				}
+
+				Fail(strings.Join(errs, "\n"))
+			}
+		})
 	})
-}
+})
 
 func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
 	// About all of the proxy accesses in this file:
