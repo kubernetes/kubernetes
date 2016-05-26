@@ -25,7 +25,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -59,7 +59,7 @@ type GenericPLEG struct {
 	// Cache for storing the runtime states required for syncing pods.
 	cache kubecontainer.Cache
 	// For testability.
-	clock util.Clock
+	clock clock.Clock
 	// Pods that failed to have their status retrieved during a relist. These pods will be
 	// retried during the next relisting.
 	podsToReinspect map[types.UID]*kubecontainer.Pod
@@ -98,7 +98,7 @@ type podRecord struct {
 type podRecords map[types.UID]*podRecord
 
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
-	relistPeriod time.Duration, cache kubecontainer.Cache, clock util.Clock) PodLifecycleEventGenerator {
+	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
 		relistPeriod: relistPeriod,
 		runtime:      runtime,

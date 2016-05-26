@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
@@ -101,7 +101,7 @@ func TestPuller(t *testing.T) {
 		}
 
 		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-		fakeClock := util.NewFakeClock(time.Now())
+		fakeClock := clock.NewFakeClock(time.Now())
 		backOff.Clock = fakeClock
 
 		fakeRuntime := &ctest.FakeRuntime{}

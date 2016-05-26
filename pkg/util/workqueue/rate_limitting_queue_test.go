@@ -20,13 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 func TestRateLimitingQueue(t *testing.T) {
 	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second)
 	queue := NewRateLimitingQueue(limiter).(*rateLimitingType)
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	delayingQueue := &delayingType{
 		Interface:       New(),
 		clock:           fakeClock,

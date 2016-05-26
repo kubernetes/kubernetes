@@ -66,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -91,7 +92,7 @@ const (
 
 	maxImageTagsForTest = 3
 
-	// TODO(harry) any global place for these two?
+	// TODO(clock. any global place for these two?
 	// Reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
 	minImgSize int64 = 23 * 1024 * 1024
 	maxImgSize int64 = 1000 * 1024 * 1024
@@ -113,7 +114,7 @@ type TestKubelet struct {
 	fakeCadvisor     *cadvisortest.Mock
 	fakeKubeClient   *fake.Clientset
 	fakeMirrorClient *podtest.FakeMirrorClient
-	fakeClock        *util.FakeClock
+	fakeClock        *clock.FakeClock
 	mounter          mount.Interface
 }
 
@@ -245,7 +246,7 @@ func newTestKubeletWithImageList(t *testing.T, imageList []kubecontainer.Image) 
 		LowThresholdPercent:  80,
 	}
 	kubelet.imageManager, err = newImageManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKillingCh = make(chan *kubecontainer.PodPair, 20)
@@ -258,7 +259,7 @@ func newTestKubeletWithImageList(t *testing.T, imageList []kubecontainer.Image) 
 	}
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, util.RealClock{})
+	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, clock.RealClock{})
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 

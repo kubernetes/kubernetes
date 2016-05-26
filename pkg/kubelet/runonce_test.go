@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -77,7 +77,7 @@ func TestRunOnce(t *testing.T) {
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
 		reasonCache:         NewReasonCache(),
-		clock:               util.RealClock{},
+		clock:               clock.RealClock{},
 		kubeClient:          &fake.Clientset{},
 		hostname:            testKubeletHostname,
 		nodeName:            testKubeletHostname,

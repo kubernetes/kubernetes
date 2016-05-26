@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -54,7 +55,7 @@ type SSHTunneler struct {
 	lastSync       int64 // Seconds since Epoch
 	lastSSHKeySync int64 // Seconds since Epoch
 	lastSyncMetric prometheus.GaugeFunc
-	clock          util.Clock
+	clock          clock.Clock
 
 	getAddresses AddressFunc
 	stopChan     chan struct{}
@@ -66,7 +67,7 @@ func NewSSHTunneler(sshUser, sshKeyfile string, healthCheckURL *url.URL, install
 		SSHKeyfile:     sshKeyfile,
 		InstallSSHKey:  installSSHKey,
 		HealthCheckURL: healthCheckURL,
-		clock:          util.RealClock{},
+		clock:          clock.RealClock{},
 	}
 }
 
