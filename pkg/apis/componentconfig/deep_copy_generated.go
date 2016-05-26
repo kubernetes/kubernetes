@@ -134,6 +134,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	if err := unversioned.DeepCopy_unversioned_Duration(in.ControllerStartInterval, &out.ControllerStartInterval, c); err != nil {
 		return err
 	}
+	out.EnableGarbageCollector = in.EnableGarbageCollector
 	return nil
 }
 
