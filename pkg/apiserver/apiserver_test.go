@@ -120,7 +120,7 @@ func newMapper() *meta.DefaultRESTMapper {
 
 func addGrouplessTypes() {
 	type ListOptions struct {
-		runtime.Object
+		Object               runtime.Object
 		unversioned.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
@@ -139,7 +139,7 @@ func addGrouplessTypes() {
 
 func addTestTypes() {
 	type ListOptions struct {
-		runtime.Object
+		Object               runtime.Object
 		unversioned.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
@@ -167,7 +167,7 @@ func addTestTypes() {
 
 func addNewTestTypes() {
 	type ListOptions struct {
-		runtime.Object
+		Object               runtime.Object
 		unversioned.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`

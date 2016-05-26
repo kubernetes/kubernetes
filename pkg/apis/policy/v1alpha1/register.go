@@ -45,6 +45,3 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	// Add the watch version that applies
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
-
-func (obj *PodDisruptionBudget) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *PodDisruptionBudgetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
