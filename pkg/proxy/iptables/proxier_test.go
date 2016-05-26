@@ -30,7 +30,7 @@ import (
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
-	chainLines := getChainLines(table, save)
+	chainLines := utiliptables.GetChainLines(table, save)
 	for chain, line := range chainLines {
 		if expected, exists := expectedLines[chain]; exists {
 			if expected != line {
@@ -47,7 +47,7 @@ func TestReadLinesFromByteBuffer(t *testing.T) {
 		index := 0
 		readIndex := 0
 		for ; readIndex < len(byteArray); index++ {
-			line, n := readLine(readIndex, byteArray)
+			line, n := utiliptables.ReadLine(readIndex, byteArray)
 			readIndex = n
 			if expected[index] != line {
 				t.Errorf("expected:%q, actual:%q", expected[index], line)
