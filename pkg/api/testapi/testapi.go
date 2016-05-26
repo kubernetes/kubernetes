@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 
@@ -46,6 +47,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
+	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 )
 
 var (
@@ -57,6 +59,7 @@ var (
 	Apps        TestGroup
 	Policy      TestGroup
 	Federation  TestGroup
+	Rbac        TestGroup
 
 	serializer        runtime.SerializerInfo
 	storageSerializer runtime.SerializerInfo
@@ -191,6 +194,13 @@ func init() {
 			internalTypes:         api.Scheme.KnownTypes(federation.SchemeGroupVersion),
 		}
 	}
+	if _, ok := Groups[rbac.GroupName]; !ok {
+		Groups[rbac.GroupName] = TestGroup{
+			externalGroupVersions: []unversioned.GroupVersion{{Group: rbac.GroupName, Version: registered.GroupOrDie(rbac.GroupName).GroupVersion.Version}},
+			internalGroupVersion:  rbac.SchemeGroupVersion,
+			internalTypes:         api.Scheme.KnownTypes(rbac.SchemeGroupVersion),
+		}
+	}
 
 	Default = Groups[api.GroupName]
 	Autoscaling = Groups[autoscaling.GroupName]
@@ -199,6 +209,7 @@ func init() {
 	Policy = Groups[policy.GroupName]
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
+	Rbac = Groups[rbac.GroupName]
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {

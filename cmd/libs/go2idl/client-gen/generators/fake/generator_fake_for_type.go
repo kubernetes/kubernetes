@@ -31,6 +31,7 @@ type genFakeForType struct {
 	generator.DefaultGen
 	outputPackage string
 	group         string
+	inputPackage  string
 	version       string
 	typeToMatch   *types.Type
 	imports       namer.ImportTracker
@@ -87,6 +88,20 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	if canonicalVersion == "unversioned" {
 		canonicalVersion = ""
 	}
+
+	groupName := g.group
+	if g.group == "core" {
+		groupName = ""
+	}
+
+	// allow user to define a group name that's different from the one parsed from the directory.
+	for _, comment := range c.Universe.Package(g.inputPackage).DocComments {
+		comment = strings.TrimLeft(comment, "//")
+		if override, ok := types.ExtractCommentTags("+", comment)["groupName"]; ok {
+			groupName = override
+		}
+	}
+
 	m := map[string]interface{}{
 		"type":                 t,
 		"package":              pkg,
@@ -94,6 +109,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"namespaced":           namespaced,
 		"Group":                namer.IC(g.group),
 		"group":                canonicalGroup,
+		"groupName":            groupName,
 		"version":              canonicalVersion,
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
 		"apiDeleteOptions":     c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
@@ -168,7 +184,7 @@ type Fake$.type|publicPlural$ struct {
 `
 
 var resource = `
-var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.group$", Version: "$.version$", Resource: "$.type|allLowercasePlural$"}
+var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.type|allLowercasePlural$"}
 `
 
 var listTemplate = `

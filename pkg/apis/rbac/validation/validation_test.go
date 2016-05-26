@@ -25,7 +25,7 @@ import (
 )
 
 func TestValidateRoleBinding(t *testing.T) {
-	errs := ValidateRoleBinding(
+	errs := validateRoleBinding(
 		&rbac.RoleBinding{
 			ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
 			RoleRef:    api.ObjectReference{Namespace: "master", Name: "valid"},
@@ -116,7 +116,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateRoleBinding(&v.A, true)
+		errs := validateRoleBinding(&v.A, true)
 		if len(errs) == 0 {
 			t.Errorf("expected failure %s for %v", k, v.A)
 			continue
@@ -138,7 +138,7 @@ func TestValidateRoleBindingUpdate(t *testing.T) {
 		RoleRef:    api.ObjectReference{Namespace: "master", Name: "valid"},
 	}
 
-	errs := ValidateRoleBindingUpdate(
+	errs := validateRoleBindingUpdate(
 		&rbac.RoleBinding{
 			ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master", ResourceVersion: "1"},
 			RoleRef:    api.ObjectReference{Namespace: "master", Name: "valid"},
@@ -165,7 +165,7 @@ func TestValidateRoleBindingUpdate(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateRoleBindingUpdate(&v.A, old, true)
+		errs := validateRoleBindingUpdate(&v.A, old, true)
 		if len(errs) == 0 {
 			t.Errorf("expected failure %s for %v", k, v.A)
 			continue
@@ -182,7 +182,7 @@ func TestValidateRoleBindingUpdate(t *testing.T) {
 }
 
 func TestValidateRole(t *testing.T) {
-	errs := ValidateRole(
+	errs := validateRole(
 		&rbac.Role{
 			ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
 		},
@@ -213,7 +213,7 @@ func TestValidateRole(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateRole(&v.A, true)
+		errs := validateRole(&v.A, true)
 		if len(errs) == 0 {
 			t.Errorf("expected failure %s for %v", k, v.A)
 			continue

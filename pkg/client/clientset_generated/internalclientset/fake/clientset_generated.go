@@ -28,6 +28,8 @@ import (
 	fakeunversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned/fake"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	fakeunversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned/fake"
+	unversionedrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
+	fakeunversionedrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
@@ -83,4 +85,9 @@ func (c *Clientset) Autoscaling() unversionedautoscaling.AutoscalingInterface {
 // Batch retrieves the BatchClient
 func (c *Clientset) Batch() unversionedbatch.BatchInterface {
 	return &fakeunversionedbatch.FakeBatch{Fake: &c.Fake}
+}
+
+// Rbac retrieves the RbacClient
+func (c *Clientset) Rbac() unversionedrbac.RbacInterface {
+	return &fakeunversionedrbac.FakeRbac{Fake: &c.Fake}
 }

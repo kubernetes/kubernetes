@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, boilerplate []byte, generatedBy string) generator.Package {
+func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
 	outputPackagePath := filepath.Join(packageBasePath, gv.Group, gv.Version, "fake")
 	// TODO: should make this a function, called by here and in client-generator.go
 	realClientPath := filepath.Join(packageBasePath, gv.Group, gv.Version)
@@ -55,6 +55,7 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 					},
 					outputPackage: outputPackagePath,
 					group:         normalization.BeforeFirstDot(gv.Group),
+					inputPackage:  inputPath,
 					version:       gv.Version,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
