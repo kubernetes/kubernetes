@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"sort"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -193,7 +194,7 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 	}
 }
 
-func TestSort(t *testing.T) {
+func TestListByAccessModes(t *testing.T) {
 	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
 		volList.store.Add(pv)
@@ -203,6 +204,7 @@ func TestSort(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
+	sort.Sort(byCapacity{volumes})
 
 	for i, expected := range []string{"gce-pd-1", "gce-pd-5", "gce-pd-10"} {
 		if string(volumes[i].UID) != expected {
@@ -214,6 +216,7 @@ func TestSort(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
+	sort.Sort(byCapacity{volumes})
 
 	for i, expected := range []string{"nfs-1", "nfs-5", "nfs-10"} {
 		if string(volumes[i].UID) != expected {
@@ -551,4 +554,21 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
 	}
+}
+
+// byCapacity is used to order volumes by ascending storage size
+type byCapacity struct {
+	volumes []*api.PersistentVolume
+}
+
+func (c byCapacity) Less(i, j int) bool {
+	return matchStorageCapacity(c.volumes[i], c.volumes[j])
+}
+
+func (c byCapacity) Swap(i, j int) {
+	c.volumes[i], c.volumes[j] = c.volumes[j], c.volumes[i]
+}
+
+func (c byCapacity) Len() int {
+	return len(c.volumes)
 }

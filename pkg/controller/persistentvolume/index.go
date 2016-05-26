@@ -38,7 +38,7 @@ func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
 }
 
-// listByAccessModes returns all volumes with the given set of AccessModeTypes *in order* of their storage capacity (low to high)
+// listByAccessModes returns all volumes with the given set of AccessModeTypes. The list is unsorted!
 func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.PersistentVolumeAccessMode) ([]*api.PersistentVolume, error) {
 	pv := &api.PersistentVolume{
 		Spec: api.PersistentVolumeSpec{
@@ -56,7 +56,6 @@ func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.Persi
 		volumes[i] = obj.(*api.PersistentVolume)
 	}
 
-	sort.Sort(byCapacity{volumes})
 	return volumes, nil
 }
 
@@ -75,26 +74,43 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 	// potential matches (the GCEPD example above).
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
+	var smallestVolume *api.PersistentVolume
+	var smallestVolumeSize int64
+	requestedQty := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	requestedSize := requestedQty.Value()
+
 	for _, modes := range allPossibleModes {
 		volumes, err := pvIndex.listByAccessModes(modes)
 		if err != nil {
 			return nil, err
 		}
 
-		// volumes are sorted by size but some may be bound or earmarked for a specific claim.
-		// filter those volumes for easy binary search by size
-		// return the exact pre-binding match, if found
-		unboundVolumes := []*api.PersistentVolume{}
+		// Go through all available volumes with two goals:
+		// - find a volume that is either pre-bound by user or dynamically
+		//   provisioned for this claim. Because of this we need to loop through
+		//   all volumes.
+		// - find the smallest matching one if there is no volume pre-bound to
+		//   the claim.
 		for _, volume := range volumes {
-			// volume isn't currently bound or pre-bound.
-			if volume.Spec.ClaimRef == nil {
-				unboundVolumes = append(unboundVolumes, volume)
+			if isVolumeBoundToClaim(volume, claim) {
+				// Exact match! No search required. This catches both volumes
+				// pre-bound by user and volumes dynamically provisioned by the
+				// controller.
+				return volume, nil
+			}
+
+			if volume.Spec.ClaimRef != nil {
+				// This volume waits for exact claim or is alredy bound.
 				continue
 			}
 
-			if isVolumeBoundToClaim(volume, claim) {
-				// Exact match! No search required.
-				return volume, nil
+			volumeQty := volume.Spec.Capacity[api.ResourceStorage]
+			volumeSize := volumeQty.Value()
+			if volumeSize >= requestedSize {
+				if smallestVolume == nil || smallestVolumeSize > volumeSize {
+					smallestVolume = volume
+					smallestVolumeSize = volumeSize
+				}
 			}
 		}
 
@@ -109,18 +125,9 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 			return nil, nil
 		}
 
-		searchPV := &api.PersistentVolume{
-			Spec: api.PersistentVolumeSpec{
-				AccessModes: claim.Spec.AccessModes,
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
-				},
-			},
-		}
-
-		i := sort.Search(len(unboundVolumes), func(i int) bool { return matchPredicate(searchPV, unboundVolumes[i]) })
-		if i < len(unboundVolumes) {
-			return unboundVolumes[i], nil
+		if smallestVolume != nil {
+			// Found a matching volume
+			return smallestVolume, nil
 		}
 	}
 	return nil, nil
@@ -129,23 +136,6 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
 func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolume, error) {
 	return pvIndex.findByClaim(claim, matchStorageCapacity)
-}
-
-// byCapacity is used to order volumes by ascending storage size
-type byCapacity struct {
-	volumes []*api.PersistentVolume
-}
-
-func (c byCapacity) Less(i, j int) bool {
-	return matchStorageCapacity(c.volumes[i], c.volumes[j])
-}
-
-func (c byCapacity) Swap(i, j int) {
-	c.volumes[i], c.volumes[j] = c.volumes[j], c.volumes[i]
-}
-
-func (c byCapacity) Len() int {
-	return len(c.volumes)
 }
 
 // matchStorageCapacity is a matchPredicate used to sort and find volumes
