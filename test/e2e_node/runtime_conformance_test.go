@@ -86,9 +86,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 					},
 				}
 				testStatuses := []testStatus{
-					{"terminate-cmd-rpa", api.RestartPolicyAlways, api.PodRunning, ContainerStateRunning, "==", 2, true},
-					{"terminate-cmd-rpof", api.RestartPolicyOnFailure, api.PodSucceeded, ContainerStateTerminated, "==", 1, false},
-					{"terminate-cmd-rpn", api.RestartPolicyNever, api.PodFailed, ContainerStateTerminated, "==", 0, false},
+					{"terminate-cmd-rpa", api.RestartPolicyAlways, api.PodRunning, ContainerStateRunning, "==", 0, true},
 				}
 
 				for _, testStatus := range testStatuses {
@@ -101,6 +99,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 f=%s
 count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
 if [ $count -eq 1 ]; then
+	while true; do sleep 1; done
 	exit 1
 elif [ $count -eq 2 ]; then
 	exit 0
