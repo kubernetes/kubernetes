@@ -153,6 +153,19 @@ func getNestedString(obj map[string]interface{}, fields ...string) string {
 	return ""
 }
 
+func getNestedSlice(obj map[string]interface{}, fields ...string) []string {
+	if m, ok := getNestedField(obj, fields...).([]interface{}); ok {
+		strSlice := make([]string, 0, len(m))
+		for _, v := range m {
+			if str, ok := v.(string); ok {
+				strSlice = append(strSlice, str)
+			}
+		}
+		return strSlice
+	}
+	return nil
+}
+
 func getNestedMap(obj map[string]interface{}, fields ...string) map[string]string {
 	if m, ok := getNestedField(obj, fields...).(map[string]interface{}); ok {
 		strMap := make(map[string]string, len(m))
@@ -179,6 +192,14 @@ func setNestedField(obj map[string]interface{}, value interface{}, fields ...str
 	m[fields[len(fields)-1]] = value
 }
 
+func setNestedSlice(obj map[string]interface{}, value []string, fields ...string) {
+	m := make([]interface{}, 0, len(value))
+	for _, v := range value {
+		m = append(m, v)
+	}
+	setNestedField(obj, m, fields...)
+}
+
 func setNestedMap(obj map[string]interface{}, value map[string]string, fields ...string) {
 	m := make(map[string]interface{}, len(value))
 	for k, v := range value {
@@ -192,6 +213,13 @@ func (u *Unstructured) setNestedField(value interface{}, fields ...string) {
 		u.Object = make(map[string]interface{})
 	}
 	setNestedField(u.Object, value, fields...)
+}
+
+func (u *Unstructured) setNestedSlice(value []string, fields ...string) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
+	setNestedSlice(u.Object, value, fields...)
 }
 
 func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
@@ -383,6 +411,14 @@ func (u *Unstructured) GroupVersionKind() unversioned.GroupVersionKind {
 	}
 	gvk := gv.WithKind(u.GetKind())
 	return gvk
+}
+
+func (u *Unstructured) GetFinalizers() []string {
+	return getNestedSlice(u.Object, "metadata", "finalizers")
+}
+
+func (u *Unstructured) SetFinalizers(finalizers []string) {
+	u.setNestedSlice(finalizers, "metadata", "finalizers")
 }
 
 // UnstructuredList allows lists that do not have Golang structs
