@@ -2522,6 +2522,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		pod  *api.Pod
 		node api.Node
 		fits bool
+		wErr error
 		test string
 	}{
 		{
@@ -2543,6 +2544,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
+			wErr: newErrTaintsTolerationsNotMatch(false),
 			test: "a pod having no tolerations can't be scheduled onto a node with nonempty taints",
 		},
 		{
@@ -2608,6 +2610,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
+			wErr: newErrTaintsTolerationsNotMatch(false),
 			test: "a pod which can't be scheduled on a dedicated node assgined to user2 with effect NoSchedule",
 		},
 		{
@@ -2714,6 +2717,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
+			wErr: newErrTaintsTolerationsNotMatch(false),
 			test: "a pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
 				"can't be scheduled onto the node",
 		},
@@ -2747,7 +2751,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			test: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
+			test: "the pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
 				"and the effect of taint is NoSchedule. Pod can be scheduled onto the node",
 		},
 		{
@@ -2784,17 +2788,74 @@ func TestPodToleratesTaints(t *testing.T) {
 			test: "The pod has a toleration that key and value don't match the taint on the node, " +
 				"but the effect of taint on node is PreferNochedule. Pod can be shceduled onto the node",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "podadmit1",
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoScheduleNoAdmit"
+						}]`,
+					},
+				},
+			},
+			fits: false,
+			wErr: newErrTaintsTolerationsNotMatch(true),
+			test: "node should aware that that a pod having no tolerations can't be scheduled or started on a node with nonempty taints",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "podadmit2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"operator": "Equal",
+							"value": "user2",
+							"effect": "NoScheduleNoAdmit"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoScheduleNoAdmit"
+						}]`,
+					},
+				},
+			},
+			fits: false,
+			wErr: newErrTaintsTolerationsNotMatch(true),
+			test: "node should aware that a pod which can't be scheduled or start on a dedicated node assgined to user2 with effect NoScheduleNoAdmit",
+		},
 	}
 
 	for _, test := range podTolerateTaintsTests {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&test.node)
 		fits, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod), nodeInfo)
-		if fits == false && !reflect.DeepEqual(err, ErrTaintsTolerationsNotMatch) {
-			t.Errorf("%s, unexpected error: %v", test.test, err)
+		if fits == false && !reflect.DeepEqual(err, test.wErr) {
+			t.Errorf("%s,\n expectd error: %v, but got error: %v", test.test, test.wErr, err)
 		}
+
 		if fits != test.fits {
-			t.Errorf("%s, expected: %v got %v", test.test, test.fits, fits)
+			t.Errorf("%s,\n expected: %v got %v", test.test, test.fits, fits)
 		}
 	}
 }

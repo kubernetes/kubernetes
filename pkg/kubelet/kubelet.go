@@ -2220,6 +2220,11 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	}
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
+
+	return kl.checkPredicatesFitness(pod, nodeInfo)
+}
+
+func (kl *Kubelet) checkPredicatesFitness(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, string, string) {
 	fit, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
 	if !fit {
 		if re, ok := err.(*predicates.PredicateFailureError); ok {
@@ -2234,11 +2239,28 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 			return fit, reason, message
 		}
+
 		reason := "UnexpectedPredicateFailureType"
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		return fit, reason, message
 	}
+
+	fit, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	if !fit {
+		if re, ok := err.(*predicates.ErrTaintsTolerationsNotMatch); ok {
+			// if kubelet should not care this un-fit, just return true
+			if !re.KubeletAwareness {
+				return true, "", ""
+			}
+		}
+
+		reason := "UnexpectedPredicateFailureType"
+		message := fmt.Sprintf("PodToleratesNodeTaints failed due to %v, which is unexpected.", err)
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		return fit, reason, message
+	}
+
 	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
 	// add the disk space predicate to predicates.GeneralPredicates.
 	if kl.isOutOfDisk() {

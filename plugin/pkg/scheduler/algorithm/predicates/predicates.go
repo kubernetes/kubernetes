@@ -986,21 +986,32 @@ func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulerc
 		return false, err
 	}
 
-	if tolerationsToleratesTaints(tolerations, taints) {
+	if tolerated, kubeltAwareness := tolerationsToleratesTaints(tolerations, taints); tolerated {
 		return true, nil
+	} else {
+		return false, newErrTaintsTolerationsNotMatch(kubeltAwareness)
 	}
-	return false, ErrTaintsTolerationsNotMatch
 }
 
-func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
+// tolerationsToleratesTaints checks if given tolerations can live with given taints.
+// It returns:
+// 1. whether tolerated or not;
+// 2. whether kubelet should be aware of 1.
+func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) (bool, bool) {
 	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
 	if len(taints) == 0 {
-		return true
+		return true, false
 	}
 
 	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
 	if len(tolerations) == 0 {
-		return false
+		// if there's taint has TaintEffectNoScheduleNoAdmit, kubelet should also be aware of this.
+		for _, taint := range taints {
+			if taint.Effect == api.TaintEffectNoScheduleNoAdmit {
+				return false, true
+			}
+		}
+		return false, false
 	}
 
 	for i := range taints {
@@ -1010,12 +1021,14 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 			continue
 		}
 
-		if !api.TaintToleratedByTolerations(taint, tolerations) {
-			return false
+		if tolerated, kubeleteAwareness := api.TaintToleratedByTolerations(taint, tolerations); !tolerated {
+			return false, kubeleteAwareness
+		} else {
+			return true, kubeleteAwareness
 		}
 	}
 
-	return true
+	return true, false
 }
 
 // Determine if a pod is scheduled with best-effort QoS
