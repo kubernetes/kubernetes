@@ -31,7 +31,7 @@
                         "memory": "300Mi"
                     },
                     "requests": {
-                        "cpu": "50m",
+                        "cpu": "20m",
                         "memory": "300Mi"
                     }
                 },
