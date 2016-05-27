@@ -28,7 +28,6 @@ var (
 	ErrVolumeZoneConflict        = newPredicateFailureError("NoVolumeZoneConflict")
 	ErrNodeSelectorNotMatch      = newPredicateFailureError("MatchNodeSelector")
 	ErrPodAffinityNotMatch       = newPredicateFailureError("MatchInterPodAffinity")
-	ErrTaintsTolerationsNotMatch = newPredicateFailureError("PodToleratesNodeTaints")
 	ErrPodNotMatchHostName       = newPredicateFailureError("HostName")
 	ErrPodNotFitsHostPorts       = newPredicateFailureError("PodFitsHostPorts")
 	ErrNodeLabelPresenceViolated = newPredicateFailureError("CheckNodeLabelPresence")
@@ -40,6 +39,21 @@ var (
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError")
 )
+
+// ErrTaintsTolerationsNotMatch is an error type that indicates with if it should be aware by kubelet.
+type ErrTaintsTolerationsNotMatch struct {
+	KubeletAwareness bool
+}
+
+func newErrTaintsTolerationsNotMatch(kubeletAwareness bool) *ErrTaintsTolerationsNotMatch {
+	return &ErrTaintsTolerationsNotMatch{
+		KubeletAwareness: kubeletAwareness,
+	}
+}
+
+func (e *ErrTaintsTolerationsNotMatch) Error() string {
+	return fmt.Sprintf("Taint Toleration unmatched with KubeletAwareness: %v", e.KubeletAwareness)
+}
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is
 // hit and caused the unfitting failure.
