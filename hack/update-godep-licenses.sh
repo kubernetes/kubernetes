@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Update the Godeps/LICENSES.md document.
+# Update the Godeps/LICENSES document.
 # Generates a table of Godep dependencies and their license.
 #
 # Usage:
@@ -117,6 +117,7 @@ LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
 
 GODEPS_LICENSE_FILE="Godeps/LICENSES"
+TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
 DEPS_DIR="vendor"
 declare -Ag CONTENT
 
@@ -129,7 +130,7 @@ cat ${LICENSE_ROOT}/LICENSE
 echo
 echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum)"
 echo "================================================================================"
-) > ${GODEPS_LICENSE_FILE}
+) > ${TMP_LICENSE_FILE}
 
 # Loop through every package in Godeps.json
 for PACKAGE in $(cat Godeps/Godeps.json | \
@@ -144,21 +145,22 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
   echo "= ${DEPS_DIR}/${PACKAGE} licensed under: ="
   echo
 
-  content=""
+  file=""
   if [[ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]]; then
-    content="${CONTENT[${PACKAGE}-LICENSE]-}"
+      file="${CONTENT[${PACKAGE}-LICENSE]-}"
   elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
-    content="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
+      file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
   fi
-  if [[ -z "${content}" ]]; then
-      echo "UNKNOWN"
-      content="/dev/null"
-  else
-      cat "${content}"
+  if [[ -z "${file}" ]]; then
+      echo "Could not find a license for ${PACKAGE} - aborting" > /dev/stderr
+      exit 9
   fi
+  cat "${file}"
 
   echo
-  echo "= ${content} $(cat ${content} | md5sum)"
+  echo "= ${file} $(cat ${file} | md5sum)"
   echo "================================================================================"
   echo
-done >> ${GODEPS_LICENSE_FILE}
+done >> ${TMP_LICENSE_FILE}
+
+cat ${TMP_LICENSE_FILE} > ${GODEPS_LICENSE_FILE}
