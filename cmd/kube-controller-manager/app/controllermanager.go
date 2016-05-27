@@ -229,9 +229,14 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
-	// this cidr has been validated already
-	_, clusterCIDR, _ := net.ParseCIDR(s.ClusterCIDR)
-	_, serviceCIDR, _ := net.ParseCIDR(s.ServiceCIDR)
+	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
+	if err != nil {
+		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", s.ClusterCIDR, err)
+	}
+	_, serviceCIDR, err := net.ParseCIDR(s.ServiceCIDR)
+	if err != nil {
+		glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", s.ServiceCIDR, err)
+	}
 	nodeController := nodecontroller.NewNodeController(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-controller")),
 		s.PodEvictionTimeout.Duration, flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, int(s.DeletingPodsBurst)),
 		flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, int(s.DeletingPodsBurst)),

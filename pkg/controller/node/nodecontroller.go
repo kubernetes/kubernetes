@@ -265,7 +265,11 @@ func NewNodeController(
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
 	if nc.allocateNodeCIDRs {
-		nc.filterOutServiceRange()
+		if nc.serviceCIDR != nil {
+			nc.filterOutServiceRange()
+		} else {
+			glog.Info("No Service CIDR provided. Skipping filtering out service addresses.")
+		}
 	}
 
 	go nc.nodeController.Run(wait.NeverStop)
