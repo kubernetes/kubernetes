@@ -15,3 +15,5 @@ subordinate: false
 requires:
    etcd:
      interface: etcd
+series: 
+  - 'trusty'
