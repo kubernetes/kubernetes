@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -209,12 +210,12 @@ func proxyContext(version string) {
 		}
 
 		wg := sync.WaitGroup{}
-		errors := []string{}
+		errs := []string{}
 		errLock := sync.Mutex{}
 		recordError := func(s string) {
 			errLock.Lock()
 			defer errLock.Unlock()
-			errors = append(errors, s)
+			errs = append(errs, s)
 		}
 		for i := 0; i < proxyAttempts; i++ {
 			for path, val := range expectations {
@@ -223,7 +224,11 @@ func proxyContext(version string) {
 					defer wg.Done()
 					body, status, d, err := doProxy(f, path)
 					if err != nil {
-						recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
+						if serr, ok := err.(*errors.StatusError); ok {
+							recordError(fmt.Sprintf("%v: path %v gave status error: %+v", i, path, serr.Status()))
+						} else {
+							recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
+						}
 						return
 					}
 					if status != http.StatusOK {
@@ -242,7 +247,7 @@ func proxyContext(version string) {
 		}
 		wg.Wait()
 
-		if len(errors) != 0 {
+		if len(errs) != 0 {
 			body, err := f.Client.Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
 			if err != nil {
 				framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
@@ -250,7 +255,7 @@ func proxyContext(version string) {
 				framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 			}
 
-			Fail(strings.Join(errors, "\n"))
+			Fail(strings.Join(errs, "\n"))
 		}
 	})
 }
