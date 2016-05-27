@@ -1,5 +1,7 @@
 .generated_docs
 contrib/completions/bash/kubectl
+docs/admin/federation-apiserver.md
+docs/admin/federation-controller-manager.md
 docs/admin/kube-apiserver.md
 docs/admin/kube-controller-manager.md
 docs/admin/kube-proxy.md
