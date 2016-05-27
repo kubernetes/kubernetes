@@ -44,8 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -93,7 +94,7 @@ func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, 
 	return "", "", nil
 }
 
-func (f *fakeRuntimeHelper) GetPodDir(types.UID) string {
+func (f *fakeRuntimeHelper) GetPodDir(kubetypes.UID) string {
 	return ""
 }
 
@@ -338,13 +339,13 @@ func TestGetPods(t *testing.T) {
 
 	expected := []*kubecontainer.Pod{
 		{
-			ID:         types.UID("1234"),
+			ID:         kubetypes.UID("1234"),
 			Name:       "qux",
 			Namespace:  "new",
 			Containers: []*kubecontainer.Container{containers[0], containers[1]},
 		},
 		{
-			ID:         types.UID("5678"),
+			ID:         kubetypes.UID("5678"),
 			Name:       "jlk",
 			Namespace:  "wen",
 			Containers: []*kubecontainer.Container{containers[2]},
@@ -458,8 +459,8 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 			Name: "/k8s_foo_qux_new_1234_42",
 			Config: &dockercontainer.Config{
 				Labels: map[string]string{
-					kubernetesPodLabel:           string(podString),
-					kubernetesContainerNameLabel: "foo",
+					kubernetesPodLabel:                 string(podString),
+					types.KubernetesContainerNameLabel: "foo",
 				},
 			},
 		},

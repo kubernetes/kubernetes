@@ -49,10 +49,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -84,9 +84,6 @@ const (
 
 	k8sRktKubeletAnno                = "rkt.kubernetes.io/managed-by-kubelet"
 	k8sRktKubeletAnnoValue           = "true"
-	k8sRktUIDAnno                    = "rkt.kubernetes.io/uid"
-	k8sRktNameAnno                   = "rkt.kubernetes.io/name"
-	k8sRktNamespaceAnno              = "rkt.kubernetes.io/namespace"
 	k8sRktContainerHashAnno          = "rkt.kubernetes.io/container-hash"
 	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restart-count"
 	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/termination-message-path"
@@ -167,12 +164,12 @@ var _ kubecontainer.Runtime = &Runtime{}
 
 // TODO(yifan): Remove this when volumeManager is moved to separate package.
 type VolumeGetter interface {
-	GetVolumes(podUID types.UID) (kubecontainer.VolumeMap, bool)
+	GetVolumes(podUID kubetypes.UID) (kubecontainer.VolumeMap, bool)
 }
 
 // TODO(yifan): This duplicates the podGetter in dockertools.
 type podGetter interface {
-	GetPodByUID(types.UID) (*api.Pod, bool)
+	GetPodByUID(kubetypes.UID) (*api.Pod, bool)
 }
 
 // cliInterface wrapps the command line calls for testing purpose.
@@ -194,7 +191,7 @@ func New(
 	podGetter podGetter,
 	livenessManager proberesults.Manager,
 	volumeGetter VolumeGetter,
-	httpClient kubetypes.HttpGetter,
+	httpClient types.HttpGetter,
 	networkPlugin network.NetworkPlugin,
 	hairpinMode bool,
 	execer utilexec.Interface,
@@ -608,9 +605,9 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 
 	requiresPrivileged := false
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktKubeletAnno), k8sRktKubeletAnnoValue)
-	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktUIDAnno), string(pod.UID))
-	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktNameAnno), pod.Name)
-	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktNamespaceAnno), pod.Namespace)
+	manifest.Annotations.Set(*appctypes.MustACIdentifier(types.KubernetesPodUIDLabel), string(pod.UID))
+	manifest.Annotations.Set(*appctypes.MustACIdentifier(types.KubernetesPodNameLabel), pod.Name)
+	manifest.Annotations.Set(*appctypes.MustACIdentifier(types.KubernetesPodNamespaceLabel), pod.Namespace)
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktRestartCountAnno), strconv.Itoa(restartCount))
 	if stage1Name, ok := pod.Annotations[k8sRktStage1NameAnno]; ok {
 		requiresPrivileged = true
@@ -676,7 +673,7 @@ func podFinishedMarkCommand(touchPath, podDir, rktUID string) string {
 
 // podFinishedAt returns the time that a pod exited, or a zero time if it has
 // not.
-func (r *Runtime) podFinishedAt(podUID types.UID, rktUID string) time.Time {
+func (r *Runtime) podFinishedAt(podUID kubetypes.UID, rktUID string) time.Time {
 	markerFile := podFinishedMarkerPath(r.runtimeHelper.GetPodDir(podUID), rktUID)
 	stat, err := r.os.Stat(markerFile)
 	if err != nil {
@@ -793,6 +790,10 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, requiresPrivi
 				Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
 				Value: strconv.FormatUint(kubecontainer.HashContainer(&c), 10),
 			},
+			{
+				Name:  *appctypes.MustACIdentifier(types.KubernetesContainerNameLabel),
+				Value: c.Name,
+			},
 		},
 	}
 
@@ -825,7 +826,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, requiresPrivi
 	return nil
 }
 
-func runningKubernetesPodFilters(uid types.UID) []*rktapi.PodFilter {
+func runningKubernetesPodFilters(uid kubetypes.UID) []*rktapi.PodFilter {
 	return []*rktapi.PodFilter{
 		{
 			States: []rktapi.PodState{
@@ -837,7 +838,7 @@ func runningKubernetesPodFilters(uid types.UID) []*rktapi.PodFilter {
 					Value: k8sRktKubeletAnnoValue,
 				},
 				{
-					Key:   k8sRktUIDAnno,
+					Key:   types.KubernetesPodUIDLabel,
 					Value: string(uid),
 				},
 			},
@@ -845,7 +846,7 @@ func runningKubernetesPodFilters(uid types.UID) []*rktapi.PodFilter {
 	}
 }
 
-func kubernetesPodFilters(uid types.UID) []*rktapi.PodFilter {
+func kubernetesPodFilters(uid kubetypes.UID) []*rktapi.PodFilter {
 	return []*rktapi.PodFilter{
 		{
 			Annotations: []*rktapi.KeyValue{
@@ -854,7 +855,7 @@ func kubernetesPodFilters(uid types.UID) []*rktapi.PodFilter {
 					Value: k8sRktKubeletAnnoValue,
 				},
 				{
-					Key:   k8sRktUIDAnno,
+					Key:   types.KubernetesPodUIDLabel,
 					Value: string(uid),
 				},
 			},
@@ -1111,7 +1112,7 @@ func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, f
 	return
 }
 
-func makePodNetnsName(podID types.UID) string {
+func makePodNetnsName(podID kubetypes.UID) string {
 	return fmt.Sprintf("%s_%s", kubernetesUnitPrefix, string(podID))
 }
 
@@ -1346,21 +1347,21 @@ func (r *Runtime) convertRktPod(rktpod *rktapi.Pod) (*kubecontainer.Pod, error) 
 		return nil, err
 	}
 
-	podUID, ok := manifest.Annotations.Get(k8sRktUIDAnno)
+	podUID, ok := manifest.Annotations.Get(types.KubernetesPodUIDLabel)
 	if !ok {
-		return nil, fmt.Errorf("pod is missing annotation %s", k8sRktUIDAnno)
+		return nil, fmt.Errorf("pod is missing annotation %s", types.KubernetesPodUIDLabel)
 	}
-	podName, ok := manifest.Annotations.Get(k8sRktNameAnno)
+	podName, ok := manifest.Annotations.Get(types.KubernetesPodNameLabel)
 	if !ok {
-		return nil, fmt.Errorf("pod is missing annotation %s", k8sRktNameAnno)
+		return nil, fmt.Errorf("pod is missing annotation %s", types.KubernetesPodNameLabel)
 	}
-	podNamespace, ok := manifest.Annotations.Get(k8sRktNamespaceAnno)
+	podNamespace, ok := manifest.Annotations.Get(types.KubernetesPodNamespaceLabel)
 	if !ok {
-		return nil, fmt.Errorf("pod is missing annotation %s", k8sRktNamespaceAnno)
+		return nil, fmt.Errorf("pod is missing annotation %s", types.KubernetesPodNamespaceLabel)
 	}
 
 	kubepod := &kubecontainer.Pod{
-		ID:        types.UID(podUID),
+		ID:        kubetypes.UID(podUID),
 		Name:      podName,
 		Namespace: podNamespace,
 	}
@@ -1418,8 +1419,8 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 		return nil, fmt.Errorf("couldn't list pods: %v", err)
 	}
 
-	pods := make(map[types.UID]*kubecontainer.Pod)
-	var podIDs []types.UID
+	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
+	var podIDs []kubetypes.UID
 	for _, pod := range listResp.Pods {
 		pod, err := r.convertRktPod(pod)
 		if err != nil {
@@ -1639,13 +1640,13 @@ func (s podsByCreatedAt) Less(i, j int) bool { return s[i].CreatedAt < s[j].Crea
 
 // getPodUID returns the pod's API UID, it returns
 // empty UID if the UID cannot be determined.
-func getPodUID(pod *rktapi.Pod) types.UID {
+func getPodUID(pod *rktapi.Pod) kubetypes.UID {
 	for _, anno := range pod.Annotations {
-		if anno.Key == k8sRktUIDAnno {
-			return types.UID(anno.Value)
+		if anno.Key == types.KubernetesPodUIDLabel {
+			return kubetypes.UID(anno.Value)
 		}
 	}
-	return types.UID("")
+	return kubetypes.UID("")
 }
 
 // podIsActive returns true if the pod is embryo, preparing or running.
@@ -1664,7 +1665,7 @@ func (r *Runtime) GetNetNS(containerID kubecontainer.ContainerID) (string, error
 	// We pretend the pod.UID is an infra container ID.
 	// This deception is only possible because we played the same trick in
 	// `networkPlugin.SetUpPod` and `networkPlugin.TearDownPod`.
-	return netnsPathFromName(makePodNetnsName(types.UID(containerID.ID))), nil
+	return netnsPathFromName(makePodNetnsName(kubetypes.UID(containerID.ID))), nil
 }
 
 func podDetailsFromServiceFile(serviceFilePath string) (string, string, string, error) {
@@ -1738,7 +1739,7 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 		allPods[pod.Id] = pod
 		if !podIsActive(pod) {
 			uid := getPodUID(pod)
-			if uid == types.UID("") {
+			if uid == kubetypes.UID("") {
 				glog.Errorf("rkt: Cannot get the UID of pod %q, pod is broken, will remove it", pod.Id)
 				removeCandidates = append(removeCandidates, pod)
 				continue
@@ -1807,7 +1808,7 @@ func (r *Runtime) cleanupPodNetworkFromServiceFile(serviceFilePath string) {
 	if err == nil {
 		r.cleanupPodNetwork(&api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				UID:       types.UID(id),
+				UID:       kubetypes.UID(id),
 				Name:      name,
 				Namespace: namespace,
 			},
@@ -2066,7 +2067,7 @@ func populateContainerStatus(pod rktapi.Pod, app rktapi.App, runtimeApp appcsche
 // server doesn't error, but doesn't provide meaningful information about the
 // pod, a status with no information (other than the passed in arguments) is
 // returned anyways.
-func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+func (r *Runtime) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	podStatus := &kubecontainer.PodStatus{
 		ID:        uid,
 		Name:      name,
