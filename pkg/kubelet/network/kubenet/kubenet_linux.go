@@ -369,7 +369,8 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 		glog.V(5).Infof("Removing pod IP %s from shaper", podIP)
 		// shaper wants /32
 		if err := plugin.shaper().Reset(fmt.Sprintf("%s/32", podIP)); err != nil {
-			glog.Warningf("Failed to remove pod IP %s from shaper: %v", podIP, err)
+			// Possible bandwidth shaping wasn't enabled for this pod anyways
+			glog.V(4).Infof("Failed to remove pod IP %s from shaper: %v", podIP, err)
 		}
 	}
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
