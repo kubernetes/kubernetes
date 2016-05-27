@@ -59,7 +59,7 @@ func (unstructuredJSONScheme) EncodeToStream(obj Object, w io.Writer, overrides 
 	case *Unstructured:
 		return json.NewEncoder(w).Encode(t.Object)
 	case *UnstructuredList:
-		var items []map[string]interface{}
+		items := make([]map[string]interface{}, 0, len(t.Items))
 		for _, i := range t.Items {
 			items = append(items, i.Object)
 		}
