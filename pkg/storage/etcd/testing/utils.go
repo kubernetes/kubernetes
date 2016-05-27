@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/util/wait"
+
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api/v2http"
@@ -186,7 +188,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 // waitForEtcd wait until etcd is propagated correctly
 func (m *EtcdTestServer) waitUntilUp() error {
 	membersAPI := etcd.NewMembersAPI(m.Client)
-	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+	for start := time.Now(); time.Since(start) < wait.ForeverTestTimeout; time.Sleep(10 * time.Millisecond) {
 		members, err := membersAPI.List(context.TODO())
 		if err != nil {
 			glog.Errorf("Error when getting etcd cluster members")
@@ -237,13 +239,13 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
-		t.Errorf("Unexpected error in NewEtcdTestClientServer (%v)", err)
 		server.Terminate(t)
+		t.Fatalf("Unexpected error in NewEtcdTestClientServer (%v)", err)
 		return nil
 	}
 	if err := server.waitUntilUp(); err != nil {
-		t.Errorf("Unexpected error in waitUntilUp (%v)", err)
 		server.Terminate(t)
+		t.Fatalf("Unexpected error in waitUntilUp (%v)", err)
 		return nil
 	}
 	return server
