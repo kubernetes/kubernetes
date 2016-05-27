@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blang/semver"
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
@@ -54,8 +55,15 @@ const (
 	// The minimum memory limit allocated to docker container: 150Mi
 	MinDockerMemoryLimit = 150 * 1024 * 1024
 
-	dockerProcessName = "docker"
-	dockerPidFile     = "/var/run/docker.pid"
+	dockerProcessName     = "docker"
+	dockerPidFile         = "/var/run/docker.pid"
+	containerdProcessName = "docker-containerd"
+	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
+)
+
+var (
+	// The docker version in which containerd was introduced.
+	containerdVersion = semver.MustParse("1.11.0")
 )
 
 // A non-user container tracked by the Kubelet.
@@ -261,8 +269,9 @@ func (cm *containerManagerImpl) setupNode() error {
 					},
 				},
 			}
+			dockerVersion := getDockerVersion(cm.cadvisorInterface)
 			cont.ensureStateFunc = func(manager *fs.Manager) error {
-				return ensureDockerInContainer(cm.cadvisorInterface, -900, dockerContainer)
+				return ensureDockerInContainer(dockerVersion, -900, dockerContainer)
 			}
 			systemContainers = append(systemContainers, cont)
 		} else {
@@ -370,6 +379,7 @@ func (cm *containerManagerImpl) Start() error {
 		}
 	}
 	if numEnsureStateFuncs >= 0 {
+		// Run ensure state functions every minute.
 		go wait.Until(func() {
 			for _, cont := range cm.systemContainers {
 				if cont.ensureStateFunc != nil {
@@ -382,7 +392,6 @@ func (cm *containerManagerImpl) Start() error {
 
 	}
 
-	// Run ensure state functions every minute.
 	if len(cm.periodicTasks) > 0 {
 		go wait.Until(func() {
 			for _, task := range cm.periodicTasks {
@@ -472,42 +481,58 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 }
 
 // Ensures that the Docker daemon is in the desired container.
-func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manager *fs.Manager) error {
-	pids, err := getPidsForProcess(dockerProcessName, dockerPidFile)
-	if err != nil {
-		return err
+func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, manager *fs.Manager) error {
+	type process struct{ name, file string }
+	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
+	if dockerVersion.GTE(containerdVersion) {
+		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
 	}
-	// Move if the pid is not already in the desired container.
-	errs := []error{}
-	for _, pid := range pids {
-		if runningInHost, err := isProcessRunningInHost(pid); err != nil {
-			errs = append(errs, err)
-			// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.
-			continue
-		} else if !runningInHost {
-			// Docker daemon is running inside a container. Don't touch that.
-			continue
-		}
 
-		cont, err := getContainer(pid)
+	var errs []error
+	for _, proc := range dockerProcs {
+		pids, err := getPidsForProcess(proc.name, proc.file)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
+			errs = append(errs, fmt.Errorf("failed to get pids for %q: %v", proc.name, err))
+			continue
 		}
 
-		if cont != manager.Cgroups.Name {
-			err = manager.Apply(pid)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q", pid, cont, manager.Cgroups.Name))
+		// Move if the pid is not already in the desired container.
+		for _, pid := range pids {
+			if err := ensureProcessInContainer(pid, oomScoreAdj, manager); err != nil {
+				errs = append(errs, fmt.Errorf("errors moving %q pid: %v", proc.name, err))
 			}
 		}
+	}
+	return utilerrors.NewAggregate(errs)
+}
 
-		// Also apply oom-score-adj to processes
-		oomAdjuster := oom.NewOOMAdjuster()
-		if err := oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err != nil {
-			errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
+func ensureProcessInContainer(pid int, oomScoreAdj int, manager *fs.Manager) error {
+	if runningInHost, err := isProcessRunningInHost(pid); err != nil {
+		// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.
+		return err
+	} else if !runningInHost {
+		// Process is running inside a container. Don't touch that.
+		return nil
+	}
+
+	var errs []error
+	cont, err := getContainer(pid)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
+	}
+
+	if cont != manager.Cgroups.Name {
+		err = manager.Apply(pid)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q", pid, cont, manager.Cgroups.Name))
 		}
 	}
 
+	// Also apply oom-score-adj to processes
+	oomAdjuster := oom.NewOOMAdjuster()
+	if err := oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err != nil {
+		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
+	}
 	return utilerrors.NewAggregate(errs)
 }
 
@@ -584,4 +609,20 @@ func isKernelPid(pid int) bool {
 	// Kernel threads have no associated executable.
 	_, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
 	return err != nil
+}
+
+// Helper for getting the docker version.
+func getDockerVersion(cadvisor cadvisor.Interface) semver.Version {
+	var fallback semver.Version // Fallback to zero-value by default.
+	versions, err := cadvisor.VersionInfo()
+	if err != nil {
+		glog.Errorf("Error requesting cAdvisor VersionInfo: %v", err)
+		return fallback
+	}
+	dockerVersion, err := semver.Parse(versions.DockerVersion)
+	if err != nil {
+		glog.Errorf("Error parsing docker version %q: %v", versions.DockerVersion, err)
+		return fallback
+	}
+	return dockerVersion
 }
