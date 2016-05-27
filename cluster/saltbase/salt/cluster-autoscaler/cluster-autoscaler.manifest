@@ -1,3 +1,4 @@
+{% if pillar.get('enable_node_autoscaler', '').lower() == 'true' %}
 {% set params = pillar['autoscaler_mig_config'] -%}
 {
     "kind": "Pod",
@@ -56,3 +57,4 @@
         "restartPolicy": "Always"
     }
 }
+{% endif %}
