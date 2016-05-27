@@ -156,7 +156,7 @@ function push-federated-images {
 
 	echo "Load: ${imageFile}"
 	# Load the image. Trust we know what it's called, as docker load provides no help there :(
-	docker load -q < "${imageFile}"
+	docker load < "${imageFile}"
 
 	local srcImageTag="$(cat ${imageFolder}/${binary}.docker_tag)"
 	local dstImageTag="${FEDERATION_IMAGE_TAG:-$srcImageTag}"
