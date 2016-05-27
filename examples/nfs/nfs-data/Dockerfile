@@ -12,8 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM jsafrane/nfsexporter
-MAINTAINER Jan Safranek <jsafrane@redhat.com>
-ADD index.html /mnt/data/index.html
+FROM centos
+MAINTAINER Jan Safranek, jsafrane@redhat.com; Huamin Chen, hchen@redhat.com
+RUN yum -y install /usr/bin/ps nfs-utils && yum clean all
+RUN mkdir -p /exports
+ADD run_nfs.sh /usr/local/bin/
+ADD index.html /tmp/index.html
+RUN chmod 644 /tmp/index.html
 
-ENTRYPOINT ["/usr/local/bin/run_nfs", "/mnt/data"]
+# expose mountd 20048/tcp and nfsd 2049/tcp and rpcbind 111/tcp
+EXPOSE 2049/tcp 20048/tcp 111/tcp 111/udp
+
+ENTRYPOINT ["/usr/local/bin/run_nfs.sh", "/exports"]

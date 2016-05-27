@@ -4,6 +4,11 @@ metadata:
   name: nfs-server
 spec:
   ports:
-    - port: 2049
+    - name: nfs
+      port: 2049
+    - name: mountd
+      port: 20048
+    - name: rpcbind
+      port: 111
   selector:
     role: nfs-server
