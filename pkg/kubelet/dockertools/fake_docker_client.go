@@ -30,7 +30,6 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
@@ -49,7 +48,6 @@ type FakeDockerClient struct {
 	Created         []string
 	Stopped         []string
 	Removed         []string
-	RemovedImages   sets.String
 	VersionInfo     dockertypes.Version
 	Information     dockertypes.Info
 	ExecInspect     *dockertypes.ContainerExecInspect
@@ -68,10 +66,9 @@ func NewFakeDockerClient() *FakeDockerClient {
 
 func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClient {
 	return &FakeDockerClient{
-		VersionInfo:   dockertypes.Version{Version: version, APIVersion: apiVersion},
-		Errors:        make(map[string]error),
-		RemovedImages: sets.String{},
-		ContainerMap:  make(map[string]*dockertypes.ContainerJSON),
+		VersionInfo:  dockertypes.Version{Version: version, APIVersion: apiVersion},
+		Errors:       make(map[string]error),
+		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
 	}
 }
 
@@ -471,6 +468,7 @@ func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 }
 
 func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
+	f.called = append(f.called, "list_images")
 	err := f.popError("list_images")
 	return f.Images, err
 }
@@ -478,7 +476,12 @@ func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
 	err := f.popError("remove_image")
 	if err == nil {
-		f.RemovedImages.Insert(image)
+		for i := range f.Images {
+			if f.Images[i].ID == image {
+				f.Images = append(f.Images[:i], f.Images[i+1:]...)
+				break
+			}
+		}
 	}
 	return []dockertypes.ImageDelete{{Deleted: image}}, err
 }
@@ -538,6 +541,7 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 func (f *FakeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
 	f.Lock()
 	defer f.Unlock()
+	f.called = append(f.called, "image_history")
 	history := f.ImageHistoryMap[id]
 	return history, nil
 }
