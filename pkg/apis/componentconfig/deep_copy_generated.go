@@ -120,6 +120,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	out.ServiceCIDR = in.ServiceCIDR
 	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
+	out.ConfigureCloudRoutes = in.ConfigureCloudRoutes
 	out.RootCAFile = in.RootCAFile
 	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
