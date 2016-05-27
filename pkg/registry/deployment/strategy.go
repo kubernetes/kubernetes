@@ -17,10 +17,12 @@ limitations under the License.
 package deployment
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -48,6 +50,25 @@ func (deploymentStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (deploymentStrategy) PrepareForCreate(obj runtime.Object) {
 	deployment := obj.(*extensions.Deployment)
+
+	// If necessary update LastAppliedConfigAnnotation before create
+	meta := &deployment.ObjectMeta
+	annots := meta.Annotations
+	if annots != nil {
+		original := annots[annotations.LastAppliedConfigAnnotation]
+		if len(original) > 0 {
+			delete(annots, annotations.LastAppliedConfigAnnotation)
+			modified, err := json.Marshal(deployment)
+			fmt.Printf("get the updated last config: %s\n", modified)
+			if err != nil {
+				annots[annotations.LastAppliedConfigAnnotation] = original
+			} else {
+				annots[annotations.LastAppliedConfigAnnotation] = string(modified)
+			}
+		}
+	}
+	meta.SetAnnotations(annots)
+
 	deployment.Status = extensions.DeploymentStatus{}
 	deployment.Generation = 1
 }
