@@ -19,14 +19,24 @@ package kubenet
 import (
 	"fmt"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
+	"testing"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"testing"
+	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
 )
 
-func newFakeKubenetPlugin(initMap map[kubecontainer.ContainerID]string, execer exec.Interface, host network.Host) network.NetworkPlugin {
+// test it fulfills the NetworkPlugin interface
+var _ network.NetworkPlugin = &kubenetNetworkPlugin{}
+
+func newFakeKubenetPlugin(initMap map[kubecontainer.ContainerID]string, execer exec.Interface, host network.Host) *kubenetNetworkPlugin {
 	return &kubenetNetworkPlugin{
 		podCIDRs: initMap,
 		execer:   execer,
@@ -109,6 +119,40 @@ func TestGetPodNetworkStatus(t *testing.T) {
 			t.Errorf("Test case %d expects ip %s but got %s", i, tc.expectIP, out.IP.String())
 		}
 	}
+}
+
+// TestTeardownBeforeSetUp tests that a `TearDown` call does call
+// `shaper.Reset`
+func TestTeardownCallsShaper(t *testing.T) {
+	fexec := &exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{},
+		LookPathFunc: func(file string) (string, error) {
+			return fmt.Sprintf("/fake-bin/%s", file), nil
+		},
+	}
+	fhost := nettest.NewFakeHost(nil)
+	fshaper := &bandwidth.FakeShaper{}
+	mockcni := &mock_cni.MockCNI{}
+	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
+	kubenet.cniConfig = mockcni
+	kubenet.shaper = fshaper
+	kubenet.iptables = ipttest.NewFake()
+
+	mockcni.On("DelNetwork", mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+
+	details := make(map[string]interface{})
+	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
+	kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+
+	existingContainerID := kubecontainer.BuildContainerID("docker", "123")
+	kubenet.podCIDRs[existingContainerID] = "10.0.0.1/24"
+
+	if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
+		t.Fatalf("Unexpected error in TearDownPod: %v", err)
+	}
+	assert.Equal(t, []string{"10.0.0.1/32"}, fshaper.ResetCIDRs, "shaper.Reset should have been called")
+
+	mockcni.AssertExpectations(t)
 }
 
 //TODO: add unit test for each implementation of network plugin interface
