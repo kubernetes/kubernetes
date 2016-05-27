@@ -256,14 +256,14 @@ func waitForAttachCallCount(
 	t *testing.T,
 	expectedAttachCallCount int,
 	fakePlugin *volumetesting.FakeVolumePlugin) {
-	if len(fakePlugin.Attachers) == 0 && expectedAttachCallCount == 0 {
+	if len(fakePlugin.GetAttachers()) == 0 && expectedAttachCallCount == 0 {
 		return
 	}
 
 	err := retryWithExponentialBackOff(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
-			for i, attacher := range fakePlugin.Attachers {
+			for i, attacher := range fakePlugin.GetAttachers() {
 				actualCallCount := attacher.GetAttachCallCount()
 				if actualCallCount == expectedAttachCallCount {
 					return true, nil
@@ -293,14 +293,14 @@ func waitForDetachCallCount(
 	t *testing.T,
 	expectedDetachCallCount int,
 	fakePlugin *volumetesting.FakeVolumePlugin) {
-	if len(fakePlugin.Detachers) == 0 && expectedDetachCallCount == 0 {
+	if len(fakePlugin.GetDetachers()) == 0 && expectedDetachCallCount == 0 {
 		return
 	}
 
 	err := retryWithExponentialBackOff(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
-			for i, detacher := range fakePlugin.Detachers {
+			for i, detacher := range fakePlugin.GetDetachers() {
 				actualCallCount := detacher.GetDetachCallCount()
 				if actualCallCount == expectedDetachCallCount {
 					return true, nil
