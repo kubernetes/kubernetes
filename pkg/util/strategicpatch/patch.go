@@ -432,7 +432,7 @@ loopB:
 	if !ignoreChangesAndAdditions {
 		// Add any remaining items found only in modified
 		for ; modifiedIndex < len(modifiedSorted); modifiedIndex++ {
-			patch = append(patch, modified[modifiedIndex])
+			patch = append(patch, modifiedSorted[modifiedIndex])
 		}
 	}
 
