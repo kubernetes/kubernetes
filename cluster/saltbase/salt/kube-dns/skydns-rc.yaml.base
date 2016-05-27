@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/saltbase/salt/kube-dns/skydns-rc.yaml.in
+# This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
+
+# __MACHINE_GENERATED_WARNING__
+
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -23,7 +26,7 @@ metadata:
     version: v13
     kubernetes.io/cluster-service: "true"
 spec:
-  replicas: 1
+  replicas: __PILLAR__DNS__REPLICAS__
   selector:
     k8s-app: kube-dns
     version: v13
@@ -36,8 +39,7 @@ spec:
     spec:
       containers:
       - name: kubedns
-        # ARCH will be replaced with the architecture it's built for. Check out the Makefile for more details
-        image: gcr.io/google_containers/kubedns-ARCH:1.2
+        image: gcr.io/google_containers/kubedns-amd64:1.2
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -69,7 +71,7 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube-dns"
-        - --domain=cluster.local
+        - --domain=__PILLAR__DNS__DOMAIN__
         - --dns-port=10053
         ports:
         - containerPort: 10053
@@ -79,7 +81,7 @@ spec:
           name: dns-tcp-local
           protocol: TCP
       - name: dnsmasq
-        image: gcr.io/google_containers/dnsmasq-ARCH:1.1
+        image: gcr.io/google_containers/dnsmasq:1.1
         args:
         - --cache-size=1000
         - --no-resolv
@@ -92,7 +94,7 @@ spec:
           name: dns-tcp
           protocol: TCP
       - name: healthz
-        image: gcr.io/google_containers/exechealthz-ARCH:1.0
+        image: gcr.io/google_containers/exechealthz-amd64:1.0
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
@@ -102,7 +104,7 @@ spec:
             cpu: 10m
             memory: 20Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.cluster.local 127.0.0.1 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.__PILLAR__DNS__DOMAIN__ 127.0.0.1 >/dev/null
         - -port=8080
         ports:
         - containerPort: 8080
