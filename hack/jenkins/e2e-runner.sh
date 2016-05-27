@@ -140,9 +140,7 @@ function install_google_cloud_sdk_tarball() {
 # bringing the cluster down.
 function dump_cluster_logs_and_exit() {
     local -r exit_status=$?
-    if [[ -x "cluster/log-dump.sh"  ]]; then
-        ./cluster/log-dump.sh "${ARTIFACTS}"
-    fi
+    dump_cluster_logs
     if [[ "${E2E_DOWN,,}" == "true" ]]; then
       # If we tried to bring the cluster up, make a courtesy attempt
       # to bring the cluster down so we're not leaving resources
@@ -152,6 +150,14 @@ function dump_cluster_logs_and_exit() {
       go run ./hack/e2e.go ${E2E_OPT:-} -v --down || true
     fi
     exit ${exit_status}
+}
+
+# Only call after attempting to bring the cluster up. Don't call after
+# bringing the cluster down.
+function dump_cluster_logs() {
+    if [[ -x "cluster/log-dump.sh"  ]]; then
+        ./cluster/log-dump.sh "${ARTIFACTS}"
+    fi
 }
 
 ### Pre Set Up ###
@@ -364,7 +370,11 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   # If start-kubemark fails, we trigger empty set of tests that would trigger storing logs from the base cluster.
   ./test/kubemark/start-kubemark.sh || dump_cluster_logs_and_exit
   # Similarly, if tests fail, we trigger empty set of tests that would trigger storing logs from the base cluster.
-  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS:-starting\s30\spods}" "${KUBEMARK_TEST_ARGS:-}" || dump_cluster_logs_and_exit
+  # We intentionally overwrite the exit-code from `run-e2e-tests.sh` because we want jenkins to look at the
+  # junit.xml results for test failures and not process the exit code.  This is needed by jenkins to more gracefully
+  # handle blocking the merge queue as a result of test failure flakes.  Infrastructure failures should continue to
+  # exit non-0.
+  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS:-starting\s30\spods}" "${KUBEMARK_TEST_ARGS:-}" || dump_cluster_logs
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
