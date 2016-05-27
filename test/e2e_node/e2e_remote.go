@@ -125,13 +125,15 @@ func CreateTestArchive() string {
 }
 
 // RunRemote copies the archive file to a /tmp file on host, unpacks it, and runs the e2e_node.test
-func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (string, error) {
+// Returns the command output, whether the exit was ok, and any errors
+func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (string, bool, error) {
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
 	_, err := RunSshCommand("ssh", host, "--", "mkdir", tmp)
 	if err != nil {
-		return "", err
+		// Exit failure with the error
+		return "", false, err
 	}
 	if cleanup {
 		defer func() {
@@ -145,7 +147,8 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (
 	// Copy the archive to the staging directory
 	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", host, tmp))
 	if err != nil {
-		return "", err
+		// Exit failure with the error
+		return "", false, err
 	}
 
 	// Kill any running node processes
@@ -160,27 +163,38 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (
 	glog.Infof("Killing any existing node processes on %s", host)
 	RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
 
-	// Extract the archive and run the tests
-	cmd = getSshCommand(" && ",
-		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("tar -xzvf ./%s", archiveName),
-		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d %s", *testTimeoutSeconds, cleanup, host, tmp, junitFileNumber, *ginkgoFlags),
-	)
-	aggErr := []error{}
-
-	glog.Infof("Starting tests on %s", host)
+	// Extract the archive
+	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", tmp), fmt.Sprintf("tar -xzvf ./%s", archiveName))
+	glog.Infof("Extracting tar on %s", host)
 	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
 	if err != nil {
-		aggErr = append(aggErr, err)
+		// Exit failure with the error
+		return "", false, err
+	}
+
+	// Run the tests
+	cmd = getSshCommand(" && ",
+		fmt.Sprintf("cd %s", tmp),
+		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d %s", *testTimeoutSeconds, cleanup, host, tmp, junitFileNumber, *ginkgoFlags),
+	)
+	aggErrs := []error{}
+
+	glog.Infof("Starting tests on %s", host)
+	output, err = RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
+	if err != nil {
+		aggErrs = append(aggErrs, err)
 	}
 
 	glog.Infof("Copying test artifacts from %s", host)
 	scpErr := getTestArtifacts(host, tmp)
+	exitOk := true
 	if scpErr != nil {
-		aggErr = append(aggErr, scpErr)
+		// Only exit non-0 if the scp failed
+		exitOk = false
+		aggErrs = append(aggErrs, err)
 	}
 
-	return output, utilerrors.NewAggregate(aggErr)
+	return output, exitOk, utilerrors.NewAggregate(aggErrs)
 }
 
 func getTestArtifacts(host, testDir string) error {
