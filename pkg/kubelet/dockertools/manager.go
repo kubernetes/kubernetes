@@ -50,12 +50,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -180,7 +180,7 @@ type DockerManager struct {
 
 // A subset of the pod.Manager interface extracted for testing purposes.
 type podGetter interface {
-	GetPodByUID(types.UID) (*api.Pod, bool)
+	GetPodByUID(kubetypes.UID) (*api.Pod, bool)
 }
 
 func PodInfraContainerEnv(env map[string]string) kubecontainer.Option {
@@ -209,7 +209,7 @@ func NewDockerManager(
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
 	runtimeHelper kubecontainer.RuntimeHelper,
-	httpClient kubetypes.HttpGetter,
+	httpClient types.HttpGetter,
 	execHandler ExecHandler,
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFSInterface,
@@ -750,14 +750,14 @@ func getDockerContainerNameInfo(c *dockertypes.Container) (*KubeletContainerName
 }
 
 // Get pod UID, name, and namespace by examining the container names.
-func getPodInfoFromContainer(c *dockertypes.Container) (types.UID, string, string, error) {
+func getPodInfoFromContainer(c *dockertypes.Container) (kubetypes.UID, string, string, error) {
 	dockerName, _, err := getDockerContainerNameInfo(c)
 	if err != nil {
-		return types.UID(""), "", "", err
+		return kubetypes.UID(""), "", "", err
 	}
 	name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
 	if err != nil {
-		return types.UID(""), "", "", fmt.Errorf("parse pod full name %q error: %v", dockerName.PodFullName, err)
+		return kubetypes.UID(""), "", "", fmt.Errorf("parse pod full name %q error: %v", dockerName.PodFullName, err)
 	}
 	return dockerName.PodUID, name, namespace, nil
 }
@@ -787,7 +787,7 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("GetPods").Observe(metrics.SinceInMicroseconds(start))
 	}()
-	pods := make(map[types.UID]*kubecontainer.Pod)
+	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
 	var result []*kubecontainer.Pod
 
 	containers, err := GetKubeletDockerContainers(dm.client, all)
@@ -1428,7 +1428,7 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
 		if err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
-			name := labels[kubernetesContainerNameLabel]
+			name := labels[types.KubernetesContainerNameLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {
 					container = &pod.Spec.Containers[ix]
@@ -2357,7 +2357,7 @@ func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy
 	return dm.containerGC.GarbageCollect(gcPolicy)
 }
 
-func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	podStatus := &kubecontainer.PodStatus{ID: uid, Name: name, Namespace: namespace}
 	// Now we retain restart count of container as a docker label. Each time a container
 	// restarts, pod will read the restart count from the registered dead container, increment

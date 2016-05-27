@@ -37,7 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
 	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_rkt"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -83,15 +84,15 @@ func makeRktPod(rktPodState rktapi.PodState,
 				Value: k8sRktKubeletAnnoValue,
 			},
 			appctypes.Annotation{
-				Name:  *appctypes.MustACIdentifier(k8sRktUIDAnno),
+				Name:  *appctypes.MustACIdentifier(types.KubernetesPodUIDLabel),
 				Value: podUID,
 			},
 			appctypes.Annotation{
-				Name:  *appctypes.MustACIdentifier(k8sRktNameAnno),
+				Name:  *appctypes.MustACIdentifier(types.KubernetesPodNameLabel),
 				Value: podName,
 			},
 			appctypes.Annotation{
-				Name:  *appctypes.MustACIdentifier(k8sRktNamespaceAnno),
+				Name:  *appctypes.MustACIdentifier(types.KubernetesPodNamespaceLabel),
 				Value: podNamespace,
 			},
 			appctypes.Annotation{
@@ -1461,7 +1462,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-0",
 						},
 					},
@@ -1474,7 +1475,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-1",
 						},
 					},
@@ -1487,7 +1488,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-2",
 						},
 					},
@@ -1500,7 +1501,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-3",
 						},
 					},
@@ -1513,7 +1514,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-4",
 						},
 					},
@@ -1544,7 +1545,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-2",
 						},
 					},
@@ -1557,7 +1558,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-1",
 						},
 					},
@@ -1570,7 +1571,7 @@ func TestGarbageCollect(t *testing.T) {
 					Apps:      []*rktapi.App{fakeApp},
 					Annotations: []*rktapi.KeyValue{
 						{
-							Key:   k8sRktUIDAnno,
+							Key:   types.KubernetesPodUIDLabel,
 							Value: "pod-uid-0",
 						},
 					},
@@ -1621,7 +1622,7 @@ func TestGarbageCollect(t *testing.T) {
 		cli.Reset()
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
-		getter.pods = make(map[types.UID]*api.Pod)
+		getter.pods = make(map[kubetypes.UID]*api.Pod)
 	}
 }
 
@@ -1664,11 +1665,11 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 						Value: "stage1-override-img",
 					},
 					{
-						Name:  appctypes.ACIdentifier(k8sRktUIDAnno),
+						Name:  appctypes.ACIdentifier(types.KubernetesPodUIDLabel),
 						Value: "uid-1",
 					},
 					{
-						Name:  appctypes.ACIdentifier(k8sRktNameAnno),
+						Name:  appctypes.ACIdentifier(types.KubernetesPodNameLabel),
 						Value: "name-1",
 					},
 					{
@@ -1676,7 +1677,7 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 						Value: "true",
 					},
 					{
-						Name:  appctypes.ACIdentifier(k8sRktNamespaceAnno),
+						Name:  appctypes.ACIdentifier(types.KubernetesPodNamespaceLabel),
 						Value: "namespace-1",
 					},
 					{
