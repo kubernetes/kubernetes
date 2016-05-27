@@ -162,21 +162,21 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d", *testTimeoutSeconds, cleanup, host, tmp, junitFileNumber),
 	)
+	aggErr := []error{}
+
 	glog.Infof("Starting tests on %s", host)
 	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
-
 	if err != nil {
-		scpErr := getTestArtifacts(host, tmp)
-
-		// Return both the testing and scp error
-		if scpErr != nil {
-			return "", utilerrors.NewAggregate([]error{err, scpErr})
-		}
-		return "", err
+		aggErr = append(aggErr, err)
 	}
 
-	err = getTestArtifacts(host, tmp)
-	return output, nil
+	glog.Infof("Copying test artifacts from %s", host)
+	scpErr := getTestArtifacts(host, tmp)
+	if scpErr != nil {
+		aggErr = append(aggErr, scpErr)
+	}
+
+	return output, utilerrors.NewAggregate(aggErr)
 }
 
 func getTestArtifacts(host, testDir string) error {
