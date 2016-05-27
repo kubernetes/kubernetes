@@ -60,9 +60,8 @@ KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1,metrics/v1alpha1,federation/v1alpha1;v1,autoscaling/v1,batch/v1,batch/v2alpha1,extensions/v1beta1,apps/v1alpha1,metrics/v1alpha1,federation/v1alpha1,policy/v1alpha1,rbac.authorization.k8s.io/v1alpha1"}
 # once we have multiple group supports
-# Run tests with the standard (registry) and a custom etcd prefix
-# (kubernetes.io/registry).
-KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
+# Run tests with the standard (registry) etcd prefix.
+KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry"}
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
