@@ -32,7 +32,7 @@ kube::util::wait_for_url() {
   local i
   for i in $(seq 1 $times); do
     local out
-    if out=$(curl -fs $url 2>/dev/null); then
+    if out=$(curl -gfs $url 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
