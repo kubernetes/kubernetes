@@ -19,7 +19,9 @@
             },
             {
                 "name": "etcdstorage",
-                "emptyDir": {}
+                "hostPath": {
+                    "path": "/var/etcd-flannel"
+                }
             },
             {
                 "name": "networkconfig",
@@ -77,7 +79,7 @@
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "/usr/local/bin/etcd --listen-peer-urls http://127.0.0.1:{{ etcd_peer_port }} --addr 127.0.0.1:{{ etcd_port }} --bind-addr 127.0.0.1:{{ etcd_port }} --data-dir /var/etcd/data 1>>/var/log/etcd_flannel.log 2>&1"
+                    "/usr/local/bin/etcd --listen-peer-urls http://127.0.0.1:{{ etcd_peer_port }} --addr 127.0.0.1:{{ etcd_port }} --bind-addr 127.0.0.1:{{ etcd_port }} --data-dir /var/etcd-flannel/data 1>>/var/log/etcd_flannel.log 2>&1"
                 ],
                 "livenessProbe": {
                     "httpGet": {
@@ -100,7 +102,7 @@
                     },
                     {
                         "name": "etcdstorage",
-                        "mountPath": "/var/etcd/data"
+                        "mountPath": "/var/etcd-flannel"
                     }
                 ]
             }
