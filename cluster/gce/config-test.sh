@@ -60,8 +60,6 @@ TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 # Extra docker options for nodes.
 EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
 
-# Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
-POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
 # Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
