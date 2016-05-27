@@ -70,10 +70,13 @@ process_content () {
   # Start search at package root
   case ${package} in
     github.com/*|golang.org/*|bitbucket.org/*)
-     package_root=$(echo ${package} |awk -F/ '{print $1"/"$2"/"$3 }')
+     package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2"/"$3 }')
+     ;;
+    go4.org/*)
+     package_root=$(echo ${package} |awk -F/ '{ print $1 }')
      ;;
     *)
-     package_root=$(echo ${package} |awk -F/ '{print $1"/"$2 }')
+     package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2 }')
      ;;
   esac
 
