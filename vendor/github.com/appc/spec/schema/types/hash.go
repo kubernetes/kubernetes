@@ -27,6 +27,7 @@ const (
 	maxHashSize = (sha512.Size / 2) + len("sha512-")
 )
 
+// THIS IS A TEST OF THE GODEPS VENDORING
 // Hash encodes a hash specified in a string of the form:
 //    "<type>-<value>"
 // for example
