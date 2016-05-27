@@ -52,6 +52,7 @@ type TestResult struct {
 	output string
 	err    error
 	host   string
+	exitOk bool
 }
 
 func main() {
@@ -129,6 +130,7 @@ func main() {
 
 	// Wait for all tests to complete and emit the results
 	errCount := 0
+	exitOk := true
 	for i := 0; i < running; i++ {
 		tr := <-results
 		host := tr.host
@@ -139,11 +141,12 @@ func main() {
 		} else {
 			fmt.Printf("Success Finished Host %s Test Suite\n%s\n", host, tr.output)
 		}
+		exitOk = exitOk && tr.exitOk
 		fmt.Printf("%s================================================================%s\n", blue, noColour)
 	}
 
 	// Set the exit code if there were failures
-	if errCount > 0 {
+	if !exitOk {
 		fmt.Printf("Failure: %d errors encountered.", errCount)
 		os.Exit(1)
 	}
@@ -151,11 +154,12 @@ func main() {
 
 // Run tests in archive against host
 func testHost(host, archive string, deleteFiles bool, junitFileNum int) *TestResult {
-	output, err := e2e_node.RunRemote(archive, host, deleteFiles, junitFileNum)
+	output, exitOk, err := e2e_node.RunRemote(archive, host, deleteFiles, junitFileNum)
 	return &TestResult{
 		output: output,
 		err:    err,
 		host:   host,
+		exitOk: exitOk,
 	}
 }
 
