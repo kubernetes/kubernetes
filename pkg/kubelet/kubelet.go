@@ -46,7 +46,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -1014,6 +1013,16 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 			Unschedulable: !kl.registerSchedulable,
 		},
 	}
+	// Initially, set NodeNetworkUnavailable to true.
+	if kl.providerRequiresNetworkingConfiguration() {
+		node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+			Type:               api.NodeNetworkUnavailable,
+			Status:             api.ConditionTrue,
+			Reason:             "NoRouteCreated",
+			Message:            "Node created without a route",
+			LastTransitionTime: unversioned.NewTime(kl.clock.Now()),
+		})
+	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
@@ -1077,6 +1086,14 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		return nil, err
 	}
 	return node, nil
+}
+
+func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
+	if kl.cloud == nil || kl.flannelExperimentalOverlay {
+		return false
+	}
+	_, supported := kl.cloud.Routes()
+	return supported
 }
 
 // registerWithApiserver registers the node with the cluster master. It is safe
@@ -3164,23 +3181,12 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 	currentTime := unversioned.NewTime(kl.clock.Now())
 	var newNodeReadyCondition api.NodeCondition
 	if rs := kl.runtimeState.errors(); len(rs) == 0 {
-		_, networkingCondition := api.GetNodeCondition(&node.Status, api.NodeNetworkingReady)
-		if (kl.cloud.ProviderName() == gce.ProviderName) && (networkingCondition == nil || networkingCondition.Status != api.ConditionTrue) {
-			newNodeReadyCondition = api.NodeCondition{
-				Type:              api.NodeReady,
-				Status:            api.ConditionFalse,
-				Reason:            "KubeletNotReady",
-				Message:           "networking is not ready",
-				LastHeartbeatTime: currentTime,
-			}
-		} else {
-			newNodeReadyCondition = api.NodeCondition{
-				Type:              api.NodeReady,
-				Status:            api.ConditionTrue,
-				Reason:            "KubeletReady",
-				Message:           "kubelet is posting ready status",
-				LastHeartbeatTime: currentTime,
-			}
+		newNodeReadyCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionTrue,
+			Reason:            "KubeletReady",
+			Message:           "kubelet is posting ready status",
+			LastHeartbeatTime: currentTime,
 		}
 	} else {
 		newNodeReadyCondition = api.NodeCondition{
