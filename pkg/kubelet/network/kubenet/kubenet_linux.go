@@ -317,7 +317,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	if err != nil {
 		return err
 	}
-	if res.IP4 == nil || res.IP4.IP.IP.String() == "" {
+	if res.IP4 == nil || len(res.IP4.IP.IP) != net.IPv4len {
 		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
 	}
 	plugin.podIPs[id] = res.IP4.IP.IP.String()
