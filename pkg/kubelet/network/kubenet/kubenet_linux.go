@@ -67,7 +67,7 @@ type kubenetNetworkPlugin struct {
 	host        network.Host
 	netConfig   *libcni.NetworkConfig
 	loConfig    *libcni.NetworkConfig
-	cniConfig   *libcni.CNIConfig
+	cniConfig   libcni.CNI
 	shaper      bandwidth.BandwidthShaper
 	podCIDRs    map[kubecontainer.ContainerID]string
 	MTU         int
@@ -374,7 +374,7 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	if hasCIDR {
 		glog.V(5).Infof("Removing pod CIDR %s from shaper", cidr)
 		// shaper wants /32
-		if addr, _, err := net.ParseCIDR(cidr); err != nil {
+		if addr, _, err := net.ParseCIDR(cidr); err == nil {
 			if err = plugin.shaper.Reset(fmt.Sprintf("%s/32", addr.String())); err != nil {
 				glog.Warningf("Failed to remove pod CIDR %s from shaper: %v", cidr, err)
 			}
