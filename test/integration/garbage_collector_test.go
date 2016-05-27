@@ -1,4 +1,4 @@
-// +build integration,!no-etcd
+// // +build integration,!no-etcd
 
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
@@ -127,6 +127,7 @@ func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interfac
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.EnableCoreControllers = false
+	glog.Infof("CHAO: masterConfig.EnableWatchCache=%v", masterConfig.EnableWatchCache)
 	m, err := master.New(masterConfig)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -232,7 +233,10 @@ func TestCascadingDeletion(t *testing.T) {
 				t.Fatalf("Failed to list replication controllers: %v", err2)
 			}
 			t.Errorf("The polling of GC has failed. The cluster has %d replication controllers. They are %#v", len(rcs.Items), rcs)
-			t.Fatal(err)
+			glog.Info("FAILED!!!!! The polling of GC has failed. The cluster has %d replication controllers. They are %#v", len(rcs.Items), rcs)
+			close(stopCh)
+			continue
+			//t.Fatal(err)
 		}
 		// wait for the garbage collector to drain its queue again because it's
 		// possible it just processed the delete of the toBeDeletedRC.

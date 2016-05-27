@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -453,6 +454,9 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 	}
 	if !w.filter(obj) {
 		return
+	}
+	if rc, ok := obj.(*api.ReplicationController); ok {
+		glog.V(6).Infof("CHAO: in etcd sendDelete, obj=%#v", rc)
 	}
 	w.emit(watch.Event{
 		Type:   watch.Deleted,
