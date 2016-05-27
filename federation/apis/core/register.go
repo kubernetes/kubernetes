@@ -72,4 +72,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&unversioned.APIGroup{},
 		&unversioned.APIResourceList{},
 	)
+
+	addDeepCopyFuncs(scheme)
+	addDefaultingFuncs(scheme)
+	addConversionFuncs(scheme)
 }
