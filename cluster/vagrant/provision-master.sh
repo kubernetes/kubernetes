@@ -64,6 +64,7 @@ done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
+enable-accounting
 prepare-package-manager
 
 # Configure the master network
@@ -118,8 +119,7 @@ if ! which /usr/libexec/cockpit-ws &>/dev/null; then
 
   pushd /etc/yum.repos.d
     curl -OL https://copr.fedorainfracloud.org/coprs/g/cockpit/cockpit-preview/repo/fedora-23/msuchy-cockpit-preview-fedora-23.repo
-    dnf install -y cockpit cockpit-kubernetes socat ethtool
-    dnf update -y docker
+    dnf install -y cockpit cockpit-kubernetes docker socat ethtool
   popd
 
   systemctl enable cockpit.socket
