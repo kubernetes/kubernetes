@@ -333,8 +333,9 @@ kube::util::git_upstream_remote_name() {
 kube::util::has_changes_against_upstream_branch() {
   local -r git_branch=$1
   local -r pattern=$2
+  local full_branch
 
-  readonly full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
+  full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
   echo "Checking for '${pattern}' changes against '${full_branch}'"
   # make sure the branch is valid, otherwise the check will pass erroneously.
   if ! git describe "${full_branch}" >/dev/null; then
