@@ -630,7 +630,7 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	cmd := KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
 	err := cmd.Run()
 	return stdout.Bytes(), stderr.Bytes(), err
 }
