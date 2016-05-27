@@ -108,10 +108,7 @@ func NewMetrics() Metrics {
 }
 
 func parseMetrics(data string, knownMetrics map[string][]string, output *Metrics, unknownMetrics sets.String) error {
-	dec, err := expfmt.NewDecoder(strings.NewReader(data), expfmt.FmtText)
-	if err != nil {
-		return err
-	}
+	dec := expfmt.NewDecoder(strings.NewReader(data), expfmt.FmtText)
 	decoder := expfmt.SampleDecoder{
 		Dec:  dec,
 		Opts: &expfmt.DecodeOptions{},
@@ -119,7 +116,7 @@ func parseMetrics(data string, knownMetrics map[string][]string, output *Metrics
 
 	for {
 		var v model.Vector
-		if err = decoder.Decode(&v); err != nil {
+		if err := decoder.Decode(&v); err != nil {
 			if err == io.EOF {
 				// Expected loop termination condition.
 				return nil

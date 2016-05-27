@@ -152,7 +152,16 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
       file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
   fi
   if [[ -z "${file}" ]]; then
-      echo "Could not find a license for ${PACKAGE} - aborting" > /dev/stderr
+      cat > /dev/stderr << __EOF__
+No license could be found for ${PACKAGE} - aborting.
+
+Options:
+1. Check if the upstream repository has a newer version with LICENSE and/or
+   COPYRIGHT files.
+2. Contact the author of the package to ensure there is a LICENSE and/or
+   COPYRIGHT file present.
+3. Do not use this package in Kubernetes.
+__EOF__
       exit 9
   fi
   cat "${file}"
