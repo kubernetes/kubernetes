@@ -164,6 +164,14 @@ func DeepCopy_v1alpha1_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *co
 	if err := DeepCopy_v1alpha1_ClusterMeta(in.ClusterMeta, &out.ClusterMeta, c); err != nil {
 		return err
 	}
+	if in.Zones != nil {
+		in, out := in.Zones, &out.Zones
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.Zones = nil
+	}
+	out.Region = in.Region
 	return nil
 }
 
