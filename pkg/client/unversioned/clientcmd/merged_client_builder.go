@@ -27,13 +27,13 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-// DeferredLoadingClientConfig is a ClientConfig interface that is backed by a set of loading rules
+// DeferredLoadingClientConfig is a ClientConfig interface that is backed by a client config loader.
 // It is used in cases where the loading rules may change after you've instantiated them and you want to be sure that
 // the most recent rules are used.  This is useful in cases where you bind flags to loading rule parameters before
 // the parse happens and you want your calling code to be ignorant of how the values are being mutated to avoid
 // passing extraneous information down a call stack
 type DeferredLoadingClientConfig struct {
-	loadingRules   *ClientConfigLoadingRules
+	loader         ClientConfigLoader
 	overrides      *ConfigOverrides
 	fallbackReader io.Reader
 
@@ -42,13 +42,13 @@ type DeferredLoadingClientConfig struct {
 }
 
 // NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
-func NewNonInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides) ClientConfig {
-	return &DeferredLoadingClientConfig{loadingRules: loadingRules, overrides: overrides}
+func NewNonInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides) ClientConfig {
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides}
 }
 
 // NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
-func NewInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return &DeferredLoadingClientConfig{loadingRules: loadingRules, overrides: overrides, fallbackReader: fallbackReader}
+func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, fallbackReader: fallbackReader}
 }
 
 func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
@@ -57,16 +57,16 @@ func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, e
 		defer config.loadingLock.Unlock()
 
 		if config.clientConfig == nil {
-			mergedConfig, err := config.loadingRules.Load()
+			mergedConfig, err := config.loader.Load()
 			if err != nil {
 				return nil, err
 			}
 
 			var mergedClientConfig ClientConfig
 			if config.fallbackReader != nil {
-				mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader, config.loadingRules)
+				mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader, config.loader)
 			} else {
-				mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.loadingRules)
+				mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.loader)
 			}
 
 			config.clientConfig = mergedClientConfig
@@ -118,5 +118,5 @@ func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 
 // ConfigAccess implements ClientConfig
 func (config *DeferredLoadingClientConfig) ConfigAccess() ConfigAccess {
-	return config.loadingRules
+	return config.loader
 }

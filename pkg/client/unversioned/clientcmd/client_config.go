@@ -399,3 +399,13 @@ func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config,
 		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
 }
+
+// BuildConfigFromKubeconfigGetter is a helper function that builds configs from a master
+// url and a kubeconfigGetter.
+func BuildConfigFromKubeconfigGetter(masterUrl string, kubeconfigGetter KubeconfigGetter) (*restclient.Config, error) {
+	// TODO: We do not need a DeferredLoader here. Refactor code and see if we can use DirectClientConfig here.
+	cc := NewNonInteractiveDeferredLoadingClientConfig(
+		&ClientConfigGetter{kubeconfigGetter: kubeconfigGetter},
+		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}})
+	return cc.ClientConfig()
+}
