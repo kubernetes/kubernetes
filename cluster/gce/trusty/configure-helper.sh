@@ -614,6 +614,20 @@ start_kube_scheduler() {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
+# Starts k8s cluster autoscaler.
+start_cluster_autoscaler() {
+  if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ]; then
+     # Remove salt comments and replace variables with values
+    src_file="${kube_home}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
+    remove_salt_config_comments "${src_file}"
+
+    local params=`sed 's/^/"/;s/ /","/g;s/$/",/' <<< "${AUTOSCALER_MIG_CONFIG}"`
+    sed -i -e "s@\"{{param}}\",@${params}@g" "${src_file}"
+    sed -i -e "s@{%.*%}@@g" "${src_file}"
+    cp "${src_file}" /etc/kubernetes/manifests
+  fi
+}
+
 # Starts a fluentd static pod for logging.
 start_fluentd() {
   if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then

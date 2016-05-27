@@ -622,6 +622,22 @@ function start-kube-scheduler {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
+# Starts cluster autoscaler.
+function start-cluster-autoscaler {
+  if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ]; then
+    touch /etc/kubernetes/start-cluster-autoscaler-enabled
+
+     # Remove salt comments and replace variables with values
+    src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
+    remove-salt-config-comments "${src_file}"
+
+    local params=`sed 's/^/"/;s/ /","/g;s/$/",/' <<< "${AUTOSCALER_MIG_CONFIG}"`
+    sed -i -e "s@\"{{param}}\",@${params}@g" "${src_file}"
+    sed -i -e "s@{%.*%}@@g" "${src_file}"
+    cp "${src_file}" /etc/kubernetes/manifests
+  fi
+}
+
 # A helper function for copying addon manifests and set dir/files
 # permissions.
 #
@@ -812,6 +828,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-kube-controller-manager
   start-kube-scheduler
   start-kube-addons
+  start-cluster-autoscaler
 else
   start-kube-proxy
   # Kube-registry-proxy.
