@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	pkgutil "k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -138,6 +139,23 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 
 func readTestFileOrDie(file string) []byte {
 	return framework.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+}
+
+func runKubectlRetryOrDie(args ...string) string {
+	var err error
+	var output string
+	for i := 0; i < 3; i++ {
+		output, err = framework.RunKubectl(args...)
+		if err == nil || !strings.Contains(err.Error(), registry.OptimisticLockErrorMsg) {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	// Expect no errors to be present after retries are finished
+	// Copied from framework #ExecOrDie
+	framework.Logf("stdout: %q", output)
+	Expect(err).NotTo(HaveOccurred())
+	return output
 }
 
 var _ = framework.KubeDescribe("Kubectl client", func() {
@@ -909,7 +927,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
 
 			By("rolling-update to same image controller")
-			framework.RunKubectlOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(api.PullIfNotPresent), nsFlag)
+
+			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(api.PullIfNotPresent), nsFlag)
 			framework.ValidateController(c, nginxImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
 	})
