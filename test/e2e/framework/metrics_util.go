@@ -417,10 +417,7 @@ func PrettyPrintJSON(metrics interface{}) string {
 
 // extractMetricSamples parses the prometheus metric samples from the input string.
 func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
-	dec, err := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
-	if err != nil {
-		return nil, err
-	}
+	dec := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
 	decoder := expfmt.SampleDecoder{
 		Dec:  dec,
 		Opts: &expfmt.DecodeOptions{},
@@ -429,7 +426,7 @@ func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	var samples []*model.Sample
 	for {
 		var v model.Vector
-		if err = decoder.Decode(&v); err != nil {
+		if err := decoder.Decode(&v); err != nil {
 			if err == io.EOF {
 				// Expected loop termination condition.
 				return samples, nil
