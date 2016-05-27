@@ -32,9 +32,51 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Example of NFS volume
+# Outline
 
-See [nfs-web-rc.yaml](nfs-web-rc.yaml) for a quick example of how to use an NFS
+This example describes how to create Web frontend server, an auto-provisioned persistent volume on GCE, and an NFS-backed persistent claim.
+
+Demonstrated Kubernetes Concepts:
+
+* [Persistent Volumes](http://kubernetes.io/docs/user-guide/persistent-volumes/) to
+  define persistent disks (disk lifecycle not tied to the Pods).
+* [Services](http://kubernetes.io/docs/user-guide/services/) to enable Pods to
+  locate one another.
+
+![alt text][nfs pv example]
+
+As illustrated above, two persistent volumes are used in this example:
+
+- Web frontend Pod uses a persistent volume based on NFS server, and
+- NFS server uses an auto provisioned [persistent volume](http://kubernetes.io/docs/user-guide/persistent-volumes/) from GCE PD or AWS EBS.
+
+Note, this example uses an NFS container that doesn't support NFSv4.
+
+[nfs pv example]: nfs-pv.png
+
+
+## tl;dr Quickstart
+
+```console
+$ kubectl create -f examples/nfs/provisioner/nfs-server-gce-pv.yaml
+$ kubectl create -f examples/nfs/nfs-server-rc.yaml
+$ kubectl create -f examples/nfs/nfs-server-service.yaml
+# get the cluster IP of the server using the following command
+$ kubectl describe services nfs-server
+# use the NFS server IP to update nfs-pv.yaml and execute the following
+$ kubectl create -f examples/nfs/nfs-pv.yaml
+$ kubectl create -f examples/nfs/nfs-pvc.yaml
+# run a fake backend
+$ kubectl create -f examples/nfs/nfs-busybox-rc.yaml
+# get pod name from this command
+$ kubectl get pod -l name=nfs-busybox
+# use the pod name to check the test file
+$ kubectl exec nfs-busybox-jdhf3 -- cat /mnt/index.html
+```
+
+## Example of NFS based persistent volume
+
+See [NFS Service and Replication Controller](nfs-web-rc.yaml) for a quick example of how to use an NFS
 volume claim in a replication controller. It relies on the
 [NFS persistent volume](nfs-pv.yaml) and
 [NFS persistent volume claim](nfs-pvc.yaml) in this example as well.
@@ -46,19 +88,24 @@ controller and import it into two replication controllers.
 
 ### NFS server part
 
-Define [NFS server controller](nfs-server-rc.yaml) and
+Define [the NFS Service and Replication Controller](nfs-server-rc.yaml) and
 [NFS service](nfs-server-service.yaml):
+
+The NFS server exports an an auto-provisioned persistent volume backed by GCE PD:
+
+```console
+$ kubectl create -f examples/nfs/provisioner/nfs-server-gce-pv.yaml
+```
 
 ```console
 $ kubectl create -f examples/nfs/nfs-server-rc.yaml
 $ kubectl create -f examples/nfs/nfs-server-service.yaml
 ```
 
-The server exports `/mnt/data` directory as `/` (fsid=0). The
-directory contains dummy `index.html`. Wait until the pod is running
-by checking `kubectl get pods -lrole=nfs-server`.
+The directory contains dummy `index.html`. Wait until the pod is running
+by checking `kubectl get pods -l role=nfs-server`.
 
-### Create the NFS claim
+### Create the NFS based persistent volume claim
 
 The [NFS busybox controller](nfs-busybox-rc.yaml) uses a simple script to
 generate data written to the NFS server we just started. First, you'll need to
@@ -95,7 +142,7 @@ Conveniently, it's also a `busybox` pod, so we can get an early check
 that our mounts are working now. Find a busybox pod and exec:
 
 ```console
-$ kubectl get pod -lname=nfs-busybox
+$ kubectl get pod -l name=nfs-busybox
 NAME                READY     STATUS    RESTARTS   AGE
 nfs-busybox-jdhf3   1/1       Running   0          25m
 nfs-busybox-w3s4t   1/1       Running   0          25m
@@ -132,7 +179,7 @@ We can then use the busybox container we launched before to check that `nginx`
 is serving the data appropriately:
 
 ```console
-$ kubectl get pod -lname=nfs-busybox
+$ kubectl get pod -l name=nfs-busybox
 NAME                READY     STATUS    RESTARTS   AGE
 nfs-busybox-jdhf3   1/1       Running   0          1h
 nfs-busybox-w3s4t   1/1       Running   0          1h
@@ -143,6 +190,13 @@ $ kubectl exec nfs-busybox-jdhf3 -- wget -qO- http://10.0.68.37
 Thu Oct 22 19:28:55 UTC 2015
 nfs-busybox-w3s4t
 ```
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

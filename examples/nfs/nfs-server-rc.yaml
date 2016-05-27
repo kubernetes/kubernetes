@@ -13,9 +13,20 @@ spec:
     spec:
       containers:
       - name: nfs-server
-        image: gcr.io/google_containers/volume-nfs
+        image: gcr.io/google-samples/nfs-server:1.1
         ports:
           - name: nfs
             containerPort: 2049
+          - name: mountd
+            containerPort: 20048
+          - name: rpcbind
+            containerPort: 111
         securityContext:
           privileged: true
+        volumeMounts:
+          - mountPath: /exports
+            name: mypvc
+      volumes:
+        - name: mypvc
+          persistentVolumeClaim:
+            claimName: nfs-pv-provisioning-demo
