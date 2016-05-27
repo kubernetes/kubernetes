@@ -19,6 +19,7 @@ package dockertools
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -48,6 +49,8 @@ const (
 
 	// TODO(random-liu): Keep this for old containers, remove this when we drop support for v1.1.
 	kubernetesPodLabel = "io.kubernetes.pod.data"
+
+	kubernetesAnnotationContainerLabelPrefix = "alpha.kubernetes.io/containers-labels/"
 
 	cadvisorPrometheusMetricsLabel = "io.cadvisor.metric.prometheus"
 )
@@ -106,6 +109,19 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableC
 			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
 			labels[kubernetesContainerPreStopHandlerLabel] = string(rawPreStop)
+		}
+	}
+	// If there are any pod annotations that are of the form:
+	//   container.label/XXX=YYY
+	// then create a container label of the form: XXX=YYY
+	for k, v := range pod.Annotations {
+		if strings.HasPrefix(k, kubernetesAnnotationContainerLabelPrefix) {
+			k = k[len(kubernetesAnnotationContainerLabelPrefix):]
+
+			// If there's nothing after the "/" then just skip this one
+			if len(k) > 0 {
+				labels[k] = v
+			}
 		}
 	}
 
