@@ -375,8 +375,9 @@ func (nc *NodeController) allocateOrOccupyCIDR(obj interface{}) {
 	glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
 	for rep := 0; rep < podCIDRUpdateRetry; rep++ {
 		node.Spec.PodCIDR = podCIDR.String()
-		if _, err := nc.kubeClient.Core().Nodes().Update(node); err == nil {
-			glog.Errorf("Failed while updating Node.Spec.PodCIDR : %v", err)
+		if _, err := nc.kubeClient.Core().Nodes().Update(node); err != nil {
+			glog.Errorf("Failed while updating Node.Spec.PodCIDR (%d retries left): %v", podCIDRUpdateRetry-rep-1, err)
+		} else {
 			break
 		}
 		node, err = nc.kubeClient.Core().Nodes().Get(node.Name)
