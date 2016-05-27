@@ -12,8 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
-MAINTAINER Tim Hockin <thockin@google.com>
-ADD kube2sky /
-ADD kube2sky.go /
-ENTRYPOINT ["/kube2sky"]
+# This file should be kept in sync with cluster/addons/dns/skydns-rc.yaml.in
+
+# Warning: This is a file generated from the base underscore template file: skydns-svc.yaml.base
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "KubeDNS"
+spec:
+  selector:
+    k8s-app: kube-dns
+  clusterIP:  $DNS_SERVER_IP
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP

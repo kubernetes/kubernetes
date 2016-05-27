@@ -148,8 +148,8 @@ set:
 ```
 
 Second, you need to start the DNS server ReplicationController and Service. See
-the example files ([ReplicationController](skydns-rc.yaml.in) and
-[Service](skydns-svc.yaml.in)), but keep in mind that these are templated for
+the example files ([ReplicationController](../../cluster/saltbase/salt/skydns-rc.yaml.in) and
+[Service](../../cluster/saltbase/salt/skydns-svc.yaml.in)), but keep in mind that these are templated for
 Salt.  You will need to replace the `{{ <param> }}` blocks with your own values
 for the config variables mentioned above.  Other than the templating, these are
 normal kubernetes objects, and can be instantiated with `kubectl create`.
@@ -217,14 +217,14 @@ If you see that, DNS is working correctly.
 
 
 ## How does it work?
-SkyDNS depends on etcd for what to serve, but it doesn't really need all of
+<del>SkyDNS depends on etcd for what to serve, but it doesn't really need all of
 what etcd offers (at least not in the way we use it).  For simplicity, we run
 etcd and SkyDNS together in a pod, and we do not try to link etcd instances
 across replicas.  A helper container called [kube2sky](kube2sky/) also runs in
 the pod and acts a bridge between Kubernetes and SkyDNS.  It finds the
 Kubernetes master through the `kubernetes` service (via environment
 variables), pulls service info from the master, and writes that to etcd for
-SkyDNS to find.
+SkyDNS to find.</del>
 
 ## Inheriting DNS from the node
 When running a pod, kubelet will prepend the cluster DNS server and search
@@ -252,11 +252,14 @@ some of those settings will be lost.  As a partial workaround, the node can run
 entries.  You can also use kubelet's `--resolv-conf` flag.
 
 ## Making changes
-Please observe the release process for making changes to the `kube2sky`
-image that is documented in [RELEASES.md](kube2sky/RELEASES.md). Any significant changes
-to the YAML template for `kube-dns` should result a bump of the version number
-for the `kube-dns` replication controller and well as the `version` label. This
-will permit a rolling update of `kube-dns`.
+The container containing the kube-dns binary needs to be built for every
+architecture and pushed to the registry manually whenever the kube-dns binary
+has code changes. Every significant change to the functionality should result
+in a bump of the TAG in the Makefile.
+
+Any significant changes to the YAML template for `kube-dns` should result a bump
+of the version number for the `kube-dns` replication controller and well as the
+`version` label. This will permit a rolling update of `kube-dns`.
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/kube-dns/README.md?pixel)]()

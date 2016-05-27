@@ -1,28 +1,45 @@
+# Copyright 2016 The Kubernetes Authors All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
+
+# Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
+
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v11
+  name: kube-dns-v13
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v11
+    version: v13
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
     k8s-app: kube-dns
-    version: v11
+    version: v13
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v11
+        version: v13
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - name: etcd
-        image: gcr.io/google_containers/etcd-amd64:2.2.1
+      - name: kubedns
+        image: gcr.io/google_containers/kubedns-amd64:1.2
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -30,33 +47,6 @@ spec:
           # "burstable" category so the kubelet doesn't backoff from restarting it.
           limits:
             cpu: 100m
-            memory: 500Mi
-          requests:
-            cpu: 100m
-            memory: 50Mi
-        command:
-        - /usr/local/bin/etcd
-        - -data-dir
-        - /var/etcd/data
-        - -listen-client-urls
-        - http://127.0.0.1:2379,http://127.0.0.1:4001
-        - -advertise-client-urls
-        - http://127.0.0.1:2379,http://127.0.0.1:4001
-        - -initial-cluster-token
-        - skydns-etcd
-        volumeMounts:
-        - name: etcd-storage
-          mountPath: /var/etcd/data
-      - name: kube2sky
-        image: gcr.io/google_containers/kube2sky-amd64:1.15
-        resources:
-          # TODO: Set memory limits when we've profiled the container for large
-          # clusters, then set request = limit to keep this container in
-          # guaranteed class. Currently, this container falls into the
-          # "burstable" category so the kubelet doesn't backoff from restarting it.
-          limits:
-            cpu: 100m
-            # Kube2sky watches all pods.
             memory: 200Mi
           requests:
             cpu: 100m
@@ -80,27 +70,22 @@ spec:
           initialDelaySeconds: 30
           timeoutSeconds: 5
         args:
-        # command = "/kube2sky"
+        # command = "/kube-dns"
         - --domain={{ pillar['dns_domain'] }}
-      - name: skydns
-        image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
-        resources:
-          # TODO: Set memory limits when we've profiled the container for large
-          # clusters, then set request = limit to keep this container in
-          # guaranteed class. Currently, this container falls into the
-          # "burstable" category so the kubelet doesn't backoff from restarting it.
-          limits:
-            cpu: 100m
-            memory: 200Mi
-          requests:
-            cpu: 100m
-            memory: 50Mi
+        - --dns-port=10053
+        ports:
+        - containerPort: 10053
+          name: dns-local
+          protocol: UDP
+        - containerPort: 10053
+          name: dns-tcp-local
+          protocol: TCP
+      - name: dnsmasq
+        image: gcr.io/google_containers/dnsmasq:1.1
         args:
-        # command = "/skydns"
-        - -machines=http://127.0.0.1:4001
-        - -addr=0.0.0.0:53
-        - -ns-rotate=false
-        - -domain={{ pillar['dns_domain'] }}.
+        - --cache-size=1000
+        - --no-resolv
+        - --server=127.0.0.1#10053
         ports:
         - containerPort: 53
           name: dns
@@ -109,7 +94,7 @@ spec:
           name: dns-tcp
           protocol: TCP
       - name: healthz
-        image: gcr.io/google_containers/exechealthz:1.0
+        image: gcr.io/google_containers/exechealthz-amd64:1.0
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
@@ -124,7 +109,4 @@ spec:
         ports:
         - containerPort: 8080
           protocol: TCP
-      volumes:
-      - name: etcd-storage
-        emptyDir: {}
       dnsPolicy: Default  # Don't use cluster DNS.
