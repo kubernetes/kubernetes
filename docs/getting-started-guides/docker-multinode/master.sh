@@ -26,8 +26,8 @@ if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null ); then
 fi
 
 # Make sure k8s version env is properly set
-K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.7"}
-ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
+K8S_VERSION=${K8S_VERSION:-"1.2.2"}
+ETCD_VERSION=${ETCD_VERSION:-"2.3.1"}
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 FLANNEL_IPMASQ=${FLANNEL_IPMASQ:-"true"}
 FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
@@ -142,7 +142,7 @@ start_k8s(){
     sleep 5
     # Set flannel net config
     docker -H unix:///var/run/docker-bootstrap.sock run \
-        --net=host gcr.io/google_containers/etcd:${ETCD_VERSION} \
+        --net=host quay.io/coreos/etcd:v${ETCD_VERSION} \
         etcdctl \
         set /coreos.com/network/config \
             '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
