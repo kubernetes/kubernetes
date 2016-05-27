@@ -206,6 +206,12 @@ func (plugin *FakeVolumePlugin) NewAttacher() (Attacher, error) {
 	return plugin.getFakeVolume(&plugin.Attachers), nil
 }
 
+func (plugin *FakeVolumePlugin) GetAttachers() (Attachers []*FakeVolume) {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.Attachers
+}
+
 func (plugin *FakeVolumePlugin) GetNewAttacherCallCount() int {
 	plugin.RLock()
 	defer plugin.RUnlock()
@@ -217,6 +223,12 @@ func (plugin *FakeVolumePlugin) NewDetacher() (Detacher, error) {
 	defer plugin.Unlock()
 	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
 	return plugin.getFakeVolume(&plugin.Detachers), nil
+}
+
+func (plugin *FakeVolumePlugin) GetDetachers() (Detachers []*FakeVolume) {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.Detachers
 }
 
 func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
