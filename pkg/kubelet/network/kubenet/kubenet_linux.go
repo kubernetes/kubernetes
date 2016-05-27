@@ -64,19 +64,19 @@ const (
 type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
-	host        network.Host
-	netConfig   *libcni.NetworkConfig
-	loConfig    *libcni.NetworkConfig
-	cniConfig   libcni.CNI
-	shaper      bandwidth.BandwidthShaper
-	mu          sync.Mutex //Mutex for protecting podIPs map and netConfig
-	podIPs      map[kubecontainer.ContainerID]string
-	MTU         int
-	execer      utilexec.Interface
-	nsenterPath string
-	hairpinMode componentconfig.HairpinMode
-	hostPortMap map[hostport]closeable
-	iptables    utiliptables.Interface
+	host            network.Host
+	netConfig       *libcni.NetworkConfig
+	loConfig        *libcni.NetworkConfig
+	cniConfig       libcni.CNI
+	bandwidthShaper bandwidth.BandwidthShaper
+	mu              sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
+	podIPs          map[kubecontainer.ContainerID]string
+	MTU             int
+	execer          utilexec.Interface
+	nsenterPath     string
+	hairpinMode     componentconfig.HairpinMode
+	hostPortMap     map[hostport]closeable
+	iptables        utiliptables.Interface
 }
 
 func NewPlugin() network.NetworkPlugin {
@@ -335,19 +335,13 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		}
 	}
 
-	// The first SetUpPod call creates the bridge; ensure shaping is enabled
-	if plugin.shaper == nil {
-		plugin.shaper = bandwidth.NewTCShaper(BridgeName)
-		if plugin.shaper == nil {
-			return fmt.Errorf("Failed to create bandwidth shaper!")
-		}
-		plugin.ensureBridgeTxQueueLen()
-		plugin.shaper.ReconcileInterface()
-	}
+	// The first SetUpPod call creates the bridge; get a shaper for the sake of
+	// initialization
+	shaper := plugin.shaper()
 
 	if egress != nil || ingress != nil {
 		ipAddr := plugin.podIPs[id]
-		if err := plugin.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", ipAddr), egress, ingress); err != nil {
+		if err := shaper.ReconcileCIDR(fmt.Sprintf("%s/32", ipAddr), egress, ingress); err != nil {
 			return fmt.Errorf("Failed to add pod to shaper: %v", err)
 		}
 	}
@@ -374,7 +368,7 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	if hasIP {
 		glog.V(5).Infof("Removing pod IP %s from shaper", podIP)
 		// shaper wants /32
-		if err := plugin.shaper.Reset(fmt.Sprintf("%s/32", podIP)); err != nil {
+		if err := plugin.shaper().Reset(fmt.Sprintf("%s/32", podIP)); err != nil {
 			glog.Warningf("Failed to remove pod IP %s from shaper: %v", podIP, err)
 		}
 	}
@@ -810,4 +804,16 @@ func (plugin *kubenetNetworkPlugin) cleanupHostportMap(containerPortMap map[api.
 			delete(plugin.hostPortMap, hp)
 		}
 	}
+}
+
+// shaper retrieves the bandwidth shaper and, if it hasn't been fetched before,
+// initializes it and ensures the bridge is appropriately configured
+// This function should only be called while holding the `plugin.mu` lock
+func (plugin *kubenetNetworkPlugin) shaper() bandwidth.BandwidthShaper {
+	if plugin.bandwidthShaper == nil {
+		plugin.bandwidthShaper = bandwidth.NewTCShaper(BridgeName)
+		plugin.ensureBridgeTxQueueLen()
+		plugin.bandwidthShaper.ReconcileInterface()
+	}
+	return plugin.bandwidthShaper
 }
