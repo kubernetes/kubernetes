@@ -52,18 +52,18 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.8.1",
-			"Rev": "b889d03467ae08bb6c13241762a64305b69bcf82"
+			"Comment": "v0.8.1-6-gab50d12",
+			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/common",
-			"Comment": "v0.8.1",
-			"Rev": "b889d03467ae08bb6c13241762a64305b69bcf82"
+			"Comment": "v0.8.1-6-gab50d12",
+			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/types",
-			"Comment": "v0.8.1",
-			"Rev": "b889d03467ae08bb6c13241762a64305b69bcf82"
+			"Comment": "v0.8.1-6-gab50d12",
+			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
 		},
 		{
 			"ImportPath": "github.com/armon/go-metrics",
