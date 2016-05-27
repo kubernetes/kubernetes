@@ -53,10 +53,21 @@ const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
 func init() {
-	// Override the default cAdvisor housekeeping interval.
-	if f := flag.Lookup("housekeeping_interval"); f != nil {
-		f.DefValue = defaultHousekeepingInterval.String()
-		f.Value.Set(f.DefValue)
+	// Override cAdvisor flag defaults.
+	flagOverrides := map[string]string{
+		// Override the default cAdvisor housekeeping interval.
+		"housekeeping_interval": defaultHousekeepingInterval.String(),
+		// Disable event storage by default.
+		"event_storage_event_limit": "default=0",
+		"event_storage_age_limit":   "default=0",
+	}
+	for name, defaultValue := range flagOverrides {
+		if f := flag.Lookup(name); f != nil {
+			f.DefValue = defaultValue
+			f.Value.Set(defaultValue)
+		} else {
+			glog.Errorf("Expected cAdvisor flag %q not found", name)
+		}
 	}
 }
 
