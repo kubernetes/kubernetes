@@ -79,6 +79,11 @@ func IsPodReady(pod *Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
 }
 
+// IsPodTerminated returns true if a pod is terminated with any status; false otherwise.
+func IsPodTerminated(pod *Pod) bool {
+	return pod.Status.Phase == PodSucceeded || pod.Status.Phase == PodFailed
+}
+
 // IsPodReady retruns true if a pod is ready; false otherwise.
 func IsPodReadyConditionTrue(status PodStatus) bool {
 	condition := GetPodReadyCondition(status)
