@@ -63,7 +63,7 @@ func NewCMServer() *CMServer {
 			PVClaimBinderSyncPeriod:           unversioned.Duration{Duration: 10 * time.Minute},
 			HorizontalPodAutoscalerSyncPeriod: unversioned.Duration{Duration: 30 * time.Second},
 			DeploymentControllerSyncPeriod:    unversioned.Duration{Duration: 30 * time.Second},
-			MinResyncPeriod:                   unversioned.Duration{Duration: 12 * time.Hour},
+			MinResyncPeriod:                   unversioned.Duration{Duration: 1 * time.Minute},
 			RegisterRetryCount:                10,
 			PodEvictionTimeout:                unversioned.Duration{Duration: 5 * time.Minute},
 			NodeMonitorGracePeriod:            unversioned.Duration{Duration: 40 * time.Second},
