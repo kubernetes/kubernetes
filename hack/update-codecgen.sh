@@ -56,11 +56,14 @@ function cleanup {
 }
 trap cleanup EXIT
 
-# Sort all files in the dependency order.
+# Precompute dependencies for all directories.
+# Then sort all files in the dependency order.
 number=${#generated_files[@]}
 result=""
 for (( i=0; i<number; i++ )); do
   visited[${i}]=false
+  file="${generated_files[${i}]/\.generated\.go/.go}"
+  deps[${i}]=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ${file} | grep "^${my_prefix}")
 done
 ###echo "DBG: found $number generated files"
 ###for f in $(echo "${generated_files[@]}" | sort); do
@@ -70,11 +73,9 @@ done
 # NOTE: depends function assumes that the whole repository is under
 # $my_prefix - it will NOT work if that is not true.
 function depends {
-  file="${generated_files[$1]/\.generated\.go/.go}"
   rhs="$(dirname ${generated_files[$2]/#./${my_prefix}})"
   ###echo "DBG: does ${file} depend on ${rhs}?"
-  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ${file} | grep "^${my_prefix}")
-  for dep in ${deps}; do
+  for dep in ${deps[$1]}; do
     ###echo "DBG:   checking against $dep"
     if [[ "${dep}" == "${rhs}" ]]; then
       ###echo "DBG: = yes"
