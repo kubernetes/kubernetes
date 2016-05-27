@@ -87,7 +87,9 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*federation.Cluster)
-			object.Spec.Credential = "bar"
+			object.Spec.SecretRef = &api.LocalObjectReference{
+				Name: "bar",
+			}
 			return object
 		},
 	)
