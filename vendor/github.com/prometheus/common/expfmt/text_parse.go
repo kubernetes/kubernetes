@@ -108,6 +108,13 @@ func (p *TextParser) TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricF
 			delete(p.metricFamiliesByName, k)
 		}
 	}
+	// If p.err is io.EOF now, we have run into a premature end of the input
+	// stream. Turn this error into something nicer and more
+	// meaningful. (io.EOF is often used as a signal for the legitimate end
+	// of an input stream.)
+	if p.err == io.EOF {
+		p.parseError("unexpected end of input stream")
+	}
 	return p.metricFamiliesByName, p.err
 }
 
