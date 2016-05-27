@@ -181,7 +181,7 @@ func parseTaints(spec []string) ([]api.Taint, []api.Taint, error) {
 				return nil, nil, fmt.Errorf("invalid taint spec: %v, %s", taintSpec, strings.Join(errs, "; "))
 			}
 
-			if parts2[1] != string(api.TaintEffectNoSchedule) && parts2[1] != string(api.TaintEffectPreferNoSchedule) {
+			if parts2[1] != string(api.TaintEffectNoSchedule) && parts2[1] != string(api.TaintEffectPreferNoSchedule) && parts2[1] != string(api.TaintEffectNoScheduleNoAdmit) {
 				return nil, nil, fmt.Errorf("invalid taint spec: %v, unsupported taint effect", taintSpec)
 			}
 

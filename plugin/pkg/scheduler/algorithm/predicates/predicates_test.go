@@ -2563,10 +2563,11 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 
 func TestPodToleratesTaints(t *testing.T) {
 	podTolerateTaintsTests := []struct {
-		pod  *api.Pod
-		node api.Node
-		fits bool
-		test string
+		pod                    *api.Pod
+		node                   api.Node
+		fits                   bool
+		expectedFailureReasons []algorithm.PredicateFailureReason
+		test                   string
 	}{
 		{
 			pod: &api.Pod{
@@ -2587,6 +2588,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
+			expectedFailureReasons: []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(false)},
 			test: "a pod having no tolerations can't be scheduled onto a node with nonempty taints",
 		},
 		{
@@ -2652,6 +2654,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
+			expectedFailureReasons: []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(false)},
 			test: "a pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
 		},
 		{
@@ -2758,6 +2761,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
+			expectedFailureReasons: []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(false)},
 			test: "a pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
 				"can't be scheduled onto the node",
 		},
@@ -2791,7 +2795,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			test: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
+			test: "the pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
 				"and the effect of taint is NoSchedule. Pod can be scheduled onto the node",
 		},
 		{
@@ -2828,8 +2832,63 @@ func TestPodToleratesTaints(t *testing.T) {
 			test: "The pod has a toleration that key and value don't match the taint on the node, " +
 				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "podadmit1",
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoScheduleNoAdmit"
+						}]`,
+					},
+				},
+			},
+			fits: false,
+			expectedFailureReasons: []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(true)},
+			test: "node should aware that that a pod having no tolerations can't be scheduled or started on a node with nonempty taints",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "podadmit2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"operator": "Equal",
+							"value": "user2",
+							"effect": "NoScheduleNoAdmit"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoScheduleNoAdmit"
+						}]`,
+					},
+				},
+			},
+			fits: false,
+			expectedFailureReasons: []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(true)},
+			test: "node should aware that a pod which can't be scheduled or start on a dedicated node assgined to user2 with effect NoScheduleNoAdmit",
+		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}
 
 	for _, test := range podTolerateTaintsTests {
 		nodeInfo := schedulercache.NewNodeInfo()
@@ -2838,11 +2897,11 @@ func TestPodToleratesTaints(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
 		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s, unexpected failure reason: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		if !fits && !reflect.DeepEqual(reasons, test.expectedFailureReasons) {
+			t.Errorf("%s, unexpected failure reason: %v, want: %v", test.test, reasons, test.expectedFailureReasons)
 		}
 		if fits != test.fits {
-			t.Errorf("%s, expected: %v got %v", test.test, test.fits, fits)
+			t.Errorf("%s,\n expected: %v got %v", test.test, test.fits, fits)
 		}
 	}
 }
