@@ -317,10 +317,14 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	if err != nil {
 		return err
 	}
-	if res.IP4 == nil || len(res.IP4.IP.IP) != net.IPv4len {
+	if res.IP4 == nil {
 		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
 	}
-	plugin.podIPs[id] = res.IP4.IP.IP.String()
+	ip4 := res.IP4.IP.IP.To4()
+	if ip4 == nil {
+		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
+	}
+	plugin.podIPs[id] = ip4.String()
 
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
