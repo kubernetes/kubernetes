@@ -163,7 +163,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.APIPrefix, config.APIPrefix)
 	assert.Equal(master.APIGroupPrefix, config.APIGroupPrefix)
 	assert.Equal(master.RequestContextMapper, config.RequestContextMapper)
-	assert.Equal(master.MasterCount, config.MasterCount)
 	assert.Equal(master.ClusterIP, config.PublicAddress)
 	assert.Equal(master.PublicReadWritePort, config.ReadWritePort)
 	assert.Equal(master.ServiceReadWriteIP, config.ServiceReadWriteIP)
@@ -240,7 +239,7 @@ func TestFindExternalAddress(t *testing.T) {
 // TestNewBootstrapController verifies master fields are properly copied into controller
 func TestNewBootstrapController(t *testing.T) {
 	// Tests a subset of inputs to ensure they are set properly in the controller
-	master, etcdserver, _, assert := setUp(t)
+	master, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
 	portRange := utilnet.PortRange{Base: 10, Size: 10}
@@ -250,17 +249,15 @@ func TestNewBootstrapController(t *testing.T) {
 	master.endpointRegistry = endpoint.NewRegistry(nil)
 
 	master.ServiceNodePortRange = portRange
-	master.MasterCount = 1
 	master.ServiceReadWritePort = 1000
 	master.PublicReadWritePort = 1010
 
-	controller := master.NewBootstrapController()
+	controller := master.NewBootstrapController(&config)
 
 	assert.Equal(controller.NamespaceRegistry, master.namespaceRegistry)
 	assert.Equal(controller.EndpointRegistry, master.endpointRegistry)
 	assert.Equal(controller.ServiceRegistry, master.serviceRegistry)
 	assert.Equal(controller.ServiceNodePortRange, portRange)
-	assert.Equal(controller.MasterCount, master.MasterCount)
 	assert.Equal(controller.ServicePort, master.ServiceReadWritePort)
 	assert.Equal(controller.PublicServicePort, master.PublicReadWritePort)
 }
@@ -268,7 +265,7 @@ func TestNewBootstrapController(t *testing.T) {
 // TestControllerServicePorts verifies master extraServicePorts are
 // correctly copied into controller
 func TestControllerServicePorts(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
+	master, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
 	master.namespaceRegistry = namespace.NewRegistry(nil)
@@ -290,7 +287,7 @@ func TestControllerServicePorts(t *testing.T) {
 		},
 	}
 
-	controller := master.NewBootstrapController()
+	controller := master.NewBootstrapController(&config)
 
 	assert.Equal(int32(1000), controller.ExtraServicePorts[0].Port)
 	assert.Equal(int32(1010), controller.ExtraServicePorts[1].Port)

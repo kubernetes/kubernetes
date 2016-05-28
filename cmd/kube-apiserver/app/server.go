@@ -267,6 +267,8 @@ func Run(s *options.APIServer) error {
 		KubeletClient:           kubeletClient,
 
 		Tunneler: tunneler,
+
+		EnableLeases: s.EnableLeases,
 	}
 
 	if s.EnableWatchCache {

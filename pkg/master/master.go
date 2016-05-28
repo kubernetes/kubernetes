@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/master/leases"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
@@ -125,6 +126,9 @@ type Config struct {
 	// Used to start and monitor tunneling
 	Tunneler genericapiserver.Tunneler
 
+	// Enables using master leases
+	EnableLeases bool
+
 	disableThirdPartyControllerForTesting bool
 }
 
@@ -193,7 +197,7 @@ func New(c *Config) (*Master, error) {
 
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
-		m.NewBootstrapController().Start()
+		m.NewBootstrapController(c).Start()
 	}
 
 	return m, nil
@@ -586,11 +590,20 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master.
-func (m *Master) NewBootstrapController() *Controller {
+func (m *Master) NewBootstrapController(c *Config) *Controller {
+	var masterLeases leases.Leases
+	if c.EnableLeases {
+		leaseStorage, err := c.StorageFactory.New(api.Resource("apiServerIPInfo"))
+		if err != nil {
+			glog.Fatalf(err.Error())
+		}
+
+		masterLeases = leases.NewLeases(leaseStorage, "/masterleaseinfo/")
+	}
+
 	return &Controller{
 		NamespaceRegistry: m.namespaceRegistry,
 		ServiceRegistry:   m.serviceRegistry,
-		MasterCount:       m.MasterCount,
 
 		EndpointRegistry: m.endpointRegistry,
 		EndpointInterval: 10 * time.Second,
@@ -614,6 +627,8 @@ func (m *Master) NewBootstrapController() *Controller {
 		ExtraEndpointPorts:        m.ExtraEndpointPorts,
 		PublicServicePort:         m.PublicReadWritePort,
 		KubernetesServiceNodePort: m.KubernetesServiceNodePort,
+
+		MasterLeases: masterLeases,
 	}
 }
 

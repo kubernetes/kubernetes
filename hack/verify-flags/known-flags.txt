@@ -115,6 +115,7 @@ enable-custom-metrics
 enable-debugging-handlers
 enable-garbage-collector
 enable-hostpath-provisioner
+enable-leases
 enable-server
 enable-swagger-ui
 enable-garbage-collector

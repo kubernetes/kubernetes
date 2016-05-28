@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/master/leases"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/service"
@@ -42,10 +43,14 @@ import (
 // loops, which manage creating the "kubernetes" service, the "default" and "kube-system"
 // namespace, and provide the IP repair check on service IPs
 type Controller struct {
+	runner *util.Runner
+
 	NamespaceRegistry namespace.Registry
 	ServiceRegistry   service.Registry
-	// TODO: MasterCount is yucky
+	// MasterCount is superceded by MasterLeases
 	MasterCount int
+	// MasterLeases supercedes MasterCount
+	MasterLeases leases.Leases
 
 	ServiceClusterIPRegistry service.RangeRegistry
 	ServiceClusterIPInterval time.Duration
@@ -69,8 +74,6 @@ type Controller struct {
 	ExtraEndpointPorts        []api.EndpointPort
 	PublicServicePort         int
 	KubernetesServiceNodePort int
-
-	runner *util.Runner
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
@@ -82,6 +85,11 @@ func (c *Controller) Start() {
 
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
+
+	// Initialize the master leases
+	if c.MasterLeases != nil {
+		c.MasterLeases.SetLeaseTime(uint64(c.EndpointInterval.Seconds()))
+	}
 
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
@@ -240,10 +248,23 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	return err
 }
 
-// ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).
-// ReconcileEndpoints expects that the endpoints objects it manages will all be
-// managed only by ReconcileEndpoints; therefore, to understand this, you need only
-// understand the requirements and the body of this function.
+// ReconcileEndpoints sets the endpoints for the given apiserver service (ro
+// or rw).  It is a wrapper that calls ReconcileEndpointsUsingMasterCount
+// unless the controller is configured to use master leases, in which case, it
+// calls ReconcileEndpointsUsingLeases.
+func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+	if c.MasterLeases != nil {
+		return c.ReconcileEndpointsUsingMasterLeases(serviceName, ip, endpointPorts, reconcilePorts)
+	}
+
+	return c.ReconcileEndpointsUsingMasterCount(serviceName, ip, endpointPorts, reconcilePorts)
+}
+
+// ReconcileEndpoints sets the endpoints for the given apiserver service (ro
+// or rw).  ReconcileEndpointsUsingMasterCount expects that the endpoints
+// objects it manages will all be managed only by
+// ReconcileEndpointsUsingMasterCount; therefore, to understand this, you need
+// only understand the requirements and the body of this function.
 //
 // Requirements:
 //  * All apiservers MUST use the same ports for their {rw, ro} services.
@@ -252,9 +273,9 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 //  * All apiservers MUST know and agree on the number of apiservers expected
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
-//
-func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+func (c *Controller) ReconcileEndpointsUsingMasterCount(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
 	ctx := api.NewDefaultContext()
+
 	e, err := c.EndpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
 		e = &api.Endpoints{
@@ -309,6 +330,82 @@ func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointP
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
+
+	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
+	return c.EndpointRegistry.UpdateEndpoints(ctx, e)
+}
+
+// ReconcileEndpointsUsingMasterLeases lists keys in a special etcd directory.
+// Each key is expected to have a TTL of R+n, where R is the refresh interval
+// at which this function is called, and n is some small value.  If an
+// apiserver goes down, it will fail to refresh its key's TTL and the key will
+// expire. ReconcileEndpoints will notice that the endpoints object is
+// different from the directory listing, and update the endpoints object
+// accordingly.
+func (c *Controller) ReconcileEndpointsUsingMasterLeases(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+	ctx := api.NewDefaultContext()
+
+	// Refresh the TTL on our key, independently of whether any error or
+	// update conflict happens below. This makes sure that at least some of
+	// the masters will add our endpoint.
+	if err := c.MasterLeases.UpdateLease(ip.String()); err != nil {
+		return err
+	}
+
+	// Retrieve the current list of endpoints...
+	e, err := c.EndpointRegistry.GetEndpoints(ctx, serviceName)
+	if err != nil {
+		e = &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:      serviceName,
+				Namespace: api.NamespaceDefault,
+			},
+		}
+	}
+
+	// ... and the list of master IP keys from etcd
+	masterIPs, err := c.MasterLeases.ListLeases()
+	if err != nil {
+		return err
+	}
+
+	// Since we just refreshed our own key, assume that zero endpoints
+	// returned from storage indicates an issue or invalid state, and thus do
+	// not update the endpoints list based on the result.
+	if len(masterIPs) == 0 {
+		return fmt.Errorf("No master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
+	}
+
+	// Next, we compare the current list of endpoints with the list of master IP keys
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
+	if formatCorrect && ipCorrect && portsCorrect {
+		return nil
+	}
+
+	if !formatCorrect {
+		// Something is egregiously wrong, just re-make the endpoints record.
+		e.Subsets = []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{},
+			Ports:     endpointPorts,
+		}}
+	}
+
+	if !formatCorrect || !ipCorrect {
+		// repopulate the addresses according to the expected IPs from etcd
+		e.Subsets[0].Addresses = make([]api.EndpointAddress, len(masterIPs))
+		for ind, ip := range masterIPs {
+			e.Subsets[0].Addresses[ind] = api.EndpointAddress{IP: ip}
+		}
+
+		// Lexicographic order is retained by this step.
+		e.Subsets = endpoints.RepackSubsets(e.Subsets)
+	}
+
+	if !portsCorrect {
+		// Reset ports.
+		e.Subsets[0].Ports = endpointPorts
+	}
+
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
 	return c.EndpointRegistry.UpdateEndpoints(ctx, e)
 }
@@ -345,6 +442,58 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 		}
 	}
 	return true, ipCorrect, portsCorrect
+}
+
+// checkEndpointSubsetFormatWithLease determines if the endpoint is in the
+// format ReconcileEndpoints expects when the controller is using leases.
+//
+// Return values:
+// * formatCorrect is true if exactly one subset is found.
+// * ipsCorrect when the addresses in the endpoints match the expected addresses list
+// * portsCorrect is true when endpoint ports exactly match provided ports.
+//     portsCorrect is only evaluated when reconcilePorts is set to true.
+func checkEndpointSubsetFormatWithLease(e *api.Endpoints, expectedIPs []string, ports []api.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
+	if len(e.Subsets) != 1 {
+		return false, false, false
+	}
+	sub := &e.Subsets[0]
+	portsCorrect = true
+	if reconcilePorts {
+		if len(sub.Ports) != len(ports) {
+			portsCorrect = false
+		}
+		for i, port := range ports {
+			if len(sub.Ports) <= i || port != sub.Ports[i] {
+				portsCorrect = false
+				break
+			}
+		}
+	}
+
+	ipsCorrect = true
+	if len(sub.Addresses) != len(expectedIPs) {
+		ipsCorrect = false
+	} else {
+		// check the actual content of the addresses
+		// present addrs is used as a set (the keys) and to indicate if a
+		// value was already found (the values)
+		presentAddrs := make(map[string]bool, len(expectedIPs))
+		for _, ip := range expectedIPs {
+			presentAddrs[ip] = false
+		}
+
+		// uniqueness is assumed amongst all Addresses.
+		for _, addr := range sub.Addresses {
+			if alreadySeen, ok := presentAddrs[addr.IP]; alreadySeen || !ok {
+				ipsCorrect = false
+				break
+			}
+
+			presentAddrs[addr.IP] = true
+		}
+	}
+
+	return true, ipsCorrect, portsCorrect
 }
 
 // * getMasterServiceUpdateIfNeeded sets service attributes for the
