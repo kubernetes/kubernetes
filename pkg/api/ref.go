@@ -57,11 +57,11 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	kind := gvk.Kind
 	if len(kind) == 0 {
 		// TODO: this is wrong
-		gvk, err := Scheme.ObjectKind(obj)
+		gvks, _, err := Scheme.ObjectKinds(obj)
 		if err != nil {
 			return nil, err
 		}
-		kind = gvk.Kind
+		kind = gvks[0].Kind
 	}
 
 	// if the object referenced is actually persisted, we can also get version from meta

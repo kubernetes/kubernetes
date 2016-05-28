@@ -466,7 +466,7 @@ func TestPrinters(t *testing.T) {
 		"template2":            templatePrinter2,
 		"jsonpath":             jsonpathPrinter,
 		"name": &NamePrinter{
-			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
+			Typer:   api.Scheme,
 			Decoder: api.Codecs.UniversalDecoder(),
 		},
 	}

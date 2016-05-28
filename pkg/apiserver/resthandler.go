@@ -23,7 +23,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	gpath "path"
 	"strings"
 	"time"
 
@@ -975,10 +974,11 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 
 // transformDecodeError adds additional information when a decode fails.
 func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, gvk *unversioned.GroupVersionKind, body []byte) error {
-	objGVK, err := typer.ObjectKind(into)
+	objGVKs, _, err := typer.ObjectKinds(into)
 	if err != nil {
 		return err
 	}
+	objGVK := objGVKs[0]
 	if gvk != nil && len(gvk.Kind) > 0 {
 		return errors.NewBadRequest(fmt.Sprintf("%s in version %q cannot be handled as a %s: %v", gvk.Kind, gvk.Version, objGVK.Kind, baseErr))
 	}
@@ -997,7 +997,7 @@ func setSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) err
 
 	newURL := *req.Request.URL
 	// use only canonical paths
-	newURL.Path = gpath.Clean(path)
+	newURL.Path = path
 	newURL.RawQuery = query
 	newURL.Fragment = ""
 

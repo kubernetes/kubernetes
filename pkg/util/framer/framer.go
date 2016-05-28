@@ -25,6 +25,7 @@ import (
 
 type lengthDelimitedFrameWriter struct {
 	w io.Writer
+	h [4]byte
 }
 
 func NewLengthDelimitedFrameWriter(w io.Writer) io.Writer {
@@ -34,13 +35,12 @@ func NewLengthDelimitedFrameWriter(w io.Writer) io.Writer {
 // Write writes a single frame to the nested writer, prepending it with the length in
 // in bytes of data (as a 4 byte, bigendian uint32).
 func (w *lengthDelimitedFrameWriter) Write(data []byte) (int, error) {
-	header := [4]byte{}
-	binary.BigEndian.PutUint32(header[:], uint32(len(data)))
-	n, err := w.w.Write(header[:])
+	binary.BigEndian.PutUint32(w.h[:], uint32(len(data)))
+	n, err := w.w.Write(w.h[:])
 	if err != nil {
 		return 0, err
 	}
-	if n != len(header) {
+	if n != len(w.h) {
 		return 0, io.ErrShortWrite
 	}
 	return w.w.Write(data)

@@ -58,9 +58,9 @@ type serializerType struct {
 }
 
 func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []serializerType {
-	jsonSerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), false)
-	jsonPrettySerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), true)
-	yamlSerializer := json.NewYAMLSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme))
+	jsonSerializer := json.NewSerializer(mf, scheme, scheme, false)
+	jsonPrettySerializer := json.NewSerializer(mf, scheme, scheme, true)
+	yamlSerializer := json.NewYAMLSerializer(mf, scheme, scheme)
 
 	serializers := []serializerType{
 		{

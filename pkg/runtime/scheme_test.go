@@ -354,10 +354,11 @@ func TestUnversionedTypes(t *testing.T) {
 		t.Fatalf("type not unversioned and in scheme: %t %t", unv, ok)
 	}
 
-	kind, err := scheme.ObjectKind(&InternalSimple{})
+	kinds, _, err := scheme.ObjectKinds(&InternalSimple{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	kind := kinds[0]
 	if kind != externalGV.WithKind("InternalSimple") {
 		t.Fatalf("unexpected: %#v", kind)
 	}

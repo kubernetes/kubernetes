@@ -427,11 +427,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 			default:
-				gvk, err := api.Scheme.ObjectKind(object)
+				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
 					return "", err
 				}
-				return "", fmt.Errorf("cannot extract pod selector from %v", gvk)
+				return "", fmt.Errorf("cannot extract pod selector from %v", gvks[0])
 			}
 		},
 		PortsForObject: func(object runtime.Object) ([]string, error) {
@@ -448,11 +448,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *extensions.ReplicaSet:
 				return getPorts(t.Spec.Template.Spec), nil
 			default:
-				gvk, err := api.Scheme.ObjectKind(object)
+				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot extract ports from %v", gvk)
+				return nil, fmt.Errorf("cannot extract ports from %v", gvks[0])
 			}
 		},
 		ProtocolsForObject: func(object runtime.Object) (map[string]string, error) {
@@ -469,11 +469,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *extensions.ReplicaSet:
 				return getProtocols(t.Spec.Template.Spec), nil
 			default:
-				gvk, err := api.Scheme.ObjectKind(object)
+				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot extract protocols from %v", gvk)
+				return nil, fmt.Errorf("cannot extract protocols from %v", gvks[0])
 			}
 		},
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
@@ -531,11 +531,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return c.Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
 
 			default:
-				gvk, err := api.Scheme.ObjectKind(object)
+				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot get the logs from %v", gvk)
+				return nil, fmt.Errorf("cannot get the logs from %v", gvks[0])
 			}
 		},
 		PauseObject: func(object runtime.Object) (bool, error) {
@@ -553,11 +553,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
 				return false, err
 			default:
-				gvk, err := api.Scheme.ObjectKind(object)
+				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
 					return false, err
 				}
-				return false, fmt.Errorf("cannot pause %v", gvk)
+				return false, fmt.Errorf("cannot pause %v", gvks[0])
 			}
 		},
 		ResumeObject: func(object runtime.Object) (bool, error) {
@@ -575,11 +575,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
 				return false, err
 			default:
-				gvk, err := api.Scheme.ObjectKind(object)
+				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
 					return false, err
 				}
-				return false, fmt.Errorf("cannot resume %v", gvk)
+				return false, fmt.Errorf("cannot resume %v", gvks[0])
 			}
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
@@ -712,11 +712,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *api.Pod:
 				return t, nil
 			default:
-				gvk, err := api.Scheme.ObjectKind(object)
+				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot attach to %v: not implemented", gvk)
+				return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
 			}
 		},
 		// UpdatePodSpecForObject update the pod specification for the provided object
@@ -1101,12 +1101,12 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 
 // PrintObject prints an api object given command line flags to modify the output format
 func (f *Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-	gvk, err := api.Scheme.ObjectKind(obj)
+	gvks, _, err := api.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
 	}
 
-	mapping, err := mapper.RESTMapping(gvk.GroupKind())
+	mapping, err := mapper.RESTMapping(gvks[0].GroupKind())
 	if err != nil {
 		return err
 	}

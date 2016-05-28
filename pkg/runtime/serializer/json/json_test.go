@@ -41,7 +41,7 @@ func (d *testDecodable) GroupVersionKind() unversioned.GroupVersionKind       { 
 func TestDecode(t *testing.T) {
 	testCases := []struct {
 		creater runtime.ObjectCreater
-		typer   runtime.Typer
+		typer   runtime.ObjectTyper
 		yaml    bool
 		pretty  bool
 
@@ -260,6 +260,13 @@ type mockTyper struct {
 	err error
 }
 
-func (t *mockTyper) ObjectKind(obj runtime.Object) (*unversioned.GroupVersionKind, bool, error) {
-	return t.gvk, false, t.err
+func (t *mockTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionKind, bool, error) {
+	if t.gvk == nil {
+		return nil, false, t.err
+	}
+	return []unversioned.GroupVersionKind{*t.gvk}, false, t.err
+}
+
+func (t *mockTyper) Recognizes(_ unversioned.GroupVersionKind) bool {
+	return false
 }
