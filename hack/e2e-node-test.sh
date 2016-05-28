@@ -23,7 +23,7 @@ report=${REPORT:-"/tmp/"}
 
 ginkgo=$(kube::util::find-binary "ginkgo")
 if [[ -z "${ginkgo}" ]]; then
-  echo "You do not appear to have ginkgo built. Try 'make WHAT=vendor/github.com/onsi/ginkgo/ginkgo'"
+  echo "You do not appear to have ginkgo built. 'make WHAT=vendor/github.com/onsi/ginkgo/ginkgo'"
   exit 1
 fi
 

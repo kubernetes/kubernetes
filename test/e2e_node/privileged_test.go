@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,55 +45,60 @@ const (
 	privilegedCommand          = "ip link add dummy1 type dummy"
 )
 
-type PrivilegedPodTestConfig struct {
-	config        *restclient.Config
-	client        *client.Client
-	namespace     string
-	hostExecPod   *api.Pod
-	privilegedPod *api.Pod
-}
-
 var _ = Describe("PrivilegedPod", func() {
-	var c *client.Client
-	restClientConfig := &restclient.Config{Host: *apiServerAddress}
-	BeforeEach(func() {
-		// Setup the apiserver client
-		c = client.NewOrDie(restClientConfig)
-	})
+	f := NewDefaultFramework("privileged-pod")
 	It("should test privileged pod", func() {
-		namespace := "privileged-pods"
-		config := &PrivilegedPodTestConfig{
-			client:    c,
-			config:    restClientConfig,
-			namespace: namespace,
-		}
+		restClientConfig := &restclient.Config{Host: *apiServerAddress}
 		By("Creating a host exec pod")
-		config.hostExecPod = createPodAndWaitUntilRunning(c, newHostExecPodSpec(config.namespace, "hostexec"))
+		podClient := f.Client.Pods(f.Namespace.Name)
+		hostExecPod := newHostExecPodSpec("hostexec")
+		defer podClient.Delete(hostExecPod.Name, nil)
+		_, err := podClient.Create(hostExecPod)
+		Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+
+		By("Waiting for host exec pod to be running")
+		framework.ExpectNoError(f.WaitForPodRunning(hostExecPod.Name))
+
+		By("Getting status of the host exec pod")
+		hostExecPod, err = podClient.Get(hostExecPod.Name)
+		Expect(err).To(BeNil(), fmt.Sprintf("Error getting Pod %v", err))
 
 		By("Creating a privileged pod")
-		config.privilegedPod = createPodAndWaitUntilRunning(c, config.createPrivilegedPodSpec())
+		privilegedPod := createPrivilegedPodSpec()
+		defer podClient.Delete(privilegedPod.Name, nil)
+		_, err = podClient.Create(privilegedPod)
+		Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+
+		By("Waiting for privileged pod to be running")
+		framework.ExpectNoError(f.WaitForPodRunning(privilegedPod.Name))
+
+		By("Getting status of privileged pod")
+		privilegedPod, err = podClient.Get(privilegedPod.Name)
+		Expect(err).To(BeNil(), fmt.Sprintf("Error getting Pod %v", err))
 
 		By("Executing privileged command on privileged container")
-		config.runPrivilegedCommandOnPrivilegedContainer()
+		outputMap := dialFromContainer(restClientConfig, f, hostExecPod, privilegedPod.Status.PodIP, privilegedHttpPort)
+		Expect(outputMap["error"]).To(BeEmpty(), fmt.Sprintf("Privileged command failed unexpectedly on privileged container, output: %v", outputMap))
 
 		By("Executing privileged command on non-privileged container")
-		config.runPrivilegedCommandOnNonPrivilegedContainer()
+		outputMap = dialFromContainer(restClientConfig, f, hostExecPod, privilegedPod.Status.PodIP, notPrivilegedHttpPort)
+		Expect(outputMap["error"]).To(BeEmpty(), fmt.Sprintf("Privileged command should have failed on non-privileged container, output: %v", outputMap))
 	})
 })
 
-func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
+func createPrivilegedPodSpec() *api.Pod {
 	isPrivileged := true
 	notPrivileged := false
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name:      privilegedPodName,
-			Namespace: config.namespace,
+			Name: privilegedPodName,
 		},
 		Spec: api.PodSpec{
+			NodeName: *nodeName,
 			Containers: []api.Container{
 				{
 					Name:            privilegedContainerName,
@@ -123,17 +128,7 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
 	return pod
 }
 
-func (config *PrivilegedPodTestConfig) runPrivilegedCommandOnPrivilegedContainer() {
-	outputMap := config.dialFromContainer(config.privilegedPod.Status.PodIP, privilegedHttpPort)
-	Expect(len(outputMap["error"]) == 0).To(BeTrue(), fmt.Sprintf("Privileged command failed unexpectedly on privileged container, output: %v", outputMap))
-}
-
-func (config *PrivilegedPodTestConfig) runPrivilegedCommandOnNonPrivilegedContainer() {
-	outputMap := config.dialFromContainer(config.privilegedPod.Status.PodIP, notPrivilegedHttpPort)
-	Expect(len(outputMap["error"]) > 0).To(BeTrue(), fmt.Sprintf("Privileged command should have failed on non-privileged container, output: %v", outputMap))
-}
-
-func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, containerHttpPort int) map[string]string {
+func dialFromContainer(config *restclient.Config, f *framework.Framework, hostExecPod *api.Pod, containerIP string, containerHttpPort int) map[string]string {
 	v := url.Values{}
 	v.Set("shellCommand", "ip link add dummy1 type dummy")
 	cmd := fmt.Sprintf("curl -q 'http://%s:%d/shell?%s'",
@@ -142,8 +137,7 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 		v.Encode())
 	By(fmt.Sprintf("Exec-ing into container over http. Running command: %s", cmd))
 
-	stdout, err := execCommandInContainer(config.config, config.client, config.hostExecPod.Namespace, config.hostExecPod.Name, config.hostExecPod.Spec.Containers[0].Name,
-		[]string{"/bin/sh", "-c", cmd})
+	stdout, err := execCommandInContainer(config, f, f.Namespace.Name, hostExecPod.Name, hostExecPod.Spec.Containers[0].Name, []string{"/bin/sh", "-c", cmd})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error running command %q: %v", cmd, err))
 
 	var output map[string]string
@@ -153,17 +147,17 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 }
 
 // newHostExecPodSpec returns the pod spec of hostexec pod
-func newHostExecPodSpec(ns, name string) *api.Pod {
+func newHostExecPodSpec(name string) *api.Pod {
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			Name: name,
 		},
 		Spec: api.PodSpec{
+			NodeName: *nodeName,
 			Containers: []api.Container{
 				{
 					Name:            "hostexec",
