@@ -207,7 +207,7 @@ func TestControllerSyncJob(t *testing.T) {
 	for name, tc := range testCases {
 		// job manager setup
 		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-		manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+		manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
@@ -302,7 +302,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 	for name, tc := range testCases {
 		// job manager setup
 		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-		manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+		manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 		fakePodControl := controller.FakePodControl{}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
@@ -372,7 +372,7 @@ func getCondition(job *batch.Job, condition batch.JobConditionType) bool {
 
 func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -406,7 +406,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 
 func TestSyncJobComplete(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -431,7 +431,7 @@ func TestSyncJobComplete(t *testing.T) {
 
 func TestSyncJobDeleted(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -451,7 +451,7 @@ func TestSyncJobDeleted(t *testing.T) {
 
 func TestSyncJobUpdateRequeue(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -472,7 +472,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 
 func TestJobPodLookup(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
 		job *batch.Job
@@ -562,7 +562,7 @@ func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
 // and checking expectations.
 func TestSyncJobExpectations(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
@@ -599,7 +599,7 @@ func TestWatchJobs(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	clientset.PrependWatchReactor("jobs", core.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	manager.podStoreSynced = alwaysReady
 
 	var testJob batch.Job
@@ -666,7 +666,7 @@ func TestWatchPods(t *testing.T) {
 	clientset := fake.NewSimpleClientset(testJob)
 	fakeWatch := watch.NewFake()
 	clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	manager.podStoreSynced = alwaysReady
 
 	// Put one job and one pod into the store

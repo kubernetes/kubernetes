@@ -282,10 +282,9 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.Daemo
 		ds, ok := obj.(*extensions.DaemonSet)
 		if !ok {
 			// This should not happen
-			glog.Errorf("lookup cache does not retuen a ReplicationController object")
-			return nil
+			glog.Errorf("lookup cache does not retuen a DaemonSet object")
 		}
-		if cached && dsc.isCacheValid(pod, ds) {
+		if cached && ok && dsc.isCacheValid(pod, ds) {
 			return ds
 		}
 	}

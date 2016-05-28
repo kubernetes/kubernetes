@@ -262,9 +262,8 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 		if !ok {
 			// This should not happen
 			glog.Errorf("lookup cache does not retuen a ReplicationController object")
-			return nil
 		}
-		if cached && rm.isCacheValid(pod, controller) {
+		if cached && ok && rm.isCacheValid(pod, controller) {
 			return controller
 		}
 	}
