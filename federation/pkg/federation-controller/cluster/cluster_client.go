@@ -72,6 +72,7 @@ var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.
 
 type ClusterClient struct {
 	discoveryClient *discovery.DiscoveryClient
+	kubeClient      *clientset.Clientset
 }
 
 func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error) {
@@ -103,6 +104,10 @@ func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error)
 		clusterConfig.Burst = KubeAPIBurst
 		clusterClientSet.discoveryClient = discovery.NewDiscoveryClientForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
 		if clusterClientSet.discoveryClient == nil {
+			return nil, nil
+		}
+		clusterClientSet.kubeClient = clientset.NewForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
+		if clusterClientSet.kubeClient == nil {
 			return nil, nil
 		}
 	}
@@ -159,8 +164,8 @@ func (self *ClusterClient) GetClusterHealthStatus() *federation_v1alpha1.Cluster
 }
 
 // GetClusterZones gets the kubernetes cluster zones and region by inspecting labels on nodes in the cluster.
-func GetClusterZones(client *clientset.Clientset) (zones []string, region string, err error) {
-	return getZoneNames(client)
+func (self *ClusterClient) GetClusterZones() (zones []string, region string, err error) {
+	return getZoneNames(self.kubeClient)
 }
 
 // Find the name of the zone in which a Node is running
@@ -194,6 +199,11 @@ func getZoneNames(client *clientset.Clientset) (zones []string, region string, e
 		return nil, "", err
 	}
 	for i, node := range nodes.Items {
+		// TODO: quinton-hoole make this more efficient.
+		//       For non-multi-zone clusters the zone will
+		//       be identical for all nodes, so we only need to look at one node
+		//       For multi-zone clusters we know at build time
+		//       which zones are included.  Rather get this info from there, because it's cheaper.
 		zoneName, err := getZoneNameForNode(node)
 		if err != nil {
 			return nil, "", err

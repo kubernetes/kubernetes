@@ -27,9 +27,6 @@ import (
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -187,10 +184,16 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 				}
 			}
 		}
-		clusterClientSet, _ := NewClusterClientset(&cluster)
-		zones, region, err := GetClusterZones(clusterClientSet)
+		clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
+		if !found {
+			glog.Warningf("Failed to client for cluster %s", cluster.Name)
+			continue
+		}
+
+		zones, region, err := clusterClient.GetClusterZones()
 		if err != nil {
-			glog.Errorf("Failed to get zones and region for cluster %s: %v", cluster.Name, err)
+			glog.Warningf("Failed to get zones and region for cluster %s: %v", cluster.Name, err)
+			// Don't return err here, as we want the rest of the status update to proceed.
 		} else {
 			clusterStatusNew.Zones = zones
 			clusterStatusNew.Region = region
@@ -199,20 +202,10 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		cluster.Status = *clusterStatusNew
 		cluster, err := cc.federationClient.Federation().Clusters().UpdateStatus(&cluster)
 		if err != nil {
-			glog.Infof("Failed to update the status of cluster: %v ,error is : %v", cluster.Name, err)
+			glog.Warningf("Failed to update the status of cluster: %v ,error is : %v", cluster.Name, err)
+			// Don't return err here, as we want to continue processing remaining clusters.
 			continue
 		}
 	}
 	return nil
-}
-
-func NewClusterClientset(c *federation_v1alpha1.Cluster) (*clientset.Clientset, error) { // TODO: Stolen from federation/pkg/federation-controller/service/cluster_helper.go - factor it out of there.
-	clusterConfig, err := clientcmd.BuildConfigFromFlags(c.Spec.ServerAddressByClientCIDRs[0].ServerAddress, "")
-	if err != nil {
-		return nil, err
-	}
-	clusterConfig.QPS = KubeAPIQPS
-	clusterConfig.Burst = KubeAPIBurst
-	clientset := clientset.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
-	return clientset, nil
 }
