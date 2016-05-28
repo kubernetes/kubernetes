@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
+	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -234,8 +235,8 @@ func TestMultiWatch(t *testing.T) {
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{{
-					Name:  "nothing",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Name:  "pause",
+					Image: e2e.GetPauseImageName(client),
 				}},
 			},
 		})
@@ -341,7 +342,7 @@ func TestMultiWatch(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{{
 								Name:  "nothing",
-								Image: "gcr.io/google_containers/pause-amd64:3.0",
+								Image: e2e.GetPauseImageName(client),
 							}},
 						},
 					})
@@ -372,7 +373,7 @@ func TestMultiWatch(t *testing.T) {
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}
-			pod.Spec.Containers[0].Image = "gcr.io/google_containers/pause-amd64:3.0"
+			pod.Spec.Containers[0].Image = e2e.GetPauseImageName(client)
 			sentTimes <- timePair{time.Now(), name}
 			if _, err := client.Pods(ns).Update(pod); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))

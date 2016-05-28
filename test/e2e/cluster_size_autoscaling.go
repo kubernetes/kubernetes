@@ -86,7 +86,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 		Name:      id,
 		Namespace: f.Namespace.Name,
 		Timeout:   scaleTimeout,
-		Image:     "gcr.io/google_containers/pause-amd64:3.0",
+		Image:     framework.GetPauseImageName(f.Client),
 		Replicas:  replicas,
 		HostPorts: map[string]int{"port1": 4321},
 	}
@@ -105,7 +105,7 @@ func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 		Name:       id,
 		Namespace:  f.Namespace.Name,
 		Timeout:    scaleTimeout,
-		Image:      "gcr.io/google_containers/pause-amd64:3.0",
+		Image:      framework.GetPauseImageName(f.Client),
 		Replicas:   replicas,
 		CpuRequest: request,
 	}
@@ -120,7 +120,7 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Name:       id,
 		Namespace:  f.Namespace.Name,
 		Timeout:    scaleTimeout,
-		Image:      "gcr.io/google_containers/pause-amd64:3.0",
+		Image:      framework.GetPauseImageName(f.Client),
 		Replicas:   replicas,
 		MemRequest: request,
 	}

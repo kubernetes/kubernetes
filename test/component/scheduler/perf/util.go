@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -113,7 +114,7 @@ func makePodSpec() api.PodSpec {
 	return api.PodSpec{
 		Containers: []api.Container{{
 			Name:  "pause",
-			Image: "gcr.io/google_containers/pause:1.0",
+			Image: e2e.GetPauseImageNameForHostArch(),
 			Ports: []api.ContainerPort{{ContainerPort: 80}},
 			Resources: api.ResourceRequirements{
 				Limits: api.ResourceList{
