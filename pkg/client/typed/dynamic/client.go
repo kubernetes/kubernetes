@@ -42,6 +42,11 @@ type Client struct {
 	cl *restclient.RESTClient
 }
 
+type ClientWithParameterCodec struct {
+	client         *Client
+	parameterCodec runtime.ParameterCodec
+}
+
 // NewClient returns a new client based on the passed in config. The
 // codec is ignored, as the dynamic client uses it's own codec.
 func NewClient(conf *restclient.Config) (*Client, error) {
@@ -79,9 +84,9 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	return &Client{cl: cl}, nil
 }
 
-// Resource returns an API interface to the specified resource for
-// this client's group and version. If resource is not a namespaced
-// resource, then namespace is ignored.
+// Resource returns an API interface to the specified resource for this client's
+// group and version. If resource is not a namespaced resource, then namespace
+// is ignored.
 func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
 	return &ResourceClient{
 		cl:       c.cl,
@@ -90,17 +95,42 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 	}
 }
 
+// ParameterCodec wraps a parameterCodec around the Client.
+func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *ClientWithParameterCodec {
+	return &ClientWithParameterCodec{
+		client:         c,
+		parameterCodec: parameterCodec,
+	}
+}
+
+// Resource returns an API interface to the specified resource for this client's
+// group and version. If resource is not a namespaced resource, then namespace
+// is ignored. The ResourceClient inherits the parameter codec of c.
+func (c *ClientWithParameterCodec) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
+	return &ResourceClient{
+		cl:             c.client.cl,
+		resource:       resource,
+		ns:             namespace,
+		parameterCodec: c.parameterCodec,
+	}
+}
+
 // ResourceClient is an API interface to a specific resource under a
 // dynamic client.
 type ResourceClient struct {
-	cl       *restclient.RESTClient
-	resource *unversioned.APIResource
-	ns       string
+	cl             *restclient.RESTClient
+	resource       *unversioned.APIResource
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // List returns a list of objects for this resource.
 func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, error) {
 	result := new(runtime.UnstructuredList)
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
 	err := rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -135,6 +165,10 @@ func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, listOptions runtime.Object) error {
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
 	return rc.cl.Delete().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -174,6 +208,10 @@ func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructur
 
 // Watch returns a watch.Interface that watches the resource.
 func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
 	return rc.cl.Get().
 		Prefix("watch").
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
@@ -231,4 +269,4 @@ func (parameterCodec) DecodeParameters(parameters url.Values, from unversioned.G
 	return errors.New("DecodeParameters not implemented on dynamic parameterCodec")
 }
 
-var parameterEncoder runtime.ParameterCodec = parameterCodec{}
+var defaultParameterEncoder runtime.ParameterCodec = parameterCodec{}

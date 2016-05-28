@@ -52,6 +52,7 @@ func TestNewGarbageCollector(t *testing.T) {
 type fakeAction struct {
 	method string
 	path   string
+	query  string
 }
 
 // String returns method=path to aid in testing
@@ -78,7 +79,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
+	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path, query: request.URL.RawQuery})
 	fakeResponse, ok := f.response[request.Method+request.URL.Path]
 	if !ok {
 		fakeResponse.statusCode = 200
@@ -316,4 +317,29 @@ func TestDependentsRace(t *testing.T) {
 			gc.orphanFinalizer()
 		}
 	}()
+}
+
+// test the list and watch functions correctly converts the ListOptions
+func TestGCListWatcher(t *testing.T) {
+	testHandler := &fakeActionHandler{}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+	podResource := unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
+	client, err := clientPool.ClientForGroupVersion(podResource.GroupVersion())
+	if err != nil {
+		t.Fatal(err)
+	}
+	lw := gcListWatcher(client, podResource)
+	lw.Watch(api.ListOptions{ResourceVersion: "1"})
+	lw.List(api.ListOptions{ResourceVersion: "1"})
+	if e, a := 2, len(testHandler.actions); e != a {
+		t.Errorf("expect %d requests, got %d", e, a)
+	}
+	if e, a := "resourceVersion=1", testHandler.actions[0].query; e != a {
+		t.Errorf("expect %s, got %s", e, a)
+	}
+	if e, a := "resourceVersion=1", testHandler.actions[1].query; e != a {
+		t.Errorf("expect %s, got %s", e, a)
+	}
 }
