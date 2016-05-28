@@ -22,6 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -62,14 +64,17 @@ func CreateNamespace(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 		return err
 	}
 	var generator kubectl.StructuredGenerator
+	var resource unversioned.GroupVersionResource
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.NamespaceV1GeneratorName:
 		generator = &kubectl.NamespaceGeneratorV1{Name: name}
+		resource = v1.SchemeGroupVersion.WithResource("namespace")
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
+		Resource:            resource,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetDryRunFlag(cmd),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
