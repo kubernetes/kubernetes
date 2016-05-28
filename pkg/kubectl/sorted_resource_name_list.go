@@ -17,7 +17,10 @@ limitations under the License.
 package kubectl
 
 import (
+	"sort"
+
 	"k8s.io/kubernetes/pkg/api"
+	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 )
 
 type SortableResourceNames []api.ResourceName
@@ -34,6 +37,16 @@ func (list SortableResourceNames) Less(i, j int) bool {
 	return list[i] < list[j]
 }
 
+// SortedResourceNames returns the sorted resource names of a resource list.
+func SortedResourceNames(list api.ResourceList) []api.ResourceName {
+	resources := make([]api.ResourceName, 0, len(list))
+	for res := range list {
+		resources = append(resources, res)
+	}
+	sort.Sort(SortableResourceNames(resources))
+	return resources
+}
+
 type SortableResourceQuotas []api.ResourceQuota
 
 func (list SortableResourceQuotas) Len() int {
@@ -46,4 +59,14 @@ func (list SortableResourceQuotas) Swap(i, j int) {
 
 func (list SortableResourceQuotas) Less(i, j int) bool {
 	return list[i].Name < list[j].Name
+}
+
+// SortedQoSResourceNames returns the sorted resource names of a QoS list.
+func SortedQoSResourceNames(list qosutil.QoSList) []api.ResourceName {
+	resources := make([]api.ResourceName, 0, len(list))
+	for res := range list {
+		resources = append(resources, res)
+	}
+	sort.Sort(SortableResourceNames(resources))
+	return resources
 }
