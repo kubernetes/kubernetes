@@ -2968,6 +2968,13 @@ func DeepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 	}
 	out.SessionAffinity = in.SessionAffinity
 	out.LoadBalancerIP = in.LoadBalancerIP
+	if in.LoadBalancerSourceRanges != nil {
+		in, out := in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.LoadBalancerSourceRanges = nil
+	}
 	return nil
 }
 

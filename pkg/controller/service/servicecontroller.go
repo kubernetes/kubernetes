@@ -404,7 +404,7 @@ func (s *ServiceController) createLoadBalancer(service *api.Service) error {
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	status, err := s.balancer.EnsureLoadBalancer(service, hostsFromNodeList(&nodes), service.ObjectMeta.Annotations)
+	status, err := s.balancer.EnsureLoadBalancer(service, hostsFromNodeList(&nodes))
 	if err != nil {
 		return err
 	} else {
