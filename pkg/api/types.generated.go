@@ -57119,7 +57119,7 @@ func (x codecSelfer1234) decResourceList(v *ResourceList, d *codec1978.Decoder) 
 	yyl1 := r.ReadMapStart()
 	yybh1 := z.DecBasicHandle()
 	if yyv1 == nil {
-		yyrl1, _ := z.DecInferLen(yyl1, yybh1.MaxInitLen, 80)
+		yyrl1, _ := z.DecInferLen(yyl1, yybh1.MaxInitLen, 72)
 		yyv1 = make(map[ResourceName]pkg3_resource.Quantity, yyrl1)
 		*v = yyv1
 	}
