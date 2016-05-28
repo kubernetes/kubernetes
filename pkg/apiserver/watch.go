@@ -203,7 +203,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
-			flusher.Flush()
+			if len(ch) == 0 {
+				flusher.Flush()
+			}
 
 			buf.Reset()
 		}
