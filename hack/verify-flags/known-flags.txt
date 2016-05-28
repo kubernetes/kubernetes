@@ -63,6 +63,7 @@ concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-namespace-syncs
 concurrent-replicaset-syncs
+concurrent-service-syncs
 concurrent-resource-quota-syncs
 config-sync-period
 configure-cbr0
