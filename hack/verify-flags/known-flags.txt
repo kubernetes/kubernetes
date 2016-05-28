@@ -330,6 +330,7 @@ pod-cidr
 pod-eviction-timeout
 pod-infra-container-image
 pod-running
+pods-per-core
 policy-config-file
 poll-interval
 portal-net

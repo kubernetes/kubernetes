@@ -49,7 +49,8 @@ type HollowNodeConfig struct {
 }
 
 const (
-	maxPods = 110
+	maxPods     = 110
+	podsPerCore = 0
 )
 
 var knownMorphs = sets.NewString("kubelet", "proxy")
@@ -115,6 +116,7 @@ func main() {
 			config.KubeletReadOnlyPort,
 			containerManager,
 			maxPods,
+			podsPerCore,
 		)
 		hollowKubelet.Run()
 	}

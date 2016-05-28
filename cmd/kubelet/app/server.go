@@ -277,6 +277,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		ExperimentalFlannelOverlay:     s.ExperimentalFlannelOverlay,
 		NodeIP:         net.ParseIP(s.NodeIP),
 		EvictionConfig: evictionConfig,
+		PodsPerCore:    int(s.PodsPerCore),
 	}, nil
 }
 
@@ -533,7 +534,7 @@ func SimpleKubelet(client *clientset.Clientset,
 	cloud cloudprovider.Interface,
 	osInterface kubecontainer.OSInterface,
 	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency, outOfDiskTransitionFrequency, evictionPressureTransitionPeriod time.Duration,
-	maxPods int,
+	maxPods int, podsPerCore int,
 	containerManager cm.ContainerManager, clusterDNS net.IP) *KubeletConfig {
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
@@ -604,6 +605,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		Writer:              &io.StdWriter{},
 		OutOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		EvictionConfig:               evictionConfig,
+		PodsPerCore:                  podsPerCore,
 	}
 	return &kcfg
 }
@@ -814,6 +816,7 @@ type KubeletConfig struct {
 	OOMAdjuster                    *oom.OOMAdjuster
 	OSInterface                    kubecontainer.OSInterface
 	PodCIDR                        string
+	PodsPerCore                    int
 	ReconcileCIDR                  bool
 	PodConfig                      *config.PodConfig
 	PodInfraContainerImage         string
@@ -923,6 +926,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.PodCIDR,
 		kc.ReconcileCIDR,
 		kc.MaxPods,
+		kc.PodsPerCore,
 		kc.NvidiaGPUs,
 		kc.DockerExecHandler,
 		kc.ResolverConfig,
