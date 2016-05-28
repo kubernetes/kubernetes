@@ -36,7 +36,6 @@ import (
 	kubetesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
-	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_rkt"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -1636,11 +1635,9 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockVolumeGetter := mock_rkt.NewMockVolumeGetter(ctrl)
-
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
-	r := &Runtime{apisvc: fr, systemd: fs, volumeGetter: mockVolumeGetter}
+	r := &Runtime{apisvc: fr, systemd: fs}
 
 	testCases := []struct {
 		in     *api.Pod
@@ -1691,7 +1688,6 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 
 	for i, testCase := range testCases {
 		hint := fmt.Sprintf("case #%d", i)
-		mockVolumeGetter.EXPECT().GetVolumes(gomock.Any()).Return(kubecontainer.VolumeMap{}, true)
 
 		result, err := r.makePodManifest(testCase.in, []api.Secret{})
 		assert.Equal(t, err, testCase.outerr, hint)
