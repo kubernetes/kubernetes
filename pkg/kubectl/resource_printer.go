@@ -69,7 +69,8 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		printer = &YAMLPrinter{}
 	case "name":
 		printer = &NamePrinter{
-			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
+			// TODO: this is wrong, these should be provided as an argument to GetPrinter
+			Typer:   api.Scheme,
 			Decoder: api.Codecs.UniversalDecoder(),
 		}
 	case "template", "go-template":
@@ -203,14 +204,12 @@ func (p *VersionedPrinter) HandledResources() []string {
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
 type NamePrinter struct {
 	Decoder runtime.Decoder
-	Typer   runtime.Typer
+	Typer   runtime.ObjectTyper
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
 // and print "resource/name" pair. If the object is a List, print all items in it.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	gvk, _, _ := p.Typer.ObjectKind(obj)
-
 	if meta.IsListType(obj) {
 		items, err := meta.ExtractList(obj)
 		if err != nil {
@@ -236,10 +235,9 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	if gvk != nil {
+	if gvks, _, err := p.Typer.ObjectKinds(obj); err == nil {
 		// TODO: this is wrong, it assumes that meta knows about all Kinds - should take a RESTMapper
-		_, resource := meta.KindToResource(*gvk)
-
+		_, resource := meta.KindToResource(gvks[0])
 		fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
 	} else {
 		fmt.Fprintf(w, "<unknown>/%s\n", name)

@@ -561,6 +561,7 @@ func benchmarkItems() []api.Pod {
 	items := make([]api.Pod, 3)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])
+		items[i].Spec.InitContainers, items[i].Status.InitContainerStatuses = nil, nil
 	}
 	return items
 }

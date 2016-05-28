@@ -49,7 +49,7 @@ func TestDecode(t *testing.T) {
 		convertor  runtime.ObjectConvertor
 		creater    runtime.ObjectCreater
 		copier     runtime.ObjectCopier
-		typer      runtime.Typer
+		typer      runtime.ObjectTyper
 		yaml       bool
 		pretty     bool
 

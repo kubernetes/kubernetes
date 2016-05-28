@@ -31,8 +31,8 @@ const (
 )
 
 func protobufSerializer(scheme *runtime.Scheme) (serializerType, bool) {
-	serializer := protobuf.NewSerializer(scheme, runtime.ObjectTyperToTyper(scheme), contentTypeProtobuf)
-	raw := protobuf.NewRawSerializer(scheme, runtime.ObjectTyperToTyper(scheme), contentTypeProtobuf)
+	serializer := protobuf.NewSerializer(scheme, scheme, contentTypeProtobuf)
+	raw := protobuf.NewRawSerializer(scheme, scheme, contentTypeProtobuf)
 	return serializerType{
 		AcceptContentTypes: []string{contentTypeProtobuf},
 		ContentType:        contentTypeProtobuf,

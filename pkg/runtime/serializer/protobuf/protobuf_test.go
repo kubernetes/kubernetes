@@ -323,7 +323,7 @@ func TestDecodeObjects(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/protobuf")
+		s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/protobuf")
 		obj, err := runtime.Decode(s, test.data)
 
 		switch {
