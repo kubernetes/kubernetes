@@ -367,6 +367,18 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 	return false
 }
 
+func areTypesAliased(in, out *types.Type) bool {
+	// If one of the types is Alias, resolve it.
+	if in.Kind == types.Alias {
+		return areTypesAliased(in.Underlying, out)
+	}
+	if out.Kind == types.Alias {
+		return areTypesAliased(in, out.Underlying)
+	}
+
+	return in == out
+}
+
 const (
 	apiPackagePath        = "k8s.io/kubernetes/pkg/api"
 	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
@@ -693,6 +705,11 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 			}
 		case types.Map, types.Slice, types.Pointer:
+			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+				sw.Do("out.$.name$ = in.$.name$\n", args)
+				continue
+			}
+
 			sw.Do("if in.$.name$ != nil {\n", args)
 			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
 			g.generateFor(m.Type, outMember.Type, sw)
@@ -700,6 +717,10 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("out.$.name$ = nil\n", args)
 			sw.Do("}\n", nil)
 		case types.Struct:
+			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+				sw.Do("out.$.name$ = in.$.name$\n", args)
+				continue
+			}
 			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
 				funcName := g.funcNameTmpl(m.Type, outMember.Type)
 				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
@@ -739,6 +760,10 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("}\n", nil)
 		}
 	}
+}
+
+func (g *genConversion) isDirectlyAssignable(inType, outType *types.Type) bool {
+	return inType == outType || areTypesAliased(inType, outType)
 }
 
 func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.SnippetWriter) {

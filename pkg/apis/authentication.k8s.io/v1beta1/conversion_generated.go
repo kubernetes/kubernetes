@@ -121,27 +121,8 @@ func Convert_authenticationk8sio_TokenReviewStatus_To_v1beta1_TokenReviewStatus(
 func autoConvert_v1beta1_UserInfo_To_authenticationk8sio_UserInfo(in *UserInfo, out *authentication_k8s_io.UserInfo, s conversion.Scope) error {
 	out.Username = in.Username
 	out.UID = in.UID
-	if in.Groups != nil {
-		in, out := &in.Groups, &out.Groups
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Groups = nil
-	}
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string][]string, len(*in))
-		for key, val := range *in {
-			newVal := new([]string)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out.Groups = in.Groups
+	out.Extra = in.Extra
 	return nil
 }
 
@@ -152,27 +133,8 @@ func Convert_v1beta1_UserInfo_To_authenticationk8sio_UserInfo(in *UserInfo, out 
 func autoConvert_authenticationk8sio_UserInfo_To_v1beta1_UserInfo(in *authentication_k8s_io.UserInfo, out *UserInfo, s conversion.Scope) error {
 	out.Username = in.Username
 	out.UID = in.UID
-	if in.Groups != nil {
-		in, out := &in.Groups, &out.Groups
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Groups = nil
-	}
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string][]string, len(*in))
-		for key, val := range *in {
-			newVal := new([]string)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out.Groups = in.Groups
+	out.Extra = in.Extra
 	return nil
 }
 
