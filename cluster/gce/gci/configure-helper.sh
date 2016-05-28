@@ -558,7 +558,6 @@ function start-kube-apiserver {
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
   prepare-log-file /var/log/kube-controller-manager.log
- 
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-}"
   params+=" --cloud-provider=gce"
@@ -706,9 +705,6 @@ function start-kube-addons {
   fi
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
-    local -r glbc_yaml="${dst_dir}/cluster-loadbalancing/glbc/glbc.yaml"
-    remove-salt-config-comments "${glbc_yaml}"
-    sed -i -e "s@{{ *kube_uid *}}@${KUBE_UID:-}@g" "${glbc_yaml}"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
@@ -760,6 +756,17 @@ function start-fluentd {
     fi
   fi
 }
+
+# Starts a l7 loadbalancing controller for ingress.
+function start-lb-controller {
+  if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
+    echo "Starting GCE L7 pod"
+    prepare-log-file /var/log/glbc.log
+    local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
+    cp "${src_file}" /etc/kubernetes/manifests/
+  fi
+}
+
 
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
@@ -829,6 +836,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-kube-scheduler
   start-kube-addons
   start-cluster-autoscaler
+  start-lb-controller
 else
   start-kube-proxy
   # Kube-registry-proxy.

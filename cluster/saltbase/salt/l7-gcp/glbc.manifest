@@ -1,20 +1,18 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: l7-lb-controller-v0.6.0
+  name: l7-lb-controller-v0.6.3
   namespace: kube-system
   labels:
     k8s-app: glbc
-    version: v0.6.0
+    version: v0.6.3
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "GLBC"
 spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  # TODO: Push thing image once kubernetes/contrib/pull/680 is in.
-  - image: bprashanth/glbc:0.6.3
-    imagePullPolicy: Always
+  - image: gcr.io/google_containers/glbc:0.6.3
     livenessProbe:
       httpGet:
         path: /healthz
@@ -33,11 +31,13 @@ spec:
       name: logfile
       readOnly: false
     resources:
+      # Request and limits are set to accomodate this pod alongside the other
+      # master components on a single core master.
       limits:
-        cpu: 100m
+        cpu: 50m
         memory: 100Mi
       requests:
-        cpu: 100m
+        cpu: 10m
         memory: 50Mi
     command:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428

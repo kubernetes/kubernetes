@@ -926,6 +926,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-addons/kube-addon-manager.yaml" "${dst_dir}"
+  cp "${salt_dir}/l7-gcp/glbc.manifest" "${dst_dir}"
   cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}/trusty-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
