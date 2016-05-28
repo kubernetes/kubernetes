@@ -1529,10 +1529,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_replace_status_of_the_specified_horizontalpodautoscaler">replace status of the specified HorizontalPodAutoscaler</h3>
+<h3 id="_read_status_of_the_specified_horizontalpodautoscaler">read status of the specified HorizontalPodAutoscaler</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PUT /apis/autoscaling/v1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status</pre>
+<pre>GET /apis/autoscaling/v1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1563,14 +1563,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
-<td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="definitions.html#_v1_horizontalpodautoscaler">v1.HorizontalPodAutoscaler</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1656,6 +1648,266 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
+<h3 id="_replace_status_of_the_specified_horizontalpodautoscaler">replace status of the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PUT /apis/autoscaling/v1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_10">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="definitions.html#_v1_horizontalpodautoscaler">v1.HorizontalPodAutoscaler</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_11">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="definitions.html#_v1_horizontalpodautoscaler">v1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_11">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_11">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_11">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_partially_update_status_of_the_specified_horizontalpodautoscaler">partially update status of the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PATCH /apis/autoscaling/v1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_11">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="definitions.html#_unversioned_patch">unversioned.Patch</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_12">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="definitions.html#_v1_horizontalpodautoscaler">v1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_12">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json-patch+json</p>
+</li>
+<li>
+<p>application/merge-patch+json</p>
+</li>
+<li>
+<p>application/strategic-merge-patch+json</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_12">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_12">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
 <h3 id="_watch_individual_changes_to_a_list_of_horizontalpodautoscaler">watch individual changes to a list of HorizontalPodAutoscaler</h3>
 <div class="listingblock">
 <div class="content">
@@ -1663,7 +1915,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_10">Parameters</h4>
+<h4 id="_parameters_12">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -1737,7 +1989,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_11">Responses</h4>
+<h4 id="_responses_13">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -1762,7 +2014,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_11">Consumes</h4>
+<h4 id="_consumes_13">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1772,7 +2024,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_11">Produces</h4>
+<h4 id="_produces_13">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1791,7 +2043,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_11">Tags</h4>
+<h4 id="_tags_13">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1809,7 +2061,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_11">Parameters</h4>
+<h4 id="_parameters_13">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -1891,7 +2143,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_12">Responses</h4>
+<h4 id="_responses_14">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -1916,7 +2168,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_12">Consumes</h4>
+<h4 id="_consumes_14">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1926,7 +2178,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_12">Produces</h4>
+<h4 id="_produces_14">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1945,7 +2197,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_12">Tags</h4>
+<h4 id="_tags_14">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -1963,7 +2215,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_parameters_12">Parameters</h4>
+<h4 id="_parameters_14">Parameters</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:16%;">
@@ -2053,7 +2305,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_responses_13">Responses</h4>
+<h4 id="_responses_15">Responses</h4>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
 <col style="width:33%;">
@@ -2078,7 +2330,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect3">
-<h4 id="_consumes_13">Consumes</h4>
+<h4 id="_consumes_15">Consumes</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -2088,7 +2340,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_produces_13">Produces</h4>
+<h4 id="_produces_15">Produces</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -2107,7 +2359,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect3">
-<h4 id="_tags_13">Tags</h4>
+<h4 id="_tags_15">Tags</h4>
 <div class="ulist">
 <ul>
 <li>
@@ -2122,7 +2374,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-04-27 19:28:56 UTC
+Last updated 2016-05-26 21:24:45 UTC
 </div>
 </div>
 </body>
