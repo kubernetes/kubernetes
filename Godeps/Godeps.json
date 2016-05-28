@@ -2002,6 +2002,10 @@
 			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
 		{
+			"ImportPath": "google.golang.org/api/dns/v1",
+			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
+		},
+		{
 			"ImportPath": "google.golang.org/api/gensupport",
 			"Rev": "4300f6b0c8a7f09e521dd0af2cee27e28846e037"
 		},
