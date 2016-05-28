@@ -149,9 +149,6 @@ func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interfac
 
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
-	// TODO: Figure out what's going on with this test!
-	t.Log("This test is failing too much-- lavalamp removed it to stop the submit queue bleeding")
-	return
 	gc, clientSet := setup(t)
 	oldEnableGarbageCollector := registry.EnableGarbageCollector
 	registry.EnableGarbageCollector = true

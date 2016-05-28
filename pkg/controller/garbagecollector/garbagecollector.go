@@ -433,6 +433,35 @@ type GarbageCollector struct {
 	propagator  *Propagator
 }
 
+// TODO: make special List and Watch function that removes fields other than
+// ObjectMeta.
+func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
+	return &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			// APIResource.Kind is not used by the dynamic client, so
+			// leave it empty. We want to list this resource in all
+			// namespaces if it's namespace scoped, so leave
+			// APIResource.Namespaced as false is all right.
+			apiResource := unversioned.APIResource{Name: resource.Resource}
+			// The default parameter codec used by the dynamic client cannot
+			// encode api.ListOptions.
+			// TODO: api.ParameterCodec doesn't support thirdparty objects.
+			// We need a generic parameter codec.
+			return client.ParameterCodec(api.ParameterCodec).Resource(&apiResource, api.NamespaceAll).List(&options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			// APIResource.Kind is not used by the dynamic client, so
+			// leave it empty. We want to list this resource in all
+			// namespaces if it's namespace scoped, so leave
+			// APIResource.Namespaced as false is all right.
+			apiResource := unversioned.APIResource{Name: resource.Resource}
+			// The default parameter codec used by the dynamic client cannot
+			// encode api.ListOptions.
+			return client.ParameterCodec(api.ParameterCodec).Resource(&apiResource, api.NamespaceAll).Watch(&options)
+		},
+	}
+}
+
 func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
@@ -442,26 +471,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 		return monitor, err
 	}
 	monitor.store, monitor.controller = framework.NewInformer(
-		// TODO: make special List and Watch function that removes fields other
-		// than ObjectMeta.
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				// APIResource.Kind is not used by the dynamic client, so
-				// leave it empty. We want to list this resource in all
-				// namespaces if it's namespace scoped, so leave
-				// APIResource.Namespaced as false is all right.
-				apiResource := unversioned.APIResource{Name: resource.Resource}
-				return client.Resource(&apiResource, api.NamespaceAll).List(&options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				// APIResource.Kind is not used by the dynamic client, so
-				// leave it empty. We want to list this resource in all
-				// namespaces if it's namespace scoped, so leave
-				// APIResource.Namespaced as false is all right.
-				apiResource := unversioned.APIResource{Name: resource.Resource}
-				return client.Resource(&apiResource, api.NamespaceAll).Watch(&options)
-			},
-		},
+		gcListWatcher(client, resource),
 		nil,
 		ResourceResyncTime,
 		framework.ResourceEventHandlerFuncs{
