@@ -198,6 +198,7 @@ func NewMasterConfig() *master.Config {
 			Authorizer:              apiserver.NewAlwaysAllowAuthorizer(),
 			AdmissionControl:        admit.NewAlwaysAdmit(),
 			Serializer:              api.Codecs,
+			EnableWatchCache:        true,
 		},
 		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
