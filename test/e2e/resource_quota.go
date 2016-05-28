@@ -328,7 +328,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		requests := api.ResourceList{}
 		requests[api.ResourceCPU] = resource.MustParse("500m")
 		requests[api.ResourceMemory] = resource.MustParse("252Mi")
-		pod := newTestPodForQuota(podName, requests, api.ResourceList{})
+		pod := newTestPodForQuota(f, podName, requests, api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 		podToUpdate := pod
@@ -345,7 +345,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		requests = api.ResourceList{}
 		requests[api.ResourceCPU] = resource.MustParse("600m")
 		requests[api.ResourceMemory] = resource.MustParse("100Mi")
-		pod = newTestPodForQuota("fail-pod", requests, api.ResourceList{})
+		pod = newTestPodForQuota(f, "fail-pod", requests, api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 
@@ -509,7 +509,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		limits := api.ResourceList{}
 		limits[api.ResourceCPU] = resource.MustParse("1")
 		limits[api.ResourceMemory] = resource.MustParse("400Mi")
-		pod := newTestPodForQuota(podName, requests, limits)
+		pod := newTestPodForQuota(f, podName, requests, limits)
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -546,7 +546,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 
 		By("Creating a terminating pod")
 		podName = "terminating-pod"
-		pod = newTestPodForQuota(podName, requests, limits)
+		pod = newTestPodForQuota(f, podName, requests, limits)
 		activeDeadlineSeconds := int64(3600)
 		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
@@ -604,7 +604,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a best-effort pod")
-		pod := newTestPodForQuota(podName, api.ResourceList{}, api.ResourceList{})
+		pod := newTestPodForQuota(f, podName, api.ResourceList{}, api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -634,7 +634,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		limits := api.ResourceList{}
 		limits[api.ResourceCPU] = resource.MustParse("1")
 		limits[api.ResourceMemory] = resource.MustParse("400Mi")
-		pod = newTestPodForQuota("burstable-pod", requests, limits)
+		pod = newTestPodForQuota(f, "burstable-pod", requests, limits)
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -697,7 +697,7 @@ func newTestResourceQuota(name string) *api.ResourceQuota {
 }
 
 // newTestPodForQuota returns a pod that has the specified requests and limits
-func newTestPodForQuota(name string, requests api.ResourceList, limits api.ResourceList) *api.Pod {
+func newTestPodForQuota(f *framework.Framework, name string, requests api.ResourceList, limits api.ResourceList) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -705,8 +705,8 @@ func newTestPodForQuota(name string, requests api.ResourceList, limits api.Resou
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  "nginx",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Name:  "pause",
+					Image: framework.GetPauseImageName(f.Client),
 					Resources: api.ResourceRequirements{
 						Requests: requests,
 						Limits:   limits,

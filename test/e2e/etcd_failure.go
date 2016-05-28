@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 			Client:    f.Client,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
-			Image:     "gcr.io/google_containers/pause-amd64:3.0",
+			Image:     framework.GetPauseImageName(f.Client),
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})

@@ -19,8 +19,11 @@
 # `make container` will build a container-- you must supply a tag.
 # `make push` will push the container-- you must supply a tag.
 
+GOARCH?=$(shell go env GOARCH)
+GOOS?=$(shell go env GOOS)
+
 kubectl:
-	KUBE_STATIC_OVERRIDES="kubectl" ../../hack/build-go.sh cmd/kubectl; cp ../../_output/local/bin/linux/amd64/kubectl .
+	KUBE_STATIC_OVERRIDES="kubectl" ../../hack/build-go.sh cmd/kubectl; cp ../../_output/local/bin/$(GOOS)/$(GOARCH)/kubectl .
 
 .tag: kubectl
 	./kubectl version -c | grep -o 'GitVersion:"[^"]*"' | cut -f 2 -d '"' > .tag

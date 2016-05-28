@@ -209,7 +209,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 			Client:      f.Client,
 			Name:        rcName,
 			Namespace:   ns,
-			Image:       "gcr.io/google_containers/pause-amd64:3.0",
+			Image:       framework.GetPauseImageName(f.Client),
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}

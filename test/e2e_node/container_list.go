@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -45,7 +47,7 @@ var ImageRegistry = map[int]string{
 	hostExecImage: "gcr.io/google_containers/hostexec:1.2",
 	netExecImage:  "gcr.io/google_containers/netexec:1.4",
 	nginxImage:    "gcr.io/google_containers/nginx:1.7.9",
-	pauseImage:    "gcr.io/google_containers/pause-amd64:3.0",
+	pauseImage:    framework.GetPauseImageNameForHostArch(),
 }
 
 // These are used by tests that explicitly test the ability to pull images
