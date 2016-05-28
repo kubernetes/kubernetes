@@ -472,7 +472,11 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				// namespaces if it's namespace scoped, so leave
 				// APIResource.Namespaced as false is all right.
 				apiResource := unversioned.APIResource{Name: resource.Resource}
-				return client.Resource(&apiResource, api.NamespaceAll).List(&options)
+				v1Options := &v1.ListOptions{}
+				if err := api.Scheme.Convert(&options, v1Options); err != nil {
+					return nil, err
+				}
+				return client.Resource(&apiResource, api.NamespaceAll).List(v1Options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				// APIResource.Kind is not used by the dynamic client, so
@@ -480,7 +484,11 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				// namespaces if it's namespace scoped, so leave
 				// APIResource.Namespaced as false is all right.
 				apiResource := unversioned.APIResource{Name: resource.Resource}
-				return client.Resource(&apiResource, api.NamespaceAll).Watch(&options)
+				v1Options := &v1.ListOptions{}
+				if err := api.Scheme.Convert(&options, v1Options); err != nil {
+					return nil, err
+				}
+				return client.Resource(&apiResource, api.NamespaceAll).Watch(v1Options)
 			},
 		},
 		nil,
