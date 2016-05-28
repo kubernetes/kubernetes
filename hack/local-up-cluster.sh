@@ -25,6 +25,7 @@ ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 NET_PLUGIN=${NET_PLUGIN:-""}
+NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 # We disable cluster DNS by default because this script uses docker0 (or whatever
 # container bridge docker is currently using) and we don't know the IP of the
@@ -339,6 +340,11 @@ function start_kubelet {
       if [[ -n "${NET_PLUGIN}" ]]; then
         net_plugin_args="--network-plugin=${NET_PLUGIN}"
       fi
+      
+      net_plugin_dir_args=""
+      if [[ -n "${NET_PLUGIN_DIR}" ]]; then
+        net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
+      fi
 
       kubenet_plugin_args=""
       if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
@@ -357,6 +363,7 @@ function start_kubelet {
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         ${dns_args} \
+        ${net_plugin_dir_args} \
         ${net_plugin_args} \
         ${kubenet_plugin_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
