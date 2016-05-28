@@ -257,12 +257,19 @@ case "${KUBERNETES_PROVIDER}" in
             cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
             cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
         fi
-        if [[ ! -f ${WORKSPACE}/.ssh/google_compute_engine ]]; then
-            echo "google_compute_engine ssh key missing!"
+        echo 'Checking existence of private ssh key'
+        gce_key="${WORKSPACE}/.ssh/google_compute_engine"
+        if [[ ! -f "${gce_key}" || ! -f "${gce_key}.pub" ]]; then
+            echo 'google_compute_engine ssh key missing!'
             exit 1
         fi
+        echo "Checking presence of public key in ${PROJECT}"
+        if ! gcloud compute --project="${PROJECT}" project-info describe |
+             grep "$(cat "${gce_key}.pub")" >/dev/null; then
+            echo 'Uploading public ssh key to project metadata...'
+            gcloud compute --project="${PROJECT}" config-ssh
+        fi
         ;;
-
     default)
         echo "Not copying ssh keys for ${KUBERNETES_PROVIDER}"
         ;;
