@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/addons/dns/skydns-rc.yaml.in
+# This file should be kept in sync with cluster/images/hyperkube/dns-svc.yaml
 
 # __MACHINE_GENERATED_WARNING__
 

@@ -23,11 +23,11 @@ all: transform
 
 # .base -> .in pattern rule
 %.in: %.base
-        sed -f transforms2salt.sed $< | sed s/__SOURCE_FILENAME__/$</g > $@
+	sed -f transforms2salt.sed $< | sed s/__SOURCE_FILENAME__/$</g > $@
 
 # .base -> .sed pattern rule
 %.sed: %.base
-        sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
+	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
 
 transform: skydns-rc.yaml.in skydns-svc.yaml.in skydns-rc.yaml.sed skydns-svc.yaml.sed
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/addons/dns/skydns-svc.yaml.in
+# This file should be kept in sync with cluster/saltbase/salt/kube-dns/skydns-svc.yaml.in
 apiVersion: v1
 kind: Service
 metadata:
