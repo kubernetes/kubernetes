@@ -185,6 +185,7 @@ import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversio
 import k8s_io_kubernetes_pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 
 import k8s_io_kubernetes_pkg_types "k8s.io/kubernetes/pkg/types"
+import k8s_io_kubernetes_pkg_util_bytestr "k8s.io/kubernetes/pkg/util/bytestr"
 
 import io "io"
 
@@ -30762,9 +30763,9 @@ func (m *Secret) Unmarshal(data []byte) error {
 			copy(mapvalue, data[iNdEx:postbytesIndex])
 			iNdEx = postbytesIndex
 			if m.Data == nil {
-				m.Data = make(map[string][]byte)
+				m.Data = make(map[string]k8s_io_kubernetes_pkg_util_bytestr.StringOrByteSlice)
 			}
-			m.Data[mapkey] = mapvalue
+			m.Data[mapkey] = ((k8s_io_kubernetes_pkg_util_bytestr.StringOrByteSlice)(mapvalue))
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {

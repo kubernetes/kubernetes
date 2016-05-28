@@ -27,6 +27,7 @@ import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	types "k8s.io/kubernetes/pkg/types"
+	bytestr "k8s.io/kubernetes/pkg/util/bytestr"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -2700,12 +2701,12 @@ func DeepCopy_v1_Secret(in Secret, out *Secret, c *conversion.Cloner) error {
 	}
 	if in.Data != nil {
 		in, out := in.Data, &out.Data
-		*out = make(map[string][]byte)
+		*out = make(map[string]bytestr.StringOrByteSlice)
 		for key, val := range in {
 			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
 			} else {
-				(*out)[key] = newVal.([]byte)
+				(*out)[key] = newVal.(bytestr.StringOrByteSlice)
 			}
 		}
 	} else {
