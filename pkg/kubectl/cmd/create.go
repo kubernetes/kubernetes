@@ -19,17 +19,13 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // CreateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -140,7 +136,7 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		count++
 		shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 		if !shortOutput {
-			printObjectSpecificMessage(info.Object, out)
+			f.PrintObjectSpecificMessage(info.Object, out)
 		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
 		return nil
@@ -152,49 +148,6 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
-}
-
-func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
-	switch obj := obj.(type) {
-	case *api.Service:
-		if obj.Spec.Type == api.ServiceTypeNodePort {
-			msg := fmt.Sprintf(
-				`You have exposed your service on an external port on all nodes in your
-cluster.  If you want to expose this service to the external internet, you may
-need to set up firewall rules for the service port(s) (%s) to serve traffic.
-
-See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
-`,
-				makePortsString(obj.Spec.Ports, true))
-			out.Write([]byte(msg))
-		}
-
-		_, ok := obj.Annotations[service.AnnotationLoadBalancerSourceRangesKey]
-		if ok {
-			msg := fmt.Sprintf(
-				`You are using service annotation [service.beta.kubernetes.io/load-balancer-source-ranges].
-It has been promoted to field [loadBalancerSourceRanges] in service spec. This annotation will be deprecated in the future.
-Please use the loadBalancerSourceRanges field instead.
-
-See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
-`)
-			out.Write([]byte(msg))
-		}
-	}
-}
-
-func makePortsString(ports []api.ServicePort, useNodePort bool) string {
-	pieces := make([]string, len(ports))
-	for ix := range ports {
-		var port int32
-		if useNodePort {
-			port = ports[ix].NodePort
-		} else {
-			port = ports[ix].Port
-		}
-		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), port)
-	}
-	return strings.Join(pieces, ",")
 }
 
 // createAndRefresh creates an object from input info and refreshes info with that object
