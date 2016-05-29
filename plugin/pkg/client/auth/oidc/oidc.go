@@ -20,14 +20,19 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/oauth2"
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
+	"github.com/pkg/browser"
 
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -42,6 +47,9 @@ const (
 	cfgExtraScopes              = "extra-scopes"
 	cfgIDToken                  = "id-token"
 	cfgRefreshToken             = "refresh-token"
+	cfgRedirectUri              = "redirect-uri"
+	cfgOffline                  = "offline-access"
+	cbOOB                       = "urn:ietf:wg:oauth:2.0:oob"
 )
 
 var (
@@ -102,7 +110,30 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		return nil, fmt.Errorf("error fetching provider config: %v", err)
 	}
 
+	redirect := cfg[cfgRedirectUri]
+	var oob bool
+	var port int
+	if redirect != "" {
+		oob, port, err = parseRedirect(redirect)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	scopes := strings.Split(cfg[cfgExtraScopes], ",")
+
+	offline := cfg[cfgOffline] == "true"
+	if offline {
+		// NOTE: The Google OIDC Issuer will complain with the added
+		// "offline_access" scope
+		// (http://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess),
+		// so we handle the Google case slightly differently, adding
+		// "access_type=offline" to the query string of the auth request
+		if !isGoogle(issuer) {
+			scopes = append(scopes, "offline_access")
+		}
+	}
+
 	oidcCfg := oidc.ClientConfig{
 		HTTPClient: hc,
 		Credentials: oidc.ClientCredentials{
@@ -111,6 +142,7 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		},
 		ProviderConfig: providerCfg,
 		Scope:          append(scopes, oidc.DefaultScope...),
+		RedirectURL:    redirect,
 	}
 
 	client, err := oidc.NewClient(oidcCfg)
@@ -118,7 +150,15 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		return nil, fmt.Errorf("error creating OIDC Client: %v", err)
 	}
 
-	oClient := &oidcClient{client}
+	oauthClient, err := client.OAuthClient()
+	if err != nil {
+		return nil, fmt.Errorf("error creating OAuth2 Client: %v", err)
+	}
+
+	oClient := &oidcClient{
+		client:      client,
+		oauthClient: oauthClient,
+	}
 
 	var initialIDToken jose.JWT
 	if cfg[cfgIDToken] != "" {
@@ -129,6 +169,9 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 	}
 
 	return &oidcAuthProvider{
+		offline:        offline,
+		redirectPort:   port,
+		redirectOOB:    oob,
 		initialIDToken: initialIDToken,
 		refresher: &idTokenRefresher{
 			client:    oClient,
@@ -139,6 +182,9 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 }
 
 type oidcAuthProvider struct {
+	offline        bool
+	redirectPort   int
+	redirectOOB    bool
 	refresher      *idTokenRefresher
 	initialIDToken jose.JWT
 }
@@ -156,12 +202,104 @@ func (g *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper
 }
 
 func (g *oidcAuthProvider) Login() error {
-	return errors.New("not yet implemented")
+	if !g.redirectOOB && g.redirectPort == 0 {
+		return errors.New("Cannot login without a '" + cfgRedirectUri + "' set")
+	}
+
+	var code string
+	var reqErr error
+	var wg sync.WaitGroup
+	if !g.redirectOOB {
+		listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", g.redirectPort))
+		if err != nil {
+			return err
+		}
+
+		// This server waits for the redirect coming back from API server, populates
+		// code and reqErr from that request, and then stops itself.
+		srv := &http.Server{
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// This is to handle unwanted but inevitable requests, like for
+				// "favicon.ico"
+				if r.URL.Path != "/" {
+					return
+				}
+
+				// Stop listening once we've gotten a request.
+				listener.Close()
+				if r.Method != "GET" {
+					reqErr = errors.New("The server made a bad request: Only GET is allowed")
+				}
+
+				code = r.URL.Query().Get("code")
+				if code == "" {
+					reqErr = errors.New("Missing 'code' parameter from server.")
+				}
+
+				var msg string
+				if reqErr == nil {
+					msg = "Login Successful!"
+				} else {
+					msg = reqErr.Error()
+				}
+				w.Write([]byte(fmt.Sprintf(authPostLoginTpl, msg)))
+				wg.Done()
+			}),
+		}
+		wg.Add(1)
+		go srv.Serve(listener)
+	}
+
+	// NOTE: Google gets handlded slightly differently when requesting offline
+	// access - see earlier NOTE.
+	var accessType string
+	if g.offline && isGoogle(g.refresher.cfg[cfgIssuerUrl]) {
+		accessType = "offline"
+	}
+	authURL := g.refresher.client.authCodeURL(accessType)
+
+	err := browser.OpenURL(authURL)
+	if err != nil {
+		return err
+	}
+
+	if g.redirectOOB {
+		return nil
+	}
+	wg.Wait()
+
+	if reqErr != nil {
+		return reqErr
+	}
+
+	tokens, err := g.refresher.client.exchangeCode(code)
+	if err != nil {
+		return fmt.Errorf("error exchanging auth code: %v", err)
+	}
+
+	jwt, err := jose.ParseJWT(tokens.IDToken)
+	if err != nil {
+		return err
+	}
+
+	cfg := g.refresher.cfg
+	if tokens.RefreshToken != "" {
+		cfg[cfgRefreshToken] = tokens.RefreshToken
+	}
+	cfg[cfgIDToken] = jwt.Encode()
+	err = g.refresher.persister.Persist(cfg)
+	if err != nil {
+		return fmt.Errorf("could not perist new tokens: %v", err)
+	}
+
+	return nil
 }
 
 type OIDCClient interface {
 	refreshToken(rt string) (oauth2.TokenResponse, error)
+	exchangeCode(code string) (oauth2.TokenResponse, error)
 	verifyJWT(jwt jose.JWT) error
+	authCodeURL(accessType string) string
 }
 
 type roundTripper struct {
@@ -253,7 +391,8 @@ func (r *idTokenRefresher) Refresh() (jose.JWT, error) {
 }
 
 type oidcClient struct {
-	client *oidc.Client
+	client      *oidc.Client
+	oauthClient *oauth2.Client
 }
 
 func (o *oidcClient) refreshToken(rt string) (oauth2.TokenResponse, error) {
@@ -265,6 +404,62 @@ func (o *oidcClient) refreshToken(rt string) (oauth2.TokenResponse, error) {
 	return oac.RequestToken(oauth2.GrantTypeRefreshToken, rt)
 }
 
+func (o *oidcClient) exchangeCode(code string) (oauth2.TokenResponse, error) {
+	oac, err := o.client.OAuthClient()
+	if err != nil {
+		return oauth2.TokenResponse{}, err
+	}
+
+	return oac.RequestToken(oauth2.GrantTypeAuthCode, code)
+}
+
 func (o *oidcClient) verifyJWT(jwt jose.JWT) error {
 	return o.client.VerifyJWT(jwt)
 }
+
+func (o *oidcClient) authCodeURL(accessType string) string {
+	return o.oauthClient.AuthCodeURL("", accessType, "")
+}
+
+// parseRedirect returns whether or not the redirect url is for an OOB flow, the port number for localhost redirects, and an error if the string is an invalid redirect.
+// Valid redirects are either "urn:ietf:wg:oauth:2.0:oob" or a localhost:$port
+// url. The "oob:auto" case is disallowed because this implementation doesn't
+// cannot read the title bar of the browser window to determine the code.
+func parseRedirect(r string) (bool, int, error) {
+	if r == cbOOB {
+		return true, 0, nil
+	}
+
+	u, err := url.Parse(r)
+	if err != nil {
+		return false, 0, fmt.Errorf("invalid %v: %v", cfgRedirectUri, err)
+	}
+
+	hostPort := strings.Split(u.Host, ":")
+	if hostPort[0] != "localhost" {
+		return false, 0, errors.New("Host must be 'localhost' in " + cfgRedirectUri)
+	}
+
+	if u.Scheme != "http" {
+		return false, 0, errors.New("Scheme must be 'http' in " + cfgRedirectUri)
+	}
+
+	port, err := strconv.ParseInt(hostPort[1], 10, 0)
+	if err != nil {
+		return false, 0, fmt.Errorf("Could not parse port in %v", r)
+	}
+
+	return false, int(port), nil
+}
+
+func isGoogle(s string) bool {
+	return strings.TrimRight(s, "/") == "https://accounts.google.com"
+}
+
+const authPostLoginTpl = `
+  <body>
+    %v
+    <br>
+    You can now close this window.
+  </body>
+</html>`

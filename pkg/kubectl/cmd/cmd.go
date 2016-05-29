@@ -236,6 +236,8 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
 
+	cmds.AddCommand(NewCmdLogin(f, clientcmd.NewDefaultPathOptions(), out))
+
 	if cmds.Flag("namespace").Annotations == nil {
 		cmds.Flag("namespace").Annotations = map[string][]string{}
 	}
