@@ -35,6 +35,7 @@ var sshOptions = flag.String("ssh-options", "", "Commandline options passed to s
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
 var testTimeoutSeconds = flag.Int("test-timeout", 45*60, "How long (in seconds) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
+var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 
 var sshOptionsMap map[string]string
 
@@ -163,7 +164,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
-		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d", *testTimeoutSeconds, cleanup, host, tmp, junitFileNumber),
+		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d %s", *testTimeoutSeconds, cleanup, host, tmp, junitFileNumber, *ginkgoFlags),
 	)
 	glog.Infof("Starting tests on %s", host)
 	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
