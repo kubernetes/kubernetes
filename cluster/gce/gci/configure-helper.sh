@@ -106,9 +106,9 @@ function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
   if [[ ! -e "${auth_dir}/ca.crt" && ! -z "${CA_CERT:-}" && ! -z "${MASTER_CERT:-}" && ! -z "${MASTER_KEY:-}" ]]; then
-    echo "${CA_CERT}" | base64 -d > "${auth_dir}/ca.crt"
-    echo "${MASTER_CERT}" | base64 -d > "${auth_dir}/server.cert"
-    echo "${MASTER_KEY}" | base64 -d > "${auth_dir}/server.key"
+    echo "${CA_CERT}" | base64 --decode > "${auth_dir}/ca.crt"
+    echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
+    echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ ! -e "${basic_auth_csv}" ]]; then

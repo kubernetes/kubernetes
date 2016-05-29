@@ -126,9 +126,9 @@ create-certs ${MASTER_IP}
 KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
-echo "${CA_CERT_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/ca.crt"
-echo "${KUBECFG_CERT_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/kubecfg.crt"
-echo "${KUBECFG_KEY_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/kubecfg.key"
+echo "${CA_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/ca.crt"
+echo "${KUBECFG_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.crt"
+echo "${KUBECFG_KEY_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.key"
 
 until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" --command="ls" &> /dev/null; do
   sleep 1
@@ -138,11 +138,11 @@ password=$(python -c 'import string,random; print("".join(random.SystemRandom().
 
 gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
   --command="sudo mkdir /srv/kubernetes -p && \
-    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
-    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
-    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
-    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
-    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
+    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /srv/kubernetes/server.cert\" && \
+    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /srv/kubernetes/server.key\" && \
+    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /srv/kubernetes/ca.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /srv/kubernetes/kubecfg.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /srv/kubernetes/kubecfg.key\" && \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \

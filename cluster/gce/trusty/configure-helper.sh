@@ -280,14 +280,14 @@ create_master_auth() {
   readonly auth_dir="/etc/srv/kubernetes"
   if [ ! -e "${auth_dir}/ca.crt" ]; then
     if  [ ! -z "${CA_CERT:-}" ] && [ ! -z "${MASTER_CERT:-}" ] && [ ! -z "${MASTER_KEY:-}" ]; then
-      echo "${CA_CERT}" | base64 -d > "${auth_dir}/ca.crt"
-      echo "${MASTER_CERT}" | base64 -d > "${auth_dir}/server.cert"
-      echo "${MASTER_KEY}" | base64 -d > "${auth_dir}/server.key"
+      echo "${CA_CERT}" | base64 --decode > "${auth_dir}/ca.crt"
+      echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
+      echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
       # Kubecfg cert/key are optional and included for backwards compatibility.
       # TODO(roberthbailey): Remove these two lines once GKE no longer requires
       # fetching clients certs from the master VM.
-      echo "${KUBECFG_CERT:-}" | base64 -d > "${auth_dir}/kubecfg.crt"
-      echo "${KUBECFG_KEY:-}" | base64 -d > "${auth_dir}/kubecfg.key"
+      echo "${KUBECFG_CERT:-}" | base64 --decode > "${auth_dir}/kubecfg.crt"
+      echo "${KUBECFG_KEY:-}" | base64 --decode > "${auth_dir}/kubecfg.key"
     fi
   fi
   readonly basic_auth_csv="${auth_dir}/basic_auth.csv"
