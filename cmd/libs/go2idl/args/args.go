@@ -61,6 +61,9 @@ type GeneratorArgs struct {
 	// Package path within the source tree.
 	OutputPackagePath string
 
+	// Output file name.
+	OutputFileBaseName string
+
 	// Where to get copyright header text.
 	GoHeaderFilePath string
 
@@ -81,6 +84,7 @@ func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVarP(&g.InputDirs, "input-dirs", "i", g.InputDirs, "Comma-separated list of import paths to get input types from.")
 	fs.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to $GOPATH/src/ or ./ if $GOPATH is not set.")
 	fs.StringVarP(&g.OutputPackagePath, "output-package", "p", g.OutputPackagePath, "Base package path.")
+	fs.StringVarP(&g.OutputFileBaseName, "output-file-base", "O", g.OutputFileBaseName, "Base name (without .go suffix) for output files.")
 	fs.StringVarP(&g.GoHeaderFilePath, "go-header-file", "h", g.GoHeaderFilePath, "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
 	fs.BoolVar(&g.VerifyOnly, "verify-only", g.VerifyOnly, "If true, only verify existing output, do not write anything.")
 	fs.BoolVar(&g.Recursive, "recursive", g.VerifyOnly, "If true, recurse into all children of input directories.")
