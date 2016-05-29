@@ -416,8 +416,10 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 	}
 	tlsOptions := &server.TLSOptions{
 		Config: &tls.Config{
-			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability).
-			MinVersion: tls.VersionTLS10,
+			// Can't use SSLv3 because of POODLE and BEAST
+			// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
+			// Can't use TLSv1.1 because of RC4 cipher usage
+			MinVersion: tls.VersionTLS12,
 			// Populate PeerCertificates in requests, but don't yet reject connections without certificates.
 			ClientAuth: tls.RequestClientCert,
 		},
