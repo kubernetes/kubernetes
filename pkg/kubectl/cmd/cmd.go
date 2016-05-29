@@ -236,13 +236,15 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
 
-	if cmds.Flag("namespace").Annotations == nil {
-		cmds.Flag("namespace").Annotations = map[string][]string{}
+	if cmds.Flag("namespace") != nil {
+		if cmds.Flag("namespace").Annotations == nil {
+			cmds.Flag("namespace").Annotations = map[string][]string{}
+		}
+		cmds.Flag("namespace").Annotations[cobra.BashCompCustom] = append(
+			cmds.Flag("namespace").Annotations[cobra.BashCompCustom],
+			"__kubectl_get_namespaces",
+		)
 	}
-	cmds.Flag("namespace").Annotations[cobra.BashCompCustom] = append(
-		cmds.Flag("namespace").Annotations[cobra.BashCompCustom],
-		"__kubectl_get_namespaces",
-	)
 
 	return cmds
 }
