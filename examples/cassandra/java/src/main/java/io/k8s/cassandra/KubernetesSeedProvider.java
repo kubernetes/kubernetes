@@ -152,7 +152,7 @@ public class KubernetesSeedProvider implements SeedProvider {
                 logger.warn("Endpoints are not available using default seeds in cassandra.yaml");
                 return Collections.unmodifiableList(defaultSeeds);
             }
-        } catch (IOException | NoSuchAlgorithmException | KeyManagementException ex) {
+        } catch (Exception ex) {
             logger.warn("Request to kubernetes apiserver failed, using default seeds in cassandra.yaml", ex);
             return Collections.unmodifiableList(defaultSeeds);
         }
