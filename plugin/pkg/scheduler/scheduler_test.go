@@ -19,7 +19,6 @@ package scheduler
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -218,8 +217,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		cache,
 		map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts},
 		[]algorithm.PriorityConfig{},
-		[]algorithm.SchedulerExtender{},
-		rand.New(rand.NewSource(time.Now().UnixNano())))
+		[]algorithm.SchedulerExtender{})
 
 	var gotBinding *api.Binding
 	c := &Config{

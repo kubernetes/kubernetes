@@ -19,7 +19,6 @@ package scheduler
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -56,14 +55,13 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache         schedulercache.Cache
-	predicates    map[string]algorithm.FitPredicate
-	prioritizers  []algorithm.PriorityConfig
-	extenders     []algorithm.SchedulerExtender
-	pods          algorithm.PodLister
-	random        *rand.Rand
-	randomLock    sync.Mutex
-	lastNodeIndex uint64
+	cache             schedulercache.Cache
+	predicates        map[string]algorithm.FitPredicate
+	prioritizers      []algorithm.PriorityConfig
+	extenders         []algorithm.SchedulerExtender
+	pods              algorithm.PodLister
+	lastNodeIndexLock sync.Mutex
+	lastNodeIndex     uint64
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -116,7 +114,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
-// randomly from the nodes that had the highest score.
+// in a round-robin manner from the nodes that had the highest score.
 func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
@@ -126,10 +124,10 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 	maxScore := priorityList[0].Score
 	firstAfterMaxScore := sort.Search(len(priorityList), func(i int) bool { return priorityList[i].Score < maxScore })
 
-	g.randomLock.Lock()
+	g.lastNodeIndexLock.Lock()
 	ix := int(g.lastNodeIndex % uint64(firstAfterMaxScore))
 	g.lastNodeIndex++
-	g.randomLock.Unlock()
+	g.lastNodeIndexLock.Unlock()
 
 	return priorityList[ix].Host, nil
 }
@@ -324,12 +322,11 @@ func EqualPriority(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInf
 	return result, nil
 }
 
-func NewGenericScheduler(cache schedulercache.Cache, predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender, random *rand.Rand) algorithm.ScheduleAlgorithm {
+func NewGenericScheduler(cache schedulercache.Cache, predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:        cache,
 		predicates:   predicates,
 		prioritizers: prioritizers,
 		extenders:    extenders,
-		random:       random,
 	}
 }
