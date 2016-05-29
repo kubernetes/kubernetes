@@ -417,20 +417,6 @@ func (nc *NodeController) recycleCIDR(obj interface{}) {
 	}
 }
 
-// getCondition returns a condition object for the specific condition
-// type, nil if the condition is not set.
-func (nc *NodeController) getCondition(status *api.NodeStatus, conditionType api.NodeConditionType) *api.NodeCondition {
-	if status == nil {
-		return nil
-	}
-	for i := range status.Conditions {
-		if status.Conditions[i].Type == conditionType {
-			return &status.Conditions[i]
-		}
-	}
-	return nil
-}
-
 var gracefulDeletionVersion = version.MustParse("v1.1.0")
 
 // maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
@@ -716,7 +702,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	var err error
 	var gracePeriod time.Duration
 	var observedReadyCondition api.NodeCondition
-	currentReadyCondition := nc.getCondition(&node.Status, api.NodeReady)
+	_, currentReadyCondition := api.GetNodeCondition(&node.Status, api.NodeReady)
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
@@ -756,9 +742,9 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	//     if that's the case, but it does not seem necessary.
 	var savedCondition *api.NodeCondition
 	if found {
-		savedCondition = nc.getCondition(&savedNodeStatus.status, api.NodeReady)
+		_, savedCondition = api.GetNodeCondition(&savedNodeStatus.status, api.NodeReady)
 	}
-	observedCondition := nc.getCondition(&node.Status, api.NodeReady)
+	_, observedCondition := api.GetNodeCondition(&node.Status, api.NodeReady)
 	if !found {
 		glog.Warningf("Missing timestamp for Node %s. Assuming now as a timestamp.", node.Name)
 		savedNodeStatus = nodeStatusData{
@@ -834,7 +820,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 		// Like NodeReady condition, NodeOutOfDisk was last set longer ago than gracePeriod, so update
 		// it to Unknown (regardless of its current value) in the master.
 		// TODO(madhusudancs): Refactor this with readyCondition to remove duplicated code.
-		oodCondition := nc.getCondition(&node.Status, api.NodeOutOfDisk)
+		_, oodCondition := api.GetNodeCondition(&node.Status, api.NodeOutOfDisk)
 		if oodCondition == nil {
 			glog.V(2).Infof("Out of disk condition of node %v is never updated by kubelet", node.Name)
 			node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
@@ -856,7 +842,8 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 			}
 		}
 
-		if !api.Semantic.DeepEqual(nc.getCondition(&node.Status, api.NodeReady), &observedReadyCondition) {
+		_, currentCondition := api.GetNodeCondition(&node.Status, api.NodeReady)
+		if !api.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
 			if _, err = nc.kubeClient.Core().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
 				return gracePeriod, observedReadyCondition, currentReadyCondition, err
