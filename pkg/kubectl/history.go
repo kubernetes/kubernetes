@@ -19,8 +19,6 @@ package kubectl
 import (
 	"fmt"
 	"io"
-	"sort"
-	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -29,7 +27,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
-	"k8s.io/kubernetes/pkg/util/errors"
+	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
@@ -103,30 +101,24 @@ func PrintRolloutHistory(historyInfo HistoryInfo, resource, name string) (string
 		return fmt.Sprintf("No rollout history found in %s %q", resource, name), nil
 	}
 	// Sort the revisionToChangeCause map by revision
-	var revisions []string
-	for k := range historyInfo.RevisionToTemplate {
-		revisions = append(revisions, strconv.FormatInt(k, 10))
+	var revisions []int64
+	for r := range historyInfo.RevisionToTemplate {
+		revisions = append(revisions, r)
 	}
-	sort.Strings(revisions)
+	sliceutil.SortInts64(revisions)
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "%s %q:\n", resource, name)
 		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
-		errs := []error{}
 		for _, r := range revisions {
 			// Find the change-cause of revision r
-			r64, err := strconv.ParseInt(r, 10, 64)
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-			changeCause := historyInfo.RevisionToTemplate[r64].Annotations[ChangeCauseAnnotation]
+			changeCause := historyInfo.RevisionToTemplate[r].Annotations[ChangeCauseAnnotation]
 			if len(changeCause) == 0 {
 				changeCause = "<none>"
 			}
-			fmt.Fprintf(out, "%s\t%s\n", r, changeCause)
+			fmt.Fprintf(out, "%d\t%s\n", r, changeCause)
 		}
-		return errors.NewAggregate(errs)
+		return nil
 	})
 }
 
