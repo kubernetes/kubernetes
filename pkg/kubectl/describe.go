@@ -280,7 +280,7 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 	for _, q := range quotas.Items {
 		fmt.Fprintf(w, "\n Name:\t%s\n", q.Name)
 		if len(q.Spec.Scopes) > 0 {
-			scopes := []string{}
+			scopes := make([]string, 0, len(q.Spec.Scopes))
 			for _, scope := range q.Spec.Scopes {
 				scopes = append(scopes, string(scope))
 			}
@@ -297,7 +297,7 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 		fmt.Fprintf(w, " Resource\tUsed\tHard\n")
 		fmt.Fprint(w, " --------\t---\t---\n")
 
-		resources := []api.ResourceName{}
+		resources := make([]api.ResourceName, 0, len(q.Status.Hard))
 		for resource := range q.Status.Hard {
 			resources = append(resources, resource)
 		}
@@ -433,7 +433,7 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 		fmt.Fprintf(out, "Name:\t%s\n", resourceQuota.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", resourceQuota.Namespace)
 		if len(resourceQuota.Spec.Scopes) > 0 {
-			scopes := []string{}
+			scopes := make([]string, 0, len(resourceQuota.Spec.Scopes))
 			for _, scope := range resourceQuota.Spec.Scopes {
 				scopes = append(scopes, string(scope))
 			}
@@ -449,7 +449,7 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 		fmt.Fprintf(out, "Resource\tUsed\tHard\n")
 		fmt.Fprintf(out, "--------\t----\t----\n")
 
-		resources := []api.ResourceName{}
+		resources := make([]api.ResourceName, 0, len(resourceQuota.Status.Hard))
 		for resource := range resourceQuota.Status.Hard {
 			resources = append(resources, resource)
 		}
@@ -920,7 +920,7 @@ func describeContainers(label string, containers []api.Container, containerStatu
 }
 
 func describeContainerPorts(cPorts []api.ContainerPort) string {
-	ports := []string{}
+	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
 		ports = append(ports, fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol))
 	}
@@ -1471,7 +1471,7 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 		for i := range ep.Subsets {
 			subset := &ep.Subsets[i]
 
-			addresses := []string{}
+			addresses := make([]string, 0, len(subset.Addresses))
 			for _, addr := range subset.Addresses {
 				addresses = append(addresses, addr.IP)
 			}
@@ -1481,7 +1481,7 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 			}
 			fmt.Fprintf(out, "  Addresses:\t%s\n", addressesString)
 
-			notReadyAddresses := []string{}
+			notReadyAddresses := make([]string, 0, len(subset.NotReadyAddresses))
 			for _, addr := range subset.NotReadyAddresses {
 				notReadyAddresses = append(notReadyAddresses, addr.IP)
 			}
@@ -1655,7 +1655,7 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 					c.Message)
 			}
 		}
-		var addresses []string
+		addresses := make([]string, 0, len(node.Status.Addresses))
 		for _, address := range node.Status.Addresses {
 			addresses = append(addresses, address.Address)
 		}
@@ -1974,7 +1974,7 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 
 func printReplicationControllersByLabels(matchingRCs []*api.ReplicationController) string {
 	// Format the matching RC's into strings.
-	var rcStrings []string
+	rcStrings := make([]string, 0, len(matchingRCs))
 	for _, controller := range matchingRCs {
 		rcStrings = append(rcStrings, fmt.Sprintf("%s (%d/%d replicas created)", controller.Name, controller.Status.Replicas, controller.Spec.Replicas))
 	}
@@ -1988,7 +1988,7 @@ func printReplicationControllersByLabels(matchingRCs []*api.ReplicationControlle
 
 func printReplicaSetsByLabels(matchingRSs []*extensions.ReplicaSet) string {
 	// Format the matching ReplicaSets into strings.
-	var rsStrings []string
+	rsStrings := make([]string, 0, len(matchingRSs))
 	for _, rs := range matchingRSs {
 		rsStrings = append(rsStrings, fmt.Sprintf("%s (%d/%d replicas created)", rs.Name, rs.Status.Replicas, rs.Spec.Replicas))
 	}
@@ -2138,7 +2138,7 @@ func describeNetworkPolicy(networkPolicy *extensions.NetworkPolicy) (string, err
 
 // newErrNoDescriber creates a new ErrNoDescriber with the names of the provided types.
 func newErrNoDescriber(types ...reflect.Type) error {
-	names := []string{}
+	names := make([]string, 0, len(types))
 	for _, t := range types {
 		names = append(names, t.String())
 	}
@@ -2177,7 +2177,7 @@ func (d *Describers) DescribeObject(exact interface{}, extra ...interface{}) (st
 		return fns[0].Describe(exact, extra...)
 	}
 
-	types := []reflect.Type{}
+	types := make([]reflect.Type, 0, len(extra))
 	for _, obj := range extra {
 		types = append(types, reflect.TypeOf(obj))
 	}
@@ -2202,14 +2202,15 @@ func (d *Describers) Add(fns ...interface{}) error {
 		if ft.Kind() != reflect.Func {
 			return fmt.Errorf("expected func, got: %v", ft)
 		}
-		if ft.NumIn() == 0 {
+		numIn := ft.NumIn()
+		if numIn == 0 {
 			return fmt.Errorf("expected at least one 'in' params, got: %v", ft)
 		}
 		if ft.NumOut() != 2 {
 			return fmt.Errorf("expected two 'out' params - (string, error), got: %v", ft)
 		}
-		types := []reflect.Type{}
-		for i := 0; i < ft.NumIn(); i++ {
+		types := make([]reflect.Type, 0, numIn)
+		for i := 0; i < numIn; i++ {
 			types = append(types, ft.In(i))
 		}
 		if ft.Out(0) != reflect.TypeOf(string("")) {
