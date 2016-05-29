@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
@@ -37,11 +37,11 @@ func execute(method string, url *url.URL, config *restclient.Config, stdin io.Re
 	return exec.Stream(remotecommandserver.SupportedStreamingProtocols, stdin, stdout, stderr, tty)
 }
 
-func execCommandInContainer(config *restclient.Config, f *framework.Framework, ns, podName, containerName string, cmd []string) (string, error) {
+func execCommandInContainer(config *restclient.Config, c *client.Client, ns, podName, containerName string, cmd []string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	var stdin io.Reader
 	tty := false
-	req := f.Client.RESTClient.Post().
+	req := c.RESTClient.Post().
 		Resource("pods").
 		Name(podName).
 		Namespace(ns).
