@@ -16,6 +16,9 @@ FROM google/debian:jessie
 
 COPY cassandra.list /etc/apt/sources.list.d/cassandra.list
 COPY run.sh /run.sh
+COPY cassandra.yaml /cassandra.yaml
+COPY logback.xml /logback.xml
+COPY kubernetes-cassandra.jar /kubernetes-cassandra.jar
 
 RUN gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D && \
   gpg --export --armor F758CE318D77295D | apt-key add - && \
@@ -24,20 +27,32 @@ RUN gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D && \
   gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && \
   gpg --export --armor 0353B12C | apt-key add - && \
   apt-get update && \
-  apt-get -qq -y install procps  cassandra openjdk-8-jre-headless && \
+  apt-get -qq -y install procps cassandra openjdk-8-jre-headless && \
   chmod a+rx /run.sh && \
   mkdir -p /cassandra_data/data && \
-  chown -R cassandra.cassandra /etc/cassandra /cassandra_data && \
+  mv /logback.xml /etc/cassandra/ && \
+  mv /cassandra.yaml /etc/cassandra/ && \
+  chown -R cassandra: /etc/cassandra /cassandra_data /run.sh \
+    /kubernetes-cassandra.jar && \
   chmod o+w -R /etc/cassandra /cassandra_data && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /usr/share/doc/ && \
-  rm -rf /usr/share/doc-base/ && \
-  rm -rf /usr/share/man/ && \
-  rm -rf /tmp/*
+  rm -rf \
+        doc \
+        man \
+        info \
+        locale \
+        /var/lib/apt/lists/* \
+        /var/log/* \
+        /var/cache/debconf/* \
+        common-licenses \
+        ~/.bashrc \
+        /etc/systemd \
+        /lib/lsb \
+        /lib/udev \
+        /usr/share/doc/ \
+        /usr/share/doc-base/ \
+        /usr/share/man/ \
+        /tmp/*
 
-COPY cassandra.yaml /etc/cassandra/cassandra.yaml
-COPY logback.xml /etc/cassandra/logback.xml
-COPY kubernetes-cassandra.jar /kubernetes-cassandra.jar
 
 VOLUME ["/cassandra_data/data"]
 
