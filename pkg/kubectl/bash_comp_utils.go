@@ -28,7 +28,7 @@ import (
 
 func AddJsonFilenameFlag(cmd *cobra.Command, value *[]string, usage string) {
 	cmd.Flags().StringSliceVarP(value, "filename", "f", *value, usage)
-	annotations := []string{}
+	annotations := make([]string, 0, len(resource.FileExtensions))
 	for _, ext := range resource.FileExtensions {
 		annotations = append(annotations, strings.TrimLeft(ext, "."))
 	}
