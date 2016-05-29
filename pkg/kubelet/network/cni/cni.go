@@ -18,9 +18,7 @@ package cni
 
 import (
 	"fmt"
-	"net"
 	"sort"
-	"strings"
 
 	"github.com/appc/cni/libcni"
 	cnitypes "github.com/appc/cni/pkg/types"
@@ -142,15 +140,11 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	if !ok {
 		return nil, fmt.Errorf("CNI execution called on non-docker runtime")
 	}
-	ipStr, err := runtime.GetContainerIP(id.ID, network.DefaultInterfaceName)
+	result, err := runtime.GetContainerIP(id.ID, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
-	ip, _, err := net.ParseCIDR(strings.Trim(ipStr, "\n"))
-	if err != nil {
-		return nil, err
-	}
-	return &network.PodNetworkStatus{IP: ip}, nil
+	return result, nil
 }
 
 func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
