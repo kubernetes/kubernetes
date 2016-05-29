@@ -1173,23 +1173,35 @@ func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (stri
 	}
 
 	containerPid := container.State.Pid
-	extractIPCmd := fmt.Sprintf("ip -4 addr show %s | grep inet | awk -F\" \" '{print $2}'", interfaceName)
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
-	command := exec.Command("nsenter", args...)
-	out, err := command.CombinedOutput()
 
-	// Fall back to IPv6 address if no IPv4 address is present
-	if err == nil && string(out) == "" {
-		extractIPCmd = fmt.Sprintf("ip -6 addr show %s scope global | grep inet6 | awk -F\" \" '{print $2}'", interfaceName)
-		args = []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
-		command = exec.Command("nsenter", args...)
-		out, err = command.CombinedOutput()
-	}
+	ipAddrCmd := fmt.Sprintf("ip addr show %s | awk -F\" \" "+
+		"/inet6/ {ipv6=$2} "+
+		"/inet/ && !/inet6/ {ip=$2;} "+
+		"END {print \"ip\";\"ipv6\"}'", interfaceName)
+	ipAddrArgs := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", ipAddrCmd}
+	command := exec.Command("nsenter", ipAddrArgs...)
+	ipAddrOut, err := command.CombinedOutput()
 
 	if err != nil {
+		glog.Errorf("Unable to execute 'ip addr' for interface %s on container %s: %s",
+			interfaceName, containerID, err.Error())
 		return "", err
 	}
-	return string(out), nil
+
+	ipAddrOutItems := strings.Split(string(ipAddrOut), ";")
+	if len(ipAddrOutItems) != 2 {
+		return "", fmt.Errorf("Unable to retrieve network info. Expected 2 items, found %d", len(ipAddrOutItems))
+	}
+
+	ip := ipAddrOutItems[0]
+	ipv6 := ipAddrOutItems[1]
+
+	// Fall back to IPv6 address if no IPv4 address is present
+	if ip == "" {
+		ip = ipv6
+	}
+
+	return ip, nil
 }
 
 // TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
