@@ -101,7 +101,7 @@ func PrintRolloutHistory(historyInfo HistoryInfo, resource, name string) (string
 		return fmt.Sprintf("No rollout history found in %s %q", resource, name), nil
 	}
 	// Sort the revisionToChangeCause map by revision
-	var revisions []int64
+	revisions := make([]int64, 0, len(historyInfo.RevisionToTemplate))
 	for r := range historyInfo.RevisionToTemplate {
 		revisions = append(revisions, r)
 	}
