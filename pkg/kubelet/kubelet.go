@@ -3556,11 +3556,10 @@ func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.P
 	// TODO: Consider include the container information.
 	// TODO: move this into a sync/evictor
 	if kl.pastActiveDeadline(pod) {
-		reason := "DeadlineExceeded"
-		kl.recorder.Eventf(pod, api.EventTypeNormal, reason, "Pod was active on the node longer than specified deadline")
+		kl.recorder.Eventf(pod, api.EventTypeNormal, kubecontainer.DeadlineExceeded, "Pod was active on the node longer than specified deadline")
 		return api.PodStatus{
 			Phase:   api.PodFailed,
-			Reason:  reason,
+			Reason:  kubecontainer.DeadlineExceeded,
 			Message: "Pod was active on the node longer than specified deadline"}
 	}
 

@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
@@ -99,7 +100,7 @@ func (s *Scheduler) scheduleOne() {
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %+v", pod)
 		s.config.Error(pod, err)
-		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
+		s.config.Recorder.Eventf(pod, api.EventTypeWarning, container.FailedScheduling, "%v", err)
 		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
 			Type:   api.PodScheduled,
 			Status: api.ConditionFalse,
@@ -139,7 +140,7 @@ func (s *Scheduler) scheduleOne() {
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %v/%v", pod.Namespace, pod.Name)
 			s.config.Error(pod, err)
-			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
+			s.config.Recorder.Eventf(pod, api.EventTypeNormal, container.FailedScheduling, "Binding rejected: %v", err)
 			s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
 				Type:   api.PodScheduled,
 				Status: api.ConditionFalse,
@@ -148,6 +149,6 @@ func (s *Scheduler) scheduleOne() {
 			return
 		}
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
-		s.config.Recorder.Eventf(pod, api.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+		s.config.Recorder.Eventf(pod, api.EventTypeNormal, container.Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
 	}()
 }

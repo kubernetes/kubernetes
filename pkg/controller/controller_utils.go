@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -450,7 +451,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 		return fmt.Errorf("unable to create pods, no labels")
 	}
 	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
+		r.Recorder.Eventf(object, api.EventTypeWarning, container.FailedCreate, "Error creating: %v", err)
 		return fmt.Errorf("unable to create pods: %v", err)
 	} else {
 		accessor, err := meta.Accessor(object)
@@ -459,7 +460,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 			return nil
 		}
 		glog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulCreate", "Created pod: %v", newPod.Name)
+		r.Recorder.Eventf(object, api.EventTypeNormal, container.SuccessfulCreate, "Created pod: %v", newPod.Name)
 	}
 	return nil
 }
@@ -470,11 +471,11 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
 	if err := r.KubeClient.Core().Pods(namespace).Delete(podID, nil); err != nil {
-		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
+		r.Recorder.Eventf(object, api.EventTypeWarning, container.FailedDelete, "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	} else {
 		glog.V(4).Infof("Controller %v deleted pod %v", accessor.GetName(), podID)
-		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulDelete", "Deleted pod: %v", podID)
+		r.Recorder.Eventf(object, api.EventTypeNormal, container.SuccessfulDelete, "Deleted pod: %v", podID)
 	}
 	return nil
 }

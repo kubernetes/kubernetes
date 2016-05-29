@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -371,8 +372,8 @@ func (jm *JobController) syncJob(key string) error {
 		// update status values accordingly
 		failed += active
 		active = 0
-		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
-		jm.recorder.Event(&job, api.EventTypeNormal, "DeadlineExceeded", "Job was active longer than specified deadline")
+		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, container.DeadlineExceeded, "Job was active longer than specified deadline"))
+		jm.recorder.Event(&job, api.EventTypeNormal, container.DeadlineExceeded, "Job was active longer than specified deadline")
 	} else {
 		if jobNeedsSync {
 			active = jm.manageJob(activePods, succeeded, &job)
@@ -397,10 +398,10 @@ func (jm *JobController) syncJob(key string) error {
 			if completions >= *job.Spec.Completions {
 				complete = true
 				if active > 0 {
-					jm.recorder.Event(&job, api.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
+					jm.recorder.Event(&job, api.EventTypeWarning, container.TooManyActivePods, "Too many active pods running after completion count reached")
 				}
 				if completions > *job.Spec.Completions {
-					jm.recorder.Event(&job, api.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
+					jm.recorder.Event(&job, api.EventTypeWarning, container.TooManySucceededPods, "Too many succeeded pods running after completion count reached")
 				}
 			}
 		}
