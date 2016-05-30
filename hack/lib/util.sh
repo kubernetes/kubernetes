@@ -176,7 +176,7 @@ kube::util::find-binary() {
   echo -n "${bin}"
 }
 
-# Run all known doc generators (today gendocs, genman, and genbashcomp for kubectl)
+# Run all known doc generators (today gendocs and genman for kubectl)
 # $1 is the directory to put those generated documents
 kube::util::gen-docs() {
   local dest="$1"
@@ -186,7 +186,6 @@ kube::util::gen-docs() {
   genkubedocs=$(kube::util::find-binary "genkubedocs")
   genman=$(kube::util::find-binary "genman")
   genyaml=$(kube::util::find-binary "genyaml")
-  genbashcomp=$(kube::util::find-binary "genbashcomp")
   genfeddocs=$(kube::util::find-binary "genfeddocs")
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
@@ -203,8 +202,6 @@ kube::util::gen-docs() {
   "${genman}" "${dest}/docs/man/man1/"
   mkdir -p "${dest}/docs/yaml/kubectl/"
   "${genyaml}" "${dest}/docs/yaml/kubectl/"
-  mkdir -p "${dest}/contrib/completions/bash/"
-  "${genbashcomp}" "${dest}/contrib/completions/bash/"
 
   # create the list of generated files
   pushd "${dest}" > /dev/null

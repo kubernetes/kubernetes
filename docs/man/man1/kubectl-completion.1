@@ -3,24 +3,24 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl completion \- Output shell completion code for the given shell (bash or zsh)
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl completion\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
+Output shell completion code for the given shell (bash or zsh).
 
 .PP
-Find more information at 
-\[la]https://github.com/kubernetes/kubernetes\[ra].
+This command prints shell code which must be evaluation to provide interactive
+completion of kubectl commands.
 
 
-.SH OPTIONS
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -118,9 +118,33 @@ Find more information at
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+
+$ source <(kubectl completion bash)
+
+will load the kubectl completion code for bash. Note that this depends on the bash\-completion
+framework. It must be sourced before sourcing the kubectl completion, i.e. on the Mac:
+
+$ brew install bash\-completion
+$ source $(brew \-\-prefix)/etc/bash\_completion
+$ source <(kubectl completion bash)
+
+If you use zsh, the following will load kubectl zsh completion:
+
+$ source <(kubectl completion zsh)
+
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl\-get(1)\fP, \fBkubectl\-set(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-replace(1)\fP, \fBkubectl\-patch(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-edit(1)\fP, \fBkubectl\-apply(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-logs(1)\fP, \fBkubectl\-rolling\-update(1)\fP, \fBkubectl\-scale(1)\fP, \fBkubectl\-cordon(1)\fP, \fBkubectl\-drain(1)\fP, \fBkubectl\-uncordon(1)\fP, \fBkubectl\-attach(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-run(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-autoscale(1)\fP, \fBkubectl\-rollout(1)\fP, \fBkubectl\-label(1)\fP, \fBkubectl\-annotate(1)\fP, \fBkubectl\-taint(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-cluster\-info(1)\fP, \fBkubectl\-api\-versions(1)\fP, \fBkubectl\-version(1)\fP, \fBkubectl\-explain(1)\fP, \fBkubectl\-convert(1)\fP, \fBkubectl\-completion(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY
