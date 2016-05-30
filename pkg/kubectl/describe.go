@@ -211,7 +211,7 @@ func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 			defaultRequestResources := item.DefaultRequest
 			ratio := item.MaxLimitRequestRatio
 
-			set := map[api.ResourceName]bool{}
+			set := map[resource.Name]bool{}
 			for k := range maxResources {
 				set[k] = true
 			}
@@ -297,7 +297,7 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
 		fmt.Fprintf(w, " Resource\tUsed\tHard\n")
 		fmt.Fprint(w, " --------\t---\t---\n")
 
-		resources := make([]api.ResourceName, 0, len(q.Status.Hard))
+		resources := make([]resource.Name, 0, len(q.Status.Hard))
 		for resource := range q.Status.Hard {
 			resources = append(resources, resource)
 		}
@@ -340,7 +340,7 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 			defaultRequestResources := item.DefaultRequest
 			ratio := item.MaxLimitRequestRatio
 
-			set := map[api.ResourceName]bool{}
+			set := map[resource.Name]bool{}
 			for k := range maxResources {
 				set[k] = true
 			}
@@ -449,7 +449,7 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 		fmt.Fprintf(out, "Resource\tUsed\tHard\n")
 		fmt.Fprintf(out, "--------\t----\t----\n")
 
-		resources := make([]api.ResourceName, 0, len(resourceQuota.Status.Hard))
+		resources := make([]resource.Name, 0, len(resourceQuota.Status.Hard))
 		for resource := range resourceQuota.Status.Hard {
 			resources = append(resources, resource)
 		}
@@ -1847,8 +1847,8 @@ func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
 	return result
 }
 
-func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
-	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
+func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[resource.Name]resource.Quantity, limits map[resource.Name]resource.Quantity, err error) {
+	reqs, limits = map[resource.Name]resource.Quantity{}, map[resource.Name]resource.Quantity{}
 	for _, pod := range podList.Items {
 		podReqs, podLimits, err := api.PodRequestsAndLimits(&pod)
 		if err != nil {

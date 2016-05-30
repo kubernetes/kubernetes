@@ -3078,7 +3078,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 	if err != nil {
 		// TODO(roberthbailey): This is required for test-cmd.sh to pass.
 		// See if the test should be updated instead.
-		node.Status.Capacity = api.ResourceList{
+		node.Status.Capacity = resource.List{
 			api.ResourceCPU:       *resource.NewMilliQuantity(0, resource.DecimalSI),
 			api.ResourceMemory:    resource.MustParse("0Gi"),
 			api.ResourcePods:      *resource.NewQuantity(int64(kl.maxPods), resource.DecimalSI),
@@ -3109,7 +3109,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 	}
 
 	// Set Allocatable.
-	node.Status.Allocatable = make(api.ResourceList)
+	node.Status.Allocatable = make(resource.List)
 	for k, v := range node.Status.Capacity {
 		value := *(v.Copy())
 		if kl.reservation.System != nil {

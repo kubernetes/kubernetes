@@ -251,7 +251,7 @@ func newTestKubeletWithImageList(t *testing.T, imageList []kubecontainer.Image) 
 	kubelet.podKillingCh = make(chan *kubecontainer.PodPair, 20)
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.reservation = kubetypes.Reservation{
-		Kubernetes: api.ResourceList{
+		Kubernetes: resource.List{
 			api.ResourceCPU:    resource.MustParse(testReservationCPU),
 			api.ResourceMemory: resource.MustParse(testReservationMemory),
 		},
@@ -2192,7 +2192,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
 			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 				},
 			},
@@ -2202,7 +2202,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
 			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 				},
 			},
@@ -2253,7 +2253,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
 			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 				},
 			},
@@ -2263,7 +2263,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
 			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 				},
 			},
@@ -2307,7 +2307,7 @@ func TestHandleNodeSelector(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
 			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 				},
 			},
@@ -2352,7 +2352,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	kl := testKubelet.kubelet
 	nodes := []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-			Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: api.ResourceList{
+			Status: api.NodeStatus{Capacity: resource.List{}, Allocatable: resource.List{
 				api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
@@ -2366,7 +2366,7 @@ func TestHandleMemExceeded(t *testing.T) {
 
 	spec := api.PodSpec{NodeName: kl.nodeName,
 		Containers: []api.Container{{Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
+			Requests: resource.List{
 				"memory": resource.MustParse("90"),
 			},
 		}}}}
@@ -2638,13 +2638,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
 			},
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourceCPU:       *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory:    *resource.NewQuantity(10E9, resource.BinarySI),
 				api.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
 				api.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Allocatable: api.ResourceList{
+			Allocatable: resource.List{
 				api.ResourceCPU:       *resource.NewMilliQuantity(1800, resource.DecimalSI),
 				api.ResourceMemory:    *resource.NewQuantity(9900E6, resource.BinarySI),
 				api.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
@@ -2809,12 +2809,12 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 				},
-				Capacity: api.ResourceList{
+				Capacity: resource.List{
 					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
 					api.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
 					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 				},
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourceCPU:    *resource.NewMilliQuantity(2800, resource.DecimalSI),
 					api.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
 					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
@@ -2885,13 +2885,13 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
 			},
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourceCPU:       *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory:    *resource.NewQuantity(20E9, resource.BinarySI),
 				api.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
 				api.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Allocatable: api.ResourceList{
+			Allocatable: resource.List{
 				api.ResourceCPU:       *resource.NewMilliQuantity(1800, resource.DecimalSI),
 				api.ResourceMemory:    *resource.NewQuantity(19900E6, resource.BinarySI),
 				api.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
@@ -3169,13 +3169,13 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
 			},
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourceCPU:       *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory:    *resource.NewQuantity(10E9, resource.BinarySI),
 				api.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
 				api.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Allocatable: api.ResourceList{
+			Allocatable: resource.List{
 				api.ResourceCPU:       *resource.NewMilliQuantity(1800, resource.DecimalSI),
 				api.ResourceMemory:    *resource.NewQuantity(9900E6, resource.BinarySI),
 				api.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
@@ -4570,7 +4570,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
 			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 				},
 			},
@@ -4580,7 +4580,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
 			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
+				Allocatable: resource.List{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
 				},
 			},

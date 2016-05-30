@@ -26,7 +26,7 @@ func TestResourceHelpers(t *testing.T) {
 	cpuLimit := resource.MustParse("10")
 	memoryLimit := resource.MustParse("10G")
 	resourceSpec := ResourceRequirements{
-		Limits: ResourceList{
+		Limits: resource.List{
 			"cpu":             cpuLimit,
 			"memory":          memoryLimit,
 			"kube.io/storage": memoryLimit,
@@ -39,7 +39,7 @@ func TestResourceHelpers(t *testing.T) {
 		t.Errorf("expected memorylimit %v, got %v", memoryLimit, res)
 	}
 	resourceSpec = ResourceRequirements{
-		Limits: ResourceList{
+		Limits: resource.List{
 			"memory":          memoryLimit,
 			"kube.io/storage": memoryLimit,
 		},
@@ -53,7 +53,7 @@ func TestResourceHelpers(t *testing.T) {
 }
 
 func TestDefaultResourceHelpers(t *testing.T) {
-	resourceList := ResourceList{}
+	resourceList := resource.List{}
 	if resourceList.Cpu().Format != resource.DecimalSI {
 		t.Errorf("expected %v, actual %v", resource.DecimalSI, resourceList.Cpu().Format)
 	}

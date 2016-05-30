@@ -22,7 +22,9 @@ import (
 	"time"
 
 	influxdb "github.com/influxdb/influxdb/client"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 const (
@@ -45,7 +47,7 @@ func (s *influxdbSource) query(query string) ([]*influxdb.Response, error) {
 	return nil, fmt.Errorf("temporary not supported; see #18826 for more details")
 }
 
-func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+func (s *influxdbSource) GetUsagePercentile(kind resource.Name, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 	var series string
 	if kind == api.ResourceCPU {
 		series = cpuSeriesName

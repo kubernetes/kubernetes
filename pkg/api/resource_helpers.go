@@ -21,41 +21,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-// Returns string version of ResourceName.
-func (self ResourceName) String() string {
-	return string(self)
-}
-
-// Returns the CPU limit if specified.
-func (self *ResourceList) Cpu() *resource.Quantity {
-	if val, ok := (*self)[ResourceCPU]; ok {
-		return &val
-	}
-	return &resource.Quantity{Format: resource.DecimalSI}
-}
-
-// Returns the Memory limit if specified.
-func (self *ResourceList) Memory() *resource.Quantity {
-	if val, ok := (*self)[ResourceMemory]; ok {
-		return &val
-	}
-	return &resource.Quantity{Format: resource.BinarySI}
-}
-
-func (self *ResourceList) Pods() *resource.Quantity {
-	if val, ok := (*self)[ResourcePods]; ok {
-		return &val
-	}
-	return &resource.Quantity{}
-}
-
-func (self *ResourceList) NvidiaGPU() *resource.Quantity {
-	if val, ok := (*self)[ResourceNvidiaGPU]; ok {
-		return &val
-	}
-	return &resource.Quantity{}
-}
-
 func GetContainerStatus(statuses []ContainerStatus, name string) (ContainerStatus, bool) {
 	for i := range statuses {
 		if statuses[i].Name == name {
@@ -162,8 +127,8 @@ func IsNodeReady(node *Node) bool {
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, limits map[ResourceName]resource.Quantity, err error) {
-	reqs, limits = map[ResourceName]resource.Quantity{}, map[ResourceName]resource.Quantity{}
+func PodRequestsAndLimits(pod *Pod) (reqs map[resource.Name]resource.Quantity, limits map[resource.Name]resource.Quantity, err error) {
+	reqs, limits = map[resource.Name]resource.Quantity{}, map[resource.Name]resource.Quantity{}
 	for _, container := range pod.Spec.Containers {
 		for name, quantity := range container.Resources.Requests {
 			if value, ok := reqs[name]; !ok {

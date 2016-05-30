@@ -22,6 +22,7 @@ import (
 	"regexp"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
@@ -266,8 +267,8 @@ func (r *hostPathProvisioner) Provision() (*api.PersistentVolume, error) {
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: r.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   r.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): r.options.Capacity,
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): r.options.Capacity,
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{

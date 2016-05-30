@@ -267,7 +267,7 @@ func DoTestPodScheduling(t *testing.T, restClient *client.Client) {
 	node := &api.Node{
 		Spec: api.NodeSpec{Unschedulable: false},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 			},
 			Conditions: []api.NodeCondition{goodCondition},

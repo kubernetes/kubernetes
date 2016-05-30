@@ -296,7 +296,7 @@ type PersistentVolume struct {
 
 type PersistentVolumeSpec struct {
 	// Resources represents the actual resources of the volume
-	Capacity ResourceList `json:"capacity"`
+	Capacity resource.List `json:"capacity"`
 	// Source represents the location and type of a volume to mount.
 	PersistentVolumeSource `json:",inline"`
 	// AccessModes contains all ways the volume can be mounted
@@ -376,7 +376,7 @@ type PersistentVolumeClaimStatus struct {
 	// AccessModes contains all ways the volume backing the PVC can be mounted
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume
-	Capacity ResourceList `json:"capacity,omitempty"`
+	Capacity resource.List `json:"capacity,omitempty"`
 }
 
 type PersistentVolumeAccessMode string
@@ -951,11 +951,11 @@ type Capabilities struct {
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
-	Limits ResourceList `json:"limits,omitempty"`
+	Limits resource.List `json:"limits,omitempty"`
 	// Requests describes the minimum amount of compute resources required.
 	// If Request is omitted for a container, it defaults to Limits if that is explicitly specified,
 	// otherwise to an implementation-defined value
-	Requests ResourceList `json:"requests,omitempty"`
+	Requests resource.List `json:"requests,omitempty"`
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -1964,9 +1964,9 @@ type NodeSystemInfo struct {
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the total resources of a node.
-	Capacity ResourceList `json:"capacity,omitempty"`
+	Capacity resource.List `json:"capacity,omitempty"`
 	// Allocatable represents the resources of a node that are available for scheduling.
-	Allocatable ResourceList `json:"allocatable,omitempty"`
+	Allocatable resource.List `json:"allocatable,omitempty"`
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty"`
 	// Conditions is an array of current node conditions.
@@ -2047,11 +2047,8 @@ type NodeAddress struct {
 // see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
-	Capacity ResourceList `json:"capacity,omitempty"`
+	Capacity resource.List `json:"capacity,omitempty"`
 }
-
-// ResourceName is the name identifying various resources in a ResourceList.
-type ResourceName string
 
 // Resource names must be not more than 63 characters, consisting of upper- or lower-case alphanumeric characters,
 // with the -, _, and . characters allowed anywhere, except the first or last character.
@@ -2060,18 +2057,15 @@ type ResourceName string
 // Fully-qualified resource typenames are constructed from a DNS-style subdomain, followed by a slash `/` and a name.
 const (
 	// CPU, in cores. (500m = .5 cores)
-	ResourceCPU ResourceName = "cpu"
+	ResourceCPU resource.Name = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceMemory ResourceName = "memory"
+	ResourceMemory resource.Name = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
-	ResourceStorage ResourceName = "storage"
+	ResourceStorage resource.Name = "storage"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
-	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
+	ResourceNvidiaGPU resource.Name = "alpha.kubernetes.io/nvidia-gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods
 )
-
-// ResourceList is a set of (resource name, quantity) pairs.
-type ResourceList map[ResourceName]resource.Quantity
 
 // +genclient=true,nonNamespaced=true
 
@@ -2444,15 +2438,15 @@ type LimitRangeItem struct {
 	// Type of resource that this limit applies to
 	Type LimitType `json:"type,omitempty"`
 	// Max usage constraints on this kind by resource name
-	Max ResourceList `json:"max,omitempty"`
+	Max resource.List `json:"max,omitempty"`
 	// Min usage constraints on this kind by resource name
-	Min ResourceList `json:"min,omitempty"`
+	Min resource.List `json:"min,omitempty"`
 	// Default resource requirement limit value by resource name.
-	Default ResourceList `json:"default,omitempty"`
+	Default resource.List `json:"default,omitempty"`
 	// DefaultRequest resource requirement request value by resource name.
-	DefaultRequest ResourceList `json:"defaultRequest,omitempty"`
+	DefaultRequest resource.List `json:"defaultRequest,omitempty"`
 	// MaxLimitRequestRatio represents the max burst value for the named resource
-	MaxLimitRequestRatio ResourceList `json:"maxLimitRequestRatio,omitempty"`
+	MaxLimitRequestRatio resource.List `json:"maxLimitRequestRatio,omitempty"`
 }
 
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind
@@ -2484,31 +2478,31 @@ type LimitRangeList struct {
 // The following identify resource constants for Kubernetes object types
 const (
 	// Pods, number
-	ResourcePods ResourceName = "pods"
+	ResourcePods resource.Name = "pods"
 	// Services, number
-	ResourceServices ResourceName = "services"
+	ResourceServices resource.Name = "services"
 	// ReplicationControllers, number
-	ResourceReplicationControllers ResourceName = "replicationcontrollers"
+	ResourceReplicationControllers resource.Name = "replicationcontrollers"
 	// ResourceQuotas, number
-	ResourceQuotas ResourceName = "resourcequotas"
+	ResourceQuotas resource.Name = "resourcequotas"
 	// ResourceSecrets, number
-	ResourceSecrets ResourceName = "secrets"
+	ResourceSecrets resource.Name = "secrets"
 	// ResourceConfigMaps, number
-	ResourceConfigMaps ResourceName = "configmaps"
+	ResourceConfigMaps resource.Name = "configmaps"
 	// ResourcePersistentVolumeClaims, number
-	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
+	ResourcePersistentVolumeClaims resource.Name = "persistentvolumeclaims"
 	// ResourceServicesNodePorts, number
-	ResourceServicesNodePorts ResourceName = "services.nodeports"
+	ResourceServicesNodePorts resource.Name = "services.nodeports"
 	// ResourceServicesLoadBalancers, number
-	ResourceServicesLoadBalancers ResourceName = "services.loadbalancers"
+	ResourceServicesLoadBalancers resource.Name = "services.loadbalancers"
 	// CPU request, in cores. (500m = .5 cores)
-	ResourceRequestsCPU ResourceName = "requests.cpu"
+	ResourceRequestsCPU resource.Name = "requests.cpu"
 	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceRequestsMemory ResourceName = "requests.memory"
+	ResourceRequestsMemory resource.Name = "requests.memory"
 	// CPU limit, in cores. (500m = .5 cores)
-	ResourceLimitsCPU ResourceName = "limits.cpu"
+	ResourceLimitsCPU resource.Name = "limits.cpu"
 	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceLimitsMemory ResourceName = "limits.memory"
+	ResourceLimitsMemory resource.Name = "limits.memory"
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota
@@ -2528,7 +2522,7 @@ const (
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource
-	Hard ResourceList `json:"hard,omitempty"`
+	Hard resource.List `json:"hard,omitempty"`
 	// A collection of filters that must match each object tracked by a quota.
 	// If not specified, the quota matches all objects.
 	Scopes []ResourceQuotaScope `json:"scopes,omitempty"`
@@ -2537,9 +2531,9 @@ type ResourceQuotaSpec struct {
 // ResourceQuotaStatus defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {
 	// Hard is the set of enforced hard limits for each named resource
-	Hard ResourceList `json:"hard,omitempty"`
+	Hard resource.List `json:"hard,omitempty"`
 	// Used is the current observed total usage of the resource in the namespace
-	Used ResourceList `json:"used,omitempty"`
+	Used resource.List `json:"used,omitempty"`
 }
 
 // +genclient=true

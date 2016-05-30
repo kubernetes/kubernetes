@@ -852,9 +852,9 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
-							Capacity: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							Capacity: resource.List{
+								resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+								resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
 						Spec: api.NodeSpec{
@@ -883,9 +883,9 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 			expectedNodes: []*api.Node{
@@ -913,9 +913,9 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								LastTransitionTime: unversioned.Time{Time: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
 							},
 						},
-						Capacity: api.ResourceList{
-							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						Capacity: resource.List{
+							resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+							resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
 					Spec: api.NodeSpec{
@@ -944,9 +944,9 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									LastTransitionTime: fakeNow,
 								},
 							},
-							Capacity: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							Capacity: resource.List{
+								resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+								resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
 						Spec: api.NodeSpec{
@@ -1031,9 +1031,9 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 									LastTransitionTime: fakeNow,
 								},
 							},
-							Capacity: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							Capacity: resource.List{
+								resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+								resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
 						Spec: api.NodeSpec{
@@ -1072,9 +1072,9 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
-							Capacity: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							Capacity: resource.List{
+								resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+								resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
 						Spec: api.NodeSpec{
@@ -1102,9 +1102,9 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 			expectedPodStatusUpdate: true,
@@ -1157,9 +1157,9 @@ func TestNodeDeletion(t *testing.T) {
 							LastTransitionTime: fakeNow,
 						},
 					},
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-						api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					Capacity: resource.List{
+						resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+						resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 					},
 				},
 				Spec: api.NodeSpec{
@@ -1181,9 +1181,9 @@ func TestNodeDeletion(t *testing.T) {
 							LastTransitionTime: fakeNow,
 						},
 					},
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-						api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					Capacity: resource.List{
+						resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+						resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 					},
 				},
 				Spec: api.NodeSpec{
@@ -1408,9 +1408,9 @@ func newNode(name string) *api.Node {
 			ExternalID: name,
 		},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+				resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 			},
 		},
 	}

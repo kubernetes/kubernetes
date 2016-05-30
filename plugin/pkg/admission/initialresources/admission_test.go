@@ -26,18 +26,18 @@ import (
 )
 
 type fakeSource struct {
-	f func(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error)
+	f func(kind resource.Name, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error)
 }
 
-func (s *fakeSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error) {
+func (s *fakeSource) GetUsagePercentile(kind resource.Name, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error) {
 	return s.f(kind, perc, image, namespace, exactMatch, start, end)
 }
 
-func parseReq(cpu, mem string) api.ResourceList {
+func parseReq(cpu, mem string) resource.List {
 	if cpu == "" && mem == "" {
 		return nil
 	}
-	req := api.ResourceList{}
+	req := resource.List{}
 	if cpu != "" {
 		req[api.ResourceCPU] = resource.MustParse(cpu)
 	}
@@ -47,7 +47,7 @@ func parseReq(cpu, mem string) api.ResourceList {
 	return req
 }
 
-func addContainer(pod *api.Pod, name, image string, request api.ResourceList) {
+func addContainer(pod *api.Pod, name, image string, request resource.List) {
 	pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
 		Name:      name,
 		Image:     image,
@@ -55,7 +55,7 @@ func addContainer(pod *api.Pod, name, image string, request api.ResourceList) {
 	})
 }
 
-func createPod(name string, image string, request api.ResourceList) *api.Pod {
+func createPod(name string, image string, request resource.List) *api.Pod {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test-ns"},
 		Spec:       api.PodSpec{},
@@ -129,7 +129,7 @@ func performTest(t *testing.T, ir admission.Interface) {
 }
 
 func TestEstimationBasedOnTheSameImageSameNamespace7d(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 		if exactMatch && end.Sub(start) == week && ns == "test-ns" {
 			return 100, 120, nil
 		}
@@ -140,7 +140,7 @@ func TestEstimationBasedOnTheSameImageSameNamespace7d(t *testing.T) {
 }
 
 func TestEstimationBasedOnTheSameImageSameNamespace30d(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 		if exactMatch && end.Sub(start) == week && ns == "test-ns" {
 			return 200, 20, nil
 		}
@@ -153,7 +153,7 @@ func TestEstimationBasedOnTheSameImageSameNamespace30d(t *testing.T) {
 }
 
 func TestEstimationBasedOnTheSameImageAllNamespaces7d(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 		if exactMatch && ns == "test-ns" {
 			return 200, 20, nil
 		}
@@ -166,7 +166,7 @@ func TestEstimationBasedOnTheSameImageAllNamespaces7d(t *testing.T) {
 }
 
 func TestEstimationBasedOnTheSameImageAllNamespaces30d(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 		if exactMatch && ns == "test-ns" {
 			return 200, 20, nil
 		}
@@ -182,7 +182,7 @@ func TestEstimationBasedOnTheSameImageAllNamespaces30d(t *testing.T) {
 }
 
 func TestEstimationBasedOnOtherImages(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, image, ns string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, image, ns string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
 		if image == "image" && !exactMatch && ns == "" {
 			return 100, 5, nil
 		}
@@ -192,7 +192,7 @@ func TestEstimationBasedOnOtherImages(t *testing.T) {
 }
 
 func TestNoData(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _, ns string, _ bool, _, _ time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, _, ns string, _ bool, _, _ time.Time) (int64, int64, error) {
 		return 200, 0, nil
 	}
 	ir := newInitialResources(&fakeSource{f: f}, 90, false)
@@ -210,7 +210,7 @@ func TestNoData(t *testing.T) {
 }
 
 func TestManyContainers(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, _, ns string, exactMatch bool, _, _ time.Time) (int64, int64, error) {
 		if exactMatch {
 			return 100, 120, nil
 		}
@@ -233,7 +233,7 @@ func TestManyContainers(t *testing.T) {
 }
 
 func TestNamespaceAware(t *testing.T) {
-	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+	f := func(_ resource.Name, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 		if ns == "test-ns" {
 			return 200, 0, nil
 		}

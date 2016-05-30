@@ -589,7 +589,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c *client.Client, name, ns, imag
 							Name:  name,
 							Image: image,
 							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
+								Requests: resource.List{
 									api.ResourceCPU:    cpuRequest,
 									api.ResourceMemory: memRequest,
 								},

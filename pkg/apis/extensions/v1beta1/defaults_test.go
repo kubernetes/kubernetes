@@ -664,7 +664,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	s.Containers = []v1.Container{
 		{
 			Resources: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
+				Limits: resource.List{
 					v1.ResourceCPU: resource.MustParse("100m"),
 				},
 			},

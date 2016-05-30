@@ -366,7 +366,7 @@ type PersistentVolume struct {
 type PersistentVolumeSpec struct {
 	// A description of the persistent volume's resources and capacity.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity
-	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+	Capacity resource.List `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=resource.List,castkey=resource.Name"`
 	// The actual volume backing the persistent volume.
 	PersistentVolumeSource `json:",inline" protobuf:"bytes,2,opt,name=persistentVolumeSource"`
 	// AccessModes contains all ways the volume can be mounted.
@@ -471,7 +471,7 @@ type PersistentVolumeClaimStatus struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,2,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// Represents the actual resources of the underlying volume.
-	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+	Capacity resource.List `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=resource.List,castkey=resource.Name"`
 }
 
 type PersistentVolumeAccessMode string
@@ -1085,12 +1085,12 @@ type Capabilities struct {
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
 	// More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications
-	Limits ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
+	Limits resource.List `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=resource.List,castkey=resource.Name"`
 	// Requests describes the minimum amount of compute resources required.
 	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
 	// otherwise to an implementation-defined value.
 	// More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications
-	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+	Requests resource.List `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=resource.List,castkey=resource.Name"`
 }
 
 const (
@@ -2361,10 +2361,10 @@ type NodeSystemInfo struct {
 type NodeStatus struct {
 	// Capacity represents the total resources of a node.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity for more details.
-	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+	Capacity resource.List `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=resource.List,castkey=resource.Name"`
 	// Allocatable represents the resources of a node that are available for scheduling.
 	// Defaults to Capacity.
-	Allocatable ResourceList `json:"allocatable,omitempty" protobuf:"bytes,2,rep,name=allocatable,casttype=ResourceList,castkey=ResourceName"`
+	Allocatable resource.List `json:"allocatable,omitempty" protobuf:"bytes,2,rep,name=allocatable,casttype=resource.List,castkey=resource.Name"`
 	// NodePhase is the recently observed lifecycle phase of the node.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase
 	Phase NodePhase `json:"phase,omitempty" protobuf:"bytes,3,opt,name=phase,casttype=NodePhase"`
@@ -2456,27 +2456,29 @@ type NodeAddress struct {
 }
 
 // ResourceName is the name identifying various resources in a ResourceList.
+// DEPRECATED: Use resource.List, preserved only for allowing Heapster to update
 type ResourceName string
+
+// ResourceList is a set of (resource name, quantity) pairs.
+// DEPRECATED: Use resource.List, preserved only for allowing Heapster to update
+type ResourceList map[ResourceName]resource.Quantity
 
 // Resource names must be not more than 63 characters, consisting of upper- or lower-case alphanumeric characters,
 // with the -, _, and . characters allowed anywhere, except the first or last character.
 // The default convention, matching that for annotations, is to use lower-case names, with dashes, rather than
 // camel case, separating compound words.
 // Fully-qualified resource typenames are constructed from a DNS-style subdomain, followed by a slash `/` and a name.
+// DEPRECATED: use constants defined elsewhere
 const (
 	// CPU, in cores. (500m = .5 cores)
-	ResourceCPU ResourceName = "cpu"
+	ResourceCPU resource.Name = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceMemory ResourceName = "memory"
+	ResourceMemory resource.Name = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
-	ResourceStorage ResourceName = "storage"
+	ResourceStorage resource.Name = "storage"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
-	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
-	// Number of Pods that may be running on this Node: see ResourcePods
+	ResourceNvidiaGPU resource.Name = "alpha.kubernetes.io/nvidia-gpu"
 )
-
-// ResourceList is a set of (resource name, quantity) pairs.
-type ResourceList map[ResourceName]resource.Quantity
 
 // +genclient=true,nonNamespaced=true
 
@@ -2915,15 +2917,15 @@ type LimitRangeItem struct {
 	// Type of resource that this limit applies to.
 	Type LimitType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=LimitType"`
 	// Max usage constraints on this kind by resource name.
-	Max ResourceList `json:"max,omitempty" protobuf:"bytes,2,rep,name=max,casttype=ResourceList,castkey=ResourceName"`
+	Max resource.List `json:"max,omitempty" protobuf:"bytes,2,rep,name=max,casttype=resource.List,castkey=resource.Name"`
 	// Min usage constraints on this kind by resource name.
-	Min ResourceList `json:"min,omitempty" protobuf:"bytes,3,rep,name=min,casttype=ResourceList,castkey=ResourceName"`
+	Min resource.List `json:"min,omitempty" protobuf:"bytes,3,rep,name=min,casttype=resource.List,castkey=resource.Name"`
 	// Default resource requirement limit value by resource name if resource limit is omitted.
-	Default ResourceList `json:"default,omitempty" protobuf:"bytes,4,rep,name=default,casttype=ResourceList,castkey=ResourceName"`
+	Default resource.List `json:"default,omitempty" protobuf:"bytes,4,rep,name=default,casttype=resource.List,castkey=resource.Name"`
 	// DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
-	DefaultRequest ResourceList `json:"defaultRequest,omitempty" protobuf:"bytes,5,rep,name=defaultRequest,casttype=ResourceList,castkey=ResourceName"`
+	DefaultRequest resource.List `json:"defaultRequest,omitempty" protobuf:"bytes,5,rep,name=defaultRequest,casttype=resource.List,castkey=resource.Name"`
 	// MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
-	MaxLimitRequestRatio ResourceList `json:"maxLimitRequestRatio,omitempty" protobuf:"bytes,6,rep,name=maxLimitRequestRatio,casttype=ResourceList,castkey=ResourceName"`
+	MaxLimitRequestRatio resource.List `json:"maxLimitRequestRatio,omitempty" protobuf:"bytes,6,rep,name=maxLimitRequestRatio,casttype=resource.List,castkey=resource.Name"`
 }
 
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind.
@@ -2961,31 +2963,31 @@ type LimitRangeList struct {
 // The following identify resource constants for Kubernetes object types
 const (
 	// Pods, number
-	ResourcePods ResourceName = "pods"
+	ResourcePods resource.Name = "pods"
 	// Services, number
-	ResourceServices ResourceName = "services"
+	ResourceServices resource.Name = "services"
 	// ReplicationControllers, number
-	ResourceReplicationControllers ResourceName = "replicationcontrollers"
+	ResourceReplicationControllers resource.Name = "replicationcontrollers"
 	// ResourceQuotas, number
-	ResourceQuotas ResourceName = "resourcequotas"
+	ResourceQuotas resource.Name = "resourcequotas"
 	// ResourceSecrets, number
-	ResourceSecrets ResourceName = "secrets"
+	ResourceSecrets resource.Name = "secrets"
 	// ResourceConfigMaps, number
-	ResourceConfigMaps ResourceName = "configmaps"
+	ResourceConfigMaps resource.Name = "configmaps"
 	// ResourcePersistentVolumeClaims, number
-	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
+	ResourcePersistentVolumeClaims resource.Name = "persistentvolumeclaims"
 	// ResourceServicesNodePorts, number
-	ResourceServicesNodePorts ResourceName = "services.nodeports"
+	ResourceServicesNodePorts resource.Name = "services.nodeports"
 	// ResourceServicesLoadBalancers, number
-	ResourceServicesLoadBalancers ResourceName = "services.loadbalancers"
+	ResourceServicesLoadBalancers resource.Name = "services.loadbalancers"
 	// CPU request, in cores. (500m = .5 cores)
-	ResourceRequestsCPU ResourceName = "requests.cpu"
+	ResourceRequestsCPU resource.Name = "requests.cpu"
 	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceRequestsMemory ResourceName = "requests.memory"
+	ResourceRequestsMemory resource.Name = "requests.memory"
 	// CPU limit, in cores. (500m = .5 cores)
-	ResourceLimitsCPU ResourceName = "limits.cpu"
+	ResourceLimitsCPU resource.Name = "limits.cpu"
 	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceLimitsMemory ResourceName = "limits.memory"
+	ResourceLimitsMemory resource.Name = "limits.memory"
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota
@@ -3006,7 +3008,7 @@ const (
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource.
 	// More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
-	Hard ResourceList `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=ResourceList,castkey=ResourceName"`
+	Hard resource.List `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=resource.List,castkey=resource.Name"`
 	// A collection of filters that must match each object tracked by a quota.
 	// If not specified, the quota matches all objects.
 	Scopes []ResourceQuotaScope `json:"scopes,omitempty" protobuf:"bytes,2,rep,name=scopes,casttype=ResourceQuotaScope"`
@@ -3016,9 +3018,9 @@ type ResourceQuotaSpec struct {
 type ResourceQuotaStatus struct {
 	// Hard is the set of enforced hard limits for each named resource.
 	// More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
-	Hard ResourceList `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=ResourceList,castkey=ResourceName"`
+	Hard resource.List `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=resource.List,castkey=resource.Name"`
 	// Used is the current observed total usage of the resource in the namespace.
-	Used ResourceList `json:"used,omitempty" protobuf:"bytes,2,rep,name=used,casttype=ResourceList,castkey=ResourceName"`
+	Used resource.List `json:"used,omitempty" protobuf:"bytes,2,rep,name=used,casttype=resource.List,castkey=resource.Name"`
 }
 
 // +genclient=true

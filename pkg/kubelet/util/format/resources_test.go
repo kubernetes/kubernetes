@@ -24,7 +24,7 @@ import (
 )
 
 func TestResourceList(t *testing.T) {
-	resourceList := api.ResourceList{}
+	resourceList := resource.List{}
 	resourceList[api.ResourceCPU] = resource.MustParse("100m")
 	resourceList[api.ResourceMemory] = resource.MustParse("5Gi")
 	actual := ResourceList(resourceList)

@@ -19,6 +19,7 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -27,11 +28,11 @@ import (
 
 // NewSecretEvaluator returns an evaluator that can evaluate secrets
 func NewSecretEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceSecrets}
+	allResources := []resource.Name{api.ResourceSecrets}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Secret",
 		InternalGroupKind: api.Kind("Secret"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]resource.Name{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,

@@ -353,7 +353,7 @@ func createPV(name, path, cap string, mode []api.PersistentVolumeAccessMode, rec
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource:        api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: path}},
-			Capacity:                      api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(cap)},
+			Capacity:                      resource.List{resource.Name(api.ResourceStorage): resource.MustParse(cap)},
 			AccessModes:                   mode,
 			PersistentVolumeReclaimPolicy: reclaim,
 		},
@@ -364,7 +364,7 @@ func createPVC(name, cap string, mode []api.PersistentVolumeAccessMode) *api.Per
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Spec: api.PersistentVolumeClaimSpec{
-			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(cap)}},
+			Resources:   api.ResourceRequirements{Requests: resource.List{resource.Name(api.ResourceStorage): resource.MustParse(cap)}},
 			AccessModes: mode,
 		},
 	}

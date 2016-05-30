@@ -257,10 +257,10 @@ func TestDescribeContainers(t *testing.T) {
 				Name:  "test",
 				Image: "image",
 				Resources: api.ResourceRequirements{
-					Limits: api.ResourceList{
-						api.ResourceName(api.ResourceCPU):     resource.MustParse("1000"),
-						api.ResourceName(api.ResourceMemory):  resource.MustParse("4G"),
-						api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+					Limits: resource.List{
+						resource.Name(api.ResourceCPU):     resource.MustParse("1000"),
+						resource.Name(api.ResourceMemory):  resource.MustParse("4G"),
+						resource.Name(api.ResourceStorage): resource.MustParse("20G"),
 					},
 				},
 			},
@@ -277,10 +277,10 @@ func TestDescribeContainers(t *testing.T) {
 				Name:  "test",
 				Image: "image",
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceName(api.ResourceCPU):     resource.MustParse("1000"),
-						api.ResourceName(api.ResourceMemory):  resource.MustParse("4G"),
-						api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+					Requests: resource.List{
+						resource.Name(api.ResourceCPU):     resource.MustParse("1000"),
+						resource.Name(api.ResourceMemory):  resource.MustParse("4G"),
+						resource.Name(api.ResourceStorage): resource.MustParse("20G"),
 					},
 				},
 			},
@@ -391,7 +391,7 @@ func TestDefaultDescribers(t *testing.T) {
 func TestGetPodsTotalRequests(t *testing.T) {
 	testCases := []struct {
 		pods                         *api.PodList
-		expectedReqs, expectedLimits map[api.ResourceName]resource.Quantity
+		expectedReqs, expectedLimits map[resource.Name]resource.Quantity
 	}{
 		{
 			pods: &api.PodList{
@@ -401,19 +401,19 @@ func TestGetPodsTotalRequests(t *testing.T) {
 							Containers: []api.Container{
 								{
 									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceName(api.ResourceCPU):     resource.MustParse("1"),
-											api.ResourceName(api.ResourceMemory):  resource.MustParse("300Mi"),
-											api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+										Requests: resource.List{
+											resource.Name(api.ResourceCPU):     resource.MustParse("1"),
+											resource.Name(api.ResourceMemory):  resource.MustParse("300Mi"),
+											resource.Name(api.ResourceStorage): resource.MustParse("1G"),
 										},
 									},
 								},
 								{
 									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceName(api.ResourceCPU):     resource.MustParse("90m"),
-											api.ResourceName(api.ResourceMemory):  resource.MustParse("120Mi"),
-											api.ResourceName(api.ResourceStorage): resource.MustParse("200M"),
+										Requests: resource.List{
+											resource.Name(api.ResourceCPU):     resource.MustParse("90m"),
+											resource.Name(api.ResourceMemory):  resource.MustParse("120Mi"),
+											resource.Name(api.ResourceStorage): resource.MustParse("200M"),
 										},
 									},
 								},
@@ -425,19 +425,19 @@ func TestGetPodsTotalRequests(t *testing.T) {
 							Containers: []api.Container{
 								{
 									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceName(api.ResourceCPU):     resource.MustParse("60m"),
-											api.ResourceName(api.ResourceMemory):  resource.MustParse("43Mi"),
-											api.ResourceName(api.ResourceStorage): resource.MustParse("500M"),
+										Requests: resource.List{
+											resource.Name(api.ResourceCPU):     resource.MustParse("60m"),
+											resource.Name(api.ResourceMemory):  resource.MustParse("43Mi"),
+											resource.Name(api.ResourceStorage): resource.MustParse("500M"),
 										},
 									},
 								},
 								{
 									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceName(api.ResourceCPU):     resource.MustParse("34m"),
-											api.ResourceName(api.ResourceMemory):  resource.MustParse("83Mi"),
-											api.ResourceName(api.ResourceStorage): resource.MustParse("700M"),
+										Requests: resource.List{
+											resource.Name(api.ResourceCPU):     resource.MustParse("34m"),
+											resource.Name(api.ResourceMemory):  resource.MustParse("83Mi"),
+											resource.Name(api.ResourceStorage): resource.MustParse("700M"),
 										},
 									},
 								},
@@ -446,10 +446,10 @@ func TestGetPodsTotalRequests(t *testing.T) {
 					},
 				},
 			},
-			expectedReqs: map[api.ResourceName]resource.Quantity{
-				api.ResourceName(api.ResourceCPU):     resource.MustParse("1.184"),
-				api.ResourceName(api.ResourceMemory):  resource.MustParse("546Mi"),
-				api.ResourceName(api.ResourceStorage): resource.MustParse("2.4G"),
+			expectedReqs: map[resource.Name]resource.Quantity{
+				resource.Name(api.ResourceCPU):     resource.MustParse("1.184"),
+				resource.Name(api.ResourceMemory):  resource.MustParse("546Mi"),
+				resource.Name(api.ResourceStorage): resource.MustParse("2.4G"),
 			},
 		},
 	}

@@ -21,12 +21,13 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/cloudmonitoring/v2beta2"
 	gce "google.golang.org/cloud/compute/metadata"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 const (
@@ -84,7 +85,7 @@ func retrieveRawSamples(res *gcm.ListTimeseriesResponse, output *[]int) {
 	}
 }
 
-func (s *gcmSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+func (s *gcmSource) GetUsagePercentile(kind resource.Name, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 	var metric string
 	if kind == api.ResourceCPU {
 		metric = cpuMetricName

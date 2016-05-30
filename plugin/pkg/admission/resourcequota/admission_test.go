@@ -40,8 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func getResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceList(cpu, memory string) resource.List {
+	res := resource.List{}
 	if cpu != "" {
 		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
@@ -51,7 +51,7 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
-func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
+func getResourceRequirements(requests, limits resource.List) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
@@ -74,25 +74,25 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 }
 
 func TestPrettyPrint(t *testing.T) {
-	toResourceList := func(resources map[api.ResourceName]string) api.ResourceList {
-		resourceList := api.ResourceList{}
+	toResourceList := func(resources map[resource.Name]string) resource.List {
+		resourceList := resource.List{}
 		for key, value := range resources {
 			resourceList[key] = resource.MustParse(value)
 		}
 		return resourceList
 	}
 	testCases := []struct {
-		input    api.ResourceList
+		input    resource.List
 		expected string
 	}{
 		{
-			input: toResourceList(map[api.ResourceName]string{
+			input: toResourceList(map[resource.Name]string{
 				api.ResourceCPU: "100m",
 			}),
 			expected: "cpu=100m",
 		},
 		{
-			input: toResourceList(map[api.ResourceName]string{
+			input: toResourceList(map[resource.Name]string{
 				api.ResourcePods:                   "10",
 				api.ResourceServices:               "10",
 				api.ResourceReplicationControllers: "10",
@@ -137,8 +137,8 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	resourceQuota.Name = "quota"
 	resourceQuota.Namespace = "test"
 	resourceQuota.Status = api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
+		Hard: resource.List{},
+		Used: resource.List{},
 	}
 	resourceQuota.Status.Hard[api.ResourceMemory] = resource.MustParse("2Gi")
 	resourceQuota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
@@ -171,12 +171,12 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:    resource.MustParse("1"),
 				api.ResourceMemory: resource.MustParse("50Gi"),
 				api.ResourcePods:   resource.MustParse("3"),
@@ -221,12 +221,12 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:    resource.MustParse("1100m"),
 				api.ResourceMemory: resource.MustParse("52Gi"),
 				api.ResourcePods:   resource.MustParse("4"),
@@ -248,12 +248,12 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:    resource.MustParse("1"),
 				api.ResourceMemory: resource.MustParse("50Gi"),
 				api.ResourcePods:   resource.MustParse("3"),
@@ -287,13 +287,13 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:          resource.MustParse("3"),
 				api.ResourceMemory:       resource.MustParse("100Gi"),
 				api.ResourceLimitsMemory: resource.MustParse("200Gi"),
 				api.ResourcePods:         resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:          resource.MustParse("1"),
 				api.ResourceMemory:       resource.MustParse("50Gi"),
 				api.ResourceLimitsMemory: resource.MustParse("100Gi"),
@@ -333,13 +333,13 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "other", ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:          resource.MustParse("3"),
 				api.ResourceMemory:       resource.MustParse("100Gi"),
 				api.ResourceLimitsMemory: resource.MustParse("200Gi"),
 				api.ResourcePods:         resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:          resource.MustParse("1"),
 				api.ResourceMemory:       resource.MustParse("50Gi"),
 				api.ResourceLimitsMemory: resource.MustParse("100Gi"),
@@ -385,12 +385,12 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotTerminating},
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:    resource.MustParse("1"),
 				api.ResourceMemory: resource.MustParse("50Gi"),
 				api.ResourcePods:   resource.MustParse("3"),
@@ -403,12 +403,12 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating},
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:    resource.MustParse("1"),
 				api.ResourceMemory: resource.MustParse("50Gi"),
 				api.ResourcePods:   resource.MustParse("3"),
@@ -464,12 +464,12 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:    resource.MustParse("1100m"),
 				api.ResourceMemory: resource.MustParse("52Gi"),
 				api.ResourcePods:   resource.MustParse("4"),
@@ -495,10 +495,10 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourcePods: resource.MustParse("3"),
 			},
 		},
@@ -509,10 +509,10 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourcePods: resource.MustParse("3"),
 			},
 		},
@@ -558,10 +558,10 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourcePods: resource.MustParse("4"),
 			},
 		},
@@ -598,10 +598,10 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourcePods: resource.MustParse("3"),
 			},
 		},
@@ -637,16 +637,16 @@ func TestHasUsageStats(t *testing.T) {
 		expected bool
 	}{
 		"empty": {
-			a:        api.ResourceQuota{Status: api.ResourceQuotaStatus{Hard: api.ResourceList{}}},
+			a:        api.ResourceQuota{Status: api.ResourceQuotaStatus{Hard: resource.List{}}},
 			expected: true,
 		},
 		"hard-only": {
 			a: api.ResourceQuota{
 				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
+					Hard: resource.List{
 						api.ResourceMemory: resource.MustParse("1Gi"),
 					},
-					Used: api.ResourceList{},
+					Used: resource.List{},
 				},
 			},
 			expected: false,
@@ -654,10 +654,10 @@ func TestHasUsageStats(t *testing.T) {
 		"hard-used": {
 			a: api.ResourceQuota{
 				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
+					Hard: resource.List{
 						api.ResourceMemory: resource.MustParse("1Gi"),
 					},
-					Used: api.ResourceList{
+					Used: resource.List{
 						api.ResourceMemory: resource.MustParse("500Mi"),
 					},
 				},
@@ -679,10 +679,10 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: namespace, ResourceVersion: "124"},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU: resource.MustParse("3"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU: resource.MustParse("1"),
 			},
 		},
@@ -690,12 +690,12 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 
-	computeResources := []api.ResourceName{
+	computeResources := []resource.Name{
 		api.ResourcePods,
 		api.ResourceCPU,
 	}
 
-	usageFunc := func(object runtime.Object) api.ResourceList {
+	usageFunc := func(object runtime.Object) resource.List {
 		pod, ok := object.(*api.Pod)
 		if !ok {
 			t.Fatalf("Expected pod, got %T", object)
@@ -709,7 +709,7 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	podEvaluator := &generic.GenericEvaluator{
 		Name:              "Test-Evaluator.Pod",
 		InternalGroupKind: api.Kind("Pod"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]resource.Name{
 			admission.Create: computeResources,
 		},
 		ConstraintsFunc:      core.PodConstraintsFunc,

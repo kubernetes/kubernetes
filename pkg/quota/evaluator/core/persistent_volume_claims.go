@@ -19,6 +19,7 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -27,11 +28,11 @@ import (
 
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
 func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims}
+	allResources := []resource.Name{api.ResourcePersistentVolumeClaims}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.PersistentVolumeClaim",
 		InternalGroupKind: api.Kind("PersistentVolumeClaim"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]resource.Name{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,

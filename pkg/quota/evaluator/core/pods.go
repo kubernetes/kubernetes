@@ -35,7 +35,7 @@ import (
 
 // NewPodEvaluator returns an evaluator that can evaluate pods
 func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	computeResources := []api.ResourceName{
+	computeResources := []resource.Name{
 		api.ResourceCPU,
 		api.ResourceMemory,
 		api.ResourceRequestsCPU,
@@ -47,7 +47,7 @@ func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Pod",
 		InternalGroupKind: api.Kind("Pod"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]resource.Name{
 			admission.Create: allResources,
 			// TODO: the quota system can only charge for deltas on compute resources when pods support updates.
 			// admission.Update: computeResources,
@@ -67,7 +67,7 @@ func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 
 // PodConstraintsFunc verifies that all required resources are present on the pod
 // In addition, it validates that the resources are valid (i.e. requests < limits)
-func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
+func PodConstraintsFunc(required []resource.Name, object runtime.Object) error {
 	pod, ok := object.(*api.Pod)
 	if !ok {
 		return fmt.Errorf("Unexpected input object %v", object)
@@ -108,8 +108,8 @@ func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) erro
 }
 
 // podUsageHelper can summarize the pod quota usage based on requests and limits
-func podUsageHelper(requests api.ResourceList, limits api.ResourceList) api.ResourceList {
-	result := api.ResourceList{}
+func podUsageHelper(requests resource.List, limits resource.List) resource.List {
+	result := resource.List{}
 	result[api.ResourcePods] = resource.MustParse("1")
 	if request, found := requests[api.ResourceCPU]; found {
 		result[api.ResourceCPU] = request
@@ -129,21 +129,21 @@ func podUsageHelper(requests api.ResourceList, limits api.ResourceList) api.Reso
 }
 
 // PodUsageFunc knows how to measure usage associated with pods
-func PodUsageFunc(object runtime.Object) api.ResourceList {
+func PodUsageFunc(object runtime.Object) resource.List {
 	pod, ok := object.(*api.Pod)
 	if !ok {
-		return api.ResourceList{}
+		return resource.List{}
 	}
 
 	// by convention, we do not quota pods that have reached an end-of-life state
 	if !QuotaPod(pod) {
-		return api.ResourceList{}
+		return resource.List{}
 	}
 
 	// TODO: fix this when we have pod level cgroups
 	// when we have pod level cgroups, we can just read pod level requests/limits
-	requests := api.ResourceList{}
-	limits := api.ResourceList{}
+	requests := resource.List{}
+	limits := resource.List{}
 	for i := range pod.Spec.Containers {
 		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
 		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)

@@ -42,8 +42,8 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 				api.ReadOnlyMany,
 			},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -77,8 +77,8 @@ func TestPersistentVolumeClaimGet(t *testing.T) {
 				api.ReadOnlyMany,
 			},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -134,8 +134,8 @@ func TestPersistentVolumeClaimUpdate(t *testing.T) {
 				api.ReadOnlyMany,
 			},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -162,8 +162,8 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 				api.ReadOnlyMany,
 			},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},

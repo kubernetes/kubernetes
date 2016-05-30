@@ -167,37 +167,37 @@ func TestResourceListConversion(t *testing.T) {
 	bigMilliQuantity.Add(resource.MustParse("12345m"))
 
 	tests := []struct {
-		input    versioned.ResourceList
-		expected api.ResourceList
+		input    resource.List
+		expected resource.List
 	}{
 		{ // No changes necessary.
-			input: versioned.ResourceList{
+			input: resource.List{
 				versioned.ResourceMemory:  resource.MustParse("30M"),
 				versioned.ResourceCPU:     resource.MustParse("100m"),
 				versioned.ResourceStorage: resource.MustParse("1G"),
 			},
-			expected: api.ResourceList{
+			expected: resource.List{
 				api.ResourceMemory:  resource.MustParse("30M"),
 				api.ResourceCPU:     resource.MustParse("100m"),
 				api.ResourceStorage: resource.MustParse("1G"),
 			},
 		},
 		{ // Nano-scale values should be rounded up to milli-scale.
-			input: versioned.ResourceList{
+			input: resource.List{
 				versioned.ResourceCPU:    resource.MustParse("3.000023m"),
 				versioned.ResourceMemory: resource.MustParse("500.000050m"),
 			},
-			expected: api.ResourceList{
+			expected: resource.List{
 				api.ResourceCPU:    resource.MustParse("4m"),
 				api.ResourceMemory: resource.MustParse("501m"),
 			},
 		},
 		{ // Large values should still be accurate.
-			input: versioned.ResourceList{
+			input: resource.List{
 				versioned.ResourceCPU:     *bigMilliQuantity.Copy(),
 				versioned.ResourceStorage: *bigMilliQuantity.Copy(),
 			},
-			expected: api.ResourceList{
+			expected: resource.List{
 				api.ResourceCPU:     *bigMilliQuantity.Copy(),
 				api.ResourceStorage: *bigMilliQuantity.Copy(),
 			},
@@ -205,7 +205,7 @@ func TestResourceListConversion(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		output := api.ResourceList{}
+		output := resource.List{}
 		err := api.Scheme.Convert(&test.input, &output)
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", i, err)

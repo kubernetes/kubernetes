@@ -246,7 +246,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 						Name:  "nginx",
 						Image: framework.GetPauseImageName(f.Client),
 						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
+							Limits: resource.List{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
 							},
@@ -756,7 +756,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 						Name:  "run1",
 						Image: framework.GetPauseImageName(f.Client),
 						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
+							Limits: resource.List{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
 							},
@@ -825,7 +825,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 						Name:  "run1",
 						Image: framework.GetPauseImageName(f.Client),
 						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
+							Limits: resource.List{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
 							},
@@ -942,7 +942,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/true"},
 						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
+							Limits: resource.List{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
 							},

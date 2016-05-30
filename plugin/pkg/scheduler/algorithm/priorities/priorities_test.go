@@ -38,11 +38,11 @@ func makeNode(node string, milliCPU, memory int64) api.Node {
 	return api.Node{
 		ObjectMeta: api.ObjectMeta{Name: node},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				"memory": *resource.NewQuantity(memory, resource.BinarySI),
 			},
-			Allocatable: api.ResourceList{
+			Allocatable: resource.List{
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				"memory": *resource.NewQuantity(memory, resource.BinarySI),
 			},
@@ -64,7 +64,7 @@ func TestZeroRequest(t *testing.T) {
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu": resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
 						"memory": resource.MustParse(
@@ -81,7 +81,7 @@ func TestZeroRequest(t *testing.T) {
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu": resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
 						"memory": resource.MustParse(
@@ -185,7 +185,7 @@ func TestLeastRequested(t *testing.T) {
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("0"),
 					},
@@ -193,7 +193,7 @@ func TestLeastRequested(t *testing.T) {
 			},
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("0"),
 					},
@@ -208,7 +208,7 @@ func TestLeastRequested(t *testing.T) {
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("2000"),
 					},
@@ -216,7 +216,7 @@ func TestLeastRequested(t *testing.T) {
 			},
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("3000"),
 					},
@@ -518,7 +518,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("0"),
 					},
@@ -526,7 +526,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			},
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("0"),
 					},
@@ -541,7 +541,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("2000"),
 					},
@@ -549,7 +549,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			},
 			{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
+					Requests: resource.List{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("3000"),
 					},

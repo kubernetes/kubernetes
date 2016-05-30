@@ -37,7 +37,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		max := getResourceList("500m", "500Mi")
 		defaultLimit := getResourceList("500m", "500Mi")
 		defaultRequest := getResourceList("100m", "200Mi")
-		maxLimitRequestRatio := api.ResourceList{}
+		maxLimitRequestRatio := resource.List{}
 		limitRange := newLimitRange("limit-range", api.LimitTypeContainer,
 			min, max,
 			defaultLimit, defaultRequest,
@@ -53,7 +53,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a Pod with no resource requirements")
-		pod := newTestPod(f, "pod-no-resources", api.ResourceList{}, api.ResourceList{})
+		pod := newTestPod(f, "pod-no-resources", resource.List{}, resource.List{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -91,12 +91,12 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		}
 
 		By("Failing to create a Pod with less than min resources")
-		pod = newTestPod(f, podName, getResourceList("10m", "50Mi"), api.ResourceList{})
+		pod = newTestPod(f, podName, getResourceList("10m", "50Mi"), resource.List{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Failing to create a Pod with more than max resources")
-		pod = newTestPod(f, podName, getResourceList("600m", "600Mi"), api.ResourceList{})
+		pod = newTestPod(f, podName, getResourceList("600m", "600Mi"), resource.List{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 	})
@@ -117,7 +117,7 @@ func equalResourceRequirement(expected api.ResourceRequirements, actual api.Reso
 	return nil
 }
 
-func equalResourceList(expected api.ResourceList, actual api.ResourceList) error {
+func equalResourceList(expected resource.List, actual resource.List) error {
 	for k, v := range expected {
 		if actualValue, found := actual[k]; !found || (v.Cmp(actualValue) != 0) {
 			return fmt.Errorf("resource %v expected %v actual %v", k, v.String(), actualValue.String())
@@ -131,8 +131,8 @@ func equalResourceList(expected api.ResourceList, actual api.ResourceList) error
 	return nil
 }
 
-func getResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceList(cpu, memory string) resource.List {
+	res := resource.List{}
 	if cpu != "" {
 		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
@@ -146,7 +146,7 @@ func getResourceList(cpu, memory string) api.ResourceList {
 func newLimitRange(name string, limitType api.LimitType,
 	min, max,
 	defaultLimit, defaultRequest,
-	maxLimitRequestRatio api.ResourceList) *api.LimitRange {
+	maxLimitRequestRatio resource.List) *api.LimitRange {
 	return &api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -167,7 +167,7 @@ func newLimitRange(name string, limitType api.LimitType,
 }
 
 // newTestPod returns a pod that has the specified requests and limits
-func newTestPod(f *framework.Framework, name string, requests api.ResourceList, limits api.ResourceList) *api.Pod {
+func newTestPod(f *framework.Framework, name string, requests resource.List, limits resource.List) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,

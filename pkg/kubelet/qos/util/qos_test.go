@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-func getResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceList(cpu, memory string) resource.List {
+	res := resource.List{}
 	if cpu != "" {
 		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
@@ -34,14 +34,14 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
-func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
+func getResourceRequirements(requests, limits resource.List) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
 	return res
 }
 
-func newContainer(name string, requests api.ResourceList, limits api.ResourceList) api.Container {
+func newContainer(name string, requests resource.List, limits resource.List) api.Container {
 	return api.Container{
 		Name:      name,
 		Resources: getResourceRequirements(requests, limits),

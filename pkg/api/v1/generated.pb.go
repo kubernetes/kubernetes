@@ -17979,7 +17979,7 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -18027,9 +18027,9 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Max == nil {
-				m.Max = make(ResourceList)
+				m.Max = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Max[ResourceName(mapkey)] = *mapvalue
+			m.Max[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -18095,7 +18095,7 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -18143,9 +18143,9 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Min == nil {
-				m.Min = make(ResourceList)
+				m.Min = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Min[ResourceName(mapkey)] = *mapvalue
+			m.Min[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
@@ -18211,7 +18211,7 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -18259,9 +18259,9 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Default == nil {
-				m.Default = make(ResourceList)
+				m.Default = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Default[ResourceName(mapkey)] = *mapvalue
+			m.Default[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
@@ -18327,7 +18327,7 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -18375,9 +18375,9 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.DefaultRequest == nil {
-				m.DefaultRequest = make(ResourceList)
+				m.DefaultRequest = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.DefaultRequest[ResourceName(mapkey)] = *mapvalue
+			m.DefaultRequest[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
@@ -18443,7 +18443,7 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -18491,9 +18491,9 @@ func (m *LimitRangeItem) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.MaxLimitRequestRatio == nil {
-				m.MaxLimitRequestRatio = make(ResourceList)
+				m.MaxLimitRequestRatio = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.MaxLimitRequestRatio[ResourceName(mapkey)] = *mapvalue
+			m.MaxLimitRequestRatio[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -21208,7 +21208,7 @@ func (m *NodeStatus) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -21256,9 +21256,9 @@ func (m *NodeStatus) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Capacity == nil {
-				m.Capacity = make(ResourceList)
+				m.Capacity = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Capacity[ResourceName(mapkey)] = *mapvalue
+			m.Capacity[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -21324,7 +21324,7 @@ func (m *NodeStatus) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -21372,9 +21372,9 @@ func (m *NodeStatus) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Allocatable == nil {
-				m.Allocatable = make(ResourceList)
+				m.Allocatable = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Allocatable[ResourceName(mapkey)] = *mapvalue
+			m.Allocatable[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -23734,7 +23734,7 @@ func (m *PersistentVolumeClaimStatus) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -23782,9 +23782,9 @@ func (m *PersistentVolumeClaimStatus) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Capacity == nil {
-				m.Capacity = make(ResourceList)
+				m.Capacity = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Capacity[ResourceName(mapkey)] = *mapvalue
+			m.Capacity[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -24622,7 +24622,7 @@ func (m *PersistentVolumeSpec) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -24670,9 +24670,9 @@ func (m *PersistentVolumeSpec) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Capacity == nil {
-				m.Capacity = make(ResourceList)
+				m.Capacity = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Capacity[ResourceName(mapkey)] = *mapvalue
+			m.Capacity[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -29763,7 +29763,7 @@ func (m *ResourceQuotaSpec) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -29811,9 +29811,9 @@ func (m *ResourceQuotaSpec) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Hard == nil {
-				m.Hard = make(ResourceList)
+				m.Hard = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Hard[ResourceName(mapkey)] = *mapvalue
+			m.Hard[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -29958,7 +29958,7 @@ func (m *ResourceQuotaStatus) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -30006,9 +30006,9 @@ func (m *ResourceQuotaStatus) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Hard == nil {
-				m.Hard = make(ResourceList)
+				m.Hard = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Hard[ResourceName(mapkey)] = *mapvalue
+			m.Hard[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -30074,7 +30074,7 @@ func (m *ResourceQuotaStatus) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -30122,9 +30122,9 @@ func (m *ResourceQuotaStatus) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Used == nil {
-				m.Used = make(ResourceList)
+				m.Used = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Used[ResourceName(mapkey)] = *mapvalue
+			m.Used[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -30240,7 +30240,7 @@ func (m *ResourceRequirements) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -30288,9 +30288,9 @@ func (m *ResourceRequirements) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Limits == nil {
-				m.Limits = make(ResourceList)
+				m.Limits = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Limits[ResourceName(mapkey)] = *mapvalue
+			m.Limits[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -30356,7 +30356,7 @@ func (m *ResourceRequirements) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -30404,9 +30404,9 @@ func (m *ResourceRequirements) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Requests == nil {
-				m.Requests = make(ResourceList)
+				m.Requests = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Requests[ResourceName(mapkey)] = *mapvalue
+			m.Requests[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

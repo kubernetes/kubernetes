@@ -1358,7 +1358,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := k8s_io_kubernetes_pkg_api_v1.ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1406,9 +1406,9 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Capacity == nil {
-				m.Capacity = make(k8s_io_kubernetes_pkg_api_v1.ResourceList)
+				m.Capacity = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Capacity[k8s_io_kubernetes_pkg_api_v1.ResourceName(mapkey)] = *mapvalue
+			m.Capacity[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -1474,7 +1474,7 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 			if postStringIndexmapkey > l {
 				return io.ErrUnexpectedEOF
 			}
-			mapkey := k8s_io_kubernetes_pkg_api_v1.ResourceName(data[iNdEx:postStringIndexmapkey])
+			mapkey := k8s_io_kubernetes_pkg_api_resource.Name(data[iNdEx:postStringIndexmapkey])
 			iNdEx = postStringIndexmapkey
 			var valuekey uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1522,9 +1522,9 @@ func (m *ClusterStatus) Unmarshal(data []byte) error {
 			}
 			iNdEx = postmsgIndex
 			if m.Allocatable == nil {
-				m.Allocatable = make(k8s_io_kubernetes_pkg_api_v1.ResourceList)
+				m.Allocatable = make(k8s_io_kubernetes_pkg_api_resource.List)
 			}
-			m.Allocatable[k8s_io_kubernetes_pkg_api_v1.ResourceName(mapkey)] = *mapvalue
+			m.Allocatable[k8s_io_kubernetes_pkg_api_resource.Name(mapkey)] = *mapvalue
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {

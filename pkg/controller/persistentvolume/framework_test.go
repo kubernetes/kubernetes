@@ -537,8 +537,8 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 			ResourceVersion: "1",
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(capacity),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse(capacity),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -595,8 +595,8 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase api.Persiste
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse(capacity),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse(capacity),
 				},
 			},
 			VolumeName: boundToVolume,
@@ -933,8 +933,8 @@ func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
 				Name: plugin.provisionOptions.PVName,
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): plugin.provisionOptions.Capacity,
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): plugin.provisionOptions.Capacity,
 				},
 				AccessModes:                   plugin.provisionOptions.AccessModes,
 				PersistentVolumeReclaimPolicy: plugin.provisionOptions.PersistentVolumeReclaimPolicy,

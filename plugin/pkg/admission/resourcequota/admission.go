@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/install"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -97,7 +98,7 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 
 // prettyPrint formats a resource list for usage in errors
 // it outputs resources sorted in increasing order
-func prettyPrint(item api.ResourceList) string {
+func prettyPrint(item resource.List) string {
 	parts := []string{}
 	keys := []string{}
 	for key := range item {
@@ -105,7 +106,7 @@ func prettyPrint(item api.ResourceList) string {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		value := item[api.ResourceName(key)]
+		value := item[resource.Name(key)]
 		constraint := key + "=" + value.String()
 		parts = append(parts, constraint)
 	}

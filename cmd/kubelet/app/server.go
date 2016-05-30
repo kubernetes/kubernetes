@@ -976,10 +976,10 @@ func parseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) 
 	return reservation, nil
 }
 
-func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) {
-	rl := make(api.ResourceList)
+func parseResourceList(m utilconfig.ConfigurationMap) (resource.List, error) {
+	rl := make(resource.List)
 	for k, v := range m {
-		switch api.ResourceName(k) {
+		switch resource.Name(k) {
 		// Only CPU and memory resources are supported.
 		case api.ResourceCPU, api.ResourceMemory:
 			q, err := resource.ParseQuantity(v)
@@ -989,7 +989,7 @@ func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) 
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
-			rl[api.ResourceName(k)] = q
+			rl[resource.Name(k)] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}

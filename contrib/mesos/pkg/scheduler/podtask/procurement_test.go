@@ -68,7 +68,7 @@ func TestNewPodResourcesProcurement(t *testing.T) {
 				Containers: []api.Container{
 					{
 						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
+							Limits: resource.List{
 								api.ResourceCPU: *resource.NewQuantity(
 									3,
 									resource.DecimalSI,

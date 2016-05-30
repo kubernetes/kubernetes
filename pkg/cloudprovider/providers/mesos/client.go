@@ -315,7 +315,7 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			continue
 		}
 		node := &slaveNode{hostname: slave.Hostname}
-		cap := api.ResourceList{}
+		cap := resource.List{}
 		if slave.Resources != nil && len(slave.Resources) > 0 {
 			// attempt to translate CPU (cores) and memory (MB) resources
 			if cpu, found := slave.Resources["cpus"]; found {

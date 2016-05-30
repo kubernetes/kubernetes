@@ -28,7 +28,7 @@ import (
 
 // NewServiceEvaluator returns an evaluator that can evaluate service quotas
 func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{
+	allResources := []resource.Name{
 		api.ResourceServices,
 		api.ResourceServicesNodePorts,
 		api.ResourceServicesLoadBalancers,
@@ -36,7 +36,7 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Service",
 		InternalGroupKind: api.Kind("Service"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]resource.Name{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
@@ -50,8 +50,8 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 }
 
 // ServiceUsageFunc knows how to measure usage associated with services
-func ServiceUsageFunc(object runtime.Object) api.ResourceList {
-	result := api.ResourceList{}
+func ServiceUsageFunc(object runtime.Object) resource.List {
+	result := resource.List{}
 	if service, ok := object.(*api.Service); ok {
 		result[api.ResourceServices] = resource.MustParse("1")
 		switch service.Spec.Type {

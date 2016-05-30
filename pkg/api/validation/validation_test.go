@@ -349,8 +349,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		"good-volume": {
 			isExpectedFailure: false,
 			volume: testVolume("foo", "", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
@@ -361,8 +361,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		"invalid-accessmode": {
 			isExpectedFailure: true,
 			volume: testVolume("foo", "", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{"fakemode"},
 				PersistentVolumeSource: api.PersistentVolumeSource{
@@ -373,8 +373,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		"unexpected-namespace": {
 			isExpectedFailure: true,
 			volume: testVolume("foo", "unexpected-namespace", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
@@ -385,8 +385,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		"bad-name": {
 			isExpectedFailure: true,
 			volume: testVolume("123*Bad(Name", "unexpected-namespace", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
@@ -397,8 +397,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		"missing-name": {
 			isExpectedFailure: true,
 			volume: testVolume("", "", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			}),
@@ -410,8 +410,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		"missing-accessmodes": {
 			isExpectedFailure: true,
 			volume: testVolume("goodname", "missing-accessmodes", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
@@ -421,8 +421,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		"too-many-sources": {
 			isExpectedFailure: true,
 			volume: testVolume("", "", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("5G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath:          &api.HostPathVolumeSource{Path: "/foo"},
@@ -464,8 +464,8 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 					api.ReadOnlyMany,
 				},
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					Requests: resource.List{
+						resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 					},
 				},
 			}),
@@ -475,8 +475,8 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 				AccessModes: []api.PersistentVolumeAccessMode{"fakemode"},
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					Requests: resource.List{
+						resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 					},
 				},
 			}),
@@ -489,8 +489,8 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 					api.ReadOnlyMany,
 				},
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					Requests: resource.List{
+						resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 					},
 				},
 			}),
@@ -499,8 +499,8 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					Requests: resource.List{
+						resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 					},
 				},
 			}),
@@ -520,8 +520,8 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 					api.ReadWriteOnce,
 				},
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					Requests: resource.List{
+						resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 					},
 				},
 			}),
@@ -546,8 +546,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			api.ReadOnlyMany,
 		},
 		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Requests: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
 	})
@@ -557,8 +557,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			api.ReadOnlyMany,
 		},
 		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Requests: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
 		VolumeName: "volume",
@@ -569,8 +569,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			api.ReadOnlyMany,
 		},
 		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+			Requests: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("20G"),
 			},
 		},
 		VolumeName: "volume",
@@ -580,8 +580,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			api.ReadWriteOnce,
 		},
 		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Requests: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
 		VolumeName: "volume",
@@ -1357,8 +1357,8 @@ func TestValidatePullPolicy(t *testing.T) {
 	}
 }
 
-func getResourceLimits(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceLimits(cpu, memory string) resource.List {
+	res := resource.List{}
 	res[api.ResourceCPU] = resource.MustParse(cpu)
 	res[api.ResourceMemory] = resource.MustParse(memory)
 	return res
@@ -1388,10 +1388,10 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "resources-test",
 			Image: "image",
 			Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+				Limits: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
+					resource.Name("my.org/resource"):  resource.MustParse("10m"),
 				},
 			},
 			ImagePullPolicy: "IfNotPresent",
@@ -1400,14 +1400,14 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "resources-test-with-gpu",
 			Image: "image",
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
-				Limits: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
-					api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+				Limits: resource.List{
+					resource.Name(api.ResourceCPU):       resource.MustParse("10"),
+					resource.Name(api.ResourceMemory):    resource.MustParse("10G"),
+					resource.Name(api.ResourceNvidiaGPU): resource.MustParse("1"),
 				},
 			},
 			ImagePullPolicy: "IfNotPresent",
@@ -1416,11 +1416,11 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "resources-request-limit-simple",
 			Image: "image",
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceCPU): resource.MustParse("8"),
+				Requests: resource.List{
+					resource.Name(api.ResourceCPU): resource.MustParse("8"),
 				},
-				Limits: api.ResourceList{
-					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+				Limits: resource.List{
+					resource.Name(api.ResourceCPU): resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy: "IfNotPresent",
@@ -1429,15 +1429,15 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "resources-request-limit-edge",
 			Image: "image",
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+				Requests: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
+					resource.Name("my.org/resource"):  resource.MustParse("10m"),
 				},
-				Limits: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+				Limits: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
+					resource.Name("my.org/resource"):  resource.MustParse("10m"),
 				},
 			},
 			ImagePullPolicy: "IfNotPresent",
@@ -1446,13 +1446,13 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "resources-request-limit-partials",
 			Image: "image",
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("9.5"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("9.5"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
-				Limits: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):   resource.MustParse("10"),
-					api.ResourceName("my.org/resource"): resource.MustParse("10m"),
+				Limits: resource.List{
+					resource.Name(api.ResourceCPU):   resource.MustParse("10"),
+					resource.Name("my.org/resource"): resource.MustParse("10m"),
 				},
 			},
 			ImagePullPolicy: "IfNotPresent",
@@ -1461,9 +1461,9 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "resources-request",
 			Image: "image",
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("9.5"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("9.5"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 			ImagePullPolicy: "IfNotPresent",
@@ -1598,7 +1598,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "abc-123",
 				Image: "image",
 				Resources: api.ResourceRequirements{
-					Limits: api.ResourceList{
+					Limits: resource.List{
 						"disk": resource.MustParse("10G"),
 					},
 				},
@@ -1640,15 +1640,15 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "resources-request-limit-edge",
 				Image: "image",
 				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
-						api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
-						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+					Requests: resource.List{
+						resource.Name(api.ResourceCPU):       resource.MustParse("10"),
+						resource.Name(api.ResourceMemory):    resource.MustParse("10G"),
+						resource.Name(api.ResourceNvidiaGPU): resource.MustParse("1"),
 					},
-					Limits: api.ResourceList{
-						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
-						api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
-						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+					Limits: resource.List{
+						resource.Name(api.ResourceCPU):       resource.MustParse("10"),
+						resource.Name(api.ResourceMemory):    resource.MustParse("10G"),
+						resource.Name(api.ResourceNvidiaGPU): resource.MustParse("1"),
 					},
 				},
 				ImagePullPolicy: "IfNotPresent",
@@ -4021,10 +4021,10 @@ func TestValidateNode(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
+					resource.Name("my.org/gpu"):       resource.MustParse("10"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -4039,9 +4039,9 @@ func TestValidateNode(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -4065,9 +4065,9 @@ func TestValidateNode(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -4089,9 +4089,9 @@ func TestValidateNode(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -4104,9 +4104,9 @@ func TestValidateNode(t *testing.T) {
 				Labels: invalidSelector,
 			},
 			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -4119,9 +4119,9 @@ func TestValidateNode(t *testing.T) {
 				Labels: validSelector,
 			},
 			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -4176,9 +4176,9 @@ func TestValidateNode(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
 			// Add a taint with an empty value to a node
@@ -4203,9 +4203,9 @@ func TestValidateNode(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -4229,9 +4229,9 @@ func TestValidateNode(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceCPU):    resource.MustParse("10"),
+					resource.Name(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -4346,7 +4346,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Name: "foo",
 			},
 			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
+				Capacity: resource.List{
 					api.ResourceCPU:    resource.MustParse("10000"),
 					api.ResourceMemory: resource.MustParse("100"),
 				},
@@ -4356,7 +4356,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Name: "foo",
 			},
 			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
+				Capacity: resource.List{
 					api.ResourceCPU:    resource.MustParse("100"),
 					api.ResourceMemory: resource.MustParse("10000"),
 				},
@@ -4368,7 +4368,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"bar": "foo"},
 			},
 			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
+				Capacity: resource.List{
 					api.ResourceCPU:    resource.MustParse("10000"),
 					api.ResourceMemory: resource.MustParse("100"),
 				},
@@ -4379,7 +4379,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Labels: map[string]string{"bar": "fooobaz"},
 			},
 			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
+				Capacity: resource.List{
 					api.ResourceCPU:    resource.MustParse("100"),
 					api.ResourceMemory: resource.MustParse("10000"),
 				},
@@ -4622,8 +4622,8 @@ func TestValidateResourceNames(t *testing.T) {
 	}
 }
 
-func getResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceList(cpu, memory string) resource.List {
+	res := resource.List{}
 	if cpu != "" {
 		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
@@ -4633,8 +4633,8 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
-func getStorageResourceList(storage string) api.ResourceList {
-	res := api.ResourceList{}
+func getStorageResourceList(storage string) resource.List {
+	res := resource.List{}
 	if storage != "" {
 		res[api.ResourceStorage] = resource.MustParse(storage)
 	}
@@ -4893,7 +4893,7 @@ func TestValidateLimitRange(t *testing.T) {
 
 func TestValidateResourceQuota(t *testing.T) {
 	spec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU:                    resource.MustParse("100"),
 			api.ResourceMemory:                 resource.MustParse("10000"),
 			api.ResourceRequestsCPU:            resource.MustParse("100"),
@@ -4910,7 +4910,7 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	terminatingSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU:       resource.MustParse("100"),
 			api.ResourceLimitsCPU: resource.MustParse("200"),
 		},
@@ -4918,21 +4918,21 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	nonTerminatingSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU: resource.MustParse("100"),
 		},
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotTerminating},
 	}
 
 	bestEffortSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourcePods: resource.MustParse("100"),
 		},
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
 	}
 
 	nonBestEffortSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU: resource.MustParse("100"),
 		},
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
@@ -4940,13 +4940,13 @@ func TestValidateResourceQuota(t *testing.T) {
 
 	// storage is not yet supported as a quota tracked resource
 	invalidQuotaResourceSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceStorage: resource.MustParse("10"),
 		},
 	}
 
 	negativeSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU:                    resource.MustParse("-100"),
 			api.ResourceMemory:                 resource.MustParse("-10000"),
 			api.ResourcePods:                   resource.MustParse("-10"),
@@ -4959,13 +4959,13 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	fractionalComputeSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU: resource.MustParse("100m"),
 		},
 	}
 
 	fractionalPodSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourcePods:                   resource.MustParse(".1"),
 			api.ResourceServices:               resource.MustParse(".5"),
 			api.ResourceReplicationControllers: resource.MustParse("1.25"),
@@ -4974,21 +4974,21 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	invalidTerminatingScopePairsSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU: resource.MustParse("100"),
 		},
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating, api.ResourceQuotaScopeNotTerminating},
 	}
 
 	invalidBestEffortScopePairsSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourcePods: resource.MustParse("100"),
 		},
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort, api.ResourceQuotaScopeNotBestEffort},
 	}
 
 	invalidScopeNameSpec := api.ResourceQuotaSpec{
-		Hard: api.ResourceList{
+		Hard: resource.List{
 			api.ResourceCPU: resource.MustParse("100"),
 		},
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScope("foo")},

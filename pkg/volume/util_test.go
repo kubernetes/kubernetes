@@ -157,8 +157,8 @@ func (c *mockRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 func TestCalculateTimeoutForVolume(t *testing.T) {
 	pv := &api.PersistentVolume{
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("500M"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("500M"),
 			},
 		},
 	}

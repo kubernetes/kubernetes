@@ -19,6 +19,7 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -27,11 +28,11 @@ import (
 
 // NewReplicationControllerEvaluator returns an evaluator that can evaluate replication controllers
 func NewReplicationControllerEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceReplicationControllers}
+	allResources := []resource.Name{api.ResourceReplicationControllers}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.ReplicationController",
 		InternalGroupKind: api.Kind("ReplicationController"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]resource.Name{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,

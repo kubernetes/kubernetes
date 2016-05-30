@@ -18,7 +18,7 @@ package cm
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 type containerManagerStub struct{}
@@ -30,8 +30,8 @@ func (cm *containerManagerStub) Start() error {
 	return nil
 }
 
-func (cm *containerManagerStub) SystemCgroupsLimit() api.ResourceList {
-	return api.ResourceList{}
+func (cm *containerManagerStub) SystemCgroupsLimit() resource.List {
+	return resource.List{}
 }
 
 func (cm *containerManagerStub) GetNodeConfig() NodeConfig {

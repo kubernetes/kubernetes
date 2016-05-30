@@ -480,9 +480,9 @@ func benchmarkExpire(b *testing.B, podNum int) {
 }
 
 func makeBasePod(nodeName, objName, cpu, mem string, ports []api.ContainerPort) *api.Pod {
-	req := api.ResourceList{}
+	req := resource.List{}
 	if cpu != "" {
-		req = api.ResourceList{
+		req = resource.List{
 			api.ResourceCPU:    resource.MustParse(cpu),
 			api.ResourceMemory: resource.MustParse(mem),
 		}

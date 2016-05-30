@@ -109,7 +109,7 @@ func TestQuota(t *testing.T) {
 	quota := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: "quota"},
 		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourcePods: resource.MustParse("1000"),
 			},
 		},

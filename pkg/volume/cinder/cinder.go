@@ -444,8 +444,8 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   c.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				Cinder: &api.CinderVolumeSource{

@@ -136,7 +136,7 @@ func DeepCopy_federation_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *
 	}
 	if in.Capacity != nil {
 		in, out := in.Capacity, &out.Capacity
-		*out = make(api.ResourceList)
+		*out = make(resource.List)
 		for key, val := range in {
 			newVal := new(resource.Quantity)
 			if err := resource.DeepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -149,7 +149,7 @@ func DeepCopy_federation_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *
 	}
 	if in.Allocatable != nil {
 		in, out := in.Allocatable, &out.Allocatable
-		*out = make(api.ResourceList)
+		*out = make(resource.List)
 		for key, val := range in {
 			newVal := new(resource.Quantity)
 			if err := resource.DeepCopy_resource_Quantity(val, newVal, c); err != nil {

@@ -25,43 +25,43 @@ import (
 
 func TestEquals(t *testing.T) {
 	testCases := map[string]struct {
-		a        api.ResourceList
-		b        api.ResourceList
+		a        resource.List
+		b        resource.List
 		expected bool
 	}{
 		"isEqual": {
-			a:        api.ResourceList{},
-			b:        api.ResourceList{},
+			a:        resource.List{},
+			b:        resource.List{},
 			expected: true,
 		},
 		"isEqualWithKeys": {
-			a: api.ResourceList{
+			a: resource.List{
 				api.ResourceCPU:    resource.MustParse("100m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},
-			b: api.ResourceList{
+			b: resource.List{
 				api.ResourceCPU:    resource.MustParse("100m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},
 			expected: true,
 		},
 		"isNotEqualSameKeys": {
-			a: api.ResourceList{
+			a: resource.List{
 				api.ResourceCPU:    resource.MustParse("200m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},
-			b: api.ResourceList{
+			b: resource.List{
 				api.ResourceCPU:    resource.MustParse("100m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},
 			expected: false,
 		},
 		"isNotEqualDiffKeys": {
-			a: api.ResourceList{
+			a: resource.List{
 				api.ResourceCPU:    resource.MustParse("100m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},
-			b: api.ResourceList{
+			b: resource.List{
 				api.ResourceCPU:    resource.MustParse("100m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 				api.ResourcePods:   resource.MustParse("1"),
@@ -78,24 +78,24 @@ func TestEquals(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	testCases := map[string]struct {
-		a        api.ResourceList
-		b        api.ResourceList
-		expected api.ResourceList
+		a        resource.List
+		b        resource.List
+		expected resource.List
 	}{
 		"noKeys": {
-			a:        api.ResourceList{},
-			b:        api.ResourceList{},
-			expected: api.ResourceList{},
+			a:        resource.List{},
+			b:        resource.List{},
+			expected: resource.List{},
 		},
 		"toEmpty": {
-			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
-			b:        api.ResourceList{},
-			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			a:        resource.List{api.ResourceCPU: resource.MustParse("100m")},
+			b:        resource.List{},
+			expected: resource.List{api.ResourceCPU: resource.MustParse("100m")},
 		},
 		"matching": {
-			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
-			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
-			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+			a:        resource.List{api.ResourceCPU: resource.MustParse("100m")},
+			b:        resource.List{api.ResourceCPU: resource.MustParse("100m")},
+			expected: resource.List{api.ResourceCPU: resource.MustParse("200m")},
 		},
 	}
 	for testName, testCase := range testCases {
@@ -108,29 +108,29 @@ func TestAdd(t *testing.T) {
 
 func TestSubtract(t *testing.T) {
 	testCases := map[string]struct {
-		a        api.ResourceList
-		b        api.ResourceList
-		expected api.ResourceList
+		a        resource.List
+		b        resource.List
+		expected resource.List
 	}{
 		"noKeys": {
-			a:        api.ResourceList{},
-			b:        api.ResourceList{},
-			expected: api.ResourceList{},
+			a:        resource.List{},
+			b:        resource.List{},
+			expected: resource.List{},
 		},
 		"value-empty": {
-			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
-			b:        api.ResourceList{},
-			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			a:        resource.List{api.ResourceCPU: resource.MustParse("100m")},
+			b:        resource.List{},
+			expected: resource.List{api.ResourceCPU: resource.MustParse("100m")},
 		},
 		"empty-value": {
-			a:        api.ResourceList{},
-			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
-			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("-100m")},
+			a:        resource.List{},
+			b:        resource.List{api.ResourceCPU: resource.MustParse("100m")},
+			expected: resource.List{api.ResourceCPU: resource.MustParse("-100m")},
 		},
 		"value-value": {
-			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
-			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
-			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			a:        resource.List{api.ResourceCPU: resource.MustParse("200m")},
+			b:        resource.List{api.ResourceCPU: resource.MustParse("100m")},
+			expected: resource.List{api.ResourceCPU: resource.MustParse("100m")},
 		},
 	}
 	for testName, testCase := range testCases {
@@ -143,19 +143,19 @@ func TestSubtract(t *testing.T) {
 
 func TestResourceNames(t *testing.T) {
 	testCases := map[string]struct {
-		a        api.ResourceList
-		expected []api.ResourceName
+		a        resource.List
+		expected []resource.Name
 	}{
 		"empty": {
-			a:        api.ResourceList{},
-			expected: []api.ResourceName{},
+			a:        resource.List{},
+			expected: []resource.Name{},
 		},
 		"values": {
-			a: api.ResourceList{
+			a: resource.List{
 				api.ResourceCPU:    resource.MustParse("100m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},
-			expected: []api.ResourceName{api.ResourceMemory, api.ResourceCPU},
+			expected: []resource.Name{api.ResourceMemory, api.ResourceCPU},
 		},
 	}
 	for testName, testCase := range testCases {
@@ -169,17 +169,17 @@ func TestResourceNames(t *testing.T) {
 
 func TestContains(t *testing.T) {
 	testCases := map[string]struct {
-		a        []api.ResourceName
-		b        api.ResourceName
+		a        []resource.Name
+		b        resource.Name
 		expected bool
 	}{
 		"does-not-contain": {
-			a:        []api.ResourceName{api.ResourceMemory},
+			a:        []resource.Name{api.ResourceMemory},
 			b:        api.ResourceCPU,
 			expected: false,
 		},
 		"does-contain": {
-			a:        []api.ResourceName{api.ResourceMemory, api.ResourceCPU},
+			a:        []resource.Name{api.ResourceMemory, api.ResourceCPU},
 			b:        api.ResourceCPU,
 			expected: true,
 		},
@@ -193,22 +193,22 @@ func TestContains(t *testing.T) {
 
 func TestIsZero(t *testing.T) {
 	testCases := map[string]struct {
-		a        api.ResourceList
+		a        resource.List
 		expected bool
 	}{
 		"empty": {
-			a:        api.ResourceList{},
+			a:        resource.List{},
 			expected: true,
 		},
 		"zero": {
-			a: api.ResourceList{
+			a: resource.List{
 				api.ResourceCPU:    resource.MustParse("0"),
 				api.ResourceMemory: resource.MustParse("0"),
 			},
 			expected: true,
 		},
 		"non-zero": {
-			a: api.ResourceList{
+			a: resource.List{
 				api.ResourceCPU:    resource.MustParse("200m"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},

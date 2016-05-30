@@ -22,8 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
-	c := api.ResourceList{
+func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) resource.List {
+	c := resource.List{
 		api.ResourceCPU: *resource.NewMilliQuantity(
 			int64(info.NumCores*1000),
 			resource.DecimalSI),

@@ -189,8 +189,8 @@ func Max(a int64, b int64) int64 {
 // the requirement.Requests are taken from the LimitRange default request (if specified)
 func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.ResourceRequirements {
 	requirements := api.ResourceRequirements{}
-	requirements.Requests = api.ResourceList{}
-	requirements.Limits = api.ResourceList{}
+	requirements.Requests = resource.List{}
+	requirements.Limits = resource.List{}
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
@@ -213,10 +213,10 @@ func mergeContainerResources(container *api.Container, defaultRequirements *api.
 	setRequests := []string{}
 	setLimits := []string{}
 	if container.Resources.Limits == nil {
-		container.Resources.Limits = api.ResourceList{}
+		container.Resources.Limits = resource.List{}
 	}
 	if container.Resources.Requests == nil {
-		container.Resources.Requests = api.ResourceList{}
+		container.Resources.Requests = resource.List{}
 	}
 	for k, v := range defaultRequirements.Limits {
 		_, found := container.Resources.Limits[k]
@@ -282,7 +282,7 @@ func requestLimitEnforcedValues(requestQuantity, limitQuantity, enforcedQuantity
 }
 
 // minConstraint enforces the min constraint over the specified resource
-func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+func minConstraint(limitType api.LimitType, resourceName resource.Name, enforced resource.Quantity, request resource.List, limit resource.List) error {
 	req, reqExists := request[resourceName]
 	lim, limExists := limit[resourceName]
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
@@ -300,7 +300,7 @@ func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 }
 
 // maxConstraint enforces the max constraint over the specified resource
-func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+func maxConstraint(limitType api.LimitType, resourceName resource.Name, enforced resource.Quantity, request resource.List, limit resource.List) error {
 	req, reqExists := request[resourceName]
 	lim, limExists := limit[resourceName]
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
@@ -318,7 +318,7 @@ func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 }
 
 // limitRequestRatioConstraint enforces the limit to request ratio over the specified resource
-func limitRequestRatioConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+func limitRequestRatioConstraint(limitType api.LimitType, resourceName resource.Name, enforced resource.Quantity, request resource.List, limit resource.List) error {
 	req, reqExists := request[resourceName]
 	lim, limExists := limit[resourceName]
 	observedReqValue, observedLimValue, _ := requestLimitEnforcedValues(req, lim, enforced)
@@ -347,9 +347,9 @@ func limitRequestRatioConstraint(limitType api.LimitType, resourceName api.Resou
 
 // sum takes the total of each named resource across all inputs
 // if a key is not in each input, then the output resource list will omit the key
-func sum(inputs []api.ResourceList) api.ResourceList {
-	result := api.ResourceList{}
-	keys := []api.ResourceName{}
+func sum(inputs []resource.List) resource.List {
+	result := resource.List{}
+	keys := []resource.Name{}
 	for i := range inputs {
 		for k := range inputs[i] {
 			keys = append(keys, k)
@@ -452,7 +452,7 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 
 		// enforce pod limits on init containers
 		if limitType == api.LimitTypePod {
-			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
+			containerRequests, containerLimits := []resource.List{}, []resource.List{}
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]
 				containerRequests = append(containerRequests, container.Resources.Requests)

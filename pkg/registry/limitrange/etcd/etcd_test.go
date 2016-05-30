@@ -45,11 +45,11 @@ func validNewLimitRange() *api.LimitRange {
 			Limits: []api.LimitRangeItem{
 				{
 					Type: api.LimitTypePod,
-					Max: api.ResourceList{
+					Max: resource.List{
 						api.ResourceCPU:    resource.MustParse("100"),
 						api.ResourceMemory: resource.MustParse("10000"),
 					},
-					Min: api.ResourceList{
+					Min: resource.List{
 						api.ResourceCPU:    resource.MustParse("0"),
 						api.ResourceMemory: resource.MustParse("100"),
 					},
@@ -88,11 +88,11 @@ func TestUpdate(t *testing.T) {
 			object.Spec.Limits = []api.LimitRangeItem{
 				{
 					Type: api.LimitTypePod,
-					Max: api.ResourceList{
+					Max: resource.List{
 						api.ResourceCPU:    resource.MustParse("1000"),
 						api.ResourceMemory: resource.MustParse("100000"),
 					},
-					Min: api.ResourceList{
+					Min: resource.List{
 						api.ResourceCPU:    resource.MustParse("10"),
 						api.ResourceMemory: resource.MustParse("1000"),
 					},

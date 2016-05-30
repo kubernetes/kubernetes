@@ -36,8 +36,8 @@ func TestPersistentVolumeCreate(t *testing.T) {
 			Name: "abc",
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
@@ -67,8 +67,8 @@ func TestPersistentVolumeGet(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
@@ -119,8 +119,8 @@ func TestPersistentVolumeUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
@@ -143,8 +143,8 @@ func TestPersistentVolumeStatusUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},

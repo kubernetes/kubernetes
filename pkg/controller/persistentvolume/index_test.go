@@ -50,8 +50,8 @@ func TestMatchVolume(t *testing.T) {
 				Spec: api.PersistentVolumeClaimSpec{
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("8G"),
+						Requests: resource.List{
+							resource.Name(api.ResourceStorage): resource.MustParse("8G"),
 						},
 					},
 				},
@@ -67,8 +67,8 @@ func TestMatchVolume(t *testing.T) {
 				Spec: api.PersistentVolumeClaimSpec{
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce, api.ReadWriteMany},
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+						Requests: resource.List{
+							resource.Name(api.ResourceStorage): resource.MustParse("5G"),
 						},
 					},
 				},
@@ -84,8 +84,8 @@ func TestMatchVolume(t *testing.T) {
 				Spec: api.PersistentVolumeClaimSpec{
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+						Requests: resource.List{
+							resource.Name(api.ResourceStorage): resource.MustParse("1G"),
 						},
 					},
 				},
@@ -101,8 +101,8 @@ func TestMatchVolume(t *testing.T) {
 				Spec: api.PersistentVolumeClaimSpec{
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("999G"),
+						Requests: resource.List{
+							resource.Name(api.ResourceStorage): resource.MustParse("999G"),
 						},
 					},
 				},
@@ -136,8 +136,8 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 			Name: "gce001",
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("1G"),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -154,8 +154,8 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 			Name: "gce002",
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("1G"),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -175,8 +175,8 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("1G"),
 				},
 			},
 		},
@@ -256,7 +256,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	gce := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{UID: "001", Name: "gce"},
 		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			Capacity:               resource.List{resource.Name(api.ResourceStorage): resource.MustParse("10G")},
 			PersistentVolumeSource: api.PersistentVolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}},
 			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
@@ -268,7 +268,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	ebs := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{UID: "002", Name: "ebs"},
 		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			Capacity:               resource.List{resource.Name(api.ResourceStorage): resource.MustParse("10G")},
 			PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}},
 			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
@@ -279,7 +279,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	nfs := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{UID: "003", Name: "nfs"},
 		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("10G")},
+			Capacity:               resource.List{resource.Name(api.ResourceStorage): resource.MustParse("10G")},
 			PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{}},
 			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
@@ -296,7 +296,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1G")}},
+			Resources:   api.ResourceRequirements{Requests: resource.List{resource.Name(api.ResourceStorage): resource.MustParse("1G")}},
 		},
 	}
 
@@ -364,8 +364,8 @@ func createTestVolumes() []*api.PersistentVolume {
 				Name: "gce003",
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -382,8 +382,8 @@ func createTestVolumes() []*api.PersistentVolume {
 				Name: "gce004",
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("20G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -402,8 +402,8 @@ func createTestVolumes() []*api.PersistentVolume {
 				Name: "nfs002",
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("5G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					Glusterfs: &api.GlusterfsVolumeSource{},
@@ -421,8 +421,8 @@ func createTestVolumes() []*api.PersistentVolume {
 				Name: "gce001",
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("1G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -441,8 +441,8 @@ func createTestVolumes() []*api.PersistentVolume {
 				Name: "nfs003",
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					Glusterfs: &api.GlusterfsVolumeSource{},
@@ -460,8 +460,8 @@ func createTestVolumes() []*api.PersistentVolume {
 				Name: "gce002",
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("5G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -478,8 +478,8 @@ func createTestVolumes() []*api.PersistentVolume {
 				Name: "nfs001",
 			},
 			Spec: api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+				Capacity: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("1G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					Glusterfs: &api.GlusterfsVolumeSource{},
@@ -501,7 +501,7 @@ func testVolume(name, size string) *api.PersistentVolume {
 			Annotations: map[string]string{},
 		},
 		Spec: api.PersistentVolumeSpec{
-			Capacity:               api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(size)},
+			Capacity:               resource.List{resource.Name(api.ResourceStorage): resource.MustParse(size)},
 			PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}},
 			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 		},
@@ -517,7 +517,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi")}},
+			Resources:   api.ResourceRequirements{Requests: resource.List{resource.Name(api.ResourceStorage): resource.MustParse("1Gi")}},
 		},
 	}
 	claimRef, err := api.GetReference(claim)

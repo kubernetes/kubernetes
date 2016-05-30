@@ -22,7 +22,6 @@ package v1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	resource "k8s.io/kubernetes/pkg/api/resource"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 )
@@ -2454,21 +2453,11 @@ func Convert_api_LimitRange_To_v1_LimitRange(in *api.LimitRange, out *LimitRange
 func autoConvert_v1_LimitRangeItem_To_api_LimitRangeItem(in *LimitRangeItem, out *api.LimitRangeItem, s conversion.Scope) error {
 	SetDefaults_LimitRangeItem(in)
 	out.Type = api.LimitType(in.Type)
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Max, &out.Max, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Min, &out.Min, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Default, &out.Default, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.DefaultRequest, &out.DefaultRequest, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.MaxLimitRequestRatio, &out.MaxLimitRequestRatio, s); err != nil {
-		return err
-	}
+	out.Max = in.Max
+	out.Min = in.Min
+	out.Default = in.Default
+	out.DefaultRequest = in.DefaultRequest
+	out.MaxLimitRequestRatio = in.MaxLimitRequestRatio
 	return nil
 }
 
@@ -2478,71 +2467,11 @@ func Convert_v1_LimitRangeItem_To_api_LimitRangeItem(in *LimitRangeItem, out *ap
 
 func autoConvert_api_LimitRangeItem_To_v1_LimitRangeItem(in *api.LimitRangeItem, out *LimitRangeItem, s conversion.Scope) error {
 	out.Type = LimitType(in.Type)
-	if in.Max != nil {
-		in, out := &in.Max, &out.Max
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Max = nil
-	}
-	if in.Min != nil {
-		in, out := &in.Min, &out.Min
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Min = nil
-	}
-	if in.Default != nil {
-		in, out := &in.Default, &out.Default
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Default = nil
-	}
-	if in.DefaultRequest != nil {
-		in, out := &in.DefaultRequest, &out.DefaultRequest
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.DefaultRequest = nil
-	}
-	if in.MaxLimitRequestRatio != nil {
-		in, out := &in.MaxLimitRequestRatio, &out.MaxLimitRequestRatio
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.MaxLimitRequestRatio = nil
-	}
+	out.Max = in.Max
+	out.Min = in.Min
+	out.Default = in.Default
+	out.DefaultRequest = in.DefaultRequest
+	out.MaxLimitRequestRatio = in.MaxLimitRequestRatio
 	return nil
 }
 
@@ -3342,12 +3271,8 @@ func Convert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conv
 
 func autoConvert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus, s conversion.Scope) error {
 	SetDefaults_NodeStatus(in)
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Capacity, &out.Capacity, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Allocatable, &out.Allocatable, s); err != nil {
-		return err
-	}
+	out.Capacity = in.Capacity
+	out.Allocatable = in.Allocatable
 	out.Phase = api.NodePhase(in.Phase)
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
@@ -3396,32 +3321,8 @@ func Convert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus
 }
 
 func autoConvert_api_NodeStatus_To_v1_NodeStatus(in *api.NodeStatus, out *NodeStatus, s conversion.Scope) error {
-	if in.Capacity != nil {
-		in, out := &in.Capacity, &out.Capacity
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Capacity = nil
-	}
-	if in.Allocatable != nil {
-		in, out := &in.Allocatable, &out.Allocatable
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Allocatable = nil
-	}
+	out.Capacity = in.Capacity
+	out.Allocatable = in.Allocatable
 	out.Phase = NodePhase(in.Phase)
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
@@ -3833,9 +3734,7 @@ func autoConvert_v1_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStat
 	} else {
 		out.AccessModes = nil
 	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Capacity, &out.Capacity, s); err != nil {
-		return err
-	}
+	out.Capacity = in.Capacity
 	return nil
 }
 
@@ -3854,19 +3753,7 @@ func autoConvert_api_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimStat
 	} else {
 		out.AccessModes = nil
 	}
-	if in.Capacity != nil {
-		in, out := &in.Capacity, &out.Capacity
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Capacity = nil
-	}
+	out.Capacity = in.Capacity
 	return nil
 }
 
@@ -4213,9 +4100,7 @@ func Convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.Per
 }
 
 func autoConvert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *PersistentVolumeSpec, out *api.PersistentVolumeSpec, s conversion.Scope) error {
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Capacity, &out.Capacity, s); err != nil {
-		return err
-	}
+	out.Capacity = in.Capacity
 	if err := Convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(&in.PersistentVolumeSource, &out.PersistentVolumeSource, s); err != nil {
 		return err
 	}
@@ -4246,19 +4131,7 @@ func Convert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *PersistentV
 }
 
 func autoConvert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *api.PersistentVolumeSpec, out *PersistentVolumeSpec, s conversion.Scope) error {
-	if in.Capacity != nil {
-		in, out := &in.Capacity, &out.Capacity
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Capacity = nil
-	}
+	out.Capacity = in.Capacity
 	if err := Convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(&in.PersistentVolumeSource, &out.PersistentVolumeSource, s); err != nil {
 		return err
 	}
@@ -5397,9 +5270,7 @@ func Convert_api_ResourceQuotaList_To_v1_ResourceQuotaList(in *api.ResourceQuota
 }
 
 func autoConvert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuotaSpec, out *api.ResourceQuotaSpec, s conversion.Scope) error {
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Hard, &out.Hard, s); err != nil {
-		return err
-	}
+	out.Hard = in.Hard
 	if in.Scopes != nil {
 		in, out := &in.Scopes, &out.Scopes
 		*out = make([]api.ResourceQuotaScope, len(*in))
@@ -5417,19 +5288,7 @@ func Convert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuotaSpec
 }
 
 func autoConvert_api_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(in *api.ResourceQuotaSpec, out *ResourceQuotaSpec, s conversion.Scope) error {
-	if in.Hard != nil {
-		in, out := &in.Hard, &out.Hard
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Hard = nil
-	}
+	out.Hard = in.Hard
 	if in.Scopes != nil {
 		in, out := &in.Scopes, &out.Scopes
 		*out = make([]ResourceQuotaScope, len(*in))
@@ -5447,12 +5306,8 @@ func Convert_api_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(in *api.ResourceQuota
 }
 
 func autoConvert_v1_ResourceQuotaStatus_To_api_ResourceQuotaStatus(in *ResourceQuotaStatus, out *api.ResourceQuotaStatus, s conversion.Scope) error {
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Hard, &out.Hard, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Used, &out.Used, s); err != nil {
-		return err
-	}
+	out.Hard = in.Hard
+	out.Used = in.Used
 	return nil
 }
 
@@ -5461,32 +5316,8 @@ func Convert_v1_ResourceQuotaStatus_To_api_ResourceQuotaStatus(in *ResourceQuota
 }
 
 func autoConvert_api_ResourceQuotaStatus_To_v1_ResourceQuotaStatus(in *api.ResourceQuotaStatus, out *ResourceQuotaStatus, s conversion.Scope) error {
-	if in.Hard != nil {
-		in, out := &in.Hard, &out.Hard
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Hard = nil
-	}
-	if in.Used != nil {
-		in, out := &in.Used, &out.Used
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Used = nil
-	}
+	out.Hard = in.Hard
+	out.Used = in.Used
 	return nil
 }
 
@@ -5495,12 +5326,8 @@ func Convert_api_ResourceQuotaStatus_To_v1_ResourceQuotaStatus(in *api.ResourceQ
 }
 
 func autoConvert_v1_ResourceRequirements_To_api_ResourceRequirements(in *ResourceRequirements, out *api.ResourceRequirements, s conversion.Scope) error {
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Limits, &out.Limits, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Requests, &out.Requests, s); err != nil {
-		return err
-	}
+	out.Limits = in.Limits
+	out.Requests = in.Requests
 	return nil
 }
 
@@ -5509,32 +5336,8 @@ func Convert_v1_ResourceRequirements_To_api_ResourceRequirements(in *ResourceReq
 }
 
 func autoConvert_api_ResourceRequirements_To_v1_ResourceRequirements(in *api.ResourceRequirements, out *ResourceRequirements, s conversion.Scope) error {
-	if in.Limits != nil {
-		in, out := &in.Limits, &out.Limits
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Limits = nil
-	}
-	if in.Requests != nil {
-		in, out := &in.Requests, &out.Requests
-		*out = make(ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Requests = nil
-	}
+	out.Limits = in.Limits
+	out.Requests = in.Requests
 	return nil
 }
 

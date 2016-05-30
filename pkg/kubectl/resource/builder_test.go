@@ -279,7 +279,7 @@ func TestNodeBuilder(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "node1", Namespace: "should-not-have", ResourceVersion: "10"},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
 			},

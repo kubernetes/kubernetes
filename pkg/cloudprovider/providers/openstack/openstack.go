@@ -267,7 +267,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		}
 		for _, flavor := range flavorList {
 			rsrc := api.NodeResources{
-				Capacity: api.ResourceList{
+				Capacity: resource.List{
 					api.ResourceCPU:            *resource.NewQuantity(int64(flavor.VCPUs), resource.DecimalSI),
 					api.ResourceMemory:         *resource.NewQuantity(int64(flavor.RAM)*MiB, resource.BinarySI),
 					"openstack.org/disk":       *resource.NewQuantity(int64(flavor.Disk)*GB, resource.DecimalSI),
