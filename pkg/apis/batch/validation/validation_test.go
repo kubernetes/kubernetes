@@ -306,8 +306,8 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 
 func TestValidateScheduledJob(t *testing.T) {
 	validManualSelector := getValidManualSelector()
-	validGeneratedSelector := getValidGeneratedSelector()
-	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
 
 	successCases := map[string]batch.ScheduledJob{
 		"basic scheduled job": {
@@ -321,7 +321,6 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector: validGeneratedSelector,
 						Template: validPodTemplateSpec,
 					},
 				},
@@ -349,7 +348,6 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector: validGeneratedSelector,
 						Template: validPodTemplateSpec,
 					},
 				},
@@ -366,7 +364,6 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector: validGeneratedSelector,
 						Template: validPodTemplateSpec,
 					},
 				},
@@ -384,7 +381,6 @@ func TestValidateScheduledJob(t *testing.T) {
 				StartingDeadlineSeconds: &negative64,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector: validGeneratedSelector,
 						Template: validPodTemplateSpec,
 					},
 				},
@@ -400,7 +396,6 @@ func TestValidateScheduledJob(t *testing.T) {
 				Schedule: "* * * * * ?",
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector: validGeneratedSelector,
 						Template: validPodTemplateSpec,
 					},
 				},
@@ -417,7 +412,6 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector:    validGeneratedSelector,
 						Parallelism: &negative,
 						Template:    validPodTemplateSpec,
 					},
@@ -437,7 +431,6 @@ func TestValidateScheduledJob(t *testing.T) {
 
 					Spec: batch.JobSpec{
 						Completions: &negative,
-						Selector:    validGeneratedSelector,
 						Template:    validPodTemplateSpec,
 					},
 				},
@@ -455,13 +448,12 @@ func TestValidateScheduledJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						ActiveDeadlineSeconds: &negative64,
-						Selector:              validGeneratedSelector,
 						Template:              validPodTemplateSpec,
 					},
 				},
 			},
 		},
-		"spec.jobTemplate.spec.selector:Required value": {
+		"spec.jobTemplate.spec.selector: Invalid value: {\"matchLabels\":{\"a\":\"b\"}}: `selector` will be auto-generated": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myscheduledjob",
 				Namespace: api.NamespaceDefault,
@@ -472,12 +464,13 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
+						Selector: validManualSelector,
 						Template: validPodTemplateSpec,
 					},
 				},
 			},
 		},
-		"spec.jobTemplate.spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
+		"spec.jobTemplate.spec.manualSelector: Unsupported value": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "myscheduledjob",
 				Namespace: api.NamespaceDefault,
@@ -488,45 +481,8 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector:       validManualSelector,
 						ManualSelector: newBool(true),
-						Template: api.PodTemplateSpec{
-							ObjectMeta: api.ObjectMeta{
-								Labels: map[string]string{"y": "z"},
-							},
-							Spec: api.PodSpec{
-								RestartPolicy: api.RestartPolicyOnFailure,
-								DNSPolicy:     api.DNSClusterFirst,
-								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-							},
-						},
-					},
-				},
-			},
-		},
-		"spec.jobTemplate.spec.template.metadata.labels: Invalid value: {\"controller-uid\":\"4d5e6f\"}: `selector` does not match template `labels`": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
-				Namespace: api.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Selector:       validManualSelector,
-						ManualSelector: newBool(true),
-						Template: api.PodTemplateSpec{
-							ObjectMeta: api.ObjectMeta{
-								Labels: map[string]string{"controller-uid": "4d5e6f"},
-							},
-							Spec: api.PodSpec{
-								RestartPolicy: api.RestartPolicyOnFailure,
-								DNSPolicy:     api.DNSClusterFirst,
-								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-							},
-						},
+						Template:       validPodTemplateSpec,
 					},
 				},
 			},
@@ -542,12 +498,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector:       validManualSelector,
-						ManualSelector: newBool(true),
 						Template: api.PodTemplateSpec{
-							ObjectMeta: api.ObjectMeta{
-								Labels: validManualSelector.MatchLabels,
-							},
 							Spec: api.PodSpec{
 								RestartPolicy: api.RestartPolicyAlways,
 								DNSPolicy:     api.DNSClusterFirst,

@@ -89,17 +89,8 @@ func ValidateJob(job *batch.Job) field.ErrorList {
 }
 
 func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
+	allErrs := validateJobSpec(spec, fldPath)
 
-	if spec.Parallelism != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Parallelism), fldPath.Child("parallelism"))...)
-	}
-	if spec.Completions != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Completions), fldPath.Child("completions"))...)
-	}
-	if spec.ActiveDeadlineSeconds != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
-	}
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
@@ -112,6 +103,21 @@ func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 		if !selector.Matches(labels) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
 		}
+	}
+	return allErrs
+}
+
+func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if spec.Parallelism != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Parallelism), fldPath.Child("parallelism"))...)
+	}
+	if spec.Completions != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Completions), fldPath.Child("completions"))...)
+	}
+	if spec.ActiveDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
@@ -215,7 +221,14 @@ func ValidateJobTemplate(job *batch.JobTemplate) field.ErrorList {
 }
 
 func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path) field.ErrorList {
-	// this method should be identical to ValidateJob
-	allErrs := ValidateJobSpec(&spec.Spec, fldPath.Child("spec"))
+	allErrs := validateJobSpec(&spec.Spec, fldPath.Child("spec"))
+
+	// jobtemplate will always have the selector automatically generated
+	if spec.Spec.Selector != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "selector"), spec.Spec.Selector, "`selector` will be auto-generated"))
+	}
+	if spec.Spec.ManualSelector != nil && *spec.Spec.ManualSelector {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "manualSelector"), spec.Spec.ManualSelector, []string{"nil", "false"}))
+	}
 	return allErrs
 }
