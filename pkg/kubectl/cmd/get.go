@@ -219,15 +219,8 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return err
 	}
 
-	infos := []*resource.Info{}
 	allErrs := []error{}
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		infos = append(infos, info)
-		return nil
-	})
+	infos, err := r.Infos()
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}
@@ -322,5 +315,5 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			continue
 		}
 	}
-	return utilerrors.NewAggregate(allErrs)
+	return utilerrors.Flatten(utilerrors.NewAggregate(allErrs))
 }
