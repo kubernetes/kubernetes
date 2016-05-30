@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attacherdetacher"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/testing"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -66,8 +67,8 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
-	podName := "pod-name"
-	volumeName := api.UniqueDeviceName("volume-name")
+	podName := types.UniquePodName("pod-name")
+	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
@@ -107,8 +108,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
-	podName := "pod-name"
-	volumeName := api.UniqueDeviceName("volume-name")
+	podName := types.UniquePodName("pod-name")
+	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
@@ -169,8 +170,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
-	podName := "pod-name"
-	volumeName := api.UniqueDeviceName("volume-name")
+	podName := types.UniquePodName("pod-name")
+	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)

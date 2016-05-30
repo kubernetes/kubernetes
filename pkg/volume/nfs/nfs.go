@@ -63,8 +63,20 @@ func (plugin *nfsPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *nfsPlugin) Name() string {
+func (plugin *nfsPlugin) GetPluginName() string {
 	return nfsPluginName
+}
+
+func (plugin *nfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a NFS volume type")
+	}
+
+	return fmt.Sprintf(
+		"%v/%v",
+		volumeSource.Server,
+		volumeSource.Path), nil
 }
 
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -295,4 +307,19 @@ func (r *nfsRecycler) Recycle() error {
 		},
 	}
 	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient())
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.NFSVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.NFSVolumeSource
+
+	if spec.Volume != nil && spec.Volume.NFS != nil {
+		volumeSource = spec.Volume.NFS
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.NFS
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

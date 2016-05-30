@@ -36754,7 +36754,7 @@ func (x *NodeStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 						_ = yym32
 						if false {
 						} else {
-							h.encSliceUniqueDeviceName(([]UniqueDeviceName)(x.VolumesInUse), e)
+							h.encSliceUniqueVolumeName(([]UniqueVolumeName)(x.VolumesInUse), e)
 						}
 					}
 				} else {
@@ -36772,7 +36772,7 @@ func (x *NodeStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 						_ = yym33
 						if false {
 						} else {
-							h.encSliceUniqueDeviceName(([]UniqueDeviceName)(x.VolumesInUse), e)
+							h.encSliceUniqueVolumeName(([]UniqueVolumeName)(x.VolumesInUse), e)
 						}
 					}
 				}
@@ -36917,7 +36917,7 @@ func (x *NodeStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				_ = yym16
 				if false {
 				} else {
-					h.decSliceUniqueDeviceName((*[]UniqueDeviceName)(yyv15), d)
+					h.decSliceUniqueVolumeName((*[]UniqueVolumeName)(yyv15), d)
 				}
 			}
 		default:
@@ -37103,7 +37103,7 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		_ = yym30
 		if false {
 		} else {
-			h.decSliceUniqueDeviceName((*[]UniqueDeviceName)(yyv29), d)
+			h.decSliceUniqueVolumeName((*[]UniqueVolumeName)(yyv29), d)
 		}
 	}
 	for {
@@ -37122,7 +37122,7 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x UniqueDeviceName) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x UniqueVolumeName) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -37135,7 +37135,7 @@ func (x UniqueDeviceName) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *UniqueDeviceName) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *UniqueVolumeName) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -57367,7 +57367,7 @@ func (x codecSelfer1234) decSliceContainerImage(v *[]ContainerImage, d *codec197
 	}
 }
 
-func (x codecSelfer1234) encSliceUniqueDeviceName(v []UniqueDeviceName, e *codec1978.Encoder) {
+func (x codecSelfer1234) encSliceUniqueVolumeName(v []UniqueVolumeName, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -57379,7 +57379,7 @@ func (x codecSelfer1234) encSliceUniqueDeviceName(v []UniqueDeviceName, e *codec
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *codec1978.Decoder) {
+func (x codecSelfer1234) decSliceUniqueVolumeName(v *[]UniqueVolumeName, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -57390,7 +57390,7 @@ func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *code
 	_ = yyc1
 	if yyl1 == 0 {
 		if yyv1 == nil {
-			yyv1 = []UniqueDeviceName{}
+			yyv1 = []UniqueVolumeName{}
 			yyc1 = true
 		} else if len(yyv1) != 0 {
 			yyv1 = yyv1[:0]
@@ -57408,10 +57408,10 @@ func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *code
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
 				} else {
-					yyv1 = make([]UniqueDeviceName, yyrl1)
+					yyv1 = make([]UniqueVolumeName, yyrl1)
 				}
 			} else {
-				yyv1 = make([]UniqueDeviceName, yyrl1)
+				yyv1 = make([]UniqueVolumeName, yyrl1)
 			}
 			yyc1 = true
 			yyrr1 = len(yyv1)
@@ -57425,7 +57425,7 @@ func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *code
 			if r.TryDecodeAsNil() {
 				yyv1[yyj1] = ""
 			} else {
-				yyv1[yyj1] = UniqueDeviceName(r.DecodeString())
+				yyv1[yyj1] = UniqueVolumeName(r.DecodeString())
 			}
 
 		}
@@ -57436,7 +57436,7 @@ func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *code
 				if r.TryDecodeAsNil() {
 					yyv1[yyj1] = ""
 				} else {
-					yyv1[yyj1] = UniqueDeviceName(r.DecodeString())
+					yyv1[yyj1] = UniqueVolumeName(r.DecodeString())
 				}
 
 			}
@@ -57447,7 +57447,7 @@ func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *code
 		for ; !r.CheckBreak(); yyj1++ {
 
 			if yyj1 >= len(yyv1) {
-				yyv1 = append(yyv1, "") // var yyz1 UniqueDeviceName
+				yyv1 = append(yyv1, "") // var yyz1 UniqueVolumeName
 				yyc1 = true
 			}
 			yyh1.ElemContainerState(yyj1)
@@ -57455,7 +57455,7 @@ func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *code
 				if r.TryDecodeAsNil() {
 					yyv1[yyj1] = ""
 				} else {
-					yyv1[yyj1] = UniqueDeviceName(r.DecodeString())
+					yyv1[yyj1] = UniqueVolumeName(r.DecodeString())
 				}
 
 			} else {
@@ -57467,7 +57467,7 @@ func (x codecSelfer1234) decSliceUniqueDeviceName(v *[]UniqueDeviceName, d *code
 			yyv1 = yyv1[:yyj1]
 			yyc1 = true
 		} else if yyj1 == 0 && yyv1 == nil {
-			yyv1 = []UniqueDeviceName{}
+			yyv1 = []UniqueVolumeName{}
 			yyc1 = true
 		}
 	}

@@ -155,7 +155,7 @@ func (ad *attacherDetacher) generateDetachVolumeFunc(
 			err)
 	}
 
-	deviceName, err := attachableVolumePlugin.GetDeviceName(volumeToDetach.VolumeSpec)
+	deviceName, err := attachableVolumePlugin.GetVolumeName(volumeToDetach.VolumeSpec)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to GetDeviceName from AttachablePlugin for volumeSpec %q err=%v",

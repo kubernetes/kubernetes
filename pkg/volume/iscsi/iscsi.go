@@ -17,6 +17,7 @@ limitations under the License.
 package iscsi
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -52,8 +53,21 @@ func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *iscsiPlugin) Name() string {
+func (plugin *iscsiPlugin) GetPluginName() string {
 	return iscsiPluginName
+}
+
+func (plugin *iscsiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a ISCSI volume type")
+	}
+
+	return fmt.Sprintf(
+		"%v:%v:%v",
+		volumeSource.TargetPortal,
+		volumeSource.IQN,
+		volumeSource.Lun), nil
 }
 
 func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
@@ -205,4 +219,19 @@ func portalMounter(portal string) string {
 		portal = portal + ":3260"
 	}
 	return portal
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.ISCSIVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.ISCSIVolumeSource
+
+	if spec.Volume != nil && spec.Volume.ISCSI != nil {
+		volumeSource = spec.Volume.ISCSI
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.ISCSI
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

@@ -32,13 +32,13 @@ import (
 type volumeManager struct {
 	lock         sync.RWMutex
 	volumeMaps   map[types.UID]kubecontainer.VolumeMap
-	volumesInUse []api.UniqueDeviceName
+	volumesInUse []api.UniqueVolumeName
 }
 
 func newVolumeManager() *volumeManager {
 	vm := &volumeManager{
 		volumeMaps:   make(map[types.UID]kubecontainer.VolumeMap),
-		volumesInUse: []api.UniqueDeviceName{},
+		volumesInUse: []api.UniqueVolumeName{},
 	}
 	return vm
 }
@@ -69,7 +69,7 @@ func (vm *volumeManager) DeleteVolumes(podUID types.UID) {
 
 // AddVolumeInUse adds specified volume to volumesInUse list, if it doesn't
 // already exist
-func (vm *volumeManager) AddVolumeInUse(uniqueDeviceName api.UniqueDeviceName) {
+func (vm *volumeManager) AddVolumeInUse(uniqueDeviceName api.UniqueVolumeName) {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 	for _, volume := range vm.volumesInUse {
@@ -84,7 +84,7 @@ func (vm *volumeManager) AddVolumeInUse(uniqueDeviceName api.UniqueDeviceName) {
 
 // RemoveVolumeInUse removes the specified volume from volumesInUse list, if it
 // exists
-func (vm *volumeManager) RemoveVolumeInUse(uniqueDeviceName api.UniqueDeviceName) {
+func (vm *volumeManager) RemoveVolumeInUse(uniqueDeviceName api.UniqueVolumeName) {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 	for i := len(vm.volumesInUse) - 1; i >= 0; i-- {
@@ -96,7 +96,7 @@ func (vm *volumeManager) RemoveVolumeInUse(uniqueDeviceName api.UniqueDeviceName
 }
 
 // GetVolumesInUse returns the volumesInUse list
-func (vm *volumeManager) GetVolumesInUse() []api.UniqueDeviceName {
+func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
 	vm.lock.RLock()
 	defer vm.lock.RUnlock()
 	return vm.volumesInUse

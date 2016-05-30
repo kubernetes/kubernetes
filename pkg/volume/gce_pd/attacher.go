@@ -53,15 +53,6 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) GetDeviceName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a GCE volume type")
-	}
-
-	return volumeSource.PDName, nil
-}
-
 // Attach checks with the GCE cloud provider if the specified volume is already
 // attached to the specified node. If the volume is attached, it succeeds
 // (returns nil). If it is not, Attach issues a call to the GCE cloud provider

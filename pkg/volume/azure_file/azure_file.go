@@ -54,8 +54,17 @@ func (plugin *azureFilePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *azureFilePlugin) Name() string {
+func (plugin *azureFilePlugin) GetPluginName() string {
 	return azureFilePluginName
+}
+
+func (plugin *azureFilePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference an AzureFile volume type")
+	}
+
+	return volumeSource.ShareName, nil
 }
 
 func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
@@ -236,4 +245,19 @@ func (c *azureFileUnmounter) TearDownAt(dir string) error {
 	}
 
 	return nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.AzureFileVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.AzureFileVolumeSource
+
+	if spec.Volume != nil && spec.Volume.AzureFile != nil {
+		volumeSource = spec.Volume.AzureFile
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.AzureFile
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

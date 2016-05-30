@@ -51,8 +51,17 @@ func (plugin *fcPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *fcPlugin) Name() string {
+func (plugin *fcPlugin) GetPluginName() string {
 	return fcPluginName
+}
+
+func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a FibreChannel volume type")
+	}
+
+	return fmt.Sprintf("%v", volumeSource.TargetWWNs), nil
 }
 
 func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
@@ -196,4 +205,19 @@ func (c *fcDiskUnmounter) TearDown() error {
 
 func (c *fcDiskUnmounter) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.FCVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.FCVolumeSource
+
+	if spec.Volume != nil && spec.Volume.FC != nil {
+		volumeSource = spec.Volume.FC
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.FC
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

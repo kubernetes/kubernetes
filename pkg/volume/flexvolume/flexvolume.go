@@ -73,8 +73,17 @@ func (plugin *flexVolumePlugin) getExecutable() string {
 	return path.Join(plugin.execPath, execName)
 }
 
-func (plugin *flexVolumePlugin) Name() string {
+func (plugin *flexVolumePlugin) GetPluginName() string {
 	return plugin.driverName
+}
+
+func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a Flex volume type")
+	}
+
+	return volumeSource.Driver, nil
 }
 
 // CanSupport checks whether the plugin can support the input volume spec.
@@ -385,4 +394,19 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	return nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.FlexVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.FlexVolumeSource
+
+	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
+		volumeSource = spec.Volume.FlexVolume
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.FlexVolume
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

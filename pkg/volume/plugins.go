@@ -71,7 +71,15 @@ type VolumePlugin interface {
 	// Name returns the plugin's name.  Plugins should use namespaced names
 	// such as "example.com/volume".  The "kubernetes.io" namespace is
 	// reserved for plugins which are bundled with kubernetes.
-	Name() string
+	GetPluginName() string
+
+	// GetVolumeName returns the name/ID to uniquely identifying the actual
+	// backing device, directory, path, etc. referenced by the specified volume
+	// spec.
+	// For Attachable volumes, this value must be able to be passed back to
+	// volume Detach methods to identify the device to act on.
+	// If the plugin does not support the given spec, this returns an error.
+	GetVolumeName(spec *Spec) (string, error)
 
 	// CanSupport tests whether the plugin supports a given volume
 	// specification from the API.  The spec pointer should be considered
@@ -141,11 +149,6 @@ type AttachableVolumePlugin interface {
 	VolumePlugin
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
-
-	// GetDeviceName returns the name or ID of the device referenced in the
-	// specified volume spec. This is passed by callers to the Deatch method.
-	// If the plugin does not support the given spec, this returns an error.
-	GetDeviceName(spec *Spec) (string, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
@@ -299,7 +302,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 
 	allErrs := []error{}
 	for _, plugin := range plugins {
-		name := plugin.Name()
+		name := plugin.GetPluginName()
 		if errs := validation.IsQualifiedName(name); len(errs) != 0 {
 			allErrs = append(allErrs, fmt.Errorf("volume plugin has invalid name: %q: %s", name, strings.Join(errs, ";")))
 			continue
@@ -352,7 +355,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
 	matches := []string{}
 	for k, v := range pm.plugins {
-		if v.Name() == name {
+		if v.GetPluginName() == name {
 			matches = append(matches, k)
 		}
 	}

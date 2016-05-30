@@ -1154,7 +1154,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	// Add annBoundByController (used in deleting the volume)
 	setAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
-	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.Name())
+	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
