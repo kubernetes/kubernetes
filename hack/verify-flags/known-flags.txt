@@ -297,6 +297,7 @@ minion-max-log-backups
 minion-max-log-size
 minion-path-override
 namespace-sync-period
+network-driver
 network-plugin
 network-plugin-dir
 no-headers
