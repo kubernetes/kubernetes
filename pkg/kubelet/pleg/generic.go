@@ -18,6 +18,7 @@ package pleg
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/util/clock"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // GenericPLEG is an extremely simple generic PLEG that relies solely on
@@ -75,11 +77,11 @@ const (
 	plegContainerExited      plegContainerState = "exited"
 	plegContainerUnknown     plegContainerState = "unknown"
 	plegContainerNonExistent plegContainerState = "non-existent"
-
 	// The threshold needs to be greater than the relisting period + the
 	// relisting time, which can vary significantly. Set a conservative
 	// threshold to avoid flipping between healthy and unhealthy.
-	relistThreshold = 3 * time.Minute
+	relistThreshold       = 3 * time.Minute
+	podCacheUpdateWorkers = 2
 )
 
 func convertState(state kubecontainer.ContainerState) plegContainerState {
@@ -221,44 +223,8 @@ func (g *GenericPLEG) relist() {
 		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
 	}
 
-	// If there are events associated with a pod, we should update the
-	// podCache.
-	for pid, events := range eventsByPodID {
-		pod := g.podRecords.getCurrent(pid)
-		if g.cacheEnabled() {
-			// updateCache() will inspect the pod and update the cache. If an
-			// error occurs during the inspection, we want PLEG to retry again
-			// in the next relist. To achieve this, we do not update the
-			// associated podRecord of the pod, so that the change will be
-			// detect again in the next relist.
-			// TODO: If many pods changed during the same relist period,
-			// inspecting the pod and getting the PodStatus to update the cache
-			// serially may take a while. We should be aware of this and
-			// parallelize if needed.
-			if err := g.updateCache(pod, pid); err != nil {
-				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
-
-				// make sure we try to reinspect the pod during the next relisting
-				needsReinspection[pid] = pod
-
-				continue
-			} else if _, found := g.podsToReinspect[pid]; found {
-				// this pod was in the list to reinspect and we did so because it had events, so remove it
-				// from the list (we don't want the reinspection code below to inspect it a second time in
-				// this relist execution)
-				delete(g.podsToReinspect, pid)
-			}
-		}
-		// Update the internal storage and send out the events.
-		g.podRecords.update(pid)
-		for i := range events {
-			// Filter out events that are not reliable and no other components use yet.
-			if events[i].Type == ContainerChanged {
-				continue
-			}
-			g.eventChannel <- events[i]
-		}
-	}
+	// update PodCache and PodRecords
+	g.updatePodCacheByWorkers(eventsByPodID, needsReinspection)
 
 	if g.cacheEnabled() {
 		// reinspect any pods that failed inspection during the previous relist
@@ -279,6 +245,65 @@ func (g *GenericPLEG) relist() {
 
 	// make sure we retain the list of pods that need reinspecting the next time relist is called
 	g.podsToReinspect = needsReinspection
+}
+
+func (g *GenericPLEG) updatePodCacheByWorkers(eventsByPodID map[types.UID][]*PodLifecycleEvent,
+	needsReinspection map[types.UID]*kubecontainer.Pod) {
+	// If there are events associated with a pod, we should update the
+	// podCache.
+	doUpdateCache := func(pid types.UID) {
+		events := eventsByPodID[pid]
+		pod := g.podRecords.getCurrent(pid)
+		if g.cacheEnabled() {
+			// updateCache() will inspect the pod and update the cache. If an
+			// error occurs during the inspection, we want PLEG to retry again
+			// in the next relist. To achieve this, we do not update the
+			// associated podRecord of the pod, so that the change will be
+			// detect again in the next relist.
+			if err := g.updateCache(pod, pid); err != nil {
+				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+				// make sure we try to reinspect the pod during the next relisting
+				needsReinspection[pid] = pod
+				return
+			} else if _, found := g.podsToReinspect[pid]; found {
+				// this pod was in the list to reinspect and we did so because it had events, so remove it
+				// from the list (we don't want the reinspection code below to inspect it a second time in
+				// this relist execution)
+				delete(g.podsToReinspect, pid)
+			}
+		}
+		// Update the internal storage and send out the events.
+		g.podRecords.update(pid)
+		for i := range events {
+			// Filter out events that are not reliable and no other components use yet.
+			if events[i].Type == ContainerChanged {
+				continue
+			}
+			g.eventChannel <- events[i]
+		}
+	}
+
+	// toUpdate records pids of all the events needed to be processed
+	toUpdate := make(chan types.UID, len(eventsByPodID))
+	for pid := range eventsByPodID {
+		toUpdate <- pid
+	}
+	close(toUpdate)
+
+	// use a waitGroup to wait all goroutines finished
+	wg := sync.WaitGroup{}
+	wg.Add(podCacheUpdateWorkers)
+	for i := 0; i < podCacheUpdateWorkers; i++ {
+		// start several goroutines, each one will process part of all the events
+		go func() {
+			defer utilruntime.HandleCrash()
+			defer wg.Done()
+			for pid := range toUpdate {
+				doUpdateCache(pid)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
