@@ -2598,7 +2598,10 @@ func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	FilterNodes(nodes, func(node api.Node) bool {
-		return !node.Spec.Unschedulable && IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
+		nodeReady := IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
+		networkReady := IsNodeConditionUnset(&node, api.NodeNetworkUnavailable) ||
+			IsNodeConditionSetAsExpected(&node, api.NodeNetworkUnavailable, false)
+		return !node.Spec.Unschedulable && nodeReady && networkReady
 	})
 	return nodes
 }
@@ -3387,6 +3390,15 @@ func IsNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditio
 	}
 	Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
 	return false
+}
+
+func IsNodeConditionUnset(node *api.Node, conditionType api.NodeConditionType) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == conditionType {
+			return false
+		}
+	}
+	return true
 }
 
 // WaitForNodeToBe returns whether node "name's" condition state matches wantTrue
