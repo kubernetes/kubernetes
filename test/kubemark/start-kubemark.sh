@@ -57,7 +57,19 @@ fi
 
 CURR_DIR=`pwd`
 cd "${MAKE_DIR}"
-make
+RETRIES=3
+for attempt in $(seq 1 ${RETRIES}); do
+  if ! make; then
+    if [[ $((attempt)) -eq "${RETRIES}" ]]; then
+      echo "${color_red}Make failed. Exiting.${color_norm}"
+      exit 1
+    fi
+    echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
+    sleep $(($attempt * 5))
+  else
+    break
+  fi
+done
 rm kubemark
 cd $CURR_DIR
 
