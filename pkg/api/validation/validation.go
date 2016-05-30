@@ -705,23 +705,32 @@ func validateFlockerVolumeSource(flocker *api.FlockerVolumeSource, fldPath *fiel
 }
 
 var validDownwardAPIFieldPathExpressions = sets.NewString("metadata.name", "metadata.namespace", "metadata.labels", "metadata.annotations")
+var validDownwardAPINodeFieldPathExpressions = sets.NewString("metadata.name", "metadata.labels", "metadata.annotations")
 
 func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, downwardAPIVolumeFile := range downwardAPIVolume.Items {
+		numSources := 0
 		if len(downwardAPIVolumeFile.Path) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 		}
 		allErrs = append(allErrs, validateVolumeSourcePath(downwardAPIVolumeFile.Path, fldPath.Child("path"))...)
 		if downwardAPIVolumeFile.FieldRef != nil {
-			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
-			if downwardAPIVolumeFile.ResourceFieldRef != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
-			}
-		} else if downwardAPIVolumeFile.ResourceFieldRef != nil {
+			numSources++
+			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"), "Pod")...)
+		}
+		if downwardAPIVolumeFile.ResourceFieldRef != nil {
+			numSources++
 			allErrs = append(allErrs, validateContainerResourceFieldSelector(downwardAPIVolumeFile.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
-		} else {
-			allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
+		}
+		if downwardAPIVolumeFile.NodeFieldRef != nil {
+			numSources++
+			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.NodeFieldRef, &validDownwardAPINodeFieldPathExpressions, fldPath.Child("nodeFieldRef"), "Node")...)
+		}
+		if numSources == 0 {
+			allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef, resourceFieldRef and nodeFieldRef is required"))
+		} else if numSources > 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef, resourceFieldRef and nodeFieldRef can not be specified simultaneously"))
 		}
 	}
 	return allErrs
@@ -1108,7 +1117,7 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 
 	if ev.ValueFrom.FieldRef != nil {
 		numSources++
-		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"))...)
+		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"), "Pod")...)
 	}
 	if ev.ValueFrom.ResourceFieldRef != nil {
 		numSources++
@@ -1134,7 +1143,7 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path) field.ErrorList {
+func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path, resource string) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(fs.APIVersion) == 0 {
@@ -1142,7 +1151,7 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 	} else if len(fs.FieldPath) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("fieldPath"), ""))
 	} else {
-		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, resource, fs.FieldPath, "")
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
 		} else if !expressions.Has(internalFieldPath) {

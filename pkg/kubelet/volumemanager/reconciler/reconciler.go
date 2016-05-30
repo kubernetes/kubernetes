@@ -229,6 +229,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				err := rc.operationExecutor.MountVolume(
 					rc.waitForAttachTimeout,
 					volumeToMount.VolumeToMount,
+					rc.hostName,
 					rc.actualStateOfWorld)
 				if err != nil &&
 					!goroutinemap.IsAlreadyExists(err) &&

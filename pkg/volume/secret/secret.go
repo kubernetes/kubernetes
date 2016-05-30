@@ -79,7 +79,7 @@ func (plugin *secretPlugin) RequiresRemount() bool {
 	return true
 }
 
-func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *secretPlugin) NewMounter(spec *volume.Spec, node *api.Node, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &secretVolumeMounter{
 		secretVolume: &secretVolume{
 			spec.Name(),

@@ -319,8 +319,9 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 var map_DownwardAPIVolumeFile = map[string]string{
 	"":                 "DownwardAPIVolumeFile represents information to create the file containing the pod field",
 	"path":             "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
-	"fieldRef":         "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
+	"fieldRef":         "Selects a field of the pod: only annotations, labels, name and namespace are supported.",
 	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+	"nodeFieldRef":     "Selects a field of the node: only annotations and labels are supported.",
 }
 
 func (DownwardAPIVolumeFile) SwaggerDoc() map[string]string {

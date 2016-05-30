@@ -783,6 +783,12 @@ func TestValidateVolumes(t *testing.T) {
 			{Path: "memory_request", ResourceFieldRef: &api.ResourceFieldSelector{
 				ContainerName: "test-container",
 				Resource:      "requests.memory"}},
+			{Path: "node_labels", NodeFieldRef: &api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels"}},
+			{Path: "node_annotations", NodeFieldRef: &api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.annotations"}},
 		}}}},
 		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"some_wwn"}, Lun: &lun, FSType: "ext4", ReadOnly: false}}},
 		{Name: "flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/blue", FSType: "ext4"}}},
@@ -839,6 +845,22 @@ func TestValidateVolumes(t *testing.T) {
 		ResourceFieldRef: &api.ResourceFieldSelector{
 			ContainerName: "test-container",
 			Resource:      "requests.memory"}}},
+	}}
+	fieldRefandNodeFieldRef := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "test",
+		FieldRef: &api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"},
+		NodeFieldRef: &api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"}}},
+	}}
+	resourceFieldRefandNodeFieldRef := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "test",
+		ResourceFieldRef: &api.ResourceFieldSelector{
+			ContainerName: "test-container",
+			Resource:      "requests.memory"},
+		NodeFieldRef: &api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"}}},
 	}}
 	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{}, Lun: &lun, FSType: "ext4", ReadOnly: false}}
 	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"wwn"}, Lun: nil, FSType: "ext4", ReadOnly: false}}
@@ -979,7 +1001,17 @@ func TestValidateVolumes(t *testing.T) {
 		"fieldRef and ResourceFieldRef together": {
 			[]api.Volume{{Name: "testvolume", VolumeSource: fieldRefandResourceFieldRef}},
 			field.ErrorTypeInvalid,
-			"downwardAPI", "fieldRef and resourceFieldRef can not be specified simultaneously",
+			"downwardAPI", "fieldRef, resourceFieldRef and nodeFieldRef can not be specified simultaneously",
+		},
+		"fieldRef and NodeFieldRef together": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: fieldRefandNodeFieldRef}},
+			field.ErrorTypeInvalid,
+			"downwardAPI", "fieldRef, resourceFieldRef and nodeFieldRef can not be specified simultaneously",
+		},
+		"resourceFieldRef and NodeFieldRef together": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: resourceFieldRefandNodeFieldRef}},
+			field.ErrorTypeInvalid,
+			"downwardAPI", "fieldRef, resourceFieldRef and nodeFieldRef can not be specified simultaneously",
 		},
 	}
 	for k, v := range errorCases {

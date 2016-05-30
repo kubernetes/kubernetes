@@ -1395,6 +1395,15 @@ func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *Downw
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	if in.NodeFieldRef != nil {
+		in, out := &in.NodeFieldRef, &out.NodeFieldRef
+		*out = new(api.ObjectFieldSelector)
+		if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NodeFieldRef = nil
+	}
 	return nil
 }
 
@@ -1421,6 +1430,15 @@ func autoConvert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.D
 		}
 	} else {
 		out.ResourceFieldRef = nil
+	}
+	if in.NodeFieldRef != nil {
+		in, out := &in.NodeFieldRef, &out.NodeFieldRef
+		*out = new(ObjectFieldSelector)
+		if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NodeFieldRef = nil
 	}
 	return nil
 }

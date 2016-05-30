@@ -123,6 +123,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	devicePath := "fake/device/path"
 
+	node := &api.Node{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -152,7 +153,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	}
 	podName := volumehelper.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, node, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -182,6 +183,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	devicePath := "fake/device/path"
 
+	node := &api.Node{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -211,7 +213,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	}
 	podName := volumehelper.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, node, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -244,6 +246,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 
+	node := &api.Node{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -276,7 +279,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 
 	podName := volumehelper.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, node, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
 	}

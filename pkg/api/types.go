@@ -713,11 +713,13 @@ type DownwardAPIVolumeSource struct {
 type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string `json:"path"`
-	// Required: Selects a field of the pod: only annotations, labels, name and  namespace are supported.
+	// Selects a field of the pod: only annotations, labels, name and  namespace are supported.
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty"`
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty"`
+	// Selects a field of the node: only annotations and labels are supported.
+	NodeFieldRef *ObjectFieldSelector `json:"nodeFieldRef,omitempty"`
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.

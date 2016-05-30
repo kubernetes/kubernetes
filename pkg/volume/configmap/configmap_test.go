@@ -209,6 +209,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	var (
+		testNodeUID    = types.UID("test_node_uid")
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_configmap_namespace"
@@ -228,8 +229,9 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
+	node := &api.Node{ObjectMeta: api.ObjectMeta{UID: testNodeUID}}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), node, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -272,6 +274,7 @@ func TestPlugin(t *testing.T) {
 // should be mounter and the configMap data written to it.
 func TestPluginReboot(t *testing.T) {
 	var (
+		testNodeUID    = types.UID("test_node_uid3")
 		testPodUID     = types.UID("test_pod_uid3")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_configmap_namespace"
@@ -291,8 +294,9 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
+	node := &api.Node{ObjectMeta: api.ObjectMeta{UID: testNodeUID}}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), node, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

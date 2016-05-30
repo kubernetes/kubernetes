@@ -92,7 +92,7 @@ type VolumePlugin interface {
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
 	// - pod: The enclosing pod
-	NewMounter(spec *Spec, podRef *api.Pod, opts VolumeOptions) (Mounter, error)
+	NewMounter(spec *Spec, nodeRef *api.Node, podRef *api.Pod, opts VolumeOptions) (Mounter, error)
 
 	// NewUnmounter creates a new volume.Unmounter from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
