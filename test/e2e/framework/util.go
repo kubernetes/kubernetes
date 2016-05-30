@@ -140,7 +140,7 @@ const (
 // before e2es.
 var ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
 
-// GetServerArchitecture fetches the architecture of the target cluster.
+// GetServerArchitecture fetches the architecture of the cluster's apiserver.
 func GetServerArchitecture(c *client.Client) string {
 	arch := ""
 	sVer, err := c.Discovery().ServerVersion()
@@ -156,12 +156,12 @@ func GetServerArchitecture(c *client.Client) string {
 	return arch
 }
 
-// GetPauseImageName fetches the architecture of the target cluster and chooses the pause image to use.
+// GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
 func GetPauseImageName(c *client.Client) string {
 	return currentPodInfraContainerImageName + "-" + GetServerArchitecture(c) + ":" + currentPodInfraContainerImageVersion
 }
 
-// GetPauseImageNameForHostArch() fetches the pause image for the same architecture the machine is running on.
+// GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
 func GetPauseImageNameForHostArch() string {
 	return currentPodInfraContainerImageName + "-" + goRuntime.GOARCH + ":" + currentPodInfraContainerImageVersion
 }
