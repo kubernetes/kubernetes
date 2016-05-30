@@ -49,8 +49,17 @@ func (plugin *cephfsPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *cephfsPlugin) Name() string {
+func (plugin *cephfsPlugin) GetPluginName() string {
 	return cephfsPluginName
+}
+
+func (plugin *cephfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a CephFS volume type")
+	}
+
+	return fmt.Sprintf("%v", volumeSource.Monitors), nil
 }
 
 func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -278,4 +287,19 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	}
 
 	return nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.CephFSVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.CephFSVolumeSource
+
+	if spec.Volume != nil && spec.Volume.CephFS != nil {
+		volumeSource = spec.Volume.CephFS
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.CephFS
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

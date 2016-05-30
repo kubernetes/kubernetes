@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/attachdetach"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
@@ -185,13 +185,13 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 				if kl.enableControllerAttachDetach {
 					// Attach/Detach controller is enabled and this volume type
 					// implements an attacher
-					uniqueDeviceName, err := attachdetach.GetUniqueDeviceNameFromSpec(
+					uniqueDeviceName, err := volumehelper.GetUniqueVolumeNameFromSpec(
 						attachablePlugin, volSpec)
 					if err != nil {
 						return nil, err
 					}
 					kl.volumeManager.AddVolumeInUse(
-						api.UniqueDeviceName(uniqueDeviceName))
+						api.UniqueVolumeName(uniqueDeviceName))
 				}
 
 				if err = attacher.MountDevice(volSpec, devicePath, deviceMountPath, kl.mounter); err != nil {
@@ -373,9 +373,9 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *api.Pod, 
 	}
 	physicalMounter, err := plugin.NewMounter(spec, pod, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate mounter for volume: %s using plugin: %s with a root cause: %v", spec.Name(), plugin.Name(), err)
+		return nil, fmt.Errorf("failed to instantiate mounter for volume: %s using plugin: %s with a root cause: %v", spec.Name(), plugin.GetPluginName(), err)
 	}
-	glog.V(10).Infof("Using volume plugin %q to mount %s", plugin.Name(), spec.Name())
+	glog.V(10).Infof("Using volume plugin %q to mount %s", plugin.GetPluginName(), spec.Name())
 	return physicalMounter, nil
 }
 
@@ -400,7 +400,7 @@ func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to instantiate volume attacher for %s: %v", spec.Name(), err)
 	}
-	glog.V(3).Infof("Using volume plugin %q to attach %s/%s", plugin.Name(), spec.Name())
+	glog.V(3).Infof("Using volume plugin %q to attach %s/%s", plugin.GetPluginName(), spec.Name())
 	return attacher, plugin, nil
 }
 
@@ -419,8 +419,8 @@ func (kl *Kubelet) newVolumeUnmounterFromPlugins(kind string, name string, podUI
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to instantiate volume plugin for %s/%s: %v", podUID, kind, err)
 	}
-	glog.V(5).Infof("Using volume plugin %q to unmount %s/%s", plugin.Name(), podUID, kind)
-	return unmounter, plugin.Name(), nil
+	glog.V(5).Infof("Using volume plugin %q to unmount %s/%s", plugin.GetPluginName(), podUID, kind)
+	return unmounter, plugin.GetPluginName(), nil
 }
 
 // newVolumeDetacherFromPlugins attempts to find a plugin by a name and then

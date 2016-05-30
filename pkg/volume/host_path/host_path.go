@@ -78,8 +78,17 @@ func (plugin *hostPathPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *hostPathPlugin) Name() string {
+func (plugin *hostPathPlugin) GetPluginName() string {
 	return hostPathPluginName
+}
+
+func (plugin *hostPathPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference an HostPath volume type")
+	}
+
+	return volumeSource.Path, nil
 }
 
 func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
@@ -302,4 +311,19 @@ func (r *hostPathDeleter) Delete() error {
 		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.GetPath())
 	}
 	return os.RemoveAll(r.GetPath())
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.HostPathVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.HostPathVolumeSource
+
+	if spec.Volume != nil && spec.Volume.HostPath != nil {
+		volumeSource = spec.Volume.HostPath
+		readOnly = spec.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.HostPath
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

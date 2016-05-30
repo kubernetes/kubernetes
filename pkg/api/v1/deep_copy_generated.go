@@ -1550,7 +1550,7 @@ func DeepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 	}
 	if in.VolumesInUse != nil {
 		in, out := in.VolumesInUse, &out.VolumesInUse
-		*out = make([]UniqueDeviceName, len(in))
+		*out = make([]UniqueVolumeName, len(in))
 		for i := range in {
 			(*out)[i] = in[i]
 		}

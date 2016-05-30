@@ -66,11 +66,20 @@ func (p *flockerPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (p flockerPlugin) Name() string {
+func (p *flockerPlugin) GetPluginName() string {
 	return flockerPluginName
 }
 
-func (p flockerPlugin) CanSupport(spec *volume.Spec) bool {
+func (p *flockerPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a Flocker volume type")
+	}
+
+	return volumeSource.DatasetName, nil
+}
+
+func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Flocker != nil) ||
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
 }
@@ -240,4 +249,19 @@ func (b flockerMounter) updateDatasetPrimary(datasetID, primaryUUID string) erro
 		}
 	}
 
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.FlockerVolumeSource
+
+	if spec.Volume != nil && spec.Volume.Flocker != nil {
+		volumeSource = spec.Volume.Flocker
+		readOnly = spec.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.Flocker
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

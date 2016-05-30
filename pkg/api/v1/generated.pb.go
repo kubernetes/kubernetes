@@ -21633,7 +21633,7 @@ func (m *NodeStatus) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.VolumesInUse = append(m.VolumesInUse, UniqueDeviceName(data[iNdEx:postIndex]))
+			m.VolumesInUse = append(m.VolumesInUse, UniqueVolumeName(data[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

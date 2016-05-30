@@ -64,8 +64,18 @@ func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *emptyDirPlugin) Name() string {
+func (plugin *emptyDirPlugin) GetPluginName() string {
 	return emptyDirPluginName
+}
+
+func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference an EmptyDir volume type")
+	}
+
+	// Return user defined volume name, since this is an ephemeral volume type
+	return spec.Name(), nil
 }
 
 func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
@@ -325,4 +335,16 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 
 func (ed *emptyDir) getMetaDir() string {
 	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, strings.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.EmptyDirVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.EmptyDirVolumeSource
+
+	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
+		volumeSource = spec.Volume.EmptyDir
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

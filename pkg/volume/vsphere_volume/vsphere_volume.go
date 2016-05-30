@@ -57,8 +57,17 @@ func (plugin *vsphereVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *vsphereVolumePlugin) Name() string {
+func (plugin *vsphereVolumePlugin) GetPluginName() string {
 	return vsphereVolumePluginName
+}
+
+func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a VSphere volume type")
+	}
+
+	return volumeSource.VolumePath, nil
 }
 
 func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
@@ -416,4 +425,19 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 	}
 	return pv, nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.VsphereVirtualDiskVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.VsphereVirtualDiskVolumeSource
+
+	if spec.Volume != nil && spec.Volume.VsphereVolume != nil {
+		volumeSource = spec.Volume.VsphereVolume
+		readOnly = spec.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.VsphereVolume
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

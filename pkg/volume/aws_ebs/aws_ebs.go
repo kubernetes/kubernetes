@@ -61,8 +61,17 @@ func (plugin *awsElasticBlockStorePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) Name() string {
+func (plugin *awsElasticBlockStorePlugin) GetPluginName() string {
 	return awsElasticBlockStorePluginName
+}
+
+func (plugin *awsElasticBlockStorePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference an AWS EBS volume type")
+	}
+
+	return volumeSource.VolumeID, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
@@ -165,6 +174,21 @@ func (plugin *awsElasticBlockStorePlugin) newProvisionerInternal(options volume.
 		},
 		options: options,
 	}, nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.AWSElasticBlockStoreVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.AWSElasticBlockStoreVolumeSource
+
+	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
+		volumeSource = spec.Volume.AWSElasticBlockStore
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.AWSElasticBlockStore
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }
 
 // Abstract interface to PD operations.

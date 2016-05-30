@@ -74,8 +74,17 @@ func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *cinderPlugin) Name() string {
+func (plugin *cinderPlugin) GetPluginName() string {
 	return cinderVolumePluginName
+}
+
+func (plugin *cinderPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a Cinder volume type")
+	}
+
+	return volumeSource.VolumeID, nil
 }
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
@@ -457,4 +466,19 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 	}
 	return pv, nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.CinderVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.CinderVolumeSource
+
+	if spec.Volume != nil && spec.Volume.Cinder != nil {
+		volumeSource = spec.Volume.Cinder
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.Cinder
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

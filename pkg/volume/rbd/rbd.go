@@ -50,8 +50,20 @@ func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *rbdPlugin) Name() string {
+func (plugin *rbdPlugin) GetPluginName() string {
 	return rbdPluginName
+}
+
+func (plugin *rbdPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a RBD volume type")
+	}
+
+	return fmt.Sprintf(
+		"%v:%v",
+		volumeSource.CephMonitors,
+		volumeSource.RBDImage), nil
 }
 
 func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
@@ -220,4 +232,19 @@ func (c *rbdUnmounter) TearDownAt(dir string) error {
 func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.RBDVolumeSource
+
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		volumeSource = spec.Volume.RBD
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.RBD
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

@@ -166,10 +166,14 @@ func (plugin *FakeVolumePlugin) Init(host VolumeHost) error {
 	return nil
 }
 
-func (plugin *FakeVolumePlugin) Name() string {
+func (plugin *FakeVolumePlugin) GetPluginName() string {
 	plugin.RLock()
 	defer plugin.RUnlock()
 	return plugin.PluginName
+}
+
+func (plugin *FakeVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
+	return spec.Name(), nil
 }
 
 func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
@@ -235,10 +239,6 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	plugin.RLock()
 	defer plugin.RUnlock()
 	return plugin.NewDetacherCallCount
-}
-
-func (plugin *FakeVolumePlugin) GetDeviceName(spec *Spec) (string, error) {
-	return spec.Name(), nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler, error) {

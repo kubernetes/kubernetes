@@ -92,7 +92,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
-	attachdetachutil "k8s.io/kubernetes/pkg/volume/util/attachdetach"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -1043,7 +1043,7 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 			node.Annotations = make(map[string]string)
 		}
 
-		node.Annotations[attachdetachutil.ControllerManagedAnnotation] = "true"
+		node.Annotations[volumehelper.ControllerManagedAnnotation] = "true"
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
@@ -2145,10 +2145,10 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 				if kl.enableControllerAttachDetach {
 					// Attach/Detach controller is enabled and this volume type
 					// implments a detacher
-					uniqueDeviceName := attachdetachutil.GetUniqueDeviceName(
+					uniqueDeviceName := volumehelper.GetUniqueVolumeName(
 						cleaner.PluginName, pdName)
 					kl.volumeManager.RemoveVolumeInUse(
-						api.UniqueDeviceName(uniqueDeviceName))
+						api.UniqueVolumeName(uniqueDeviceName))
 				} else {
 					// Attach/Detach controller is disabled
 					err = detacher.Detach(pdName, kl.hostname)

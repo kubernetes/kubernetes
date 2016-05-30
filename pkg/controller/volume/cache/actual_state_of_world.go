@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/attachdetach"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // ActualStateOfWorld defines a set of thread-safe operations supported on
@@ -47,7 +47,7 @@ type ActualStateOfWorld interface {
 	// added.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, the node is added.
-	AddVolumeNode(volumeSpec *volume.Spec, nodeName string) (api.UniqueDeviceName, error)
+	AddVolumeNode(volumeSpec *volume.Spec, nodeName string) (api.UniqueVolumeName, error)
 
 	// SetVolumeMountedByNode sets the MountedByNode value for the given volume
 	// and node. When set to true this value indicates the volume is mounted by
@@ -56,7 +56,7 @@ type ActualStateOfWorld interface {
 	// returned.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, an error is returned.
-	SetVolumeMountedByNode(volumeName api.UniqueDeviceName, nodeName string, mounted bool) error
+	SetVolumeMountedByNode(volumeName api.UniqueVolumeName, nodeName string, mounted bool) error
 
 	// MarkDesireToDetach returns the difference between the current time  and
 	// the DetachRequestedTime for the given volume/node combo. If the
@@ -65,7 +65,7 @@ type ActualStateOfWorld interface {
 	// returned.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, an error is returned.
-	MarkDesireToDetach(volumeName api.UniqueDeviceName, nodeName string) (time.Duration, error)
+	MarkDesireToDetach(volumeName api.UniqueVolumeName, nodeName string) (time.Duration, error)
 
 	// DeleteVolumeNode removes the given volume and node from the underlying
 	// store indicating the specified volume is no longer attached to the
@@ -73,12 +73,12 @@ type ActualStateOfWorld interface {
 	// If the volume/node combo does not exist, this is a no-op.
 	// If after deleting the node, the specified volume contains no other child
 	// nodes, the volume is also deleted.
-	DeleteVolumeNode(volumeName api.UniqueDeviceName, nodeName string)
+	DeleteVolumeNode(volumeName api.UniqueVolumeName, nodeName string)
 
 	// VolumeNodeExists returns true if the specified volume/node combo exists
 	// in the underlying store indicating the specified volume is attached to
 	// the specified node.
-	VolumeNodeExists(volumeName api.UniqueDeviceName, nodeName string) bool
+	VolumeNodeExists(volumeName api.UniqueVolumeName, nodeName string) bool
 
 	// GetAttachedVolumes generates and returns a list of volumes/node pairs
 	// reflecting which volumes are attached to which nodes based on the
@@ -94,7 +94,7 @@ type ActualStateOfWorld interface {
 // AttachedVolume represents a volume that is attached to a node.
 type AttachedVolume struct {
 	// VolumeName is the unique identifier for the volume that is attached.
-	VolumeName api.UniqueDeviceName
+	VolumeName api.UniqueVolumeName
 
 	// VolumeSpec is the volume spec containing the specification for the
 	// volume that is attached.
@@ -119,7 +119,7 @@ type AttachedVolume struct {
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
 func NewActualStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
-		attachedVolumes: make(map[api.UniqueDeviceName]attachedVolume),
+		attachedVolumes: make(map[api.UniqueVolumeName]attachedVolume),
 		volumePluginMgr: volumePluginMgr,
 	}
 }
@@ -129,7 +129,7 @@ type actualStateOfWorld struct {
 	// controller believes to be successfully attached to the nodes it is
 	// managing. The key in this map is the name of the volume and the value is
 	// an object containing more information about the attached volume.
-	attachedVolumes map[api.UniqueDeviceName]attachedVolume
+	attachedVolumes map[api.UniqueVolumeName]attachedVolume
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -140,7 +140,7 @@ type actualStateOfWorld struct {
 // believes to be succesfully attached to a node it is managing.
 type attachedVolume struct {
 	// volumeName contains the unique identifier for this volume.
-	volumeName api.UniqueDeviceName
+	volumeName api.UniqueVolumeName
 
 	// spec is the volume spec containing the specification for this volume.
 	// Used to generate the volume plugin object, and passed to attach/detach
@@ -174,7 +174,7 @@ type nodeAttachedTo struct {
 }
 
 func (asw *actualStateOfWorld) AddVolumeNode(
-	volumeSpec *volume.Spec, nodeName string) (api.UniqueDeviceName, error) {
+	volumeSpec *volume.Spec, nodeName string) (api.UniqueVolumeName, error) {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -186,11 +186,11 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			err)
 	}
 
-	volumeName, err := attachdetach.GetUniqueDeviceNameFromSpec(
+	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
 		attachableVolumePlugin, volumeSpec)
 	if err != nil {
 		return "", fmt.Errorf(
-			"failed to GetUniqueDeviceNameFromSpec for volumeSpec %q err=%v",
+			"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q err=%v",
 			volumeSpec.Name(),
 			err)
 	}
@@ -224,7 +224,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 }
 
 func (asw *actualStateOfWorld) SetVolumeMountedByNode(
-	volumeName api.UniqueDeviceName, nodeName string, mounted bool) error {
+	volumeName api.UniqueVolumeName, nodeName string, mounted bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
@@ -262,7 +262,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 }
 
 func (asw *actualStateOfWorld) MarkDesireToDetach(
-	volumeName api.UniqueDeviceName, nodeName string) (time.Duration, error) {
+	volumeName api.UniqueVolumeName, nodeName string) (time.Duration, error) {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -291,7 +291,7 @@ func (asw *actualStateOfWorld) MarkDesireToDetach(
 }
 
 func (asw *actualStateOfWorld) DeleteVolumeNode(
-	volumeName api.UniqueDeviceName, nodeName string) {
+	volumeName api.UniqueVolumeName, nodeName string) {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -311,7 +311,7 @@ func (asw *actualStateOfWorld) DeleteVolumeNode(
 }
 
 func (asw *actualStateOfWorld) VolumeNodeExists(
-	volumeName api.UniqueDeviceName, nodeName string) bool {
+	volumeName api.UniqueVolumeName, nodeName string) bool {
 	asw.RLock()
 	defer asw.RUnlock()
 

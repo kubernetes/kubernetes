@@ -52,8 +52,20 @@ func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *glusterfsPlugin) Name() string {
+func (plugin *glusterfsPlugin) GetPluginName() string {
 	return glusterfsPluginName
+}
+
+func (plugin *glusterfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a Gluster volume type")
+	}
+
+	return fmt.Sprintf(
+		"%v:%v",
+		volumeSource.EndpointsName,
+		volumeSource.Path), nil
 }
 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -274,4 +286,19 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		return fmt.Errorf("glusterfs: mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logerror)
 	}
 	return fmt.Errorf("glusterfs: mount failed: %v", errs)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.GlusterfsVolumeSource
+
+	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
+		volumeSource = spec.Volume.Glusterfs
+		readOnly = volumeSource.ReadOnly
+	} else {
+		volumeSource = spec.PersistentVolume.Spec.Glusterfs
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

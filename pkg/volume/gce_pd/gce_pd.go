@@ -58,8 +58,17 @@ func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *gcePersistentDiskPlugin) Name() string {
+func (plugin *gcePersistentDiskPlugin) GetPluginName() string {
 	return gcePersistentDiskPluginName
+}
+
+func (plugin *gcePersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a GCE volume type")
+	}
+
+	return volumeSource.PDName, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
