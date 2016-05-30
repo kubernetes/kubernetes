@@ -298,13 +298,27 @@ spec:
   - mysql
 ```
 
-and the default `PodSecurityPolicy`:
+and a restricted default `PodSecurityPolicy`:
 
 ```yaml
 apiVersion: v1
 kind: PodSecurityPolicy
 metadata:
-  name: default
+  name: 
+spec:
+  sysctls: # none
+  groups:
+  - system:authenticated
+  - system:service-accounts
+```
+
+in contrast to a permissive default `PodSecurityPolicy`:
+
+```yaml
+apiVersion: v1
+kind: PodSecurityPolicy
+metadata:
+  name: 
 spec:
   sysctls:
   - *
