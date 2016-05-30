@@ -60,7 +60,7 @@ func NewCMServer() *CMServer {
 			NodeSyncPeriod:                    unversioned.Duration{Duration: 10 * time.Second},
 			ResourceQuotaSyncPeriod:           unversioned.Duration{Duration: 5 * time.Minute},
 			NamespaceSyncPeriod:               unversioned.Duration{Duration: 5 * time.Minute},
-			PVClaimBinderSyncPeriod:           unversioned.Duration{Duration: 10 * time.Minute},
+			PVClaimBinderSyncPeriod:           unversioned.Duration{Duration: 15 * time.Second},
 			HorizontalPodAutoscalerSyncPeriod: unversioned.Duration{Duration: 30 * time.Second},
 			DeploymentControllerSyncPeriod:    unversioned.Duration{Duration: 30 * time.Second},
 			MinResyncPeriod:                   unversioned.Duration{Duration: 12 * time.Hour},
