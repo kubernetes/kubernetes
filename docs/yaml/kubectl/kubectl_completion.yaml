@@ -1,10 +1,12 @@
-name: kubectl
-synopsis: kubectl controls the Kubernetes cluster manager
-description: |-
-  kubectl controls the Kubernetes cluster manager.
+name: completion
+synopsis: |
+  Output shell completion code for the given shell (bash or zsh)
+description: |
+  Output shell completion code for the given shell (bash or zsh).
 
-  Find more information at https://github.com/kubernetes/kubernetes.
-options:
+  This command prints shell code which must be evaluation to provide interactive
+  completion of kubectl commands.
+inherited_options:
 - name: alsologtostderr
   default_value: "false"
   usage: log to standard error as well as files
@@ -65,39 +67,19 @@ options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
+example: |2
+
+  $ source <(kubectl completion bash)
+
+  will load the kubectl completion code for bash. Note that this depends on the bash-completion
+  framework. It must be sourced before sourcing the kubectl completion, i.e. on the Mac:
+
+  $ brew install bash-completion
+  $ source $(brew --prefix)/etc/bash_completion
+  $ source <(kubectl completion bash)
+
+  If you use zsh, the following will load kubectl zsh completion:
+
+  $ source <(kubectl completion zsh)
 see_also:
-- get
-- set
-- describe
-- create
-- replace
-- patch
-- delete
-- edit
-- apply
-- namespace
-- logs
-- rolling-update
-- scale
-- cordon
-- drain
-- uncordon
-- attach
-- exec
-- port-forward
-- proxy
-- run
-- stop
-- expose
-- autoscale
-- rollout
-- label
-- annotate
-- taint
-- config
-- cluster-info
-- api-versions
-- version
-- explain
-- convert
-- completion
+- kubectl

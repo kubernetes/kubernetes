@@ -478,7 +478,6 @@ function kube::build::source_targets() {
     test
     third_party
     vendor
-    contrib/completions/bash/kubectl
     contrib/mesos
     .generated_docs
   )
@@ -1022,8 +1021,6 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
-  mkdir -p "${release_stage}/contrib/completions/bash"
-  cp "${KUBE_ROOT}/contrib/completions/bash/kubectl" "${release_stage}/contrib/completions/bash"
 
   echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 
