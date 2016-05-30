@@ -884,6 +884,18 @@ __EOF__
   kubectl delete hpa frontend "${kube_flags[@]}"
   kubectl delete rc  frontend "${kube_flags[@]}"
 
+  ## kubectl create should not panic on empty string lists in a template
+  ERROR_FILE="${KUBE_TEMP}/validation-error"
+  kubectl create -f hack/testdata/invalid-rc-with-empty-args.yaml "${kube_flags[@]}" 2> "${ERROR_FILE}" || true
+  # Post-condition: should get an error reporting the empty string
+  if grep -q "unexpected nil value for field" "${ERROR_FILE}"; then
+    kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat ${ERROR_FILE})"
+  else
+    kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat ${ERROR_FILE})"
+    exit 1
+  fi
+  rm "${ERROR_FILE}"
+
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
