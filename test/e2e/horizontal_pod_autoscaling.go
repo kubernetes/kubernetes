@@ -35,7 +35,7 @@ const (
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
-var _ = framework.KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() {
+var _ = framework.KubeDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
 	var rc *ResourceConsumer
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
