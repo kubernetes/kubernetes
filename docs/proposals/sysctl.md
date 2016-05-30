@@ -237,14 +237,14 @@ A list of permissible sysctls is to be added to `pkg/apis/extensions/types.go` (
 // PodSecurityPolicySpec defines the policy enforced.
 type PodSecurityPolicySpec struct {
 	...
-	// AllowedSysctls is a white list of allowed sysctls in a pod spec. Each entry
-	// is either a plain sysctl name or ends in ".*" in which case it is considered
+	// Sysctls is a white list of allowed sysctls in a pod spec. Each entry
+	// is either a plain sysctl name or ends in "*" in which case it is considered
 	// as a prefix of allowed sysctls.
-	AllowedSysctls []string `json:"allowedSysctls,omitempty"`
+	Sysctls []string `json:"sysctls,omitempty"`
 }
 ```
 
-The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.AllowedSysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
+The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.Sysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
 
 ### Application of the given Sysctls
 
@@ -276,6 +276,35 @@ spec:
     sysctls:
     - name: net.ipv4.ip_forward
       value: 2
+```
+
+### Allowing only certain sysctls
+
+Here is an example of a `PodSecurityPolicy`, allowing `kernel.shmmax`, `kernel.shmall` and all `net.*`
+sysctls to be set:
+
+```yaml
+apiVersion: v1
+kind: PodSecurityPolicy
+metadata:
+  name: database
+spec:
+  sysctls:
+  - kernel.shmmax
+  - kernel.shmall
+  - net.*
+```
+
+and the default `PodSecurityPolicy`:
+
+```yaml
+apiVersion: v1
+kind: PodSecurityPolicy
+metadata:
+  name: default
+spec:
+  sysctls:
+  - *
 ```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
