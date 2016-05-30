@@ -3653,6 +3653,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.P
 func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) *api.PodStatus {
 	var apiPodStatus api.PodStatus
 	apiPodStatus.PodIP = podStatus.IP
+	apiPodStatus.PodMAC = podStatus.MAC
+	apiPodStatus.PodGatewayIP = podStatus.GatewayIP
+	apiPodStatus.PodLinkStatus = podStatus.LinkStatus
 
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,

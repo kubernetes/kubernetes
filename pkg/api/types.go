@@ -1526,8 +1526,11 @@ type PodStatus struct {
 	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
 	Reason string `json:"reason,omitempty"`
 
-	HostIP string `json:"hostIP,omitempty"`
-	PodIP  string `json:"podIP,omitempty"`
+	HostIP        string `json:"hostIP,omitempty"`
+	PodIP         string `json:"podIP,omitempty"`
+	PodMAC        string `json:"podMAC,omitempty"`
+	PodGatewayIP  string `json:"podGatewayIP,omitempty"`
+	PodLinkStatus string `json:"podLinkStatus,omitempty"`
 
 	// Date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.

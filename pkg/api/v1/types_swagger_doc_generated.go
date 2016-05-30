@@ -1248,6 +1248,9 @@ var map_PodStatus = map[string]string{
 	"reason":            "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'",
 	"hostIP":            "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
 	"podIP":             "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"podMAC":            "MAC address allocated to the pod. Empty if not yet allocated, or if not set by the Kubelet. Note that in some cases, such as IPVLAN, all the pods on a given node may share the same MAC address.",
+	"podGatewayIP":      "Default gateway for the pod. Empty if not yet allocated, or if not configured on the pod. This could be the case of a CNI network without a default gateway.",
+	"podLinkStatus":     "Current link status of the Pod. Empty if the interface has not yet been configured.",
 	"startTime":         "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
 	"containerStatuses": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses",
 }

@@ -2138,6 +2138,19 @@ message PodStatus {
   // Empty if not yet allocated.
   optional string podIP = 6;
 
+  // MAC address allocated to the pod. Empty if not yet allocated, or if not set by
+  // the Kubelet. Note that in some cases, such as IPVLAN, all the pods on a given node
+  // may share the same MAC address.
+  optional string podMAC = 9;
+
+  // Default gateway for the pod. Empty if not yet allocated, or if not configured
+  // on the pod. This could be the case of a CNI network without a default gateway.
+  optional string podGatewayIP = 10;
+
+  // Current link status of the Pod. Empty if the interface has not yet been
+  // configured.
+  optional string podLinkStatus = 11;
+
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.
   optional k8s.io.kubernetes.pkg.api.unversioned.Time startTime = 7;

@@ -2324,6 +2324,9 @@ func DeepCopy_v1_PodStatus(in PodStatus, out *PodStatus, c *conversion.Cloner) e
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
+	out.PodMAC = in.PodMAC
+	out.PodGatewayIP = in.PodGatewayIP
+	out.PodLinkStatus = in.PodLinkStatus
 	if in.StartTime != nil {
 		in, out := in.StartTime, &out.StartTime
 		*out = new(unversioned.Time)

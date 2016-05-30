@@ -5782,6 +5782,18 @@ func (m *PodStatus) MarshalTo(data []byte) (int, error) {
 			i += n
 		}
 	}
+	data[i] = 0x4a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.PodMAC)))
+	i += copy(data[i:], m.PodMAC)
+	data[i] = 0x52
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.PodGatewayIP)))
+	i += copy(data[i:], m.PodGatewayIP)
+	data[i] = 0x5a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.PodLinkStatus)))
+	i += copy(data[i:], m.PodLinkStatus)
 	return i, nil
 }
 
@@ -9477,6 +9489,12 @@ func (m *PodStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	l = len(m.PodMAC)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.PodGatewayIP)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.PodLinkStatus)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -27556,6 +27574,93 @@ func (m *PodStatus) Unmarshal(data []byte) error {
 			if err := m.ContainerStatuses[len(m.ContainerStatuses)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodMAC", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PodMAC = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodGatewayIP", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PodGatewayIP = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodLinkStatus", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PodLinkStatus = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
