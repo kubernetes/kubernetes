@@ -378,7 +378,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	// Use observedGeneration to determine if the deployment controller noticed the pause.
 	if err := deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
 		return deployments.Get(name)
-	}, deployment.Generation, 10*time.Millisecond, 1*time.Minute); err != nil {
+	}, deployment.Generation, 1*time.Second, 1*time.Minute); err != nil {
 		return err
 	}
 
@@ -396,7 +396,8 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	errList := []error{}
 	for _, rc := range rsList.Items {
 		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
-			if !errors.IsNotFound(err) {
+			scaleGetErr, ok := err.(*ScaleError)
+			if !errors.IsNotFound(err) || ok && !errors.IsNotFound(scaleGetErr.ActualError) {
 				errList = append(errList, err)
 			}
 		}
