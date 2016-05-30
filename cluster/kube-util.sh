@@ -16,10 +16,15 @@
 
 # This script contains skeletons of helper functions that each provider hosting
 # Kubernetes must implement to use cluster/kube-*.sh scripts.
-# It sets KUBERNETES_PROVIDER to its default value (gce) if it is unset, and
+# It sets KUBERNETES_PROVIDER to its default value (gce) if it is unset
+# and KUBERNETES_CONFORMANCE_TEST is unset, and
 # then sources cluster/${KUBERNETES_PROVIDER}/util.sh.
 
-KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
+if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
+    KUBERNETES_PROVIDER=""
+else
+    KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
+fi
 
 # Must ensure that the following ENV vars are set
 function detect-master {
