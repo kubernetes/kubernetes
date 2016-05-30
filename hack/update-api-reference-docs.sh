@@ -95,7 +95,7 @@ while read file; do
 
     # By now, the contents should be normalized and stripped of any
     # auto-managed content.
-    if diff -Bw >/dev/null <(echo "${original}") <(echo "${generated}"); then
+    if diff -B >/dev/null <(echo "${original}") <(echo "${generated}"); then
       # actual contents same, overwrite generated with original.
       cp "${OUTPUT}/${file}" "${OUTPUT_TMP}/${file}"
     fi
