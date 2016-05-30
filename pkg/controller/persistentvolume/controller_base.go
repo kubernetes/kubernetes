@@ -89,6 +89,7 @@ func NewPersistentVolumeController(
 			},
 		}
 	}
+	controller.volumeSource = volumeSource
 
 	if claimSource == nil {
 		claimSource = &cache.ListWatch{
@@ -100,6 +101,7 @@ func NewPersistentVolumeController(
 			},
 		}
 	}
+	controller.claimSource = claimSource
 
 	_, controller.volumeController = framework.NewIndexerInformer(
 		volumeSource,
@@ -125,6 +127,40 @@ func NewPersistentVolumeController(
 	return controller
 }
 
+// initalizeCaches fills all controller caches with initial data from etcd in
+// order to have the caches already filled when first addClaim/addVolume to
+// perform initial synchronization of the controller.
+func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSource cache.ListerWatcher) {
+	volumeListObj, err := volumeSource.List(api.ListOptions{})
+	if err != nil {
+		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
+		return
+	}
+	volumeList, ok := volumeListObj.(*api.List)
+	if !ok {
+		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of volumes, got: %+v", volumeListObj)
+		return
+	}
+	for _, volume := range volumeList.Items {
+		storeObjectUpdate(ctrl.volumes.store, volume, "volume")
+	}
+
+	claimListObj, err := claimSource.List(api.ListOptions{})
+	if err != nil {
+		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
+		return
+	}
+	claimList, ok := claimListObj.(*api.List)
+	if !ok {
+		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of claims, got: %+v", volumeListObj)
+		return
+	}
+	for _, claim := range claimList.Items {
+		storeObjectUpdate(ctrl.claims, claim, "claim")
+	}
+	glog.V(4).Infof("controller initialized")
+}
+
 // addVolume is callback from framework.Controller watching PersistentVolume
 // events.
 func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
@@ -135,10 +171,6 @@ func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 		glog.Errorf("%v", err)
 	}
 	if !new {
-		return
-	}
-
-	if !ctrl.isFullySynced() {
 		return
 	}
 
@@ -171,10 +203,6 @@ func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{})
 		return
 	}
 
-	if !ctrl.isFullySynced() {
-		return
-	}
-
 	newVolume, ok := newObj.(*api.PersistentVolume)
 	if !ok {
 		glog.Errorf("Expected PersistentVolume but handler received %+v", newObj)
@@ -196,10 +224,6 @@ func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{})
 func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 	_ = ctrl.volumes.store.Delete(obj)
 
-	if !ctrl.isFullySynced() {
-		return
-	}
-
 	var volume *api.PersistentVolume
 	var ok bool
 	volume, ok = obj.(*api.PersistentVolume)
@@ -219,6 +243,8 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 	if !ok || volume == nil || volume.Spec.ClaimRef == nil {
 		return
 	}
+
+	glog.V(4).Infof("volume %q deleted", volume.Name)
 
 	if claimObj, exists, _ := ctrl.claims.GetByKey(claimrefToClaimKey(volume.Spec.ClaimRef)); exists {
 		if claim, ok := claimObj.(*api.PersistentVolumeClaim); ok && claim != nil {
@@ -254,10 +280,6 @@ func (ctrl *PersistentVolumeController) addClaim(obj interface{}) {
 		return
 	}
 
-	if !ctrl.isFullySynced() {
-		return
-	}
-
 	claim, ok := obj.(*api.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but addClaim received %+v", obj)
@@ -287,10 +309,6 @@ func (ctrl *PersistentVolumeController) updateClaim(oldObj, newObj interface{}) 
 		return
 	}
 
-	if !ctrl.isFullySynced() {
-		return
-	}
-
 	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but updateClaim received %+v", newObj)
@@ -311,10 +329,6 @@ func (ctrl *PersistentVolumeController) updateClaim(oldObj, newObj interface{}) 
 // events.
 func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 	_ = ctrl.claims.Delete(obj)
-
-	if !ctrl.isFullySynced() {
-		return
-	}
 
 	var volume *api.PersistentVolume
 	var claim *api.PersistentVolumeClaim
@@ -337,6 +351,7 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 	if !ok || claim == nil {
 		return
 	}
+	glog.V(4).Infof("claim %q deleted", claimToClaimKey(claim))
 
 	if pvObj, exists, _ := ctrl.volumes.store.GetByKey(claim.Spec.VolumeName); exists {
 		if volume, ok = pvObj.(*api.PersistentVolume); ok {
@@ -365,6 +380,8 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 func (ctrl *PersistentVolumeController) Run() {
 	glog.V(4).Infof("starting PersistentVolumeController")
 
+	ctrl.initializeCaches(ctrl.volumeSource, ctrl.claimSource)
+
 	if ctrl.volumeControllerStopCh == nil {
 		ctrl.volumeControllerStopCh = make(chan struct{})
 		go ctrl.volumeController.Run(ctrl.volumeControllerStopCh)
@@ -381,14 +398,6 @@ func (ctrl *PersistentVolumeController) Stop() {
 	glog.V(4).Infof("stopping PersistentVolumeController")
 	close(ctrl.volumeControllerStopCh)
 	close(ctrl.claimControllerStopCh)
-}
-
-// isFullySynced returns true, if both volume and claim caches are fully loaded
-// after startup.
-// We do not want to process events with not fully loaded caches - e.g. we might
-// recycle/delete PVs that don't have corresponding claim in the cache yet.
-func (ctrl *PersistentVolumeController) isFullySynced() bool {
-	return ctrl.volumeController.HasSynced() && ctrl.claimController.HasSynced()
 }
 
 // Stateless functions

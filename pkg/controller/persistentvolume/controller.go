@@ -108,8 +108,10 @@ const createProvisionedPVInterval = 10 * time.Second
 type PersistentVolumeController struct {
 	volumeController       *framework.Controller
 	volumeControllerStopCh chan struct{}
+	volumeSource           cache.ListerWatcher
 	claimController        *framework.Controller
 	claimControllerStopCh  chan struct{}
+	claimSource            cache.ListerWatcher
 	kubeClient             clientset.Interface
 	eventRecorder          record.EventRecorder
 	cloud                  cloudprovider.Interface
