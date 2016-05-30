@@ -140,7 +140,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	if !ok {
 		return nil, fmt.Errorf("CNI execution called on non-docker runtime")
 	}
-	result, err := runtime.GetContainerIP(id.ID, network.DefaultInterfaceName)
+	result, err := runtime.GetContainerNetworkInfo(id.ID, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}

@@ -253,8 +253,15 @@ type PodStatus struct {
 	Name string
 	// Namspace of the pod.
 	Namespace string
+	// TODO(salv-orlando): Switch to a network.PodNetworkStatus member
 	// IP of the pod.
 	IP string
+	// Gateway IP of the Pod
+	GatewayIP string
+	// Mac of the pod.
+	MAC string
+	// Link status of the pod.
+	LinkStatus string
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
 }
