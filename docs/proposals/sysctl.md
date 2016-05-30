@@ -71,20 +71,21 @@ A number of Linux applications need certain kernel parameter settings to
 In Kubernetes we want to allow to set these parameters within a pod specification
 in order to enable the use of the platform for those applications.
 
-In docker version 1.11.1 it is possible to change kernel parameters inside privileged containers.
-However, the process is purely manual and the changes are applied across all containers
-affecting entire host system. It is not possible to set the parameters within a non-privileged
+With Docker version 1.11.1 it is possible to change kernel parameters inside privileged containers.
+However, the process is purely manual and the changes might be applied across all containers
+affecting the entire host system. It is not possible to set the parameters within a non-privileged
 container.
 
 With [docker#19265](https://github.com/docker/docker/pull/19265) docker-run as of 1.12.0
-supports setting sysctls during the container creation process.
+supports setting a number of whitelisted sysctls during the container creation process.
 
-Some examples are:
+Some real-world examples for the use of sysctls:
 
 - PostgreSQL requires `kernel.shmmax` and `kernel.shmall` (among others) to be
   set to reasonable high values (compare [PostgresSQL Manual 17.4.1. Shared Memory
   and Semaphores](http://www.postgresql.org/docs/9.1/static/kernel-resources.html)).
   The default of 32 MB for shared memory is not reasonable for a database.
+- RabbitMQ proposes a number of sysctl settings to optimize networking: https://www.rabbitmq.com/networking.html.
 - web applications with many concurrent connections require high values for
   `net.core.somaxconn`.
 - certain Java applications require "hugepages" support to perform well
@@ -106,61 +107,29 @@ Some examples are:
 ## Further work (out of scope for this proposal)
 
 * Update kernel parameters in running containers.
+* Integration with new container runtime proposal: https://github.com/kubernetes/kubernetes/pull/25899.
 
 ## Use Cases
 
 As an administrator I want to set customizable kernel parameters for a container
 
 1. To be able to limit consumed kernel resources
+   1. so I can provide more resources to other containers
+   1. to restrict system communication that slows down the host or other containers
+   1. to protect against programming errors like resource leaks
+   1. to protect against DDoS attacks.
 1. To be able to increase limits for certain applications while not
    changing the default for all containers on a host
+   1. to enable resource hungry applications like databases to perform well
+      while the default limits for all other applications can be kept low
+   1. to enable many network connections e.g. for web backends
+   1. to allow special memory management like Java hugepages.
 1. To be able to enable kernel features.
-
-### Use Case: Set kernel parameters to limit consumed kernel resources
-
-As an administrator I would like to limit available kernel resources for a container
-
-1. so I can provide more resources to other containers
-1. to restrict system communication that slows down the host or other containers
-1. to protect against programming errors like resource leaks
-1. to protect against DDoS attacks.
-
-### Use Case: Set kernel parameters to increase limits
-
-As an administrator I would like to increase limits for certain applications while
-not changing the default for all containers on a host
-
-1. to enable resource hungry applications like databases to perform well
-   while the default limits for all other applications can be kept low
-1. to enable many network connections e.g. for web backends
-1. to allow special memory management like Java hugepages.
-
-### Use Case: Set kernel parameters to enable kernel features
-
-As an administrator I would like to enable kernel features for certain
-applications while leaving them off for all other containers on a host
-
-1. to enable containerized execution of special purpose applications without
-  the need to enable those kernel features host wide, e.g. ip forwarding for
-  network router daemons
+   1. to enable containerized execution of special purpose applications without
+      the need to enable those kernel features host wide, e.g. ip forwarding for
+      network router daemons
 
 ## Community Work
-
-### Runc support for sysctl
-
-Supported sysctls (whitelist) as of RunC 0.1.1 (compare
-[libcontainer config validator](https://github.com/opencontainers/runc/blob/master/libcontainer/configs/validate/validator.go#L107)):
-
-- IPC namespace
-  - System V: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
-    `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
-  - POSIX queues: `fs.mqueue.*`
-- network namespace: `net.*`
-
-Applied changes:
-
-* https://github.com/opencontainers/runc/pull/73
-* https://github.com/opencontainers/runc/pull/303
 
 ### Docker support for sysctl
 
@@ -191,6 +160,22 @@ Issues:
 * https://github.com/docker/docker#21126
 * https://github.com/ibm-messaging/mq-docker#13
 
+### Runc support for sysctl
+
+Supported sysctls (whitelist) as of RunC 0.1.1 (compare
+[libcontainer config validator](https://github.com/opencontainers/runc/blob/master/libcontainer/configs/validate/validator.go#L107)):
+
+- IPC namespace
+  - System V: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`,
+    `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`
+  - POSIX queues: `fs.mqueue.*`
+- network namespace: `net.*`
+
+Applied changes:
+
+* https://github.com/opencontainers/runc/pull/73
+* https://github.com/opencontainers/runc/pull/303
+* 
 ### Rocket support for sysctl
 
 Supported sysctls (whitelist):
@@ -234,6 +219,16 @@ type PodSecurityContext struct {
 
 Note that sysctls must be on the pod level because containers in a pod share IPC and network namespaces (if pod.spec.hostIPC and pod.spec.hostNetwork is false) and therefore cannot have conflicting sysctl values. Moreover, note that all namespaced sysctl supported by Docker/RunC are either in the IPC or network namespace.
 
+### Error behaviour
+
+Pods with specified sysctls are either launched with the given sysctl values or fail to launch.
+
+### Scheduling
+
+For the first step of sysctl support it is considered *out of scope* to schedule pods with certain sysctls onto certain hosts according to some given rules.
+
+One could imagine to offer certain non-namespaced sysctls as well which taint a host such that only containers with compatible sysctls settings are scheduled there. Moreover, there is no accounting of sysctl values if that makes any sense for a given sysctl.
+
 ### SecurityContext Enforcement
 
 A list of permissible sysctls is to be added to `pkg/apis/extensions/types.go` (compare [security-context-constraints]( https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/security-context-constraints.md)):
@@ -245,7 +240,7 @@ type PodSecurityPolicySpec struct {
 	// AllowedSysctls is a white list of allowed sysctls in a pod spec. Each entry
 	// is either a plain sysctl name or ends in ".*" in which case it is considered
 	// as a prefix of allowed sysctls.
-	AllowedSysctls []string `json:"sysctls,omitempty"`
+	AllowedSysctls []string `json:"allowedSysctls,omitempty"`
 }
 ```
 
@@ -253,14 +248,16 @@ The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value
 
 ### Application of the given Sysctls
 
-Finally, the container runtime will interpret the `pod.spec.securityPolicy.sysctls`,
+Finally, the container runtime will interpret `pod.spec.securityPolicy.sysctls`,
 e.g. in the case of Docker the `DockerManager` will apply the given sysctls to the infra container in `createPodInfraContainer`.
+
+In a later implementation of a container runtime interface (compare https://github.com/kubernetes/kubernetes/pull/25899), sysctls will be part of `LinuxPodSandboxConfig` (compare https://github.com/kubernetes/kubernetes/pull/25899#discussion_r64867763) and to be applied by the runtime implementaiton to the `PodSandbox` by the `PodSandboxManager` implementation.
 
 ## Examples
 
 ### Use in a pod
 
-Here's an example of a pod that has `net.ipv4.ip_forward` set to `2`:
+Here is an example of a pod that has `net.ipv4.ip_forward` set to `2`:
 
 ```yaml
 apiVersion: v1
