@@ -16767,7 +16767,7 @@
       "items": {
        "$ref": "v1.UniqueVolumeName"
       },
-      "description": "List of attachable volume devices in use (mounted) by the node."
+      "description": "List of attachable volumes in use (mounted) by the node."
      }
     }
    },

@@ -26,8 +26,9 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
@@ -37,6 +38,9 @@ import (
 // managed by the attach/detach controller, volumes are all the volumes that
 // should be attached to the specified node, and pods are the pods that
 // reference the volume and are scheduled to that node.
+// Note: This is distinct from the DesiredStateOfWorld implemented by the
+// kubelet volume manager. The both keep track of different objects. This
+// contains attach/detach controller specific state.
 type DesiredStateOfWorld interface {
 	// AddNode adds the given node to the list of nodes managed by the attach/
 	// detach controller.
@@ -90,17 +94,7 @@ type DesiredStateOfWorld interface {
 
 // VolumeToAttach represents a volume that should be attached to a node.
 type VolumeToAttach struct {
-	// VolumeName is the unique identifier for the volume that should be
-	// attached.
-	VolumeName api.UniqueVolumeName
-
-	// VolumeSpec is a volume spec containing the specification for the volume
-	// that should be attached.
-	VolumeSpec *volume.Spec
-
-	// NodeName is the identifier for the node that the volume should be
-	// attached to.
-	NodeName string
+	operationexecutor.VolumeToAttach
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
@@ -196,7 +190,7 @@ func (dsw *desiredStateOfWorld) AddPod(
 		attachableVolumePlugin, volumeSpec)
 	if err != nil {
 		return "", fmt.Errorf(
-			"failed to GenerateUniqueVolumeName for volumeSpec %q err=%v",
+			"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q err=%v",
 			volumeSpec.Name(),
 			err)
 	}
@@ -304,7 +298,12 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 	volumesToAttach := make([]VolumeToAttach, 0 /* len */, len(dsw.nodesManaged) /* cap */)
 	for nodeName, nodeObj := range dsw.nodesManaged {
 		for volumeName, volumeObj := range nodeObj.volumesToAttach {
-			volumesToAttach = append(volumesToAttach, VolumeToAttach{NodeName: nodeName, VolumeName: volumeName, VolumeSpec: volumeObj.spec})
+			volumesToAttach = append(volumesToAttach,
+				VolumeToAttach{
+					VolumeToAttach: operationexecutor.VolumeToAttach{
+						VolumeName: volumeName,
+						VolumeSpec: volumeObj.spec,
+						NodeName:   nodeName}})
 		}
 	}
 

@@ -83,9 +83,9 @@ func (plugin *hostPathPlugin) GetPluginName() string {
 }
 
 func (plugin *hostPathPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an HostPath volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return volumeSource.Path, nil
@@ -96,6 +96,10 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
 }
 
+func (plugin *hostPathPlugin) RequiresRemount() bool {
+	return false
+}
+
 func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
@@ -103,19 +107,14 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 }
 
 func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	if spec.Volume != nil && spec.Volume.HostPath != nil {
-		path := spec.Volume.HostPath.Path
-		return &hostPathMounter{
-			hostPath: &hostPath{path: path},
-			readOnly: false,
-		}, nil
-	} else {
-		path := spec.PersistentVolume.Spec.HostPath.Path
-		return &hostPathMounter{
-			hostPath: &hostPath{path: path},
-			readOnly: spec.ReadOnly,
-		}, nil
+	hostPathVolumeSource, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
+	return &hostPathMounter{
+		hostPath: &hostPath{path: hostPathVolumeSource.Path},
+		readOnly: readOnly,
+	}, nil
 }
 
 func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -313,17 +312,14 @@ func (r *hostPathDeleter) Delete() error {
 	return os.RemoveAll(r.GetPath())
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.HostPathVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.HostPathVolumeSource
-
+func getVolumeSource(
+	spec *volume.Spec) (*api.HostPathVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.HostPath != nil {
-		volumeSource = spec.Volume.HostPath
-		readOnly = spec.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.HostPath
-		readOnly = spec.ReadOnly
+		return spec.Volume.HostPath, spec.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.HostPath != nil {
+		return spec.PersistentVolume.Spec.HostPath, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference an HostPath volume type")
 }

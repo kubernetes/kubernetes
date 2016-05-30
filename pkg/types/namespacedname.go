@@ -16,10 +16,6 @@ limitations under the License.
 
 package types
 
-// UniquePodName is an identifier that can be used to uniquely identify a  pod
-// within the cluster.
-type UniquePodName string
-
 // NamespacedName comprises a resource name, with a mandatory namespace,
 // rendered as "<namespace>/<name>".  Being a type captures intent and
 // helps make sure that UIDs, namespaced names and non-namespaced names
@@ -36,9 +32,4 @@ type NamespacedName struct {
 // String returns the general purpose string representation
 func (n NamespacedName) String() string {
 	return n.Namespace + "/" + n.Name
-}
-
-// UniquePodName returns the UniquePodName object representation
-func (n NamespacedName) UniquePodName() UniquePodName {
-	return UniquePodName(n.String())
 }

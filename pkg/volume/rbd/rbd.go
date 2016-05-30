@@ -55,9 +55,9 @@ func (plugin *rbdPlugin) GetPluginName() string {
 }
 
 func (plugin *rbdPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a RBD volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return fmt.Sprintf(
@@ -72,6 +72,10 @@ func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	return true
+}
+
+func (plugin *rbdPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -234,17 +238,14 @@ func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, err
 	return cmd.CombinedOutput()
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.RBDVolumeSource
-
+func getVolumeSource(
+	spec *volume.Spec) (*api.RBDVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		volumeSource = spec.Volume.RBD
-		readOnly = volumeSource.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.RBD
-		readOnly = spec.ReadOnly
+		return spec.Volume.RBD, spec.Volume.RBD.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		return spec.PersistentVolume.Spec.RBD, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference a RBD volume type")
 }

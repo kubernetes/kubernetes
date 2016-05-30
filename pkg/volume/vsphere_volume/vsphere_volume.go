@@ -62,9 +62,9 @@ func (plugin *vsphereVolumePlugin) GetPluginName() string {
 }
 
 func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a VSphere volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return volumeSource.VolumePath, nil
@@ -73,6 +73,10 @@ func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, err
 func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.VsphereVolume != nil) ||
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
+}
+
+func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *vsphereVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
@@ -84,11 +88,9 @@ func (plugin *vsphereVolumePlugin) NewUnmounter(volName string, podUID types.UID
 }
 
 func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager vdManager, mounter mount.Interface) (volume.Mounter, error) {
-	var vvol *api.VsphereVirtualDiskVolumeSource
-	if spec.Volume != nil && spec.Volume.VsphereVolume != nil {
-		vvol = spec.Volume.VsphereVolume
-	} else {
-		vvol = spec.PersistentVolume.Spec.VsphereVolume
+	vvol, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	volPath := vvol.VolumePath
@@ -427,17 +429,14 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	return pv, nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.VsphereVirtualDiskVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.VsphereVirtualDiskVolumeSource
-
+func getVolumeSource(
+	spec *volume.Spec) (*api.VsphereVirtualDiskVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.VsphereVolume != nil {
-		volumeSource = spec.Volume.VsphereVolume
-		readOnly = spec.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.VsphereVolume
-		readOnly = spec.ReadOnly
+		return spec.Volume.VsphereVolume, spec.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.VsphereVolume != nil {
+		return spec.PersistentVolume.Spec.VsphereVolume, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
 }

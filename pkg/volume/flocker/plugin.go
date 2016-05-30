@@ -71,9 +71,9 @@ func (p *flockerPlugin) GetPluginName() string {
 }
 
 func (p *flockerPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a Flocker volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return volumeSource.DatasetName, nil
@@ -82,6 +82,10 @@ func (p *flockerPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Flocker != nil) ||
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
+}
+
+func (p *flockerPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool) {
@@ -152,7 +156,12 @@ func (b flockerMounter) newFlockerClient() (*flockerclient.Client, error) {
 	keyPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
 	certPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
 
-	c, err := flockerclient.NewClient(host, port, b.flocker.pod.Status.HostIP, caCertPath, keyPath, certPath)
+	hostIP, err := b.plugin.host.GetHostIP()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := flockerclient.NewClient(host, port, hostIP.String(), caCertPath, keyPath, certPath)
 	return c, err
 }
 
@@ -251,17 +260,13 @@ func (b flockerMounter) updateDatasetPrimary(datasetID, primaryUUID string) erro
 
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.FlockerVolumeSource
-
+func getVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.Flocker != nil {
-		volumeSource = spec.Volume.Flocker
-		readOnly = spec.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.Flocker
-		readOnly = spec.ReadOnly
+		return spec.Volume.Flocker, spec.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Flocker != nil {
+		return spec.PersistentVolume.Spec.Flocker, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference a Flocker volume type")
 }

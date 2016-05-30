@@ -18,6 +18,7 @@ package volume
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
@@ -35,12 +36,6 @@ import (
 
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
-	// The rootcontext to use when performing mounts for a volume. This is a
-	// temporary measure in order to set the rootContext of tmpfs mounts
-	// correctly. it will be replaced and expanded on by future
-	// SecurityContext work.
-	RootContext string
-
 	// The attributes below are required by volume.Provisioner
 	// TODO: refactor all of this out of volumes when an admin can configure
 	// many kinds of provisioners.
@@ -85,6 +80,11 @@ type VolumePlugin interface {
 	// specification from the API.  The spec pointer should be considered
 	// const.
 	CanSupport(spec *Spec) bool
+
+	// RequiresRemount returns true if this plugin requires mount calls to be
+	// reexecuted. Atomically updating volumes, like Downward API, depend on
+	// this to update the contents of the volume.
+	RequiresRemount() bool
 
 	// NewMounter creates a new volume.Mounter from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
@@ -196,6 +196,15 @@ type VolumeHost interface {
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string
+
+	// Returns host IP or nil in the case of error.
+	GetHostIP() (net.IP, error)
+
+	// Returns the rootcontext to use when performing mounts for a volume.
+	// This is a temporary measure in order to set the rootContext of tmpfs
+	// mounts correctly. It will be replaced and expanded on by future
+	// SecurityContext work.
+	GetRootContext() string
 }
 
 // VolumePluginMgr tracks registered plugins.
