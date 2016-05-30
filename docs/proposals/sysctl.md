@@ -30,7 +30,7 @@ Documentation for other releases can be found at
 ## Abstract
 
 This proposal aims at extending the current pod specification with support
-for namespaced kernel parameters set for each container.
+for namespaced kernel parameters set for each pod.
 
 In Linux, the sysctl interface allows an administrator to modify kernel
 parameters at runtime. Parameters are available via `/proc/sys/` virtual
@@ -55,7 +55,7 @@ To get a list of all parameters, you can run
 $ sudo sysctl -a
 ```
 
-A number of them are namespaced and can therefore be set for each container
+A number of them are namespaced and can therefore be set for a container
 independently with today's Linux kernels.
 
 **Note**: This proposal - while sharing some use-cases - does not cover ulimits
