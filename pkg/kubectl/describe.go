@@ -63,6 +63,7 @@ type Describer interface {
 // describer to control what is printed.
 type DescriberSettings struct {
 	ShowEvents bool
+	ShowAll    bool
 }
 
 // ObjectDescriber is an interface for displaying arbitrary objects with extra
@@ -1632,10 +1633,10 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		}
 	}
 
-	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods)
+	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, describerSettings)
 }
 
-func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool) (string, error) {
+func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool, describerSettings DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
 		printLabelsMultiline(out, "Labels", node.Labels)
@@ -1646,13 +1647,15 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			fmt.Fprint(out, "  ----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range node.Status.Conditions {
-				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
-					c.Type,
-					c.Status,
-					c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
-					c.Reason,
-					c.Message)
+				if describerSettings.ShowAll || c.Status == api.ConditionTrue || c.Type == api.NodeReady {
+					fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
+						c.Type,
+						c.Status,
+						c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
+						c.LastTransitionTime.Time.Format(time.RFC1123Z),
+						c.Reason,
+						c.Message)
+				}
 			}
 		}
 		addresses := make([]string, 0, len(node.Status.Addresses))
