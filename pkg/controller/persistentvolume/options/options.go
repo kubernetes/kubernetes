@@ -44,7 +44,7 @@ type PersistentVolumeControllerOptions struct {
 
 func NewPersistentVolumeControllerOptions() PersistentVolumeControllerOptions {
 	return PersistentVolumeControllerOptions{
-		PVClaimBinderSyncPeriod: 10 * time.Minute,
+		PVClaimBinderSyncPeriod: 15 * time.Second,
 		VolumeConfigFlags: VolumeConfigFlags{
 			// default values here
 			PersistentVolumeRecyclerMaximumRetry:             3,
