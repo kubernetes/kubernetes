@@ -68,9 +68,9 @@ func (plugin *nfsPlugin) GetPluginName() string {
 }
 
 func (plugin *nfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a NFS volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return fmt.Sprintf(
@@ -82,6 +82,10 @@ func (plugin *nfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS != nil) ||
 		(spec.Volume != nil && spec.Volume.NFS != nil)
+}
+
+func (plugin *nfsPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -97,15 +101,11 @@ func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 }
 
 func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Mounter, error) {
-	var source *api.NFSVolumeSource
-	var readOnly bool
-	if spec.Volume != nil && spec.Volume.NFS != nil {
-		source = spec.Volume.NFS
-		readOnly = spec.Volume.NFS.ReadOnly
-	} else {
-		source = spec.PersistentVolume.Spec.NFS
-		readOnly = spec.ReadOnly
+	source, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
+
 	return &nfsMounter{
 		nfs: &nfs{
 			volName: spec.Name(),
@@ -309,17 +309,13 @@ func (r *nfsRecycler) Recycle() error {
 	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient())
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.NFSVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.NFSVolumeSource
-
+func getVolumeSource(spec *volume.Spec) (*api.NFSVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.NFS != nil {
-		volumeSource = spec.Volume.NFS
-		readOnly = volumeSource.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.NFS
-		readOnly = spec.ReadOnly
+		return spec.Volume.NFS, spec.Volume.NFS.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.NFS != nil {
+		return spec.PersistentVolume.Spec.NFS, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference a NFS volume type")
 }

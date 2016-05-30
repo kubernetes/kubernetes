@@ -23,14 +23,24 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
-	// ControllerManagedAnnotation is the key of the annotation on Node objects
-	// that indicates attach/detach operations for the node should be managed
-	// by the attach/detach controller
-	ControllerManagedAnnotation string = "volumes.kubernetes.io/controller-managed-attach-detach"
+	// ControllerManagedAttachAnnotation is the key of the annotation on Node
+	// objects that indicates attach/detach operations for the node should be
+	// managed by the attach/detach controller
+	ControllerManagedAttachAnnotation string = "volumes.kubernetes.io/controller-managed-attach-detach"
+
+	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
 )
+
+// GetUniquePodName returns a unique identifier to reference a pod by
+func GetUniquePodName(pod *api.Pod) types.UniquePodName {
+	return types.UniquePodName(pod.UID)
+}
 
 // GetUniqueVolumeName returns a unique name representing the volume/plugin.
 // Caller should ensure that volumeName is a name/ID uniquely identifying the
@@ -38,8 +48,7 @@ const (
 // The returned name can be used to uniquely reference the volume, for example,
 // to prevent operations (attach/detach or mount/unmount) from being triggered
 // on the same volume.
-func GetUniqueVolumeName(
-	pluginName string, volumeName string) api.UniqueVolumeName {
+func GetUniqueVolumeName(pluginName, volumeName string) api.UniqueVolumeName {
 	return api.UniqueVolumeName(fmt.Sprintf("%s/%s", pluginName, volumeName))
 }
 

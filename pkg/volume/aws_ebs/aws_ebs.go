@@ -66,9 +66,9 @@ func (plugin *awsElasticBlockStorePlugin) GetPluginName() string {
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an AWS EBS volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return volumeSource.VolumeID, nil
@@ -77,6 +77,10 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeName(spec *volume.Spec) (stri
 func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AWSElasticBlockStore != nil) ||
 		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
+}
+
+func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -93,14 +97,9 @@ func (plugin *awsElasticBlockStorePlugin) NewMounter(spec *volume.Spec, pod *api
 func (plugin *awsElasticBlockStorePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Mounter, error) {
 	// EBSs used directly in a pod have a ReadOnly flag set by the pod author.
 	// EBSs used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	var readOnly bool
-	var ebs *api.AWSElasticBlockStoreVolumeSource
-	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
-		ebs = spec.Volume.AWSElasticBlockStore
-		readOnly = ebs.ReadOnly
-	} else {
-		ebs = spec.PersistentVolume.Spec.AWSElasticBlockStore
-		readOnly = spec.ReadOnly
+	ebs, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	volumeID := ebs.VolumeID
@@ -176,19 +175,16 @@ func (plugin *awsElasticBlockStorePlugin) newProvisionerInternal(options volume.
 	}, nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.AWSElasticBlockStoreVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.AWSElasticBlockStoreVolumeSource
-
+func getVolumeSource(
+	spec *volume.Spec) (*api.AWSElasticBlockStoreVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
-		volumeSource = spec.Volume.AWSElasticBlockStore
-		readOnly = volumeSource.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.AWSElasticBlockStore
-		readOnly = spec.ReadOnly
+		return spec.Volume.AWSElasticBlockStore, spec.Volume.AWSElasticBlockStore.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.AWSElasticBlockStore != nil {
+		return spec.PersistentVolume.Spec.AWSElasticBlockStore, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference an AWS EBS volume type")
 }
 
 // Abstract interface to PD operations.

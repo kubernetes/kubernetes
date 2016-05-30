@@ -33,7 +33,7 @@ func TestGetContainerInfo(t *testing.T) {
 		},
 	}
 
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -69,7 +69,7 @@ func TestGetRawContainerInfoRoot(t *testing.T) {
 			Name: containerPath,
 		},
 	}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -96,7 +96,7 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 			},
 		},
 	}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -114,7 +114,7 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 
 func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerID := "ab2cdf"
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime := testKubelet.fakeRuntime
@@ -149,7 +149,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 }
 
 func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime := testKubelet.fakeRuntime
@@ -163,7 +163,7 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 }
 
 func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime := testKubelet.fakeRuntime
@@ -184,7 +184,7 @@ func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
 }
 
 func TestGetContainerInfoWithNoContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 
@@ -202,7 +202,7 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 }
 
 func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor

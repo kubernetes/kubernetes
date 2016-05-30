@@ -76,6 +76,10 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
+func (plugin *downwardAPIPlugin) RequiresRemount() bool {
+	return true
+}
+
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName: spec.Name(),

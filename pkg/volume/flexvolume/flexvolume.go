@@ -78,9 +78,9 @@ func (plugin *flexVolumePlugin) GetPluginName() string {
 }
 
 func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a Flex volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return volumeSource.Driver, nil
@@ -88,8 +88,12 @@ func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 
 // CanSupport checks whether the plugin can support the input volume spec.
 func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
-	source := plugin.getVolumeSource(spec)
+	source, _, _ := getVolumeSource(spec)
 	return (source != nil) && (source.Driver == plugin.driverName)
+}
+
+func (plugin *flexVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 // GetAccessModes gets the allowed access modes for this plugin.
@@ -100,19 +104,12 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 	}
 }
 
-func (plugin *flexVolumePlugin) getVolumeSource(spec *volume.Spec) *api.FlexVolumeSource {
-	var source *api.FlexVolumeSource
-	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
-		source = spec.Volume.FlexVolume
-	} else if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
-		source = spec.PersistentVolume.Spec.FlexVolume
-	}
-	return source
-}
-
 // NewMounter is the mounter routine to build the volume.
 func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	fv := plugin.getVolumeSource(spec)
+	fv, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
 	secrets := make(map[string]string)
 	if fv.SecretRef != nil {
 		kubeClient := plugin.host.GetKubeClient()
@@ -135,7 +132,11 @@ func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ vo
 
 // newMounterInternal is the internal mounter routine to build the volume.
 func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface, secrets map[string]string) (volume.Mounter, error) {
-	source := plugin.getVolumeSource(spec)
+	source, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	return &flexVolumeMounter{
 		flexVolumeDisk: &flexVolumeDisk{
 			podUID:       pod.UID,
@@ -396,17 +397,13 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.FlexVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.FlexVolumeSource
-
+func getVolumeSource(spec *volume.Spec) (*api.FlexVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
-		volumeSource = spec.Volume.FlexVolume
-		readOnly = volumeSource.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.FlexVolume
-		readOnly = spec.ReadOnly
+		return spec.Volume.FlexVolume, spec.Volume.FlexVolume.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.FlexVolume != nil {
+		return spec.PersistentVolume.Spec.FlexVolume, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference a Flex volume type")
 }

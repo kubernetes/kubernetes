@@ -44,13 +44,16 @@ import (
 const (
 	gcePDDetachTimeout  = 10 * time.Minute
 	gcePDDetachPollTime = 10 * time.Second
+	nodeStatusTimeout   = 1 * time.Minute
+	nodeStatusPollTime  = 1 * time.Second
 )
 
 var _ = framework.KubeDescribe("Pod Disks", func() {
 	var (
-		podClient client.PodInterface
-		host0Name string
-		host1Name string
+		podClient  client.PodInterface
+		nodeClient client.NodeInterface
+		host0Name  string
+		host1Name  string
 	)
 	f := framework.NewDefaultFramework("pod-disks")
 
@@ -58,6 +61,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessNodeCountIsAtLeast(2)
 
 		podClient = f.Client.Pods(f.Namespace.Name)
+		nodeClient = f.Client.Nodes()
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
@@ -100,6 +104,9 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 		framework.Logf("Wrote value: %v", testFileContents)
 
+		// Verify that disk shows up for in node 1's VolumeInUse list
+		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
+
 		By("deleting host0Pod")
 		framework.ExpectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 
@@ -114,6 +121,9 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.Logf("Read value: %v", v)
 
 		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(testFileContents)))
+
+		// Verify that disk is removed from node 1's VolumeInUse list
+		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
 
 		By("deleting host1Pod")
 		framework.ExpectNoError(podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host1Pod")
@@ -544,4 +554,53 @@ func detachAndDeletePDs(diskName string, hosts []string) {
 	}
 	By(fmt.Sprintf("Deleting PD %q", diskName))
 	deletePDWithRetry(diskName)
+}
+
+func waitForPDInVolumesInUse(
+	nodeClient client.NodeInterface,
+	diskName, nodeName string,
+	timeout time.Duration,
+	shouldExist bool) error {
+	logStr := "to contain"
+	if !shouldExist {
+		logStr = "to NOT contain"
+	}
+	framework.Logf(
+		"Waiting for node %s's VolumesInUse Status %s PD %q",
+		nodeName, logStr, diskName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(nodeStatusPollTime) {
+		nodeObj, err := nodeClient.Get(nodeName)
+		if err != nil || nodeObj == nil {
+			framework.Logf(
+				"Failed to fetch node object %q from API server. err=%v",
+				nodeName, err)
+			continue
+		}
+
+		exists := false
+		for _, volumeInUse := range nodeObj.Status.VolumesInUse {
+			volumeInUseStr := string(volumeInUse)
+			if strings.Contains(volumeInUseStr, diskName) {
+				if shouldExist {
+					framework.Logf(
+						"Found PD %q in node %q's VolumesInUse Status: %q",
+						diskName, nodeName, volumeInUseStr)
+					return nil
+				}
+
+				exists = true
+			}
+		}
+
+		if !shouldExist && !exists {
+			framework.Logf(
+				"Verified PD %q does not exist in node %q's VolumesInUse Status.",
+				diskName, nodeName)
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"Timed out waiting for node %s VolumesInUse Status %s diskName %q",
+		nodeName, logStr, diskName)
 }

@@ -54,9 +54,9 @@ func (plugin *cephfsPlugin) GetPluginName() string {
 }
 
 func (plugin *cephfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a CephFS volume type")
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
 	}
 
 	return fmt.Sprintf("%v", volumeSource.Monitors), nil
@@ -64,6 +64,10 @@ func (plugin *cephfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 
 func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.CephFS != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CephFS != nil)
+}
+
+func (plugin *cephfsPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *cephfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -75,7 +79,10 @@ func (plugin *cephfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 }
 
 func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	cephvs := plugin.getVolumeSource(spec)
+	cephvs, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
 	secret := ""
 	if cephvs.SecretRef != nil {
 		kubeClient := plugin.host.GetKubeClient()
@@ -97,7 +104,11 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume
 }
 
 func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, mounter mount.Interface, secret string) (volume.Mounter, error) {
-	cephvs := plugin.getVolumeSource(spec)
+	cephvs, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	id := cephvs.User
 	if id == "" {
 		id = "admin"
@@ -141,14 +152,6 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 			mounter: mounter,
 			plugin:  plugin},
 	}, nil
-}
-
-func (plugin *cephfsPlugin) getVolumeSource(spec *volume.Spec) *api.CephFSVolumeSource {
-	if spec.Volume != nil && spec.Volume.CephFS != nil {
-		return spec.Volume.CephFS
-	} else {
-		return spec.PersistentVolume.Spec.CephFS
-	}
 }
 
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.
@@ -289,17 +292,13 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.CephFSVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.CephFSVolumeSource
-
+func getVolumeSource(spec *volume.Spec) (*api.CephFSVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.CephFS != nil {
-		volumeSource = spec.Volume.CephFS
-		readOnly = volumeSource.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.CephFS
-		readOnly = spec.ReadOnly
+		return spec.Volume.CephFS, spec.Volume.CephFS.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.CephFS != nil {
+		return spec.PersistentVolume.Spec.CephFS, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly
+	return nil, false, fmt.Errorf("Spec does not reference a CephFS volume type")
 }

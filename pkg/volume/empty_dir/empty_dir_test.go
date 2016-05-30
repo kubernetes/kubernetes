@@ -33,9 +33,9 @@ import (
 )
 
 // Construct an instance of a plugin, by name.
-func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
+func makePluginUnderTest(t *testing.T, plugName, basePath, rootContext string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(basePath, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(basePath, nil, nil, rootContext))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
@@ -50,10 +50,10 @@ func TestCanSupport(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
 
-	if plug.Name() != "kubernetes.io/empty-dir" {
-		t.Errorf("Wrong name: %s", plug.Name())
+	if plug.GetPluginName() != "kubernetes.io/empty-dir" {
+		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}}) {
 		t.Errorf("Expected true")
@@ -130,7 +130,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
 		metadataDir = path.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/test-volume")
 
-		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, config.rootContext)
 		volumeName = "test-volume"
 		spec       = &api.Volume{
 			Name:         volumeName,
@@ -173,7 +173,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		pod,
 		&physicalMounter,
 		&mountDetector,
-		volume.VolumeOptions{RootContext: config.rootContext})
+		volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -258,13 +258,13 @@ func TestPluginBackCompat(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, "" /* rootContext */)
 
 	spec := &api.Volume{
 		Name: "vol1",
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""})
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -287,13 +287,13 @@ func TestMetrics(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
 
 	spec := &api.Volume{
 		Name: "vol1",
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""})
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

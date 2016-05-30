@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
@@ -35,10 +36,17 @@ import (
 // the attach/detach controller's actual state of the world cache.
 // This cache contains volumes->nodes i.e. a set of all volumes and the nodes
 // the attach/detach controller believes are successfully attached.
+// Note: This is distinct from the ActualStateOfWorld implemented by the kubelet
+// volume manager. They both keep track of different objects. This contains
+// attach/detach controller specific state.
 type ActualStateOfWorld interface {
+	// ActualStateOfWorld must implement the methods required to allow
+	// operationexecutor to interact with it.
+	operationexecutor.ActualStateOfWorldAttacherUpdater
+
 	// AddVolumeNode adds the given volume and node to the underlying store
 	// indicating the specified volume is attached to the specified node.
-	// A unique volumeName is generated from the volumeSpec and returned on
+	// A unique volume name is generated from the volumeSpec and returned on
 	// success.
 	// If the volume/node combo already exists, the detachRequestedTime is reset
 	// to zero.
@@ -93,15 +101,7 @@ type ActualStateOfWorld interface {
 
 // AttachedVolume represents a volume that is attached to a node.
 type AttachedVolume struct {
-	// VolumeName is the unique identifier for the volume that is attached.
-	VolumeName api.UniqueVolumeName
-
-	// VolumeSpec is the volume spec containing the specification for the
-	// volume that is attached.
-	VolumeSpec *volume.Spec
-
-	// NodeName is the identifier for the node that the volume is attached to.
-	NodeName string
+	operationexecutor.AttachedVolume
 
 	// MountedByNode indicates that this volume has been been mounted by the
 	// node and is unsafe to detach.
@@ -171,6 +171,17 @@ type nodeAttachedTo struct {
 
 	// detachRequestedTime used to capture the desire to detach this volume
 	detachRequestedTime time.Time
+}
+
+func (asw *actualStateOfWorld) MarkVolumeAsAttached(
+	volumeSpec *volume.Spec, nodeName string) error {
+	_, err := asw.AddVolumeNode(volumeSpec, nodeName)
+	return err
+}
+
+func (asw *actualStateOfWorld) MarkVolumeAsDetached(
+	volumeName api.UniqueVolumeName, nodeName string) {
+	asw.DeleteVolumeNode(volumeName, nodeName)
 }
 
 func (asw *actualStateOfWorld) AddVolumeNode(
@@ -330,16 +341,11 @@ func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
 	defer asw.RUnlock()
 
 	attachedVolumes := make([]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
-	for volumeName, volumeObj := range asw.attachedVolumes {
-		for nodeName, nodeObj := range volumeObj.nodesAttachedTo {
+	for _, volumeObj := range asw.attachedVolumes {
+		for _, nodeObj := range volumeObj.nodesAttachedTo {
 			attachedVolumes = append(
 				attachedVolumes,
-				AttachedVolume{
-					NodeName:            nodeName,
-					VolumeName:          volumeName,
-					VolumeSpec:          volumeObj.spec,
-					MountedByNode:       nodeObj.mountedByNode,
-					DetachRequestedTime: nodeObj.detachRequestedTime})
+				getAttachedVolume(&volumeObj, &nodeObj))
 		}
 	}
 
@@ -353,20 +359,29 @@ func (asw *actualStateOfWorld) GetAttachedVolumesForNode(
 
 	attachedVolumes := make(
 		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
-	for volumeName, volumeObj := range asw.attachedVolumes {
+	for _, volumeObj := range asw.attachedVolumes {
 		for actualNodeName, nodeObj := range volumeObj.nodesAttachedTo {
 			if actualNodeName == nodeName {
 				attachedVolumes = append(
 					attachedVolumes,
-					AttachedVolume{
-						NodeName:            nodeName,
-						VolumeName:          volumeName,
-						VolumeSpec:          volumeObj.spec,
-						MountedByNode:       nodeObj.mountedByNode,
-						DetachRequestedTime: nodeObj.detachRequestedTime})
+					getAttachedVolume(&volumeObj, &nodeObj))
 			}
 		}
 	}
 
 	return attachedVolumes
+}
+
+func getAttachedVolume(
+	attachedVolume *attachedVolume,
+	nodeAttachedTo *nodeAttachedTo) AttachedVolume {
+	return AttachedVolume{
+		AttachedVolume: operationexecutor.AttachedVolume{
+			VolumeName:         attachedVolume.volumeName,
+			VolumeSpec:         attachedVolume.spec,
+			NodeName:           nodeAttachedTo.nodeName,
+			PluginIsAttachable: true,
+		},
+		MountedByNode:       nodeAttachedTo.mountedByNode,
+		DetachRequestedTime: nodeAttachedTo.detachRequestedTime}
 }

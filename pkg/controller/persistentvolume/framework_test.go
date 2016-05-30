@@ -980,12 +980,20 @@ func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
 	return nil
 }
 
-func (plugin *mockVolumePlugin) Name() string {
+func (plugin *mockVolumePlugin) GetPluginName() string {
 	return mockPluginName
+}
+
+func (plugin *mockVolumePlugin) GetVolumeName(spec *vol.Spec) (string, error) {
+	return spec.Name(), nil
 }
 
 func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
 	return true
+}
+
+func (plugin *mockVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *api.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {

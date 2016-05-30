@@ -85,6 +85,10 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *emptyDirPlugin) RequiresRemount() bool {
+	return false
+}
+
 func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts)
 }
@@ -101,7 +105,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
-		rootContext:     opts.RootContext,
+		rootContext:     plugin.host.GetRootContext(),
 		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
