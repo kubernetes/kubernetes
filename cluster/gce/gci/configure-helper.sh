@@ -630,7 +630,13 @@ function start-cluster-autoscaler {
     remove-salt-config-comments "${src_file}"
 
     local params=`sed 's/^/"/;s/ /","/g;s/$/",/' <<< "${AUTOSCALER_MIG_CONFIG}"`
+    if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
+      params+=" --cloud-config=/etc/gce.conf"
+    fi
+
     sed -i -e "s@\"{{param}}\",@${params}@g" "${src_file}"
+    sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
+    sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
     sed -i -e "s@{%.*%}@@g" "${src_file}"
     cp "${src_file}" /etc/kubernetes/manifests
   fi
