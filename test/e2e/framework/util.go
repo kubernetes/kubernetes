@@ -358,18 +358,13 @@ func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInter
 }
 
 // Detects whether the federation namespace exists in the underlying cluster
-func SkipUnlessFederated() {
-	c, err := LoadClient()
-	if err != nil {
-		Failf("Unable to load client: %v", err)
-	}
-
+func SkipUnlessFederated(c *client.Client) {
 	federationNS := os.Getenv("FEDERATION_NAMESPACE")
 	if federationNS == "" {
 		federationNS = "federation-e2e"
 	}
 
-	_, err = c.Namespaces().Get(federationNS)
+	_, err := c.Namespaces().Get(federationNS)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Skipf("Could not find federation namespace %s: skipping federated test", federationNS)
@@ -482,11 +477,7 @@ func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api
 // WaitForPodsSuccess waits till all labels matching the given selector enter
 // the Success state. The caller is expected to only invoke this method once the
 // pods have been created.
-func WaitForPodsSuccess(ns string, successPodLabels map[string]string, timeout time.Duration) error {
-	c, err := LoadClient()
-	if err != nil {
-		return err
-	}
+func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string]string, timeout time.Duration) error {
 	successPodSelector := labels.SelectorFromSet(successPodLabels)
 	start, badPods := time.Now(), []api.Pod{}
 
@@ -533,11 +524,7 @@ func WaitForPodsSuccess(ns string, successPodLabels map[string]string, timeout t
 // returned even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
-func WaitForPodsRunningReady(ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
-	c, err := LoadClient()
-	if err != nil {
-		return err
-	}
+func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
@@ -618,12 +605,7 @@ func podFromManifest(filename string) (*api.Pod, error) {
 
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
 // to flip to Ready, log its output and delete it.
-func RunKubernetesServiceTestContainer(repoRoot string, ns string) {
-	c, err := LoadClient()
-	if err != nil {
-		Logf("Failed to load client")
-		return
-	}
+func RunKubernetesServiceTestContainer(c *client.Client, repoRoot string, ns string) {
 	path := filepath.Join(repoRoot, "test", "images", "clusterapi-tester", "pod.yaml")
 	p, err := podFromManifest(path)
 	if err != nil {
@@ -667,12 +649,7 @@ func kubectlLogPod(c *client.Client, pod api.Pod) {
 	}
 }
 
-func LogFailedContainers(ns string) {
-	c, err := LoadClient()
-	if err != nil {
-		Logf("Failed to load client")
-		return
-	}
+func LogFailedContainers(c *client.Client, ns string) {
 	podList, err := c.Pods(ns).List(api.ListOptions{})
 	if err != nil {
 		Logf("Error getting pods in namespace '%s': %v", ns, err)
@@ -2366,7 +2343,7 @@ func (config *RCConfig) start() error {
 		if startupStatus.FailedContainers > maxContainerFailures {
 			DumpNodeDebugInfo(config.Client, startupStatus.ContainerRestartNodes.List())
 			// Get the logs from the failed containers to help diagnose what caused them to fail
-			LogFailedContainers(config.Namespace)
+			LogFailedContainers(config.Client, config.Namespace)
 			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
 		}
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {

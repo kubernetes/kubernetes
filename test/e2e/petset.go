@@ -62,9 +62,7 @@ var _ = framework.KubeDescribe("PetSet", func() {
 		// dynamic volume provisioner.
 		framework.SkipUnlessProviderIs("gce")
 
-		var err error
-		c, err = framework.LoadClient()
-		Expect(err).NotTo(HaveOccurred())
+		c = f.Client
 		ns = f.Namespace.Name
 	})
 
