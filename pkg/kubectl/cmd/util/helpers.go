@@ -488,6 +488,10 @@ func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
 	return GetRecordFlag(cmd) || ContainsChangeCause(info)
 }
 
+// GetThirdPartyGroupVersions returns the thirdparty "group/versions"s and
+// resources supported by the server. A user may delete a thirdparty resource
+// when this function is running, so this function may return a "NotFound" error
+// due to the race.
 func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unversioned.GroupVersion, []unversioned.GroupVersionKind, error) {
 	result := []unversioned.GroupVersion{}
 	gvks := []unversioned.GroupVersionKind{}
