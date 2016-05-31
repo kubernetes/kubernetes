@@ -19,12 +19,15 @@ limitations under the License.
 package integration
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -172,6 +175,9 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 }
 
 func TestPersistentVolumeMultiPVs(t *testing.T) {
+	flag.Lookup("v").Value.Set("5")
+	glog.V(5).Infof("TestPersistentVolumeMultiPVs started - level 5")
+	glog.V(1).Infof("TestPersistentVolumeMultiPVs started - level 1")
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
@@ -248,6 +254,9 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 }
 
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
+	flag.Lookup("v").Value.Set("5")
+	glog.V(5).Infof("TestPersistentVolumeMultiPVs started - level 5")
+	glog.V(1).Infof("TestPersistentVolumeMultiPVs started - level 1")
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
