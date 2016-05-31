@@ -20,10 +20,11 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 )
 
-type SortableResourceNames []api.ResourceName
+type SortableResourceNames []resource.Name
 
 func (list SortableResourceNames) Len() int {
 	return len(list)
@@ -38,8 +39,8 @@ func (list SortableResourceNames) Less(i, j int) bool {
 }
 
 // SortedResourceNames returns the sorted resource names of a resource list.
-func SortedResourceNames(list api.ResourceList) []api.ResourceName {
-	resources := make([]api.ResourceName, 0, len(list))
+func SortedResourceNames(list resource.List) []resource.Name {
+	resources := make([]resource.Name, 0, len(list))
 	for res := range list {
 		resources = append(resources, res)
 	}
@@ -62,8 +63,8 @@ func (list SortableResourceQuotas) Less(i, j int) bool {
 }
 
 // SortedQoSResourceNames returns the sorted resource names of a QoS list.
-func SortedQoSResourceNames(list qosutil.QoSList) []api.ResourceName {
-	resources := make([]api.ResourceName, 0, len(list))
+func SortedQoSResourceNames(list qosutil.QoSList) []resource.Name {
+	resources := make([]resource.Name, 0, len(list))
 	for res := range list {
 		resources = append(resources, res)
 	}

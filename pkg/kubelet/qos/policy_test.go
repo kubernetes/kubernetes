@@ -34,8 +34,8 @@ var (
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Limits: api.ResourceList{
-							api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+						Limits: resource.List{
+							resource.Name(api.ResourceCPU): resource.MustParse("10"),
 						},
 					},
 				},
@@ -48,11 +48,11 @@ var (
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceCPU): resource.MustParse("0"),
+						Requests: resource.List{
+							resource.Name(api.ResourceCPU): resource.MustParse("0"),
 						},
-						Limits: api.ResourceList{
-							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						Limits: resource.List{
+							resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
 				},
@@ -65,8 +65,8 @@ var (
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Limits: api.ResourceList{
-							api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+						Limits: resource.List{
+							resource.Name(api.ResourceMemory): resource.MustParse("0"),
 						},
 					},
 				},
@@ -89,13 +89,13 @@ var (
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-							api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
+						Requests: resource.List{
+							resource.Name(api.ResourceMemory): resource.MustParse("10G"),
+							resource.Name(api.ResourceCPU):    resource.MustParse("5m"),
 						},
-						Limits: api.ResourceList{
-							api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
-							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						Limits: resource.List{
+							resource.Name(api.ResourceCPU):    resource.MustParse("5m"),
+							resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
 				},
@@ -108,12 +108,12 @@ var (
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount / 2)),
-							api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
+						Requests: resource.List{
+							resource.Name(api.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount / 2)),
+							resource.Name(api.ResourceCPU):    resource.MustParse("5m"),
 						},
-						Limits: api.ResourceList{
-							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						Limits: resource.List{
+							resource.Name(api.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
 				},
@@ -126,9 +126,9 @@ var (
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount - 1)),
-							api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
+						Requests: resource.List{
+							resource.Name(api.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount - 1)),
+							resource.Name(api.ResourceCPU):    resource.MustParse("5m"),
 						},
 					},
 				},

@@ -318,10 +318,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 						Name:  "",
 						Image: framework.GetPauseImageName(f.Client),
 						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
+							Limits: resource.List{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
-							Requests: api.ResourceList{
+							Requests: resource.List{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
 						},
@@ -345,7 +345,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 						Name:  podName,
 						Image: framework.GetPauseImageName(f.Client),
 						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
+							Limits: resource.List{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
 						},

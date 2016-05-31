@@ -143,11 +143,11 @@ func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, e
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"sh", "-c", "env"},
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
+						Requests: resource.List{
 							api.ResourceCPU:    resource.MustParse("250m"),
 							api.ResourceMemory: resource.MustParse("32Mi"),
 						},
-						Limits: api.ResourceList{
+						Limits: resource.List{
 							api.ResourceCPU:    resource.MustParse("1250m"),
 							api.ResourceMemory: resource.MustParse("64Mi"),
 						},

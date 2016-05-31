@@ -92,7 +92,7 @@ func makeNodes(c client.Interface, nodeCount int) {
 			ExternalID: "foobar",
 		},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
 				api.ResourceCPU:    resource.MustParse("4"),
 				api.ResourceMemory: resource.MustParse("32Gi"),
@@ -117,11 +117,11 @@ func makePodSpec() api.PodSpec {
 			Image: e2e.GetPauseImageNameForHostArch(),
 			Ports: []api.ContainerPort{{ContainerPort: 80}},
 			Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{
+				Limits: resource.List{
 					api.ResourceCPU:    resource.MustParse("100m"),
 					api.ResourceMemory: resource.MustParse("500Mi"),
 				},
-				Requests: api.ResourceList{
+				Requests: resource.List{
 					api.ResourceCPU:    resource.MustParse("100m"),
 					api.ResourceMemory: resource.MustParse("500Mi"),
 				},

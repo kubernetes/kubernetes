@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 var (
@@ -40,7 +40,7 @@ type dataSource interface {
 	// withing time range (start, end), number of samples considered and error if occured.
 	// If <exactMatch> then take only samples that concern the same image (both name and take are the same),
 	// otherwise consider also samples with the same image a possibly different tag.
-	GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error)
+	GetUsagePercentile(kind resource.Name, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error)
 }
 
 func newDataSource(kind string) (dataSource, error) {

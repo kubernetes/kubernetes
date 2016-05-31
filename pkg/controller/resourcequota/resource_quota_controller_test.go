@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func getResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func getResourceList(cpu, memory string) resource.List {
+	res := resource.List{}
 	if cpu != "" {
 		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
@@ -41,7 +41,7 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
-func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
+func getResourceRequirements(requests, limits resource.List) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
@@ -80,7 +80,7 @@ func TestSyncResourceQuota(t *testing.T) {
 	resourceQuota := api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "testing"},
 		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
@@ -89,12 +89,12 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:    resource.MustParse("3"),
 				api.ResourceMemory: resource.MustParse("100Gi"),
 				api.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU:    resource.MustParse("200m"),
 				api.ResourceMemory: resource.MustParse("2Gi"),
 				api.ResourcePods:   resource.MustParse("2"),
@@ -163,15 +163,15 @@ func TestSyncResourceQuota(t *testing.T) {
 func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	resourceQuota := api.ResourceQuota{
 		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU: resource.MustParse("4"),
 			},
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU: resource.MustParse("3"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU: resource.MustParse("0"),
 			},
 		},
@@ -179,10 +179,10 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU: resource.MustParse("4"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU: resource.MustParse("0"),
 			},
 		},
@@ -251,15 +251,15 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 func TestSyncResourceQuotaNoChange(t *testing.T) {
 	resourceQuota := api.ResourceQuota{
 		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU: resource.MustParse("4"),
 			},
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU: resource.MustParse("4"),
 			},
-			Used: api.ResourceList{
+			Used: resource.List{
 				api.ResourceCPU: resource.MustParse("0"),
 			},
 		},

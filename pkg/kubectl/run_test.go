@@ -360,11 +360,11 @@ func TestGenerate(t *testing.T) {
 									Name:  "foo",
 									Image: "someimage",
 									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
+										Requests: resource.List{
 											api.ResourceCPU:    resource.MustParse("100m"),
 											api.ResourceMemory: resource.MustParse("100Mi"),
 										},
-										Limits: api.ResourceList{
+										Limits: resource.List{
 											api.ResourceCPU:    resource.MustParse("400m"),
 											api.ResourceMemory: resource.MustParse("200Mi"),
 										},
@@ -688,11 +688,11 @@ func TestGenerateDeployment(t *testing.T) {
 										},
 									},
 									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
+										Requests: resource.List{
 											api.ResourceCPU:    resource.MustParse("100m"),
 											api.ResourceMemory: resource.MustParse("100Mi"),
 										},
-										Limits: api.ResourceList{
+										Limits: resource.List{
 											api.ResourceCPU:    resource.MustParse("400m"),
 											api.ResourceMemory: resource.MustParse("200Mi"),
 										},
@@ -783,11 +783,11 @@ func TestGenerateJob(t *testing.T) {
 										},
 									},
 									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
+										Requests: resource.List{
 											api.ResourceCPU:    resource.MustParse("100m"),
 											api.ResourceMemory: resource.MustParse("100Mi"),
 										},
-										Limits: api.ResourceList{
+										Limits: resource.List{
 											api.ResourceCPU:    resource.MustParse("400m"),
 											api.ResourceMemory: resource.MustParse("200Mi"),
 										},

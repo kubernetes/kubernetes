@@ -440,8 +440,8 @@ func (fc *FakeProvisioner) Provision() (*api.PersistentVolume, error) {
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: fc.Options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   fc.Options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): fc.Options.Capacity,
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): fc.Options.Capacity,
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{

@@ -48,8 +48,8 @@ func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -87,8 +87,8 @@ func TestUpdate(t *testing.T) {
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.PersistentVolumeClaim)
 			object.Spec.Resources = api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("20G"),
 				},
 			}
 			return object
@@ -159,8 +159,8 @@ func TestUpdateStatus(t *testing.T) {
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("3Gi"),
 				},
 			},
 		},

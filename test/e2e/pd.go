@@ -446,7 +446,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 			containers[i].VolumeMounts[k].MountPath = fmt.Sprintf("/testpd%v", k+1)
 		}
 
-		containers[i].Resources.Limits = api.ResourceList{}
+		containers[i].Resources.Limits = resource.List{}
 		containers[i].Resources.Limits[api.ResourceCPU] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 
 	}

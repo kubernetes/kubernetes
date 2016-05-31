@@ -28,7 +28,7 @@ const (
 )
 
 // isResourceGuaranteed returns true if the container's resource requirements are Guaranteed.
-func isResourceGuaranteed(container *api.Container, resource api.ResourceName) bool {
+func isResourceGuaranteed(container *api.Container, resource resource.Name) bool {
 	// A container resource is guaranteed if its request == limit.
 	// If request == limit, the user is very confident of resource consumption.
 	req, hasReq := container.Resources.Requests[resource]
@@ -40,7 +40,7 @@ func isResourceGuaranteed(container *api.Container, resource api.ResourceName) b
 }
 
 // isResourceBestEffort returns true if the container's resource requirements are best-effort.
-func isResourceBestEffort(container *api.Container, resource api.ResourceName) bool {
+func isResourceBestEffort(container *api.Container, resource resource.Name) bool {
 	// A container resource is best-effort if its request is unspecified or 0.
 	// If a request is specified, then the user expects some kind of resource guarantee.
 	req, hasReq := container.Resources.Requests[resource]
@@ -52,8 +52,8 @@ func isResourceBestEffort(container *api.Container, resource api.ResourceName) b
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
 func GetPodQos(pod *api.Pod) string {
-	requests := api.ResourceList{}
-	limits := api.ResourceList{}
+	requests := resource.List{}
+	limits := resource.List{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
 	for _, container := range pod.Spec.Containers {
@@ -106,7 +106,7 @@ func GetPodQos(pod *api.Pod) string {
 }
 
 // QoSList is a set of (resource name, QoS class) pairs.
-type QoSList map[api.ResourceName]string
+type QoSList map[resource.Name]string
 
 // GetQoS returns a mapping of resource name to QoS class of a container
 func GetQoS(container *api.Container) QoSList {
@@ -125,14 +125,14 @@ func GetQoS(container *api.Container) QoSList {
 }
 
 // supportedComputeResources is the list of supported compute resources
-var supportedComputeResources = []api.ResourceName{
+var supportedComputeResources = []resource.Name{
 	api.ResourceCPU,
 	api.ResourceMemory,
 }
 
 // allResources returns a set of all possible resources whose mapped key value is true if present on the container
-func allResources(container *api.Container) map[api.ResourceName]bool {
-	resources := map[api.ResourceName]bool{}
+func allResources(container *api.Container) map[resource.Name]bool {
+	resources := map[resource.Name]bool{}
 	for _, resource := range supportedComputeResources {
 		resources[resource] = false
 	}

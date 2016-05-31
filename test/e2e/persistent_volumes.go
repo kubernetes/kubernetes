@@ -124,8 +124,8 @@ func makePersistentVolume(serverIP string) *api.PersistentVolume {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("2Gi"),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse("2Gi"),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				NFS: &api.NFSVolumeSource{
@@ -156,8 +156,8 @@ func makePersistentVolumeClaim(ns string) *api.PersistentVolumeClaim {
 				api.ReadWriteMany,
 			},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi"),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse("1Gi"),
 				},
 			},
 		},

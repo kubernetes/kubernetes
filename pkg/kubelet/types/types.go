@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage
@@ -71,7 +72,7 @@ func (s SortedContainerStatuses) Less(i, j int) bool {
 // Reservation represents reserved resources for non-pod components.
 type Reservation struct {
 	// System represents resources reserved for non-kubernetes components.
-	System api.ResourceList
+	System resource.List
 	// Kubernetes represents resources reserved for kubernetes system components.
-	Kubernetes api.ResourceList
+	Kubernetes resource.List
 }

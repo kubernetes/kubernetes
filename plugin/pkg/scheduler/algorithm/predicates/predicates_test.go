@@ -73,7 +73,7 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*api.P
 
 func makeResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) api.NodeResources {
 	return api.NodeResources{
-		Capacity: api.ResourceList{
+		Capacity: resource.List{
 			api.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 			api.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
 			api.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
@@ -82,8 +82,8 @@ func makeResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) a
 	}
 }
 
-func makeAllocatableResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) api.ResourceList {
-	return api.ResourceList{
+func makeAllocatableResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) resource.List {
+	return resource.List{
 		api.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 		api.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
 		api.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
@@ -96,7 +96,7 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 	for _, req := range usage {
 		containers = append(containers, api.Container{
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
+				Requests: resource.List{
 					api.ResourceCPU:       *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
 					api.ResourceMemory:    *resource.NewQuantity(req.memory, resource.BinarySI),
 					api.ResourceNvidiaGPU: *resource.NewQuantity(req.nvidiaGPU, resource.DecimalSI),
@@ -276,7 +276,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
+		node := api.Node{Status: api.NodeStatus{Capacity: resource.List{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
 		test.nodeInfo.SetNode(&node)
 
 		fits, err := PodFitsResources(test.pod, test.nodeInfo)

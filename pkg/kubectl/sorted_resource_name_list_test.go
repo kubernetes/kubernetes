@@ -21,26 +21,26 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 func TestSortableResourceNamesSorting(t *testing.T) {
 	want := SortableResourceNames{
-		api.ResourceName(""),
-		api.ResourceName("42"),
-		api.ResourceName("bar"),
-		api.ResourceName("foo"),
-		api.ResourceName("foo"),
-		api.ResourceName("foobar"),
+		resource.Name(""),
+		resource.Name("42"),
+		resource.Name("bar"),
+		resource.Name("foo"),
+		resource.Name("foo"),
+		resource.Name("foobar"),
 	}
 
 	in := SortableResourceNames{
-		api.ResourceName("foo"),
-		api.ResourceName("42"),
-		api.ResourceName("foobar"),
-		api.ResourceName("foo"),
-		api.ResourceName("bar"),
-		api.ResourceName(""),
+		resource.Name("foo"),
+		resource.Name("42"),
+		resource.Name("foobar"),
+		resource.Name("foo"),
+		resource.Name("bar"),
+		resource.Name(""),
 	}
 
 	sort.Sort(in)

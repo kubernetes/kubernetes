@@ -40,11 +40,11 @@ const (
 	// the message associated with the reason.
 	message = "The node was low on compute resources."
 	// disk, in bytes.  internal to this module, used to account for local disk usage.
-	resourceDisk api.ResourceName = "disk"
+	resourceDisk resource.Name = "disk"
 )
 
 // resourceToRankFunc maps a resource to ranking function for that resource.
-var resourceToRankFunc = map[api.ResourceName]rankFunc{
+var resourceToRankFunc = map[resource.Name]rankFunc{
 	api.ResourceMemory: rankMemoryPressure,
 }
 
@@ -54,7 +54,7 @@ var signalToNodeCondition = map[Signal]api.NodeConditionType{
 }
 
 // signalToResource maps a Signal to its associated Resource.
-var signalToResource = map[Signal]api.ResourceName{
+var signalToResource = map[Signal]resource.Name{
 	SignalMemoryAvailable: api.ResourceMemory,
 }
 
@@ -206,7 +206,7 @@ func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 
 // podUsage aggregates usage of compute resources.
 // it supports the following memory and disk.
-func podUsage(podStats statsapi.PodStats) (api.ResourceList, error) {
+func podUsage(podStats statsapi.PodStats) (resource.List, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	memory := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
@@ -218,7 +218,7 @@ func podUsage(podStats statsapi.PodStats) (api.ResourceList, error) {
 		// memory usage (if known)
 		memory.Add(*memoryUsage(container.Memory))
 	}
-	return api.ResourceList{
+	return resource.List{
 		api.ResourceMemory: memory,
 		resourceDisk:       disk,
 	}, nil
@@ -405,8 +405,8 @@ func rankDiskPressure(pods []*api.Pod, stats statsFunc) {
 	orderedBy(qos, disk(stats)).Sort(pods)
 }
 
-// byEvictionPriority implements sort.Interface for []api.ResourceName.
-type byEvictionPriority []api.ResourceName
+// byEvictionPriority implements sort.Interface for []resource.Name.
+type byEvictionPriority []resource.Name
 
 func (a byEvictionPriority) Len() int      { return len(a) }
 func (a byEvictionPriority) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -542,8 +542,8 @@ func hasThreshold(inputs []Threshold, item Threshold) bool {
 }
 
 // reclaimResources returns the set of resources that are starved based on thresholds met.
-func reclaimResources(thresholds []Threshold) []api.ResourceName {
-	results := []api.ResourceName{}
+func reclaimResources(thresholds []Threshold) []resource.Name {
+	results := []resource.Name{}
 	for _, threshold := range thresholds {
 		if starvedResource, found := signalToResource[threshold.Signal]; found {
 			results = append(results, starvedResource)
@@ -553,7 +553,7 @@ func reclaimResources(thresholds []Threshold) []api.ResourceName {
 }
 
 // isSoftEviction returns true if the thresholds met for the starved resource are only soft thresholds
-func isSoftEviction(thresholds []Threshold, starvedResource api.ResourceName) bool {
+func isSoftEviction(thresholds []Threshold, starvedResource resource.Name) bool {
 	for _, threshold := range thresholds {
 		if resourceToCheck := signalToResource[threshold.Signal]; resourceToCheck != starvedResource {
 			continue

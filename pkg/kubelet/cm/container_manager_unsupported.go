@@ -21,7 +21,7 @@ package cm
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
@@ -35,8 +35,8 @@ func (unsupportedContainerManager) Start() error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func (unsupportedContainerManager) SystemCgroupsLimit() api.ResourceList {
-	return api.ResourceList{}
+func (unsupportedContainerManager) SystemCgroupsLimit() resource.List {
+	return resource.List{}
 }
 
 func (unsupportedContainerManager) GetNodeConfig() NodeConfig {

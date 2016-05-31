@@ -954,8 +954,8 @@ func TestSetApp(t *testing.T) {
 				Command:    []string{"/bin/bar", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
-					Limits:   api.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
-					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+					Limits:   resource.List{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
+					Requests: resource.List{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
 				},
 			},
 			opts: &kubecontainer.RunContainerOptions{
@@ -1016,8 +1016,8 @@ func TestSetApp(t *testing.T) {
 				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: api.ResourceRequirements{
-					Limits:   api.ResourceList{"cpu": resource.MustParse("50m")},
-					Requests: api.ResourceList{"memory": resource.MustParse("5M")},
+					Limits:   resource.List{"cpu": resource.MustParse("50m")},
+					Requests: resource.List{"memory": resource.MustParse("5M")},
 				},
 			},
 			opts: &kubecontainer.RunContainerOptions{

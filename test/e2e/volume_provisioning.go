@@ -74,11 +74,11 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			// Check sizes
 			expectedCapacity := resource.MustParse(expectedSize)
-			pvCapacity := pv.Spec.Capacity[api.ResourceName(api.ResourceStorage)]
+			pvCapacity := pv.Spec.Capacity[resource.Name(api.ResourceStorage)]
 			Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()))
 
 			requestedCapacity := resource.MustParse(requestedSize)
-			claimCapacity := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+			claimCapacity := claim.Spec.Resources.Requests[resource.Name(api.ResourceStorage)]
 			Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()))
 
 			// Check PV properties
@@ -138,8 +138,8 @@ func createClaim(ns string) *api.PersistentVolumeClaim {
 				api.ReadWriteOnce,
 			},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse(requestedSize),
+				Requests: resource.List{
+					resource.Name(api.ResourceStorage): resource.MustParse(requestedSize),
 				},
 			},
 		},

@@ -416,20 +416,20 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 }
 
 // populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
-func populateResourceList(spec string) (api.ResourceList, error) {
+func populateResourceList(spec string) (resource.List, error) {
 	// empty input gets a nil response to preserve generator test expected behaviors
 	if spec == "" {
 		return nil, nil
 	}
 
-	result := api.ResourceList{}
+	result := resource.List{}
 	resourceStatements := strings.Split(spec, ",")
 	for _, resourceStatement := range resourceStatements {
 		parts := strings.Split(resourceStatement, "=")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
 		}
-		resourceName := api.ResourceName(parts[0])
+		resourceName := resource.Name(parts[0])
 		resourceQuantity, err := resource.ParseQuantity(parts[1])
 		if err != nil {
 			return nil, err
@@ -440,20 +440,20 @@ func populateResourceList(spec string) (api.ResourceList, error) {
 }
 
 // populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
-func populateV1ResourceList(spec string) (v1.ResourceList, error) {
+func populateV1ResourceList(spec string) (resource.List, error) {
 	// empty input gets a nil response to preserve generator test expected behaviors
 	if spec == "" {
 		return nil, nil
 	}
 
-	result := v1.ResourceList{}
+	result := resource.List{}
 	resourceStatements := strings.Split(spec, ",")
 	for _, resourceStatement := range resourceStatements {
 		parts := strings.Split(resourceStatement, "=")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
 		}
-		resourceName := v1.ResourceName(parts[0])
+		resourceName := resource.Name(parts[0])
 		resourceQuantity, err := resource.ParseQuantity(parts[1])
 		if err != nil {
 			return nil, err

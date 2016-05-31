@@ -2229,7 +2229,7 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 		}
 	}
 	if config.CpuLimit > 0 || config.MemLimit > 0 {
-		template.Spec.Containers[0].Resources.Limits = api.ResourceList{}
+		template.Spec.Containers[0].Resources.Limits = resource.List{}
 	}
 	if config.CpuLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuLimit, resource.DecimalSI)
@@ -2238,7 +2238,7 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 		template.Spec.Containers[0].Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
 	}
 	if config.CpuRequest > 0 || config.MemRequest > 0 {
-		template.Spec.Containers[0].Resources.Requests = api.ResourceList{}
+		template.Spec.Containers[0].Resources.Requests = resource.List{}
 	}
 	if config.CpuRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -179,7 +180,7 @@ func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selec
 	for _, m := range metrics {
 		if _, found := podNames[m.Name]; found {
 			for _, c := range m.Containers {
-				cpu, found := c.Usage[v1.ResourceCPU]
+				cpu, found := c.Usage[v1.ResourceName(v1.ResourceCPU)]
 				if !found {
 					return 0, time.Time{}, fmt.Errorf("no cpu for container %v in pod %v/%v", c.Name, namespace, m.Name)
 				}

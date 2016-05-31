@@ -404,8 +404,8 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: v.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   v.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", sizeKB)),
+			Capacity: resource.List{
+				resource.Name(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", sizeKB)),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				VsphereVolume: &api.VsphereVirtualDiskVolumeSource{

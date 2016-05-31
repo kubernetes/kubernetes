@@ -181,7 +181,7 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 					Name:  "pause",
 					Image: framework.GetPauseImageName(c),
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
+						Requests: resource.List{
 							// Request enough CPU to fit only two pods on a given node.
 							api.ResourceCPU: *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 						},

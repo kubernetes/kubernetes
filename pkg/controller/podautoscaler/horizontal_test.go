@@ -264,7 +264,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 					Containers: []api.Container{
 						{
 							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
+								Requests: resource.List{
 									api.ResourceCPU: tc.reportedCPURequests[i],
 								},
 							},
@@ -296,10 +296,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						{
 							Name: "container",
 							Usage: v1.ResourceList{
-								v1.ResourceCPU: *resource.NewMilliQuantity(
+								v1.ResourceName(v1.ResourceCPU): *resource.NewMilliQuantity(
 									int64(cpu),
 									resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(
+								v1.ResourceName(v1.ResourceMemory): *resource.NewQuantity(
 									int64(1024*1024),
 									resource.BinarySI),
 							},

@@ -29,8 +29,9 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/hawkular/hawkular-client-go/metrics"
-	"k8s.io/kubernetes/pkg/api"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
@@ -51,7 +52,7 @@ const (
 )
 
 // heapsterName gets the equivalent MetricDescriptor.Name used in the Heapster
-func heapsterName(kind api.ResourceName) string {
+func heapsterName(kind resource.Name) string {
 	switch kind {
 	case api.ResourceCPU:
 		return "cpu/usage"
@@ -63,7 +64,7 @@ func heapsterName(kind api.ResourceName) string {
 }
 
 // tagQuery creates tagFilter query for Hawkular
-func tagQuery(kind api.ResourceName, image string, exactMatch bool) map[string]string {
+func tagQuery(kind resource.Name, image string, exactMatch bool) map[string]string {
 	q := make(map[string]string)
 
 	// Add here the descriptor_tag..
@@ -84,7 +85,7 @@ func tagQuery(kind api.ResourceName, image string, exactMatch bool) map[string]s
 
 // dataSource API
 
-func (hs *hawkularSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+func (hs *hawkularSource) GetUsagePercentile(kind resource.Name, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 	q := tagQuery(kind, image, exactMatch)
 
 	m := make([]metrics.Modifier, len(hs.modifiers), 2+len(hs.modifiers))

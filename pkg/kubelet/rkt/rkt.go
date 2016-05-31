@@ -40,7 +40,9 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -340,15 +342,15 @@ func setIsolators(app *appctypes.App, c *api.Container, ctx *api.SecurityContext
 	}
 
 	// Resources isolators.
-	type resource struct {
+	type isolator struct {
 		limit   string
 		request string
 	}
 
 	// If limit is empty, populate it with request and vice versa.
-	resources := make(map[api.ResourceName]*resource)
+	resources := make(map[resource.Name]*isolator)
 	for name, quantity := range c.Resources.Limits {
-		resources[name] = &resource{limit: quantity.String(), request: quantity.String()}
+		resources[name] = &isolator{limit: quantity.String(), request: quantity.String()}
 	}
 	for name, quantity := range c.Resources.Requests {
 		r, ok := resources[name]
@@ -356,7 +358,7 @@ func setIsolators(app *appctypes.App, c *api.Container, ctx *api.SecurityContext
 			r.request = quantity.String()
 			continue
 		}
-		resources[name] = &resource{limit: quantity.String(), request: quantity.String()}
+		resources[name] = &isolator{limit: quantity.String(), request: quantity.String()}
 	}
 
 	for name, res := range resources {

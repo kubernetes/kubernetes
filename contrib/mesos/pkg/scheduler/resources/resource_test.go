@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 type resources struct {
@@ -61,7 +63,7 @@ func TestResources(tst *testing.T) {
 		}
 
 		if defined(t.input.cpuR) || defined(t.input.memR) {
-			pod.Spec.Containers[0].Resources.Requests = api.ResourceList{}
+			pod.Spec.Containers[0].Resources.Requests = resource.List{}
 			if defined(t.input.cpuR) {
 				pod.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = *CPUShares(t.input.cpuR).Quantity()
 			}
@@ -70,7 +72,7 @@ func TestResources(tst *testing.T) {
 			}
 		}
 		if defined(t.input.cpuL) || defined(t.input.memL) {
-			pod.Spec.Containers[0].Resources.Limits = api.ResourceList{}
+			pod.Spec.Containers[0].Resources.Limits = resource.List{}
 			if defined(t.input.cpuL) {
 				pod.Spec.Containers[0].Resources.Limits[api.ResourceCPU] = *CPUShares(t.input.cpuL).Quantity()
 			}

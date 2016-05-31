@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -81,9 +82,9 @@ type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
 	Conditions []ClusterCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 	// Capacity represents the total resources of the cluster
-	Capacity v1.ResourceList `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity,casttype=k8s.io/kubernetes/pkg/api/v1.ResourceList,castkey=k8s.io/kubernetes/pkg/api/v1.ResourceName"`
+	Capacity resource.List `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity,casttype=k8s.io/kubernetes/pkg/api/resource.List,castkey=k8s.io/kubernetes/pkg/api/v1.resource.Name"`
 	// Allocatable represents the total resources of a cluster that are available for scheduling.
-	Allocatable v1.ResourceList `json:"allocatable,omitempty" protobuf:"bytes,3,rep,name=allocatable,casttype=k8s.io/kubernetes/pkg/api/v1.ResourceList,castkey=k8s.io/kubernetes/pkg/api/v1.ResourceName"`
+	Allocatable resource.List `json:"allocatable,omitempty" protobuf:"bytes,3,rep,name=allocatable,casttype=k8s.io/kubernetes/pkg/api/resource.List,castkey=k8s.io/kubernetes/pkg/api/v1.resource.Name"`
 	ClusterMeta `json:",inline" protobuf:"bytes,4,opt,name=clusterMeta"`
 	// Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.

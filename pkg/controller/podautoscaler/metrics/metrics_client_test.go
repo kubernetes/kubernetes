@@ -116,10 +116,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 					cm := metrics_api.ContainerMetrics{
 						Name: fmt.Sprintf("%s-%d-container-%d", podNamePrefix, i, j),
 						Usage: v1.ResourceList{
-							v1.ResourceCPU: *resource.NewMilliQuantity(
+							v1.ResourceName(v1.ResourceCPU): *resource.NewMilliQuantity(
 								cpu,
 								resource.DecimalSI),
-							v1.ResourceMemory: *resource.NewQuantity(
+							v1.ResourceName(v1.ResourceMemory): *resource.NewQuantity(
 								int64(1024*1024),
 								resource.BinarySI),
 						},
@@ -170,7 +170,7 @@ func buildPod(namespace, podName string, podLabels map[string]string, phase api.
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
+						Requests: resource.List{
 							api.ResourceCPU: resource.MustParse("10"),
 						},
 					},

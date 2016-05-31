@@ -107,7 +107,7 @@ func TestCreateNode(t *testing.T) {
 			Name: "node-1",
 		},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
 			},
@@ -151,7 +151,7 @@ func TestUpdateNode(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
 			},

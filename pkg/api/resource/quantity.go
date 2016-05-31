@@ -496,6 +496,14 @@ func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 	return q.i.AsScale(scale)
 }
 
+// Scale returns the scale of the quantity.
+func (q *Quantity) Scale() Scale {
+	if q.d.Dec != nil {
+		return Scale(-q.d.Scale())
+	}
+	return q.i.scale
+}
+
 // RoundUp updates the quantity to the provided scale, ensuring that the value is at
 // least 1. False is returned if the rounding operation resulted in a loss of precision.
 // Negative numbers are rounded away from zero (-9 scale 1 rounds to -10).

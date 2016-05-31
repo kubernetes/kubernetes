@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -621,21 +622,19 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityCont
 	return nil
 }
 
-func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.ResourceList, s conversion.Scope) error {
+func Convert_v1_ResourceList_To_api_ResourceList(in *resource.List, out *resource.List, s conversion.Scope) error {
 	if *in == nil {
 		return nil
 	}
-
-	if *out == nil {
-		*out = make(api.ResourceList, len(*in))
-	}
+	*out = *in
 	for key, val := range *in {
 		// TODO(#18538): We round up resource values to milli scale to maintain API compatibility.
 		// In the future, we should instead reject values that need rounding.
 		const milliScale = -3
-		val.RoundUp(milliScale)
-
-		(*out)[api.ResourceName(key)] = val
+		if val.Scale() < milliScale {
+			val.RoundUp(milliScale)
+			(*in)[resource.Name(key)] = val
+		}
 	}
 	return nil
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
@@ -373,7 +374,7 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 	return result
 }
 
-func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingNvidiaGPU []*api.Pod) {
+func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable resource.List) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingNvidiaGPU []*api.Pod) {
 	totalMilliCPU := allocatable.Cpu().MilliValue()
 	totalMemory := allocatable.Memory().Value()
 	totalNvidiaGPU := allocatable.NvidiaGPU().Value()

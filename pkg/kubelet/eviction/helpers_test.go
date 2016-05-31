@@ -620,13 +620,13 @@ func TestHasNodeConditions(t *testing.T) {
 func TestReclaimResources(t *testing.T) {
 	testCases := map[string]struct {
 		inputs []Threshold
-		result []api.ResourceName
+		result []resource.Name
 	}{
 		"memory.available": {
 			inputs: []Threshold{
 				{Signal: SignalMemoryAvailable},
 			},
-			result: []api.ResourceName{api.ResourceMemory},
+			result: []resource.Name{api.ResourceMemory},
 		},
 	}
 	for testName, testCase := range testCases {
@@ -656,8 +656,8 @@ func newPodMemoryStats(pod *api.Pod, workingSet resource.Quantity) statsapi.PodS
 	return result
 }
 
-func newResourceList(cpu, memory string) api.ResourceList {
-	res := api.ResourceList{}
+func newResourceList(cpu, memory string) resource.List {
+	res := resource.List{}
 	if cpu != "" {
 		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
@@ -667,14 +667,14 @@ func newResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
-func newResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
+func newResourceRequirements(requests, limits resource.List) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
 	return res
 }
 
-func newContainer(name string, requests api.ResourceList, limits api.ResourceList) api.Container {
+func newContainer(name string, requests resource.List, limits resource.List) api.Container {
 	return api.Container{
 		Name:      name,
 		Resources: newResourceRequirements(requests, limits),

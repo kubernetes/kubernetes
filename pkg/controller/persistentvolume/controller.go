@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -1118,7 +1119,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	tags[cloudVolumeCreatedForVolumeNameTag] = pvName
 
 	options := vol.VolumeOptions{
-		Capacity:                      claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
+		Capacity:                      claim.Spec.Resources.Requests[resource.Name(api.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 		CloudTags:                     &tags,

@@ -131,7 +131,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		ObjectMeta: api.ObjectMeta{Name: "node-scheduling-test-node"},
 		Spec:       api.NodeSpec{Unschedulable: false},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 			},
 			Conditions: []api.NodeCondition{goodCondition},
@@ -184,7 +184,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		{
 			makeUnSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
-					Capacity: api.ResourceList{
+					Capacity: resource.List{
 						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 					},
 					Conditions: []api.NodeCondition{badCondition},
@@ -201,7 +201,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			},
 			makeSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
-					Capacity: api.ResourceList{
+					Capacity: resource.List{
 						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 					},
 					Conditions: []api.NodeCondition{goodCondition},
@@ -332,7 +332,7 @@ func TestMultiScheduler(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "node-multi-scheduler-test-node"},
 		Spec:       api.NodeSpec{Unschedulable: false},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 			},
 		},
@@ -502,7 +502,7 @@ func TestAllocatable(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "node-allocatable-scheduler-test-node"},
 		Spec:       api.NodeSpec{Unschedulable: false},
 		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
+			Capacity: resource.List{
 				api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 				api.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
@@ -524,7 +524,7 @@ func TestAllocatable(t *testing.T) {
 					Name:  "container",
 					Image: e2e.GetPauseImageName(restClient),
 					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
+						Requests: resource.List{
 							api.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),
 							api.ResourceMemory: *resource.NewQuantity(20, resource.BinarySI),
 						},
@@ -549,12 +549,12 @@ func TestAllocatable(t *testing.T) {
 
 	// 5. Change the node status to allocatable aware, note that Allocatable is less than Pod's requirement
 	allocNode.Status = api.NodeStatus{
-		Capacity: api.ResourceList{
+		Capacity: resource.List{
 			api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 			api.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
 			api.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
 		},
-		Allocatable: api.ResourceList{
+		Allocatable: resource.List{
 			api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 			api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 			api.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),

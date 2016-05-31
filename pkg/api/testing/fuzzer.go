@@ -199,8 +199,8 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				_ = q.String()
 				return q
 			}
-			q.Limits = make(api.ResourceList)
-			q.Requests = make(api.ResourceList)
+			q.Limits = make(resource.List)
+			q.Requests = make(resource.List)
 			cpuLimit := randomQuantity()
 			q.Limits[api.ResourceCPU] = *cpuLimit.Copy()
 			q.Requests[api.ResourceCPU] = *cpuLimit.Copy()
@@ -216,19 +216,19 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			c.Fuzz(&cpuLimit)
 
 			q.Type = api.LimitTypeContainer
-			q.Default = make(api.ResourceList)
+			q.Default = make(resource.List)
 			q.Default[api.ResourceCPU] = *(cpuLimit.Copy())
 
-			q.DefaultRequest = make(api.ResourceList)
+			q.DefaultRequest = make(resource.List)
 			q.DefaultRequest[api.ResourceCPU] = *(cpuLimit.Copy())
 
-			q.Max = make(api.ResourceList)
+			q.Max = make(resource.List)
 			q.Max[api.ResourceCPU] = *(cpuLimit.Copy())
 
-			q.Min = make(api.ResourceList)
+			q.Min = make(resource.List)
 			q.Min[api.ResourceCPU] = *(cpuLimit.Copy())
 
-			q.MaxLimitRequestRatio = make(api.ResourceList)
+			q.MaxLimitRequestRatio = make(resource.List)
 			q.MaxLimitRequestRatio[api.ResourceCPU] = resource.MustParse("10")
 		},
 		func(p *api.PullPolicy, c fuzz.Continue) {

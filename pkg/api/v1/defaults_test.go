@@ -408,18 +408,18 @@ func TestSetDefaultNodeExternalID(t *testing.T) {
 }
 
 func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
-	capacity := versioned.ResourceList{
+	capacity := resource.List{
 		versioned.ResourceCPU:    resource.MustParse("1000m"),
 		versioned.ResourceMemory: resource.MustParse("10G"),
 	}
-	allocatable := versioned.ResourceList{
+	allocatable := resource.List{
 		versioned.ResourceCPU:    resource.MustParse("500m"),
 		versioned.ResourceMemory: resource.MustParse("5G"),
 	}
 	tests := []struct {
-		capacity            versioned.ResourceList
-		allocatable         versioned.ResourceList
-		expectedAllocatable versioned.ResourceList
+		capacity            resource.List
+		allocatable         resource.List
+		expectedAllocatable resource.List
 	}{{ // Everything set, no defaulting.
 		capacity:            capacity,
 		allocatable:         allocatable,
@@ -438,18 +438,18 @@ func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 		expectedAllocatable: nil,
 	}}
 
-	copyResourceList := func(rl versioned.ResourceList) versioned.ResourceList {
+	copyResourceList := func(rl resource.List) resource.List {
 		if rl == nil {
 			return nil
 		}
-		copy := make(versioned.ResourceList, len(rl))
+		copy := make(resource.List, len(rl))
 		for k, v := range rl {
 			copy[k] = *v.Copy()
 		}
 		return copy
 	}
 
-	resourceListsEqual := func(a versioned.ResourceList, b versioned.ResourceList) bool {
+	resourceListsEqual := func(a resource.List, b resource.List) bool {
 		if len(a) != len(b) {
 			return false
 		}
@@ -514,7 +514,7 @@ func TestSetDefaultRequestsPod(t *testing.T) {
 	s.Containers = []versioned.Container{
 		{
 			Resources: versioned.ResourceRequirements{
-				Limits: versioned.ResourceList{
+				Limits: resource.List{
 					versioned.ResourceCPU: resource.MustParse("100m"),
 				},
 			},
@@ -551,7 +551,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 	s.Containers = []versioned.Container{
 		{
 			Resources: versioned.ResourceRequirements{
-				Limits: versioned.ResourceList{
+				Limits: resource.List{
 					versioned.ResourceCPU: resource.MustParse("100m"),
 				},
 			},
@@ -587,14 +587,14 @@ func TestSetDefaultLimitRangeItem(t *testing.T) {
 		Spec: versioned.LimitRangeSpec{
 			Limits: []versioned.LimitRangeItem{{
 				Type: versioned.LimitTypeContainer,
-				Max: versioned.ResourceList{
+				Max: resource.List{
 					versioned.ResourceCPU: resource.MustParse("100m"),
 				},
-				Min: versioned.ResourceList{
+				Min: resource.List{
 					versioned.ResourceMemory: resource.MustParse("100Mi"),
 				},
-				Default:        versioned.ResourceList{},
-				DefaultRequest: versioned.ResourceList{},
+				Default:        resource.List{},
+				DefaultRequest: resource.List{},
 			}},
 		},
 	}

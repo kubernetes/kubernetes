@@ -205,11 +205,11 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []api.Container {
 			Image:   "gcr.io/google_containers/mounttest:0.6",
 			Command: []string{"/mt", "--file_content=" + filePath},
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
+				Requests: resource.List{
 					api.ResourceCPU:    resource.MustParse("250m"),
 					api.ResourceMemory: resource.MustParse("32Mi"),
 				},
-				Limits: api.ResourceList{
+				Limits: resource.List{
 					api.ResourceCPU:    resource.MustParse("1250m"),
 					api.ResourceMemory: resource.MustParse("64Mi"),
 				},

@@ -46,9 +46,9 @@ func (m *mockPodKiller) killPodNow(pod *api.Pod, status api.PodStatus, gracePeri
 
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
-	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
+	podMaker := func(name string, requests resource.List, limits resource.List, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
 		pod := newPod(name, []api.Container{
-			newContainer(name, requests, api.ResourceList{}),
+			newContainer(name, requests, resource.List{}),
 		})
 		podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
 		return pod, podStats
@@ -71,8 +71,8 @@ func TestMemoryPressure(t *testing.T) {
 	}
 	podsToMake := []struct {
 		name             string
-		requests         api.ResourceList
-		limits           api.ResourceList
+		requests         resource.List
+		limits           resource.List
 		memoryWorkingSet string
 	}{
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},

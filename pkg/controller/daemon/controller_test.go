@@ -234,8 +234,8 @@ func resourcePodSpec(nodeName, memory, cpu string) api.PodSpec {
 	}
 }
 
-func allocatableResources(memory, cpu string) api.ResourceList {
-	return api.ResourceList{
+func allocatableResources(memory, cpu string) resource.List {
+	return resource.List{
 		api.ResourceMemory: resource.MustParse(memory),
 		api.ResourceCPU:    resource.MustParse(cpu),
 	}

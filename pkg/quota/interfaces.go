@@ -19,6 +19,7 @@ package quota
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -34,27 +35,27 @@ type UsageStatsOptions struct {
 // UsageStats is result of measuring observed resource use in the system
 type UsageStats struct {
 	// Used maps resource to quantity used
-	Used api.ResourceList
+	Used resource.List
 }
 
 // Evaluator knows how to evaluate quota usage for a particular group kind
 type Evaluator interface {
 	// Constraints ensures that each required resource is present on item
-	Constraints(required []api.ResourceName, item runtime.Object) error
+	Constraints(required []resource.Name, item runtime.Object) error
 	// Get returns the object with specified namespace and name
 	Get(namespace, name string) (runtime.Object, error)
 	// GroupKind returns the groupKind that this object knows how to evaluate
 	GroupKind() unversioned.GroupKind
 	// MatchesResources is the list of resources that this evaluator matches
-	MatchesResources() []api.ResourceName
+	MatchesResources() []resource.Name
 	// Matches returns true if the specified quota matches the input item
 	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) bool
 	// OperationResources returns the set of resources that could be updated for the
 	// specified operation for this kind.  If empty, admission control will ignore
 	// quota processing for the operation.
-	OperationResources(operation admission.Operation) []api.ResourceName
+	OperationResources(operation admission.Operation) []resource.Name
 	// Usage returns the resource usage for the specified object
-	Usage(object runtime.Object) api.ResourceList
+	Usage(object runtime.Object) resource.List
 	// UsageStats calculates latest observed usage stats for all objects
 	UsageStats(options UsageStatsOptions) (UsageStats, error)
 }

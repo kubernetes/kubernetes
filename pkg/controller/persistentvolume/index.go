@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
@@ -80,7 +81,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 
 	var smallestVolume *api.PersistentVolume
 	var smallestVolumeSize int64
-	requestedQty := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	requestedQty := claim.Spec.Resources.Requests[resource.Name(api.ResourceStorage)]
 	requestedSize := requestedQty.Value()
 
 	for _, modes := range allPossibleModes {

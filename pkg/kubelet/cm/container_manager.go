@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // Manages the containers running on a machine.
@@ -29,7 +29,7 @@ type ContainerManager interface {
 
 	// Returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
-	SystemCgroupsLimit() api.ResourceList
+	SystemCgroupsLimit() resource.List
 
 	// Returns a NodeConfig that is being used by the container manager.
 	GetNodeConfig() NodeConfig

@@ -146,7 +146,7 @@ func containers(ct ...api.Container) podOpt {
 func resourceLimits(cpu resources.CPUShares, mem resources.MegaBytes) ctOpt {
 	return ctOpt(func(c *api.Container) {
 		if c.Resources.Limits == nil {
-			c.Resources.Limits = make(api.ResourceList)
+			c.Resources.Limits = make(resource.List)
 		}
 		c.Resources.Limits[api.ResourceCPU] = *resource.NewMilliQuantity(int64(float64(cpu)*1000.0), resource.DecimalSI)
 		c.Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(int64(float64(mem)*1024.0*1024.0), resource.BinarySI)

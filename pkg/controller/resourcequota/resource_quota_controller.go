@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -238,9 +239,9 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
-	previousUsed := api.ResourceList{}
+	previousUsed := resource.List{}
 	if resourceQuota.Status.Used != nil {
-		previousUsed = quota.Add(api.ResourceList{}, resourceQuota.Status.Used)
+		previousUsed = quota.Add(resource.List{}, resourceQuota.Status.Used)
 	}
 	usage := api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{
@@ -250,7 +251,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 			Labels:          resourceQuota.Labels,
 			Annotations:     resourceQuota.Annotations},
 		Status: api.ResourceQuotaStatus{
-			Hard: quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard),
+			Hard: quota.Add(resource.List{}, resourceQuota.Spec.Hard),
 			Used: previousUsed,
 		},
 	}
@@ -259,7 +260,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 	// and the resources this controller can track to know what we can
 	// look to measure updated usage stats for
 	hardResources := quota.ResourceNames(usage.Status.Hard)
-	potentialResources := []api.ResourceName{}
+	potentialResources := []resource.Name{}
 	evaluators := rq.registry.Evaluators()
 	for _, evaluator := range evaluators {
 		potentialResources = append(potentialResources, evaluator.MatchesResources()...)
@@ -267,7 +268,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 	matchedResources := quota.Intersection(hardResources, potentialResources)
 
 	// sum the observed usage from each evaluator
-	newUsage := api.ResourceList{}
+	newUsage := resource.List{}
 	usageStatsOptions := quota.UsageStatsOptions{Namespace: resourceQuota.Namespace, Scopes: resourceQuota.Spec.Scopes}
 	for _, evaluator := range evaluators {
 		stats, err := evaluator.UsageStats(usageStatsOptions)

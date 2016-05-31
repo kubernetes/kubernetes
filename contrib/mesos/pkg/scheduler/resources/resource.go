@@ -34,7 +34,7 @@ var (
 
 // podResource computes requested resources and the limit. If write is true,
 // it will also write missing requests and limits into the pod.
-func podResources(pod *api.Pod, resourceName api.ResourceName, def, min resource.Quantity, write bool) (
+func podResources(pod *api.Pod, resourceName resource.Name, def, min resource.Quantity, write bool) (
 	requestSum *resource.Quantity,
 	limitSum *resource.Quantity,
 	modified bool,
@@ -50,10 +50,10 @@ func podResources(pod *api.Pod, resourceName api.ResourceName, def, min resource
 
 		// create maps
 		if container.Resources.Limits == nil {
-			container.Resources.Limits = api.ResourceList{}
+			container.Resources.Limits = resource.List{}
 		}
 		if container.Resources.Requests == nil {
-			container.Resources.Requests = api.ResourceList{}
+			container.Resources.Requests = resource.List{}
 		}
 
 		// request and limit defined?

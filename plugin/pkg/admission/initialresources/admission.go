@@ -23,13 +23,13 @@ import (
 	"strings"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 var (
@@ -115,7 +115,7 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 
 		// If Requests doesn't exits and an estimation was made, create Requests.
 		if req == nil && (cpu != nil || mem != nil) {
-			c.Resources.Requests = api.ResourceList{}
+			c.Resources.Requests = resource.List{}
 			req = c.Resources.Requests
 		}
 		setRes := []string{}
@@ -144,7 +144,7 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 	}
 }
 
-func (ir initialResources) getEstimation(kind api.ResourceName, c *api.Container, ns string) (*resource.Quantity, error) {
+func (ir initialResources) getEstimation(kind resource.Name, c *api.Container, ns string) (*resource.Quantity, error) {
 	end := time.Now()
 	start := end.Add(-week)
 	var usage, samples int64

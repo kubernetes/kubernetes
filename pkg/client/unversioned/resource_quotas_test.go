@@ -38,7 +38,7 @@ func TestResourceQuotaCreate(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:                    resource.MustParse("100"),
 				api.ResourceMemory:                 resource.MustParse("10000"),
 				api.ResourcePods:                   resource.MustParse("10"),
@@ -71,7 +71,7 @@ func TestResourceQuotaGet(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:                    resource.MustParse("100"),
 				api.ResourceMemory:                 resource.MustParse("10000"),
 				api.ResourcePods:                   resource.MustParse("10"),
@@ -129,7 +129,7 @@ func TestResourceQuotaUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:                    resource.MustParse("100"),
 				api.ResourceMemory:                 resource.MustParse("10000"),
 				api.ResourcePods:                   resource.MustParse("10"),
@@ -157,7 +157,7 @@ func TestResourceQuotaStatusUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
+			Hard: resource.List{
 				api.ResourceCPU:                    resource.MustParse("100"),
 				api.ResourceMemory:                 resource.MustParse("10000"),
 				api.ResourcePods:                   resource.MustParse("10"),

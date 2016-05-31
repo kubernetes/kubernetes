@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -131,7 +132,7 @@ func SetDefaults_Pod(obj *Pod) {
 		// set requests to limits if requests are not specified, but limits are
 		if obj.Spec.Containers[i].Resources.Limits != nil {
 			if obj.Spec.Containers[i].Resources.Requests == nil {
-				obj.Spec.Containers[i].Resources.Requests = make(ResourceList)
+				obj.Spec.Containers[i].Resources.Requests = make(resource.List)
 			}
 			for key, value := range obj.Spec.Containers[i].Resources.Limits {
 				if _, exists := obj.Spec.Containers[i].Resources.Requests[key]; !exists {
@@ -227,7 +228,7 @@ func SetDefaults_Node(obj *Node) {
 }
 func SetDefaults_NodeStatus(obj *NodeStatus) {
 	if obj.Allocatable == nil && obj.Capacity != nil {
-		obj.Allocatable = make(ResourceList, len(obj.Capacity))
+		obj.Allocatable = make(resource.List, len(obj.Capacity))
 		for key, value := range obj.Capacity {
 			obj.Allocatable[key] = *(value.Copy())
 		}
@@ -244,10 +245,10 @@ func SetDefaults_LimitRangeItem(obj *LimitRangeItem) {
 	if obj.Type == LimitTypeContainer {
 
 		if obj.Default == nil {
-			obj.Default = make(ResourceList)
+			obj.Default = make(resource.List)
 		}
 		if obj.DefaultRequest == nil {
-			obj.DefaultRequest = make(ResourceList)
+			obj.DefaultRequest = make(resource.List)
 		}
 
 		// If a default limit is unspecified, but the max is specified, default the limit to the max

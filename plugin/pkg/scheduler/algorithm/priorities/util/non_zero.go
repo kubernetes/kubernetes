@@ -18,6 +18,7 @@ package util
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -35,9 +36,9 @@ const DefaultMilliCpuRequest int64 = 100             // 0.1 core
 const DefaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
 
 // GetNonzeroRequests returns the default resource request if none is found or what is provided on the request
-// TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
+// TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity resource.List"
 // as an additional argument here) rather than using constants
-func GetNonzeroRequests(requests *api.ResourceList) (int64, int64) {
+func GetNonzeroRequests(requests *resource.List) (int64, int64) {
 	var outMilliCPU, outMemory int64
 	// Override if un-set, but not if explicitly set to zero
 	if _, found := (*requests)[api.ResourceCPU]; !found {

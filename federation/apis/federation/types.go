@@ -18,6 +18,7 @@ package federation
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -81,9 +82,9 @@ type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
 	Conditions []ClusterCondition `json:"conditions,omitempty"`
 	// Capacity represents the total resources of the cluster
-	Capacity api.ResourceList `json:"capacity,omitempty"`
+	Capacity resource.List `json:"capacity,omitempty"`
 	// Allocatable represents the total resources of a cluster that are available for scheduling.
-	Allocatable api.ResourceList `json:"allocatable,omitempty"`
+	Allocatable resource.List `json:"allocatable,omitempty"`
 	ClusterMeta `json:",inline"`
 	// Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.

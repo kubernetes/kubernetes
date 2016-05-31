@@ -245,7 +245,7 @@ func (cm *containerManagerImpl) setupNode() error {
 		if cm.RuntimeCgroupsName != "" {
 			cont := newSystemCgroups(cm.RuntimeCgroupsName)
 			info, err := cm.cadvisorInterface.MachineInfo()
-			var capacity = api.ResourceList{}
+			var capacity = resource.List{}
 			if err != nil {
 			} else {
 				capacity = cadvisor.CapacityFromMachineInfo(info)
@@ -405,7 +405,7 @@ func (cm *containerManagerImpl) Start() error {
 	return nil
 }
 
-func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
+func (cm *containerManagerImpl) SystemCgroupsLimit() resource.List {
 	cpuLimit := int64(0)
 
 	// Sum up resources of all external containers.
@@ -413,7 +413,7 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
 		cpuLimit += cont.cpuMillicores
 	}
 
-	return api.ResourceList{
+	return resource.List{
 		api.ResourceCPU: *resource.NewMilliQuantity(
 			cpuLimit,
 			resource.DecimalSI),
