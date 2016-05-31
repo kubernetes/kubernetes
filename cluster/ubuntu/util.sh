@@ -245,6 +245,7 @@ KUBE_APISERVER_OPTS="\
  --admission-control=${2}\
  --service-node-port-range=${3}\
  --advertise-address=${4}\
+ --allow-privileged=${5}\
  --client-ca-file=/srv/kubernetes/ca.crt\
  --tls-cert-file=/srv/kubernetes/server.cert\
  --tls-private-key-file=/srv/kubernetes/server.key"
@@ -279,9 +280,10 @@ EOF
 # $3: If non-empty then the DNS server IP to configure in each pod.
 # $4: If non-empty then added to each pod's domain search list.
 # $5: Pathname of the kubelet config file or directory.
-# $6: If empty then flannel is used otherwise CNI is used.
+# $6: Whether or not we run kubelet in priviliged mode
+# $7: If empty then flannel is used otherwise CNI is used.
 function create-kubelet-opts() {
-  if [ -n "$6" ] ; then
+  if [ -n "$7" ] ; then
       cni_opts=" --network-plugin=cni --network-plugin-dir=/etc/cni/net.d"
   else
       cni_opts=""
@@ -294,6 +296,7 @@ KUBELET_OPTS="\
  --cluster-dns=${3} \
  --cluster-domain=${4} \
  --config=${5} \
+ --allow-privileged=${6}
  $cni_opts"
 EOF
 }
@@ -472,7 +475,8 @@ function provision-master() {
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
       '${SERVICE_NODE_PORT_RANGE}' \
-      '${MASTER_IP}'
+      '${MASTER_IP}' \
+      '${ALLOW_PRIVILIGED}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
@@ -534,7 +538,7 @@ function provision-node() {
                     service kube-proxy start'
     NEED_RECONFIG_DOCKER=false
   fi
-  
+
   BASH_DEBUG_FLAGS=""
   if [[ "$DEBUG" == "true" ]] ; then
     BASH_DEBUG_FLAGS="set -x"
@@ -553,6 +557,7 @@ function provision-node() {
       '${DNS_SERVER_IP}' \
       '${DNS_DOMAIN}' \
       '${KUBELET_CONFIG}' \
+      '${ALLOW_PRIVILEGED}' \
       '${CNI_PLUGIN_CONF}'
     create-kube-proxy-opts \
       '${1#*@}' \
@@ -560,7 +565,7 @@ function provision-node() {
       '${KUBE_PROXY_EXTRA_OPTS}'
     create-flanneld-opts '${MASTER_IP}' '${1#*@}'
 
-    sudo -E -p '[sudo] password to start node: ' -- /bin/bash -ce '    
+    sudo -E -p '[sudo] password to start node: ' -- /bin/bash -ce '
       ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
@@ -615,7 +620,7 @@ function provision-masterandnode() {
         "'
     NEED_RECONFIG_DOCKER=false
   fi
-  
+
   EXTRA_SANS=(
     IP:${MASTER_IP}
     IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1
@@ -644,7 +649,8 @@ function provision-masterandnode() {
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
       '${SERVICE_NODE_PORT_RANGE}' \
-      '${MASTER_IP}'
+      '${MASTER_IP}' \
+      '${ALLOW_PRIVILEGED}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-kubelet-opts \
@@ -653,6 +659,7 @@ function provision-masterandnode() {
       '${DNS_SERVER_IP}' \
       '${DNS_DOMAIN}' \
       '${KUBELET_CONFIG}' \
+      '${ALLOW_PRIVILEGED}' \
       '${CNI_PLUGIN_CONF}'
     create-kube-proxy-opts \
       '${MASTER_IP}' \
@@ -660,7 +667,7 @@ function provision-masterandnode() {
       '${KUBE_PROXY_EXTRA_OPTS}'
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
-    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
+    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
       ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
@@ -697,7 +704,7 @@ function check-pods-torn-down() {
 # Delete a kubernetes cluster
 function kube-down() {
   export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
-  
+
   export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
   source "${KUBE_CONFIG_FILE}"
 
