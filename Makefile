@@ -206,6 +206,14 @@ release-skip-tests quick-release: gen_deepcopy gen_conversion
 	@KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
 
+# Cross-compile for all platforms
+#
+# Example:
+#   make cross
+.PHONY: cross
+cross:
+	@hack/make-rules/cross.sh
+
 #
 # Code-generation logic.
 #

@@ -617,7 +617,7 @@ kube::golang::build_binaries() {
       targets=("${KUBE_ALL_TARGETS[@]}")
     fi
 
-    local -a platforms=("${KUBE_BUILD_PLATFORMS[@]:+${KUBE_BUILD_PLATFORMS[@]}}")
+    local -a platforms=(${KUBE_BUILD_PLATFORMS:-})
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
     fi

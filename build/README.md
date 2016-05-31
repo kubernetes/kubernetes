@@ -25,7 +25,7 @@ The following scripts are found in the `build/` directory:
 
 * `run.sh`: Run a command in a build docker container.  Common invocations:
   *  `run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
-  *  `run.sh hack/build-cross.sh`: Build all binaries for all platforms
+  *  `run.sh make cross`: Build all binaries for all platforms
   *  `run.sh make test`: Run all unit tests
   *  `run.sh make test-integration`: Run integration test
   *  `run.sh make test-cmd`: Run CLI tests
