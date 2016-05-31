@@ -28,6 +28,8 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	bridge "k8s.io/kubernetes/cluster/addons/dns/bridge"
+	testHelper "k8s.io/kubernetes/cluster/addons/dns/testHelper"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -103,25 +105,13 @@ func getEtcdPathForSRV(portName, protocol, name, namespace string) string {
 	return path.Join(basePath, serviceSubDomain, namespace, name, fmt.Sprintf("_%s", strings.ToLower(protocol)), fmt.Sprintf("_%s", strings.ToLower(portName)))
 }
 
-type hostPort struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
-}
-
-func getHostPort(service *kapi.Service) *hostPort {
-	return &hostPort{
-		Host: service.Spec.ClusterIP,
-		Port: int(service.Spec.Ports[0].Port),
-	}
-}
-
-func getHostPortFromString(data string) (*hostPort, error) {
-	var res hostPort
+func getHostPortFromString(data string) (*testHelper.HostPort, error) {
+	var res testHelper.HostPort
 	err := json.Unmarshal([]byte(data), &res)
 	return &res, err
 }
 
-func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, namespace string, expectedHostPort *hostPort) {
+func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, namespace string, expectedHostPort *testHelper.HostPort) {
 	key := getEtcdPathForA(serviceName, namespace, serviceSubDomain)
 	values := ec.Get(key)
 	//require.True(t, exists)
@@ -170,36 +160,6 @@ func newHeadlessService(namespace, serviceName string) kapi.Service {
 		},
 	}
 	return service
-}
-
-func newService(namespace, serviceName, clusterIP, portName string, portNumber int) kapi.Service {
-	service := kapi.Service{
-		ObjectMeta: kapi.ObjectMeta{
-			Name:      serviceName,
-			Namespace: namespace,
-		},
-		Spec: kapi.ServiceSpec{
-			ClusterIP: clusterIP,
-			Ports: []kapi.ServicePort{
-				{Port: int32(portNumber), Name: portName, Protocol: "TCP"},
-			},
-		},
-	}
-	return service
-}
-
-func newPod(namespace, podName, podIP string) kapi.Pod {
-	pod := kapi.Pod{
-		ObjectMeta: kapi.ObjectMeta{
-			Name:      podName,
-			Namespace: namespace,
-		},
-		Status: kapi.PodStatus{
-			PodIP: podIP,
-		},
-	}
-
-	return pod
 }
 
 func newSubset() kapi.EndpointSubset {
@@ -347,9 +307,9 @@ func TestAddSinglePortService(t *testing.T) {
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
-	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
+	service := testHelper.NewService(testNamespace, testService, "1.2.3.4", "", 0)
 	k2s.newService(&service)
-	expectedValue := getHostPort(&service)
+	expectedValue := testHelper.GetHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 }
 
@@ -360,13 +320,13 @@ func TestUpdateSinglePortService(t *testing.T) {
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
-	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
+	service := testHelper.NewService(testNamespace, testService, "1.2.3.4", "", 0)
 	k2s.newService(&service)
 	assert.Len(t, ec.writes, 1)
 	newService := service
 	newService.Spec.ClusterIP = "0.0.0.0"
 	k2s.updateService(&service, &newService)
-	expectedValue := getHostPort(&newService)
+	expectedValue := testHelper.GetHostPort(&newService)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 }
 
@@ -377,7 +337,7 @@ func TestDeleteSinglePortService(t *testing.T) {
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
-	service := newService(testNamespace, testService, "1.2.3.4", "", 80)
+	service := testHelper.NewService(testNamespace, testService, "1.2.3.4", "", 80)
 	// Add the service
 	k2s.newService(&service)
 	assert.Len(t, ec.writes, 1)
@@ -395,9 +355,9 @@ func TestServiceWithNamePort(t *testing.T) {
 	k2s := newKube2Sky(ec)
 
 	// create service
-	service := newService(testNamespace, testService, "1.2.3.4", "http1", 80)
+	service := testHelper.NewService(testNamespace, testService, "1.2.3.4", "http1", 80)
 	k2s.newService(&service)
-	expectedValue := getHostPort(&service)
+	expectedValue := testHelper.GetHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 	assertSRVEntryInEtcd(t, ec, "http1", "tcp", testService, testNamespace, 80, 1)
 	assert.Len(t, ec.writes, 2)
@@ -406,7 +366,7 @@ func TestServiceWithNamePort(t *testing.T) {
 	newService := service
 	newService.Spec.Ports[0].Name = "http2"
 	k2s.updateService(&service, &newService)
-	expectedValue = getHostPort(&newService)
+	expectedValue = testHelper.GetHostPort(&newService)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 	assertSRVEntryInEtcd(t, ec, "http2", "tcp", testService, testNamespace, 80, 1)
 	assert.Len(t, ec.writes, 2)
@@ -416,11 +376,12 @@ func TestServiceWithNamePort(t *testing.T) {
 	assert.Empty(t, ec.writes)
 }
 
+// TODO: move this to dns/bridge_test
 func TestBuildDNSName(t *testing.T) {
 	expectedDNSName := "name.ns.svc.cluster.local."
-	assert.Equal(t, expectedDNSName, buildDNSNameString("local.", "cluster", "svc", "ns", "name"))
+	assert.Equal(t, expectedDNSName, bridge.BuildDNSNameString("local.", "cluster", "svc", "ns", "name"))
 	newExpectedDNSName := "00.name.ns.svc.cluster.local."
-	assert.Equal(t, newExpectedDNSName, buildDNSNameString(expectedDNSName, "00"))
+	assert.Equal(t, newExpectedDNSName, bridge.BuildDNSNameString(expectedDNSName, "00"))
 }
 
 func TestPodDns(t *testing.T) {
@@ -434,12 +395,12 @@ func TestPodDns(t *testing.T) {
 	k2s := newKube2Sky(ec)
 
 	// create pod without ip address yet
-	pod := newPod(testNamespace, testPodName, "")
+	pod := testHelper.NewPod(testNamespace, testPodName, "")
 	k2s.handlePodCreate(&pod)
 	assert.Empty(t, ec.writes)
 
 	// create pod
-	pod = newPod(testNamespace, testPodName, testPodIP)
+	pod = testHelper.NewPod(testNamespace, testPodName, testPodIP)
 	k2s.handlePodCreate(&pod)
 	assertDnsPodEntryInEtcd(t, ec, sanitizedPodIP, testNamespace)
 
@@ -461,7 +422,8 @@ func TestPodDns(t *testing.T) {
 	assert.Empty(t, ec.writes)
 }
 
+// TODO: Move this to dns/bridge_test
 func TestSanitizeIP(t *testing.T) {
 	expectedIP := "1-2-3-4"
-	assert.Equal(t, expectedIP, santizeIP("1.2.3.4"))
+	assert.Equal(t, expectedIP, bridge.SanitizeIP("1.2.3.4"))
 }

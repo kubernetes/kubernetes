@@ -134,13 +134,17 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 		v3Client.Endpoint = endpoint
 	}
 
+	// copy the auth options to a local variable that we can change. `options`
+	// needs to stay as-is for reauth purposes
+	v3Options := options
+
 	var scope *tokens3.Scope
 	if options.TenantID != "" {
 		scope = &tokens3.Scope{
 			ProjectID: options.TenantID,
 		}
-		options.TenantID = ""
-		options.TenantName = ""
+		v3Options.TenantID = ""
+		v3Options.TenantName = ""
 	} else {
 		if options.TenantName != "" {
 			scope = &tokens3.Scope{
@@ -148,11 +152,11 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 				DomainID:    options.DomainID,
 				DomainName:  options.DomainName,
 			}
-			options.TenantName = ""
+			v3Options.TenantName = ""
 		}
 	}
 
-	result := tokens3.Create(v3Client, options, scope)
+	result := tokens3.Create(v3Client, v3Options, scope)
 
 	token, err := result.ExtractToken()
 	if err != nil {
@@ -275,6 +279,29 @@ func NewBlockStorageV1(client *gophercloud.ProviderClient, eo gophercloud.Endpoi
 		return nil, err
 	}
 	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}
+
+// NewBlockStorageV2 creates a ServiceClient that may be used to access the v2 block storage service.
+func NewBlockStorageV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("volume")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+
+	// Force using v2 API
+	if strings.Contains(url, "/v1") {
+		url = strings.Replace(url, "/v1", "/v2", -1)
+	}
+	if !strings.Contains(url, "/v2") {
+		return nil, fmt.Errorf("Block Storage v2 endpoint not found")
+	}
+
+	return &gophercloud.ServiceClient{
+		ProviderClient: client,
+		Endpoint:       url,
+		ResourceBase:   url,
+	}, nil
 }
 
 // NewCDNV1 creates a ServiceClient that may be used to access the OpenStack v1
