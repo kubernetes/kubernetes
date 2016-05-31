@@ -29,6 +29,9 @@ KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
 # the connections to localhost in scripts will time out
 export no_proxy=127.0.0.1,localhost
 
+# This is a symlink to binaries for "this platform", e.g. build tools.
+THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
+
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"

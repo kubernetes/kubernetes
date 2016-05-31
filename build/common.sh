@@ -64,6 +64,9 @@ readonly LOCAL_OUTPUT_BINPATH="${LOCAL_OUTPUT_SUBPATH}/bin"
 readonly LOCAL_OUTPUT_GOPATH="${LOCAL_OUTPUT_SUBPATH}/go"
 readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 
+# This is a symlink to binaries for "this platform" (e.g. build tools).
+readonly THIS_PLATFORM_BIN="${LOCAL_OUTPUT_ROOT}/bin"
+
 readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
 
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
@@ -672,6 +675,8 @@ function kube::build::copy_output() {
     kube::log::status "Syncing back _output/dockerized/bin directory from remote Docker"
     rm -rf "${LOCAL_OUTPUT_BINPATH}"
     mkdir -p "${LOCAL_OUTPUT_BINPATH}"
+    rm -f "${THIS_PLATFORM_BIN}"
+    ln -s "${LOCAL_OUTPUT_BINPATH}" "${THIS_PLATFORM_BIN}"
 
     kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
     "${docker_cmd[@]}" bash -c "cp -r ${REMOTE_OUTPUT_BINPATH} /tmp/bin;touch /tmp/finished;rm /tmp/bin/test_for_remote;/bin/sleep 600" > /dev/null 2>&1
