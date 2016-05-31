@@ -19,188 +19,427 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-// Before enabling this test you must make sure the associated project has
-// enough quota. At the time of this writing GCE projects are allowed 3
-// backend services by default. This test requires at least 5.
+const (
+	// parent path to yaml test manifests.
+	ingressManifestPath = "test/e2e/testing-manifests/ingress"
 
-// This test exercises the GCE L7 loadbalancer controller cluster-addon. It
-// will fail if the addon isn't running, or doesn't send traffic to the expected
-// backend. Common failure modes include:
-// * GCE L7 took too long to spin up
-// * GCE L7 took too long to health check a backend
-// * Repeated 404:
-//   - L7 is sending traffic to the default backend of the addon.
-//   - Backend is receiving /foo when it expects /bar.
-// * Repeated 5xx:
-//   - Out of quota (describe ing should show you if this is the case)
-//   - Mismatched service/container port, or endpoints are dead.
+	// timeout on a single http request.
+	reqTimeout = 10 * time.Second
 
-var (
-	appPrefix         = "app"
-	pathPrefix        = "foo"
-	testImage         = "gcr.io/google_containers/n-way-http:1.0"
-	httpContainerPort = 8080
+	// healthz port used to verify glbc restarted correctly on the master.
+	glbcHealthzPort = 8086
+
+	// On average it takes ~6 minutes for a single backend to come online in GCE.
+	lbPollTimeout = 15 * time.Minute
+
+	// Time required by the loadbalancer to cleanup, proportional to numApps/Ing.
+	lbCleanupTimeout = 5 * time.Minute
+	lbPollInterval   = 30 * time.Second
 
 	// Name of the config-map and key the ingress controller stores its uid in.
 	uidConfigMap = "ingress-uid"
 	uidKey       = "uid"
 
-	expectedLBCreationTime    = 7 * time.Minute
-	expectedLBHealthCheckTime = 7 * time.Minute
-
-	// Labels applied throughout, to the RC, the default backend, as a selector etc.
-	controllerLabels = map[string]string{"name": "glbc"}
-
-	// Name of the loadbalancer controller within the cluster addon
-	lbContainerName = "l7-lb-controller"
-
-	// Labels used to identify existing loadbalancer controllers.
-	// TODO: Pull this out of the RC manifest.
-	clusterAddonLBLabels = map[string]string{"k8s-app": "glbc"}
-
-	// If set, the test tries to perform an HTTP GET on each url endpoint of
-	// the Ingress. Only set to false to short-circuit test runs in debugging.
-	verifyHTTPGET = true
-
-	// On average it takes ~6 minutes for a single backend to come online.
-	// We *don't* expect this framework.Poll to consistently take 15 minutes for every
-	// Ingress as GCE is creating/checking backends in parallel, but at the
-	// same time, we're not testing GCE startup latency. So give it enough
-	// time, and fail if the average is too high.
-	lbPollTimeout  = 15 * time.Minute
-	lbPollInterval = 30 * time.Second
-
-	// Time required by the loadbalancer to cleanup, proportional to numApps/Ing.
-	lbCleanupTimeout = 5 * time.Minute
-
-	// One can scale this test by tweaking numApps and numIng, the former will
-	// create more RCs/Services and add them to a single Ingress, while the latter
-	// will create smaller, more fragmented Ingresses. The numbers 2, 1 are chosen
-	// arbitrarity, we want to test more than a single endpoint.
-	numApps = 2
-	numIng  = 1
-
 	// GCE only allows names < 64 characters, and the loadbalancer controller inserts
 	// a single character of padding.
 	nameLenLimit = 62
-
-	// Timing out requests will lead to retries, and more importantly, the test
-	// finishing in a deterministic manner.
-	timeoutClient = &http.Client{Timeout: 60 * time.Second}
 )
 
-// timeSlice allows sorting of time.Duration
-type timeSlice []time.Duration
+var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
+	defer GinkgoRecover()
+	f := framework.NewDefaultFramework("ingress")
+	var ns string
+	var jig *testJig
+	manifestPath := filepath.Join(ingressManifestPath, "http")
 
-func (p timeSlice) Len() int {
-	return len(p)
-}
+	// These constants match the manifests used in ingressManifestPath
+	tlsHost := "foo.bar.com"
+	tlsSecretName := "foo"
+	updatedTLSHost := "foobar.com"
+	updateURLMapHost := "bar.baz.com"
+	updateURLMapPath := "/testurl"
 
-func (p timeSlice) Less(i, j int) bool {
-	return p[i] < p[j]
-}
+	BeforeEach(func() {
+		f.BeforeEach()
+		jig = newTestJig(f.Client)
+		ns = f.Namespace.Name
+	})
 
-func (p timeSlice) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
-// ruleByIndex returns an IngressRule for the given index.
-func ruleByIndex(i int) extensions.IngressRule {
-	return extensions.IngressRule{
-		Host: fmt.Sprintf("foo%d.bar.com", i),
-		IngressRuleValue: extensions.IngressRuleValue{
-			HTTP: &extensions.HTTPIngressRuleValue{
-				Paths: []extensions.HTTPIngressPath{
-					{
-						Path: fmt.Sprintf("/%v%d", pathPrefix, i),
-						Backend: extensions.IngressBackend{
-							ServiceName: fmt.Sprintf("%v%d", appPrefix, i),
-							ServicePort: intstr.FromInt(httpContainerPort),
-						},
-					},
-				},
+	// Platform agnostic list of tests that must be satisfied by all controllers
+	conformanceTests := []struct {
+		entryLog string
+		execute  func()
+		exitLog  string
+	}{
+		{
+			fmt.Sprintf("should create a basic HTTP ingress"),
+			func() { jig.createIngress(manifestPath, ns, map[string]string{}) },
+			fmt.Sprintf("waiting for urls on basic HTTP ingress"),
+		},
+		{
+			fmt.Sprintf("should terminate TLS for host %v", tlsHost),
+			func() { jig.addHTTPS(tlsSecretName, tlsHost) },
+			fmt.Sprintf("waiting for HTTPS updates to reflect in ingress"),
+		},
+		{
+			fmt.Sprintf("should update SSL certificated with modified hostname %v", updatedTLSHost),
+			func() {
+				jig.update(func(ing *extensions.Ingress) {
+					newRules := []extensions.IngressRule{}
+					for _, rule := range ing.Spec.Rules {
+						if rule.Host != tlsHost {
+							newRules = append(newRules, rule)
+							continue
+						}
+						newRules = append(newRules, extensions.IngressRule{
+							Host:             updatedTLSHost,
+							IngressRuleValue: rule.IngressRuleValue,
+						})
+					}
+					ing.Spec.Rules = newRules
+				})
+				jig.addHTTPS(tlsSecretName, updatedTLSHost)
 			},
+			fmt.Sprintf("Waiting for updated certificates to accept requests for host %v", updatedTLSHost),
 		},
+		{
+			fmt.Sprintf("should update url map for host %v to expose a single url: %v", updateURLMapHost, updateURLMapPath),
+			func() {
+				var pathToFail string
+				jig.update(func(ing *extensions.Ingress) {
+					newRules := []extensions.IngressRule{}
+					for _, rule := range ing.Spec.Rules {
+						if rule.Host != updateURLMapHost {
+							newRules = append(newRules, rule)
+							continue
+						}
+						existingPath := rule.IngressRuleValue.HTTP.Paths[0]
+						pathToFail = existingPath.Path
+						newRules = append(newRules, extensions.IngressRule{
+							Host: updateURLMapHost,
+							IngressRuleValue: extensions.IngressRuleValue{
+								HTTP: &extensions.HTTPIngressRuleValue{
+									Paths: []extensions.HTTPIngressPath{
+										{
+											Path:    updateURLMapPath,
+											Backend: existingPath.Backend,
+										},
+									},
+								},
+							},
+						})
+					}
+					ing.Spec.Rules = newRules
+				})
+				By("Checking that " + pathToFail + " is not exposed by polling for failure")
+				route := fmt.Sprintf("http://%v%v", jig.address, pathToFail)
+				ExpectNoError(jig.pollURL(route, updateURLMapHost, lbCleanupTimeout, &http.Client{Timeout: reqTimeout}, true))
+			},
+			fmt.Sprintf("Waiting for path updates to reflect in L7"),
+		},
+	}
+
+	// Before enabling this loadbalancer test in any other test list you must
+	// make sure the associated project has enough quota. At the time of this
+	// writing a GCE project is allowed 3 backend services by default. This
+	// test requires at least 5.
+	//
+	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
+	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
+	framework.KubeDescribe("GCE [Feature: Ingress]", func() {
+		var gceController *GCEIngressController
+
+		// Platform specific setup
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			By("Initializing gce controller")
+			gceController = &GCEIngressController{ns: ns, Project: framework.TestContext.CloudConfig.ProjectID, c: jig.client}
+			gceController.init()
+		})
+
+		// Platform specific cleanup
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				describeIng(ns)
+			}
+			if jig.ing == nil {
+				By("No ingress created, no cleanup necessary")
+				return
+			}
+			By("Deleting ingress")
+			jig.deleteIngress()
+
+			By("Cleaning up cloud resources")
+			if pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+				if err := gceController.Cleanup(false); err != nil {
+					framework.Logf("Still waiting for glbc to cleanup: %v", err)
+					return false, nil
+				}
+				return true, nil
+			}); pollErr != nil {
+				if cleanupErr := gceController.Cleanup(true); cleanupErr != nil {
+					framework.Logf("WARNING: Failed to cleanup resources %v", cleanupErr)
+				}
+				framework.Failf("Failed to cleanup GCE L7 resources.")
+			}
+		})
+
+		It("should conform to Ingress spec", func() {
+			for _, t := range conformanceTests {
+				By(t.entryLog)
+				t.execute()
+				By(t.exitLog)
+				jig.waitForIngress()
+			}
+		})
+
+		It("shoud create ingress with given static-ip ", func() {
+			ip := gceController.staticIP(ns)
+			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
+
+			jig.createIngress(filepath.Join(ingressManifestPath, "static-ip"), ns, map[string]string{
+				"kubernetes.io/ingress.global-static-ip-name": ns,
+				"kubernetes.io/ingress.allow-http":            "false",
+			})
+
+			By("waiting for Ingress to come up with ip: " + ip)
+			httpClient := buildInsecureClient(reqTimeout)
+			ExpectNoError(jig.pollURL(fmt.Sprintf("https://%v/", ip), "", lbPollTimeout, httpClient, false))
+
+			By("should reject HTTP traffic")
+			ExpectNoError(jig.pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, httpClient, true))
+
+			// TODO: uncomment the restart test once we have a way to synchronize
+			// and know that the controller has resumed watching. If we delete
+			// the ingress before the controller is ready we will leak.
+			// By("restaring glbc")
+			// restarter := NewRestartConfig(
+			//	 framework.GetMasterHost(), "glbc", glbcHealthzPort, restartPollInterval, restartTimeout)
+			// restarter.restart()
+			// By("should continue serving on provided static-ip for 30 seconds")
+			// ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
+		})
+
+		// TODO: Implement a multizone e2e that verifies traffic reaches each
+		// zone based on pod labels.
+	})
+})
+
+func describeIng(ns string) {
+	framework.Logf("\nOutput of kubectl describe ing:\n")
+	desc, _ := framework.RunKubectl(
+		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+	framework.Logf(desc)
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	framework.Failf("Failed to os.Stat path %v", path)
+	return false
+}
+
+func newTestJig(c *client.Client) *testJig {
+	return &testJig{client: c, rootCAs: map[string][]byte{}}
+}
+
+type testJig struct {
+	client  *client.Client
+	rootCAs map[string][]byte
+	address string
+	ing     *extensions.Ingress
+}
+
+// createIngress creates the Ingress and associated service/rc.
+// Required: ing.yaml, rc.yaml, svc.yaml must exist in manifestPath
+// Optional: secret.yaml, ingAnnotations
+// If ingAnnotations is specified it will overwrite any annotations in ing.yaml
+func (j *testJig) createIngress(manifestPath, ns string, ingAnnotations map[string]string) {
+	mkpath := func(file string) string {
+		return filepath.Join(framework.TestContext.RepoRoot, manifestPath, file)
+	}
+
+	framework.Logf("creating replication controller")
+	framework.RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", ns))
+
+	framework.Logf("creating service")
+	framework.RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
+
+	if exists(mkpath("secret.yaml")) {
+		framework.Logf("creating secret")
+		framework.RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	}
+	j.ing = ingFromManifest(mkpath("ing.yaml"))
+	j.ing.Namespace = ns
+	if len(ingAnnotations) != 0 {
+		j.ing.Annotations = ingAnnotations
+	}
+	framework.Logf(fmt.Sprintf("creating" + j.ing.Name + " ingress"))
+	var err error
+	j.ing, err = j.client.Extensions().Ingress(ns).Create(j.ing)
+	ExpectNoError(err)
+}
+
+func (j *testJig) update(update func(ing *extensions.Ingress)) {
+	var err error
+	ns, name := j.ing.Namespace, j.ing.Name
+	for i := 0; i < 3; i++ {
+		j.ing, err = j.client.Extensions().Ingress(ns).Get(name)
+		if err != nil {
+			framework.Failf("failed to get ingress %q: %v", name, err)
+		}
+		update(j.ing)
+		j.ing, err = j.client.Extensions().Ingress(ns).Update(j.ing)
+		if err == nil {
+			describeIng(j.ing.Namespace)
+			return
+		}
+		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
+			framework.Failf("failed to update ingress %q: %v", name, err)
+		}
+	}
+	framework.Failf("too many retries updating ingress %q", name)
+}
+
+func (j *testJig) addHTTPS(secretName string, hosts ...string) {
+	j.ing.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
+	// TODO: Just create the secret in getRootCAs once we're watching secrets in
+	// the ingress controller.
+	_, cert, _, err := createSecret(j.client, j.ing)
+	ExpectNoError(err)
+	framework.Logf("Updating ingress %v to use secret %v for TLS termination", j.ing.Name, secretName)
+	j.update(func(ing *extensions.Ingress) {
+		ing.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
+	})
+	j.rootCAs[secretName] = cert
+}
+
+func (j *testJig) getRootCA(secretName string) (rootCA []byte) {
+	var ok bool
+	rootCA, ok = j.rootCAs[secretName]
+	if !ok {
+		framework.Failf("Failed to retrieve rootCAs, no recorded secret by name %v", secretName)
+	}
+	return
+}
+
+func (j *testJig) deleteIngress() {
+	ExpectNoError(j.client.Extensions().Ingress(j.ing.Namespace).Delete(j.ing.Name, nil))
+}
+
+func (j *testJig) waitForIngress() {
+	// Wait for the loadbalancer IP.
+	address, err := framework.WaitForIngressAddress(j.client, j.ing.Namespace, j.ing.Name, lbPollTimeout)
+	if err != nil {
+		framework.Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
+	}
+	j.address = address
+	framework.Logf("Found address %v for ingress %v", j.address, j.ing.Name)
+	timeoutClient := &http.Client{Timeout: reqTimeout}
+
+	// Check that all rules respond to a simple GET.
+	for _, rules := range j.ing.Spec.Rules {
+		proto := "http"
+		if len(j.ing.Spec.TLS) > 0 {
+			knownHosts := sets.NewString(j.ing.Spec.TLS[0].Hosts...)
+			if knownHosts.Has(rules.Host) {
+				timeoutClient.Transport, err = buildTransport(rules.Host, j.getRootCA(j.ing.Spec.TLS[0].SecretName))
+				ExpectNoError(err)
+				proto = "https"
+			}
+		}
+		for _, p := range rules.IngressRuleValue.HTTP.Paths {
+			j.curlServiceNodePort(j.ing.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
+			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
+			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
+			ExpectNoError(j.pollURL(route, rules.Host, lbPollTimeout, timeoutClient, false))
+		}
 	}
 }
 
-// createIngress creates an Ingress with num rules. Eg:
-// start = 1 num = 2 will given you a single Ingress with 2 rules:
-// Ingress {
-//	 foo1.bar.com: /foo1
-//	 foo2.bar.com: /foo2
-// }
-func generateIngressSpec(start, num int, ns string) *extensions.Ingress {
-	name := fmt.Sprintf("%v%d", appPrefix, start)
-	ing := extensions.Ingress{
-		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
-		},
-		Spec: extensions.IngressSpec{
-			Backend: &extensions.IngressBackend{
-				ServiceName: fmt.Sprintf("%v%d", appPrefix, start),
-				ServicePort: intstr.FromInt(httpContainerPort),
-			},
-			Rules: []extensions.IngressRule{},
-		},
+// verifyURL polls for the given iterations, in intervals, and fails if the
+// given url returns a non-healthy http code even once.
+func (j *testJig) verifyURL(route, host string, iterations int, interval time.Duration, httpClient *http.Client) error {
+	for i := 0; i < iterations; i++ {
+		b, err := simpleGET(httpClient, route, host)
+		if err != nil {
+			framework.Logf(b)
+			return err
+		}
+		framework.Logf("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
+		time.Sleep(interval)
 	}
-	for i := start; i < start+num; i++ {
-		ing.Spec.Rules = append(ing.Spec.Rules, ruleByIndex(i))
+	return nil
+}
+
+// pollURL polls till the url responds with a healthy http code. If
+// expectUnreachable is true, it breaks on first non-healthy http code instead.
+func (j *testJig) pollURL(route, host string, timeout time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+	var lastBody string
+	pollErr := wait.PollImmediate(lbPollInterval, timeout, func() (bool, error) {
+		var err error
+		lastBody, err = simpleGET(httpClient, route, host)
+		if err != nil {
+			framework.Logf("host %v path %v: %v unreachable", host, route, err)
+			return expectUnreachable, nil
+		}
+		return !expectUnreachable, nil
+	})
+	if pollErr != nil {
+		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
+			timeout, route, host, lastBody, pollErr)
 	}
-	// Create the host for the cert by appending all hosts mentioned in rules.
-	hosts := []string{}
-	for _, rules := range ing.Spec.Rules {
-		hosts = append(hosts, rules.Host)
-	}
-	ing.Spec.TLS = []extensions.IngressTLS{
-		{Hosts: hosts, SecretName: name},
-	}
+	return nil
+}
+
+func (j *testJig) curlServiceNodePort(ns, name string, port int) {
+	// TODO: Curl all nodes?
+	u, err := framework.GetNodePortURL(j.client, ns, name, port)
+	ExpectNoError(err)
+	ExpectNoError(j.pollURL(u, "", 30*time.Second, &http.Client{Timeout: reqTimeout}, false))
+}
+
+// ingFromManifest reads a .json/yaml file and returns the rc in it.
+func ingFromManifest(fileName string) *extensions.Ingress {
+	var ing extensions.Ingress
+	framework.Logf("Parsing ingress from %v", fileName)
+	data, err := ioutil.ReadFile(fileName)
+	ExpectNoError(err)
+
+	json, err := utilyaml.ToJSON(data)
+	ExpectNoError(err)
+
+	ExpectNoError(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ing))
 	return &ing
-}
-
-// createApp will create a single RC and Svc. The Svc will match pods of the
-// RC using the selector: 'name'=<name arg>
-func createApp(c *client.Client, ns string, i int) {
-	name := fmt.Sprintf("%v%d", appPrefix, i)
-	l := map[string]string{}
-
-	framework.Logf("Creating svc %v", name)
-	svc := svcByName(name, httpContainerPort)
-	svc.Spec.Type = api.ServiceTypeNodePort
-	_, err := c.Services(ns).Create(svc)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Creating rc %v", name)
-	rc := rcByNamePort(name, 1, testImage, httpContainerPort, api.ProtocolTCP, l)
-	rc.Spec.Template.Spec.Containers[0].Args = []string{
-		"--num=1",
-		fmt.Sprintf("--start=%d", i),
-		fmt.Sprintf("--prefix=%v", pathPrefix),
-		fmt.Sprintf("--port=%d", httpContainerPort),
-	}
-	_, err = c.ReplicationControllers(ns).Create(rc)
-	Expect(err).NotTo(HaveOccurred())
 }
 
 // gcloudUnmarshal unmarshals json output of gcloud into given out interface.
@@ -226,26 +465,30 @@ func gcloudUnmarshal(resource, regex, project string, out interface{}) {
 	}
 }
 
-func gcloudDelete(resource, name, project string) {
+func gcloudDelete(resource, name, project string, args ...string) error {
 	framework.Logf("Deleting %v: %v", resource, name)
-	output, err := exec.Command("gcloud", "compute", resource, "delete",
-		name, fmt.Sprintf("--project=%v", project), "-q").CombinedOutput()
+	argList := append([]string{"compute", resource, "delete", name, fmt.Sprintf("--project=%v", project), "-q"}, args...)
+	output, err := exec.Command("gcloud", argList...).CombinedOutput()
 	if err != nil {
 		framework.Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
+	return err
 }
 
-type IngressController struct {
-	ns      string
-	rcPath  string
-	UID     string
-	Project string
-	rc      *api.ReplicationController
-	svc     *api.Service
-	c       *client.Client
+// GCEIngressController manages implementation details of Ingress on GCE/GKE.
+type GCEIngressController struct {
+	ns           string
+	rcPath       string
+	UID          string
+	Project      string
+	staticIPName string
+	rc           *api.ReplicationController
+	svc          *api.Service
+	c            *client.Client
 }
 
-func (cont *IngressController) getL7AddonUID() (string, error) {
+func (cont *GCEIngressController) getL7AddonUID() (string, error) {
+	framework.Logf("Retrieving UID from config map: %v/%v", api.NamespaceSystem, uidConfigMap)
 	cm, err := cont.c.ConfigMaps(api.NamespaceSystem).Get(uidConfigMap)
 	if err != nil {
 		return "", err
@@ -256,7 +499,7 @@ func (cont *IngressController) getL7AddonUID() (string, error) {
 	return "", fmt.Errorf("Could not find cluster UID for L7 addon pod")
 }
 
-func (cont *IngressController) init() {
+func (cont *GCEIngressController) init() {
 	uid, err := cont.getL7AddonUID()
 	Expect(err).NotTo(HaveOccurred())
 	cont.UID = uid
@@ -269,7 +512,25 @@ func (cont *IngressController) init() {
 	}
 }
 
-func (cont *IngressController) Cleanup(del bool) error {
+func (cont *GCEIngressController) staticIP(name string) string {
+	output, err := exec.Command("gcloud", "compute", "addresses", "create", name, "--global").CombinedOutput()
+	framework.Logf(string(output))
+	ExpectNoError(err)
+	cont.staticIPName = name
+
+	ipList := []compute.Address{}
+	gcloudUnmarshal("addresses", name, cont.Project, &ipList)
+	if len(ipList) != 1 {
+		framework.Failf("Failed to find static ip %v even though create call succeeded, found ips %+v", name, ipList)
+	}
+	return ipList[0].Address
+}
+
+// Cleanup cleans up cloud resources.
+// If del is false, it simply reports existing resources without deleting them.
+// It always deletes resources created through it's methods, like staticIP, even
+// if del is false.
+func (cont *GCEIngressController) Cleanup(del bool) error {
 	errMsg := ""
 	// Ordering is important here because we cannot delete resources that other
 	// resources hold references to.
@@ -281,12 +542,7 @@ func (cont *IngressController) Cleanup(del bool) error {
 			for _, f := range fwList {
 				msg += fmt.Sprintf("%v\n", f.Name)
 				if del {
-					framework.Logf("Deleting forwarding-rule: %v", f.Name)
-					output, err := exec.Command("gcloud", "compute", "forwarding-rules", "delete",
-						f.Name, fmt.Sprintf("--project=%v", cont.Project), "-q", "--global").CombinedOutput()
-					if err != nil {
-						framework.Logf("Error deleting forwarding rules, output: %v\nerror:%v", string(output), err)
-					}
+					gcloudDelete("forwarding-rules", f.Name, cont.Project, "--global")
 				}
 			}
 			errMsg += fmt.Sprintf("\nFound forwarding rules:\n%v", msg)
@@ -303,7 +559,14 @@ func (cont *IngressController) Cleanup(del bool) error {
 				gcloudDelete("addresses", ip.Name, cont.Project)
 			}
 		}
-		errMsg += fmt.Sprintf("Found health check:\n%v", msg)
+		errMsg += fmt.Sprintf("Found addresses:\n%v", msg)
+	}
+
+	// If the test allocated a static ip, delete that regardless
+	if cont.staticIPName != "" {
+		if err := gcloudDelete("addresses", cont.staticIPName, cont.Project, "--global"); err == nil {
+			cont.staticIPName = ""
+		}
 	}
 
 	tpList := []compute.TargetHttpProxy{}
@@ -325,7 +588,7 @@ func (cont *IngressController) Cleanup(del bool) error {
 		for _, t := range tpsList {
 			msg += fmt.Sprintf("%v\n", t.Name)
 			if del {
-				gcloudDelete("target-http-proxies", t.Name, cont.Project)
+				gcloudDelete("target-https-proxies", t.Name, cont.Project)
 			}
 		}
 		errMsg += fmt.Sprintf("Found target HTTPS proxies:\n%v", msg)
@@ -377,222 +640,4 @@ func (cont *IngressController) Cleanup(del bool) error {
 		return nil
 	}
 	return fmt.Errorf(errMsg)
-}
-
-// Before enabling this loadbalancer test in any other test list you must
-// make sure the associated project has enough quota. At the time of this
-// writing a GCE project is allowed 3 backend services by default. This
-// test requires at least 5.
-//
-// Slow by design (10 min)
-var _ = framework.KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() {
-	// These variables are initialized after framework's beforeEach.
-	var ns string
-	var addonDir string
-	var client *client.Client
-	var responseTimes, creationTimes []time.Duration
-	var ingController *IngressController
-
-	f := framework.NewDefaultFramework("glbc")
-
-	BeforeEach(func() {
-		// This test requires a GCE/GKE only cluster-addon
-		framework.SkipUnlessProviderIs("gce", "gke")
-		f.BeforeEach()
-		client = f.Client
-		ns = f.Namespace.Name
-		addonDir = filepath.Join(
-			framework.TestContext.RepoRoot, "cluster", "addons", "cluster-loadbalancing", "glbc")
-		ingController = &IngressController{
-			ns:      ns,
-			Project: framework.TestContext.CloudConfig.ProjectID,
-			c:       client,
-		}
-		ingController.init()
-		// If we somehow get the same namespace uid as someone else in this
-		// gce project, just back off.
-		Expect(ingController.Cleanup(false)).NotTo(HaveOccurred())
-		responseTimes = []time.Duration{}
-		creationTimes = []time.Duration{}
-	})
-
-	AfterEach(func() {
-		framework.Logf("Average creation time %+v, health check time %+v", creationTimes, responseTimes)
-		if CurrentGinkgoTestDescription().Failed {
-			framework.Logf("\nOutput of kubectl describe ing:\n")
-			desc, _ := framework.RunKubectl("describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-			framework.Logf(desc)
-		}
-		// Delete all Ingress, then wait for the controller to cleanup.
-		ings, err := client.Extensions().Ingress(ns).List(api.ListOptions{})
-		if err != nil {
-			framework.Logf("WARNING: Failed to list ingress: %+v", err)
-		} else {
-			for _, ing := range ings.Items {
-				framework.Logf("Deleting ingress %v/%v", ing.Namespace, ing.Name)
-				if err := client.Extensions().Ingress(ns).Delete(ing.Name, nil); err != nil {
-					framework.Logf("WARNING: Failed to delete ingress %v: %v", ing.Name, err)
-				}
-			}
-		}
-		pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
-			if err := ingController.Cleanup(false); err != nil {
-				framework.Logf("Still waiting for glbc to cleanup: %v", err)
-				return false, nil
-			}
-			return true, nil
-		})
-		// If the controller failed to cleanup the test will fail, but we want to cleanup
-		// resources before that.
-		if pollErr != nil {
-			if cleanupErr := ingController.Cleanup(true); cleanupErr != nil {
-				framework.Logf("WARNING: Failed to cleanup resources %v", cleanupErr)
-			}
-			framework.Failf("Failed to cleanup GCE L7 resources.")
-		}
-		f.AfterEach()
-		framework.Logf("Successfully verified GCE L7 loadbalancer via Ingress.")
-	})
-
-	It("should create GCE L7 loadbalancers and verify Ingress", func() {
-		// Create numApps apps, exposed via numIng Ingress each with 2 paths.
-		// Eg with numApp=10, numIng=5:
-		// apps: {foo-app-(0-10)}
-		// ingress: {foo-app-(0, 2, 4, 6, 8)}
-		// paths:
-		//  ingress foo-app-0:
-		//	  default1.bar.com
-		//	  foo0.bar.com: /foo0
-		//	  foo1.bar.com: /foo1
-		if numApps < numIng {
-			framework.Failf("Need more apps than Ingress")
-		}
-		framework.Logf("Starting ingress test")
-		appsPerIngress := numApps / numIng
-		By(fmt.Sprintf("Creating %d rcs + svc, and %d apps per Ingress", numApps, appsPerIngress))
-
-		ingCAs := map[string][]byte{}
-		for appID := 0; appID < numApps; appID = appID + appsPerIngress {
-			// Creates appsPerIngress apps, then creates one Ingress with paths to all the apps.
-			for j := appID; j < appID+appsPerIngress; j++ {
-				createApp(client, ns, j)
-			}
-			var err error
-			ing := generateIngressSpec(appID, appsPerIngress, ns)
-
-			// Secrets must be created before the Ingress. The cert of each
-			// Ingress contains all the hostnames of that Ingress as the subject
-			// name field in the cert.
-			By(fmt.Sprintf("Creating secret for ingress %v/%v", ing.Namespace, ing.Name))
-			_, rootCA, _, err := createSecret(client, ing)
-			Expect(err).NotTo(HaveOccurred())
-			ingCAs[ing.Name] = rootCA
-
-			By(fmt.Sprintf("Creating ingress %v/%v", ing.Namespace, ing.Name))
-			ing, err = client.Extensions().Ingress(ing.Namespace).Create(ing)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
-		ings, err := client.Extensions().Ingress(ns).List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		for _, ing := range ings.Items {
-			// Wait for the loadbalancer IP.
-			start := time.Now()
-			address, err := framework.WaitForIngressAddress(client, ing.Namespace, ing.Name, lbPollTimeout)
-			if err != nil {
-				framework.Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
-			}
-			Expect(err).NotTo(HaveOccurred())
-			By(fmt.Sprintf("Found address %v for ingress %v, took %v to come online",
-				address, ing.Name, time.Since(start)))
-			creationTimes = append(creationTimes, time.Since(start))
-
-			if !verifyHTTPGET {
-				continue
-			}
-
-			// Check that all rules respond to a simple GET.
-			for _, rules := range ing.Spec.Rules {
-				// As of Kubernetes 1.1 we only support HTTP Ingress.
-				if rules.IngressRuleValue.HTTP == nil {
-					continue
-				}
-				timeoutClient.Transport, err = buildTransport(rules.Host, ingCAs[ing.Name])
-
-				for _, p := range rules.IngressRuleValue.HTTP.Paths {
-					route := fmt.Sprintf("https://%v%v", address, p.Path)
-					framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-					if err != nil {
-						framework.Failf("Unable to create transport: %v", err)
-					}
-					// Make sure the service node port is reachable
-					Expect(curlServiceNodePort(client, ns, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))).NotTo(HaveOccurred())
-
-					GETStart := time.Now()
-					var lastBody string
-					pollErr := wait.Poll(lbPollInterval, lbPollTimeout, func() (bool, error) {
-						var err error
-						lastBody, err = simpleGET(timeoutClient, route, rules.Host)
-						if err != nil {
-							framework.Logf("host %v path %v: %v", rules.Host, route, err)
-							return false, nil
-						}
-						return true, nil
-					})
-					if pollErr != nil {
-						msg := fmt.Sprintf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
-							lbPollTimeout, route, rules.Host, lastBody, pollErr)
-
-						// Make sure the service node port is still reachable
-						if err := curlServiceNodePort(client, ns, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal)); err != nil {
-							msg += fmt.Sprintf("Also unable to curl service node port: %v", err)
-						}
-						framework.Failf(msg)
-					}
-					rt := time.Since(GETStart)
-					By(fmt.Sprintf("Route %v host %v took %v to respond", route, rules.Host, rt))
-					responseTimes = append(responseTimes, rt)
-				}
-			}
-		}
-		// In most cases slow loadbalancer creation/startup translates directly to
-		// GCE api sluggishness. However this might be because of something the
-		// controller is doing, eg: maxing out QPS by repeated polling.
-		sort.Sort(timeSlice(creationTimes))
-		perc50 := creationTimes[len(creationTimes)/2]
-		if perc50 > expectedLBCreationTime {
-			framework.Logf("WARNING: Average creation time is too high: %+v", creationTimes)
-		}
-		if !verifyHTTPGET {
-			return
-		}
-		sort.Sort(timeSlice(responseTimes))
-		perc50 = responseTimes[len(responseTimes)/2]
-		if perc50 > expectedLBHealthCheckTime {
-			framework.Logf("WARNING: Average startup time is too high: %+v", responseTimes)
-		}
-	})
-})
-
-func curlServiceNodePort(client *client.Client, ns, name string, port int) error {
-	// TODO: Curl all nodes?
-	u, err := framework.GetNodePortURL(client, ns, name, port)
-	if err != nil {
-		return err
-	}
-	var svcCurlBody string
-	timeout := 30 * time.Second
-	pollErr := wait.Poll(10*time.Second, timeout, func() (bool, error) {
-		svcCurlBody, err = simpleGET(timeoutClient, u, "")
-		if err != nil {
-			framework.Logf("Failed to curl service node port, body: %v\nerror %v", svcCurlBody, err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if pollErr != nil {
-		return fmt.Errorf("Failed to curl service node port in %v, body: %v\nerror %v", timeout, svcCurlBody, err)
-	}
-	framework.Logf("Successfully curled service node port, body: %v", svcCurlBody)
-	return nil
 }
