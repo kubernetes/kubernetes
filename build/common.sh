@@ -481,24 +481,9 @@ function kube::build::build_image_built() {
 # The set of source targets to include in the kube-build image
 function kube::build::source_targets() {
   local targets=(
-    api
-    build
-    cluster
-    cmd
-    docs
-    examples
-    federation
-    Godeps/Godeps.json
-    hack
-    LICENSE
-    pkg
-    plugin
-    DESIGN.md
-    README.md
-    test
-    third_party
-    vendor
-    contrib/mesos
+      $(find . -mindepth 1 -maxdepth 1 -not \(        \
+          \( -path ./_\* -o -path ./.git\* \) -prune  \
+        \))
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
