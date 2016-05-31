@@ -214,7 +214,7 @@ type PodSecurityContext struct {
 	...
 	// Sysctls hold a list of namespaced sysctls used for the pod. They are only allowed
 	// if the respective host namespace setting pod.spec.hostIPC or pod.spec.hostNetwork
-	// are false.
+	// is false.
 	Sysctls []Sysctl `json:"sysctls,omitempty"`
 }
 ```
