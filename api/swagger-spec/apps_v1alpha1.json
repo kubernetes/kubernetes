@@ -1100,7 +1100,7 @@
       "items": {
        "$ref": "v1.OwnerReference"
       },
-      "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected."
+      "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
      "finalizers": {
       "type": "array",
@@ -1136,6 +1136,10 @@
      "uid": {
       "type": "string",
       "description": "UID of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
      }
     }
    },

@@ -4452,6 +4452,16 @@ func (m *OwnerReference) MarshalTo(data []byte) (int, error) {
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.APIVersion)))
 	i += copy(data[i:], m.APIVersion)
+	if m.Controller != nil {
+		data[i] = 0x30
+		i++
+		if *m.Controller {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
 	return i, nil
 }
 
@@ -8982,6 +8992,9 @@ func (m *OwnerReference) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.APIVersion)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.Controller != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -23047,6 +23060,27 @@ func (m *OwnerReference) Unmarshal(data []byte) error {
 			}
 			m.APIVersion = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Controller", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Controller = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])

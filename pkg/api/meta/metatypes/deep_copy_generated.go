@@ -29,5 +29,9 @@ func DeepCopy_metatypes_OwnerReference(in OwnerReference, out *OwnerReference, c
 	out.Kind = in.Kind
 	out.UID = in.UID
 	out.Name = in.Name
+	if in.Controller != nil {
+		value := *in.Controller
+		out.Controller = &value
+	}
 	return nil
 }

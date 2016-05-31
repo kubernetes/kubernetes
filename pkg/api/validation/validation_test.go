@@ -99,12 +99,17 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 }
 
 func TestValidateObjectMetaOwnerReferences(t *testing.T) {
+	trueVar := true
+	falseVar := false
 	testCases := []struct {
-		ownerReferences []api.OwnerReference
-		expectError     bool
+		description          string
+		ownerReferences      []api.OwnerReference
+		expectError          bool
+		expectedErrorMessage string
 	}{
 		{
-			[]api.OwnerReference{
+			description: "simple success - third party extension.",
+			ownerReferences: []api.OwnerReference{
 				{
 					APIVersion: "thirdpartyVersion",
 					Kind:       "thirdpartyKind",
@@ -112,11 +117,12 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 					UID:        "1",
 				},
 			},
-			false,
+			expectError:          false,
+			expectedErrorMessage: "",
 		},
 		{
-			// event shouldn't be set as an owner
-			[]api.OwnerReference{
+			description: "simple failures - event shouldn't be set as an owner",
+			ownerReferences: []api.OwnerReference{
 				{
 					APIVersion: "v1",
 					Kind:       "Event",
@@ -124,7 +130,76 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 					UID:        "1",
 				},
 			},
-			true,
+			expectError:          true,
+			expectedErrorMessage: "is disallowed from being an owner",
+		},
+		{
+			description: "simple controller ref success - one reference with Controller set",
+			ownerReferences: []api.OwnerReference{
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "1",
+					Controller: &falseVar,
+				},
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "2",
+					Controller: &trueVar,
+				},
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "3",
+					Controller: &falseVar,
+				},
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "4",
+				},
+			},
+			expectError:          false,
+			expectedErrorMessage: "",
+		},
+		{
+			description: "simple controller ref failure - two references with Controller set",
+			ownerReferences: []api.OwnerReference{
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "1",
+					Controller: &falseVar,
+				},
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "2",
+					Controller: &trueVar,
+				},
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "3",
+					Controller: &trueVar,
+				},
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "4",
+				},
+			},
+			expectError:          true,
+			expectedErrorMessage: "Only one reference can have Controller set to true",
 		},
 	}
 
@@ -137,13 +212,13 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			},
 			field.NewPath("field"))
 		if len(errs) != 0 && !tc.expectError {
-			t.Errorf("unexpected error: %v", errs)
+			t.Errorf("unexpected error: %v in test case %v", errs, tc.description)
 		}
 		if len(errs) == 0 && tc.expectError {
-			t.Errorf("expect error")
+			t.Errorf("expect error in test case %v", tc.description)
 		}
-		if len(errs) != 0 && !strings.Contains(errs[0].Error(), "is disallowed from being an owner") {
-			t.Errorf("unexpected error message: %v", errs)
+		if len(errs) != 0 && !strings.Contains(errs[0].Error(), tc.expectedErrorMessage) {
+			t.Errorf("unexpected error message: %v in test case %v", errs, tc.description)
 		}
 	}
 }

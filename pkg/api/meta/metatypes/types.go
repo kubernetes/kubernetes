@@ -26,4 +26,5 @@ type OwnerReference struct {
 	Kind       string
 	UID        types.UID
 	Name       string
+	Controller *bool
 }

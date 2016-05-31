@@ -160,8 +160,17 @@ func validateOwnerReference(ownerReference api.OwnerReference, fldPath *field.Pa
 
 func ValidateOwnerReferences(ownerReferences []api.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	controllerName := ""
 	for _, ref := range ownerReferences {
 		allErrs = append(allErrs, validateOwnerReference(ref, fldPath)...)
+		if ref.Controller != nil && *ref.Controller {
+			if controllerName != "" {
+				allErrs = append(allErrs, field.Invalid(fldPath, ownerReferences,
+					fmt.Sprintf("Only one reference can have Controller set to true. Found \"true\" in references for %v and %v", controllerName, ref.Name)))
+			} else {
+				controllerName = ref.Name
+			}
+		}
 	}
 	return allErrs
 }
