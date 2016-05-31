@@ -18,6 +18,7 @@
 
 ETCD_VERSION=${ETCD_VERSION:-2.2.1}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
+ETCD_PROTO=${ETCD_PROTO:-"http"}
 ETCD_PORT=${ETCD_PORT:-4001}
 
 kube::etcd::kubesec() {
