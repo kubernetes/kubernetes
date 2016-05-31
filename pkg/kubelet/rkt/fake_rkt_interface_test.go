@@ -194,7 +194,7 @@ func newFakeRktCli() *fakeRktCli {
 	}
 }
 
-func (f *fakeRktCli) RunCommand(args ...string) (result []string, err error) {
+func (f *fakeRktCli) RunCommand(config *Config, args ...string) (result []string, err error) {
 	f.Lock()
 	defer f.Unlock()
 	cmd := append([]string{"rkt"}, args...)
