@@ -251,14 +251,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		// have been dynamically added to the apiserver
 		Object: func(discoverDynamicAPIs bool) (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
-			CheckErr(err)
+			checkErrWithPrefix("failed to get client config: ", err)
 			cmdApiVersion := unversioned.GroupVersion{}
 			if cfg.GroupVersion != nil {
 				cmdApiVersion = *cfg.GroupVersion
 			}
 			if discoverDynamicAPIs {
 				client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
-				CheckErr(err)
+				checkErrWithPrefix("failed to find client for version v1: ", err)
 
 				var versions []unversioned.GroupVersion
 				var gvks []unversioned.GroupVersionKind
@@ -272,7 +272,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 						break
 					}
 				}
-				CheckErr(err)
+				checkErrWithPrefix("failed to get third-party group versions: ", err)
 				if len(versions) > 0 {
 					priorityMapper, ok := mapper.RESTMapper.(meta.PriorityRESTMapper)
 					if !ok {
@@ -292,7 +292,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 						preferredExternalVersion := versionList[0]
 
 						thirdPartyMapper, err := kubectl.NewThirdPartyResourceMapper(versionList, getGroupVersionKinds(gvks, group))
-						CheckErr(err)
+						checkErrWithPrefix("failed to create third party resource mapper: ", err)
 						accessor := meta.NewAccessor()
 						groupMeta := apimachinery.GroupMeta{
 							GroupVersion:  preferredExternalVersion,
@@ -302,7 +302,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 							InterfacesFor: makeInterfacesFor(versionList),
 						}
 
-						CheckErr(registered.RegisterGroup(groupMeta))
+						checkErrWithPrefix("failed to register group: ", registered.RegisterGroup(groupMeta))
 						registered.AddThirdPartyAPIGroupVersions(versionList...)
 						multiMapper = append(meta.MultiRESTMapper{thirdPartyMapper}, multiMapper...)
 					}
