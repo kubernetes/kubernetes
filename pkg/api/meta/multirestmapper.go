@@ -163,7 +163,17 @@ func (m MultiRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...strin
 			continue
 		}
 
-		allMappings = append(allMappings, currMapping)
+		// decimate dupes
+		found := false
+		for _, addedMapping := range allMappings {
+			if addedMapping.Scope == currMapping.Scope && addedMapping.GroupVersionKind == currMapping.GroupVersionKind && addedMapping.Resource == currMapping.Resource {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allMappings = append(allMappings, currMapping)
+		}
 	}
 
 	// if we got exactly one mapping, then use it even if other requested failed

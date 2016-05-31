@@ -67,7 +67,17 @@ func (m PriorityRESTMapper) ResourceFor(partiallySpecifiedResource unversioned.G
 		matchedGVRs := []unversioned.GroupVersionResource{}
 		for _, gvr := range remainingGVRs {
 			if resourceMatches(pattern, gvr) {
-				matchedGVRs = append(matchedGVRs, gvr)
+				// decimate dupes
+				found := false
+				for _, matchedGVR := range matchedGVRs {
+					if gvr == matchedGVR {
+						found = true
+						break
+					}
+				}
+				if !found {
+					matchedGVRs = append(matchedGVRs, gvr)
+				}
 			}
 		}
 
@@ -103,7 +113,17 @@ func (m PriorityRESTMapper) KindFor(partiallySpecifiedResource unversioned.Group
 		matchedGVKs := []unversioned.GroupVersionKind{}
 		for _, gvr := range remainingGVKs {
 			if kindMatches(pattern, gvr) {
-				matchedGVKs = append(matchedGVKs, gvr)
+				// decimate dupes
+				found := false
+				for _, matchedGVK := range matchedGVKs {
+					if gvr == matchedGVK {
+						found = true
+						break
+					}
+				}
+				if !found {
+					matchedGVKs = append(matchedGVKs, gvr)
+				}
 			}
 		}
 

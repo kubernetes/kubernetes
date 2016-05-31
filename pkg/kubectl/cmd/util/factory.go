@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -256,9 +257,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if cfg.GroupVersion != nil {
 				cmdApiVersion = *cfg.GroupVersion
 			}
+
+			client, clientErr := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
+
 			if discoverDynamicAPIs {
-				client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
-				CheckErr(err)
+				CheckErr(clientErr)
 
 				versions, gvks, err := GetThirdPartyGroupVersions(client.Discovery())
 				CheckErr(err)
@@ -301,23 +304,35 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					mapper.RESTMapper = priorityMapper
 				}
 			}
-			outputRESTMapper := kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
-			priorityRESTMapper := meta.PriorityRESTMapper{
-				Delegate: outputRESTMapper,
-				ResourcePriority: []unversioned.GroupVersionResource{
-					{Group: api.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-					{Group: extensions.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-					{Group: metrics.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-					{Group: federation.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-				},
-				KindPriority: []unversioned.GroupVersionKind{
-					{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-					{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-					{Group: metrics.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-					{Group: federation.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-				},
+
+			// if we don't have a client, use the hardcoded RESTMapper as the next best thing
+			if client == nil {
+				outputRESTMapper := kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
+				priorityRESTMapper := meta.PriorityRESTMapper{
+					Delegate: outputRESTMapper,
+					ResourcePriority: []unversioned.GroupVersionResource{
+						{Group: api.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+						{Group: extensions.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+						{Group: metrics.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+						{Group: federation.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					},
+					KindPriority: []unversioned.GroupVersionKind{
+						{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+						{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+						{Group: metrics.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+						{Group: federation.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					},
+				}
+				return priorityRESTMapper, api.Scheme
 			}
-			return priorityRESTMapper, api.Scheme
+
+			return kubectl.OutputVersionMapper{
+				RESTMapper: meta.MultiRESTMapper{
+					discovery.NewRESTMapper(client.Discovery()),
+					mapper,
+				},
+				OutputVersions: []unversioned.GroupVersion{cmdApiVersion},
+			}, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
