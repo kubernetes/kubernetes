@@ -42,6 +42,7 @@ type rangeAllocator struct {
 	maxCIDRs        int
 	used            big.Int
 	lock            sync.Mutex
+	nextCandidate   int
 }
 
 // NewCIDRRangeAllocator returns a CIDRAllocator to allocate CIDR for node
@@ -56,6 +57,7 @@ func NewCIDRRangeAllocator(clusterCIDR *net.IPNet, subNetMaskSize int) CIDRAlloc
 		clusterMaskSize: clusterMaskSize,
 		subNetMaskSize:  subNetMaskSize,
 		maxCIDRs:        1 << uint32(subNetMaskSize-clusterMaskSize),
+		nextCandidate:   0,
 	}
 	return ra
 }
@@ -66,14 +68,16 @@ func (r *rangeAllocator) AllocateNext() (*net.IPNet, error) {
 
 	nextUnused := -1
 	for i := 0; i < r.maxCIDRs; i++ {
-		if r.used.Bit(i) == 0 {
-			nextUnused = i
+		candidate := (i + r.nextCandidate) % r.maxCIDRs
+		if r.used.Bit(candidate) == 0 {
+			nextUnused = candidate
 			break
 		}
 	}
 	if nextUnused == -1 {
 		return nil, errCIDRRangeNoCIDRsRemaining
 	}
+	r.nextCandidate = (nextUnused + 1) % r.maxCIDRs
 
 	r.used.SetBit(&r.used, nextUnused, 1)
 
@@ -138,7 +142,6 @@ func (r *rangeAllocator) Occupy(cidr *net.IPNet) (err error) {
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
 	for i := begin; i <= end; i++ {
 		r.used.SetBit(&r.used, i, 1)
 	}
