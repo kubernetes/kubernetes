@@ -325,6 +325,7 @@ func NewMainKubelet(
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
+		nodeStore:                      nodeStore,
 		nodeInfo:                       nodeInfo,
 		masterServiceNamespace:         masterServiceNamespace,
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
@@ -627,6 +628,8 @@ type Kubelet struct {
 	masterServiceNamespace string
 	// serviceLister knows how to list services
 	serviceLister serviceLister
+	// nodeStore is a cache of nodes
+	nodeStore cache.Store
 	// nodeLister knows how to list nodes
 	nodeLister nodeLister
 	// nodeInfo knows how to get information about the node for this kubelet.
@@ -1125,6 +1128,10 @@ func (kl *Kubelet) registerWithApiserver() {
 		node, err := kl.initialNodeStatus()
 		if err != nil {
 			glog.Errorf("Unable to construct api.Node object for kubelet: %v", err)
+			continue
+		}
+		if err := kl.nodeStore.Add(node); err != nil {
+			glog.Errorf("Unable to add node to cache: %v", err)
 			continue
 		}
 		glog.V(2).Infof("Attempting to register node %s", node.Name)
