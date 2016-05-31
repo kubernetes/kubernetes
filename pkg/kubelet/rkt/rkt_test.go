@@ -172,7 +172,6 @@ func TestCheckVersion(t *testing.T) {
 	tests := []struct {
 		minimumRktBinVersion     string
 		recommendedRktBinVersion string
-		minimumAppcVersion       string
 		minimumRktApiVersion     string
 		minimumSystemdVersion    string
 		err                      error
@@ -183,7 +182,6 @@ func TestCheckVersion(t *testing.T) {
 		{
 			"1.2.3",
 			"1.2.3",
-			"1.2.4",
 			"1.2.5",
 			"99",
 			nil,
@@ -194,7 +192,6 @@ func TestCheckVersion(t *testing.T) {
 		{
 			"1.2.3+git",
 			"1.2.3+git",
-			"1.2.4+git",
 			"1.2.6-alpha",
 			"100",
 			nil,
@@ -205,21 +202,9 @@ func TestCheckVersion(t *testing.T) {
 		{
 			"1.2.4",
 			"1.2.4",
-			"1.2.4",
 			"1.2.6-alpha",
 			"100",
 			fmt.Errorf("rkt: binary version is too old(%v), requires at least %v", fr.info.RktVersion, "1.2.4"),
-			true,
-			true,
-		},
-		// Requires greater Appc version.
-		{
-			"1.2.3",
-			"1.2.3",
-			"1.2.5",
-			"1.2.6-alpha",
-			"100",
-			fmt.Errorf("rkt: appc version is too old(%v), requires at least %v", fr.info.AppcVersion, "1.2.5"),
 			true,
 			true,
 		},
@@ -227,7 +212,6 @@ func TestCheckVersion(t *testing.T) {
 		{
 			"1.2.3",
 			"1.2.3",
-			"1.2.4",
 			"1.2.6",
 			"100",
 			fmt.Errorf("rkt: API version is too old(%v), requires at least %v", fr.info.ApiVersion, "1.2.6"),
@@ -238,7 +222,6 @@ func TestCheckVersion(t *testing.T) {
 		{
 			"1.2.3",
 			"1.2.3",
-			"1.2.4",
 			"1.2.7",
 			"100",
 			fmt.Errorf("rkt: API version is too old(%v), requires at least %v", fr.info.ApiVersion, "1.2.7"),
@@ -249,7 +232,6 @@ func TestCheckVersion(t *testing.T) {
 		{
 			"1.2.3",
 			"1.2.3",
-			"1.2.4",
 			"1.2.7",
 			"101",
 			fmt.Errorf("rkt: systemd version(%v) is too old, requires at least %v", fs.version, "101"),
@@ -260,7 +242,7 @@ func TestCheckVersion(t *testing.T) {
 
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
-		err := r.checkVersion(tt.minimumRktBinVersion, tt.recommendedRktBinVersion, tt.minimumAppcVersion, tt.minimumRktApiVersion, tt.minimumSystemdVersion)
+		err := r.checkVersion(tt.minimumRktBinVersion, tt.recommendedRktBinVersion, tt.minimumRktApiVersion, tt.minimumSystemdVersion)
 		assert.Equal(t, tt.err, err, testCaseHint)
 
 		if tt.calledGetInfo {
@@ -271,7 +253,6 @@ func TestCheckVersion(t *testing.T) {
 		}
 		if err == nil {
 			assert.Equal(t, fr.info.RktVersion, r.versions.binVersion.String(), testCaseHint)
-			assert.Equal(t, fr.info.AppcVersion, r.versions.appcVersion.String(), testCaseHint)
 			assert.Equal(t, fr.info.ApiVersion, r.versions.apiVersion.String(), testCaseHint)
 		}
 		fr.CleanCalls()
