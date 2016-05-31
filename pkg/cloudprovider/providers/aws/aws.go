@@ -2175,6 +2175,7 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 			// TODO: Unify the two annotations
 			return nil, fmt.Errorf("source-range annotation cannot be combined with the internal-elb annotation")
 		}
+		glog.V(2).Infof("Creating %v as an internal load balancer", name)
 		internalELB = true
 	}
 
