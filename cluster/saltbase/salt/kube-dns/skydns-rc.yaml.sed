@@ -14,6 +14,8 @@
 
 # This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
 
+# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
+
 # Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
 
 apiVersion: v1
@@ -71,7 +73,7 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube-dns"
-        - --domain=$DNS_DOMAIN}}
+        - --domain=$DNS_DOMAIN}}.
         - --dns-port=10053
         ports:
         - containerPort: 10053

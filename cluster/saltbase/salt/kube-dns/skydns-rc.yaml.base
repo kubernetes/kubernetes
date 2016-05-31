@@ -14,6 +14,8 @@
 
 # This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
 
+# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
+
 # __MACHINE_GENERATED_WARNING__
 
 apiVersion: v1
@@ -71,7 +73,7 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube-dns"
-        - --domain=__PILLAR__DNS__DOMAIN__
+        - --domain=__PILLAR__DNS__DOMAIN__.
         - --dns-port=10053
         ports:
         - containerPort: 10053
