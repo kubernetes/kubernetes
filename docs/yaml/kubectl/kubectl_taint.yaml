@@ -1,6 +1,7 @@
 name: taint
 synopsis: Update the taints on one or more nodes
-description: |-
+description: |2-
+
   Update the taints on one or more nodes.
 
   A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
@@ -117,7 +118,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
   # If a taint with that key already exists, its value and effect are replaced as specified.
   kubectl taint nodes foo dedicated=special-user:NoSchedule

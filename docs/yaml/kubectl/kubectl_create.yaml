@@ -1,6 +1,7 @@
 name: create
 synopsis: Create a resource by filename or stdin
-description: |-
+description: |2-
+
   Create a resource by filename or stdin.
 
   JSON and YAML formats are accepted.
@@ -98,7 +99,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Create a pod using the data in pod.json.
   kubectl create -f ./pod.json
 

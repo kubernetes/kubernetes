@@ -76,7 +76,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Get output from running pod 123456-7890, using the first container by default
   kubectl attach 123456-7890
 

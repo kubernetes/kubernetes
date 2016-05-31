@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -31,27 +33,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	convert_long = `Convert config files between different API versions. Both YAML
-and JSON formats are accepted.
+var (
+	convert_long = dedent.Dedent(`
+		Convert config files between different API versions. Both YAML
+		and JSON formats are accepted.
 
-The command takes filename, directory, or URL as input, and convert it into format
-of version specified by --output-version flag. If target version is not specified or
-not supported, convert to latest version.
+		The command takes filename, directory, or URL as input, and convert it into format
+		of version specified by --output-version flag. If target version is not specified or
+		not supported, convert to latest version.
 
-The default output will be printed to stdout in YAML format. One can use -o option
-to change to output destination.
-`
-	convert_example = `# Convert 'pod.yaml' to latest version and print to stdout.
-kubectl convert -f pod.yaml
+		The default output will be printed to stdout in YAML format. One can use -o option
+		to change to output destination.
+		`)
 
-# Convert the live state of the resource specified by 'pod.yaml' to the latest version
-# and print to stdout in json format.
-kubectl convert -f pod.yaml --local -o json
+	convert_example = dedent.Dedent(`
+		# Convert 'pod.yaml' to latest version and print to stdout.
+		kubectl convert -f pod.yaml
 
-# Convert all files under current directory to latest version and create them all.
-kubectl convert -f . | kubectl create -f -
-`
+		# Convert the live state of the resource specified by 'pod.yaml' to the latest version
+		# and print to stdout in json format.
+		kubectl convert -f pod.yaml --local -o json
+
+		# Convert all files under current directory to latest version and create them all.
+		kubectl convert -f . | kubectl create -f -
+		`)
 )
 
 // NewCmdConvert creates a command object for the generic "convert" action, which

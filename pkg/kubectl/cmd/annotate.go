@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -58,42 +59,43 @@ type AnnotateOptions struct {
 	recursive bool
 }
 
-const (
+var (
 	annotate_resources = `
   pod (po), service (svc), replicationcontroller (rc),
   node (no), event (ev), componentstatuse (cs),
   limitrange (limits), persistentvolume (pv), persistentvolumeclaim (pvc),
-  horizontalpodautoscaler (hpa), resourcequota (quota), secret
-`
+  horizontalpodautoscaler (hpa), resourcequota (quota), secret`
 
-	annotate_long = `Update the annotations on one or more resources.
+	annotate_long = dedent.Dedent(`
+		Update the annotations on one or more resources.
 
-An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
-It is intended to store non-identifying auxiliary data, especially data manipulated by tools and system extensions.
-If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
-If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
+		An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
+		It is intended to store non-identifying auxiliary data, especially data manipulated by tools and system extensions.
+		If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
+		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-Possible resources include (case insensitive):` + annotate_resources
+		Possible resources include (case insensitive):`) + annotate_resources
 
-	annotate_example = `# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
-# If the same annotation is set multiple times, only the last value will be applied
-kubectl annotate pods foo description='my frontend'
+	annotate_example = dedent.Dedent(`
+		# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
+		# If the same annotation is set multiple times, only the last value will be applied
+		kubectl annotate pods foo description='my frontend'
 
-# Update a pod identified by type and name in "pod.json"
-kubectl annotate -f pod.json description='my frontend'
+		# Update a pod identified by type and name in "pod.json"
+		kubectl annotate -f pod.json description='my frontend'
 
-# Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
-kubectl annotate --overwrite pods foo description='my frontend running nginx'
+		# Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
+		kubectl annotate --overwrite pods foo description='my frontend running nginx'
 
-# Update all pods in the namespace
-kubectl annotate pods --all description='my frontend running nginx'
+		# Update all pods in the namespace
+		kubectl annotate pods --all description='my frontend running nginx'
 
-# Update pod 'foo' only if the resource is unchanged from version 1.
-kubectl annotate pods foo description='my frontend running nginx' --resource-version=1
+		# Update pod 'foo' only if the resource is unchanged from version 1.
+		kubectl annotate pods foo description='my frontend running nginx' --resource-version=1
 
-# Update pod 'foo' by removing an annotation named 'description' if it exists.
-# Does not require the --overwrite flag.
-kubectl annotate pods foo description-`
+		# Update pod 'foo' by removing an annotation named 'description' if it exists.
+		# Does not require the --overwrite flag.
+		kubectl annotate pods foo description-`)
 )
 
 func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {

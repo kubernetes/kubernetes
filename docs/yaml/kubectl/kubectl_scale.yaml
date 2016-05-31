@@ -1,7 +1,8 @@
 name: scale
 synopsis: |
   Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
-description: |-
+description: |2-
+
   Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
 
   Scale also allows users to specify one or more preconditions for the scale action.
@@ -104,7 +105,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Scale a replicaset named 'foo' to 3.
   kubectl scale --replicas=3 rs/foo
 

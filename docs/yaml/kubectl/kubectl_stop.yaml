@@ -1,7 +1,8 @@
 name: stop
 synopsis: |
   Deprecated: Gracefully shut down a resource by name or filename.
-description: |-
+description: |2-
+
   Deprecated: Gracefully shut down a resource by name or filename.
 
   The stop command is deprecated, all its functionalities are covered by delete command.
@@ -105,7 +106,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Shut down foo.
   kubectl stop replicationcontroller foo
 

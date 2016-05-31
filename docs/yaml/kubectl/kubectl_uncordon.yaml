@@ -1,6 +1,7 @@
 name: uncordon
 synopsis: Mark node as schedulable
-description: |
+description: |2
+
   Mark node as schedulable.
 inherited_options:
 - name: alsologtostderr
@@ -63,7 +64,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |
+example: |2
+
   # Mark node "foo" as schedulable.
   $ kubectl uncordon foo
 see_also:

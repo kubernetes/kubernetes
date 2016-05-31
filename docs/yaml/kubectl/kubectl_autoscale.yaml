@@ -1,7 +1,8 @@
 name: autoscale
 synopsis: |
   Auto-scale a Deployment, ReplicaSet, or ReplicationController
-description: |-
+description: |2-
+
   Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
   Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
@@ -136,7 +137,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
   kubectl autoscale deployment foo --min=2 --max=10
 

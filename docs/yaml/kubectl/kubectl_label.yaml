@@ -1,6 +1,7 @@
 name: label
 synopsis: Update the labels on a resource
-description: |-
+description: |2-
+
   Update the labels on a resource.
 
   A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to 63 characters.
@@ -127,7 +128,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Update pod 'foo' with the label 'unhealthy' and the value 'true'.
   kubectl label pods foo unhealthy=true
 

@@ -1,7 +1,10 @@
 name: set
 synopsis: Set specific features on objects
-description: "Configure application resources\n\t\nThese commands help you make changes
-  to existing application resources."
+description: |2-
+
+  Configure application resources
+
+  These commands help you make changes to existing application resources.
 inherited_options:
 - name: alsologtostderr
   default_value: "false"

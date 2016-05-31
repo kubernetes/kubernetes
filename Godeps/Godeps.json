@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v69",
+	"GodepVersion": "v70",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -1722,6 +1722,11 @@
 			"ImportPath": "github.com/rackspace/gophercloud/testhelper/client",
 			"Comment": "v1.0.0-842-g8992d74",
 			"Rev": "8992d7483a06748dea706e4716d042a4a9e73918"
+		},
+		{
+			"ImportPath": "github.com/renstrom/dedent",
+			"Comment": "v1.0.0-3-g020d11c",
+			"Rev": "020d11c3b9c0c7a3c2efcc8e5cf5b9ef7bcea21f"
 		},
 		{
 			"ImportPath": "github.com/robfig/cron",

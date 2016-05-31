@@ -1,6 +1,7 @@
 name: annotate
 synopsis: Update the annotations on a resource
-description: |
+description: |2-
+
   Update the annotations on one or more resources.
 
   An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
@@ -130,7 +131,8 @@ inherited_options:
 - name: vmodule
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
-example: |-
+example: |2-
+
   # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
   # If the same annotation is set multiple times, only the last value will be applied
   kubectl annotate pods foo description='my frontend'
