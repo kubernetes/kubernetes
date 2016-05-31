@@ -17,11 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/user"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -66,7 +67,7 @@ func ConfirmNoEscalation(ctx api.Context, ruleResolver AuthorizationRuleResolver
 	ownerRightsCover, missingRights := Covers(ownerRules, rules)
 	if !ownerRightsCover {
 		user, _ := api.UserFrom(ctx)
-		return errors.NewUnauthorized(fmt.Sprintf("attempt to grant extra privileges: %v user=%v ownerrules=%v ruleResolutionErrors=%v", missingRights, user, ownerRules, ruleResolutionErrors))
+		return apierrors.NewUnauthorized(fmt.Sprintf("attempt to grant extra privileges: %v user=%v ownerrules=%v ruleResolutionErrors=%v", missingRights, user, ownerRules, ruleResolutionErrors))
 	}
 	return nil
 }
@@ -205,4 +206,80 @@ func appliesToUser(user user.Info, subject rbac.Subject) (bool, error) {
 	default:
 		return false, fmt.Errorf("unknown subject kind: %s", subject.Kind)
 	}
+}
+
+// NewTestRuleResolver returns a rule resolver from lists of role objects.
+func NewTestRuleResolver(roles []rbac.Role, roleBindings []rbac.RoleBinding, clusterRoles []rbac.ClusterRole, clusterRoleBindings []rbac.ClusterRoleBinding) AuthorizationRuleResolver {
+	r := staticRoles{
+		roles:               roles,
+		roleBindings:        roleBindings,
+		clusterRoles:        clusterRoles,
+		clusterRoleBindings: clusterRoleBindings,
+	}
+	return newMockRuleResolver(&r)
+}
+
+func newMockRuleResolver(r *staticRoles) AuthorizationRuleResolver {
+	return NewDefaultRuleResolver(r, r, r, r)
+}
+
+type staticRoles struct {
+	roles               []rbac.Role
+	roleBindings        []rbac.RoleBinding
+	clusterRoles        []rbac.ClusterRole
+	clusterRoleBindings []rbac.ClusterRoleBinding
+}
+
+func (r *staticRoles) GetRole(ctx api.Context, id string) (*rbac.Role, error) {
+	namespace, ok := api.NamespaceFrom(ctx)
+	if !ok || namespace == "" {
+		return nil, errors.New("must provide namespace when getting role")
+	}
+	for _, role := range r.roles {
+		if role.Namespace == namespace && role.Name == id {
+			return &role, nil
+		}
+	}
+	return nil, errors.New("role not found")
+}
+
+func (r *staticRoles) GetClusterRole(ctx api.Context, id string) (*rbac.ClusterRole, error) {
+	namespace, ok := api.NamespaceFrom(ctx)
+	if ok && namespace != "" {
+		return nil, errors.New("cannot provide namespace when getting cluster role")
+	}
+	for _, clusterRole := range r.clusterRoles {
+		if clusterRole.Namespace == namespace && clusterRole.Name == id {
+			return &clusterRole, nil
+		}
+	}
+	return nil, errors.New("role not found")
+}
+
+func (r *staticRoles) ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error) {
+	namespace, ok := api.NamespaceFrom(ctx)
+	if !ok || namespace == "" {
+		return nil, errors.New("must provide namespace when listing role bindings")
+	}
+
+	roleBindingList := new(rbac.RoleBindingList)
+	for _, roleBinding := range r.roleBindings {
+		if roleBinding.Namespace != namespace {
+			continue
+		}
+		// TODO(ericchiang): need to implement label selectors?
+		roleBindingList.Items = append(roleBindingList.Items, roleBinding)
+	}
+	return roleBindingList, nil
+}
+
+func (r *staticRoles) ListClusterRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleBindingList, error) {
+	namespace, ok := api.NamespaceFrom(ctx)
+	if ok && namespace != "" {
+		return nil, errors.New("cannot list cluster role bindings from within a namespace")
+	}
+	clusterRoleBindings := new(rbac.ClusterRoleBindingList)
+	clusterRoleBindings.Items = make([]rbac.ClusterRoleBinding, len(r.clusterRoleBindings))
+	copy(clusterRoleBindings.Items, r.clusterRoleBindings)
+	return clusterRoleBindings, nil
 }

@@ -76,6 +76,13 @@ func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
 	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 }
 
+func NewRbacEtcdStorage(client etcd.Client) storage.Interface {
+	if client == nil {
+		client = NewEtcdClient()
+	}
+	return etcdstorage.NewEtcdStorage(client, testapi.Rbac.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
+}
+
 func RequireEtcd() {
 	if _, err := etcd.NewKeysAPI(NewEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)

@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"errors"
 	"hash/fnv"
 	"io"
 	"reflect"
@@ -29,71 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
-
-func newMockRuleResolver(r *staticRoles) AuthorizationRuleResolver {
-	return NewDefaultRuleResolver(r, r, r, r)
-}
-
-type staticRoles struct {
-	roles               []rbac.Role
-	roleBindings        []rbac.RoleBinding
-	clusterRoles        []rbac.ClusterRole
-	clusterRoleBindings []rbac.ClusterRoleBinding
-}
-
-func (r *staticRoles) GetRole(ctx api.Context, id string) (*rbac.Role, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if !ok || namespace == "" {
-		return nil, errors.New("must provide namespace when getting role")
-	}
-	for _, role := range r.roles {
-		if role.Namespace == namespace && role.Name == id {
-			return &role, nil
-		}
-	}
-	return nil, errors.New("role not found")
-}
-
-func (r *staticRoles) GetClusterRole(ctx api.Context, id string) (*rbac.ClusterRole, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if ok && namespace != "" {
-		return nil, errors.New("cannot provide namespace when getting cluster role")
-	}
-	for _, clusterRole := range r.clusterRoles {
-		if clusterRole.Namespace == namespace && clusterRole.Name == id {
-			return &clusterRole, nil
-		}
-	}
-	return nil, errors.New("role not found")
-}
-
-func (r *staticRoles) ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if !ok || namespace == "" {
-		return nil, errors.New("must provide namespace when listing role bindings")
-	}
-
-	roleBindingList := new(rbac.RoleBindingList)
-	for _, roleBinding := range r.roleBindings {
-		if roleBinding.Namespace != namespace {
-			continue
-		}
-		// TODO(ericchiang): need to implement label selectors?
-		roleBindingList.Items = append(roleBindingList.Items, roleBinding)
-	}
-	return roleBindingList, nil
-}
-
-func (r *staticRoles) ListClusterRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleBindingList, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if ok && namespace != "" {
-		return nil, errors.New("cannot list cluster role bindings from within a namespace")
-	}
-	clusterRoleBindings := new(rbac.ClusterRoleBindingList)
-	clusterRoleBindings.Items = make([]rbac.ClusterRoleBinding, len(r.clusterRoleBindings))
-	copy(clusterRoleBindings.Items, r.clusterRoleBindings)
-	return clusterRoleBindings, nil
-}
 
 // compute a hash of a policy rule so we can sort in a deterministic order
 func hashOf(p rbac.PolicyRule) string {
