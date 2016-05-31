@@ -13,7 +13,7 @@
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
      width="25" height="25">
 
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree </h2>
 
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
