@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	kubelabels "k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 )
@@ -87,6 +88,12 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableC
 			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
 			labels[kubernetesContainerPreStopHandlerLabel] = string(rawPreStop)
+		}
+	}
+
+	for k, v := range pod.ObjectMeta.Labels {
+		if !kubelabels.IsInternal(k) {
+			labels[k] = v
 		}
 	}
 

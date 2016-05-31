@@ -58,3 +58,22 @@ func TestLabelGet(t *testing.T) {
 		t.Errorf("Set.Get is broken")
 	}
 }
+
+func TestIsInternal(t *testing.T) {
+	cases := map[string]bool{
+		"x-kubernetes.io/y": true,
+		"kubernetes.io/y":   true,
+		"kubernetes.io/":    true,
+		"x/kubernetes.io/y": false,
+		"kubernetes.io":     false,
+		"x/y":               false,
+		"x":                 false,
+		"":                  false,
+	}
+
+	for name, ok := range cases {
+		if IsInternal(name) != ok {
+			t.Errorf("case[%v]: expected %v got %v", name, ok, !ok)
+		}
+	}
+}

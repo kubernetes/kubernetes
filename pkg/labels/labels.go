@@ -21,6 +21,8 @@ import (
 	"strings"
 )
 
+const InternalNamespace = "kubernetes.io"
+
 // Labels allows you to present labels independently from their storage.
 type Labels interface {
 	// Has returns whether the provided label exists.
@@ -68,4 +70,9 @@ func FormatLabels(labelMap map[string]string) string {
 		l = "<none>"
 	}
 	return l
+}
+
+func IsInternal(name string) bool {
+	idx := strings.IndexRune(name, '/')
+	return idx >= len(InternalNamespace) && strings.HasSuffix(name[0:idx], InternalNamespace)
 }
