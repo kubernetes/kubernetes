@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/conversion"
 )
 
 // Test the real controller methods (add/update/delete claim/volume) with
@@ -54,8 +53,7 @@ func TestControllerSync(t *testing.T) {
 			// Custom test function that generates an add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				volume := newVolume("volume5-1", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain)
-				reactor.volumes[volume.Name] = volume
-				reactor.volumeSource.Add(volume)
+				reactor.addVolumeWithEvent(volume)
 				return nil
 			},
 		},
@@ -70,8 +68,7 @@ func TestControllerSync(t *testing.T) {
 			// Custom test function that generates an add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", api.ClaimPending)
-				reactor.claims[claim.Name] = claim
-				reactor.claimSource.Add(claim)
+				reactor.addClaimWithEvent(claim)
 				return nil
 			},
 		},
@@ -87,14 +84,7 @@ func TestControllerSync(t *testing.T) {
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*api.PersistentVolumeClaim)
-				// Remove the claim from list of resulting claims.
-				delete(reactor.claims, claim.Name)
-				// Poke the controller with deletion event. Cloned claim is
-				// needed to prevent races (and we would get a clone from etcd
-				// too).
-				clone, _ := conversion.NewCloner().DeepCopy(claim)
-				claimClone := clone.(*api.PersistentVolumeClaim)
-				reactor.claimSource.Delete(claimClone)
+				reactor.deleteClaimWithEvent(claim)
 				return nil
 			},
 		},
@@ -110,14 +100,7 @@ func TestControllerSync(t *testing.T) {
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 				obj := ctrl.volumes.store.List()[0]
 				volume := obj.(*api.PersistentVolume)
-				// Remove the volume from list of resulting volumes.
-				delete(reactor.volumes, volume.Name)
-				// Poke the controller with deletion event. Cloned volume is
-				// needed to prevent races (and we would get a clone from etcd
-				// too).
-				clone, _ := conversion.NewCloner().DeepCopy(volume)
-				volumeClone := clone.(*api.PersistentVolume)
-				reactor.volumeSource.Delete(volumeClone)
+				reactor.deleteVolumeWithEvent(volume)
 				return nil
 			},
 		},
@@ -146,9 +129,10 @@ func TestControllerSync(t *testing.T) {
 		go ctrl.Run()
 
 		// Wait for the controller to pass initial sync.
-		for !ctrl.isFullySynced() {
+		for !ctrl.volumeController.HasSynced() || !ctrl.claimController.HasSynced() {
 			time.Sleep(10 * time.Millisecond)
 		}
+		glog.V(4).Infof("controller synced, starting test")
 
 		count := reactor.getChangeCount()
 
