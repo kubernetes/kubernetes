@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,30 @@ const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
 // Currently we accept only the value "0.0.0.0/0" - other values are an error.
 // This lets us define more advanced semantics in future.
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
+
+// Annotation used to specify access log emit interval.
+const ServiceAnnotationLoadBalancerAccessLogEmitInterval = "service.beta.kubernetes.io/aws-load-balancer-access-log-emit-interval"
+
+// Annotation used on the service to enable or disable access logs.
+const ServiceAnnotationLoadBalancerAccessLogEnabled = "service.beta.kubernetes.io/aws-load-balancer-access-log-enabled"
+
+// Annotation used to specify access log s3 bucket name.
+const ServiceAnnotationLoadBalancerAccessLogS3BucketName = "service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-name"
+
+// Annotation used to specify access log s3 bucket prefix.
+const ServiceAnnotationLoadBalancerAccessLogS3BucketPrefix = "service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-prefix"
+
+// Annotation used on the service to enable or disable connection draining.
+const ServiceAnnotationLoadBalancerConnectionDrainingEnabled = "service.beta.kubernetes.io/aws-load-balancer-connection-draining-enabled"
+
+// Annotation used on the service to specify a connection draining timeout.
+const ServiceAnnotationLoadBalancerConnectionDrainingTimeout = "service.beta.kubernetes.io/aws-load-balancer-connection-draining-timeout"
+
+// Annotation used on the service to specify the idle connection timeout.
+const ServiceAnnotationLoadBalancerConnectionIdleTimeout = "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout"
+
+// Annotation used on the service to enable or disable cross-zone load balancing.
+const ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled = "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled"
 
 // Service annotation requesting a secure listener. Value is a valid certificate ARN.
 // For more, see http://docs.aws.amazon.com/ElasticLoadBalancing/latest/DeveloperGuide/elb-listener-config.html
@@ -169,6 +194,9 @@ type ELB interface {
 	ApplySecurityGroupsToLoadBalancer(*elb.ApplySecurityGroupsToLoadBalancerInput) (*elb.ApplySecurityGroupsToLoadBalancerOutput, error)
 
 	ConfigureHealthCheck(*elb.ConfigureHealthCheckInput) (*elb.ConfigureHealthCheckOutput, error)
+
+	DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error)
+	ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttributesInput) (*elb.ModifyLoadBalancerAttributesOutput, error)
 }
 
 // This is a simple pass-through of the Autoscaling client interface, which allows for testing
@@ -2178,6 +2206,86 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 		internalELB = true
 	}
 
+	// Some load balancer attributes are required, so defaults are set. These can be overridden by annotations.
+	loadBalancerAttributes := &elb.LoadBalancerAttributes{
+		AccessLog:              &elb.AccessLog{Enabled: aws.Bool(false)},
+		ConnectionDraining:     &elb.ConnectionDraining{Enabled: aws.Bool(false)},
+		ConnectionSettings:     &elb.ConnectionSettings{IdleTimeout: aws.Int64(60)},
+		CrossZoneLoadBalancing: &elb.CrossZoneLoadBalancing{Enabled: aws.Bool(false)},
+	}
+
+	// Determine if an access log emit interval has been specified
+	accessLogEmitIntervalAnnotation := annotations[ServiceAnnotationLoadBalancerAccessLogEmitInterval]
+	if accessLogEmitIntervalAnnotation != "" {
+		accessLogEmitInterval, err := strconv.ParseInt(accessLogEmitIntervalAnnotation, 10, 64)
+		if err != nil {
+			glog.Error("Error parsing access log emit interval; ignoring: ", err)
+		}
+		loadBalancerAttributes.AccessLog.EmitInterval = &accessLogEmitInterval
+	}
+
+	// Determine if access log enabled/disabled has been specified
+	accessLogEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerAccessLogEnabled]
+	if accessLogEnabledAnnotation != "" {
+		accessLogEnabled, err := strconv.ParseBool(accessLogEnabledAnnotation)
+		if err != nil {
+			glog.Error("Error parsing access log enabled; ignoring: ", err)
+		}
+		loadBalancerAttributes.AccessLog.Enabled = &accessLogEnabled
+	}
+
+	// Determine if access log s3 bucket name has been specified
+	accessLogS3BucketNameAnnotation := annotations[ServiceAnnotationLoadBalancerAccessLogS3BucketName]
+	if accessLogS3BucketNameAnnotation != "" {
+		loadBalancerAttributes.AccessLog.S3BucketName = &accessLogS3BucketNameAnnotation
+	}
+
+	// Determine if access log s3 bucket prefix has been specified
+	accessLogS3BucketPrefixAnnotation := annotations[ServiceAnnotationLoadBalancerAccessLogS3BucketPrefix]
+	if accessLogS3BucketPrefixAnnotation != "" {
+		loadBalancerAttributes.AccessLog.S3BucketPrefix = &accessLogS3BucketPrefixAnnotation
+	}
+
+	// Determine if connection draining enabled/disabled has been specified
+	connectionDrainingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerConnectionDrainingEnabled]
+	if connectionDrainingEnabledAnnotation != "" {
+		connectionDrainingEnabled, err := strconv.ParseBool(connectionDrainingEnabledAnnotation)
+		if err != nil {
+			glog.Error("Error parsing connection draining enabled; ignoring: ", err)
+		}
+		loadBalancerAttributes.ConnectionDraining.Enabled = &connectionDrainingEnabled
+	}
+
+	// Determine if connection draining timeout has been specified
+	connectionDrainingTimeoutAnnotation := annotations[ServiceAnnotationLoadBalancerConnectionDrainingTimeout]
+	if connectionDrainingTimeoutAnnotation != "" {
+		connectionDrainingTimeout, err := strconv.ParseInt(connectionDrainingTimeoutAnnotation, 10, 64)
+		if err != nil {
+			glog.Error("Error parsing connection draining timeout; ignoring: ", err)
+		}
+		loadBalancerAttributes.ConnectionDraining.Timeout = &connectionDrainingTimeout
+	}
+
+	// Determine if connection idle timeout has been specified
+	connectionIdleTimeoutAnnotation := annotations[ServiceAnnotationLoadBalancerConnectionIdleTimeout]
+	if connectionIdleTimeoutAnnotation != "" {
+		connectionIdleTimeout, err := strconv.ParseInt(connectionIdleTimeoutAnnotation, 10, 64)
+		if err != nil {
+			glog.Error("Error parsing connection idle timeout; ignoring: ", err)
+		}
+		loadBalancerAttributes.ConnectionSettings.IdleTimeout = &connectionIdleTimeout
+	}
+
+	// Determine if cross zone load balancing enabled/disabled has been specified
+	crossZoneLoadBalancingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled]
+	if crossZoneLoadBalancingEnabledAnnotation != "" {
+		crossZoneLoadBalancingEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
+		if err != nil {
+			glog.Error("Error parsing cross zone load balancing enabled; ignoring: ", err)
+		}
+		loadBalancerAttributes.CrossZoneLoadBalancing.Enabled = &crossZoneLoadBalancingEnabled
+	}
+
 	// Find the subnets that the ELB will live in
 	subnetIDs, err := s.findELBSubnets(internalELB)
 	if err != nil {
@@ -2230,7 +2338,7 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 	securityGroupIDs := []string{securityGroupID}
 
 	// Build the load balancer itself
-	loadBalancer, err := s.ensureLoadBalancer(serviceName, loadBalancerName, listeners, subnetIDs, securityGroupIDs, internalELB)
+	loadBalancer, err := s.ensureLoadBalancer(serviceName, loadBalancerName, listeners, subnetIDs, securityGroupIDs, internalELB, loadBalancerAttributes)
 	if err != nil {
 		return nil, err
 	}

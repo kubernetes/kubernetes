@@ -18,6 +18,7 @@ package aws
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB bool) (*elb.LoadBalancerDescription, error) {
+func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB bool, loadBalancerAttributes *elb.LoadBalancerAttributes) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := s.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, err
@@ -188,6 +189,34 @@ func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadB
 				}
 				dirty = true
 			}
+		}
+	}
+
+	// Whether the ELB was new or existing, sync attributes regardless. This accounts for things
+	// that cannot be specified at the time of creation and can only be modified after the fact,
+	// e.g. idle connection timeout.
+	{
+		describeAttributesRequest := &elb.DescribeLoadBalancerAttributesInput{}
+		describeAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
+		describeAttributesOutput, err := s.elb.DescribeLoadBalancerAttributes(describeAttributesRequest)
+		if err != nil {
+			glog.Warning("Unable to retrieve load balancer attributes during attribute sync")
+			return nil, err
+		}
+
+		foundAttributes := &describeAttributesOutput.LoadBalancerAttributes
+
+		// Update attributes if they're dirty
+		if !reflect.DeepEqual(loadBalancerAttributes, foundAttributes) {
+			modifyAttributesRequest := &elb.ModifyLoadBalancerAttributesInput{}
+			modifyAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
+			modifyAttributesRequest.LoadBalancerAttributes = loadBalancerAttributes
+			_, err = s.elb.ModifyLoadBalancerAttributes(modifyAttributesRequest)
+			if err != nil {
+				glog.Warning("Unable to update load balancer attributes during attribute sync")
+				return nil, err
+			}
+			dirty = true
 		}
 	}
 
