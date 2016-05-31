@@ -144,6 +144,7 @@ Supported sysctls (whitelist) as of Docker 1.12.0:
 Error behaviour:
 
 - not whitelisted sysctls are rejected:
+
 ```shell
 $ docker run --sysctl=foo=bla -it busybox /bin/sh
 invalid value "foo=bla" for flag --sysctl: sysctl 'foo=bla' is not whitelisted
@@ -175,7 +176,8 @@ Applied changes:
 
 * https://github.com/opencontainers/runc/pull/73
 * https://github.com/opencontainers/runc/pull/303
-* 
+*
+
 ### Rocket support for sysctl
 
 Supported sysctls (whitelist):
@@ -231,7 +233,7 @@ One could imagine to offer certain non-namespaced sysctls as well which taint a 
 
 ### SecurityContext Enforcement
 
-A list of permissible sysctls is to be added to `pkg/apis/extensions/types.go` (compare [security-context-constraints]( https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/security-context-constraints.md)):
+A list of permissible sysctls is to be added to `pkg/apis/extensions/types.go` (compare [security-context-constraints](security-context-constraints.md)):
 
 ```go
 // PodSecurityPolicySpec defines the policy enforced.
