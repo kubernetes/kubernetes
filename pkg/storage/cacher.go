@@ -621,6 +621,10 @@ func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uin
 		if !ok {
 			return
 		}
+		rc, ok := event.Object.(*api.ReplicationController)
+		if ok {
+			glog.V(6).Info("CHAO: in cacheWatcher process, event.Type=%v, resourceVersion=%v, event.ResourceVersion=%v, rc=%#v\n", event.Type, resourceVersion, event.ResourceVersion, rc)
+		}
 		// only send events newer than resourceVersion
 		if event.ResourceVersion > resourceVersion {
 			c.sendWatchCacheEvent(event)

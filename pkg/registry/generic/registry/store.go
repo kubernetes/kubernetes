@@ -789,6 +789,7 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 	if options != nil {
 		resourceVersion = options.ResourceVersion
 	}
+	glog.Infof("CHAO: in Watch!!!!, ResourceVersion=%v", resourceVersion)
 	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
 }
 

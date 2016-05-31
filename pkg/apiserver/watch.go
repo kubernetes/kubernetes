@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch/versioned"
 
 	"github.com/emicklei/go-restful"
+	"github.com/golang/glog"
 	"golang.org/x/net/websocket"
 )
 
@@ -234,6 +236,9 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 				return
 			}
 			obj := event.Object
+			if rc, ok := obj.(*api.ReplicationController); ok {
+				glog.V(6).Infof("CHAO: in watch ServeHTTP, event.Type=%v, obj=%#v", event.Type, rc)
+			}
 			s.fixup(obj)
 			if err := s.embeddedEncoder.EncodeToStream(obj, buf); err != nil {
 				// unexpected error

@@ -247,6 +247,10 @@ func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion 
 		return nil, err
 	}
 	key = h.prefixEtcdKey(key)
+	// CHAO: rc is called as controllers...
+	if key == "/registry/controllers" {
+		glog.Infof("CHAO: h.pathPrefix=%s, key=%s, resourceVersion=%v, watchRV=%v", h.pathPrefix, key, resourceVersion, watchRV)
+	}
 	w := newEtcdWatcher(true, h.quorum, exceptKey(key), filter, h.codec, h.versioner, nil, h)
 	go w.etcdWatch(ctx, h.etcdKeysAPI, key, watchRV)
 	return w, nil

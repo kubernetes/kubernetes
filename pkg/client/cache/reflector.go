@@ -268,9 +268,19 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
 	}
 	resourceVersion = listMetaInterface.GetResourceVersion()
+	// debug only
+	typeInterface, err := meta.TypeAccessor(list)
+	if err != nil {
+		return fmt.Errorf("%s: Unable to get type from list result %#v: %v", r.name, list, err)
+	}
+
+	// end of debug only
 	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
+	}
+	if typeInterface.GetKind() == "ReplicationControllerList" {
+		glog.Infof("CHAO: in reflector, rc list resourceVersion=%v, len(items)=%d", resourceVersion, len(items))
 	}
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
