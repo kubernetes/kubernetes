@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -573,6 +574,25 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 	}
 
 	return &volume
+}
+
+// withLabels applies the given labels to the first volume in the array and
+// returns the array.  Meant to be used to compose volumes specified inline in
+// a test.
+func withLabels(labels map[string]string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+	volumes[0].Labels = labels
+	return volumes
+}
+
+// withLabelSelector sets the label selector of the first claim in the array
+// to be MatchLabels of the given label set and returns the array.  Meant
+// to be used to compose claims specified inline in a test.
+func withLabelSelector(labels map[string]string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+	claims[0].Spec.Selector = &unversioned.LabelSelector{
+		MatchLabels: labels,
+	}
+
+	return claims
 }
 
 // newVolumeArray returns array with a single volume that would be returned by

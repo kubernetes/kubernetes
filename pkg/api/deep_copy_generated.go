@@ -1772,6 +1772,15 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in PersistentVolumeClaimSpec, out *P
 	} else {
 		out.AccessModes = nil
 	}
+	if in.Selector != nil {
+		in, out := in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	if err := DeepCopy_api_ResourceRequirements(in.Resources, &out.Resources, c); err != nil {
 		return err
 	}

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestMatchVolume(t *testing.T) {
@@ -98,6 +99,72 @@ func TestMatchVolume(t *testing.T) {
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("999G"),
+						},
+					},
+				},
+			},
+		},
+		"successful-no-match-due-to-label": {
+			expectedMatch: "",
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claim01",
+					Namespace: "myns",
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{
+							"should-not-exist": "true",
+						},
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("999G"),
+						},
+					},
+				},
+			},
+		},
+		"successful-no-match-due-to-size-constraint-with-label-selector": {
+			expectedMatch: "",
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claim01",
+					Namespace: "myns",
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{
+							"should-exist": "true",
+						},
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("20000G"),
+						},
+					},
+				},
+			},
+		},
+		"successful-match-due-with-constraint-and-label-selector": {
+			expectedMatch: "gce-pd-2",
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claim01",
+					Namespace: "myns",
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					Selector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{
+							"should-exist": "true",
+						},
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
 						},
 					},
 				},
@@ -228,8 +295,8 @@ func TestAllPossibleAccessModes(t *testing.T) {
 
 	// the mock PVs creates contain 2 types of accessmodes:   RWO+ROX and RWO+ROW+RWX
 	possibleModes := index.allPossibleMatchingAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce})
-	if len(possibleModes) != 2 {
-		t.Errorf("Expected 2 arrays of modes that match RWO, but got %v", len(possibleModes))
+	if len(possibleModes) != 3 {
+		t.Errorf("Expected 3 arrays of modes that match RWO, but got %v", len(possibleModes))
 	}
 	for _, m := range possibleModes {
 		if !contains(m, api.ReadWriteOnce) {
@@ -483,6 +550,26 @@ func createTestVolumes() []*api.PersistentVolume {
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 					api.ReadWriteMany,
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-2",
+				Name: "gce0022",
+				Labels: map[string]string{
+					"should-exist": "true",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
 				},
 			},
 		},

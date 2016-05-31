@@ -992,6 +992,9 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) field.ErrorLi
 	if len(pvc.Spec.AccessModes) == 0 {
 		allErrs = append(allErrs, field.Required(specPath.Child("accessModes"), "at least 1 accessMode is required"))
 	}
+	if pvc.Spec.Selector != nil {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(pvc.Spec.Selector, specPath.Child("selector"))...)
+	}
 	for _, mode := range pvc.Spec.AccessModes {
 		if mode != api.ReadWriteOnce && mode != api.ReadOnlyMany && mode != api.ReadWriteMany {
 			allErrs = append(allErrs, field.NotSupported(specPath.Child("accessModes"), mode, supportedAccessModes.List()))

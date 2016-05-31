@@ -28,6 +28,11 @@ import (
 //    controllerTest.testCall *once*.
 // 3. Compare resulting volumes and claims with expected volumes and claims.
 func TestSync(t *testing.T) {
+	labels := map[string]string{
+		"foo": "true",
+		"bar": "false",
+	}
+
 	tests := []controllerTest{
 		// [Unit test set 1] User did not care which PV they get.
 		// Test the matching with no claim.Spec.VolumeName and with various
@@ -140,13 +145,32 @@ func TestSync(t *testing.T) {
 		{
 			// syncClaim completes binding - simulates controller crash after
 			// PVC.VolumeName is saved
-			"10 - complete bind after crash - PVC bound",
+			"1-10 - complete bind after crash - PVC bound",
 			newVolumeArray("volume1-10", "1Gi", "uid1-10", "claim1-10", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
 			newVolumeArray("volume1-10", "1Gi", "uid1-10", "claim1-10", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
 			newClaimArray("claim1-10", "uid1-10", "1Gi", "volume1-10", api.ClaimPending, annBoundByController, annBindCompleted),
 			newClaimArray("claim1-10", "uid1-10", "1Gi", "volume1-10", api.ClaimBound, annBoundByController, annBindCompleted),
 			noevents, noerrors, testSyncClaim,
 		},
+		{
+			// syncClaim binds a claim only when the label selector matches the volume
+			"1-11 - bind when selector matches",
+			withLabels(labels, newVolumeArray("volume1-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain)),
+			withLabels(labels, newVolumeArray("volume1-1", "1Gi", "uid1-1", "claim1-1", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController)),
+			withLabelSelector(labels, newClaimArray("claim1-1", "uid1-1", "1Gi", "", api.ClaimPending)),
+			withLabelSelector(labels, newClaimArray("claim1-1", "uid1-1", "1Gi", "volume1-1", api.ClaimBound, annBoundByController, annBindCompleted)),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim does not bind a claim when the label selector doesn't match
+			"1-12 - do not bind when selector does not match",
+			newVolumeArray("volume1-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+			newVolumeArray("volume1-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+			withLabelSelector(labels, newClaimArray("claim1-1", "uid1-1", "1Gi", "", api.ClaimPending)),
+			withLabelSelector(labels, newClaimArray("claim1-1", "uid1-1", "1Gi", "", api.ClaimPending)),
+			noevents, noerrors, testSyncClaim,
+		},
+
 		// [Unit test set 2] User asked for a specific PV.
 		// Test the binding when pv.ClaimRef is already set by controller or
 		// by user.
@@ -220,6 +244,18 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim2-7", "uid2-7", "10Gi", "volume2-7", api.ClaimBound, annBoundByController),
 			noevents, noerrors, testSyncClaimError,
 		},
+		{
+			// syncClaim with claim pre-bound to a PV that exists and is
+			// unbound, but does not match the selector. Check it gets bound
+			// and no annBoundByController is set.
+			"2-8 - claim prebound to unbound volume that does not match the selector",
+			newVolumeArray("volume2-3", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+			newVolumeArray("volume2-3", "1Gi", "uid2-3", "claim2-3", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
+			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimPending)),
+			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimBound, annBindCompleted)),
+			noevents, noerrors, testSyncClaim,
+		},
+
 		// [Unit test set 3] Syncing bound claim
 		{
 			// syncClaim with claim  bound and its claim.Spec.VolumeName is
@@ -282,6 +318,17 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim3-6", "uid3-6", "10Gi", "volume3-6", api.ClaimPending, annBindCompleted),
 			newClaimArray("claim3-6", "uid3-6", "10Gi", "volume3-6", api.ClaimLost, annBindCompleted),
 			[]string{"Warning ClaimMisbound"}, noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim with claim bound to unbound volume. Check it's bound
+			// even if the claim's selector doesn't match the volume. Also
+			// check that Pending phase is set to Bound
+			"3-7 - bound claim with unbound volume where selector doesn't match",
+			newVolumeArray("volume3-3", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+			newVolumeArray("volume3-3", "10Gi", "uid3-3", "claim3-3", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
+			withLabelSelector(labels, newClaimArray("claim3-3", "uid3-3", "10Gi", "volume3-3", api.ClaimPending, annBoundByController, annBindCompleted)),
+			withLabelSelector(labels, newClaimArray("claim3-3", "uid3-3", "10Gi", "volume3-3", api.ClaimBound, annBoundByController, annBindCompleted)),
+			noevents, noerrors, testSyncClaim,
 		},
 		// [Unit test set 4] All syncVolume tests.
 		{
