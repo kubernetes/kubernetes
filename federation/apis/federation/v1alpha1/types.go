@@ -41,7 +41,8 @@ type ClusterSpec struct {
 	// The secret is read from the kubernetes cluster that is hosting federation control plane.
 	// Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key "kubeconfig".
 	// This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets.
-	SecretRef *v1.LocalObjectReference `json:"secretRef" protobuf:"bytes,2,opt,name=secretRef"`
+	// This can be left empty if the cluster allows insecure access.
+	SecretRef *v1.LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,2,opt,name=secretRef"`
 }
 
 type ClusterConditionType string
