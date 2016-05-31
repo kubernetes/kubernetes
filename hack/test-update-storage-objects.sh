@@ -37,6 +37,7 @@ KUBE_STORAGE_MEDIA_TYPE_PROTOBUF="application/vnd.kubernetes.protobuf"
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PREFIX=${ETCD_PREFIX:-randomPrefix}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBE_API_VERSIONS=""
@@ -59,6 +60,7 @@ function startApiServer() {
     --bind-address="${API_HOST}" \
     --insecure-port="${API_PORT}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+    --etcd-prefix="${ETCD_PREFIX}" \
     --runtime-config="${RUNTIME_CONFIG}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
@@ -111,7 +113,6 @@ KUBE_NEW_STORAGE_VERSIONS="batch/v1,autoscaling/v1"
 
 ### END TEST DEFINITION CUSTOMIZATION ###
 
-
 #######################################################
 # Step 1: Start a server which supports both the old and new api versions,
 # but KUBE_OLD_API_VERSION is the latest (storage) version.
@@ -137,7 +138,7 @@ for test in ${tests[@]}; do
   old_storage_version=${test_data[4]}
 
   kube::log::status "Verifying ${resource}/${namespace}/${name} has storage version ${old_storage_version} in etcd"
-  curl -s http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/registry/${resource}/${namespace}/${name} | grep ${old_storage_version}
+  curl -s http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/${ETCD_PREFIX}/${resource}/${namespace}/${name} | grep ${old_storage_version}
 done
 
 killApiServer
@@ -166,7 +167,7 @@ for test in ${tests[@]}; do
   new_storage_version=${test_data[5]}
 
   kube::log::status "Verifying ${resource}/${namespace}/${name} has updated storage version ${new_storage_version} in etcd"
-  curl -s http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/registry/${resource}/${namespace}/${name} | grep ${new_storage_version}
+  curl -s http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/${ETCD_PREFIX}/${resource}/${namespace}/${name} | grep ${new_storage_version}
 done
 
 killApiServer
