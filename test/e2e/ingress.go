@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/labels"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -61,6 +60,10 @@ var (
 	pathPrefix        = "foo"
 	testImage         = "gcr.io/google_containers/n-way-http:1.0"
 	httpContainerPort = 8080
+
+	// Name of the config-map and key the ingress controller stores its uid in.
+	uidConfigMap = "ingress-uid"
+	uidKey       = "uid"
 
 	expectedLBCreationTime    = 7 * time.Minute
 	expectedLBHealthCheckTime = 7 * time.Minute
@@ -232,26 +235,6 @@ func gcloudDelete(resource, name, project string) {
 	}
 }
 
-// kubectlLogLBController logs kubectl debug output for the L7 controller pod.
-func kubectlLogLBController(c *client.Client, ns string) {
-	selector := labels.SelectorFromSet(labels.Set(controllerLabels))
-	options := api.ListOptions{LabelSelector: selector}
-	podList, err := c.Pods(api.NamespaceAll).List(options)
-	if err != nil {
-		framework.Logf("Cannot log L7 controller output, error listing pods %v", err)
-		return
-	}
-	if len(podList.Items) == 0 {
-		framework.Logf("Loadbalancer controller pod not found")
-		return
-	}
-	for _, p := range podList.Items {
-		framework.Logf("\nLast 100 log lines of %v\n", p.Name)
-		l, _ := framework.RunKubectl("logs", p.Name, fmt.Sprintf("--namespace=%v", ns), "-c", lbContainerName, "--tail=100")
-		framework.Logf(l)
-	}
-}
-
 type IngressController struct {
 	ns      string
 	rcPath  string
@@ -263,24 +246,12 @@ type IngressController struct {
 }
 
 func (cont *IngressController) getL7AddonUID() (string, error) {
-	listOpts := api.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(clusterAddonLBLabels))}
-	existingRCs, err := cont.c.ReplicationControllers(api.NamespaceSystem).List(listOpts)
+	cm, err := cont.c.ConfigMaps(api.NamespaceSystem).Get(uidConfigMap)
 	if err != nil {
 		return "", err
 	}
-	if len(existingRCs.Items) != 1 {
-		return "", fmt.Errorf("Unexpected number of lb cluster addons %v with label %v in kube-system namespace", len(existingRCs.Items), clusterAddonLBLabels)
-	}
-	rc := existingRCs.Items[0]
-	commandPrefix := "--cluster-uid="
-	for i, c := range rc.Spec.Template.Spec.Containers {
-		if c.Name == lbContainerName {
-			for _, arg := range rc.Spec.Template.Spec.Containers[i].Args {
-				if strings.HasPrefix(arg, commandPrefix) {
-					return strings.Replace(arg, commandPrefix, "", -1), nil
-				}
-			}
-		}
+	if uid, ok := cm.Data[uidKey]; ok {
+		return uid, nil
 	}
 	return "", fmt.Errorf("Could not find cluster UID for L7 addon pod")
 }
@@ -448,7 +419,6 @@ var _ = framework.KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]
 	AfterEach(func() {
 		framework.Logf("Average creation time %+v, health check time %+v", creationTimes, responseTimes)
 		if CurrentGinkgoTestDescription().Failed {
-			kubectlLogLBController(client, ns)
 			framework.Logf("\nOutput of kubectl describe ing:\n")
 			desc, _ := framework.RunKubectl("describe", "ing", fmt.Sprintf("--namespace=%v", ns))
 			framework.Logf(desc)
