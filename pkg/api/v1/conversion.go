@@ -276,6 +276,12 @@ func Convert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out 
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
 		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
 		in.Status.InitContainerStatuses = values
 	}
 
@@ -327,6 +333,12 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
 		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
 		in.Spec.InitContainers = values
 	}
 
@@ -510,8 +522,6 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 			return err
 		}
 		out.Annotations[PodInitContainersAnnotationKey] = string(value)
-	} else {
-		delete(out.Annotations, PodInitContainersAnnotationKey)
 	}
 	if len(out.Status.InitContainerStatuses) > 0 {
 		value, err := json.Marshal(out.Status.InitContainerStatuses)
@@ -519,8 +529,6 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 			return err
 		}
 		out.Annotations[PodInitContainerStatusesAnnotationKey] = string(value)
-	} else {
-		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
 	}
 
 	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
@@ -544,6 +552,12 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
 		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
 		in.Spec.InitContainers = values
 	}
 	if value, ok := in.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
@@ -551,6 +565,12 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
 			return err
 		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
 		in.Status.InitContainerStatuses = values
 	}
 
