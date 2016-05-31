@@ -625,9 +625,7 @@ function start-kube-scheduler {
 # Starts cluster autoscaler.
 function start-cluster-autoscaler {
   if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ]; then
-    touch /etc/kubernetes/start-cluster-autoscaler-enabled
-
-     # Remove salt comments and replace variables with values
+    # Remove salt comments and replace variables with values
     src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove-salt-config-comments "${src_file}"
 
