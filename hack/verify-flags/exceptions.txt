@@ -1,4 +1,87 @@
 Vagrantfile:      node_ip = $node_ips[n]
+_output/release-stage/full/kubernetes/Vagrantfile:      node_ip = $node_ips[n]
+_output/release-stage/full/kubernetes/cluster/addons/addon-manager/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
+_output/release-stage/full/kubernetes/cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
+_output/release-stage/full/kubernetes/cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
+_output/release-stage/full/kubernetes/cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to the full EC2 private dns name
+_output/release-stage/full/kubernetes/cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
+_output/release-stage/full/kubernetes/cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
+_output/release-stage/full/kubernetes/cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
+_output/release-stage/full/kubernetes/cluster/aws/templates/configure-vm-aws.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+_output/release-stage/full/kubernetes/cluster/centos/util.sh:  local node_ip=${node#*@}
+_output/release-stage/full/kubernetes/cluster/gce/config-default.sh:# reloads <os_distro>/helper.sh in the gap between when the master is created
+_output/release-stage/full/kubernetes/cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
+_output/release-stage/full/kubernetes/cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
+_output/release-stage/full/kubernetes/cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
+_output/release-stage/full/kubernetes/cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
+_output/release-stage/full/kubernetes/cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+_output/release-stage/full/kubernetes/cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
+_output/release-stage/full/kubernetes/cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+_output/release-stage/full/kubernetes/cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+_output/release-stage/full/kubernetes/cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+_output/release-stage/full/kubernetes/cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
+_output/release-stage/full/kubernetes/cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, cluster_name, public_address,
+_output/release-stage/full/kubernetes/cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, context, cluster_name, user)))
+_output/release-stage/full/kubernetes/cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
+_output/release-stage/full/kubernetes/cluster/juju/layers/kubernetes/templates/master.json:              "--client_ca_file=/srv/kubernetes/ca.crt",
+_output/release-stage/full/kubernetes/cluster/juju/layers/kubernetes/templates/skydns-rc.yml:        - -kube_master_url=http://{{ private_address }}:8080
+_output/release-stage/full/kubernetes/cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
+_output/release-stage/full/kubernetes/cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
+_output/release-stage/full/kubernetes/cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
+_output/release-stage/full/kubernetes/cluster/log-dump.sh:    local -r node_name="${1}"
+_output/release-stage/full/kubernetes/cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
+_output/release-stage/full/kubernetes/cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
+_output/release-stage/full/kubernetes/cluster/photon-controller/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
+_output/release-stage/full/kubernetes/cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -v "^-" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
+_output/release-stage/full/kubernetes/cluster/photon-controller/util.sh:  local cert_dir="/srv/kubernetes"
+_output/release-stage/full/kubernetes/cluster/photon-controller/util.sh:  node_name=${1}
+_output/release-stage/full/kubernetes/cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
+_output/release-stage/full/kubernetes/cluster/ubuntu/util.sh:  local node_ip=${1}
+_output/release-stage/full/kubernetes/cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+_output/release-stage/full/kubernetes/cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+_output/release-stage/full/kubernetes/cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+_output/release-stage/full/kubernetes/cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config;
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:  var cloud_config = cloud_config_creator(x, conf);
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:    return cloud_config.generate_environment_file_entry_from_object(util.hostname(n, 'kube'), {
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
+_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
+_output/release-stage/full/kubernetes/examples/cassandra/image/run.sh:	cluster_name \
+_output/release-stage/full/kubernetes/examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
+_output/release-stage/full/kubernetes/examples/vitess/env.sh:    node_ip=$(get_node_ip)
+_output/release-stage/manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest:{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
+_output/release-stage/manifests/kubernetes/gci-trusty/gci-configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+_output/release-stage/manifests/kubernetes/gci-trusty/gci-configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+_output/release-stage/manifests/kubernetes/gci-trusty/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout -%}
+_output/release-stage/manifests/kubernetes/gci-trusty/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+_output/release-stage/manifests/kubernetes/gci-trusty/trusty-configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+_output/release-stage/manifests/kubernetes/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
+_output/release-stage/manifests/kubernetes/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
+_output/release-stage/manifests/kubernetes/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
+_output/release-stage/salt/kubernetes/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
+_output/release-stage/salt/kubernetes/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
+_output/release-stage/salt/kubernetes/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
+_output/release-stage/salt/kubernetes/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
+_output/release-stage/salt/kubernetes/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
+_output/release-stage/salt/kubernetes/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+_output/release-stage/salt/kubernetes/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+_output/release-stage/salt/kubernetes/saltbase/salt/supervisor/kubelet-checker.sh:	{% set kubelet_port = pillar['kubelet_port'] -%}
+_output/release-stage/salt/kubernetes/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
+_output/release-stage/test/kubernetes/test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
+_output/release-stage/test/kubernetes/test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
+_output/release-stage/test/kubernetes/test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
 cluster/addons/addon-manager/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
 cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
 cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
@@ -35,6 +118,7 @@ cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id
 cluster/photon-controller/util.sh:  local cert_dir="/srv/kubernetes"
 cluster/photon-controller/util.sh:  node_name=${1}
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
+cluster/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
