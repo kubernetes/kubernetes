@@ -10,7 +10,7 @@ See http://kubernetes.io/docs/getting-started-guides/docker/ for up-to-date comm
 
 ```console
 # First, build the binaries
-$ build/run.sh hack/build-cross.sh
+$ build/run.sh make cross
 
 # Build for linux/amd64 (default)
 $ make push VERSION={target_version} ARCH=amd64
