@@ -398,7 +398,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
 
-			err := framework.WaitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout, ignoreLabels)
+			err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout, ignoreLabels)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
