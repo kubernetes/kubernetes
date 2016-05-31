@@ -167,9 +167,9 @@ type podGetter interface {
 
 // cliInterface wrapps the command line calls for testing purpose.
 type cliInterface interface {
-	// args are the arguments given to the 'rkt' command,
-	// e.g. args can be 'rm ${UUID}'.
-	RunCommand(args ...string) (result []string, err error)
+	// RunCommand creates rkt commands and runs it with the given config.
+	// If the config is nil, it will use the one inferred from rkt API service.
+	RunCommand(config *Config, args ...string) (result []string, err error)
 }
 
 // New creates the rkt container runtime which implements the container runtime interface.
@@ -263,9 +263,11 @@ func New(
 	return rkt, nil
 }
 
-func (r *Runtime) buildCommand(args ...string) *exec.Cmd {
-	allArgs := append(r.config.buildGlobalOptions(), args...)
-	return exec.Command(r.config.Path, allArgs...)
+func buildCommand(config *Config, args ...string) *exec.Cmd {
+	cmd := exec.Command(config.Path)
+	cmd.Args = append(cmd.Args, config.buildGlobalOptions()...)
+	cmd.Args = append(cmd.Args, args...)
+	return cmd
 }
 
 // convertToACName converts a string into ACName.
@@ -278,13 +280,18 @@ func convertToACName(name string) appctypes.ACName {
 
 // RunCommand invokes rkt binary with arguments and returns the result
 // from stdout in a list of strings. Each string in the list is a line.
-func (r *Runtime) RunCommand(args ...string) ([]string, error) {
-	glog.V(4).Info("rkt: Run command:", args)
+// If config is non-nil, it will use the given config instead of the config
+// inferred from rkt API service.
+func (r *Runtime) RunCommand(config *Config, args ...string) ([]string, error) {
+	if config == nil {
+		config = r.config
+	}
+	glog.V(4).Infof("rkt: Run command: %q with config: %+v", args, config)
 
 	var stdout, stderr bytes.Buffer
-	cmd := r.buildCommand(args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+
+	cmd := buildCommand(config, args...)
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("failed to run %v: %v\nstdout: %v\nstderr: %v", args, err, stdout.String(), stderr.String())
 	}
@@ -895,7 +902,7 @@ func serviceFilePath(serviceName string) string {
 
 // generateRunCommand crafts a 'rkt run-prepared' command with necessary parameters.
 func (r *Runtime) generateRunCommand(pod *api.Pod, uuid, netnsName string) (string, error) {
-	runPrepared := r.buildCommand("run-prepared").Args
+	runPrepared := buildCommand(r.config, "run-prepared").Args
 
 	// Network namespace set up in kubelet; rkt networking not used
 	runPrepared = append(runPrepared, "--net=host")
@@ -1019,7 +1026,7 @@ func (r *Runtime) preparePod(pod *api.Pod, podIP string, pullSecrets []api.Secre
 	}
 
 	prepareCmd := r.preparePodArgs(manifest, manifestFile.Name())
-	output, err := r.RunCommand(prepareCmd...)
+	output, err := r.cli.RunCommand(nil, prepareCmd...)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1826,7 +1833,7 @@ func (r *Runtime) removePod(uuid string) error {
 	// Network may not be around anymore so errors are ignored
 	r.cleanupPodNetworkFromServiceFile(serviceFile)
 
-	if _, err := r.cli.RunCommand("rm", uuid); err != nil {
+	if _, err := r.cli.RunCommand(nil, "rm", uuid); err != nil {
 		errlist = append(errlist, fmt.Errorf("rkt: Failed to remove pod %q: %v", uuid, err))
 	}
 
@@ -1866,7 +1873,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 	}
 	args := []string{"enter", fmt.Sprintf("--app=%s", id.appName), id.uuid}
 	args = append(args, cmd...)
-	command := r.buildCommand(args...)
+	command := buildCommand(r.config, args...)
 
 	if tty {
 		p, err := kubecontainer.StartPty(command)
