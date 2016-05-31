@@ -235,17 +235,27 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 				podsPerNode: 35,
 				cpuLimits: framework.ContainersCPUSummary{
 					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.14},
-					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.08},
+					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.07},
 				},
 				// We set the memory limits generously because the distribution
 				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 150 * 1024 * 1024},
 				},
 			},
 			{
-				// TODO(yujuhong): Set the limits after collecting enough data.
+				cpuLimits: framework.ContainersCPUSummary{
+					stats.SystemContainerKubelet: {0.50: 0.15, 0.95: 0.20},
+					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.09},
+				},
 				podsPerNode: 100,
+				// We set the memory limits generously because the distribution
+				// of the addon pods affect the memory usage on each node.
+				memLimits: framework.ResourceUsagePerContainer{
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 80 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
+				},
 			},
 		}
 		for _, testArg := range rTests {
