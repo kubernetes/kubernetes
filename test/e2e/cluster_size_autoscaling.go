@@ -21,17 +21,23 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 const (
-	scaleTimeout = 5 * time.Minute
+	defaultTimeout   = 3 * time.Minute
+	resizeTimeout    = 5 * time.Minute
+	scaleUpTimeout   = 5 * time.Minute
+	scaleDownTimeout = 15 * time.Minute
 )
 
-var _ = framework.KubeDescribe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
+var _ = framework.KubeDescribe("Cluster size autoscaling scale up [Feature:ClusterSizeAutoscaling] [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int
@@ -54,28 +60,58 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Feature:ClusterSizeAut
 		ReserveMemory(f, "memory-reservation", 1, memCapacityMb, false)
 		// Verify, that cluster size is not changed.
 		// TODO: find a better way of verification that the cluster size will remain unchanged.
-		time.Sleep(scaleTimeout)
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleTimeout))
-
+		time.Sleep(scaleUpTimeout)
+		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleUpTimeout))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleTimeout))
+		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
+		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, resizeTimeout))
 
 		By("Small pending pods increase cluster size")
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
 		// Verify, that cluster size is increased
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount+1, scaleTimeout))
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
-		// TODO(jsz): Disable the line bellow when scale down is implemented.
 		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleTimeout))
+		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, resizeTimeout))
 
 		By("Handling node port pods")
 		CreateHostPortPods(f, "host-port", nodeCount+2, false)
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount+2, scaleTimeout))
-		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "host-port"))
-		// TODO(jsz): Disable the line bellow when scale down is implemented.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
+
 		framework.ExpectNoError(ResizeGroup(int32(nodeCount)))
-		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, scaleTimeout))
+		framework.ExpectNoError(framework.WaitForClusterSize(f.Client, nodeCount, resizeTimeout))
+	})
+})
+
+var _ = framework.KubeDescribe("Cluster size autoscaling scale down[Feature:ClusterSizeAutoscalingScaleDown] [Slow]", func() {
+	f := framework.NewDefaultFramework("autoscaling")
+	var nodeCount int
+	var coresPerNode int
+	var memCapacityMb int
+
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce")
+
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodeCount = len(nodes.Items)
+		Expect(nodeCount).NotTo(BeZero())
+		cpu := nodes.Items[0].Status.Capacity[api.ResourceCPU]
+		mem := nodes.Items[0].Status.Capacity[api.ResourceMemory]
+		coresPerNode = int((&cpu).MilliValue() / 1000)
+		memCapacityMb = int((&mem).Value() / 1024 / 1024)
+	})
+
+	It("Should correctly handle pending and scale down after deletion", func() {
+		By("Small pending pods increase cluster size")
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
+		// Verify, that cluster size is increased
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size < nodeCount+1 }, scaleDownTimeout))
 	})
 })
 
@@ -85,7 +121,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 		Client:    f.Client,
 		Name:      id,
 		Namespace: f.Namespace.Name,
-		Timeout:   scaleTimeout,
+		Timeout:   defaultTimeout,
 		Image:     framework.GetPauseImageName(f.Client),
 		Replicas:  replicas,
 		HostPorts: map[string]int{"port1": 4321},
@@ -104,7 +140,7 @@ func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 		Client:     f.Client,
 		Name:       id,
 		Namespace:  f.Namespace.Name,
-		Timeout:    scaleTimeout,
+		Timeout:    defaultTimeout,
 		Image:      framework.GetPauseImageName(f.Client),
 		Replicas:   replicas,
 		CpuRequest: request,
@@ -119,7 +155,7 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Client:     f.Client,
 		Name:       id,
 		Namespace:  f.Namespace.Name,
-		Timeout:    scaleTimeout,
+		Timeout:    defaultTimeout,
 		Image:      framework.GetPauseImageName(f.Client),
 		Replicas:   replicas,
 		MemRequest: request,
@@ -128,4 +164,31 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
+}
+
+// WaitForClusterSize waits until the cluster size matches the given function.
+func WaitForClusterSizeFunc(c *client.Client, sizeFunc func(int) bool, timeout time.Duration) error {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
+		nodes, err := c.Nodes().List(api.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector()})
+		if err != nil {
+			glog.Warningf("Failed to list nodes: %v", err)
+			continue
+		}
+		numNodes := len(nodes.Items)
+
+		// Filter out not-ready nodes.
+		framework.FilterNodes(nodes, func(node api.Node) bool {
+			return framework.IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
+		})
+		numReady := len(nodes.Items)
+
+		if numNodes == numReady && sizeFunc(numReady) {
+			glog.Infof("Cluster has reached the desired size")
+			return nil
+		}
+		glog.Infof("Waiting for cluster, current size %d, not ready nodes %d", numNodes, numNodes-numReady)
+	}
+	return fmt.Errorf("timeout waiting %v for appropriate cluster size", timeout)
 }
