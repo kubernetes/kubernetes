@@ -30,6 +30,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -484,6 +485,14 @@ func (ec2 *FakeELB) ApplySecurityGroupsToLoadBalancer(*elb.ApplySecurityGroupsTo
 }
 
 func (elb *FakeELB) ConfigureHealthCheck(*elb.ConfigureHealthCheckInput) (*elb.ConfigureHealthCheckOutput, error) {
+	panic("Not implemented")
+}
+
+func (elb *FakeELB) CreateLoadBalancerPolicy(*elb.CreateLoadBalancerPolicyInput) (*elb.CreateLoadBalancerPolicyOutput, error) {
+	panic("Not implemented")
+}
+
+func (elb *FakeELB) SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancerPoliciesForBackendServerInput) (*elb.SetLoadBalancerPoliciesForBackendServerOutput, error) {
 	panic("Not implemented")
 }
 
@@ -1301,4 +1310,31 @@ func TestBuildListener(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestProxyProtocolEnabled(t *testing.T) {
+	policies := sets.NewString(ProxyProtocolPolicyName, "FooBarFoo")
+	fakeBackend := &elb.BackendServerDescription{
+		InstancePort: aws.Int64(80),
+		PolicyNames:  stringSetToPointers(policies),
+	}
+	result := proxyProtocolEnabled(fakeBackend)
+	assert.True(t, result, "expected to find %s in %s", ProxyProtocolPolicyName, policies)
+
+	policies = sets.NewString("FooBarFoo")
+	fakeBackend = &elb.BackendServerDescription{
+		InstancePort: aws.Int64(80),
+		PolicyNames: []*string{
+			aws.String("FooBarFoo"),
+		},
+	}
+	result = proxyProtocolEnabled(fakeBackend)
+	assert.False(t, result, "did not expect to find %s in %s", ProxyProtocolPolicyName, policies)
+
+	policies = sets.NewString()
+	fakeBackend = &elb.BackendServerDescription{
+		InstancePort: aws.Int64(80),
+	}
+	result = proxyProtocolEnabled(fakeBackend)
+	assert.False(t, result, "did not expect to find %s in %s", ProxyProtocolPolicyName, policies)
 }
