@@ -25,7 +25,11 @@ RUN chmod -R a+rwx /usr/local/go/pkg
 # of operations.
 ENV HOME /go/src/k8s.io/kubernetes
 WORKDIR ${HOME}
-RUN chmod -R a+rwx ${HOME}
+# We have to mkdir the dirs we need, or else Docker will create them when we
+# mount volumes, and it will create them with root-only permissions.  The
+# explicit chmod of _output is required, but I can't really explain why.
+RUN mkdir -p ${HOME} ${HOME}/_output \
+    && chmod -R a+rwx ${HOME} ${HOME}/_output
 
 # Propagate the git tree version into the build image
 ADD kube-version-defs /kube-version-defs
