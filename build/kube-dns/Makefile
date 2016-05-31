@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the Docker image gcr.io/google_containers/kube2sky
+# Makefile for the Docker image gcr.io/google_containers/kubedns-<ARCH>
 # MAINTAINER: Tim Hockin <thockin@google.com>
 # If you update this image please bump the tag value before pushing.
 #
@@ -22,7 +22,7 @@
 # Default registry, arch and tag. This can be overwritten by arguments to make
 PLATFORM?=linux
 ARCH?=amd64
-TAG?=1.1
+TAG?=1.2
 REGISTRY?=gcr.io/google_containers
 
 GOLANG_VERSION=1.6
@@ -48,7 +48,7 @@ all: container
 
 container:
 	# Copy the content in this dir to the temp dir
-	cp $(KUBE_ROOT)/_output/local/bin/$(PLATFORM)/$(ARCH)/kube-dns $(TEMP_DIR)
+	cp $(KUBE_ROOT)/_output/dockerized/bin/$(PLATFORM)/$(ARCH)/kube-dns $(TEMP_DIR)
 	cp $(KUBE_ROOT)/build/kube-dns/Dockerfile $(TEMP_DIR)
 
 	# Replace BASEIMAGE with the real base image

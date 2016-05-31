@@ -1,27 +1,47 @@
+# Copyright 2016 The Kubernetes Authors All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
+
+# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
+
+# Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
+
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v12
+  name: kube-dns-v13
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v12
+    version: v13
     kubernetes.io/cluster-service: "true"
 spec:
-  replicas: {{ pillar['dns_replicas'] }}
+  replicas: $DNS_REPLICAS
   selector:
     k8s-app: kube-dns
-    version: v12
+    version: v13
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v12
+        version: v13
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/kubedns-amd64:1.1
+        image: gcr.io/google_containers/kubedns-amd64:1.2
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -53,7 +73,7 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube-dns"
-        - --domain={{ pillar['dns_domain'] }}.
+        - --domain=$DNS_DOMAIN}}.
         - --dns-port=10053
         ports:
         - containerPort: 10053
@@ -76,7 +96,7 @@ spec:
           name: dns-tcp
           protocol: TCP
       - name: healthz
-        image: gcr.io/google_containers/exechealthz:1.0
+        image: gcr.io/google_containers/exechealthz-amd64:1.0
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
@@ -86,7 +106,7 @@ spec:
             cpu: 10m
             memory: 20Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.{{ pillar['dns_domain'] }} 127.0.0.1 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN}} 127.0.0.1 >/dev/null
         - -port=8080
         ports:
         - containerPort: 8080
