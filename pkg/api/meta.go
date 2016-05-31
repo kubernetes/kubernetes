@@ -100,6 +100,10 @@ func (meta *ObjectMeta) GetOwnerReferences() []metatypes.OwnerReference {
 		ret[i].Name = meta.OwnerReferences[i].Name
 		ret[i].UID = meta.OwnerReferences[i].UID
 		ret[i].APIVersion = meta.OwnerReferences[i].APIVersion
+		if meta.OwnerReferences[i].Controller != nil {
+			value := *meta.OwnerReferences[i].Controller
+			ret[i].Controller = &value
+		}
 	}
 	return ret
 }
@@ -111,6 +115,10 @@ func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference
 		newReferences[i].Name = references[i].Name
 		newReferences[i].UID = references[i].UID
 		newReferences[i].APIVersion = references[i].APIVersion
+		if references[i].Controller != nil {
+			value := *references[i].Controller
+			newReferences[i].Controller = &value
+		}
 	}
 	meta.OwnerReferences = newReferences
 }

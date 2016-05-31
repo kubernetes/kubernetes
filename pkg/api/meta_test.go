@@ -64,6 +64,7 @@ func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerRefe
 			Name:       references[i].Name,
 			UID:        references[i].UID,
 			APIVersion: references[i].APIVersion,
+			Controller: references[i].Controller,
 		})
 	}
 	if len(references) == 0 {

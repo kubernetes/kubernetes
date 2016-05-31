@@ -236,6 +236,7 @@ func TestUnstructuredGetters(t *testing.T) {
 
 func TestUnstructuredSetters(t *testing.T) {
 	unstruct := runtime.Unstructured{}
+	trueVar := true
 
 	want := runtime.Unstructured{
 		Object: map[string]interface{}{
@@ -262,12 +263,14 @@ func TestUnstructuredSetters(t *testing.T) {
 						"name":       "poda",
 						"apiVersion": "v1",
 						"uid":        "1",
+						"controller": (*bool)(nil),
 					},
 					{
 						"kind":       "Pod",
 						"name":       "podb",
 						"apiVersion": "v1",
 						"uid":        "2",
+						"controller": &trueVar,
 					},
 				},
 				"finalizers": []interface{}{
@@ -303,6 +306,7 @@ func TestUnstructuredSetters(t *testing.T) {
 			Name:       "podb",
 			APIVersion: "v1",
 			UID:        "2",
+			Controller: &trueVar,
 		},
 	}
 	unstruct.SetOwnerReferences(newOwnerReferences)

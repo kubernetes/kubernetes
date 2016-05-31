@@ -781,6 +781,7 @@ func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerRef
 			Name:       references[i].Name,
 			UID:        references[i].UID,
 			APIVersion: references[i].APIVersion,
+			Controller: references[i].Controller,
 		})
 	}
 	if len(references) == 0 {
