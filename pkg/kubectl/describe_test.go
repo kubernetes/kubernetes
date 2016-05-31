@@ -238,19 +238,6 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "time", "1000"},
 		},
-		// QoS classes
-		{
-			container: api.Container{
-				Name:  "test",
-				Image: "image",
-			},
-			status: api.ContainerStatus{
-				Name:         "test",
-				Ready:        true,
-				RestartCount: 7,
-			},
-			expectedElements: []string{"cpu", "BestEffort", "memory", "BestEffort"},
-		},
 		// Using limits.
 		{
 			container: api.Container{
