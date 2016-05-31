@@ -212,9 +212,8 @@ type Sysctl struct {
 // container.securityContext take precedence over field values of PodSecurityContext.
 type PodSecurityContext struct {
 	...
-	// Sysctls hold a list of namespaced sysctls used for the pod. They are only allowed
-	// if the respective host namespace setting pod.spec.hostIPC or pod.spec.hostNetwork
-	// is false.
+	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls (by the container runtime) might fail to launch.
 	Sysctls []Sysctl `json:"sysctls,omitempty"`
 }
 ```
