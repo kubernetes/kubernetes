@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/saltbase/salt/kube-dns/skydns-svc.yaml.in
+# This file should be kept in sync with cluster/images/hyperkube/dns-svc.yaml
+
+# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
+
+# Warning: This is a file generated from the base underscore template file: skydns-svc.yaml.base
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -25,7 +30,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: 10.0.0.10
+  clusterIP:  $DNS_SERVER_IP
   ports:
   - name: dns
     port: 53

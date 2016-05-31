@@ -12,7 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
-MAINTAINER Tim Hockin <thockin@google.com>
-ADD skydns /
-ENTRYPOINT ["/skydns"]
+# Makefile for the skydns underscore templates to Salt/Pillar and other formats.
+
+# If you update the *.base templates, please run this Makefile before pushing.
+#
+# Usage:
+#    make
+
+all: transform
+
+# .base -> .in pattern rule
+%.in: %.base
+	sed -f transforms2salt.sed $< | sed s/__SOURCE_FILENAME__/$</g > $@
+
+# .base -> .sed pattern rule
+%.sed: %.base
+	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
+
+transform: skydns-rc.yaml.in skydns-svc.yaml.in skydns-rc.yaml.sed skydns-svc.yaml.sed
+
+.PHONY: transform
