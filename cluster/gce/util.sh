@@ -804,14 +804,14 @@ function create-cluster-autoscaler-mig-config() {
   # must be greater or equal to the number of migs. 
   if [[ ${AUTOSCALER_MIN_NODES} < ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MIN_NODES must be greater or equal ${NUM_MIGS}"
-    exit 2    
+    exit 2
   fi
 
   # Each MIG must have at least one node, so the min number of nodes
   # must be greater or equal to the number of migs. 
   if [[ ${AUTOSCALER_MAX_NODES} < ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MAX_NODES must be greater or equal ${NUM_MIGS}"
-    exit 2    
+    exit 2
   fi
 
   # The code assumes that the migs were created with create-nodes 
@@ -838,7 +838,7 @@ function create-cluster-autoscaler-mig-config() {
     AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --nodes=${this_mig_min}:${this_mig_max}:${mig_url}"
   done
 
-  AUTOSCALER_MIG_CONFIG="{AUTOSCALER_MIG_CONFIG} --experimental-scale-down-enabled=${AUTOSCALER_ENABLE_SCALE_DOWN}"
+  AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --experimental-scale-down-enabled=${AUTOSCALER_ENABLE_SCALE_DOWN}"
 }
 
 # Assumes:
