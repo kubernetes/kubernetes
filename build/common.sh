@@ -99,6 +99,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v3
           federation-apiserver,busybox
+          federation-controller-manager,busybox
         );;
     "arm")
         local targets=(
@@ -107,6 +108,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,armel/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm:v3
           federation-apiserver,armel/busybox
+          federation-controller-manager,armel/busybox
         );;
     "arm64")
         local targets=(
@@ -115,6 +117,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,aarch64/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v3
           federation-apiserver,aarch64/busybox
+          federation-controller-manager,aarch64/busybox
         );;
     "ppc64le")
         local targets=(
@@ -123,6 +126,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v3
           federation-apiserver,ppc64le/busybox
+          federation-controller-manager,ppc64lebusybox
         );;
   esac
 
