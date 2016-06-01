@@ -38,6 +38,7 @@ import (
 
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -259,7 +260,18 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
 				CheckErr(err)
 
-				versions, gvks, err := GetThirdPartyGroupVersions(client.Discovery())
+				var versions []unversioned.GroupVersion
+				var gvks []unversioned.GroupVersionKind
+				retries := 3
+				for i := 0; i < retries; i++ {
+					versions, gvks, err = GetThirdPartyGroupVersions(client.Discovery())
+					// Retry if we got a NotFound error, because user may delete
+					// a thirdparty group when the GetThirdPartyGroupVersions is
+					// running.
+					if err == nil || !apierrors.IsNotFound(err) {
+						break
+					}
+				}
 				CheckErr(err)
 				if len(versions) > 0 {
 					priorityMapper, ok := mapper.RESTMapper.(meta.PriorityRESTMapper)
