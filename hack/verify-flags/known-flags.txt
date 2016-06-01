@@ -70,6 +70,9 @@ configure-cbr0
 configure-cloud-routes
 conntrack-max
 conntrack-tcp-timeout-established
+consumer-port
+consumer-service-name
+consumer-service-namespace
 contain-pod-resources
 container-port
 container-runtime
@@ -463,3 +466,4 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
+
