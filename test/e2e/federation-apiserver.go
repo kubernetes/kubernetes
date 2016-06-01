@@ -29,7 +29,7 @@ import (
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-cluster")
 	It("should allow creation of cluster api objects", func() {
-		framework.SkipUnlessFederated()
+		framework.SkipUnlessFederated(f.Client)
 
 		contexts := f.GetUnderlyingFederatedContexts()
 
