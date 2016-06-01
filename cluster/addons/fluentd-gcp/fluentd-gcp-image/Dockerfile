@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console. 
 
-FROM gcr.io/google_containers/ubuntu-slim:0.2
+FROM gcr.io/google_containers/ubuntu-slim:0.1
 MAINTAINER Alex Robinson "arob@google.com"
 
 # Disable prompts from apt.
@@ -47,7 +47,6 @@ RUN apt-get update && apt-get install --reinstall -y --no-install-recommends \
   /var/log/google-fluentd
 
 # Install the record reformer plugin.
-# Remove the misleading log file that gets generated when the agent is installed
 RUN /usr/sbin/google-fluentd-gem install fluent-plugin-record-reformer
 
 # Copy the Fluentd configuration file for logging Docker container logs.
