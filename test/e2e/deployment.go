@@ -927,13 +927,11 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	// There should be no old RSs (overlapping RS)
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
-	oldRSs, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c)
+	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(oldRSs)).Should(Equal(0))
 	Expect(len(allOldRSs)).Should(Equal(0))
 	// New RS should contain pod-template-hash in its selector, label, and template label
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
-	Expect(err).NotTo(HaveOccurred())
 	err = framework.CheckRSHashLabel(newRS)
 	Expect(err).NotTo(HaveOccurred())
 	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
