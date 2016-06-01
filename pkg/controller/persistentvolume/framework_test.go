@@ -358,11 +358,14 @@ func (r *volumeReactor) checkClaims(t *testing.T, expectedClaims []*api.Persiste
 func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeController) error {
 	var err error
 
-	// Read recorded events
+	// Read recorded events - wait up to 1 minute to get all the expected ones
+	// (just in case some goroutines are slower with writing)
+	timer := time.NewTimer(time.Minute)
+
 	fakeRecorder := ctrl.eventRecorder.(*record.FakeRecorder)
 	gotEvents := []string{}
 	finished := false
-	for !finished {
+	for len(gotEvents) < len(expectedEvents) && !finished {
 		select {
 		case event, ok := <-fakeRecorder.Events:
 			if ok {
@@ -372,8 +375,8 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 				glog.V(5).Infof("event recorder finished")
 				finished = true
 			}
-		default:
-			glog.V(5).Infof("event recorder finished")
+		case _, _ = <-timer.C:
+			glog.V(5).Infof("event recorder timeout")
 			finished = true
 		}
 	}
