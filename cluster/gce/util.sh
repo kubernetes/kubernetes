@@ -614,11 +614,13 @@ function check-existing() {
 }
 
 function create-network() {
+  # TODO: Even if the network exists, but we want to create it with a different range,
+  # we should delete the existing one and create the new one (or update if it is possible?).
   if ! gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
-    gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --range "10.240.0.0/16"
+    gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --range "${CLUSTER_IP_RANGE}"
   fi
 
   if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal" &>/dev/null; then
