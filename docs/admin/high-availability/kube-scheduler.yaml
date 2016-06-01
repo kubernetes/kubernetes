@@ -10,7 +10,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - /usr/local/bin/kube-scheduler --master=127.0.0.1:8080 --v=2 1>>/var/log/kube-scheduler.log
+    - /usr/local/bin/kube-scheduler --master=127.0.0.1:8080 --v=2 --leader-elect 1>>/var/log/kube-scheduler.log
       2>&1
     livenessProbe:
       httpGet:
