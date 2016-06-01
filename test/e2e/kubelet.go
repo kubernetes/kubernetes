@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 		updateNodeLabels(c, nodeNames, nodeLabels, nil)
 
 		// Start resourceMonitor only in small clusters.
-		if len(nodes.Items) < maxNodesToCheck {
+		if len(nodes.Items) <= maxNodesToCheck {
 			resourceMonitor = framework.NewResourceMonitor(f.Client, framework.TargetContainers(), containerStatsPollingInterval)
 			resourceMonitor.Start()
 		}
@@ -199,7 +199,9 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				// transition to the running status.
 				Expect(waitTillNPodsRunningOnNodes(f.Client, nodeNames, rcName, f.Namespace.Name, totalPods,
 					time.Second*30)).NotTo(HaveOccurred())
-				resourceMonitor.LogLatest()
+				if resourceMonitor != nil {
+					resourceMonitor.LogLatest()
+				}
 
 				By("Deleting the RC")
 				framework.DeleteRC(f.Client, f.Namespace.Name, rcName)
@@ -215,7 +217,9 @@ var _ = framework.KubeDescribe("kubelet", func() {
 					itArg.timeout)).NotTo(HaveOccurred())
 				framework.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
 					time.Since(start))
-				resourceMonitor.LogCPUSummary()
+				if resourceMonitor != nil {
+					resourceMonitor.LogCPUSummary()
+				}
 			})
 		}
 	})
