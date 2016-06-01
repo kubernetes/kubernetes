@@ -1191,7 +1191,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 				break
 			}
 			// Delete failed, try again after a while.
-			glog.V(3).Infof("failed to delete volume %q: %v", volume.Name, i, err)
+			glog.V(3).Infof("failed to delete volume %q: %v", volume.Name, err)
 			time.Sleep(ctrl.createProvisionedPVInterval)
 		}
 
