@@ -166,6 +166,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-proxy
   kubectl
   federation-apiserver
+  federation-controller-manager
 )
 
 kube::golang::is_statically_linked_library() {
@@ -225,17 +226,21 @@ kube::golang::set_platform_envs() {
   export GOOS=${platform%/*}
   export GOARCH=${platform##*/}
 
-  # Dynamic CGO linking for other server architectures than linux/amd64 goes here
-  # If you want to include support for more server platforms than these, add arch-specific gcc names here
-  if [[ ${platform} == "linux/arm" ]]; then
-    export CGO_ENABLED=1
-    export CC=arm-linux-gnueabi-gcc
-  elif [[ ${platform} == "linux/arm64" ]]; then
-    export CGO_ENABLED=1
-    export CC=aarch64-linux-gnu-gcc
-  elif [[ ${platform} == "linux/ppc64le" ]]; then
-    export CGO_ENABLED=1
-    export CC=powerpc64le-linux-gnu-gcc
+  # Do not set CC when building natively on a platform, only if cross-compiling from linux/amd64
+  if [[ $(kube::golang::host_platform) == "linux/amd64" ]]; then
+
+    # Dynamic CGO linking for other server architectures than linux/amd64 goes here
+    # If you want to include support for more server platforms than these, add arch-specific gcc names here
+    if [[ ${platform} == "linux/arm" ]]; then
+      export CGO_ENABLED=1
+      export CC=arm-linux-gnueabi-gcc
+    elif [[ ${platform} == "linux/arm64" ]]; then
+      export CGO_ENABLED=1
+      export CC=aarch64-linux-gnu-gcc
+    elif [[ ${platform} == "linux/ppc64le" ]]; then
+      export CGO_ENABLED=1
+      export CC=powerpc64le-linux-gnu-gcc
+    fi
   fi
 }
 
