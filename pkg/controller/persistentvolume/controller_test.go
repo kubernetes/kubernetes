@@ -34,31 +34,13 @@ import (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
-	expectedChanges := []int{1, 4, 1, 1}
+	expectedChanges := []int{4, 1, 1}
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
 		// it was connected to real API server, i.e. we call add/update/delete
 		// Claim/Volume methods. Also, all changes to volumes and claims are
 		// sent to add/update/delete Claim/Volume as real controller would do.
-		{
-			// addVolume gets a new volume. Check it's marked as Available and
-			// that it's not bound to any claim - we bind volumes on periodic
-			// syncClaim, not on addVolume.
-			"5-1 - addVolume",
-			novolumes, /* added in testCall below */
-			newVolumeArray("volume5-1", "10Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRetain),
-			newClaimArray("claim5-1", "uid5-1", "1Gi", "", api.ClaimPending),
-			newClaimArray("claim5-1", "uid5-1", "1Gi", "", api.ClaimPending),
-			noevents, noerrors,
-			// Custom test function that generates an add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-1", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain)
-				reactor.volumes[volume.Name] = volume
-				reactor.volumeSource.Add(volume)
-				return nil
-			},
-		},
 		{
 			// addClaim gets a new claim. Check it's bound to a volume.
 			"5-2 - complete bind",
@@ -157,6 +139,10 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Test %q initial test call failed: %v", test.name, err)
 		}
+		// Simulate a periodic resync, just in case some events arrived in a
+		// wrong order.
+		ctrl.claims.Resync()
+		ctrl.volumes.store.Resync()
 
 		for reactor.getChangeCount() < count+expectedChanges[ix] {
 			reactor.waitTest()
