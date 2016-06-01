@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	goRuntime "runtime"
 	"sort"
 	"strconv"
@@ -154,9 +155,14 @@ const (
 	RestartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-// Label allocated to the image puller static pod that runs on each node
-// before e2es.
-var ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+var (
+	// Label allocated to the image puller static pod that runs on each node
+	// before e2es.
+	ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+
+	// For parsing Kubectl version for version-skewed testing.
+	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
+)
 
 // GetServerArchitecture fetches the architecture of the cluster's apiserver.
 func GetServerArchitecture(c *client.Client) string {
@@ -1488,6 +1494,29 @@ func ServerVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (boo
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.GTE(v), nil
+}
+
+// KubectlVersionGTE returns true if the kubectl version is greater than or
+// equal to v.
+func KubectlVersionGTE(v semver.Version) (bool, error) {
+	kv, err := KubectlVersion()
+	if err != nil {
+		return false, err
+	}
+	return kv.GTE(v), nil
+}
+
+// KubectlVersion gets the version of kubectl that's currently being used (see
+// --kubectl-path in e2e.go to use an alternate kubectl).
+func KubectlVersion() (semver.Version, error) {
+	output := RunKubectlOrDie("version", "--client")
+	matches := gitVersionRegexp.FindStringSubmatch(output)
+	if len(matches) != 2 {
+		return semver.Version{}, fmt.Errorf("Could not find kubectl version in output %v", output)
+	}
+	// Don't use the full match, as it contains "GitVersion:\"" and a
+	// trailing "\"".  Just use the submatch.
+	return version.Parse(matches[1])
 }
 
 func PodsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
