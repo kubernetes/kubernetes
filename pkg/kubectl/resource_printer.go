@@ -62,7 +62,7 @@ const (
 // is agnostic to schema versions, so you must send arguments to PrintObj in the
 // version you wish them to be shown using a VersionedPrinter (typically when
 // generic is true).
-func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
+func GetPrinter(format, formatArgument string, noHeaders bool) (ResourcePrinter, bool, error) {
 	var printer ResourcePrinter
 	switch format {
 	case "json":
@@ -119,7 +119,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		}
 	case "custom-columns":
 		var err error
-		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument, api.Codecs.UniversalDecoder()); err != nil {
+		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument, api.Codecs.UniversalDecoder(), noHeaders); err != nil {
 			return nil, false, err
 		}
 	case "custom-columns-file":

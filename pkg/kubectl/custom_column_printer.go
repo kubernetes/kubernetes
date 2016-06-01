@@ -73,7 +73,7 @@ func massageJSONPath(pathExpression string) (string, error) {
 //
 //      NAME               API_VERSION
 //      foo                bar
-func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder) (*CustomColumnsPrinter, error) {
+func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder, noHeaders bool) (*CustomColumnsPrinter, error) {
 	if len(spec) == 0 {
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
 	}
@@ -90,7 +90,7 @@ func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder) (*Cus
 		}
 		columns[ix] = Column{Header: colSpec[0], FieldSpec: spec}
 	}
-	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder}, nil
+	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder, NoHeaders: noHeaders}, nil
 }
 
 func splitOnWhitespace(line string) []string {
@@ -135,7 +135,7 @@ func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader, decoder runti
 			FieldSpec: spec,
 		}
 	}
-	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder}, nil
+	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder, NoHeaders: false}, nil
 }
 
 // Column represents a user specified column
@@ -150,17 +150,21 @@ type Column struct {
 // CustomColumnPrinter is a printer that knows how to print arbitrary columns
 // of data from templates specified in the `Columns` array
 type CustomColumnsPrinter struct {
-	Columns []Column
-	Decoder runtime.Decoder
+	Columns   []Column
+	Decoder   runtime.Decoder
+	NoHeaders bool
 }
 
 func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	w := tabwriter.NewWriter(out, columnwidth, tabwidth, padding, padding_character, flags)
-	headers := make([]string, len(s.Columns))
-	for ix := range s.Columns {
-		headers[ix] = s.Columns[ix].Header
+
+	if !s.NoHeaders {
+		headers := make([]string, len(s.Columns))
+		for ix := range s.Columns {
+			headers[ix] = s.Columns[ix].Header
+		}
+		fmt.Fprintln(w, strings.Join(headers, "\t"))
 	}
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
 	parsers := make([]*jsonpath.JSONPath, len(s.Columns))
 	for ix := range s.Columns {
 		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix))

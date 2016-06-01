@@ -75,7 +75,7 @@ func TestVersionedPrinter(t *testing.T) {
 }
 
 func TestPrintDefault(t *testing.T) {
-	printer, found, err := GetPrinter("", "")
+	printer, found, err := GetPrinter("", "", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
@@ -129,7 +129,7 @@ func TestPrinter(t *testing.T) {
 	}
 	for _, test := range printerTests {
 		buf := bytes.NewBuffer([]byte{})
-		printer, found, err := GetPrinter(test.Format, test.FormatArgument)
+		printer, found, err := GetPrinter(test.Format, test.FormatArgument, false)
 		if err != nil || !found {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
@@ -156,7 +156,7 @@ func TestBadPrinter(t *testing.T) {
 		{"bad jsonpath", "jsonpath", "{.Name", fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
 	}
 	for _, test := range badPrinterTests {
-		_, _, err := GetPrinter(test.Format, test.FormatArgument)
+		_, _, err := GetPrinter(test.Format, test.FormatArgument, false)
 		if err == nil || err.Error() != test.Error.Error() {
 			t.Errorf("in %s, expect %s, got %s", test.Name, test.Error, err)
 		}
@@ -333,7 +333,7 @@ func TestNamePrinter(t *testing.T) {
 			},
 			"pod/foo\npod/bar\n"},
 	}
-	printer, _, _ := GetPrinter("name", "")
+	printer, _, _ := GetPrinter("name", "", false)
 	for name, item := range tests {
 		buff := &bytes.Buffer{}
 		err := printer.PrintObj(item.obj, buff)
