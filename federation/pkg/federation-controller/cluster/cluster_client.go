@@ -58,13 +58,19 @@ var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.
 		if err != nil {
 			return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
 		}
-		secret, err := client.Secrets(namespace).Get(c.Spec.SecretRef.Name)
-		if err != nil {
-			return nil, fmt.Errorf("error in fetching secret: %s", err)
-		}
-		data, ok := secret.Data[KubeconfigSecretDataKey]
-		if !ok {
-			return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
+		data := []byte{}
+		if c.Spec.SecretRef != nil {
+			secret, err := client.Secrets(namespace).Get(c.Spec.SecretRef.Name)
+			if err != nil {
+				return nil, fmt.Errorf("error in fetching secret: %s", err)
+			}
+			ok := false
+			data, ok = secret.Data[KubeconfigSecretDataKey]
+			if !ok {
+				return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
+			}
+		} else {
+			glog.Infof("didnt find secretRef for cluster %s. Trying insecure access", c.Name)
 		}
 		return clientcmd.Load(data)
 	}

@@ -91,6 +91,7 @@ message ClusterSpec {
   // The secret is read from the kubernetes cluster that is hosting federation control plane.
   // Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key "kubeconfig".
   // This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets.
+  // This can be left empty if the cluster allows insecure access.
   optional k8s.io.kubernetes.pkg.api.v1.LocalObjectReference secretRef = 2;
 }
 
