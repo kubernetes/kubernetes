@@ -1128,7 +1128,7 @@ func TestGenerateRunCommand(t *testing.T) {
 			[]string{},
 			"pod-hostname-foo",
 			nil,
-			" --net=\"/var/run/netns/default\" -- /bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=pod-hostname-foo rkt-uuid-foo",
+			" --net=/var/run/netns/default -- /bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=pod-hostname-foo rkt-uuid-foo",
 		},
 		// Case #2, returns no dns, with host-net.
 		{
@@ -1168,7 +1168,7 @@ func TestGenerateRunCommand(t *testing.T) {
 			[]string{"."},
 			"pod-hostname-foo",
 			nil,
-			" --net=\"/var/run/netns/default\" -- /bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 --hostname=pod-hostname-foo rkt-uuid-foo",
+			" --net=/var/run/netns/default -- /bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 --hostname=pod-hostname-foo rkt-uuid-foo",
 		},
 		// Case #4, returns no dns, dns searches, with host-network.
 		{
