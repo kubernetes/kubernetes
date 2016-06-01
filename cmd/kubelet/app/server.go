@@ -371,10 +371,6 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	runtime.ReallyCrash = s.ReallyCrashForTesting
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
-
-	glog.V(2).Infof("Using root directory: %v", s.RootDirectory)
-
 	// TODO(vmarmol): Do this through container config.
 	oomAdjuster := kcfg.OOMAdjuster
 	if err := oomAdjuster.ApplyOOMScoreAdj(0, int(s.OOMScoreAdj)); err != nil {
@@ -659,6 +655,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	capabilities.Setup(kcfg.AllowPrivileged, privilegedSources, 0)
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
+	glog.V(2).Infof("Using root directory: %v", kcfg.RootDirectory)
 
 	builder := kcfg.Builder
 	if builder == nil {
