@@ -364,6 +364,8 @@ portal-net
 prepull-images
 private-mountns
 prom-push-gateway
+proxy-client-certificate
+proxy-client-key
 proto-import
 proxy-bindall
 proxy-kubeconfig

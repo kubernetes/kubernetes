@@ -38,6 +38,8 @@ type APIServer struct {
 	MaxConnectionBytesPerSec    int64
 	SSHKeyfile                  string
 	SSHUser                     string
+	ProxyClientCertFile         string
+	ProxyClientKeyFile          string
 	ServiceAccountKeyFile       string
 	ServiceAccountLookup        bool
 	WebhookTokenAuthnConfigFile string
@@ -91,6 +93,10 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile,
 		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
+
+	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-certificate", s.ProxyClientCertFile, "Path to a client cert file to be used when proxying over TLS. Requires proxy-client-key to be specified as well.")
+
+	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key", s.ProxyClientKeyFile, "Path to a client key to be used when proxying over TLS.")
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+

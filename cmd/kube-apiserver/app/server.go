@@ -124,8 +124,27 @@ func Run(s *options.APIServer) error {
 		proxyDialerFn = tunneler.Dial
 	}
 
+	var proxyClientCerts []tls.Certificate
+	if s.ProxyClientCertFile != "" && s.ProxyClientKeyFile != "" {
+		clientCert, err := tls.LoadX509KeyPair(
+			s.ProxyClientCertFile,
+			s.ProxyClientKeyFile,
+		)
+
+		if err != nil {
+			glog.Fatalf("Invalid proxy client certificates: %v", err)
+		} else {
+			glog.V(4).Infof("Using client certificate (%s, %s) when proxying to pods and services over TLS",
+				s.ProxyClientCertFile, s.ProxyClientKeyFile)
+		}
+		proxyClientCerts = append(proxyClientCerts, clientCert)
+	}
+
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+	proxyTLSClientConfig := &tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       proxyClientCerts,
+	}
 
 	kubeletClient, err := kubeletclient.NewStaticKubeletClient(&s.KubeletConfig)
 	if err != nil {
