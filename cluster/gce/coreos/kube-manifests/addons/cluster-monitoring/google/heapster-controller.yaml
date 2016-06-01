@@ -34,7 +34,6 @@ spec:
             - /heapster
             - --source=kubernetes.summary_api:''
             - --sink=gcm
-            - --metric_resolution=60s
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
