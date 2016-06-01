@@ -234,6 +234,7 @@ EOF
 # $2: Admission Controllers to invoke in the API server.
 # $3: A port range to reserve for services with NodePort visibility.
 # $4: The IP address on which to advertise the apiserver to members of the cluster.
+# $5: Tells kube-api to run in privileged mode
 function create-kube-apiserver-opts() {
   cat <<EOF > ~/kube/default/kube-apiserver
 KUBE_APISERVER_OPTS="\
