@@ -69,9 +69,7 @@ var _ = framework.KubeDescribe("Services", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
-		var err error
-		c, err = framework.LoadClient()
-		Expect(err).NotTo(HaveOccurred())
+		c = f.Client
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
