@@ -28,8 +28,13 @@ kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 workspace=$(pwd)
 
 # Process salt pillar templates manually
-sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > "${workspace}/skydns-rc.yaml"
-sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > "${workspace}/skydns-svc.yaml"
+for f in skydns-rc.yaml skydns-svc.yaml; do
+	eval "cat <<EOF
+$(<"${KUBE_ROOT}/cluster/saltbase/salt/kube-dns/${f}.sed")
+EOF
+" 2>/dev/null >"${workspace}/$f"
+	cat "${workspace}/$f"
+done
 
 # Use kubectl to create skydns rc and service
 "${kubectl}" create -f "${workspace}/skydns-rc.yaml"
