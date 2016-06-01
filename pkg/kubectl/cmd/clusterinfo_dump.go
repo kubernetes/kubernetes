@@ -60,13 +60,13 @@ based on namespace and pod name.
 
 	dumpExample = `# Dump current cluster state to stdout
 kubectl cluster-info dump
-  
+
 # Dump current cluster state to /path/to/cluster-state
 kubectl cluster-info dump --output-directory=/path/to/cluster-state
-  
+
 # Dump all namespaces to stdout
 kubectl cluster-info dump --all-namespaces
-  
+
 # Dump a set of namespaces to /path/to/cluster-state
 kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`
 )
@@ -91,7 +91,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 	if c, err = f.Client(); err != nil {
 		return err
 	}
-	printer, _, err := kubectl.GetPrinter("json", "")
+	printer, _, err := kubectl.GetPrinter("json", "", false)
 	if err != nil {
 		return err
 	}

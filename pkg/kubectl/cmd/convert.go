@@ -150,7 +150,7 @@ func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.
 		}
 	}
 	o.encoder = f.JSONEncoder()
-	o.printer, _, err = kubectl.GetPrinter(outputFormat, templateFile)
+	o.printer, _, err = kubectl.GetPrinter(outputFormat, templateFile, false)
 	if err != nil {
 		return err
 	}
