@@ -35,7 +35,6 @@ spec:
             - --source=kubernetes.summary_api:''
             - --sink=influxdb:http://monitoring-influxdb:8086
             - --sink=gcm:?metrics=autoscaling
-            - --metric_resolution=60s
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs

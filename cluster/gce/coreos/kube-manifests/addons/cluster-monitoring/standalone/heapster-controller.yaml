@@ -33,7 +33,6 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-            - --metric_resolution=60s
         - image: gcr.io/google_containers/addon-resizer:1.0
           name: heapster-nanny
           resources:

@@ -34,7 +34,6 @@ spec:
             - /heapster
             - --source=kubernetes.summary_api:''
             - --sink=influxdb:http://monitoring-influxdb:8086
-            - --metric_resolution=60s
         - image: gcr.io/google_containers/heapster:v1.1.0-beta2
           name: eventer
           resources:
