@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -36,6 +37,8 @@ const (
 	pollInterval = 1 * time.Second
 	// Interval to framework.Poll /stats/container on a node
 	containerStatsPollingInterval = 5 * time.Second
+	// Maximum number of nodes that we constraint to
+	maxNodesToCheck = 10
 )
 
 // getPodMatches returns a set of pod names on the given node that matches the
@@ -87,25 +90,83 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames sets.String, podNam
 	})
 }
 
+// updates labels of nodes given by nodeNames.
+// In case a given label already exists, it overwrites it. If label to remove doesn't exist
+// it silently ignores it.
+func updateNodeLabels(c *client.Client, nodeNames sets.String, toAdd, toRemove map[string]string) {
+	const maxRetries = 5
+	for nodeName := range nodeNames {
+		var node *api.Node
+		var err error
+		for i := 0; i < maxRetries; i++ {
+			node, err = c.Nodes().Get(nodeName)
+			if err != nil {
+				framework.Logf("Error getting node %s: %v", nodeName, err)
+				continue
+			}
+			if toAdd != nil {
+				for k, v := range toAdd {
+					node.ObjectMeta.Labels[k] = v
+				}
+			}
+			if toRemove != nil {
+				for k := range toRemove {
+					delete(node.ObjectMeta.Labels, k)
+				}
+			}
+			_, err := c.Nodes().Update(node)
+			if err != nil {
+				framework.Logf("Error updating node %s: %v", nodeName, err)
+			} else {
+				break
+			}
+		}
+		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
 var _ = framework.KubeDescribe("kubelet", func() {
+	var c *client.Client
 	var numNodes int
 	var nodeNames sets.String
+	var nodeLabels map[string]string
 	f := framework.NewDefaultFramework("kubelet")
 	var resourceMonitor *framework.ResourceMonitor
 
 	BeforeEach(func() {
+		c = f.Client
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
-		for _, node := range nodes.Items {
-			nodeNames.Insert(node.Name)
+		// If there are a lot of nodes, we don't want to use all of them
+		// (if there are 1000 nodes in the cluster, starting 10 pods/node
+		// will take ~10 minutes today). And there is also deletion phase.
+		//
+		// Instead, we choose at most 10 nodes and will constraint pods
+		// that we are creating to be scheduled only on that nodes.
+		if numNodes > maxNodesToCheck {
+			numNodes = maxNodesToCheck
+			nodeLabels = make(map[string]string)
+			nodeLabels["kubelet_cleanup"] = "true"
 		}
-		resourceMonitor = framework.NewResourceMonitor(f.Client, framework.TargetContainers(), containerStatsPollingInterval)
-		resourceMonitor.Start()
+		for i := 0; i < numNodes; i++ {
+			nodeNames.Insert(nodes.Items[i].Name)
+		}
+		updateNodeLabels(c, nodeNames, nodeLabels, nil)
+
+		// Start resourceMonitor only in small clusters.
+		if len(nodes.Items) < maxNodesToCheck {
+			resourceMonitor = framework.NewResourceMonitor(f.Client, framework.TargetContainers(), containerStatsPollingInterval)
+			resourceMonitor.Start()
+		}
 	})
 
 	AfterEach(func() {
-		resourceMonitor.Stop()
+		if resourceMonitor != nil {
+			resourceMonitor.Stop()
+		}
+		// If we added labels to nodes in this test, remove them now.
+		updateNodeLabels(c, nodeNames, nil, nodeLabels)
 	})
 
 	framework.KubeDescribe("Clean up pods on node", func() {
@@ -125,11 +186,12 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(util.NewUUID()))
 
 				Expect(framework.RunRC(framework.RCConfig{
-					Client:    f.Client,
-					Name:      rcName,
-					Namespace: f.Namespace.Name,
-					Image:     framework.GetPauseImageName(f.Client),
-					Replicas:  totalPods,
+					Client:       f.Client,
+					Name:         rcName,
+					Namespace:    f.Namespace.Name,
+					Image:        framework.GetPauseImageName(f.Client),
+					Replicas:     totalPods,
+					NodeSelector: nodeLabels,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
