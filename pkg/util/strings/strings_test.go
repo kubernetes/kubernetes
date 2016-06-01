@@ -36,6 +36,7 @@ func TestSplitQualifiedName(t *testing.T) {
 		}
 	}
 }
+
 func TestJoinQualifiedName(t *testing.T) {
 	testCases := []struct {
 		input  []string
@@ -47,6 +48,24 @@ func TestJoinQualifiedName(t *testing.T) {
 	}
 	for i, tc := range testCases {
 		res := JoinQualifiedName(tc.input[0], tc.input[1])
+		if res != tc.output {
+			t.Errorf("case[%d]: expected %q, got %q", i, tc.output, res)
+		}
+	}
+}
+
+func TestShortenString(t *testing.T) {
+	testCases := []struct {
+		input   string
+		out_len int
+		output  string
+	}{
+		{"kubernetes.io", 5, "kuber"},
+		{"blah", 34, "blah"},
+		{"kubernetes.io", 13, "kubernetes.io"},
+	}
+	for i, tc := range testCases {
+		res := ShortenString(tc.input, tc.out_len)
 		if res != tc.output {
 			t.Errorf("case[%d]: expected %q, got %q", i, tc.output, res)
 		}
