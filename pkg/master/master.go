@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
@@ -749,7 +750,13 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 	if err != nil {
 		return err
 	}
-	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name)
+	plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+		Group:   group,
+		Version: rsrc.Versions[0].Name,
+		Kind:    kind,
+	})
+
+	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name, plural.Resource)
 	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
@@ -764,12 +771,13 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		PreferredVersion: groupVersion,
 	}
 	apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
-	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
+
+	m.addThirdPartyResourceStorage(path, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	apiserver.InstallServiceErrorHandler(api.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
 
-func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
+func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(
 		generic.RESTOptions{
 			Storage:                 m.thirdPartyStorage,
@@ -783,7 +791,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	apiRoot := makeThirdPartyPath("")
 
 	storage := map[string]rest.Storage{
-		strings.ToLower(kind) + "s": resourceStorage,
+		pluralResource: resourceStorage,
 	}
 
 	optionsExternalVersion := registered.GroupOrDie(api.GroupName).GroupVersion
