@@ -1,5 +1,14 @@
 {% if pillar.get('enable_node_autoscaler', '').lower() == 'true' %}
-{% set params = pillar['autoscaler_mig_config'] -%}
+{% set cloud_config = "" -%}
+{% set cloud_config_mount = "" -%}
+{% set cloud_config_volume = "" -%}
+{% if grains.cloud == 'gce' and grains.cloud_config is defined -%}
+  {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
+  {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
+  {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+{% endif -%}
+{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
+
 {
     "kind": "Pod",
     "apiVersion": "v1",
@@ -36,6 +45,7 @@
                     }
                 },
                 "volumeMounts": [
+                    {{cloud_config_mount}}
                     {
                         "name": "ssl-certs",
                         "readOnly": true,
@@ -47,6 +57,7 @@
             }
         ],
         "volumes": [
+            {{cloud_config_volume}}
             {
                 "name": "ssl-certs",
                 "hostPath": {
