@@ -278,6 +278,9 @@ type RCConfig struct {
 	// Extra labels added to every pod.
 	Labels map[string]string
 
+	// Node selector for pods in the RC.
+	NodeSelector map[string]string
+
 	// Ports to declare in the container (map of name to containerPort).
 	Ports map[string]int
 	// Ports to declare in the container as host and container ports.
@@ -2230,6 +2233,12 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 	if config.Labels != nil {
 		for k, v := range config.Labels {
 			template.ObjectMeta.Labels[k] = v
+		}
+	}
+	if config.NodeSelector != nil {
+		template.Spec.NodeSelector = make(map[string]string)
+		for k, v := range config.NodeSelector {
+			template.Spec.NodeSelector[k] = v
 		}
 	}
 	if config.Ports != nil {
