@@ -88,6 +88,17 @@ func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType
 	return nil
 }
 
+func (lb *LoadBalancerRR) DeleteService(svcPort proxy.ServicePortName) {
+	lb.lock.Lock()
+	defer lb.lock.Unlock()
+
+	if _, exists := lb.services[svcPort]; !exists {
+		glog.V(4).Infof("LoadBalancerRR service %q did not exist", svcPort)
+	} else {
+		delete(lb.services, svcPort)
+	}
+}
+
 // This assumes that lb.lock is already held.
 func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) *balancerState {
 	if ttlMinutes == 0 {
