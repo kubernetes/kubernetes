@@ -154,8 +154,7 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  local KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API//\//-}"
-  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_NO_SLASH}_$(kube::util::sortable_date)"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
 produceJUnitXMLReport() {
@@ -168,11 +167,11 @@ produceJUnitXMLReport() {
   local junit_xml_filename
   test_stdout_filenames=$(ls ${junit_filename_prefix}*.stdout)
   junit_xml_filename="${junit_filename_prefix}.xml"
-  if ! command -v go-junit-report >/dev/null 2>&1; then
-    kube::log::error "go-junit-report not found; please install with " \
-      "go get -u github.com/jstemmer/go-junit-report"
-    return
-  fi
+
+  curl "https://storage.googleapis.com/public-mikedanese-k8s/go-junit-reporter" \
+    -o "${GOPATH}/bin/go-junit-report"
+  chmod +x "${GOPATH}/bin/go-junit-report"
+
   cat ${test_stdout_filenames} | go-junit-report > "${junit_xml_filename}"
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
     rm ${test_stdout_filenames}
@@ -231,7 +230,11 @@ runTests() {
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
-    go test "${goflags[@]:+${goflags[@]}}" \
+    KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" \
+    KUBE_TEST_ETCD_PREFIXES="${KUBE_TEST_ETCD_PREFIXES}" \
+    go test \
+      "${goflags[@]:+${goflags[@]}}" \
+      -exec="${KUBE_ROOT}/hack/run-test.sh" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
@@ -313,32 +316,7 @@ checkFDs() {
 
 checkFDs
 
-# Convert the CSVs to arrays.
-IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
-apiVersionsCount=${#apiVersions[@]}
-etcdPrefixesCount=${#etcdPrefixes[@]}
-for (( i=0, j=0; ; )); do
-  apiVersion=${apiVersions[i]}
-  etcdPrefix=${etcdPrefixes[j]}
-  echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
-  # KUBE_TEST_API sets the version of each group to be tested.
-  KUBE_TEST_API="${apiVersion}" ETCD_PREFIX=${etcdPrefix} runTests "$@"
-  i=${i}+1
-  j=${j}+1
-  if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then
-    # All api versions and etcd prefixes tested.
-    break
-  fi
-  if [[ i -eq ${apiVersionsCount} ]]; then
-    # Use the last api version for remaining etcd prefixes.
-    i=${i}-1
-  fi
-   if [[ j -eq ${etcdPrefixesCount} ]]; then
-     # Use the last etcd prefix for remaining api versions.
-    j=${j}-1
-  fi
-done
+runTests "$@"
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.
