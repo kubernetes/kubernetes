@@ -620,8 +620,7 @@ start_cluster_autoscaler() {
      # Remove salt comments and replace variables with values
     src_file="${kube_home}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove_salt_config_comments "${src_file}"
-
-    local params=`sed 's/^/"/;s/ /","/g;s/$/",/' <<< "${AUTOSCALER_MIG_CONFIG}"`
+    params="$(echo "${AUTOSCALER_MIG_CONFIG}" | sed 's/^/"/;s/ /","/g;s/$/",/')"
     if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
       params="${params} --cloud-config=/etc/gce.conf"
     fi
@@ -629,7 +628,6 @@ start_cluster_autoscaler() {
     sed -i -e "s@\"{{param}}\",@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
-    sed -i -e "s@{%.*%}@@g" "${src_file}"
     cp "${src_file}" /etc/kubernetes/manifests
   fi
 }
@@ -684,8 +682,10 @@ start_kube_addons() {
     file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup_addon_manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    metrics_memory="200Mi"
-    eventer_memory="200Mi"
+    base_metrics_memory="200Mi"
+    metrics_memory="${base_metrics_memory}"
+    base_eventer_memory="200Mi"
+    eventer_memory="${base_eventer_memory}"
     readonly metrics_memory_per_node="4"
     readonly eventer_memory_per_node="500"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -ge 1 ]; then
@@ -700,7 +700,9 @@ start_kube_addons() {
       controller_yaml="${controller_yaml}/heapster-controller.yaml"
     fi
     remove_salt_config_comments "${controller_yaml}"
+    sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
