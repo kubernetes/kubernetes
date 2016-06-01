@@ -7,7 +7,7 @@ options:
 - name: attach
   default_value: "false"
   usage: |
-    If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--interactive' is set, in which case the default is true.
+    If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true.
 - name: command
   default_value: "false"
   usage: |
