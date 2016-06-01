@@ -33,6 +33,10 @@ will make the node schedulable again.
 
 .SH OPTIONS
 .PP
+\fB\-\-delete\-local\-data\fP=false
+    Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).
+
+.PP
 \fB\-\-force\fP=false
     Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet.
 
