@@ -45,41 +45,70 @@ const (
 	RollbackRevisionNotFound  = "DeploymentRollbackRevisionNotFound"
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	RollbackDone              = "DeploymentRollback"
+
+	all getReplicaSetType = "All"
+	old getReplicaSetType = "Old"
+	new getReplicaSetType = "New"
 )
+
+type getReplicaSetType string
+
+// GetAllReplicaSets returns the old and new replica sets targeted by the given Deployment. It gets PodList and ReplicaSetList from client interface.
+// Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
+// The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
+func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
+	return getReplicaSets(deployment, c, all)
+}
 
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment,
-		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
-			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
-			return rsList.Items, err
-		})
-	if err != nil {
-		return nil, nil, fmt.Errorf("error listing ReplicaSets: %v", err)
-	}
-	podList, err := ListPods(deployment,
-		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			return c.Core().Pods(namespace).List(options)
-		})
-	if err != nil {
-		return nil, nil, fmt.Errorf("error listing Pods: %v", err)
-	}
-	return FindOldReplicaSets(deployment, rsList, podList)
+	oldRSes, allOldRSes, _, err := getReplicaSets(deployment, c, old)
+	return oldRSes, allOldRSes, err
 }
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
+	_, _, newRS, err := getReplicaSets(deployment, c, new)
+	return newRS, err
+}
+
+func getReplicaSets(deployment *extensions.Deployment, c clientset.Interface, getType getReplicaSetType) (oldRSes []*extensions.ReplicaSet, allOldRSes []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, err error) {
+	// List all RSes
 	rsList, err := ListReplicaSets(deployment,
 		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
 			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
 			return rsList.Items, err
 		})
 	if err != nil {
-		return nil, fmt.Errorf("error listing ReplicaSets: %v", err)
+		return nil, nil, nil, fmt.Errorf("error listing ReplicaSets: %v", err)
 	}
-	return FindNewReplicaSet(deployment, rsList)
+
+	// Skip getting old replica sets when we only need new replica set
+	if getType != new {
+		// List all pods
+		podList, err := ListPods(deployment,
+			func(namespace string, options api.ListOptions) (*api.PodList, error) {
+				return c.Core().Pods(namespace).List(options)
+			})
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("error listing Pods: %v", err)
+		}
+		oldRSes, allOldRSes, err = FindOldReplicaSets(deployment, rsList, podList)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("error getting old ReplicaSets: %v", err)
+		}
+	}
+
+	// Skip getting new replica set when we only need old replica sets
+	if getType != old {
+		newRS, err = FindNewReplicaSet(deployment, rsList)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("error getting new ReplicaSet: %v", err)
+		}
+	}
+	return oldRSes, allOldRSes, newRS, nil
 }
 
 // TODO: switch this to full namespacers
