@@ -166,6 +166,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-proxy
   kubectl
   federation-apiserver
+  federation-controller-manager
 )
 
 kube::golang::is_statically_linked_library() {
