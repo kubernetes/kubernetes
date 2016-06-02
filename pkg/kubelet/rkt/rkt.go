@@ -66,11 +66,11 @@ const (
 	RktType                      = "rkt"
 	DefaultRktAPIServiceEndpoint = "localhost:15441"
 
-	minimumAppcVersion       = "0.8.1"
-	minimumRktBinVersion     = "1.6.0"
-	recommendedRktBinVersion = "1.6.0"
-	minimumRktApiVersion     = "1.0.0-alpha"
-	minimumSystemdVersion    = "219"
+	minimumRktBinVersion     = "1.7.0"
+	recommendedRktBinVersion = "1.7.0"
+
+	minimumRktApiVersion  = "1.0.0-alpha"
+	minimumSystemdVersion = "219"
 
 	systemdServiceDir = "/run/systemd/system"
 	rktDataDir        = "/var/lib/rkt"
@@ -1579,7 +1579,7 @@ func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
 
 // Status returns error if rkt is unhealthy, nil otherwise.
 func (r *Runtime) Status() error {
-	return r.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion)
+	return r.checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumRktApiVersion, minimumSystemdVersion)
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
