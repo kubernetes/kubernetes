@@ -47,6 +47,10 @@ function create-federated-api-objects {
     export FEDERATION_APISERVER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-apiserver"
     export FEDERATION_APISERVER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-apiserver.docker_tag)}"
 
+    export FEDERATION_CONTROLLER_MANAGER_DEPLOYMENT_NAME="federation-controller-manager"
+    export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager"
+    export FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-controller-manager.docker_tag)}"
+
     export FEDERATION_SERVICE_CIDR=${FEDERATION_SERVICE_CIDR:-"10.10.0.0/24"}
 
     #Only used for providers that require a nodeport service (vagrant for now)
@@ -104,6 +108,7 @@ function create-federated-api-objects {
     export FEDERATION_API_KNOWN_TOKENS="${FEDERATION_API_TOKEN},admin,admin"
 
     $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
+    $template "${manifests_root}/federation-controller-manager-deployment.yaml" | $host_kubectl create -f -
 
     # Don't finish provisioning until federation-apiserver pod is running
     for i in {1..30};do
@@ -123,6 +128,24 @@ function create-federated-api-objects {
 	sleep 4
     done
 
+    # Verify that federation-controller-manager pod is running.
+    for i in {1..30};do
+	#TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
+	phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-controller-manager --template '{.items[*].status.phase}')"
+	echo "Waiting for federation-controller-manager to be running...(phase= $phase)"
+	if [[ "$phase" == "Running" ]];then
+	    echo "federation-controller-manager pod is running!"
+	    break
+	fi
+
+	if [[ $i -eq 30 ]];then
+	    echo "federation-controller-manager pod is not running! giving up."
+	    exit 1
+	fi
+
+	sleep 4
+    done
+    
     CONTEXT=federated-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
 	   SECONDARY_KUBECONFIG=true \
@@ -137,7 +160,7 @@ function create-federated-api-objects {
 # FEDERATION_IMAGE_TAG: push all federated images with this tag. Used for ci testing
 function push-federated-images {
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
-    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-'federation-apiserver'}
+    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"federation-apiserver federation-controller-manager"}
 
     local imageFolder="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin"
 

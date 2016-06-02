@@ -23,7 +23,6 @@ spec:
         - --service-cluster-ip-range={{.FEDERATION_SERVICE_CIDR}}
         - --secure-port=443
         - --advertise-address={{.FEDERATION_API_HOST}}
-        - --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
         ports:
         - containerPort: 443
