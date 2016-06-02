@@ -92,7 +92,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		podNamesAfter, err := waitForNPods(ps, len(podNamesBefore), framework.RestartPodReadyAgainTimeout)
 		Expect(err).NotTo(HaveOccurred())
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !framework.CheckPodsRunningReady(f.Client, ns, podNamesAfter, remaining) {
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesAfter, remaining) {
 			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
