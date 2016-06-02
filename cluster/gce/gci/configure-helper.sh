@@ -615,6 +615,7 @@ function start-kube-scheduler {
   # Remove salt comments and replace variables with values.
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
   remove-salt-config-comments "${src_file}"
+
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
@@ -624,19 +625,23 @@ function start-kube-scheduler {
 # Starts cluster autoscaler.
 function start-cluster-autoscaler {
   if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ]; then
+    echo "Start kubernetes cluster autoscaler"
+    prepare-log-file /var/log/cluster-autoscaler.log
+
     # Remove salt comments and replace variables with values
-    src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
+    local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove-salt-config-comments "${src_file}"
 
-    local params=`sed 's/^/"/;s/ /","/g;s/$/",/' <<< "${AUTOSCALER_MIG_CONFIG}"`
+    local params="${AUTOSCALER_MIG_CONFIG}"
     if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
       params+=" --cloud-config=/etc/gce.conf"
     fi
 
-    sed -i -e "s@\"{{param}}\",@${params}@g" "${src_file}"
+    sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
     sed -i -e "s@{%.*%}@@g" "${src_file}"
+
     cp "${src_file}" /etc/kubernetes/manifests
   fi
 }
