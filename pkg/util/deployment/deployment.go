@@ -47,23 +47,39 @@ const (
 	RollbackDone              = "DeploymentRollback"
 )
 
+// GetAllReplicaSets returns the old and new replica sets targeted by the given Deployment. It gets PodList and ReplicaSetList from client interface.
+// Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
+// The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
+func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
+	rsList, err := listReplicaSets(deployment, c)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	podList, err := listPods(deployment, c)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList, podList)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	newRS, err := FindNewReplicaSet(deployment, rsList)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return oldRSes, allOldRSes, newRS, nil
+}
+
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment,
-		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
-			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
-			return rsList.Items, err
-		})
+	rsList, err := listReplicaSets(deployment, c)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error listing ReplicaSets: %v", err)
+		return nil, nil, err
 	}
-	podList, err := ListPods(deployment,
-		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			return c.Core().Pods(namespace).List(options)
-		})
+	podList, err := listPods(deployment, c)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error listing Pods: %v", err)
+		return nil, nil, err
 	}
 	return FindOldReplicaSets(deployment, rsList, podList)
 }
@@ -71,15 +87,28 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment,
+	rsList, err := listReplicaSets(deployment, c)
+	if err != nil {
+		return nil, err
+	}
+	return FindNewReplicaSet(deployment, rsList)
+}
+
+// listReplicaSets lists all RSes the given deployment targets with the given client interface.
+func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]extensions.ReplicaSet, error) {
+	return ListReplicaSets(deployment,
 		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
 			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
 			return rsList.Items, err
 		})
-	if err != nil {
-		return nil, fmt.Errorf("error listing ReplicaSets: %v", err)
-	}
-	return FindNewReplicaSet(deployment, rsList)
+}
+
+// listReplicaSets lists all Pods the given deployment targets with the given client interface.
+func listPods(deployment *extensions.Deployment, c clientset.Interface) (*api.PodList, error) {
+	return ListPods(deployment,
+		func(namespace string, options api.ListOptions) (*api.PodList, error) {
+			return c.Core().Pods(namespace).List(options)
+		})
 }
 
 // TODO: switch this to full namespacers

@@ -1922,12 +1922,9 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
-		oldRSs, _, err := deploymentutil.GetOldReplicaSets(d, dd)
+		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd)
 		if err == nil {
 			fmt.Fprintf(out, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
-		}
-		newRS, err := deploymentutil.GetNewReplicaSet(d, dd)
-		if err == nil {
 			var newRSs []*extensions.ReplicaSet
 			if newRS != nil {
 				newRSs = append(newRSs, newRS)
