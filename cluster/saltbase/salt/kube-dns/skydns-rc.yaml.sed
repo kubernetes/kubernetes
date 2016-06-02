@@ -73,7 +73,7 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube-dns"
-        - --domain=$DNS_DOMAIN}}.
+        - --domain=$DNS_DOMAIN.
         - --dns-port=10053
         ports:
         - containerPort: 10053
@@ -106,7 +106,7 @@ spec:
             cpu: 10m
             memory: 20Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN}} 127.0.0.1 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null
         - -port=8080
         ports:
         - containerPort: 8080
