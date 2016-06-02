@@ -1222,7 +1222,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// Verify that an escaped JSON string of pod affinity and pod anti affinity in a YAML PodSpec works.
-	It("validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work", func() {
+	It("validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work [Feature:PodAffinity]", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
