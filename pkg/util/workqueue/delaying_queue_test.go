@@ -43,7 +43,7 @@ func TestSimpleQueue(t *testing.T) {
 
 	fakeClock.Step(60 * time.Millisecond)
 
-	if err := waitForAdded(q, 1); err != nil {
+	if err := waitForAdded(t, q, 1); err != nil {
 		t.Errorf("should have added")
 	}
 	item, _ := q.Get()
@@ -88,7 +88,7 @@ func TestAddTwoFireEarly(t *testing.T) {
 
 	fakeClock.Step(60 * time.Millisecond)
 
-	if err := waitForAdded(q, 1); err != nil {
+	if err := waitForAdded(t, q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	item, _ := q.Get()
@@ -99,7 +99,7 @@ func TestAddTwoFireEarly(t *testing.T) {
 	q.AddAfter(third, 2*time.Second)
 
 	fakeClock.Step(1 * time.Second)
-	if err := waitForAdded(q, 1); err != nil {
+	if err := waitForAdded(t, q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	item, _ = q.Get()
@@ -108,7 +108,7 @@ func TestAddTwoFireEarly(t *testing.T) {
 	}
 
 	fakeClock.Step(2 * time.Second)
-	if err := waitForAdded(q, 1); err != nil {
+	if err := waitForAdded(t, q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	item, _ = q.Get()
@@ -139,7 +139,7 @@ func TestCopyShifting(t *testing.T) {
 
 	fakeClock.Step(2 * time.Second)
 
-	if err := waitForAdded(q, 3); err != nil {
+	if err := waitForAdded(t, q, 3); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	actualFirst, _ := q.Get()
@@ -156,14 +156,19 @@ func TestCopyShifting(t *testing.T) {
 	}
 }
 
-func waitForAdded(q DelayingInterface, depth int) error {
-	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+func waitForAdded(t *testing.T, q DelayingInterface, depth int) error {
+	err := wait.Poll(1*time.Millisecond, 20*time.Second, func() (done bool, err error) {
 		if q.Len() == depth {
 			return true, nil
 		}
 
 		return false, nil
 	})
+
+	if err != nil {
+		t.Logf("failed: len=%v, everything=%#v", q.Len(), q)
+	}
+	return err
 }
 
 func waitForWaitingQueueToFill(q DelayingInterface) error {
