@@ -627,6 +627,9 @@ runTests() {
   # Post-condition: valid-pod POD is created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
+  ## Patch can modify a local object
+  kubectl patch --local -f pkg/api/validation/testdata/v1/validPod.yaml --patch='{"spec": {"restartPolicy":"Never"}}' -o jsonpath='{.spec.restartPolicy}' | grep -q "Never"
+
   ## Patch pod can change image
   # Command
   kubectl patch "${kube_flags[@]}" pod valid-pod --record -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
