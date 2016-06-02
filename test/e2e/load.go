@@ -82,6 +82,11 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	BeforeEach(func() {
 		c = f.Client
 
+		// In large clusters we may get to this point but still have a bunch
+		// of nodes without Routes created. Since this would make a node
+		// unschedulable, we need to wait until all of them are schedulable.
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c))
+
 		ns = f.Namespace.Name
 		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)

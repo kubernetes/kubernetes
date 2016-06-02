@@ -2596,6 +2596,17 @@ func waitListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
 	return nodes
 }
 
+// Node is schedulable if:
+// 1) doesn't have "unschedulable" field set
+// 2) it's Ready condition is set to true
+// 3) doesn't have NetworkUnavailable condition set to true
+func isNodeSchedulable(node *api.Node) bool {
+	nodeReady := IsNodeConditionSetAsExpected(node, api.NodeReady, true)
+	networkReady := IsNodeConditionUnset(node, api.NodeNetworkUnavailable) ||
+		IsNodeConditionSetAsExpected(node, api.NodeNetworkUnavailable, false)
+	return !node.Spec.Unschedulable && nodeReady && networkReady
+}
+
 // GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
@@ -2605,12 +2616,30 @@ func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	FilterNodes(nodes, func(node api.Node) bool {
-		nodeReady := IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
-		networkReady := IsNodeConditionUnset(&node, api.NodeNetworkUnavailable) ||
-			IsNodeConditionSetAsExpected(&node, api.NodeNetworkUnavailable, false)
-		return !node.Spec.Unschedulable && nodeReady && networkReady
+		return isNodeSchedulable(&node)
 	})
 	return nodes
+}
+
+func WaitForAllNodesSchedulable(c *client.Client) error {
+	return wait.PollImmediate(30*time.Second, 2*time.Hour, func() (bool, error) {
+		opts := api.ListOptions{
+			ResourceVersion: "0",
+			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector(),
+		}
+		nodes, err := c.Nodes().List(opts)
+		if err != nil {
+			Logf("Unexpected error listing nodes: %v", err)
+			// Ignore the error here - it will be retried.
+			return false, nil
+		}
+		for _, node := range nodes.Items {
+			if !isNodeSchedulable(&node) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
