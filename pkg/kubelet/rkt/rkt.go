@@ -17,6 +17,7 @@ limitations under the License.
 package rkt
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -904,12 +905,24 @@ func serviceFilePath(serviceName string) string {
 func (r *Runtime) generateRunCommand(pod *api.Pod, uuid, netnsName string) (string, error) {
 	runPrepared := buildCommand(r.config, "run-prepared").Args
 
+	var hostname string
+	var err error
+
+	osInfos, err := getOSReleaseInfo()
+	if err != nil {
+		glog.Errorf("rkt: Failed to read the os release info: %v", err)
+	}
+
+	// Overlay fs is not supported for SELinux yet on many distros.
+	// See https://github.com/coreos/rkt/issues/1727#issuecomment-173203129.
+	// For now, coreos carries a patch to support it: https://github.com/coreos/coreos-overlay/pull/1703
+	if osInfos["ID"] != "coreos" && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil {
+		runPrepared = append(runPrepared, "--no-overlay=true")
+	}
+
 	// Network namespace set up in kubelet; rkt networking not used
 	runPrepared = append(runPrepared, "--net=host")
 
-	var hostname string
-	var err error
-	// Setup DNS and hostname configuration.
 	if len(netnsName) == 0 {
 		// TODO(yifan): Let runtimeHelper.GeneratePodHostNameAndDomain() to handle this.
 		hostname, err = r.os.Hostname()
@@ -1056,6 +1069,12 @@ func (r *Runtime) preparePod(pod *api.Pod, podIP string, pullSecrets []api.Secre
 		newUnitOption(unitKubernetesSection, unitPodUID, string(pod.UID)),
 		newUnitOption(unitKubernetesSection, unitPodName, pod.Name),
 		newUnitOption(unitKubernetesSection, unitPodNamespace, pod.Namespace),
+	}
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil {
+		opt := pod.Spec.SecurityContext.SELinuxOptions
+		selinuxContext := fmt.Sprintf("%s:%s:%s:%s", opt.User, opt.Role, opt.Type, opt.Level)
+		units = append(units, newUnitOption("Service", "SELinuxContext", selinuxContext))
 	}
 
 	serviceName := makePodServiceFileName(uuid)
@@ -2121,4 +2140,31 @@ func (r *Runtime) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kube
 	}
 
 	return podStatus, nil
+}
+
+// getOSReleaseInfo reads /etc/os-release and returns a map
+// that contains the key value pairs in that file.
+func getOSReleaseInfo() (map[string]string, error) {
+	result := make(map[string]string)
+
+	path := "/etc/os-release"
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		info := strings.SplitN(line, "=", 2)
+		if len(info) != 2 {
+			return nil, fmt.Errorf("unexpected entry in os-release %q", line)
+		}
+		result[info[0]] = info[1]
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
