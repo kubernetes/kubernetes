@@ -578,6 +578,9 @@ func TestDescribeEvents(t *testing.T) {
 	events := &api.EventList{
 		Items: []api.Event{
 			{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "foo",
+				},
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
 				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
