@@ -99,7 +99,7 @@ func newResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTo
 	runServiceAndWorkloadForResourceConsumer(f.Client, f.Namespace.Name, name, kind, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:                     name,
-		controllerName:           name + "-controller",
+		controllerName:           name + "-ctrl",
 		kind:                     kind,
 		framework:                f,
 		cpu:                      make(chan int),
@@ -361,7 +361,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	}
 
 	By(fmt.Sprintf("Running controller"))
-	controllerName := name + "-controller"
+	controllerName := name + "-ctrl"
 	_, err = c.Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: controllerName,
