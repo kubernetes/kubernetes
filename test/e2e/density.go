@@ -158,6 +158,11 @@ var _ = framework.KubeDescribe("Density", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 
+		// In large clusters we may get to this point but still have a bunch
+		// of nodes without Routes created. Since this would make a node
+		// unschedulable, we need to wait until all of them are schedulable.
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c))
+
 		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
