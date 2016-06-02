@@ -246,7 +246,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 			},
 			{
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.15, 0.95: 0.20},
+					stats.SystemContainerKubelet: {0.50: 0.17, 0.95: 0.22},
 					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.09},
 				},
 				podsPerNode: 100,
