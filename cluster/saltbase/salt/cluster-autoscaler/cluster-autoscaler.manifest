@@ -27,12 +27,9 @@
                 "name": "cluster-autoscaler",
                 "image": "gcr.io/google_containers/cluster-autoscaler:v0.1.1",
                 "command": [
-                    "./cluster-autoscaler",
-                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
-                    {% for param in params.split(" ") %}
-                    "{{param}}",
-                    {% endfor %}
-                    "-v=4"
+                    "/bin/sh",
+                    "-c",
+                    "./cluster-autoscaler --kubernetes=http://127.0.0.1:8080?inClusterConfig=f -v=4 {{params}} 1>>/var/log/cluster-autoscaler.log 2>&1"
                 ],
                 "resources": {
                     "limits": {
@@ -50,6 +47,11 @@
                         "name": "ssl-certs",
                         "readOnly": true,
                         "mountPath": "/etc/ssl/certs"
+                    },
+                    {
+                        "name": "logfile",
+                        "mountPath": "/var/log/cluster-autoscaler.log",
+                        "readOnly": false
                     }
                 ],
                 "terminationMessagePath": "/dev/termination-log",
@@ -62,6 +64,12 @@
                 "name": "ssl-certs",
                 "hostPath": {
                     "path": "/etc/ssl/certs"
+                }
+            },
+            {
+                "name": "logfile",
+                "hostPath": {
+                    "path": "/var/log/cluster-autoscaler.log"
                 }
             }
         ],

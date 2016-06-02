@@ -617,15 +617,18 @@ start_kube_scheduler() {
 # Starts k8s cluster autoscaler.
 start_cluster_autoscaler() {
   if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ]; then
+    prepare-log-file /var/log/cluster-autoscaler.log
+
      # Remove salt comments and replace variables with values
     src_file="${kube_home}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove_salt_config_comments "${src_file}"
-    params="$(echo "${AUTOSCALER_MIG_CONFIG}" | sed 's/^/"/;s/ /","/g;s/$/",/')"
+
+    params="${AUTOSCALER_MIG_CONFIG}"
     if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
       params="${params} --cloud-config=/etc/gce.conf"
     fi
 
-    sed -i -e "s@\"{{param}}\",@${params}@g" "${src_file}"
+    sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
     cp "${src_file}" /etc/kubernetes/manifests

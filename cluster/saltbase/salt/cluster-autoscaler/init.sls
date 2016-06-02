@@ -17,3 +17,9 @@
     - require:
       - service: docker
       - service: kubelet
+
+/var/log/cluster-autoscaler.log:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: 644
