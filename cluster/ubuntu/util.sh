@@ -18,7 +18,7 @@
 # must implement to use cluster/kube-*.sh scripts.
 set -e
 
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 MASTER=""
 MASTER_IP=""
