@@ -260,7 +260,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		mod.makeSchedulable(t, schedNode, nodeStore, restClient)
 
 		// Wait until the pod is scheduled.
-		err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
+		err = wait.Poll(time.Second, wait.ForeverTestTimeout*5 /* 2.5 minutes */, podScheduled(restClient, myPod.Namespace, myPod.Name))
 		if err != nil {
 			t.Errorf("Test %d: failed to schedule a pod: %v", i, err)
 		} else {
