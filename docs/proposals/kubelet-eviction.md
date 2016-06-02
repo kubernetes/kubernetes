@@ -369,6 +369,7 @@ The default `minimum-eviction-threshold` is `0` for all resources.
 some of the existing features/flags around disk space retrieval will be deprecated in-favor of this proposal.
 
 | Existing Flag | New Flag | Rationale |
+| ------------- | -------- | --------- |
 | `--image-gc-high-threshold` | `--eviction-hard` or `eviction-soft` | existing eviction signals can capture image garbage collection |
 | `--image-gc-low-threshold` | `--minimum-eviction-thresholds` | eviction thresholds achieve the same behavior |
 | `--maximum-dead-containers` | | deprecated once old logs are stored outside of container's context |
