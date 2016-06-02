@@ -408,8 +408,8 @@ to specify the output format of values of exposed resources. The default value o
 is `1` which means cores for cpu and bytes for memory. For cpu, divisor's valid
 values are `1m` (millicores), `1`(cores), and for memory, the valid values in fixed point integer
 (decimal) are `1`(bytes), `1k`(kilobytes), `1M`(megabytes), `1G`(gigabytes),
-`1T`(terabytes), `1P`(petabytes), `1E`(exabytes), and in their power-of-two equivalents `1Ki(kilobytes)`,
-`1Mi`(megabytes), `1Gi`(gigabytes), `1Ti`(terabytes), `1Pi`(petabytes), `1Ei`(exabytes).
+`1T`(terabytes), `1P`(petabytes), `1E`(exabytes), and in their power-of-two equivalents `1Ki(kibibytes)`,
+`1Mi`(mebibytes), `1Gi`(gibibytes), `1Ti`(tebibytes), `1Pi`(pebibytes), `1Ei`(exbibytes).
 For more information about these resource formats, [see details](resources.md).
 
 Also, the exposed values will be `ceiling` of the actual values in the requestd format in divisor.
