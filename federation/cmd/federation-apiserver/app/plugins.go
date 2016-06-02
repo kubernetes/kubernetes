@@ -25,16 +25,5 @@ import (
 
 	// Admission policies
 	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/exec"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/initialresources"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/limitranger"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 )
