@@ -82,7 +82,7 @@ func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc 
 		}
 
 		// Here and below we need to switch on implementation types,
-		// no on interfaces, as some interfaces are identical
+		// not on interfaces, as some interfaces are identical
 		// (e.g. UpdateAction and CreateAction), so if we use them,
 		// updates and creates end up matching the same case branch.
 		switch action := action.(type) {
