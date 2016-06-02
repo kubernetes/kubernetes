@@ -2863,11 +2863,7 @@ func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		if err != nil {
 			return false, err
 		}
-		oldRSs, allOldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c)
-		if err != nil {
-			return false, err
-		}
-		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
+		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c)
 		if err != nil {
 			return false, err
 		}
