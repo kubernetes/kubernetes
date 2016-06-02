@@ -31,8 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	adapter_1_2 "k8s.io/kubernetes/pkg/client/unversioned/adapters/release_1_2"
-	adapter_1_3 "k8s.io/kubernetes/pkg/client/unversioned/adapters/release_1_3"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -130,7 +128,6 @@ func (f *Framework) BeforeEach() {
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
-
 	if f.Client == nil {
 		By("Creating a kubernetes client")
 		config, err := LoadConfig()
@@ -143,10 +140,11 @@ func (f *Framework) BeforeEach() {
 		c, err := loadClientFromConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.Client = c
+		f.Clientset_1_2, err = release_1_2.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		f.Clientset_1_3, err = release_1_3.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
 	}
-
-	f.Clientset_1_2 = adapter_1_2.FromUnversionedClient(f.Client)
-	f.Clientset_1_3 = adapter_1_3.FromUnversionedClient(f.Client)
 
 	if f.federated && f.FederationClient == nil {
 		By("Creating a federated kubernetes client")
