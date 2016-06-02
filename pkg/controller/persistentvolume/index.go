@@ -26,7 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-// persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes indexed by AccessModes and ordered by storage capacity.
+// persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
+// indexed by AccessModes and ordered by storage capacity.
 type persistentVolumeOrderedIndex struct {
 	store cache.Indexer
 }
@@ -35,7 +36,8 @@ func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
 	return persistentVolumeOrderedIndex{cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc})}
 }
 
-// accessModesIndexFunc is an indexing function that returns a persistent volume's AccessModes as a string
+// accessModesIndexFunc is an indexing function that returns a persistent
+// volume's AccessModes as a string
 func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*api.PersistentVolume); ok {
 		modes := api.GetAccessModesAsString(pv.Spec.AccessModes)
@@ -44,7 +46,8 @@ func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
 }
 
-// listByAccessModes returns all volumes with the given set of AccessModeTypes. The list is unsorted!
+// listByAccessModes returns all volumes with the given set of
+// AccessModeTypes. The list is unsorted!
 func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.PersistentVolumeAccessMode) ([]*api.PersistentVolume, error) {
 	pv := &api.PersistentVolume{
 		Spec: api.PersistentVolumeSpec{
@@ -70,14 +73,19 @@ type matchPredicate func(compareThis, toThis *api.PersistentVolume) bool
 
 // find returns the nearest PV from the ordered list or nil if a match is not found
 func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVolumeClaim, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
-	// PVs are indexed by their access modes to allow easier searching.  Each index is the string representation of a set of access modes.
-	// There is a finite number of possible sets and PVs will only be indexed in one of them (whichever index matches the PV's modes).
+	// PVs are indexed by their access modes to allow easier searching.  Each
+	// index is the string representation of a set of access modes. There is a
+	// finite number of possible sets and PVs will only be indexed in one of
+	// them (whichever index matches the PV's modes).
 	//
-	// A request for resources will always specify its desired access modes.  Any matching PV must have at least that number
-	// of access modes, but it can have more.  For example, a user asks for ReadWriteOnce but a GCEPD is available, which is ReadWriteOnce+ReadOnlyMany.
+	// A request for resources will always specify its desired access modes.
+	// Any matching PV must have at least that number of access modes, but it
+	// can have more.  For example, a user asks for ReadWriteOnce but a GCEPD
+	// is available, which is ReadWriteOnce+ReadOnlyMany.
 	//
-	// Searches are performed against a set of access modes, so we can attempt not only the exact matching modes but also
-	// potential matches (the GCEPD example above).
+	// Searches are performed against a set of access modes, so we can attempt
+	// not only the exact matching modes but also potential matches (the GCEPD
+	// example above).
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
 	var smallestVolume *api.PersistentVolume
@@ -167,19 +175,23 @@ func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 	return aSize <= bSize
 }
 
-// allPossibleMatchingAccessModes returns an array of AccessMode arrays that can satisfy a user's requested modes.
+// allPossibleMatchingAccessModes returns an array of AccessMode arrays that
+// can satisfy a user's requested modes.
 //
 // see comments in the Find func above regarding indexing.
 //
-// allPossibleMatchingAccessModes gets all stringified accessmodes from the index and returns all those that
-// contain at least all of the requested mode.
+// allPossibleMatchingAccessModes gets all stringified accessmodes from the
+// index and returns all those that contain at least all of the requested
+// mode.
 //
-// For example, assume the index contains 2 types of PVs where the stringified accessmodes are:
+// For example, assume the index contains 2 types of PVs where the stringified
+// accessmodes are:
 //
 // "RWO,ROX" -- some number of GCEPDs
 // "RWO,ROX,RWX" -- some number of NFS volumes
 //
-// A request for RWO could be satisfied by both sets of indexed volumes, so allPossibleMatchingAccessModes returns:
+// A request for RWO could be satisfied by both sets of indexed volumes, so
+// allPossibleMatchingAccessModes returns:
 //
 // [][]api.PersistentVolumeAccessMode {
 //      []api.PersistentVolumeAccessMode {
@@ -190,7 +202,8 @@ func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 //		},
 // }
 //
-// A request for RWX can be satisfied by only one set of indexed volumes, so the return is:
+// A request for RWX can be satisfied by only one set of indexed volumes, so
+// the return is:
 //
 // [][]api.PersistentVolumeAccessMode {
 //      []api.PersistentVolumeAccessMode {
@@ -198,8 +211,8 @@ func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 //		},
 // }
 //
-// This func returns modes with ascending levels of modes to give the user what is closest to what they actually asked for.
-//
+// This func returns modes with ascending levels of modes to give the user
+// what is closest to what they actually asked for.
 func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requestedModes []api.PersistentVolumeAccessMode) [][]api.PersistentVolumeAccessMode {
 	matchedModes := [][]api.PersistentVolumeAccessMode{}
 	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
@@ -210,8 +223,9 @@ func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requ
 		}
 	}
 
-	// sort by the number of modes in each array with the fewest number of modes coming first.
-	// this allows searching for volumes by the minimum number of modes required of the possible matches.
+	// sort by the number of modes in each array with the fewest number of
+	// modes coming first. this allows searching for volumes by the minimum
+	// number of modes required of the possible matches.
 	sort.Sort(byAccessModes{matchedModes})
 	return matchedModes
 }
