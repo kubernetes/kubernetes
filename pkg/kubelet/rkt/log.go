@@ -118,7 +118,9 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 		return err
 	}
 
-	cmd := exec.Command("journalctl", "-m", fmt.Sprintf("_MACHINE_ID=%s", strings.Replace(id.uuid, "-", "", -1)), "-u", id.appName, "-a")
+	// Note: this only works for rkt versions after 1.6.0
+	// See https://github.com/coreos/rkt/issues/2630
+	cmd := exec.Command("journalctl", "-m", fmt.Sprintf("_MACHINE_ID=%s", strings.Replace(id.uuid, "-", "", -1)), "-t", id.appName, "-a")
 	// Get the json structured logs.
 	cmd.Args = append(cmd.Args, "-o", "json")
 
