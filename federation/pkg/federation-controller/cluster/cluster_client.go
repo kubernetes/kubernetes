@@ -48,19 +48,6 @@ const (
 // We dont use the standard one which calls NewInCluster in tests to avoid having to setup service accounts and mount files with secret tokens.
 var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.KubeconfigGetter {
 	return func() (*clientcmdapi.Config, error) {
-		secretRefName := ""
-		if c.Spec.SecretRef != nil {
-			secretRefName = c.Spec.SecretRef.Name
-		} else {
-			glog.Infof("didnt find secretRef for cluster %s. Trying insecure access", c.Name)
-		}
-		return KubeconfigGetterForSecret(secretRefName)()
-	}
-}
-
-// KubeconfigGettterForSecret is used to get the kubeconfig from the given secret.
-var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGetter {
-	return func() (*clientcmdapi.Config, error) {
 		// Get the namespace this is running in from the env variable.
 		namespace := os.Getenv("POD_NAMESPACE")
 		if namespace == "" {
@@ -71,17 +58,14 @@ var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGett
 		if err != nil {
 			return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
 		}
-		data := []byte{}
-		if secretName != "" {
-			secret, err := client.Secrets(namespace).Get(secretName)
-			if err != nil {
-				return nil, fmt.Errorf("error in fetching secret: %s", err)
-			}
-			ok := false
-			data, ok = secret.Data[KubeconfigSecretDataKey]
-			if !ok {
-				return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
-			}
+		secret, err := client.Secrets(namespace).Get(c.Spec.SecretRef.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error in fetching secret: %s", err)
+		}
+		ok := false
+		data, ok := secret.Data[KubeconfigSecretDataKey]
+		if !ok {
+			return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
 		}
 		return clientcmd.Load(data)
 	}
@@ -93,7 +77,27 @@ type ClusterClient struct {
 }
 
 func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error) {
+	clusterConfig, err := BuildClusterConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	var clusterClientSet = ClusterClient{}
+	if clusterConfig != nil {
+		clusterClientSet.discoveryClient = discovery.NewDiscoveryClientForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
+		if clusterClientSet.discoveryClient == nil {
+			return nil, nil
+		}
+		clusterClientSet.kubeClient = clientset.NewForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
+		if clusterClientSet.kubeClient == nil {
+			return nil, nil
+		}
+	}
+	return &clusterClientSet, err
+}
+
+func BuildClusterConfig(c *federation_v1alpha1.Cluster) (*restclient.Config, error) {
 	var serverAddress string
+	var clusterConfig *restclient.Config
 	hostIP, err := utilnet.ChooseHostInterface()
 	if err != nil {
 		return nil, err
@@ -110,25 +114,21 @@ func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error)
 			break
 		}
 	}
-	var clusterClientSet = ClusterClient{}
 	if serverAddress != "" {
-		kubeconfigGetter := KubeconfigGetterForCluster(c)
-		clusterConfig, err := clientcmd.BuildConfigFromKubeconfigGetter(serverAddress, kubeconfigGetter)
+		if c.Spec.SecretRef == nil {
+			glog.Infof("didnt find secretRef for cluster %s. Trying insecure access", c.Name)
+			clusterConfig, err = clientcmd.BuildConfigFromFlags(serverAddress, "")
+		} else {
+			kubeconfigGetter := KubeconfigGetterForCluster(c)
+			clusterConfig, err = clientcmd.BuildConfigFromKubeconfigGetter(serverAddress, kubeconfigGetter)
+		}
 		if err != nil {
 			return nil, err
 		}
 		clusterConfig.QPS = KubeAPIQPS
 		clusterConfig.Burst = KubeAPIBurst
-		clusterClientSet.discoveryClient = discovery.NewDiscoveryClientForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
-		if clusterClientSet.discoveryClient == nil {
-			return nil, nil
-		}
-		clusterClientSet.kubeClient = clientset.NewForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
-		if clusterClientSet.kubeClient == nil {
-			return nil, nil
-		}
 	}
-	return &clusterClientSet, err
+	return clusterConfig, nil
 }
 
 // GetClusterHealthStatus gets the kubernetes cluster health status by requesting "/healthz"
