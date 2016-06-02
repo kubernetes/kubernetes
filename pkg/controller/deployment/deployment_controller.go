@@ -331,7 +331,7 @@ func (dc *DeploymentController) updatePod(old, cur interface{}) {
 	}
 	curPod := cur.(*api.Pod)
 	oldPod := old.(*api.Pod)
-	glog.V(4).Infof("Pod %s updated %+v -> %+v.", curPod.Name, oldPod, curPod)
+	glog.V(4).Infof("Pod %s updated %#v -> %#v.", curPod.Name, oldPod, curPod)
 	if d := dc.getDeploymentForPod(curPod); d != nil {
 		dc.enqueueDeployment(d)
 	}
@@ -1059,7 +1059,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*extensions.Rep
 	if err != nil {
 		return false, nil
 	}
-	glog.V(4).Infof("Scaled down old RSes by %d", scaledDownCount)
+	glog.V(4).Infof("Scaled down old RSes of deployment %s by %d", deployment.Name, scaledDownCount)
 
 	totalScaledDown := cleanupCount + scaledDownCount
 	return totalScaledDown > 0, nil
@@ -1116,19 +1116,20 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs [
 	minAvailable := deployment.Spec.Replicas - maxUnavailable
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	// Find the number of ready pods.
-	readyPodCount, err := deploymentutil.GetAvailablePodsForReplicaSets(dc.client, allRSs, minReadySeconds)
+	availablePodCount, err := deploymentutil.GetAvailablePodsForReplicaSets(dc.client, allRSs, minReadySeconds)
 	if err != nil {
 		return 0, fmt.Errorf("could not find available pods: %v", err)
 	}
-	if readyPodCount <= minAvailable {
+	if availablePodCount <= minAvailable {
 		// Cannot scale down.
 		return 0, nil
 	}
+	glog.V(4).Infof("Found %d available pods in deployment %s, scaling down old RSes", availablePodCount, deployment.Name)
 
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(oldRSs))
 
 	totalScaledDown := int32(0)
-	totalScaleDownCount := readyPodCount - minAvailable
+	totalScaleDownCount := availablePodCount - minAvailable
 	for _, targetRS := range oldRSs {
 		if totalScaledDown >= totalScaleDownCount {
 			// No further scaling required.
@@ -1221,6 +1222,9 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 		UnavailableReplicas: unavailableReplicas,
 	}
 	_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
+	if err == nil {
+		glog.V(4).Infof("Updated deployment %s status: %+v", deployment.Name, newDeployment.Status)
+	}
 	return err
 }
 

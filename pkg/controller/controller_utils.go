@@ -175,7 +175,7 @@ func (exp *ControlleeExpectations) isExpired() bool {
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
 	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: util.RealClock{}.Now()}
-	glog.V(4).Infof("Setting expectations %+v", exp)
+	glog.V(4).Infof("Setting expectations %#v", exp)
 	return r.Add(exp)
 }
 
