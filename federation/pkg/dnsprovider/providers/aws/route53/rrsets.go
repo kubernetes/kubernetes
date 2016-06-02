@@ -115,6 +115,7 @@ func getChangeResourceRecordSetsInput(action, name, type_, hostedZoneId string, 
 		},
 		HostedZoneId: aws.String(hostedZoneId), // Required
 	}
+	return input
 }
 
 func (rrsets ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) dnsprovider.ResourceRecordSet {
