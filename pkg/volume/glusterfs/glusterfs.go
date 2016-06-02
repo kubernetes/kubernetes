@@ -240,7 +240,12 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	if err := os.MkdirAll(p, 0750); err != nil {
 		return fmt.Errorf("glusterfs: mkdir failed: %v", err)
 	}
-	log := path.Join(p, "glusterfs.log")
+
+	// adding log-level ERROR to remove noise
+	// and more specific log path so each pod has
+	// it's own log based on PV + Pod
+	log := path.Join(p, b.pod.Name+"-glusterfs.log")
+	options = append(options, "log-level=ERROR")
 	options = append(options, "log-file="+log)
 
 	addr := make(map[string]struct{})
@@ -255,8 +260,18 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	for hostIP := range addr {
 		errs = b.mounter.Mount(hostIP+":"+b.path, dir, "glusterfs", options)
 		if errs == nil {
+			glog.Infof("glusterfs: successfully mounted %s", dir)
 			return nil
 		}
+	}
+
+	// Failed mount scenario.
+	// Since gluster does not return eror text
+	// it all goes in a log file, we will read the log file
+	logerror := readGlusterLog(log, b.pod.Name)
+	if logerror != nil {
+		// return fmt.Errorf("glusterfs: mount failed: %v", logerror)
+		return fmt.Errorf("glusterfs: mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logerror)
 	}
 	return fmt.Errorf("glusterfs: mount failed: %v", errs)
 }
