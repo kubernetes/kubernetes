@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
@@ -593,4 +596,158 @@ func equal(rss1, rss2 []*extensions.ReplicaSet) bool {
 		}
 	}
 	return count == len(rss1)
+}
+
+func TestGetReplicaCountForReplicaSets(t *testing.T) {
+	rs1 := generateRS(generateDeployment("foo"))
+	rs1.Spec.Replicas = 1
+	rs1.Status.Replicas = 2
+	rs2 := generateRS(generateDeployment("bar"))
+	rs2.Spec.Replicas = 2
+	rs2.Status.Replicas = 3
+
+	tests := []struct {
+		test           string
+		sets           []*extensions.ReplicaSet
+		expectedCount  int32
+		expectedActual int32
+	}{
+		{
+			"1:2 Replicas",
+			[]*extensions.ReplicaSet{&rs1},
+			1,
+			2,
+		},
+		{
+			"3:5 Replicas",
+			[]*extensions.ReplicaSet{&rs1, &rs2},
+			3,
+			5,
+		},
+	}
+
+	for _, test := range tests {
+		rs := GetReplicaCountForReplicaSets(test.sets)
+		if rs != test.expectedCount {
+			t.Errorf("In test case %s, expectedCount %+v, got %+v", test.test, test.expectedCount, rs)
+		}
+		rs = GetActualReplicaCountForReplicaSets(test.sets)
+		if rs != test.expectedActual {
+			t.Errorf("In test case %s, expectedActual %+v, got %+v", test.test, test.expectedActual, rs)
+		}
+	}
+}
+
+func TestResolveFenceposts(t *testing.T) {
+
+	tests := []struct {
+		maxSurge          string
+		maxUnavailable    string
+		desired           int32
+		expectSurge       int32
+		expectUnavailable int32
+		expectError       string
+	}{
+		{
+			maxSurge:          "0%",
+			maxUnavailable:    "0%",
+			desired:           0,
+			expectSurge:       0,
+			expectUnavailable: 1,
+			expectError:       "",
+		},
+		{
+			maxSurge:          "39%",
+			maxUnavailable:    "39%",
+			desired:           10,
+			expectSurge:       4,
+			expectUnavailable: 3,
+			expectError:       "",
+		},
+		{
+			maxSurge:          "oops",
+			maxUnavailable:    "39%",
+			desired:           10,
+			expectSurge:       0,
+			expectUnavailable: 0,
+			expectError:       "invalid value for IntOrString: invalid value \"oops\": strconv.ParseInt: parsing \"oops\": invalid syntax",
+		},
+		{
+			maxSurge:          "55%",
+			maxUnavailable:    "urg",
+			desired:           10,
+			expectSurge:       0,
+			expectUnavailable: 0,
+			expectError:       "invalid value for IntOrString: invalid value \"urg\": strconv.ParseInt: parsing \"urg\": invalid syntax",
+		},
+	}
+
+	for num, test := range tests {
+		maxSurge := intstr.FromString(test.maxSurge)
+		maxUnavail := intstr.FromString(test.maxUnavailable)
+		surge, unavail, err := ResolveFenceposts(&maxSurge, &maxUnavail, test.desired)
+		if err != nil {
+			if test.expectError == "" {
+				t.Errorf("unexpected error %v", err)
+			} else {
+				assert := assert.New(t)
+				assert.EqualError(err, test.expectError)
+			}
+		}
+		if err == nil && test.expectError != "" {
+			t.Errorf("missing error %v", test.expectError)
+		}
+		if surge != test.expectSurge || unavail != test.expectUnavailable {
+			t.Errorf("#%v got %v:%v, want %v:%v", num, surge, unavail, test.expectSurge, test.expectUnavailable)
+		}
+	}
+}
+
+func TestNewRSNewReplicas(t *testing.T) {
+
+	tests := []struct {
+		test          string
+		strategyType  extensions.DeploymentStrategyType
+		depReplicas   int32
+		newRSReplicas int32
+		maxSurge      int
+		expected      int32
+	}{
+		{
+			"can not scale up - to newRSReplicas",
+			extensions.RollingUpdateDeploymentStrategyType,
+			1, 5, 1, 5,
+		},
+		{
+			"scale up - to depDeplicas",
+			extensions.RollingUpdateDeploymentStrategyType,
+			6, 2, 10, 6,
+		},
+		{
+			"recreate - to depDeplicas",
+			extensions.RecreateDeploymentStrategyType,
+			3, 1, 1, 3,
+		},
+	}
+	newDeployment := generateDeployment("nginx")
+	newRC := generateRS(newDeployment)
+	rs5 := generateRS(newDeployment)
+	rs5.Spec.Replicas = 5
+
+	for _, test := range tests {
+		newDeployment.Spec.Replicas = test.depReplicas
+		newDeployment.Spec.Strategy = extensions.DeploymentStrategy{Type: test.strategyType}
+		newDeployment.Spec.Strategy.RollingUpdate = &extensions.RollingUpdateDeployment{
+			MaxUnavailable: intstr.FromInt(1),
+			MaxSurge:       intstr.FromInt(test.maxSurge),
+		}
+		newRC.Spec.Replicas = test.newRSReplicas
+		rs, err := NewRSNewReplicas(&newDeployment, []*extensions.ReplicaSet{&rs5}, &newRC)
+		if err != nil {
+			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
+		}
+		if rs != test.expected {
+			t.Errorf("In test case %s, expected %+v, got %+v", test.test, test.expected, rs)
+		}
+	}
 }
