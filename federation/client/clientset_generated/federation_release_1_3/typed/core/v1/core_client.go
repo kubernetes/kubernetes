@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 type CoreInterface interface {
@@ -80,7 +81,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.NegotiatedSerializer = api.Codecs
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	if config.QPS == 0 {
 		config.QPS = 5
