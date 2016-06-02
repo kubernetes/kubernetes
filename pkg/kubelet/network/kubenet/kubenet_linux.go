@@ -77,20 +77,23 @@ type kubenetNetworkPlugin struct {
 	hairpinMode     componentconfig.HairpinMode
 	hostPortMap     map[hostport]closeable
 	iptables        utiliptables.Interface
+	// vendorDir is passed by kubelet network-plugin-dir parameter.
+	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
+	vendorDir string
 }
 
-func NewPlugin() network.NetworkPlugin {
+func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	protocol := utiliptables.ProtocolIpv4
 	execer := utilexec.New()
 	dbus := utildbus.New()
 	iptInterface := utiliptables.New(execer, dbus, protocol)
-
 	return &kubenetNetworkPlugin{
 		podIPs:      make(map[kubecontainer.ContainerID]string),
 		hostPortMap: make(map[hostport]closeable),
 		MTU:         1460, //TODO: don't hardcode this
 		execer:      utilexec.New(),
 		iptables:    iptInterface,
+		vendorDir:   networkPluginDir,
 	}
 }
 
@@ -98,7 +101,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 	plugin.host = host
 	plugin.hairpinMode = hairpinMode
 	plugin.cniConfig = &libcni.CNIConfig{
-		Path: []string{DefaultCNIDir},
+		Path: []string{DefaultCNIDir, plugin.vendorDir},
 	}
 
 	if link, err := findMinMTU(); err == nil {
