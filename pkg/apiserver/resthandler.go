@@ -38,8 +38,8 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
-	"github.com/emicklei/go-restful"
-	"github.com/evanphx/json-patch"
+	restful "github.com/emicklei/go-restful"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 )
 
@@ -787,7 +787,15 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			var currentObject runtime.Object
+			if getter, ok := r.(rest.Getter); ok {
+				currentObject, err = getter.Get(ctx, name)
+				if err != nil {
+					scope.err(fmt.Errorf("failed to get current object: %s", err), res.ResponseWriter, req.Request)
+				}
+			}
+
+			err = admit.Admit(admission.NewAttributesRecord(nil, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
 				scope.err(err, res.ResponseWriter, req.Request)
 				return
