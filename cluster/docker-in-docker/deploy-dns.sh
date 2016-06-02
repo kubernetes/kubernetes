@@ -33,7 +33,6 @@ for f in skydns-rc.yaml skydns-svc.yaml; do
 $(<"${KUBE_ROOT}/cluster/saltbase/salt/kube-dns/${f}.sed")
 EOF
 " 2>/dev/null >"${workspace}/$f"
-	cat "${workspace}/$f"
 done
 
 # Use kubectl to create skydns rc and service
