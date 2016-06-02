@@ -307,16 +307,25 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
 	}
 
-	// Binary search the smallest index at which resourceVersion is greater than the given one.
+	first := w.sortAndFindNextResource(size, resourceVersion)
+	return w.getEventsSince(size, first), nil
+}
+
+// findNextResource binary-searches the smallest index at which resourceVersion is greater than the given one.
+func (w *watchCache) sortAndFindNextResource(size int, resourceVersion uint64) int {
+	sort.Sort(watchCacheElementSlice(w.cache))
 	f := func(i int) bool {
 		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion > resourceVersion
 	}
-	first := sort.Search(size, f)
-	result := make([]watchCacheEvent, size-first)
+	return sort.Search(size, f)
+}
+
+func (w *watchCache) getEventsSince(size, first int) []watchCacheEvent {
+	rs := make([]watchCacheEvent, size-first)
 	for i := 0; i < size-first; i++ {
-		result[i] = w.cache[(w.startIndex+first+i)%w.capacity].watchCacheEvent
+		rs[i] = w.cache[(w.startIndex+first+i)%w.capacity].watchCacheEvent
 	}
-	return result, nil
+	return rs
 }
 
 func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]watchCacheEvent, error) {
@@ -328,4 +337,15 @@ func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]watchCacheEven
 func (w *watchCache) Resync() error {
 	// Nothing to do
 	return nil
+}
+
+type watchCacheElementSlice []watchCacheElement
+
+func (w watchCacheElementSlice) Len() int { return len(w) }
+func (w watchCacheElementSlice) Less(i, j int) bool {
+	// ascending order of resourceVersion
+	return w[i].resourceVersion < w[j].resourceVersion
+}
+func (w watchCacheElementSlice) Swap(i, j int) {
+	w[i], w[j] = w[j], w[i]
 }
