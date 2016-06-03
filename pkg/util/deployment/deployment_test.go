@@ -168,6 +168,9 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 			Replicas: 1,
 			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: labels,
+				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -384,6 +387,190 @@ func TestGetOldRCs(t *testing.T) {
 			for _, rs := range rss {
 				t.Errorf("rs = %+v", rs)
 			}
+		}
+	}
+}
+
+func generatePodTemplateSpec(name, nodeName string, annotations, labels map[string]string) api.PodTemplateSpec {
+	return api.PodTemplateSpec{
+		ObjectMeta: api.ObjectMeta{
+			Name:        name,
+			Annotations: annotations,
+			Labels:      labels,
+		},
+		Spec: api.PodSpec{
+			NodeName: nodeName,
+		},
+	}
+}
+
+func TestEqualIgnoreHash(t *testing.T) {
+	tests := []struct {
+		test           string
+		former, latter api.PodTemplateSpec
+		expected       bool
+	}{
+		{
+			"Same spec, same labels",
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			true,
+		},
+		{
+			"Same spec, only pod-template-hash label value is different",
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-2", "something": "else"}),
+			true,
+		},
+		{
+			"Same spec, the former doesn't have pod-template-hash label",
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{"something": "else"}),
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-2", "something": "else"}),
+			true,
+		},
+		{
+			"Same spec, the label is different, and the pod-template-hash label value is the same",
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1"}),
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			false,
+		},
+		{
+			"Different spec, same labels",
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{"former": "value"}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{"latter": "value"}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			false,
+		},
+		{
+			"Different spec, different pod-template-hash label value",
+			generatePodTemplateSpec("foo-1", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			generatePodTemplateSpec("foo-2", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-2", "something": "else"}),
+			false,
+		},
+		{
+			"Different spec, the former doesn't have pod-template-hash label",
+			generatePodTemplateSpec("foo-1", "foo-node-1", map[string]string{}, map[string]string{"something": "else"}),
+			generatePodTemplateSpec("foo-2", "foo-node-2", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-2", "something": "else"}),
+			false,
+		},
+		{
+			"Different spec, different labels",
+			generatePodTemplateSpec("foo", "foo-node-1", map[string]string{}, map[string]string{"something": "else"}),
+			generatePodTemplateSpec("foo", "foo-node-2", map[string]string{}, map[string]string{"nothing": "else"}),
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		equal, err := equalIgnoreHash(test.former, test.latter)
+		if err != nil {
+			t.Errorf("In test case %q, returned unexpected error %v", test.test, err)
+		}
+		if equal != test.expected {
+			t.Errorf("In test case %q, expected %v", test.test, test.expected)
+		}
+		equal, err = equalIgnoreHash(test.latter, test.former)
+		if err != nil {
+			t.Errorf("In test case %q (reverse order), returned unexpected error %v", test.test, err)
+		}
+		if equal != test.expected {
+			t.Errorf("In test case %q (reverse order), expected %v", test.test, test.expected)
+		}
+	}
+}
+
+func TestFindNewReplicaSet(t *testing.T) {
+	deployment := generateDeployment("nginx")
+	newRS := generateRS(deployment)
+	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	oldDeployment := generateDeployment("nginx")
+	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
+	oldRS := generateRS(oldDeployment)
+	oldRS.Status.FullyLabeledReplicas = oldRS.Spec.Replicas
+
+	tests := []struct {
+		test       string
+		deployment extensions.Deployment
+		rsList     []extensions.ReplicaSet
+		expected   *extensions.ReplicaSet
+	}{
+		{
+			test:       "Get new ReplicaSet with the same spec but different pod-template-hash value",
+			deployment: deployment,
+			rsList:     []extensions.ReplicaSet{newRS, oldRS},
+			expected:   &newRS,
+		},
+		{
+			test:       "Get nil new ReplicaSet",
+			deployment: deployment,
+			rsList:     []extensions.ReplicaSet{oldRS},
+			expected:   nil,
+		},
+	}
+
+	for _, test := range tests {
+		if rs, err := FindNewReplicaSet(&test.deployment, test.rsList); !reflect.DeepEqual(rs, test.expected) || err != nil {
+			t.Errorf("In test case %q, expected %#v, got %#v: %v", test.test, test.expected, rs, err)
+		}
+	}
+}
+
+func TestFindOldReplicaSets(t *testing.T) {
+	deployment := generateDeployment("nginx")
+	newRS := generateRS(deployment)
+	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	oldDeployment := generateDeployment("nginx")
+	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
+	oldRS := generateRS(oldDeployment)
+	oldRS.Status.FullyLabeledReplicas = oldRS.Spec.Replicas
+	newPod := generatePodFromRS(newRS)
+	oldPod := generatePodFromRS(oldRS)
+
+	tests := []struct {
+		test       string
+		deployment extensions.Deployment
+		rsList     []extensions.ReplicaSet
+		podList    *api.PodList
+		expected   []*extensions.ReplicaSet
+	}{
+		{
+			test:       "Get old ReplicaSets",
+			deployment: deployment,
+			rsList:     []extensions.ReplicaSet{newRS, oldRS},
+			podList: &api.PodList{
+				Items: []api.Pod{
+					newPod,
+					oldPod,
+				},
+			},
+			expected: []*extensions.ReplicaSet{&oldRS},
+		},
+		{
+			test:       "Get old ReplicaSets with no new ReplicaSet",
+			deployment: deployment,
+			rsList:     []extensions.ReplicaSet{oldRS},
+			podList: &api.PodList{
+				Items: []api.Pod{
+					oldPod,
+				},
+			},
+			expected: []*extensions.ReplicaSet{&oldRS},
+		},
+		{
+			test:       "Get empty old ReplicaSets",
+			deployment: deployment,
+			rsList:     []extensions.ReplicaSet{newRS},
+			podList: &api.PodList{
+				Items: []api.Pod{
+					newPod,
+				},
+			},
+			expected: []*extensions.ReplicaSet{},
+		},
+	}
+
+	for _, test := range tests {
+		if old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList); !reflect.DeepEqual(old, test.expected) || err != nil {
+			t.Errorf("In test case %q, expected %#v, got %#v: %v", test.test, test.expected, old, err)
 		}
 	}
 }

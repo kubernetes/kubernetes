@@ -62,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -2873,6 +2874,12 @@ func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			return false, nil
 		}
 		allRSs = append(oldRSs, newRS)
+		// The old/new ReplicaSets need to contain the pod-template-hash label
+		for i := range allRSs {
+			if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+				return false, nil
+			}
+		}
 		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 		totalAvailable, err := deploymentutil.GetAvailablePodsForReplicaSets(c, allRSs, minReadySeconds)
 		if err != nil {
@@ -2958,8 +2965,9 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		if err != nil {
 			return false, err
 		}
+		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
 		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
-		if err != nil || newRS == nil {
+		if err != nil || newRS == nil || !labelsutil.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 			return false, err
 		}
 		// Check revision of this deployment, and of the new replica set of this deployment
