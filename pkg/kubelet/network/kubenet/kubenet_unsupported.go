@@ -30,7 +30,7 @@ type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 }
 
-func NewPlugin() network.NetworkPlugin {
+func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	return &kubenetNetworkPlugin{}
 }
 
