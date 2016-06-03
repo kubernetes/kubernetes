@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+DBG_MAKEFILE ?=
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** starting makefile for goal(s) "$(MAKECMDGOALS)")
+    $(warning ***** $(shell date))
+endif
+
 # It's necessary to set this because some docker images don't make sh -> bash.
 SHELL := /bin/bash
 
@@ -31,7 +37,9 @@ OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
 PRJ_SRC_PATH := k8s.io/kubernetes
 GENERATED_FILE_PREFIX := zz_generated.
-MAKE_METAFILE_PREFIX := .make.
+
+# Metadata for driving the build lives here.
+META_DIR := .make
 
 GOFLAGS ?=
 KUBE_GOFLAGS = $(GOFLAGS)
@@ -165,7 +173,7 @@ clean: clean_generated clean_meta
 # Example:
 #   make clean_meta
 clean_meta:
-	find . -type f -name $(MAKE_METAFILE_PREFIX)\* | xargs rm -f
+	rm -rf $(META_DIR)
 .PHONE: clean_meta
 
 # Remove all auto-generated artifacts.
@@ -221,6 +229,9 @@ cross:
 # This variable holds a list of every directory that contains Go files in this
 # project.  Other rules and variables can use this as a starting point to
 # reduce filesystem accesses.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all *.go dirs)
+endif
 ALL_GO_DIRS := $(shell             \
     find .                         \
         -not \(                    \
@@ -237,21 +248,24 @@ ALL_GO_DIRS := $(shell             \
 )
 
 # The name of the make metadata file listing Go files.
-GOFILES_METAFILE := $(MAKE_METAFILE_PREFIX)gofiles
+GOFILES_META := gofiles.mk
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
 # changes (files added or removed) the deps file will be considered stale.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
+# dependency management logic.
 #
 # This is looser than we really need (e.g. we don't really care about non *.go
 # files or even *_test.go files), but this is much easier to represent.
 #
 # Because we 'sinclude' the deps file, it is considered for rebuilding, as part
-# of make's normal evaluation.
+# of make's normal evaluation.  If it gets rebuilt, make will restart.
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(ALL_GO_DIRS), $(eval   \
-    $(dir)/$(GOFILES_METAFILE): $(dir)  \
+$(foreach dir, $(ALL_GO_DIRS), $(eval           \
+    $(META_DIR)/$(dir)/$(GOFILES_META): $(dir)  \
 ))
 
 # How to rebuild a deps file.  When make determines that the deps file is stale
@@ -259,18 +273,30 @@ $(foreach dir, $(ALL_GO_DIRS), $(eval   \
 #
 # This is looser than we really need (e.g. we don't really care about test
 # files), but this is MUCH faster than calling `go list`.
-$(foreach dir, $(ALL_GO_DIRS), $(dir)/$(GOFILES_METAFILE)):
-	@FILES=$$(ls $(@D)/*.go | grep -v $(GENERATED_FILE_PREFIX)); \
-	echo "gofiles__$(@D) := $$(echo $${FILES})" >$@
+#
+# We regenerate the output file in order to satisfy make's "newer than" rules,
+# but we only need to rebuild targets if the contents actually changed.  That
+# is what the .stamp file represents.
+$(foreach dir, $(ALL_GO_DIRS), $(META_DIR)/$(dir)/$(GOFILES_META)):
+	@FILES=$$(ls $</*.go | grep -v $(GENERATED_FILE_PREFIX)); \
+	mkdir -p $(@D);                                           \
+	echo "gofiles__$< := $$(echo $${FILES})" >$@.tmp;         \
+	cmp -s $@.tmp $@ || touch $@.stamp;                       \
+	mv $@.tmp $@
 
 # Include any deps files as additional Makefile rules.  This triggers make to
 # consider the deps files for rebuild, which makes the whole
 # dependency-management logic work.  'sinclude' is "silent include" which does
 # not fail if the file does not exist.
-$(foreach dir, $(ALL_GO_DIRS), $(eval sinclude $(dir)/$(GOFILES_METAFILE)))
+$(foreach dir, $(ALL_GO_DIRS), $(eval            \
+    sinclude $(META_DIR)/$(dir)/$(GOFILES_META)  \
+))
 
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
 # used to derive lists of files/dirs for generation tools.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s: tags)
+endif
 ALL_K8S_TAG_FILES := $(shell                             \
     find $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
         | xargs grep -l '^// *+k8s:'                     \
@@ -289,6 +315,9 @@ ALL_K8S_TAG_FILES := $(shell                             \
 #               scheme
 
 # Find all the directories that request deep-copy generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:deepcopy-gen tags)
+endif
 DEEP_COPY_DIRS := $(shell \
     grep -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
         | xargs dirname                                \
@@ -305,8 +334,8 @@ gen_deepcopy:
 	@$(MAKE) -s build WHAT=cmd/libs/go2idl/deepcopy-gen
 	@$(MAKE) -s $(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS))
 
-# For each dir in DEEP_COPY_DIRS, this generates a statement of the form:
-#     path/to/dir/$(DEEP_COPY_FILENAME): <all files in dir, except generated ones>
+# For each dir in DEEP_COPY_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
 #
 # Note that this is a deps-only statement, not a full rule (see below).
 # This has to be done in a distinct step because wildcards don't seem to work
@@ -314,9 +343,13 @@ gen_deepcopy:
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(DEEP_COPY_DIRS), $(eval                       \
-    $(dir)/$(DEEP_COPY_FILENAME): $(dir)/$(GOFILES_METAFILE)   \
-                                   $(gofiles__$(dir))          \
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(DEEP_COPY_DIRS), $(eval                                    \
+    $(dir)/$(DEEP_COPY_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
+                                   $(gofiles__$(dir))                       \
+                                   $(BIN_DIR)/deepcopy-gen                  \
 ))
 
 # For each dir in DEEP_COPY_DIRS, handle deep-copy generation.
@@ -345,19 +378,22 @@ $(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS)):
 # IDL.
 
 # All directories that request any form of conversion generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:conversion-gen tags)
+endif
 CONVERSION_DIRS := $(shell                                \
     grep '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
         | cut -f1 -d:                                     \
         | xargs dirname                                   \
         | sort -u                                         \
-    )
+)
 
 # The result file, in each pkg, of conversion generation.
 CONVERSION_BASENAME := $(GENERATED_FILE_PREFIX)conversion
 CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
 
 # The name of the make metadata file controlling conversions.
-CONVERSIONS_METAFILE := $(MAKE_METAFILE_PREFIX)conversions
+CONVERSIONS_META := conversions.mk
 
 # Unfortunately there's not a good way to use Go's build tools to check
 # if a binary needs to be rebuilt.  We just have to try it.
@@ -372,33 +408,44 @@ gen_conversion:
 # files or even *_test.go files), but this is much easier to represent.
 #
 # Because we 'sinclude' the deps file, it is considered for rebuilding, as part
-# of make's normal evaluation.
+# of make's normal evaluation.  If it gets rebuilt, make will restart.
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(CONVERSION_DIRS), $(eval $(dir)/$(CONVERSIONS_METAFILE): $(dir)))
+$(foreach dir, $(CONVERSION_DIRS), $(eval           \
+    $(META_DIR)/$(dir)/$(CONVERSIONS_META): $(dir)  \
+))
 
 # How to rebuild a deps file.  When make determines that the deps file is stale
 # (see above), it executes this rule, and then re-loads the deps file.
 #
 # This is looser than we really need (e.g. we don't really care about test
 # files), but this is MUCH faster than calling `go list`.
-$(foreach dir, $(CONVERSION_DIRS), $(dir)/$(CONVERSIONS_METAFILE)):
-	@TAGS=$$(grep -h '^// *+k8s:conversion-gen=' $(@D)/*.go \
-	    | cut -f2- -d= \
-	    | sed 's|$(PRJ_SRC_PATH)/||'); \
-	echo "conversions__$(@D) := $$(echo $${TAGS})" >$@
+#
+# We regenerate the output file in order to satisfy make's "newer than" rules,
+# but we only need to rebuild targets if the contents actually changed.  That
+# is what the .stamp file represents.
+$(foreach dir, $(CONVERSION_DIRS), $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
+	@TAGS=$$(grep -h '^// *+k8s:conversion-gen=' $</*.go                   \
+	    | cut -f2- -d=                                                     \
+	    | sed 's|$(PRJ_SRC_PATH)/||');                                     \
+	mkdir -p $(@D);                                                        \
+	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;                   \
+	cmp -s $@.tmp $@ || touch $@.stamp;                                    \
+	mv $@.tmp $@
 
 # Include any deps files as additional Makefile rules.  This triggers make to
 # consider the deps files for rebuild, which makes the whole
 # dependency-management logic work.  'sinclude' is "silent include" which does
 # not fail if the file does not exist.
-$(foreach dir, $(CONVERSION_DIRS), $(eval sinclude $(dir)/$(CONVERSIONS_METAFILE)))
+$(foreach dir, $(CONVERSION_DIRS), $(eval            \
+    sinclude $(META_DIR)/$(dir)/$(CONVERSIONS_META)  \
+))
 
-# For each dir in CONVERSION_DIRS, this generates a statement of the form:
-#     path/to/dir/$(CONVERSION_FILENAME): path/to/dir/$(GOFILES_METAFILE) \
-#                                         $(gofiles__path/to/dir)
-# The variable value was set in $(GOFILES_METAFILE) and included as part of the
+# For each dir in CONVERSION_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
 # dependency management logic.
 #
 # Note that this is a deps-only statement, not a full rule (see below).
@@ -407,16 +454,20 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval sinclude $(dir)/$(CONVERSIONS_METAFILE
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(CONVERSION_DIRS), $(eval                      \
-    $(dir)/$(CONVERSION_FILENAME): $(dir)/$(GOFILES_METAFILE)  \
-                                   $(gofiles__$(dir))          \
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(CONVERSION_DIRS), $(eval                                    \
+    $(dir)/$(CONVERSION_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
+                                   $(gofiles__$(dir))                        \
+                                   $(BIN_DIR)/conversion-gen                 \
 ))
 
 # For each dir in CONVERSION_DIRS, for each target in $(conversions__$(dir)),
-# this generates a statement of the form:
-#     path/to/dir/$(CONVERSION_FILENAME): /path/to/target/$(GOFILES_METAFILE) \
-#                                         $(gofiles__path/to/target/)
-# The variable value was set in $(GOFILES_METAFILE) and included as part of the
+# this establishes a dependency between the output file and the input files
+# that should trigger a rebuild.
+#
+# The variable value was set in $(GOFILES_META) and included as part of the
 # dependency management logic.
 #
 # Note that this is a deps-only statement, not a full rule (see below).
@@ -425,11 +476,14 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval                      \
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(CONVERSION_DIRS),                                 \
-    $(foreach tgt, $(conversions__$(dir)), $(eval                  \
-        $(dir)/$(CONVERSION_FILENAME): $(tgt)/$(GOFILES_METAFILE)  \
-                                       $(gofiles__$(tgt))          \
-    ))                                                             \
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(CONVERSION_DIRS),                                               \
+    $(foreach tgt, $(conversions__$(dir)), $(eval                                \
+        $(dir)/$(CONVERSION_FILENAME): $(META_DIR)/$(tgt)/$(GOFILES_META).stamp  \
+                                       $(gofiles__$(tgt))                        \
+    ))                                                                           \
 )
 
 # For each dir in CONVERSION_DIRS, this generates a rule to auto-generate
