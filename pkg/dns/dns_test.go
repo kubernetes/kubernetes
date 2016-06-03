@@ -41,13 +41,14 @@ const (
 
 func newKubeDNS() *KubeDNS {
 	kd := &KubeDNS{
-		domain:         testDomain,
-		endpointsStore: cache.NewStore(cache.MetaNamespaceKeyFunc),
-		servicesStore:  cache.NewStore(cache.MetaNamespaceKeyFunc),
-		cache:          NewTreeCache(),
-		cacheLock:      sync.RWMutex{},
-		domainPath:     reverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
-		nodesStore:     cache.NewStore(cache.MetaNamespaceKeyFunc),
+		domain:           testDomain,
+		endpointsStore:   cache.NewStore(cache.MetaNamespaceKeyFunc),
+		servicesStore:    cache.NewStore(cache.MetaNamespaceKeyFunc),
+		cache:            NewTreeCache(),
+		reverseRecordMap: make(map[string]*skymsg.Service),
+		cacheLock:        sync.RWMutex{},
+		domainPath:       reverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
+		nodesStore:       cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
 	return kd
 }
@@ -71,9 +72,11 @@ func TestUnnamedSinglePortService(t *testing.T) {
 	// Add the service
 	kd.newService(s)
 	assertDNSForClusterIP(t, kd, s)
+	assertReverseRecord(t, kd, s)
 	// Delete the service
 	kd.removeService(s)
 	assertNoDNSForClusterIP(t, kd, s)
+	assertNoReverseRecord(t, kd, s)
 }
 
 func TestNamedSinglePortService(t *testing.T) {
@@ -455,6 +458,22 @@ func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 		assert.Equal(t, 1, len(records))
 		assert.Equal(t, s.Spec.ClusterIP, records[0].Host)
 	}
+}
+
+func assertReverseRecord(t *testing.T, kd *KubeDNS, s *kapi.Service) {
+	segments := reverseArray(strings.Split(s.Spec.ClusterIP, "."))
+	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), arpaSuffix)
+	reverseRecord, err := kd.ReverseRecord(reverseLookup)
+	require.NoError(t, err)
+	assert.Equal(t, kd.getServiceFQDN(s), reverseRecord.Host)
+}
+
+func assertNoReverseRecord(t *testing.T, kd *KubeDNS, s *kapi.Service) {
+	segments := reverseArray(strings.Split(s.Spec.ClusterIP, "."))
+	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), arpaSuffix)
+	reverseRecord, err := kd.ReverseRecord(reverseLookup)
+	require.Error(t, err)
+	require.Nil(t, reverseRecord)
 }
 
 func getEquivalentQueries(serviceFQDN, namespace string) []string {

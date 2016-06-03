@@ -49,6 +49,9 @@ const (
 	// A subdomain added to the user specified dmoain for all pods.
 	podSubdomain = "pod"
 
+	// arpaSuffix is the standard suffix for PTR IP reverse lookups.
+	arpaSuffix = ".in-addr.arpa."
+
 	// Resync period for the kube controller loop.
 	resyncPeriod = 5 * time.Minute
 
@@ -78,6 +81,8 @@ type KubeDNS struct {
 	// A Records and SRV Records for (regular) services and headless Services.
 	cache *TreeCache
 
+	reverseRecordMap map[string]*skymsg.Service
+
 	// caller is responsible for using the cacheLock before invoking methods on cache
 	// the cache is not thread-safe, and the caller can guarantee thread safety by using
 	// the cacheLock
@@ -105,12 +110,13 @@ type KubeDNS struct {
 
 func NewKubeDNS(client clientset.Interface, domain string, federations map[string]string) *KubeDNS {
 	kd := &KubeDNS{
-		kubeClient:  client,
-		domain:      domain,
-		cache:       NewTreeCache(),
-		cacheLock:   sync.RWMutex{},
-		domainPath:  reverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
-		federations: federations,
+		kubeClient:       client,
+		domain:           domain,
+		cache:            NewTreeCache(),
+		cacheLock:        sync.RWMutex{},
+		reverseRecordMap: make(map[string]*skymsg.Service),
+		domainPath:       reverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
+		federations:      federations,
 	}
 	kd.setEndpointsStore()
 	kd.setServicesStore()
@@ -225,6 +231,7 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 		kd.cacheLock.Lock()
 		defer kd.cacheLock.Unlock()
 		kd.cache.deletePath(subCachePath...)
+		delete(kd.reverseRecordMap, s.Spec.ClusterIP)
 	}
 }
 
@@ -283,9 +290,13 @@ func (kd *KubeDNS) newPortalService(service *kapi.Service) {
 		}
 	}
 	subCachePath := append(kd.domainPath, serviceSubdomain, service.Namespace)
+	host := kd.getServiceFQDN(service)
+	reverseRecord, _ := getSkyMsg(host, 0)
+
 	kd.cacheLock.Lock()
 	defer kd.cacheLock.Unlock()
 	kd.cache.setSubCache(service.Name, subCache, subCachePath...)
+	kd.reverseRecordMap[service.Spec.ClusterIP] = reverseRecord
 }
 
 func (kd *KubeDNS) generateRecordsForHeadlessService(e *kapi.Endpoints, svc *kapi.Service) error {
@@ -430,15 +441,32 @@ func (kd *KubeDNS) Records(name string, exact bool) ([]skymsg.Service, error) {
 func (kd *KubeDNS) ReverseRecord(name string) (*skymsg.Service, error) {
 	glog.Infof("Received ReverseRecord Request:%s", name)
 
-	segments := strings.Split(strings.TrimRight(name, "."), ".")
+	// if portalIP is not a valid IP, the reverseRecordMap lookup will fail
+	portalIP, ok := extractIP(name)
+	if !ok {
+		return nil, fmt.Errorf("does not support reverse lookup for %s", name)
+	}
 
-	for _, k := range segments {
-		if k == "*" {
-			return nil, fmt.Errorf("reverse can not contain wildcards")
-		}
+	kd.cacheLock.RLock()
+	defer kd.cacheLock.RUnlock()
+	if reverseRecord, ok := kd.reverseRecordMap[portalIP]; ok {
+		return reverseRecord, nil
 	}
 
 	return nil, fmt.Errorf("must be exactly one service record")
+}
+
+// extractIP turns a standard PTR reverse record lookup name
+// into an IP address
+func extractIP(reverseName string) (string, bool) {
+	if !strings.HasSuffix(reverseName, arpaSuffix) {
+		return "", false
+	}
+	search := strings.TrimSuffix(reverseName, arpaSuffix)
+
+	// reverse the segments and then combine them
+	segments := reverseArray(strings.Split(search, "."))
+	return strings.Join(segments, "."), true
 }
 
 // e.g {"local", "cluster", "pod", "default", "10-0-0-1"}
@@ -600,6 +628,10 @@ func (kd *KubeDNS) getClusterZone() (string, error) {
 		return "", fmt.Errorf("unknown cluster zone")
 	}
 	return zone, nil
+}
+
+func (kd *KubeDNS) getServiceFQDN(service *kapi.Service) string {
+	return strings.Join([]string{service.Name, service.Namespace, serviceSubdomain, kd.domain}, ".")
 }
 
 func reverseArray(arr []string) []string {
