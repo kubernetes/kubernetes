@@ -215,7 +215,9 @@ func Bool(reply interface{}, err error) (bool, error) {
 	return false, fmt.Errorf("redigo: unexpected type for Bool, got type %T", reply)
 }
 
-// MultiBulk is deprecated. Use Values.
+// MultiBulk is a helper that converts an array command reply to a []interface{}.
+//
+// Deprecated: Use Values instead.
 func MultiBulk(reply interface{}, err error) ([]interface{}, error) { return Values(reply, err) }
 
 // Values is a helper that converts an array command reply to a []interface{}.
@@ -271,13 +273,40 @@ func Strings(reply interface{}, err error) ([]string, error) {
 	return nil, fmt.Errorf("redigo: unexpected type for Strings, got type %T", reply)
 }
 
+// ByteSlices is a helper that converts an array command reply to a [][]byte.
+// If err is not equal to nil, then ByteSlices returns nil, err. Nil array
+// items are stay nil. ByteSlices returns an error if an array item is not a
+// bulk string or nil.
+func ByteSlices(reply interface{}, err error) ([][]byte, error) {
+	if err != nil {
+		return nil, err
+	}
+	switch reply := reply.(type) {
+	case []interface{}:
+		result := make([][]byte, len(reply))
+		for i := range reply {
+			if reply[i] == nil {
+				continue
+			}
+			p, ok := reply[i].([]byte)
+			if !ok {
+				return nil, fmt.Errorf("redigo: unexpected element type for ByteSlices, got type %T", reply[i])
+			}
+			result[i] = p
+		}
+		return result, nil
+	case nil:
+		return nil, ErrNil
+	case Error:
+		return nil, reply
+	}
+	return nil, fmt.Errorf("redigo: unexpected type for ByteSlices, got type %T", reply)
+}
+
 // Ints is a helper that converts an array command reply to a []int. If
 // err is not equal to nil, then Ints returns nil, err.
 func Ints(reply interface{}, err error) ([]int, error) {
 	var ints []int
-	if reply == nil {
-		return ints, ErrNil
-	}
 	values, err := Values(reply, err)
 	if err != nil {
 		return ints, err
@@ -307,6 +336,58 @@ func StringMap(result interface{}, err error) (map[string]string, error) {
 			return nil, errors.New("redigo: ScanMap key not a bulk string value")
 		}
 		m[string(key)] = string(value)
+	}
+	return m, nil
+}
+
+// IntMap is a helper that converts an array of strings (alternating key, value)
+// into a map[string]int. The HGETALL commands return replies in this format.
+// Requires an even number of values in result.
+func IntMap(result interface{}, err error) (map[string]int, error) {
+	values, err := Values(result, err)
+	if err != nil {
+		return nil, err
+	}
+	if len(values)%2 != 0 {
+		return nil, errors.New("redigo: IntMap expects even number of values result")
+	}
+	m := make(map[string]int, len(values)/2)
+	for i := 0; i < len(values); i += 2 {
+		key, ok := values[i].([]byte)
+		if !ok {
+			return nil, errors.New("redigo: ScanMap key not a bulk string value")
+		}
+		value, err := Int(values[i+1], nil)
+		if err != nil {
+			return nil, err
+		}
+		m[string(key)] = value
+	}
+	return m, nil
+}
+
+// Int64Map is a helper that converts an array of strings (alternating key, value)
+// into a map[string]int64. The HGETALL commands return replies in this format.
+// Requires an even number of values in result.
+func Int64Map(result interface{}, err error) (map[string]int64, error) {
+	values, err := Values(result, err)
+	if err != nil {
+		return nil, err
+	}
+	if len(values)%2 != 0 {
+		return nil, errors.New("redigo: Int64Map expects even number of values result")
+	}
+	m := make(map[string]int64, len(values)/2)
+	for i := 0; i < len(values); i += 2 {
+		key, ok := values[i].([]byte)
+		if !ok {
+			return nil, errors.New("redigo: ScanMap key not a bulk string value")
+		}
+		value, err := Int64(values[i+1], nil)
+		if err != nil {
+			return nil, err
+		}
+		m[string(key)] = value
 	}
 	return m, nil
 }

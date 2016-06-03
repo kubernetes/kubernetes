@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Update the Godeps/LICENSES.md document.
+# Update the Godeps/LICENSES document.
 # Generates a table of Godep dependencies and their license.
 #
 # Usage:
@@ -70,10 +70,13 @@ process_content () {
   # Start search at package root
   case ${package} in
     github.com/*|golang.org/*|bitbucket.org/*)
-     package_root=$(echo ${package} |awk -F/ '{print $1"/"$2"/"$3 }')
+     package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2"/"$3 }')
+     ;;
+    go4.org/*)
+     package_root=$(echo ${package} |awk -F/ '{ print $1 }')
      ;;
     *)
-     package_root=$(echo ${package} |awk -F/ '{print $1"/"$2 }')
+     package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2 }')
      ;;
   esac
 
@@ -114,6 +117,7 @@ LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
 
 GODEPS_LICENSE_FILE="Godeps/LICENSES"
+TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
 DEPS_DIR="vendor"
 declare -Ag CONTENT
 
@@ -126,7 +130,7 @@ cat ${LICENSE_ROOT}/LICENSE
 echo
 echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum)"
 echo "================================================================================"
-) > ${GODEPS_LICENSE_FILE}
+) > ${TMP_LICENSE_FILE}
 
 # Loop through every package in Godeps.json
 for PACKAGE in $(cat Godeps/Godeps.json | \
@@ -141,21 +145,31 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
   echo "= ${DEPS_DIR}/${PACKAGE} licensed under: ="
   echo
 
-  content=""
+  file=""
   if [[ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]]; then
-    content="${CONTENT[${PACKAGE}-LICENSE]-}"
+      file="${CONTENT[${PACKAGE}-LICENSE]-}"
   elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
-    content="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
+      file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
   fi
-  if [[ -z "${content}" ]]; then
-      echo "UNKNOWN"
-      content="/dev/null"
-  else
-      cat "${content}"
+  if [[ -z "${file}" ]]; then
+      cat > /dev/stderr << __EOF__
+No license could be found for ${PACKAGE} - aborting.
+
+Options:
+1. Check if the upstream repository has a newer version with LICENSE and/or
+   COPYRIGHT files.
+2. Contact the author of the package to ensure there is a LICENSE and/or
+   COPYRIGHT file present.
+3. Do not use this package in Kubernetes.
+__EOF__
+      exit 9
   fi
+  cat "${file}"
 
   echo
-  echo "= ${content} $(cat ${content} | md5sum)"
+  echo "= ${file} $(cat ${file} | md5sum)"
   echo "================================================================================"
   echo
-done >> ${GODEPS_LICENSE_FILE}
+done >> ${TMP_LICENSE_FILE}
+
+cat ${TMP_LICENSE_FILE} > ${GODEPS_LICENSE_FILE}
