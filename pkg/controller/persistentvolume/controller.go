@@ -78,9 +78,9 @@ const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 const annClass = "volume.alpha.kubernetes.io/storage-class"
 
 // This annotation is added to a PV that has been dynamically provisioned by
-// Kubernetes. It's value is name of volume plugin that created the volume.
+// Kubernetes. Its value is name of volume plugin that created the volume.
 // It serves both user (to show where a PV comes from) and Kubernetes (to
-// recognize dynamically provisioned PVs in its decissions).
+// recognize dynamically provisioned PVs in its decisions).
 const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
 // Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
@@ -103,7 +103,7 @@ const createProvisionedPVInterval = 10 * time.Second
 
 // PersistentVolumeController is a controller that synchronizes
 // PersistentVolumeClaims and PersistentVolumes. It starts two
-// framework.Controllers that watch PerstentVolume and PersistentVolumeClaim
+// framework.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
 	volumeController       *framework.Controller
@@ -670,8 +670,8 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *api.Persistent
 	return volume, nil
 }
 
-// bindClaimToVolume modifes given claim to be bound to a volume and saves it to
-// API server. The volume is not modified in this method!
+// bindClaimToVolume modifies the given claim to be bound to a volume and
+// saves it to API server. The volume is not modified in this method!
 func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *api.PersistentVolumeClaim, volume *api.PersistentVolume) (*api.PersistentVolumeClaim, error) {
 	glog.V(4).Infof("updating PersistentVolumeClaim[%s]: binding to %q", claimToClaimKey(claim), volume.Name)
 
@@ -1198,7 +1198,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		}
 
 		if err != nil {
-			// Delete failed several times. There is orphaned volume and there
+			// Delete failed several times. There is an orphaned volume and there
 			// is nothing we can do about it.
 			strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), err)
 			glog.V(2).Info(strerr)
@@ -1210,7 +1210,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 }
 
 // getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
-// The name must be unique
+// The name must be unique.
 func (ctrl *PersistentVolumeController) getProvisionedVolumeNameForClaim(claim *api.PersistentVolumeClaim) string {
 	return "pvc-" + string(claim.UID)
 }
@@ -1242,7 +1242,7 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 		return
 	}
 
-	// Run the operation in separate goroutine
+	// Run the operation in a separate goroutine
 	go func() {
 		glog.V(4).Infof("scheduleOperation[%s]: running the operation", operationName)
 		operation(arg)
