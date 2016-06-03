@@ -21,7 +21,9 @@ spec:
       initialDelaySeconds: 30
       # healthz reaches out to GCE
       periodSeconds: 30
-      timeoutSeconds: 5
+      timeoutSeconds: 15
+      successThreshold: 1
+      failureThreshold: 5
     name: l7-lb-controller
     volumeMounts:
     - mountPath: /etc/gce.conf
@@ -34,7 +36,7 @@ spec:
       # Request and limits are set to accomodate this pod alongside the other
       # master components on a single core master.
       limits:
-        cpu: 50m
+        cpu: 100m
         memory: 100Mi
       requests:
         cpu: 10m
