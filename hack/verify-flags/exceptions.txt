@@ -70,6 +70,7 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var 
 examples/cassandra/image/run.sh:	cluster_name \
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/vitess/env.sh:    node_ip=$(get_node_ip)
+hack/jenkins/e2e-runner.sh:    local image_project="$1"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
 hack/test-update-storage-objects.sh:  local storage_media_type=${2:-""}
