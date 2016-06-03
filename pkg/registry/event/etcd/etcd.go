@@ -18,8 +18,6 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/event"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -50,9 +48,7 @@ func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Event).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return event.MatchEvent(label, field)
-		},
+		PredicateFunc: event.MatchEvent,
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},
