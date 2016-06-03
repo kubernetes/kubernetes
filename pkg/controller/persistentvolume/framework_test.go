@@ -253,6 +253,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		_, found := r.volumes[name]
 		if found {
 			delete(r.volumes, name)
+			r.changedSinceLastSync++
 			return true, nil, nil
 		} else {
 			return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
@@ -264,6 +265,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		_, found := r.volumes[name]
 		if found {
 			delete(r.claims, name)
+			r.changedSinceLastSync++
 			return true, nil, nil
 		} else {
 			return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
@@ -517,6 +519,20 @@ func (r *volumeReactor) addVolumeEvent(volume *api.PersistentVolume) {
 	// Generate event. No cloning is needed, this claim is not stored in the
 	// controller cache yet.
 	r.volumeSource.Add(volume)
+}
+
+// modifyVolumeEvent simulates that a volume has been modified in etcd and the
+// controller receives 'volume modified' event.
+func (r *volumeReactor) modifyVolumeEvent(volume *api.PersistentVolume) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.volumes[volume.Name] = volume
+	// Generate deletion event. Cloned volume is needed to prevent races (and we
+	// would get a clone from etcd too).
+	clone, _ := conversion.NewCloner().DeepCopy(volume)
+	volumeClone := clone.(*api.PersistentVolume)
+	r.volumeSource.Modify(volumeClone)
 }
 
 // addClaimEvent simulates that a claim has been deleted in etcd and the
