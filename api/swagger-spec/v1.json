@@ -16761,6 +16761,13 @@
        "$ref": "v1.ContainerImage"
       },
       "description": "List of container images on this node"
+     },
+     "volumesInUse": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.UniqueDeviceName"
+      },
+      "description": "List of volumes in use (mounted) by the node."
      }
     }
    },
@@ -16918,6 +16925,10 @@
       "description": "The size of the image in bytes."
      }
     }
+   },
+   "v1.UniqueDeviceName": {
+    "id": "v1.UniqueDeviceName",
+    "properties": {}
    },
    "v1.PersistentVolumeClaimList": {
     "id": "v1.PersistentVolumeClaimList",

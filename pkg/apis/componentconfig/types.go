@@ -362,6 +362,10 @@ type KubeletConfiguration struct {
 	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod,omitempty"`
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32 `json:"podsPerCore"`
+	// enableControllerAttachDetach enables the Attach/Detach controller to
+	// manage attachment/detachment of volumes scheduled to this node, and
+	// disables kubelet from executing any attach/detach operations
+	EnableControllerAttachDetach bool `json:"enableControllerAttachDetach"`
 }
 
 type KubeSchedulerConfiguration struct {

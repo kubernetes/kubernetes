@@ -31,7 +31,7 @@ import (
 // Reconciler runs a periodic loop to reconcile the desired state of the with
 // the actual state of the world by triggering attach detach operations.
 type Reconciler interface {
-	// Starts running the reconcilation loop which executes periodically, checks
+	// Starts running the reconciliation loop which executes periodically, checks
 	// if volumes that should be attached are attached and volumes that should
 	// be detached are detached. If not, it will trigger attach/detach
 	// operations to rectify.
@@ -40,33 +40,34 @@ type Reconciler interface {
 
 // NewReconciler returns a new instance of Reconciler that waits loopPeriod
 // between successive executions.
-// loopPeriod is the ammount of time the reconciler loop waits between
+// loopPeriod is the amount of time the reconciler loop waits between
 // successive executions.
-// maxSafeToDetachDuration is the max ammount of time the reconciler will wait
-// for the volume to deatch, after this it will detach the volume anyway
-// assuming the node is unavilable. If during this time the volume becomes used
-// by a new pod, the detach request will be aborted and the timer cleared.
+// maxWaitForUnmountDuration is the max amount of time the reconciler will wait
+// for the volume to be safely unmounted, after this it will detach the volume
+// anyway (to handle crashed/unavailable nodes). If during this time the volume
+// becomes used by a new pod, the detach request will be aborted and the timer
+// cleared.
 func NewReconciler(
 	loopPeriod time.Duration,
-	maxSafeToDetachDuration time.Duration,
+	maxWaitForUnmountDuration time.Duration,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher attacherdetacher.AttacherDetacher) Reconciler {
 	return &reconciler{
-		loopPeriod:              loopPeriod,
-		maxSafeToDetachDuration: maxSafeToDetachDuration,
-		desiredStateOfWorld:     desiredStateOfWorld,
-		actualStateOfWorld:      actualStateOfWorld,
-		attacherDetacher:        attacherDetacher,
+		loopPeriod:                loopPeriod,
+		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
+		desiredStateOfWorld:       desiredStateOfWorld,
+		actualStateOfWorld:        actualStateOfWorld,
+		attacherDetacher:          attacherDetacher,
 	}
 }
 
 type reconciler struct {
-	loopPeriod              time.Duration
-	maxSafeToDetachDuration time.Duration
-	desiredStateOfWorld     cache.DesiredStateOfWorld
-	actualStateOfWorld      cache.ActualStateOfWorld
-	attacherDetacher        attacherdetacher.AttacherDetacher
+	loopPeriod                time.Duration
+	maxWaitForUnmountDuration time.Duration
+	desiredStateOfWorld       cache.DesiredStateOfWorld
+	actualStateOfWorld        cache.ActualStateOfWorld
+	attacherDetacher          attacherdetacher.AttacherDetacher
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -75,11 +76,42 @@ func (rc *reconciler) Run(stopCh <-chan struct{}) {
 
 func (rc *reconciler) reconciliationLoopFunc() func() {
 	return func() {
+		// Detaches are triggered before attaches so that volumes referenced by
+		// pods that are rescheduled to a different node are detached first.
+
+		// Ensure volumes that should be detached are detached.
+		for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
+			if !rc.desiredStateOfWorld.VolumeExists(
+				attachedVolume.VolumeName, attachedVolume.NodeName) {
+				// Volume exists in actual state of world but not desired
+				if !attachedVolume.MountedByNode {
+					glog.V(5).Infof("Attempting to start DetachVolume for volume %q to node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+					err := rc.attacherDetacher.DetachVolume(attachedVolume, rc.actualStateOfWorld)
+					if err == nil {
+						glog.Infof("Started DetachVolume for volume %q to node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+					}
+				} else {
+					// If volume is not safe to detach (is mounted) wait a max amount of time before detaching any way.
+					timeElapsed, err := rc.actualStateOfWorld.MarkDesireToDetach(attachedVolume.VolumeName, attachedVolume.NodeName)
+					if err != nil {
+						glog.Errorf("Unexpected error actualStateOfWorld.MarkDesireToDetach(): %v", err)
+					}
+					if timeElapsed > rc.maxWaitForUnmountDuration {
+						glog.V(5).Infof("Attempting to start DetachVolume for volume %q to node %q. Volume is not safe to detach, but maxWaitForUnmountDuration expired.", attachedVolume.VolumeName, attachedVolume.NodeName)
+						err := rc.attacherDetacher.DetachVolume(attachedVolume, rc.actualStateOfWorld)
+						if err == nil {
+							glog.Infof("Started DetachVolume for volume %q to node %q due to maxWaitForUnmountDuration expiry.", attachedVolume.VolumeName, attachedVolume.NodeName)
+						}
+					}
+				}
+			}
+		}
+
 		// Ensure volumes that should be attached are attached.
 		for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
 			if rc.actualStateOfWorld.VolumeNodeExists(
 				volumeToAttach.VolumeName, volumeToAttach.NodeName) {
-				// Volume/Node exists, touch it to reset "safe to detach"
+				// Volume/Node exists, touch it to reset detachRequestedTime
 				glog.V(12).Infof("Volume %q/Node %q is attached--touching.", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				_, err := rc.actualStateOfWorld.AddVolumeNode(
 					volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
@@ -88,29 +120,10 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				}
 			} else {
 				// Volume/Node doesn't exist, spawn a goroutine to attach it
-				glog.V(5).Infof("Triggering AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
-				rc.attacherDetacher.AttachVolume(&volumeToAttach, rc.actualStateOfWorld)
-			}
-		}
-
-		// Ensure volumes that should be detached are detached.
-		for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
-			if !rc.desiredStateOfWorld.VolumeExists(
-				attachedVolume.VolumeName, attachedVolume.NodeName) {
-				// Volume exists in actual state of world but not desired
-				if attachedVolume.SafeToDetach {
-					glog.V(5).Infof("Triggering DetachVolume for volume %q to node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
-					rc.attacherDetacher.DetachVolume(&attachedVolume, rc.actualStateOfWorld)
-				} else {
-					// If volume is not safe to detach wait a max amount of time before detaching any way.
-					timeElapsed, err := rc.actualStateOfWorld.MarkDesireToDetach(attachedVolume.VolumeName, attachedVolume.NodeName)
-					if err != nil {
-						glog.Errorf("Unexpected error actualStateOfWorld.MarkDesireToDetach(): %v", err)
-					}
-					if timeElapsed > rc.maxSafeToDetachDuration {
-						glog.V(5).Infof("Triggering DetachVolume for volume %q to node %q. Volume is not safe to detach, but max wait time expired.", attachedVolume.VolumeName, attachedVolume.NodeName)
-						rc.attacherDetacher.DetachVolume(&attachedVolume, rc.actualStateOfWorld)
-					}
+				glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+				err := rc.attacherDetacher.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
+				if err == nil {
+					glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
 			}
 		}

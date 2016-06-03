@@ -134,13 +134,6 @@ type AttachableVolumePlugin interface {
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
 
-	// GetUniqueVolumeName returns a unique name representing the volume
-	// defined in spec. e.g. pluginname-deviceName-readwrite
-	// This helps ensures that the same operation (attach/detach) is never
-	// started on the same volume.
-	// If the plugin does not support the given spec, this returns an error.
-	GetUniqueVolumeName(spec *Spec) (string, error)
-
 	// GetDeviceName returns the name or ID of the device referenced in the
 	// specified volume spec. This is passed by callers to the Deatch method.
 	// If the plugin does not support the given spec, this returns an error.
