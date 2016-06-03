@@ -20,6 +20,14 @@
 # of needed functions. The script itself is not supposed to be executed in
 # other manners.
 
+set_broken_motd() {
+  cat > /etc/motd <<EOF
+Broken (or in progress) Kubernetes node setup! If you are using Ubuntu Trusty,
+check log file /var/log/syslog. If you are using GCI image, use
+"journalctl | grep kube" to find more information.
+EOF
+}
+
 download_kube_env() {
   # Fetch kube-env from GCE metadata server.
   readonly tmp_kube_env="/tmp/kube-env.yaml"
@@ -151,6 +159,7 @@ install_kube_binary_config() {
       rm -f "${kube_bin}/kubectl"
     fi
   fi
+  cp "${kube_home}/kubernetes/LICENSES" "${kube_home}"
 
   # Put kube-system pods manifests in /home/kubernetes/kube-manifests/.
   dst_dir="${kube_home}/kube-manifests"
@@ -169,9 +178,9 @@ install_kube_binary_config() {
   tar xzf "${kube_home}/${manifests_tar}" -C "${dst_dir}" --overwrite
   readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
   if [ "${kube_addon_registry}" != "gcr.io/google_containers" ]; then
-    find "${dst_dir}" -maxdepth 1 -name \*.yaml -or -maxdepth 1 -name \*.yaml.in | \
+    find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
       xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
-    find "${dst_dir}" -maxdepth 1 -name \*.manifest -or -maxdepth 1 -name \*.json | \
+    find "${dst_dir}" -name \*.manifest -or -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/trusty-configure-helper.sh" /etc/kube-configure-helper.sh
