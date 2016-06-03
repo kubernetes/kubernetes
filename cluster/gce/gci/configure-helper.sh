@@ -253,6 +253,13 @@ function assemble-docker-flags {
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
     docker_opts+=" --debug"
   fi
+  # Decide whether to enable a docker registry mirror. This is taken from
+  # the "kube-env" metadata value.
+  if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
+    echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
+    docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+  fi
+
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 }
 

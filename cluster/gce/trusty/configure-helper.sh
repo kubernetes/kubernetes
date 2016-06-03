@@ -187,6 +187,13 @@ restart_docker_daemon() {
   if [ "${TEST_CLUSTER:-}" = "true" ]; then
     DOCKER_OPTS="${DOCKER_OPTS} --debug"
   fi
+  # Decide whether to enable a docker registry mirror. This is taken from
+  # the "kube-env" metadata value.
+  if [ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]; then
+    echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
+    DOCKER_OPTS="${DOCKER_OPTS} --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+  fi
+
   echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
   # Make sure the network interface cbr0 is created before restarting docker daemon
   while ! [ -L /sys/class/net/cbr0 ]; do
