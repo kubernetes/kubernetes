@@ -21,27 +21,27 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v13
+  name: kube-dns-v14
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v13
+    version: v14
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: $DNS_REPLICAS
   selector:
     k8s-app: kube-dns
-    version: v13
+    version: v14
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v13
+        version: v14
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/kubedns-amd64:1.2
+        image: gcr.io/google_containers/kubedns-amd64:1.3
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
