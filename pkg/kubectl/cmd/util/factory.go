@@ -516,7 +516,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, errors.New("provided options object is not a PodLogOptions")
 				}
 				selector := labels.SelectorFromSet(t.Spec.Selector)
-				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) }
+				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
 				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
@@ -536,7 +536,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
-				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) }
+				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
 				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
@@ -796,7 +796,7 @@ See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more d
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client client.Interface, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
+func GetFirstPod(client client.PodsNamespacer, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
 	options := api.ListOptions{LabelSelector: selector}
 
 	podList, err := client.Pods(namespace).List(options)
