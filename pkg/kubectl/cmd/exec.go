@@ -174,10 +174,6 @@ func (p *ExecOptions) Run() error {
 		return err
 	}
 
-	if pod.Status.Phase != api.PodRunning {
-		return fmt.Errorf("pod %s is not running and cannot execute commands; current phase is %s", p.PodName, pod.Status.Phase)
-	}
-
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)

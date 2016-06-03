@@ -332,6 +332,11 @@ func podHasContainerWithName(pod *api.Pod, containerName string) bool {
 			return true
 		}
 	}
+	for _, c := range pod.Spec.InitContainers {
+		if c.Name == containerName {
+			return true
+		}
+	}
 	return false
 }
 
