@@ -27,20 +27,23 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-// Volume represents a directory used by pods or hosts on a node.
-// All method implementations of methods in the volume interface must be idempotent.
+// Volume represents a directory used by pods or hosts on a node. All method
+// implementations of methods in the volume interface must be idempotent.
 type Volume interface {
-	// GetPath returns the path to which the volume should be
-	// mounted for the pod.
+	// GetPath returns the path to which the volume should be mounted for the
+	// pod.
 	GetPath() string
 
-	// MetricsProvider embeds methods for exposing metrics (e.g. used,available space).
+	// MetricsProvider embeds methods for exposing metrics (e.g.
+	// used, available space).
 	MetricsProvider
 }
 
-// MetricsProvider exposes metrics (e.g. used,available space) related to a Volume.
+// MetricsProvider exposes metrics (e.g. used,available space) related to a
+// Volume.
 type MetricsProvider interface {
-	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for some implementations.
+	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for
+	// some implementations.
 	GetMetrics() (*Metrics, error)
 }
 
@@ -50,14 +53,16 @@ type Metrics struct {
 	// Note: For block devices this maybe more than the total size of the files.
 	Used *resource.Quantity
 
-	// Capacity represents the total capacity (bytes) of the volume's underlying storage.
-	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath) this is the size
-	// of the underlying storage, and will not equal Used + Available as the fs is shared.
+	// Capacity represents the total capacity (bytes) of the volume's
+	// underlying storage. For Volumes that share a filesystem with the host
+	// (e.g. emptydir, hostpath) this is the size of the underlying storage,
+	// and will not equal Used + Available as the fs is shared.
 	Capacity *resource.Quantity
 
-	// Available represents the storage space available (bytes) for the Volume.
-	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath), this is the available
-	// space on the underlying storage, and is shared with host processes and other Volumes.
+	// Available represents the storage space available (bytes) for the
+	// Volume. For Volumes that share a filesystem with the host (e.g.
+	// emptydir, hostpath), this is the available space on the underlying
+	// storage, and is shared with host processes and other Volumes.
 	Available *resource.Quantity
 }
 
@@ -103,13 +108,14 @@ type Unmounter interface {
 // Recycler provides methods to reclaim the volume resource.
 type Recycler interface {
 	Volume
-	// Recycle reclaims the resource.  Calls to this method should block until the recycling task is complete.
-	// Any error returned indicates the volume has failed to be reclaimed.  A nil return indicates success.
+	// Recycle reclaims the resource.  Calls to this method should block until
+	// the recycling task is complete. Any error returned indicates the volume
+	// has failed to be reclaimed.  A nil return indicates success.
 	Recycle() error
 }
 
-// Provisioner is an interface that creates templates for PersistentVolumes and can create the volume
-// as a new resource in the infrastructure provider.
+// Provisioner is an interface that creates templates for PersistentVolumes
+// and can create the volume as a new resource in the infrastructure provider.
 type Provisioner interface {
 	// Provision creates the resource by allocating the underlying volume in a
 	// storage system. This method should block until completion and returns
@@ -117,9 +123,10 @@ type Provisioner interface {
 	Provision() (*api.PersistentVolume, error)
 }
 
-// Deleter removes the resource from the underlying storage provider.  Calls to this method should block until
-// the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
-// A nil return indicates success.
+// Deleter removes the resource from the underlying storage provider.  Calls
+// to this method should block until the deletion is complete. Any error
+// returned indicates the volume has failed to be reclaimed. A nil return
+// indicates success.
 type Deleter interface {
 	Volume
 	// This method should block until completion.
