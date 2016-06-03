@@ -624,7 +624,7 @@ function start-kube-scheduler {
 
 # Starts cluster autoscaler.
 function start-cluster-autoscaler {
-  if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ]; then
+  if [[ "${ENABLE_NODE_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
     prepare-log-file /var/log/cluster-autoscaler.log
 
@@ -712,9 +712,6 @@ function start-kube-addons {
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
   fi
-  if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
-    setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
-  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
     local -r dns_rc_file="${dst_dir}/dns/skydns-rc.yaml"
@@ -771,8 +768,9 @@ function start-lb-controller {
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     echo "Starting GCE L7 pod"
     prepare-log-file /var/log/glbc.log
-    local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
-    cp "${src_file}" /etc/kubernetes/manifests/
+    setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
+    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest" \
+       /etc/kubernetes/manifests/
   fi
 }
 
