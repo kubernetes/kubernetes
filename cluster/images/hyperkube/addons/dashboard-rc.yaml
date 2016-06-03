@@ -20,25 +20,25 @@ metadata:
   namespace: kube-system
   labels:
     app: kubernetes-dashboard
-    version: v1.1.0-beta1
+    version: v1.1.0-beta2
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
     app: kubernetes-dashboard
-    version: v1.1.0-beta1
+    version: v1.1.0-beta2
     kubernetes.io/cluster-service: "true"
   template:
     metadata:
       labels:
         app: kubernetes-dashboard
-        version: v1.1.0-beta1
+        version: v1.1.0-beta2
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: kubernetes-dashboard
         # ARCH will be replaced with the architecture it's built for. Check out the Makefile for more details
-        image: gcr.io/google_containers/kubernetes-dashboard-ARCH:v1.1.0-beta1
+        image: gcr.io/google_containers/kubernetes-dashboard-ARCH:v1.1.0-beta2
         imagePullPolicy: Always
         ports:
         - containerPort: 9090
