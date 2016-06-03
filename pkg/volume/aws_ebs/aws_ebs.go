@@ -252,7 +252,7 @@ func (b *awsElasticBlockStoreMounter) GetAttributes() volume.Attributes {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *awsElasticBlockStoreMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return AwsEbsMountErrorHint(b.SetUpAt(b.GetPath(), fsGroup))
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
@@ -313,6 +313,31 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error 
 
 	glog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
+}
+
+// AwsEbsMountErrorHint performs some basic analysis
+// on the current mount error returned from the plugin
+// and will add a user hint or resolution tip for enhanced UXP
+// If no matches then original error is returned
+func AwsEbsMountErrorHint (inerr error) error {
+
+	if inerr == nil {
+		return nil
+	}
+	if strings.Contains(inerr.Error(), "lstat") && strings.Contains(inerr.Error(), "permission denied"){
+		return fmt.Errorf("%v\n\nAdditional Info: The pod is running, and the mount succeeded, however the mount is not accessbile due to permissions.\nCheck the POSIX based permissions (owner, groups and others) on your mounted directory.\nIf needed containers and pods can utilize and pass in a securityContext specifying runAsUser (uid/owner), or additional linux groups such as fsGroup (for block) or SupplementalGroups (for shared).\nWork with the storage adminstrator to properly set up access\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "InvalidVolume.NotFound") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check AWS available volumes for the appropriate availability zone, and make sure the specified volumeID exists and is spelled correctly.\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "InvalidParameterValue") && strings.Contains(inerr.Error(), "volume is invalid. Expected: 'vol-") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check AWS available volumes, make sure the specified volumeID exists, is spelled and typed correctly and is valid format.\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "VolumeInUse:") || strings.Contains(inerr.Error(), "is already attached to an instance") {
+		return fmt.Errorf("%v\n\nAdditional Info: The AWS volume is already attached to another instance and only one node per volume is allowed for EBS block devices (can not share across nodes). Another volume will need to be provisioned for use with this pod\n", inerr)
+	}
+
+	return inerr
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {

@@ -19,11 +19,12 @@ package nfs
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -161,7 +162,7 @@ type nfs struct {
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, kstrings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
 type nfsMounter struct {
@@ -183,7 +184,7 @@ func (b *nfsMounter) GetAttributes() volume.Attributes {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *nfsMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return NfsMountErrorHint(b.SetUpAt(b.GetPath(), fsGroup))
 }
 
 func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
@@ -228,6 +229,37 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	return nil
+}
+
+// NfsMountErrorHint performs some basic analysis
+// on the current mount error returned from the plugin
+// and will add a user hint or resolution tip for enhanced UXP
+// If no matches then original error is returned
+func NfsMountErrorHint (inerr error) error {
+
+	if inerr == nil {
+		return nil
+	}
+	if strings.Contains(inerr.Error(), "lstat") && strings.Contains(inerr.Error(), "permission denied"){
+		return fmt.Errorf("%v\n\nAdditional Info: The pod is running, and the mount succeeded, however the mount is not accessbile due to permissions.\nCheck the POSIX based permissions (owner, groups and others) on your mounted directory.\nIf needed containers and pods can utilize and pass in a securityContext specifying runAsUser (uid/owner), or additional linux groups such as fsGroup (for block) or SupplementalGroups (for shared).\nWork with the storage adminstrator to properly set up access\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "access denied by server") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check the NFS Server exports, likely that the host/node was not added. (/etc/exports).  Rerun exportfs -ra on NFS Server after updated.\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "Connection timed out"){
+		return fmt.Errorf("%v\n\nAdditional Info: Check and make sure the NFS Server exists (ensure that correct IPAddress/Hostname was given) and is available/reachable.\nAlso make sure firewall ports are open on both client and NFS Server (2049 v4 and 2049, 20048 and 111 for v3).\nUse commands telnet <nfs server> <port> and showmount <nfs server> to help test connectivity.\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "Job for rpc-statd.service failed") || strings.Contains(inerr.Error(), "rpc.statd is not running") {
+		return fmt.Errorf("%v\n\nAdditional Info: The rpcbind service on the node/host is most likely not running. To start run 'systemctl start rpcbind.service'.\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "wrong fs type, bad option, bad superblock"){
+		return fmt.Errorf("%v\n\nAdditional Info: This typically means that the nfs client packages (nfs-utils and rpcbind) are not installed and/or running on the host/node.\nCheck and make sure they are properly installed and running on your host client\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "Failed to resolve server"){
+		return fmt.Errorf("%v\n\nAdditional Info: Check and make sure the NFS Server exists (ensure that correct IPAddress/Hostname was given) and is available/reachable.\nAlso check and make sure the NFS Server is resolveable through DNS or a local /etc/hosts file", inerr)
+	}
+
+	return inerr
 }
 
 //

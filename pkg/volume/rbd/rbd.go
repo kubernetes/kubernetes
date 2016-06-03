@@ -18,13 +18,14 @@ package rbd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -98,7 +99,7 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 		secretName, err := kubeClient.Core().Secrets(pod.Namespace).Get(source.SecretRef.Name)
 		if err != nil {
 			glog.Errorf("Couldn't get secret %v/%v", pod.Namespace, source.SecretRef)
-			return nil, err
+			return nil, RbdMountErrorHint(err)
 		}
 		for name, data := range secretName.Data {
 			secret = string(data)
@@ -193,7 +194,7 @@ type rbd struct {
 func (rbd *rbd) GetPath() string {
 	name := rbdPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return rbd.plugin.host.GetPodVolumeDir(rbd.podUID, strings.EscapeQualifiedNameForDisk(name), rbd.volName)
+	return rbd.plugin.host.GetPodVolumeDir(rbd.podUID, kstrings.EscapeQualifiedNameForDisk(name), rbd.volName)
 }
 
 type rbdMounter struct {
@@ -217,7 +218,7 @@ func (b *rbd) GetAttributes() volume.Attributes {
 }
 
 func (b *rbdMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return RbdMountErrorHint(b.SetUpAt(b.GetPath(), fsGroup))
 }
 
 func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
@@ -228,6 +229,25 @@ func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("rbd: failed to setup mount %s %v", dir, err)
 	}
 	return err
+}
+
+// RbdMountErrorHint performs some basic analysis
+// on the current mount error returned from the plugin
+// and will add a user hint or resolution tip for enhanced UXP
+// If no matches then original error is returned
+func RbdMountErrorHint (inerr error) error {
+
+	if inerr == nil {
+		return nil
+	}
+	if strings.Contains(inerr.Error(), "lstat") && strings.Contains(inerr.Error(), "permission denied"){
+		return fmt.Errorf("%v\nResolution hint: The pod is running, and the mount succeeded, however the mount is not accessbile due to permissions.\nCheck the POSIX based permissions (owner, groups and others) on your mounted directory.\nIf needed containers and pods can utilize and pass in a securityContext specifying runAsUser (uid/owner), or additional linux groups such as fsGroup (for block) or SupplementalGroups (for shared).\nWork with the storage adminstrator to properly set up access\n", inerr)
+	}
+	if strings.Contains(inerr.Error(), "secrets") && strings.Contains(inerr.Error(), "missing") {
+		return fmt.Errorf("%v\nResolution hint: (%s) Make sure the above secret exists.  Secret is needed for rbd mount and access\n", inerr)
+	}
+
+	return inerr
 }
 
 type rbdUnmounter struct {
