@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# It's necessary to set this because some docker images don't make sh -> bash.
+SHELL := /bin/bash
+
+# We don't need make's built-in rules.
+MAKEFLAGS += --no-builtin-rules --warn-undefined-variables
+.SUFFIXES:
+
 # Old-skool build tools.
 #
 # Targets (see each target for more information):
@@ -20,15 +27,17 @@
 #   test: Run tests.
 #   clean: Clean up.
 
-OUT_DIR = _output
+OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
 PRJ_SRC_PATH := k8s.io/kubernetes
 GENERATED_FILE_PREFIX := zz_generated.
 MAKE_METAFILE_PREFIX := .make.
 
+GOFLAGS ?=
 KUBE_GOFLAGS = $(GOFLAGS)
 export KUBE_GOFLAGS
 
+GOLDFLAGS ?=
 KUBE_GOLDFLAGS = $(GOLDFLAGS)
 export KUBE_GOLDFLAGS
 
