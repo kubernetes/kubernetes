@@ -301,13 +301,23 @@ create_master_auth() {
     echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
   fi
 
-  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
-    cat <<EOF >/etc/gce.conf
+  use_cloud_config="false"
+  cat <<EOF >/etc/gce.conf
 [global]
+EOF
+  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
+  use_cloud_config="true"
+  cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
+EOF
+  fi
+  if [ -n "${NODE_INSTANCE_PREFIX:-}" ]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+node-tags = ${NODE_INSTANCE_PREFIX}
 EOF
   fi
   if [ -n "${MULTIZONE:-}" ]; then
@@ -315,7 +325,9 @@ EOF
 multizone = ${MULTIZONE}
 EOF
   fi
-
+  if [ "${use_cloud_config}" != "true" ]; then
+    rm -f /etc/gce.conf
+  fi
   if [ -n "${GCP_AUTHN_URL:-}" ]; then
     cat <<EOF >/etc/gcp_authn.config
 clusters:
@@ -753,4 +765,33 @@ start_kube_addons() {
 
   # Place addon manager pod manifest
   cp "${addon_src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
+}
+
+reset_motd() {
+  # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
+  readonly version="$(/usr/bin/kubelet --version=true | cut -f2 -d " ")"
+  # This logic grabs either a release tag (v1.2.1 or v1.2.1-alpha.1),
+  # or the git hash that's in the build info.
+  gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
+  devel=""
+  if [ "${gitref}" != "${version}" ]; then
+    devel="
+Note: This looks like a development version, which might not be present on GitHub.
+If it isn't, the closest tag is at:
+  https://github.com/kubernetes/kubernetes/tree/${gitref}
+"
+    gitref="${version//*+/}"
+  fi
+  cat > /etc/motd <<EOF
+Welcome to Kubernetes ${version}!
+You can find documentation for Kubernetes at:
+  http://docs.kubernetes.io/
+You can download the build image for this release at:
+  https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
+It is based on the Kubernetes source at:
+  https://github.com/kubernetes/kubernetes/tree/${gitref}
+${devel}
+For Kubernetes copyright and licensing information, see:
+  /home/kubernetes/LICENSES
+EOF
 }
