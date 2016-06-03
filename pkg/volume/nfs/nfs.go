@@ -19,11 +19,12 @@ package nfs
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -161,7 +162,7 @@ type nfs struct {
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, kstrings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
 type nfsMounter struct {
@@ -183,7 +184,7 @@ func (b *nfsMounter) GetAttributes() volume.Attributes {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *nfsMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return NfsMountErrorHint(b.SetUpAt(b.GetPath(), fsGroup))
 }
 
 func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
@@ -228,6 +229,39 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	return nil
+}
+
+// NfsMountErrorHint performs some basic analysis
+// on the current mount error returned from the plugin
+// and will add a user hint or resolution tip for enhanced UXP
+// If no matches then original error is returned
+func NfsMountErrorHint (inErr error) error {
+	if inErr == nil {
+		return nil
+	}
+	if strings.Contains(inErr.Error(), "lstat") && strings.Contains(inErr.Error(), "permission denied") {
+		return fmt.Errorf("%v\n\nAdditional Info: The pod is running, and the mount succeeded, however the mount is not accessible due to permissions.\nCheck the POSIX based permissions (owner, groups and others) on your mounted directory.\nIf needed, containers and pods can utilize and pass in a securityContext specifying runAsUser (uid/owner), or additional linux groups such as SupplementalGroups (for shared).\nWork with the storage adminstrator to ensure correct volume access.\n", inErr)
+	}
+	if strings.Contains(inErr.Error(), "access denied by server") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check the NFS Server exports, likely that the host/node was not added. (/etc/exports).  Rerun exportfs -ra on NFS Server after updated.\n", inErr)
+	}
+	if strings.Contains(inErr.Error(), "Connection timed out") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check and make sure the NFS Server exists (ensure that correct IPAddress/Hostname was given) and is available/reachable.\nAlso make sure firewall ports are open on both client and NFS Server (2049 v4 and 2049, 20048 and 111 for v3).\nUse commands telnet <nfs server> <port> and showmount <nfs server> to help test connectivity.\n", inErr)
+	}
+	if strings.Contains(inErr.Error(), "Job for rpc-statd.service failed") || strings.Contains(inErr.Error(), "rpc.statd is not running") {
+		return fmt.Errorf("%v\n\nAdditional Info: The rpcbind service on the node/host is most likely not running. To start run 'systemctl start rpcbind.service'.\n", inErr)
+	}
+	if strings.Contains(inErr.Error(), "wrong fs type, bad option, bad superblock") {
+		return fmt.Errorf("%v\n\nAdditional Info: This typically means that the nfs client packages (nfs-utils and rpcbind) are not installed and/or running on the host/node.\nCheck and make sure they are properly installed and running on your host client.\n", inErr)
+	}
+	if strings.Contains(inErr.Error(), "Failed to resolve server") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check and make sure the NFS Server exists (ensure that correct IPAddress/Hostname was given) and is available/reachable.\nAlso check and make sure the NFS Server is resolvable through DNS or a local /etc/hosts file.", inErr)
+	}
+	if strings.Contains(inErr.Error(), "failed to fetch PVC") || (strings.Contains(inErr.Error(), "persistentvolumeclaims") && (strings.Contains(inErr.Error(), "not found"))) {
+		return fmt.Errorf("%v\n\nAdditional Info: Check the pod spec to make sure the persistentVolumeClaim.name correctly matches the actual PVC name.\n", inErr)
+	}
+
+	return inErr
 }
 
 //
