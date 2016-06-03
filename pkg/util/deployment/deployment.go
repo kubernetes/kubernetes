@@ -140,11 +140,34 @@ func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*api.P
 	return getPodList(namespace, options)
 }
 
+// equalIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
+// We ignore pod-template-hash because the hash result would be different upon podTemplateSpec API changes
+// (e.g. the addition of a new field will cause the hash code to change)
+// Note that we assume input podTemplateSpecs contain non-empty labels
+func equalIgnoreHash(template1, template2 api.PodTemplateSpec) (bool, error) {
+	// The podTemplateSpec must have a non-empty label so that label selectors can find them.
+	// This is checked by validation (of resources contain a podTemplateSpec).
+	if len(template1.Labels) == 0 || len(template2.Labels) == 0 {
+		return false, fmt.Errorf("Unexpected empty labels found in given template")
+	}
+	hash1 := template1.Labels[extensions.DefaultDeploymentUniqueLabelKey]
+	hash2 := template2.Labels[extensions.DefaultDeploymentUniqueLabelKey]
+	// compare equality ignoring pod-template-hash
+	template1.Labels[extensions.DefaultDeploymentUniqueLabelKey] = hash2
+	result := api.Semantic.DeepEqual(template1, template2)
+	template1.Labels[extensions.DefaultDeploymentUniqueLabelKey] = hash1
+	return result, nil
+}
+
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
 func FindNewReplicaSet(deployment *extensions.Deployment, rsList []extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
 	newRSTemplate := GetNewReplicaSetTemplate(deployment)
 	for i := range rsList {
-		if api.Semantic.DeepEqual(rsList[i].Spec.Template, newRSTemplate) {
+		equal, err := equalIgnoreHash(rsList[i].Spec.Template, newRSTemplate)
+		if err != nil {
+			return nil, err
+		}
+		if equal {
 			// This is the new ReplicaSet.
 			return &rsList[i], nil
 		}
@@ -169,7 +192,11 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []extensions.R
 				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 			}
 			// Filter out replica set that has the same pod template spec as the deployment - that is the new replica set.
-			if api.Semantic.DeepEqual(rs.Spec.Template, newRSTemplate) {
+			equal, err := equalIgnoreHash(rs.Spec.Template, newRSTemplate)
+			if err != nil {
+				return nil, nil, err
+			}
+			if equal {
 				continue
 			}
 			allOldRSs[rs.ObjectMeta.Name] = rs
