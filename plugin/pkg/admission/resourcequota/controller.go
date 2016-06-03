@@ -322,8 +322,6 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 // that capture what the usage would be if the request succeeded.  It return an error if the is insufficient quota to satisfy the request
 func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.Attributes) ([]api.ResourceQuota, error) {
 	namespace := a.GetNamespace()
-	name := a.GetName()
-
 	evaluators := e.registry.Evaluators()
 	evaluator, found := evaluators[a.GetKind().GroupKind()]
 	if !found {
@@ -382,9 +380,9 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	// if usage shows no change, just return since it has no impact on quota
 	deltaUsage := evaluator.Usage(inputObject)
 	if admission.Update == op {
-		prevItem, err := evaluator.Get(namespace, name)
-		if err != nil {
-			return nil, admission.NewForbidden(a, fmt.Errorf("Unable to get previous: %v", err))
+		prevItem := a.GetOldObject()
+		if prevItem == nil {
+			return nil, admission.NewForbidden(a, fmt.Errorf("Unable to get previous usage since prior version of object was not found"))
 		}
 		prevUsage := evaluator.Usage(prevItem)
 		deltaUsage = quota.Subtract(deltaUsage, prevUsage)
