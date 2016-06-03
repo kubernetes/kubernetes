@@ -19,8 +19,6 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -59,9 +57,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*rbac.ClusterRole).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return clusterrole.Matcher(label, field)
-		},
+		PredicateFunc:           clusterrole.Matcher,
 		QualifiedResource:       rbac.Resource("clusterroles"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
