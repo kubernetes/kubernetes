@@ -114,7 +114,6 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			}
 			nameHint := string(node.UID)
 			wg.Add(1)
-			glog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, nameHint)
 			go func(nodeName string, nameHint string, route *cloudprovider.Route) {
 				defer wg.Done()
 				for i := 0; i < maxRetries; i++ {
@@ -122,6 +121,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 					// Ensure that we don't have more than maxConcurrentRouteCreations
 					// CreateRoute calls in flight.
 					rateLimiter <- struct{}{}
+					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
 					<-rateLimiter
 
@@ -145,8 +145,8 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
 				wg.Add(1)
 				// Delete the route.
-				glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 				go func(route *cloudprovider.Route, startTime time.Time) {
+					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
 						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
 					} else {
