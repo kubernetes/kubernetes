@@ -18,7 +18,7 @@ package cache
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	kubeCache "k8s.io/kubernetes/pkg/client/cache"
 )
 
@@ -28,16 +28,16 @@ type StoreToClusterLister struct {
 	kubeCache.Store
 }
 
-func (s *StoreToClusterLister) List() (clusters federation.ClusterList, err error) {
+func (s *StoreToClusterLister) List() (clusters v1alpha1.ClusterList, err error) {
 	for _, m := range s.Store.List() {
-		clusters.Items = append(clusters.Items, *(m.(*federation.Cluster)))
+		clusters.Items = append(clusters.Items, *(m.(*v1alpha1.Cluster)))
 	}
 	return clusters, nil
 }
 
 // ClusterConditionPredicate is a function that indicates whether the given cluster's conditions meet
 // some set of criteria defined by the function.
-type ClusterConditionPredicate func(cluster federation.Cluster) bool
+type ClusterConditionPredicate func(cluster v1alpha1.Cluster) bool
 
 // storeToClusterConditionLister filters and returns nodes matching the given type and status from the store.
 type storeToClusterConditionLister struct {
@@ -51,9 +51,9 @@ func (s *StoreToClusterLister) ClusterCondition(predicate ClusterConditionPredic
 }
 
 // List returns a list of clusters that match the conditions defined by the predicate functions in the storeToClusterConditionLister.
-func (s storeToClusterConditionLister) List() (clusters federation.ClusterList, err error) {
+func (s storeToClusterConditionLister) List() (clusters v1alpha1.ClusterList, err error) {
 	for _, m := range s.store.List() {
-		cluster := *m.(*federation.Cluster)
+		cluster := *m.(*v1alpha1.Cluster)
 		if s.predicate(cluster) {
 			clusters.Items = append(clusters.Items, cluster)
 		} else {

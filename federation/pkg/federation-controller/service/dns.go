@@ -254,6 +254,9 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	// the state of the service when we last successfully sync'd it's DNS records.
 	// So this time around we only need to patch that (add new records, remove deleted records, and update changed records.
 	//
+	if s.dns == nil {
+		return nil
+	}
 	if s == nil {
 		return fmt.Errorf("nil ServiceController passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
 	}
@@ -263,6 +266,9 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	serviceName := cachedService.lastState.Name
 	namespaceName := cachedService.lastState.Namespace
 	zoneNames, regionName, err := s.getClusterZoneNames(clusterName)
+	if zoneNames == nil {
+		return fmt.Errorf("fail to get cluster zone names")
+	}
 	if err != nil {
 		return err
 	}

@@ -19,12 +19,12 @@ package service
 import (
 	"sync"
 
-	"k8s.io/kubernetes/federation/apis/federation"
+	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	release_1_3 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -32,12 +32,13 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"reflect"
 )
 
 type clusterCache struct {
-	clientset *clientset.Clientset
-	cluster   *federation.Cluster
+	clientset *release_1_3.Clientset
+	cluster   *v1alpha1.Cluster
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
@@ -57,7 +58,7 @@ type clusterClientCache struct {
 	clientMap map[string]*clusterCache
 }
 
-func (cc *clusterClientCache) startClusterLW(cluster *federation.Cluster, clusterName string) {
+func (cc *clusterClientCache) startClusterLW(cluster *v1alpha1.Cluster, clusterName string) {
 	cachedClusterClient, ok := cc.clientMap[clusterName]
 	// only create when no existing cachedClusterClient
 	if ok {
@@ -92,13 +93,13 @@ func (cc *clusterClientCache) startClusterLW(cluster *federation.Cluster, cluste
 		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = framework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					return clientset.Core().Endpoints(api.NamespaceAll).List(options)
+					return clientset.Core().Endpoints(v1.NamespaceAll).List(options)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Endpoints(api.NamespaceAll).Watch(options)
+					return clientset.Core().Endpoints(v1.NamespaceAll).Watch(options)
 				},
 			},
-			&api.Endpoints{},
+			&v1.Endpoints{},
 			serviceSyncPeriod,
 			framework.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
@@ -116,25 +117,25 @@ func (cc *clusterClientCache) startClusterLW(cluster *federation.Cluster, cluste
 		cachedClusterClient.serviceStore.Store, cachedClusterClient.serviceController = framework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					return clientset.Core().Services(api.NamespaceAll).List(options)
+					return clientset.Core().Services(v1.NamespaceAll).List(options)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Services(api.NamespaceAll).Watch(options)
+					return clientset.Core().Services(v1.NamespaceAll).Watch(options)
 				},
 			},
-			&api.Service{},
+			&v1.Service{},
 			serviceSyncPeriod,
 			framework.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					cc.enqueueService(obj, clusterName)
 				},
 				UpdateFunc: func(old, cur interface{}) {
-					oldService, ok := old.(*api.Service)
+					oldService, ok := old.(*v1.Service)
 
 					if !ok {
 						return
 					}
-					curService, ok := cur.(*api.Service)
+					curService, ok := cur.(*v1.Service)
 					if !ok {
 						return
 					}
@@ -143,7 +144,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *federation.Cluster, cluste
 					}
 				},
 				DeleteFunc: func(obj interface{}) {
-					service, _ := obj.(*api.Service)
+					service, _ := obj.(*v1.Service)
 					cc.enqueueService(obj, clusterName)
 					glog.V(2).Infof("Service %s/%s deletion found and enque to service store %s", service.Namespace, service.Name, clusterName)
 				},
@@ -161,7 +162,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *federation.Cluster, cluste
 // delFromClusterSet delete a cluster from clusterSet and
 // delete the corresponding restclient from the map clusterKubeClientMap
 func (cc *clusterClientCache) delFromClusterSet(obj interface{}) {
-	cluster, ok := obj.(*federation.Cluster)
+	cluster, ok := obj.(*v1alpha1.Cluster)
 	cc.rwlock.Lock()
 	defer cc.rwlock.Unlock()
 	if ok {
@@ -180,10 +181,10 @@ func (cc *clusterClientCache) delFromClusterSet(obj interface{}) {
 // addToClusterSet inserts the new cluster to clusterSet and creates a corresponding
 // restclient to map clusterKubeClientMap
 func (cc *clusterClientCache) addToClientMap(obj interface{}) {
-	cluster := obj.(*federation.Cluster)
+	cluster := obj.(*v1alpha1.Cluster)
 	cc.rwlock.Lock()
 	defer cc.rwlock.Unlock()
-	cluster, ok := obj.(*federation.Cluster)
+	cluster, ok := obj.(*v1alpha1.Cluster)
 	if !ok {
 		return
 	}
@@ -195,13 +196,11 @@ func (cc *clusterClientCache) addToClientMap(obj interface{}) {
 	}
 }
 
-func newClusterClientset(c *federation.Cluster) (*clientset.Clientset, error) {
-	clusterConfig, err := clientcmd.BuildConfigFromFlags(c.Spec.ServerAddressByClientCIDRs[0].ServerAddress, "")
-	if err != nil {
-		return nil, err
+func newClusterClientset(c *v1alpha1.Cluster) (*release_1_3.Clientset, error) {
+	clusterConfig, err := util.BuildClusterConfig(c)
+	if clusterConfig != nil {
+		clientset := release_1_3.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
+		return clientset, nil
 	}
-	clusterConfig.QPS = KubeAPIQPS
-	clusterConfig.Burst = KubeAPIBurst
-	clientset := clientset.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
-	return clientset, nil
+	return nil, err
 }

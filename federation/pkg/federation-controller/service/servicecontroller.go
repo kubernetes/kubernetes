@@ -24,14 +24,15 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
-	federation "k8s.io/kubernetes/federation/apis/federation"
+	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	release_1_3 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -46,9 +47,8 @@ import (
 )
 
 const (
-	// TODO update to 10 mins before merge
-	serviceSyncPeriod = 30 * time.Second
-	clusterSyncPeriod = 100 * time.Second
+	serviceSyncPeriod = 10 * time.Minute
+	clusterSyncPeriod = 10 * time.Minute
 
 	// How long to wait before retrying the processing of a service change.
 	// If this changes, the sleep in hack/jenkins/e2e.sh before downing a cluster
@@ -71,15 +71,15 @@ const (
 )
 
 type cachedService struct {
-	lastState *api.Service
+	lastState *v1.Service
 	// The state as successfully applied to the DNS server
-	appliedState *api.Service
+	appliedState *v1.Service
 	// cluster endpoint map hold subset info from kubernetes clusters
 	// key clusterName
 	// value is a flag that if there is ready address, 1 means there is ready address, 0 means no ready address
 	endpointMap map[string]int
 	// serviceStatusMap map holds service status info from kubernetes clusters, keyed on clusterName
-	serviceStatusMap map[string]api.LoadBalancerStatus
+	serviceStatusMap map[string]v1.LoadBalancerStatus
 	// Ensures only one goroutine can operate on this service at any given time.
 	rwlock sync.Mutex
 	// Controls error back-off for procceeding federation service to k8s clusters
@@ -99,7 +99,7 @@ type serviceCache struct {
 
 type ServiceController struct {
 	dns              dnsprovider.Interface
-	federationClient federationclientset.Interface
+	federationClient federation_release_1_3.Interface
 	federationName   string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
 	dnsZones     dnsprovider.Zones
@@ -123,7 +123,7 @@ type ServiceController struct {
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
-func New(federationClient federationclientset.Interface, dns dnsprovider.Interface) *ServiceController {
+func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Interface) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -145,13 +145,13 @@ func New(federationClient federationclientset.Interface, dns dnsprovider.Interfa
 	s.serviceStore.Store, s.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return s.federationClient.Core().Services(api.NamespaceAll).List(options)
+				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Core().Services(api.NamespaceAll).Watch(options)
+				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Service{},
+		&v1.Service{},
 		serviceSyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: s.enqueueService,
@@ -173,17 +173,17 @@ func New(federationClient federationclientset.Interface, dns dnsprovider.Interfa
 				return s.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
-		&federation.Cluster{},
+		&v1alpha1.Cluster{},
 		clusterSyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			DeleteFunc: s.clusterCache.delFromClusterSet,
 			AddFunc:    s.clusterCache.addToClientMap,
 			UpdateFunc: func(old, cur interface{}) {
-				oldCluster, ok := old.(*federation.Cluster)
+				oldCluster, ok := old.(*v1alpha1.Cluster)
 				if !ok {
 					return
 				}
-				curCluster, ok := cur.(*federation.Cluster)
+				curCluster, ok := cur.(*v1alpha1.Cluster)
 				if !ok {
 					return
 				}
@@ -261,14 +261,14 @@ func (s *ServiceController) fedServiceWorker() {
 	}
 }
 
-func wantsDNSRecords(service *api.Service) bool {
-	return service.Spec.Type == api.ServiceTypeLoadBalancer
+func wantsDNSRecords(service *v1.Service) bool {
+	return service.Spec.Type == v1.ServiceTypeLoadBalancer
 }
 
 // processServiceForCluster creates or updates service to all registered running clusters,
 // update DNS records and update the service info with DNS entries to federation apiserver.
 // the function returns any error caught
-func (s *ServiceController) processServiceForCluster(cachedService *cachedService, clusterName string, service *api.Service, client *clientset.Clientset) error {
+func (s *ServiceController) processServiceForCluster(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_3.Clientset) error {
 	glog.V(4).Infof("Process service %s/%s for cluster %s", service.Namespace, service.Name, clusterName)
 	// Create or Update k8s Service
 	err := s.ensureClusterService(cachedService, clusterName, service, client)
@@ -288,7 +288,7 @@ func (s *ServiceController) updateFederationService(key string, cachedService *c
 	if err != nil {
 		return err, !retryable
 	}
-	service, ok := clone.(*api.Service)
+	service, ok := clone.(*v1.Service)
 	if !ok {
 		return fmt.Errorf("Unexpected service cast error : %v\n", service), !retryable
 	}
@@ -326,7 +326,7 @@ func (s *ServiceController) deleteFederationService(cachedService *cachedService
 	return nil, !retryable
 }
 
-func (s *ServiceController) deleteClusterService(clusterName string, cachedService *cachedService, clientset *clientset.Clientset) error {
+func (s *ServiceController) deleteClusterService(clusterName string, cachedService *cachedService, clientset *release_1_3.Clientset) error {
 	service := cachedService.lastState
 	glog.V(4).Infof("Deleting service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
 	var err error
@@ -342,7 +342,7 @@ func (s *ServiceController) deleteClusterService(clusterName string, cachedServi
 	return err
 }
 
-func (s *ServiceController) ensureClusterService(cachedService *cachedService, clusterName string, service *api.Service, client *clientset.Clientset) error {
+func (s *ServiceController) ensureClusterService(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_3.Clientset) error {
 	var err error
 	var needUpdate bool
 	for i := 0; i < clientRetryCount; i++ {
@@ -434,7 +434,7 @@ func (s *serviceCache) getOrCreate(serviceName string) *cachedService {
 	if !ok {
 		service = &cachedService{
 			endpointMap:      make(map[string]int),
-			serviceStatusMap: make(map[string]api.LoadBalancerStatus),
+			serviceStatusMap: make(map[string]v1.LoadBalancerStatus),
 		}
 		s.fedServiceMap[serviceName] = service
 	}
@@ -454,12 +454,12 @@ func (s *serviceCache) delete(serviceName string) {
 }
 
 // needsUpdateDNS check if the dns records of the given service should be updated
-func (s *ServiceController) needsUpdateDNS(oldService *api.Service, newService *api.Service) bool {
+func (s *ServiceController) needsUpdateDNS(oldService *v1.Service, newService *v1.Service) bool {
 	if !wantsDNSRecords(oldService) && !wantsDNSRecords(newService) {
 		return false
 	}
 	if wantsDNSRecords(oldService) != wantsDNSRecords(newService) {
-		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "Type", "%v -> %v",
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "Type", "%v -> %v",
 			oldService.Spec.Type, newService.Spec.Type)
 		return true
 	}
@@ -467,18 +467,18 @@ func (s *ServiceController) needsUpdateDNS(oldService *api.Service, newService *
 		return true
 	}
 	if !LoadBalancerIPsAreEqual(oldService, newService) {
-		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "LoadbalancerIP", "%v -> %v",
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadbalancerIP", "%v -> %v",
 			oldService.Spec.LoadBalancerIP, newService.Spec.LoadBalancerIP)
 		return true
 	}
 	if len(oldService.Spec.ExternalIPs) != len(newService.Spec.ExternalIPs) {
-		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "ExternalIP", "Count: %v -> %v",
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalIP", "Count: %v -> %v",
 			len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs))
 		return true
 	}
 	for i := range oldService.Spec.ExternalIPs {
 		if oldService.Spec.ExternalIPs[i] != newService.Spec.ExternalIPs[i] {
-			s.eventRecorder.Eventf(newService, api.EventTypeNormal, "ExternalIP", "Added: %v",
+			s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalIP", "Added: %v",
 				newService.Spec.ExternalIPs[i])
 			return true
 		}
@@ -487,7 +487,7 @@ func (s *ServiceController) needsUpdateDNS(oldService *api.Service, newService *
 		return true
 	}
 	if oldService.UID != newService.UID {
-		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "UID", "%v -> %v",
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "UID", "%v -> %v",
 			oldService.UID, newService.UID)
 		return true
 	}
@@ -495,11 +495,11 @@ func (s *ServiceController) needsUpdateDNS(oldService *api.Service, newService *
 	return false
 }
 
-func getPortsForLB(service *api.Service) ([]*api.ServicePort, error) {
+func getPortsForLB(service *v1.Service) ([]*v1.ServicePort, error) {
 	// TODO: quinton: Probably applies for DNS SVC records.  Come back to this.
 	//var protocol api.Protocol
 
-	ports := []*api.ServicePort{}
+	ports := []*v1.ServicePort{}
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
 		// The check on protocol was removed here.  The DNS provider itself is now responsible for all protocol validation
@@ -508,7 +508,7 @@ func getPortsForLB(service *api.Service) ([]*api.ServicePort, error) {
 	return ports, nil
 }
 
-func portsEqualForLB(x, y *api.Service) bool {
+func portsEqualForLB(x, y *v1.Service) bool {
 	xPorts, err := getPortsForLB(x)
 	if err != nil {
 		return false
@@ -520,7 +520,7 @@ func portsEqualForLB(x, y *api.Service) bool {
 	return portSlicesEqualForLB(xPorts, yPorts)
 }
 
-func portSlicesEqualForLB(x, y []*api.ServicePort) bool {
+func portSlicesEqualForLB(x, y []*v1.ServicePort) bool {
 	if len(x) != len(y) {
 		return false
 	}
@@ -533,7 +533,7 @@ func portSlicesEqualForLB(x, y []*api.ServicePort) bool {
 	return true
 }
 
-func portEqualForLB(x, y *api.ServicePort) bool {
+func portEqualForLB(x, y *v1.ServicePort) bool {
 	// TODO: Should we check name?  (In theory, an LB could expose it)
 	if x.Name != y.Name {
 		return false
@@ -552,7 +552,7 @@ func portEqualForLB(x, y *api.ServicePort) bool {
 	return true
 }
 
-func portEqualExcludeNodePort(x, y *api.ServicePort) bool {
+func portEqualExcludeNodePort(x, y *v1.ServicePort) bool {
 	// TODO: Should we check name?  (In theory, an LB could expose it)
 	if x.Name != y.Name {
 		return false
@@ -568,7 +568,7 @@ func portEqualExcludeNodePort(x, y *api.ServicePort) bool {
 	return true
 }
 
-func clustersFromList(list *federation.ClusterList) []string {
+func clustersFromList(list *v1alpha1.ClusterList) []string {
 	result := []string{}
 	for ix := range list.Items {
 		result = append(result, list.Items[ix].Name)
@@ -579,7 +579,7 @@ func clustersFromList(list *federation.ClusterList) []string {
 // getClusterConditionPredicate filter all clusters meet condition of
 // condition.type=Ready and condition.status=true
 func getClusterConditionPredicate() federationcache.ClusterConditionPredicate {
-	return func(cluster federation.Cluster) bool {
+	return func(cluster v1alpha1.Cluster) bool {
 		// If we have no info, don't accept
 		if len(cluster.Status.Conditions) == 0 {
 			return false
@@ -587,7 +587,7 @@ func getClusterConditionPredicate() federationcache.ClusterConditionPredicate {
 		for _, cond := range cluster.Status.Conditions {
 			//We consider the cluster for load balancing only when its ClusterReady condition status
 			//is ConditionTrue
-			if cond.Type == federation.ClusterReady && cond.Status != api.ConditionTrue {
+			if cond.Type == v1alpha1.ClusterReady && cond.Status != v1.ConditionTrue {
 				glog.V(4).Infof("Ignoring cluser %v with %v condition status %v", cluster.Name, cond.Type, cond.Status)
 				return false
 			}
@@ -695,7 +695,7 @@ func (s *ServiceController) lockedUpdateDNSRecords(service *cachedService, clust
 	return nil
 }
 
-func LoadBalancerIPsAreEqual(oldService, newService *api.Service) bool {
+func LoadBalancerIPsAreEqual(oldService, newService *v1.Service) bool {
 	return oldService.Spec.LoadBalancerIP == newService.Spec.LoadBalancerIP
 }
 
@@ -778,7 +778,7 @@ func (s *ServiceController) syncService(key string) error {
 	}
 
 	if exists {
-		service, ok := obj.(*api.Service)
+		service, ok := obj.(*v1.Service)
 		if ok {
 			cachedService = s.serviceCache.getOrCreate(key)
 			err, retryDelay = s.processServiceUpdate(cachedService, service, key)
@@ -803,7 +803,7 @@ func (s *ServiceController) syncService(key string) error {
 // processServiceUpdate returns an error if processing the service update failed, along with a time.Duration
 // indicating whether processing should be retried; zero means no-retry; otherwise
 // we should retry in that Duration.
-func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *api.Service, key string) (error, time.Duration) {
+func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *v1.Service, key string) (error, time.Duration) {
 	// Ensure that no other goroutine will interfere with our processing of the
 	// service.
 	cachedService.rwlock.Lock()
@@ -822,7 +822,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 			message += " (will not retry): "
 		}
 		message += err.Error()
-		s.eventRecorder.Event(service, api.EventTypeWarning, "UpdateServiceFail", message)
+		s.eventRecorder.Event(service, v1.EventTypeWarning, "UpdateServiceFail", message)
 		return err, cachedService.nextRetryDelay()
 	}
 	// Always update the cache upon success.
@@ -849,7 +849,7 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 	service := cachedService.lastState
 	cachedService.rwlock.Lock()
 	defer cachedService.rwlock.Unlock()
-	s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingDNSRecord", "Deleting DNS Records")
+	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingDNSRecord", "Deleting DNS Records")
 	// TODO should we delete dns info here or wait for endpoint changes? prefer here
 	// or we do nothing for service deletion
 	//err := s.dns.balancer.EnsureLoadBalancerDeleted(service)
@@ -861,10 +861,10 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 		} else {
 			message += " (will not retry): "
 		}
-		s.eventRecorder.Event(service, api.EventTypeWarning, "DeletingDNSRecordFailed", message)
+		s.eventRecorder.Event(service, v1.EventTypeWarning, "DeletingDNSRecordFailed", message)
 		return err, cachedService.nextRetryDelay()
 	}
-	s.eventRecorder.Event(service, api.EventTypeNormal, "DeletedDNSRecord", "Deleted DNS Records")
+	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedDNSRecord", "Deleted DNS Records")
 	s.serviceCache.delete(key)
 
 	cachedService.resetRetryDelay()
