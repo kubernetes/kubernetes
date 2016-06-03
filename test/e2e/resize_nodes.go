@@ -76,6 +76,27 @@ func ResizeGroup(group string, size int32) error {
 	}
 }
 
+func GetGroupNodes(group string) ([]string, error) {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
+		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
+		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
+			"list-instances", group, "--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
+		if err != nil {
+			return nil, err
+		}
+		re := regexp.MustCompile(".*RUNNING")
+		lines := re.FindStringSubmatch(string(output))
+		for i, line := range lines {
+			lines[i] = line[:strings.Index(line, " ")]
+		}
+		return lines, nil
+	} else {
+		return nil, fmt.Errorf("provider does not support InstanceGroups")
+	}
+}
+
 func GroupSize(group string) (int, error) {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.

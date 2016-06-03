@@ -128,6 +128,54 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size < nodeCount+1 }, scaleDownTimeout))
 	})
+
+	It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		labels := map[string]string{"cluster-autoscaling-test.special-node": "true"}
+
+		By("Finding the smallest MIG")
+		minMig := ""
+		minSize := nodeCount
+		for mig, size := range originalSizes {
+			if size <= minSize {
+				minMig = mig
+				minSize = size
+			}
+		}
+
+		By(fmt.Sprintf("Annotating nodes of the smallest MIG: %s", minMig))
+		nodes, err := GetGroupNodes(minMig)
+		nodesMap := map[string]struct{}{}
+		ExpectNoError(err)
+		for _, node := range nodes {
+			updateLabelsForNode(f, node, labels, nil)
+			nodesMap[node] = struct{}{}
+		}
+
+		CreateNodeSelectorPods(f, "node-selector", minSize+1, labels, false)
+
+		By("Waiting for new node to appear and annotating it")
+		WaitForGroupSize(minMig, int32(minSize+1))
+		newNodes, err := GetGroupNodes(minMig)
+		ExpectNoError(err)
+		for _, node := range newNodes {
+			if _, old := nodesMap[node]; !old {
+				updateLabelsForNode(f, node, labels, nil)
+			}
+		}
+
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+
+		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "node-selector"))
+		By("Removing labels from nodes")
+		for _, node := range newNodes {
+			updateLabelsForNode(f, node, map[string]string{}, []string{"cluster-autoscaling-test.special-node"})
+		}
+		restoreSizes(originalSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
+
+	})
 })
 
 func getGKEClusterUrl() string {
@@ -207,6 +255,25 @@ func doPut(url, content string) (string, error) {
 	return strBody, nil
 }
 
+func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) {
+	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
+
+	config := &framework.RCConfig{
+		Client:       f.Client,
+		Name:         "node-selector",
+		Namespace:    f.Namespace.Name,
+		Timeout:      defaultTimeout,
+		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		Replicas:     replicas,
+		HostPorts:    map[string]int{"port1": 4321},
+		NodeSelector: map[string]string{"cluster-autoscaling-test.special-node": "true"},
+	}
+	err := framework.RunRC(*config)
+	if expectRunning {
+		framework.ExpectNoError(err)
+	}
+}
+
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port"))
 	config := &framework.RCConfig{
@@ -222,7 +289,6 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
-
 }
 
 func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
@@ -296,4 +362,17 @@ func restoreSizes(sizes map[string]int) {
 			framework.ExpectNoError(err)
 		}
 	}
+}
+
+func updateLabelsForNode(f *framework.Framework, node string, addLabels map[string]string, rmLabels []string) {
+	n, err := f.Client.Nodes().Get(node)
+	ExpectNoError(err)
+	for _, label := range rmLabels {
+		delete(n.Labels, label)
+	}
+	for label, value := range addLabels {
+		n.Labels[label] = value
+	}
+	_, err = f.Client.Nodes().Update(n)
+	ExpectNoError(err)
 }
