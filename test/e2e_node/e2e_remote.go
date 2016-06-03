@@ -188,7 +188,6 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (
 	glog.Infof("Copying test artifacts from %s", host)
 	scpErr := getTestArtifacts(host, tmp)
 	exitOk := true
-	glog.Errorf("vishh: %v", scpErr)
 	if scpErr != nil {
 		// Only exit non-0 if the scp failed
 		exitOk = false
