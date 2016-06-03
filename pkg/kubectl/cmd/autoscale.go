@@ -41,7 +41,7 @@ const (
 Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
 An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`
 
-	autoscaleExample = `# Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
+	autoscaleExample = `# Auto scale a deployment "foo", with the number of pods between 2 to 10, no target CPU utilization specfied so a default autoscaling policy will be used:
 kubectl autoscale deployment foo --min=2 --max=10
 
 # Auto scale a replication controller "foo", with the number of pods between 1 to 5, target CPU utilization at 80%:
@@ -62,11 +62,11 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "horizontalpodautoscaler/v1beta1", "The name of the API generator to use. Currently there is only 1 generator.")
+	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", "The name of the API generator to use. Currently there is only 1 generator.")
 	cmd.Flags().Int("min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int("max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
-	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, the server will apply a default value."))
+	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
 	cmd.Flags().String("name", "", "The name for the newly created object. If not specified, the name of the input resource will be used.")
 	cmdutil.AddDryRunFlag(cmd)
 	usage := "Filename, directory, or URL to a file identifying the resource to autoscale."
