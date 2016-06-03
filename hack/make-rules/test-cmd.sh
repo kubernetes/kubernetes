@@ -110,7 +110,7 @@ function kubectl-with-retry()
 {
   ERROR_FILE="${KUBE_TEMP}/kubectl-error"
   preserve_err_file=${PRESERVE_ERR_FILE-false}
-  for count in $(seq 0 3); do
+  for count in {0..3}; do
     kubectl "$@" 2> ${ERROR_FILE} || true
     if grep -q "the object has been modified" "${ERROR_FILE}"; then
       kube::log::status "retry $1, error: $(cat ${ERROR_FILE})"
@@ -694,7 +694,7 @@ runTests() {
   ## If the resourceVersion is the same as the one stored in the server, the patch will be applied.
   # Command
   # Needs to retry because other party may change the resource.
-  for count in $(seq 0 3); do
+  for count in {0..3}; do
     resourceVersion=$(kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
     kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'$resourceVersion'"}}' 2> "${ERROR_FILE}" || true
     if grep -q "the object has been modified" "${ERROR_FILE}"; then
