@@ -59,9 +59,65 @@ type CacherConfig struct {
 	// KeyFunc is used to get a key in the underyling storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
 
+	// TriggerPublisherFunc is used for optimizing amount of watchers that
+	// needs to process an incoming event.
+	TriggerPublisherFunc TriggerPublisherFunc
+
 	// NewList is a function that creates new empty object storing a list of
 	// objects of type Type.
 	NewListFunc func() runtime.Object
+}
+
+type watchersMap map[int]*cacheWatcher
+
+func (wm watchersMap) addWatcher(w *cacheWatcher, number int) {
+	wm[number] = w
+}
+
+func (wm watchersMap) deleteWatcher(number int) {
+	delete(wm, number)
+}
+
+func (wm watchersMap) terminateAll() {
+	for key, watcher := range wm {
+		delete(wm, key)
+		watcher.stop()
+	}
+}
+
+type indexedWatchers struct {
+	allWatchers   watchersMap
+	valueWatchers map[string]watchersMap
+}
+
+func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, value string, supported bool) {
+	if supported {
+		if _, ok := i.valueWatchers[value]; !ok {
+			i.valueWatchers[value] = watchersMap{}
+		}
+		i.valueWatchers[value].addWatcher(w, number)
+	} else {
+		i.allWatchers.addWatcher(w, number)
+	}
+}
+
+func (i *indexedWatchers) deleteWatcher(number int, value string, supported bool) {
+	if supported {
+		i.valueWatchers[value].deleteWatcher(number)
+		if len(i.valueWatchers[value]) == 0 {
+			delete(i.valueWatchers, value)
+		}
+	} else {
+		i.allWatchers.deleteWatcher(number)
+	}
+}
+
+func (i *indexedWatchers) terminateAll() {
+	i.allWatchers.terminateAll()
+	for index, watchers := range i.valueWatchers {
+		watchers.terminateAll()
+		delete(i.valueWatchers, index)
+	}
 }
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
@@ -87,15 +143,19 @@ type Cacher struct {
 	watchCache *watchCache
 	reflector  *cache.Reflector
 
-	// Registered watchers.
-	watcherIdx int
-	watchers   map[int]*cacheWatcher
-
 	// Versioner is used to handle resource versions.
 	versioner Versioner
 
 	// keyFunc is used to get a key in the underyling storage for a given object.
 	keyFunc func(runtime.Object) (string, error)
+
+	// triggerFunc is used for optimizing amount of watchers that needs to process
+	// an incoming event.
+	triggerFunc TriggerPublisherFunc
+	// watchers is mapping from the value of trigger function that a
+	// watcher is interested into the watchers
+	watcherIdx int
+	watchers   indexedWatchers
 
 	// Handling graceful termination.
 	stopLock sync.RWMutex
@@ -120,13 +180,18 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	}
 
 	cacher := &Cacher{
-		ready:      newReady(),
-		storage:    config.Storage,
-		watchCache: watchCache,
-		reflector:  cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
-		watchers:   make(map[int]*cacheWatcher),
-		versioner:  config.Versioner,
-		keyFunc:    config.KeyFunc,
+		ready:       newReady(),
+		storage:     config.Storage,
+		watchCache:  watchCache,
+		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
+		versioner:   config.Versioner,
+		keyFunc:     config.KeyFunc,
+		triggerFunc: config.TriggerPublisherFunc,
+		watcherIdx:  0,
+		watchers: indexedWatchers{
+			allWatchers:   make(map[int]*cacheWatcher),
+			valueWatchers: make(map[string]watchersMap),
+		},
 		// We need to (potentially) stop both:
 		// - wait.Until go-routine
 		// - reflector.ListAndWatch
@@ -223,10 +288,20 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		return newErrWatcher(err), nil
 	}
 
+	triggerValue, triggerSupported := "", false
+	// TODO: Currently we assume that in a given Cacher object, any <filter> that is
+	// passed here is aware of exactly the same trigger (at most one).
+	// Thus, either 0 or 1 values will be returned.
+	if matchValues := filter.Trigger(); len(matchValues) > 0 {
+		triggerValue, triggerSupported = matchValues[0].Value, true
+	}
+
 	c.Lock()
 	defer c.Unlock()
-	watcher := newCacheWatcher(watchRV, initEvents, filterFunction(key, c.keyFunc, filter), forgetWatcher(c, c.watcherIdx))
-	c.watchers[c.watcherIdx] = watcher
+	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
+	watcher := newCacheWatcher(watchRV, initEvents, filterFunction(key, c.keyFunc, filter), forget)
+
+	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
 	return watcher, nil
 }
@@ -307,21 +382,68 @@ func (c *Cacher) Codec() runtime.Codec {
 	return c.storage.Codec()
 }
 
+func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
+	// TODO: Currently we assume that in a given Cacher object, its <c.triggerFunc>
+	// is aware of exactly the same trigger (at most one). Thus calling:
+	//   c.triggerFunc(<some object>)
+	// can return only 0 or 1 values.
+	// That means, that triggerValues itself may return up to 2 different values.
+	if c.triggerFunc == nil {
+		return nil, false
+	}
+	result := make([]string, 0, 2)
+	matchValues := c.triggerFunc(event.Object)
+	if len(matchValues) > 0 {
+		result = append(result, matchValues[0].Value)
+	}
+	if event.PrevObject == nil {
+		return result, len(result) > 0
+	}
+	prevMatchValues := c.triggerFunc(event.PrevObject)
+	if len(prevMatchValues) > 0 {
+		if len(result) == 0 || result[0] != prevMatchValues[0].Value {
+			result = append(result, prevMatchValues[0].Value)
+		}
+	}
+	return result, len(result) > 0
+}
+
 func (c *Cacher) processEvent(event watchCacheEvent) {
+	triggerValues, supported := c.triggerValues(&event)
+
 	c.Lock()
 	defer c.Unlock()
-	for _, watcher := range c.watchers {
+	// Iterate over "allWatchers" no matter what the trigger function is.
+	for _, watcher := range c.watchers.allWatchers {
 		watcher.add(event)
+	}
+	if supported {
+		// Iterate over watchers interested in the given values of the trigger.
+		for _, triggerValue := range triggerValues {
+			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
+				watcher.add(event)
+			}
+		}
+	} else {
+		// supported equal to false generally means that trigger function
+		// is not defined (or not aware of any indexes). In this case,
+		// watchers filters should generally also don't generate any
+		// trigger values, but can cause problems in case of some
+		// misconfiguration. Thus we paranoidly leave this branch.
+
+		// Iterate over watchers interested in exact values for all values.
+		for _, watchers := range c.watchers.valueWatchers {
+			for _, watcher := range watchers {
+				watcher.add(event)
+			}
+		}
 	}
 }
 
 func (c *Cacher) terminateAllWatchers() {
 	c.Lock()
 	defer c.Unlock()
-	for key, watcher := range c.watchers {
-		delete(c.watchers, key)
-		watcher.stop()
-	}
+	c.watchers.terminateAll()
 }
 
 func (c *Cacher) isStopped() bool {
@@ -338,15 +460,15 @@ func (c *Cacher) Stop() {
 	c.stopWg.Wait()
 }
 
-func forgetWatcher(c *Cacher, index int) func(bool) {
+func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported bool) func(bool) {
 	return func(lock bool) {
 		if lock {
 			c.Lock()
 			defer c.Unlock()
 		}
-		// It's possible that the watcher is already not in the map (e.g. in case of
+		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
-		delete(c.watchers, index)
+		c.watchers.deleteWatcher(index, triggerValue, triggerSupported)
 	}
 }
 
@@ -362,7 +484,7 @@ func filterFunction(key string, keyFunc func(runtime.Object) (string, error), fi
 		}
 		return filter.Filter(obj)
 	}
-	return NewSimpleFilter(filterFunc)
+	return NewSimpleFilter(filterFunc, filter.Trigger)
 }
 
 // Returns resource version to which the underlying cache is synced.

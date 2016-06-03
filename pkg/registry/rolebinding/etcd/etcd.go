@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for RoleBinding against etcd
@@ -43,6 +44,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		prefix,
 		rolebinding.Strategy,
 		newListFunc,
+		storage.NoTriggerPublisher,
 	)
 
 	store := &registry.Store{

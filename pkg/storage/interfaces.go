@@ -51,11 +51,30 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
+// MatchValue defines a pair (<index name>, <value for that index>).
+type MatchValue struct {
+	IndexName string
+	Value     string
+}
+
+// TriggerPublisherFunc is a function that takes an object, and returns a list of pairs
+// (<index name>, <index value for the given object>) for all indexes known
+// to that function.
+type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
+
 // Filter is interface that is used to pass filtering mechanism.
 type Filter interface {
 	// Filter is a predicate which takes an API object and returns true
 	// if and only if the object should remain in the set.
 	Filter(obj runtime.Object) bool
+	// For any triggers known to the Filter, if Filter() can return only
+	// (a subset of) objects for which indexing function returns <value>,
+	// (<index name>, <value> pair would be returned.
+	//
+	// This is optimization to avoid computing Filter() function (which are
+	// usually relatively expensive) in case we are sure they will return
+	// false anyway.
+	Trigger() []MatchValue
 }
 
 // Everything is a Filter which accepts all objects.
@@ -65,8 +84,12 @@ var Everything Filter = everything{}
 type everything struct {
 }
 
-func (e everything) Filter(_ runtime.Object) bool {
+func (e everything) Filter(runtime.Object) bool {
 	return true
+}
+
+func (e everything) Trigger() []MatchValue {
+	return nil
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update

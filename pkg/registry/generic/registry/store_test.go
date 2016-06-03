@@ -105,6 +105,10 @@ func (sm setMatcher) MatchesSingle() (string, bool) {
 	return "", false
 }
 
+func (sm setMatcher) MatcherIndex() []storage.MatchValue {
+	return nil
+}
+
 // everythingMatcher matches everything
 type everythingMatcher struct{}
 
@@ -114,6 +118,10 @@ func (everythingMatcher) Matches(obj runtime.Object) (bool, error) {
 
 func (everythingMatcher) MatchesSingle() (string, bool) {
 	return "", false
+}
+
+func (everythingMatcher) MatcherIndex() []storage.MatchValue {
+	return nil
 }
 
 func TestStoreList(t *testing.T) {

@@ -56,6 +56,10 @@ func (f *firstLetterIsB) Filter(obj runtime.Object) bool {
 	return obj.(*api.Pod).Name[0] == 'b'
 }
 
+func (f *firstLetterIsB) Trigger() []storage.MatchValue {
+	return nil
+}
+
 func TestWatchInterpretations(t *testing.T) {
 	codec := testapi.Default.Codec()
 	// Declare some pods to make the test cases compact.
@@ -230,7 +234,7 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 	filterFunc := func(obj runtime.Object) bool {
 		return obj.(*api.Pod).Name != "bar"
 	}
-	filter := storage.NewSimpleFilter(filterFunc)
+	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
 	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, &fakeEtcdCache{})
 
 	eventChan := make(chan watch.Event, 1)

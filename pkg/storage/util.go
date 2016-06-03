@@ -38,21 +38,37 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 
 // SimpleFilter implements Filter interface.
 type SimpleFilter struct {
-	filterFunc func(runtime.Object) bool
+	filterFunc  func(runtime.Object) bool
+	triggerFunc func() []MatchValue
 }
 
 func (s *SimpleFilter) Filter(obj runtime.Object) bool {
 	return s.filterFunc(obj)
 }
 
-func NewSimpleFilter(filterFunc func(runtime.Object) bool) Filter {
+func (s *SimpleFilter) Trigger() []MatchValue {
+	return s.triggerFunc()
+}
+
+func NewSimpleFilter(
+	filterFunc func(runtime.Object) bool,
+	triggerFunc func() []MatchValue) Filter {
 	return &SimpleFilter{
-		filterFunc: filterFunc,
+		filterFunc:  filterFunc,
+		triggerFunc: triggerFunc,
 	}
 }
 
 func EverythingFunc(runtime.Object) bool {
 	return true
+}
+
+func NoTriggerFunc() []MatchValue {
+	return nil
+}
+
+func NoTriggerPublisher(runtime.Object) []MatchValue {
+	return nil
 }
 
 // ParseWatchResourceVersion takes a resource version argument and converts it to

@@ -30,15 +30,17 @@ func StorageWithCacher(
 	objectType runtime.Object,
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
-	newListFunc func() runtime.Object) storage.Interface {
+	newListFunc func() runtime.Object,
+	triggerFunc storage.TriggerPublisherFunc) storage.Interface {
 
 	config := storage.CacherConfig{
-		CacheCapacity:  capacity,
-		Storage:        storageInterface,
-		Versioner:      etcdstorage.APIObjectVersioner{},
-		Type:           objectType,
-		ResourcePrefix: resourcePrefix,
-		NewListFunc:    newListFunc,
+		CacheCapacity:        capacity,
+		Storage:              storageInterface,
+		Versioner:            etcdstorage.APIObjectVersioner{},
+		Type:                 objectType,
+		ResourcePrefix:       resourcePrefix,
+		NewListFunc:          newListFunc,
+		TriggerPublisherFunc: triggerFunc,
 	}
 	if scopeStrategy.NamespaceScoped() {
 		config.KeyFunc = func(obj runtime.Object) (string, error) {
