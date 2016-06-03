@@ -84,6 +84,8 @@ const (
 
 	DockerNetnsFmt = "/proc/%v/ns/net"
 
+	networkAnnotation = "kubernetes.io/pod/network"
+
 	// String used to detect docker host mode for various namespaces (e.g.
 	// networking). Must match the value returned by docker inspect -f
 	// '{{.HostConfig.NetworkMode}}'.
@@ -135,6 +137,10 @@ type DockerManager struct {
 
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
+
+	// If networkDriver is runtime, try to look at annotations
+	// to decide which network to connect.
+	networkDriver string
 
 	// Health check results.
 	livenessManager proberesults.Manager
@@ -207,6 +213,7 @@ func NewDockerManager(
 	burst int,
 	containerLogsDir string,
 	osInterface kubecontainer.OSInterface,
+	networkDriver string,
 	networkPlugin network.NetworkPlugin,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	httpClient types.HttpGetter,
@@ -246,6 +253,7 @@ func NewDockerManager(
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
+		networkDriver:          networkDriver,
 		livenessManager:        livenessManager,
 		runtimeHelper:          runtimeHelper,
 		execHandler:            execHandler,
@@ -1678,6 +1686,19 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 		netNamespace = namespaceModeHost
 	} else if dm.networkPlugin.Name() == "cni" || dm.networkPlugin.Name() == "kubenet" {
 		netNamespace = "none"
+	} else if dm.networkDriver == "runtime" {
+		annots := pod.ObjectMeta.Annotations
+		if network, ok := annots[networkAnnotation]; ok && len(network) > 0 {
+			netNamespace = network
+		}
+		// Docker only exports ports from the pod infra container.  Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.InitContainers {
+			ports = append(ports, container.Ports...)
+		}
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
 	} else {
 		// Docker only exports ports from the pod infra container.  Let's
 		// collect all of the relevant ports and export them.

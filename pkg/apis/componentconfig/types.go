@@ -243,6 +243,9 @@ type KubeletConfiguration struct {
 	// networkPluginDir is the full path of the directory in which to search
 	// for network plugins
 	NetworkPluginDir string `json:"networkPluginDir"`
+	// How should kubelet configure the container network. If --network-driver is runtime,
+	// kubelet would look at annotations on Pod to decide which network containers would connect.
+	NetworkDriver string `json:"networkDriver"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`

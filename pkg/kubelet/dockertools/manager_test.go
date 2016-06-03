@@ -117,6 +117,7 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 		options.GetDefaultPodInfraContainerImage(),
 		0, 0, "",
 		&containertest.FakeOS{},
+		"",
 		networkPlugin,
 		&fakeRuntimeHelper{},
 		fakeHTTPClient,
@@ -544,6 +545,7 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 // docker client and runs SyncPod for the given pod.
 func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *flowcontrol.Backoff, expectErr bool) kubecontainer.PodSyncResult {
 	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	fmt.Printf("the pod status: %#v\n", podStatus)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1363,6 +1365,70 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 	}
 	if parts[1] != "/dev/somepath" {
 		t.Errorf("unexpected container path: %s", parts[1])
+	}
+}
+
+func TestSyncPodWithNetworkDriver(t *testing.T) {
+	fakeHTTPClient := &fakeHTTP{}
+	fakeDocker := NewFakeDockerClient()
+	fakeRecorder := &record.FakeRecorder{}
+	containerRefManager := kubecontainer.NewRefManager()
+	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone)
+	dockerManager := NewFakeDockerManager(
+		fakeDocker,
+		fakeRecorder,
+		proberesults.NewManager(),
+		containerRefManager,
+		&cadvisorapi.MachineInfo{},
+		options.GetDefaultPodInfraContainerImage(),
+		0, 0, "",
+		&containertest.FakeOS{},
+		"runtime",
+		networkPlugin,
+		&fakeRuntimeHelper{},
+		fakeHTTPClient,
+		flowcontrol.NewBackOff(time.Second, 300*time.Second))
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+			Annotations: map[string]string{
+				"kubernetes.io/pod/network": "vlan1000",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar"},
+			},
+		},
+	}
+
+	runSyncPod(t, dockerManager, fakeDocker, pod, nil, false)
+
+	verifyCalls(t, fakeDocker, []string{
+		// Create pod infra container.
+		"create", "start", "inspect_container", "inspect_container",
+		// Create container.
+		"create", "start", "inspect_container",
+	})
+
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
+
+	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[0])
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	netMode := newContainer.HostConfig.NetworkMode
+	if netMode != "vlan1000" {
+		t.Errorf("Pod should have \"vlan1000\" netMode, actual: \"%v\"", netMode)
 	}
 }
 
