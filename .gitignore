@@ -102,4 +102,4 @@ kubernetes.tar.gz
 zz_generated.*
 
 # make-related metadata
-.make.*
+/.make/
