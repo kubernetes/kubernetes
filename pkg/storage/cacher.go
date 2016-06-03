@@ -200,7 +200,7 @@ func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, pre
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error) {
+func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error) {
 	watchRV, err := ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
@@ -232,7 +232,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 }
 
 // Implements storage.Interface.
-func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error) {
+func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error) {
 	return c.Watch(ctx, key, resourceVersion, filter)
 }
 
@@ -242,12 +242,12 @@ func (c *Cacher) Get(ctx context.Context, key string, objPtr runtime.Object, ign
 }
 
 // Implements storage.Interface.
-func (c *Cacher) GetToList(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error {
+func (c *Cacher) GetToList(ctx context.Context, key string, filter Filter, listObj runtime.Object) error {
 	return c.storage.GetToList(ctx, key, filter, listObj)
 }
 
 // Implements storage.Interface.
-func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, filter FilterFunc, listObj runtime.Object) error {
+func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, filter Filter, listObj runtime.Object) error {
 	if resourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
@@ -285,7 +285,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, f
 		if !ok {
 			return fmt.Errorf("non runtime.Object returned from storage: %v", obj)
 		}
-		if filterFunc(object) {
+		if filterFunc.Filter(object) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(object).Elem()))
 		}
 	}
@@ -350,8 +350,8 @@ func forgetWatcher(c *Cacher, index int) func(bool) {
 	}
 }
 
-func filterFunction(key string, keyFunc func(runtime.Object) (string, error), filter FilterFunc) FilterFunc {
-	return func(obj runtime.Object) bool {
+func filterFunction(key string, keyFunc func(runtime.Object) (string, error), filter Filter) Filter {
+	filterFunc := func(obj runtime.Object) bool {
 		objKey, err := keyFunc(obj)
 		if err != nil {
 			glog.Errorf("invalid object for filter: %v", obj)
@@ -360,8 +360,9 @@ func filterFunction(key string, keyFunc func(runtime.Object) (string, error), fi
 		if !strings.HasPrefix(objKey, key) {
 			return false
 		}
-		return filter(obj)
+		return filter.Filter(obj)
 	}
+	return NewSimpleFilter(filterFunc)
 }
 
 // Returns resource version to which the underlying cache is synced.
@@ -450,12 +451,12 @@ type cacheWatcher struct {
 	sync.Mutex
 	input   chan watchCacheEvent
 	result  chan watch.Event
-	filter  FilterFunc
+	filter  Filter
 	stopped bool
 	forget  func(bool)
 }
 
-func newCacheWatcher(resourceVersion uint64, initEvents []watchCacheEvent, filter FilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, initEvents []watchCacheEvent, filter Filter, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:   make(chan watchCacheEvent, 10),
 		result:  make(chan watch.Event, 10),
@@ -527,10 +528,10 @@ func (c *cacheWatcher) add(event watchCacheEvent) {
 }
 
 func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Object)
+	curObjPasses := event.Type != watch.Deleted && c.filter.Filter(event.Object)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.PrevObject)
+		oldObjPasses = c.filter.Filter(event.PrevObject)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.

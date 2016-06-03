@@ -57,12 +57,12 @@ func testWatch(t *testing.T, recursive bool) {
 
 	tests := []struct {
 		key        string
-		filter     storage.FilterFunc
+		filter     func(runtime.Object) bool
 		watchTests []*testWatchStruct
 	}{{ // create a key
 		key:        "/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		filter:     storage.Everything,
+		filter:     storage.EverythingFunc,
 	}, { // create a key but obj gets filtered
 		key:        "/somekey-2",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}},
@@ -77,7 +77,7 @@ func testWatch(t *testing.T, recursive bool) {
 	}, { // update
 		key:        "/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		filter:     storage.Everything,
+		filter:     storage.EverythingFunc,
 	}, { // delete because of being filtered
 		key:        "/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
@@ -87,7 +87,8 @@ func testWatch(t *testing.T, recursive bool) {
 		},
 	}}
 	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, "0", tt.filter, recursive)
+		filter := storage.NewSimpleFilter(tt.filter)
+		w, err := store.watch(ctx, tt.key, "0", filter, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}

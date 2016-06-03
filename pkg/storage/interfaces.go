@@ -51,12 +51,21 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// FilterFunc is a predicate which takes an API object and returns true
-// if and only if the object should remain in the set.
-type FilterFunc func(obj runtime.Object) bool
+// Filter is interface that is used to pass filtering mechanism.
+type Filter interface {
+	// Filter is a predicate which takes an API object and returns true
+	// if and only if the object should remain in the set.
+	Filter(obj runtime.Object) bool
+}
 
-// Everything is a FilterFunc which accepts all objects.
-func Everything(runtime.Object) bool {
+// Everything is a Filter which accepts all objects.
+var Everything Filter = everything{}
+
+// everything is implementation of Everything.
+type everything struct {
+}
+
+func (e everything) Filter(_ runtime.Object) bool {
 	return true
 }
 
@@ -102,14 +111,14 @@ type Interface interface {
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	Watch(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
+	Watch(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item passing 'filter' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	WatchList(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
@@ -118,13 +127,13 @@ type Interface interface {
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error
+	GetToList(ctx context.Context, key string, filter Filter, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion string, filter FilterFunc, listObj runtime.Object) error
+	List(ctx context.Context, key string, resourceVersion string, filter Filter, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
