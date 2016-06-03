@@ -236,7 +236,7 @@ fi
 if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
     # Retry the download a few times to mitigate transient server errors and
     # race conditions where the bucket contents change under us as we download.
-    for n in $(seq 3); do
+    for n in {1..3}; do
         gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~ && break || sleep 1
         # Delete any temporary files from the download so that we start from
         # scratch when we retry.
