@@ -2959,7 +2959,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 			return false, err
 		}
 		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
-		if err != nil {
+		if err != nil || newRS == nil {
 			return false, err
 		}
 		// Check revision of this deployment, and of the new replica set of this deployment
@@ -2972,6 +2972,9 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	})
 	if err == wait.ErrWaitTimeout {
 		logReplicaSetsOfDeployment(deployment, nil, newRS)
+	}
+	if newRS == nil {
+		return fmt.Errorf("deployment %s failed to create new RS: %v", deploymentName, err)
 	}
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %s (got %s / %s) and new RS %s (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
@@ -3035,7 +3038,11 @@ func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 	for i := range allOldRSs {
 		Logf("All old ReplicaSets (%d/%d) of deployment %s: %+v. Selector = %+v", i+1, len(allOldRSs), deployment.Name, *allOldRSs[i], allOldRSs[i].Spec.Selector)
 	}
-	Logf("New ReplicaSet of deployment %s: %+v. Selector = %+v", deployment.Name, *newRS, newRS.Spec.Selector)
+	if newRS != nil {
+		Logf("New ReplicaSet of deployment %s: %+v. Selector = %+v", deployment.Name, *newRS, newRS.Spec.Selector)
+	} else {
+		Logf("New ReplicaSet of deployment %s is nil.", deployment.Name)
+	}
 }
 
 func WaitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string, desiredGeneration int64) error {
