@@ -112,9 +112,10 @@ func TestControllerSync(t *testing.T) {
 		go ctrl.Run()
 
 		// Wait for the controller to pass initial sync.
-		for !ctrl.isFullySynced() {
+		for !ctrl.volumeController.HasSynced() || !ctrl.claimController.HasSynced() {
 			time.Sleep(10 * time.Millisecond)
 		}
+		glog.V(4).Infof("controller synced, starting test")
 
 		count := reactor.getChangeCount()
 
