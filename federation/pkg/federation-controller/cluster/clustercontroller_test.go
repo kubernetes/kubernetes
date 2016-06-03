@@ -25,6 +25,7 @@ import (
 
 	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	controller_util "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -124,8 +125,8 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 
 	// Override KubeconfigGetterForCluster to avoid having to setup service accounts and mount files with secret tokens.
-	originalGetter := KubeconfigGetterForCluster
-	KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.KubeconfigGetter {
+	originalGetter := controller_util.KubeconfigGetterForCluster
+	controller_util.KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.KubeconfigGetter {
 		return func() (*clientcmdapi.Config, error) {
 			return &clientcmdapi.Config{}, nil
 		}
@@ -146,5 +147,5 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	}
 
 	// Reset KubeconfigGetterForCluster
-	KubeconfigGetterForCluster = originalGetter
+	controller_util.KubeconfigGetterForCluster = originalGetter
 }

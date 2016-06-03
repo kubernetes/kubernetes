@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/federation/apis/federation"
 	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	cluster_cache "k8s.io/kubernetes/federation/client/cache"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
@@ -73,7 +72,7 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 				return cc.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
-		&federation.Cluster{},
+		&federation_v1alpha1.Cluster{},
 		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{
 			DeleteFunc: cc.delFromClusterSet,
