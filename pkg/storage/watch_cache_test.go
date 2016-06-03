@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -329,6 +330,34 @@ func TestReflectorForWatchCache(t *testing.T) {
 		}
 		if version != 10 {
 			t.Errorf("unexpected resource version: %d", version)
+		}
+	}
+}
+
+// TestWatchCacheSortAndFindNextResource tests if findNextResource correctly finds the
+// next smallest watchCacheElement index where its resourceVersion is greater than
+// given one.
+func TestWatchCacheSortAndFindNextResource(t *testing.T) {
+	var (
+		capacity            = 5
+		nextResource uint64 = 1
+	)
+	w := newTestWatchCache(capacity)
+	for i := capacity - 1; i >= 0; i-- { // add in unsorted order
+		if err := w.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	size := w.endIndex - w.startIndex
+
+	idx := w.sortAndFindNextResource(size, nextResource)
+	rc := w.getEventsSince(size, idx)
+	if len(rc) != 3 {
+		t.Fatalf("expected 3, got %d", len(rc))
+	}
+	for _, v := range rc {
+		if v.ResourceVersion <= nextResource {
+			t.Fatalf("unexpected resourceVersion %d", v.ResourceVersion)
 		}
 	}
 }
