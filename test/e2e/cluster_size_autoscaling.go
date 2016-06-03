@@ -17,7 +17,11 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -36,6 +40,10 @@ const (
 	resizeTimeout    = 5 * time.Minute
 	scaleUpTimeout   = 5 * time.Minute
 	scaleDownTimeout = 15 * time.Minute
+
+	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
+	zone             = "us-central1-b"
+	gkeUpdateTimeout = 10 * time.Minute
 )
 
 var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
@@ -46,7 +54,15 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	var originalSizes map[string]int
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessProviderIs("gce", "gke")
+		if framework.ProviderIs("gke") {
+			val, err := isAutoscalerEnabled()
+			framework.ExpectNoError(err)
+			if !val {
+				err = enableAutoscaler()
+				framework.ExpectNoError(err)
+			}
+		}
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		nodeCount = len(nodes.Items)
@@ -113,6 +129,83 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size < nodeCount+1 }, scaleDownTimeout))
 	})
 })
+
+func getGKEClusterUrl() string {
+	out, err := exec.Command("gcloud", "auth", "print-access-token").Output()
+	framework.ExpectNoError(err)
+	token := strings.Replace(string(out), "\n", "", -1)
+
+	return fmt.Sprintf("%s/v1/projects/%s/zones/%s/clusters/%s?access_token=%s",
+		gkeEndpoint,
+		framework.TestContext.CloudConfig.ProjectID,
+		framework.TestContext.CloudConfig.Zone,
+		framework.TestContext.CloudConfig.Cluster,
+		token)
+}
+
+func isAutoscalerEnabled() (bool, error) {
+	resp, err := http.Get(getGKEClusterUrl())
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+	strBody := string(body)
+	glog.Infof("Cluster config %s", strBody)
+
+	if strings.Contains(strBody, "minNodeCount") {
+		return true, nil
+	}
+	return false, nil
+}
+
+func enableAutoscaler() error {
+	updateRequest := "{" +
+		" \"update\": {" +
+		"  \"desiredNodePoolId\": \"default-pool\"," +
+		"  \"desiredNodePoolAutoscaling\": {" +
+		"   \"enabled\": \"true\"," +
+		"   \"minNodeCount\": \"3\"," +
+		"   \"maxNodeCount\": \"5\"" +
+		"  }" +
+		" }" +
+		"}"
+
+	url := getGKEClusterUrl()
+	glog.Infof("Using gke api url %s", url)
+	putResult, err := doPut(url, updateRequest)
+	if err != nil {
+		return fmt.Errorf("Failed to put %s: %v", url, err)
+	}
+	glog.Infof("Config update result: %s", putResult)
+
+	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
+		if val, err := isAutoscalerEnabled(); err == nil && val {
+			return nil
+		}
+	}
+	return fmt.Errorf("autoscaler not enabled")
+}
+
+func doPut(url, content string) (string, error) {
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte(content)))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	strBody := string(body)
+	return strBody, nil
+}
 
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port"))
