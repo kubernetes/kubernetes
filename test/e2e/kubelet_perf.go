@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/util"
@@ -38,6 +39,8 @@ const (
 	monitoringTime = 20 * time.Minute
 	// The periodic reporting period.
 	reportingPeriod = 5 * time.Minute
+	// Timeout for waiting for the image prepulling to complete.
+	imagePrePullingLongTimeout = time.Minute * 8
 )
 
 type resourceTest struct {
@@ -193,6 +196,12 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 	var rm *framework.ResourceMonitor
 
 	BeforeEach(func() {
+		// Wait until image prepull pod has completed so that they wouldn't
+		// affect the runtime cpu usage. Fail the test if prepulling cannot
+		// finish in time.
+		if err := framework.WaitForPodsSuccess(f.Client, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
+			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
+		}
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
