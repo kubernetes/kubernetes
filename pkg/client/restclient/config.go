@@ -93,10 +93,10 @@ type Config struct {
 	// on top of the returned RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
-	// QPS indicates the maximum QPS to the master from this client.  If zero, QPS is unlimited.
+	// QPS indicates the maximum QPS to the master from this client.  If zero, default is 5.
 	QPS float32
 
-	// Maximum burst for throttle
+	// Maximum burst for throttle. If zero, default is 10.
 	Burst int
 
 	// Rate limiter for limiting connections to the master from this client. If present overwrites QPS/Burst
