@@ -124,9 +124,19 @@ func CreateTestArchive() string {
 	return filepath.Join(dir, archiveName)
 }
 
-// RunRemote copies the archive file to a /tmp file on host, unpacks it, and runs the e2e_node.test
 // Returns the command output, whether the exit was ok, and any errors
-func RunRemote(archive string, host string, cleanup bool, junitFileNumber int) (string, bool, error) {
+func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, setupNode bool) (string, bool, error) {
+	if setupNode {
+		uname, err := user.Current()
+		if err != nil {
+			return "", false, fmt.Errorf("could not find username: %v", err)
+		}
+		output, err := RunSshCommand("ssh", host, "--", "sudo", "usermod", "-a", "-G", "docker", uname.Username)
+		if err != nil {
+			return "", false, fmt.Errorf("Instance %s not running docker daemon - Command failed: %s", host, output)
+		}
+	}
+
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
