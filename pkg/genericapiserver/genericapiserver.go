@@ -303,7 +303,7 @@ func setDefaults(c *Config) {
 	if len(c.ExternalHost) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
 		if c.ReadWritePort != 0 {
-			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ServiceReadWritePort))
+			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
 		}
 		c.ExternalHost = hostAndPort
 	}
