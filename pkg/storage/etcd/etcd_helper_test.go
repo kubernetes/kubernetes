@@ -158,7 +158,7 @@ func TestListFiltered(t *testing.T) {
 		pod := obj.(*api.Pod)
 		return pod.Name == "bar"
 	}
-	filter := storage.NewSimpleFilter(filterFunc)
+	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
 
 	var got api.PodList
 	err := helper.List(context.TODO(), key, "", filter, &got)

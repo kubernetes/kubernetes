@@ -828,7 +828,7 @@ func (e *Store) createFilter(m generic.Matcher) storage.Filter {
 		}
 		return matches
 	}
-	return storage.NewSimpleFilter(filterFunc)
+	return storage.NewSimpleFilter(filterFunc, m.MatcherIndex)
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or returning an error

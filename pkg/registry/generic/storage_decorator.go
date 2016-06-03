@@ -30,7 +30,8 @@ type StorageDecorator func(
 	objectType runtime.Object,
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
-	newListFunc func() runtime.Object) storage.Interface
+	newListFunc func() runtime.Object,
+	trigger storage.TriggerPublisherFunc) storage.Interface
 
 // Returns given 'storageInterface' without any decoration.
 func UndecoratedStorage(
@@ -39,6 +40,7 @@ func UndecoratedStorage(
 	objectType runtime.Object,
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
-	newListFunc func() runtime.Object) storage.Interface {
+	newListFunc func() runtime.Object,
+	trigger storage.TriggerPublisherFunc) storage.Interface {
 	return storageInterface
 }

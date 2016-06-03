@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for PodSecurityPolicies against etcd.
@@ -36,7 +37,14 @@ const Prefix = "/podsecuritypolicies"
 func NewREST(opts generic.RESTOptions) *REST {
 	newListFunc := func() runtime.Object { return &extensions.PodSecurityPolicyList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage, 100, &extensions.PodSecurityPolicy{}, Prefix, podsecuritypolicy.Strategy, newListFunc)
+		opts.Storage,
+		100,
+		&extensions.PodSecurityPolicy{},
+		Prefix,
+		podsecuritypolicy.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher,
+	)
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &extensions.PodSecurityPolicy{} },

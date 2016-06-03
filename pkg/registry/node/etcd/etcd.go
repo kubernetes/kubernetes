@@ -70,7 +70,13 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Nodes), &api.Node{}, prefix, node.Strategy, newListFunc)
+		opts.Storage,
+		cachesize.GetWatchCacheSizeByResource(cachesize.Nodes),
+		&api.Node{},
+		prefix,
+		node.Strategy,
+		newListFunc,
+		node.NodeNameTriggerFunc)
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Node{} },

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -177,7 +178,14 @@ func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
 			}
 			return podLabels, podFields, nil
 		},
+		IndexFields: []string{"spec.nodeName"},
 	}
+}
+
+func NodeNameTriggerFunc(obj runtime.Object) []storage.MatchValue {
+	pod := obj.(*api.Pod)
+	result := storage.MatchValue{IndexName: "spec.nodeName", Value: pod.Spec.NodeName}
+	return []storage.MatchValue{result}
 }
 
 // PodToSelectableFields returns a field set that represents the object

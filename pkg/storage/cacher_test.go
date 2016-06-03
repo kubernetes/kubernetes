@@ -340,7 +340,7 @@ func TestFiltering(t *testing.T) {
 		}
 		return selector.Matches(labels.Set(metadata.GetLabels()))
 	}
-	filter := storage.NewSimpleFilter(filterFunc)
+	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, filter)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
