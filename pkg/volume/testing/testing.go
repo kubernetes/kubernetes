@@ -237,12 +237,6 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
-func (plugin *FakeVolumePlugin) GetUniqueVolumeName(spec *Spec) (string, error) {
-	plugin.RLock()
-	defer plugin.RUnlock()
-	return plugin.Name() + "/" + spec.Name(), nil
-}
-
 func (plugin *FakeVolumePlugin) GetDeviceName(spec *Spec) (string, error) {
 	return spec.Name(), nil
 }

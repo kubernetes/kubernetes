@@ -3388,6 +3388,15 @@ func autoConvert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeSt
 	} else {
 		out.Images = nil
 	}
+	if in.VolumesInUse != nil {
+		in, out := &in.VolumesInUse, &out.VolumesInUse
+		*out = make([]api.UniqueDeviceName, len(*in))
+		for i := range *in {
+			(*out)[i] = api.UniqueDeviceName((*in)[i])
+		}
+	} else {
+		out.VolumesInUse = nil
+	}
 	return nil
 }
 
@@ -3461,6 +3470,15 @@ func autoConvert_api_NodeStatus_To_v1_NodeStatus(in *api.NodeStatus, out *NodeSt
 		}
 	} else {
 		out.Images = nil
+	}
+	if in.VolumesInUse != nil {
+		in, out := &in.VolumesInUse, &out.VolumesInUse
+		*out = make([]UniqueDeviceName, len(*in))
+		for i := range *in {
+			(*out)[i] = UniqueDeviceName((*in)[i])
+		}
+	} else {
+		out.VolumesInUse = nil
 	}
 	return nil
 }

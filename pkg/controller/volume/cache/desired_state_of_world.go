@@ -25,7 +25,9 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/attachdetach"
 )
 
 // DesiredStateOfWorld defines a set of thread-safe operations supported on
@@ -50,7 +52,7 @@ type DesiredStateOfWorld interface {
 	// should be attached to the specified node, the volume is implicitly added.
 	// If no node with the name nodeName exists in list of nodes managed by the
 	// attach/detach attached controller, an error is returned.
-	AddPod(podName string, volumeSpec *volume.Spec, nodeName string) (string, error)
+	AddPod(podName string, volumeSpec *volume.Spec, nodeName string) (api.UniqueDeviceName, error)
 
 	// DeleteNode removes the given node from the list of nodes managed by the
 	// attach/detach controller.
@@ -68,7 +70,7 @@ type DesiredStateOfWorld interface {
 	// volumes under the specified node, this is a no-op.
 	// If after deleting the pod, the specified volume contains no other child
 	// pods, the volume is also deleted.
-	DeletePod(podName, volumeName, nodeName string)
+	DeletePod(podName string, volumeName api.UniqueDeviceName, nodeName string)
 
 	// NodeExists returns true if the node with the specified name exists in
 	// the list of nodes managed by the attach/detach controller.
@@ -77,7 +79,7 @@ type DesiredStateOfWorld interface {
 	// VolumeExists returns true if the volume with the specified name exists
 	// in the list of volumes that should be attached to the specified node by
 	// the attach detach controller.
-	VolumeExists(volumeName, nodeName string) bool
+	VolumeExists(volumeName api.UniqueDeviceName, nodeName string) bool
 
 	// GetVolumesToAttach generates and returns a list of volumes to attach
 	// and the nodes they should be attached to based on the current desired
@@ -89,7 +91,7 @@ type DesiredStateOfWorld interface {
 type VolumeToAttach struct {
 	// VolumeName is the unique identifier for the volume that should be
 	// attached.
-	VolumeName string
+	VolumeName api.UniqueDeviceName
 
 	// VolumeSpec is a volume spec containing the specification for the volume
 	// that should be attached.
@@ -128,13 +130,13 @@ type nodeManaged struct {
 	// volumesToAttach is a map containing the set of volumes that should be
 	// attached to this node. The key in the map is the name of the volume and
 	// the value is a pod object containing more information about the volume.
-	volumesToAttach map[string]volumeToAttach
+	volumesToAttach map[api.UniqueDeviceName]volumeToAttach
 }
 
 // The volume object represents a volume that should be attached to a node.
 type volumeToAttach struct {
 	// volumeName contains the unique identifier for this volume.
-	volumeName string
+	volumeName api.UniqueDeviceName
 
 	// spec is the volume spec containing the specification for this volume.
 	// Used to generate the volume plugin object, and passed to attach/detach
@@ -162,12 +164,15 @@ func (dsw *desiredStateOfWorld) AddNode(nodeName string) {
 	if _, nodeExists := dsw.nodesManaged[nodeName]; !nodeExists {
 		dsw.nodesManaged[nodeName] = nodeManaged{
 			nodeName:        nodeName,
-			volumesToAttach: make(map[string]volumeToAttach),
+			volumesToAttach: make(map[api.UniqueDeviceName]volumeToAttach),
 		}
 	}
 }
 
-func (dsw *desiredStateOfWorld) AddPod(podName string, volumeSpec *volume.Spec, nodeName string) (string, error) {
+func (dsw *desiredStateOfWorld) AddPod(
+	podName string,
+	volumeSpec *volume.Spec,
+	nodeName string) (api.UniqueDeviceName, error) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -186,10 +191,11 @@ func (dsw *desiredStateOfWorld) AddPod(podName string, volumeSpec *volume.Spec, 
 			err)
 	}
 
-	volumeName, err := attachableVolumePlugin.GetUniqueVolumeName(volumeSpec)
+	volumeName, err := attachdetach.GetUniqueDeviceNameFromSpec(
+		attachableVolumePlugin, volumeSpec)
 	if err != nil {
 		return "", fmt.Errorf(
-			"failed to GetUniqueVolumeName from AttachablePlugin for volumeSpec %q err=%v",
+			"failed to GenerateUniqueDeviceName for volumeSpec %q err=%v",
 			volumeSpec.Name(),
 			err)
 	}
@@ -236,7 +242,10 @@ func (dsw *desiredStateOfWorld) DeleteNode(nodeName string) error {
 	return nil
 }
 
-func (dsw *desiredStateOfWorld) DeletePod(podName, volumeName, nodeName string) {
+func (dsw *desiredStateOfWorld) DeletePod(
+	podName string,
+	volumeName api.UniqueDeviceName,
+	nodeName string) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -272,7 +281,8 @@ func (dsw *desiredStateOfWorld) NodeExists(nodeName string) bool {
 	return nodeExists
 }
 
-func (dsw *desiredStateOfWorld) VolumeExists(volumeName, nodeName string) bool {
+func (dsw *desiredStateOfWorld) VolumeExists(
+	volumeName api.UniqueDeviceName, nodeName string) bool {
 	dsw.RLock()
 	defer dsw.RUnlock()
 

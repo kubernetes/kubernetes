@@ -22,13 +22,13 @@ import (
 )
 
 // GetTestVolumeSpec returns a test volume spec
-func GetTestVolumeSpec(volumeName, diskName string) *volume.Spec {
+func GetTestVolumeSpec(volumeName string, diskName api.UniqueDeviceName) *volume.Spec {
 	return &volume.Spec{
 		Volume: &api.Volume{
 			Name: volumeName,
 			VolumeSource: api.VolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:   diskName,
+					PDName:   string(diskName),
 					FSType:   "fake",
 					ReadOnly: false,
 				},
