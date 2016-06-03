@@ -14,26 +14,12 @@
 
 package capnslog
 
-import (
-	"log"
-)
+import "os"
 
-func initHijack() {
-	pkg := NewPackageLogger("log", "")
-	w := packageWriter{pkg}
-	log.SetFlags(0)
-	log.SetPrefix("")
-	log.SetOutput(w)
-}
+func init() {
+	initHijack()
 
-type packageWriter struct {
-	pl *PackageLogger
-}
-
-func (p packageWriter) Write(b []byte) (int, error) {
-	if p.pl.level < INFO {
-		return 0, nil
-	}
-	p.pl.internalLog(calldepth+2, INFO, string(b))
-	return len(b), nil
+	// Go `log` package uses os.Stderr.
+	SetFormatter(NewPrettyFormatter(os.Stderr, false))
+	SetGlobalLogLevel(INFO)
 }
