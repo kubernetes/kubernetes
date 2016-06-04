@@ -261,14 +261,16 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
 		}
 
 		index := c.indices[name]
-		if index != nil {
-			for _, indexValue := range indexValues {
-				set := index[indexValue]
-				if set != nil {
-					set.Delete(key)
-				}
+		if index == nil {
+			continue
+		}
+		for _, indexValue := range indexValues {
+			set := index[indexValue]
+			if set != nil {
+				set.Delete(key)
 			}
 		}
+		
 	}
 	return nil
 }
