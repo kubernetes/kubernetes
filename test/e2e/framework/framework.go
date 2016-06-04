@@ -51,9 +51,10 @@ const (
 type Framework struct {
 	BaseName string
 
-	Client        *client.Client
-	Clientset_1_2 *release_1_2.Clientset
-	Clientset_1_3 *release_1_3.Clientset
+	ClientConfigGetter ClientConfigGetter
+	Client             *client.Client
+	Clientset_1_2      *release_1_2.Clientset
+	Clientset_1_3      *release_1_3.Clientset
 
 	FederationClient *unversionedfederation.FederationClient
 
@@ -110,11 +111,16 @@ func NewDefaultFederatedFramework(baseName string) *Framework {
 }
 
 func NewFramework(baseName string, options FrameworkOptions, client *client.Client) *Framework {
+	return NewFrameworkWithConfigGetter(baseName, options, client, LoadConfig)
+}
+
+func NewFrameworkWithConfigGetter(baseName string, options FrameworkOptions, client *client.Client, configGetter ClientConfigGetter) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
 		options:                  options,
 		Client:                   client,
+		ClientConfigGetter:       configGetter,
 	}
 
 	BeforeEach(f.BeforeEach)
@@ -130,7 +136,7 @@ func (f *Framework) BeforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.Client == nil {
 		By("Creating a kubernetes client")
-		config, err := LoadConfig()
+		config, err := f.ClientConfigGetter()
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = f.options.ClientQPS
 		config.Burst = f.options.ClientBurst

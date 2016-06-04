@@ -1596,6 +1596,8 @@ func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	return c, nil
 }
 
+type ClientConfigGetter func() (*restclient.Config, error)
+
 func LoadConfig() (*restclient.Config, error) {
 	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
