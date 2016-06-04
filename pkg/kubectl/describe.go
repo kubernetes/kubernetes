@@ -1312,14 +1312,23 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 		}
 		fmt.Fprint(out, "Rules:\n  Host\tPath\tBackends\n")
 		fmt.Fprint(out, "  ----\t----\t--------\n")
+		count := 0
 		for _, rules := range ing.Spec.Rules {
 			if rules.HTTP == nil {
 				continue
 			}
-			fmt.Fprintf(out, "  %s\t\n", rules.Host)
-			for _, path := range rules.HTTP.Paths {
-				fmt.Fprintf(out, "    \t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ing.Namespace, &path.Backend))
+			count++
+			host := rules.Host
+			if len(host) == 0 {
+				host = "*"
 			}
+			fmt.Fprintf(out, "  %s\t\n", host)
+			for _, path := range rules.HTTP.Paths {
+				fmt.Fprintf(out, "    \t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ns, &path.Backend))
+			}
+		}
+		if count == 0 {
+			fmt.Fprintf(out, "  %s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackend(ns, def))
 		}
 		describeIngressAnnotations(out, ing.Annotations)
 
