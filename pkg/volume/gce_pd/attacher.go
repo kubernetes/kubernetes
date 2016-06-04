@@ -76,7 +76,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName st
 			pdName, hostName, err)
 	}
 
-	if attached {
+	if err == nil && attached {
 		// Volume is already attached to node.
 		glog.Infof("Attach operation is successful. PD %q is already attached to node %q.", pdName, hostName)
 		return nil
@@ -198,7 +198,7 @@ func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, hostNa
 			pdName, hostName, err)
 	}
 
-	if !attached {
+	if err == nil && !attached {
 		// Volume is not attached to node. Success!
 		glog.Infof("Detach operation is successful. PD %q was not attached to node %q.", pdName, hostName)
 		return nil
