@@ -540,6 +540,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, out, "")
+		fmt.Fprintf(out, "QoS Tier:\t%s\n", qosutil.GetPodQos(pod))
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -841,15 +842,6 @@ func describeContainers(label string, containers []api.Container, containerStatu
 			for _, arg := range container.Args {
 				fmt.Fprintf(out, "      %s\n", arg)
 			}
-		}
-
-		resourceToQoS := qosutil.GetQoS(&container)
-		if len(resourceToQoS) > 0 {
-			fmt.Fprintf(out, "    QoS Tier:\n")
-		}
-		for _, resource := range SortedQoSResourceNames(resourceToQoS) {
-			qos := resourceToQoS[resource]
-			fmt.Fprintf(out, "      %s:\t%s\n", resource, qos)
 		}
 
 		resources := container.Resources
