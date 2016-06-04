@@ -28,7 +28,7 @@
       },
       {
         "name": "kube-addon-manager-data",
-        "image": "gcr.io/google_containers/hyperkube-ARCH:VERSION",
+        "image": "REGISTRY/hyperkube-ARCH:VERSION",
         "command": [
           "/copy-addons.sh"
         ],
