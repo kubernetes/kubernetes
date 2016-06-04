@@ -25,6 +25,7 @@ cd "${KUBE_ROOT}"
 
 # This is required before we run govet for the results to be correct.
 # See https://github.com/golang/go/issues/16086 for details.
+make generated_files
 go install ./cmd/...
 
 # Use eval to preserve embedded quoted strings.
