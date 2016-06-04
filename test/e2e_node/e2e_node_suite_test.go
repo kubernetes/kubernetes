@@ -101,9 +101,12 @@ var _ = BeforeSuite(func() {
 
 // Tear down the kubelet on the node
 var _ = AfterSuite(func() {
-	if e2es != nil && *startServices && *stopServices {
-		glog.Infof("Stopping node services...")
-		e2es.stop()
+	if e2es != nil {
+		e2es.getLogFiles()
+		if *startServices && *stopServices {
+			glog.Infof("Stopping node services...")
+			e2es.stop()
+		}
 	}
 
 	glog.Infof("Tests Finished")
@@ -118,6 +121,6 @@ func maskLocksmithdOnCoreos() {
 		if output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput(); err != nil {
 			glog.Fatalf("Could not mask locksmithd: %v, output: %q", err, string(output))
 		}
+		glog.Infof("Locksmithd is masked successfully")
 	}
-	glog.Infof("Locksmithd is masked successfully")
 }

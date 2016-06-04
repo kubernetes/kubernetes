@@ -75,6 +75,71 @@ func (es *e2eService) start() error {
 	return nil
 }
 
+// Get logs of interest either via journalctl or by creating sym links.
+// Since we scp files from the remote directory, symlinks will be treated as normal files and file contents will be copied over.
+func (es *e2eService) getLogFiles() {
+	// Special log files that need to be collected for additional debugging.
+	type logFileData struct {
+		files             []string
+		journalctlCommand []string
+	}
+	var logFiles = map[string]logFileData{
+		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
+		"docker.log": {[]string{"/var/log/docker.log", "/var/log/upstart/docker.log"}, []string{"-u", "docker"}},
+	}
+
+	// Nothing to do if report dir is not specified.
+	if *reportDir == "" {
+		return
+	}
+	journaldFound := isJournaldAvailable()
+	for targetFileName, logFileData := range logFiles {
+		targetLink := path.Join(*reportDir, targetFileName)
+		if journaldFound {
+			// Skip log files that do not have an equivalent in journald based machines.
+			if len(logFileData.journalctlCommand) == 0 {
+				continue
+			}
+			out, err := exec.Command("sudo", append([]string{"journalctl"}, logFileData.journalctlCommand...)...).CombinedOutput()
+			if err != nil {
+				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
+			} else {
+				if err = ioutil.WriteFile(targetLink, out, 0755); err != nil {
+					glog.Errorf("failed to write logs to %q: %v", targetLink, err)
+				}
+			}
+			continue
+		}
+		for _, file := range logFileData.files {
+			if _, err := os.Stat(file); err != nil {
+				// Expected file not found on this distro.
+				continue
+			}
+			if err := copyLogFile(file, targetLink); err != nil {
+				glog.Error(err)
+			} else {
+				break
+			}
+		}
+	}
+}
+
+func copyLogFile(src, target string) error {
+	// If not a journald based distro, then just symlink files.
+	if out, err := exec.Command("sudo", "cp", src, target).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to copy %q to %q: %v, %v", src, target, out, err)
+	}
+	if out, err := exec.Command("sudo", "chmod", "a+r", target).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to make log file %q world readable: %v, %v", target, out, err)
+	}
+	return nil
+}
+
+func isJournaldAvailable() bool {
+	_, err := exec.LookPath("journalctl")
+	return err == nil
+}
+
 func (es *e2eService) stop() {
 	if es.kubeletCmd != nil {
 		err := es.kubeletCmd.Process.Kill()
