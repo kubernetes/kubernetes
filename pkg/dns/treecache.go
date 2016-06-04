@@ -19,6 +19,7 @@ package dns
 import (
 	"bytes"
 	"encoding/json"
+	skymsg "github.com/skynetservices/skydns/msg"
 	"strings"
 )
 
@@ -49,8 +50,30 @@ func (cache *TreeCache) Serialize() (string, error) {
 	return string(prettyJSON.Bytes()), nil
 }
 
-func (cache *TreeCache) setEntry(key string, val interface{}, path ...string) {
+// setEntry creates the entire path if it doesn't already exist in the cache,
+// then sets the given service record under the given key. The path this entry
+// would have occupied in an etcd datastore is computed from the given fqdn and
+// stored as the "Key" of the skydns service; this is only required because
+// skydns expects the service record to contain a key in a specific format
+// (presumably for legacy compatibility). Note that the fqnd string typically
+// contains both the key and all elements in the path.
+func (cache *TreeCache) setEntry(key string, val *skymsg.Service, fqdn string, path ...string) {
+	// TODO: Consolidate setEntry and setSubCache into a single method with a
+	// type switch.
+	// TODO: Insted of passing the fqdn as an argument, we can reconstruct
+	// it from the path, provided callers always pass the full path to the
+	// object. This is currently *not* the case, since callers first create
+	// a new, empty node, populate it, then parent it under the right path.
+	// So we don't know the full key till the final parenting operation.
 	node := cache.ensureChildNode(path...)
+
+	// This key is used to construct the "target" for SRV record lookups.
+	// For normal service/endpoint lookups, this will result in a key like:
+	// /skydns/local/cluster/svc/svcNS/svcName/record-hash
+	// but for headless services that govern pods requesting a specific
+	// hostname (as used by petset), this will end up being:
+	// /skydns/local/cluster/svc/svcNS/svcName/pod-hostname
+	val.Key = skymsg.Path(fqdn)
 	node.Entries[key] = val
 }
 
@@ -65,6 +88,9 @@ func (cache *TreeCache) getSubCache(path ...string) *TreeCache {
 	return childCache
 }
 
+// setSubCache inserts the given subtree under the given path:key. Usually the
+// key is the name of a Kubernetes Service, and the path maps to the cluster
+// subdomains matching the Service.
 func (cache *TreeCache) setSubCache(key string, subCache *TreeCache, path ...string) {
 	node := cache.ensureChildNode(path...)
 	node.ChildNodes[key] = subCache
@@ -76,8 +102,8 @@ func (cache *TreeCache) getEntry(key string, path ...string) (interface{}, bool)
 	return val, ok
 }
 
-func (cache *TreeCache) getValuesForPathWithWildcards(path ...string) []interface{} {
-	retval := []interface{}{}
+func (cache *TreeCache) getValuesForPathWithWildcards(path ...string) []*skymsg.Service {
+	retval := []*skymsg.Service{}
 	nodesToExplore := []*TreeCache{cache}
 	for idx, subpath := range path {
 		nextNodesToExplore := []*TreeCache{}
@@ -88,7 +114,7 @@ func (cache *TreeCache) getValuesForPathWithWildcards(path ...string) []interfac
 					nextNodesToExplore = append(nextNodesToExplore, node)
 				} else {
 					if val, ok := node.Entries[subpath]; ok {
-						retval = append(retval, val)
+						retval = append(retval, val.(*skymsg.Service))
 					} else {
 						childNode := node.ChildNodes[subpath]
 						if childNode != nil {
@@ -122,10 +148,9 @@ func (cache *TreeCache) getValuesForPathWithWildcards(path ...string) []interfac
 
 	for _, node := range nodesToExplore {
 		for _, val := range node.Entries {
-			retval = append(retval, val)
+			retval = append(retval, val.(*skymsg.Service))
 		}
 	}
-
 	return retval
 }
 
