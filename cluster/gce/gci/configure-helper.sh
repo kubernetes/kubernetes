@@ -750,6 +750,13 @@ function start-kube-addons {
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
   fi
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "node-problem-detector"
+    local -r node_problem_detector_file="${dst_dir}/node-problem-detector/node-problem-detector.yaml"
+    mv "${dst_dir}/node-problem-detector/node-problem-detector.yaml.in" "${node_problem_detector_file}"
+    # Replace the salt configurations with variable values.
+    sed -i -e "s@{{ *pillar\['master_node'\] *}}@${MASTER_NAME}@g" "${node_problem_detector_file}"
+  fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"
   fi
