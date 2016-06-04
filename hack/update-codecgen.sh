@@ -117,6 +117,7 @@ if [[ -z ${haveindex} ]]; then
 fi
 
 echo "Building codecgen"
+make generated_files
 CODECGEN="${PWD}/codecgen_binary"
 go build -o "${CODECGEN}" ./vendor/github.com/ugorji/go/codec/codecgen
 

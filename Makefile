@@ -18,21 +18,24 @@ ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** $(shell date))
 endif
 
+# Old-skool build tools.
+#
+# Commonly used targets (see each target for more information):
+#   all: Build code.
+#   test: Run tests.
+#   clean: Clean up.
+
 # It's necessary to set this because some docker images don't make sh -> bash.
 SHELL := /bin/bash
 
 # We don't need make's built-in rules.
-MAKEFLAGS += --no-builtin-rules --warn-undefined-variables
+MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-# Old-skool build tools.
-#
-# Targets (see each target for more information):
-#   all: Build code.
-#   check: Run tests.
-#   test: Run tests.
-#   clean: Clean up.
+# We want make to yell at us if we use undefined variables.
+MAKEFLAGS += --warn-undefined-variables
 
+# Constants used throughout.
 OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
 PRJ_SRC_PATH := k8s.io/kubernetes
@@ -41,13 +44,20 @@ GENERATED_FILE_PREFIX := zz_generated.
 # Metadata for driving the build lives here.
 META_DIR := .make
 
+#
+# Define variables that we use as inputs so we can warn about undefined variables.
+#
+
+WHAT ?=
+TESTS ?=
+
 GOFLAGS ?=
 KUBE_GOFLAGS = $(GOFLAGS)
-export KUBE_GOFLAGS
+export KUBE_GOFLAGS GOFLAGS
 
 GOLDFLAGS ?=
 KUBE_GOLDFLAGS = $(GOLDFLAGS)
-export KUBE_GOLDFLAGS
+export KUBE_GOLDFLAGS GOLDFLAGS
 
 # Build code.
 #
@@ -62,10 +72,9 @@ export KUBE_GOLDFLAGS
 #   make
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
-#
-# TODO: It's a not ideal that we build the tools on every invocation.
-all: gen_deepcopy gen_conversion build
 .PHONY: all
+all: generated_files
+	@hack/make-rules/build.sh $(WHAT)
 
 # Build ginkgo
 #
@@ -75,11 +84,6 @@ ginkgo:
 	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
 .PHONY: ginkgo
 
-# This is a helper to break circular dependencies with recursive `make` calls.
-build:
-	@hack/make-rules/build.sh $(WHAT)
-.PHONY: build
-
 # Runs all the presubmission verifications.
 #
 # Args:
@@ -88,9 +92,9 @@ build:
 # Example:
 #   make verify
 #   make verify BRANCH=branch_x
+.PHONY: verify
 verify:
 	@KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
-.PHONY: verify
 
 # Build and run tests.
 #
@@ -105,50 +109,62 @@ verify:
 #   make check
 #   make test
 #   make check WHAT=pkg/kubelet GOFLAGS=-v
-check test: gen_deepcopy gen_conversion
-	@hack/make-rules/test.sh $(WHAT) $(TESTS)
 .PHONY: check test
+check test: generated_files
+	@hack/make-rules/test.sh $(WHAT) $(TESTS)
 
 # Build and run integration tests.
 #
 # Example:
 #   make test-integration
-test-integration: gen_deepcopy gen_conversion
-	@hack/make-rules/test-integration.sh
 .PHONY: test-integration
+test-integration: generated_files
+	@hack/make-rules/test-integration.sh
 
 # Build and run end-to-end tests.
 #
 # Example:
 #   make test-e2e
-test-e2e: ginkgo gen_deepcopy gen_conversion
-	@go run hack/e2e.go -v --build --up --test --down
 .PHONY: test-e2e
+test-e2e: ginkgo generated_files
+	@go run hack/e2e.go -v --build --up --test --down
 
 # Build and run node end-to-end tests.
 #
 # Args:
-#  FOCUS: regexp that matches the tests to be run.  Defaults to "".
-#  SKIP: regexp that matches the tests that needs to be skipped.  Defaults to "".
-#  RUN_UNTIL_FAILURE: Ff true, pass --untilItFails to ginkgo so tests are run repeatedly until they fail.  Defaults to false.
-#  REMOTE: If true, run the tests on a remote host instance on GCE.  Defaults to false.
-#  IMAGES: for REMOTE=true only.  Comma delimited list of images for creating remote hosts to run tests against.  Defaults to "e2e-node-containervm-v20160321-image".
-#  LIST_IMAGES: If true, don't run tests.  Just output the list of available images for testing.  Defaults to false.
-#  HOSTS: for REMOTE=true only.  Comma delimited list of running gce hosts to run tests against.  Defaults to "".
-#  DELETE_INSTANCES: for REMOTE=true only.  Delete any instances created as part of this test run.  Defaults to false.
-#  ARTIFACTS: for REMOTE=true only.  Local directory to scp test artifacts into from the remote hosts.  Defaults to ""/tmp/_artifacts".
-#  REPORT: for REMOTE=false only.  Local directory to write juntil xml results to.  Defaults to "/tmp/".
-#  CLEANUP: for REMOTE=true only.  If false, do not stop processes or delete test files on remote hosts.  Defaults to true.
-#  IMAGE_PROJECT: for REMOTE=true only.  Project containing images provided to IMAGES.  Defaults to "kubernetes-node-e2e-images".
-#  INSTANCE_PREFIX: for REMOTE=true only.  Instances created from images will have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test"/
+#  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
+#  SKIP: Regexp that matches the tests that needs to be skipped.  Defaults
+#    to "".
+#  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
+#    repeatedly until they fail.  Defaults to false.
+#  REMOTE: If true, run the tests on a remote host instance on GCE.  Defaults
+#    to false.
+#  IMAGES: For REMOTE=true only.  Comma delimited list of images for creating
+#    remote hosts to run tests against.  Defaults to a recent image.
+#  LIST_IMAGES: If true, don't run tests.  Just output the list of available
+#    images for testing.  Defaults to false.
+#  HOSTS: For REMOTE=true only.  Comma delimited list of running gce hosts to
+#    run tests against.  Defaults to "".
+#  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
+#    part of this test run.  Defaults to false.
+#  ARTIFACTS: For REMOTE=true only.  Local directory to scp test artifacts into
+#    from the remote hosts.  Defaults to ""/tmp/_artifacts".
+#  REPORT: For REMOTE=false only.  Local directory to write juntil xml results
+#    to.  Defaults to "/tmp/".
+#  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
+#    test files on remote hosts.  Defaults to true.
+#  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
+#  IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
+#    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
 #
 # Example:
 #   make test-e2e-node FOCUS=kubelet SKIP=container
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
 # Build and run tests.
-test-e2e_node: ginkgo gen_deepcopy gen_conversion
-	@hack/make-rules/test-e2e_node.sh
-.PHONY: test-e2e_node
+.PHONY: test-e2e-node
+test-e2e-node: ginkgo generated_files
+	@hack/make-rules/test-e2e-node.sh
 
 # Build and run cmdline tests.
 #
@@ -162,27 +178,27 @@ test-cmd:
 #
 # Example:
 #   make clean
+.PHONY: clean
 clean: clean_generated clean_meta
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
-.PHONY: clean
 
 # Remove make-related metadata files.
 #
 # Example:
 #   make clean_meta
+.PHONY: clean_meta
 clean_meta:
 	rm -rf $(META_DIR)
-.PHONE: clean_meta
 
 # Remove all auto-generated artifacts.
 #
 # Example:
 #   make clean_generated
+.PHONY: clean_generated
 clean_generated:
 	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
-.PHONY: clean_generated
 
 # Run 'go vet'.
 #
@@ -194,25 +210,25 @@ clean_generated:
 # Example:
 #   make vet
 #   make vet WHAT=pkg/kubelet
+.PHONY: vet
 vet:
 	@hack/make-rules/vet.sh $(WHAT)
-.PHONY: vet
 
 # Build a release
 #
 # Example:
 #   make release
-release: gen_deepcopy gen_conversion
-	@build/release.sh
 .PHONY: release
+release: generated_files
+	@build/release.sh
 
 # Build a release, but skip tests
 #
 # Example:
 #   make release-skip-tests
-release-skip-tests quick-release: gen_deepcopy gen_conversion
-	@KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
+release-skip-tests quick-release: generated_files
+	@KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 
 # Cross-compile for all platforms
 #
@@ -238,7 +254,9 @@ ALL_GO_DIRS := $(shell             \
             \(                     \
                 -path ./vendor -o  \
                 -path ./_\* -o     \
-                -path ./.\*        \
+                -path ./.\* -o     \
+                -path ./docs -o    \
+                -path ./examples   \
             \) -prune              \
         \)                         \
         -type f -name \*.go        \
@@ -314,6 +332,13 @@ ALL_K8S_TAG_FILES := $(shell                             \
 #     register: generate deep-copy functions and register them with a
 #               scheme
 
+# The result file, in each pkg, of deep-copy generation.
+DEEP_COPY_BASENAME := $(GENERATED_FILE_PREFIX)deep_copy
+DEEP_COPY_FILENAME := $(DEEP_COPY_BASENAME).go
+
+# The tool used to generate deep copies.
+DEEP_COPY_GEN := $(BIN_DIR)/deepcopy-gen
+
 # Find all the directories that request deep-copy generation.
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:deepcopy-gen tags)
@@ -323,23 +348,14 @@ DEEP_COPY_DIRS := $(shell \
         | xargs dirname                                \
         | sort -u                                      \
 )
-
-# The result file, in each pkg, of deep-copy generation.
-DEEP_COPY_BASENAME := $(GENERATED_FILE_PREFIX)deep_copy
-DEEP_COPY_FILENAME := $(DEEP_COPY_BASENAME).go
-
-# Unfortunately there's not a good way to use Go's build tools to check
-# if a binary needs to be rebuilt.  We just have to try it.
-gen_deepcopy:
-	@$(MAKE) -s build WHAT=cmd/libs/go2idl/deepcopy-gen
-	@$(MAKE) -s $(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS))
+DEEP_COPY_FILES := $(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS))
 
 # For each dir in DEEP_COPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
 #
-# Note that this is a deps-only statement, not a full rule (see below).
-# This has to be done in a distinct step because wildcards don't seem to work
-# in static pattern rules.
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
@@ -349,17 +365,49 @@ gen_deepcopy:
 $(foreach dir, $(DEEP_COPY_DIRS), $(eval                                    \
     $(dir)/$(DEEP_COPY_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
                                    $(gofiles__$(dir))                       \
-                                   $(BIN_DIR)/deepcopy-gen                  \
 ))
 
-# For each dir in DEEP_COPY_DIRS, handle deep-copy generation.
-# This has to be done in two steps because wildcards don't seem to work in
-# static pattern rules.
-$(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS)):
-	$(BIN_DIR)/deepcopy-gen \
-	    -i $(PRJ_SRC_PATH)/$$(dirname $@) \
-	    --bounding-dirs $(PRJ_SRC_PATH) \
+# How to regenerate deep-copy code.
+$(DEEP_COPY_FILES): $(DEEP_COPY_GEN)
+	@$(DEEP_COPY_GEN)                                   \
+	    -i $(PRJ_SRC_PATH)/$$(dirname $@)               \
+	    --bounding-dirs $(PRJ_SRC_PATH)                 \
 	    -O $(DEEP_COPY_BASENAME)
+
+# This calculates the dependencies for the generator tool, so we only rebuild
+# it when needed.  It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed.  We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(DEEP_COPY_GEN).mk
+$(META_DIR)/$(DEEP_COPY_GEN).mk:
+	@mkdir -p $(@D);                                       \
+	(echo -n "$(DEEP_COPY_GEN): ";                         \
+	 DIRECT=$$(go list -e -f '{{.Dir}} {{.Dir}}/*.go'      \
+	     ./cmd/libs/go2idl/deepcopy-gen);                  \
+	 INDIRECT=$$(go list -e                                \
+	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
+	     ./cmd/libs/go2idl/deepcopy-gen                    \
+	     | grep "^$(PRJ_SRC_PATH)"                         \
+	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
+	 echo $$DIRECT $$INDIRECT | sed 's/ / \\\n\t/g';       \
+	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
+	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+
+# Include dependency info for the generator tool.  This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(DEEP_COPY_GEN).mk
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(DEEP_COPY_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(DEEP_COPY_GEN):
+	@hack/make-rules/build.sh cmd/libs/go2idl/deepcopy-gen
+	@touch $@
 
 #
 # Conversion generation
@@ -377,6 +425,16 @@ $(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS)):
 # TODO: it might be better in the long term to make peer-types explicit in the
 # IDL.
 
+# The result file, in each pkg, of conversion generation.
+CONVERSION_BASENAME := $(GENERATED_FILE_PREFIX)conversion
+CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
+
+# The tool used to generate conversions.
+CONVERSION_GEN := $(BIN_DIR)/conversion-gen
+
+# The name of the make metadata file controlling conversions.
+CONVERSIONS_META := conversions.mk
+
 # All directories that request any form of conversion generation.
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:conversion-gen tags)
@@ -388,18 +446,7 @@ CONVERSION_DIRS := $(shell                                \
         | sort -u                                         \
 )
 
-# The result file, in each pkg, of conversion generation.
-CONVERSION_BASENAME := $(GENERATED_FILE_PREFIX)conversion
-CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
-
-# The name of the make metadata file controlling conversions.
-CONVERSIONS_META := conversions.mk
-
-# Unfortunately there's not a good way to use Go's build tools to check
-# if a binary needs to be rebuilt.  We just have to try it.
-gen_conversion:
-	@$(MAKE) -s build WHAT=cmd/libs/go2idl/conversion-gen
-	@$(MAKE) -s $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
+CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
 # changes (files added or removed) the deps file will be considered stale.
@@ -448,9 +495,9 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval            \
 # The variable value was set in $(GOFILES_META) and included as part of the
 # dependency management logic.
 #
-# Note that this is a deps-only statement, not a full rule (see below).
-# This has to be done in a distinct step because wildcards don't seem to work
-# in static pattern rules.
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
@@ -460,7 +507,6 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval            \
 $(foreach dir, $(CONVERSION_DIRS), $(eval                                    \
     $(dir)/$(CONVERSION_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
                                    $(gofiles__$(dir))                        \
-                                   $(BIN_DIR)/conversion-gen                 \
 ))
 
 # For each dir in CONVERSION_DIRS, for each target in $(conversions__$(dir)),
@@ -470,9 +516,9 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval                                    \
 # The variable value was set in $(GOFILES_META) and included as part of the
 # dependency management logic.
 #
-# Note that this is a deps-only statement, not a full rule (see below).
-# This has to be done in a distinct step because wildcards don't seem to work
-# in static pattern rules.
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
@@ -486,9 +532,48 @@ $(foreach dir, $(CONVERSION_DIRS),                                              
     ))                                                                           \
 )
 
-# For each dir in CONVERSION_DIRS, this generates a rule to auto-generate
-# conversion code.  Dependencies of the target have been populated above.
-$(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS)):
-	@$(BIN_DIR)/conversion-gen \
-	    -i $(PRJ_SRC_PATH)/$(@D) \
+# How to regenerate conversion code.
+$(CONVERSION_FILES): $(CONVERSION_GEN)
+	@$(CONVERSION_GEN)            \
+	    -i $(PRJ_SRC_PATH)/$(@D)  \
 	    -O $(CONVERSION_BASENAME)
+
+# This calculates the dependencies for the generator tool, so we only rebuild
+# it when needed.  It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed.  We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(CONVERSION_GEN).mk
+$(META_DIR)/$(CONVERSION_GEN).mk:
+	@mkdir -p $(@D);                                       \
+	(echo -n "$(CONVERSION_GEN): ";                        \
+	 DIRECT=$$(go list -e -f '{{.Dir}} {{.Dir}}/*.go'      \
+	     ./cmd/libs/go2idl/conversion-gen);                \
+	 INDIRECT=$$(go list -e                                \
+	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
+	     ./cmd/libs/go2idl/conversion-gen                  \
+	     | grep "^$(PRJ_SRC_PATH)"                         \
+	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
+	 echo $$DIRECT $$INDIRECT | sed 's/ / \\\n\t/g';       \
+	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
+	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+
+# Include dependency info for the generator tool.  This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(CONVERSION_GEN).mk
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(CONVERSION_GEN).mk, above.
+#
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(CONVERSION_GEN):
+	@hack/make-rules/build.sh cmd/libs/go2idl/conversion-gen
+	@touch $@
+
+# This rule collects all the generated file sets into a single dep, which is
+# defined BELOW the *_FILES variables and leaves higher-level rules clean.
+generated_files: $(DEEP_COPY_FILES) $(CONVERSION_FILES)
