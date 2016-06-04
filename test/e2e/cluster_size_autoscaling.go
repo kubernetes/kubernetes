@@ -86,11 +86,29 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("shouldn't increase cluster size if pending pod it too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		ReserveMemory(f, "memory-reservation", 1, memCapacityMb, false)
-		// Verify, that cluster size is not changed.
-		// TODO: find a better way of verification that the cluster size will remain unchanged using events.
 		time.Sleep(scaleUpTimeout)
+
+		// Verfiy, that the appropreate event was generated.
+		eventFound := false
+	EventsLoop:
+		for start := time.Now(); time.Since(start) < scaleUpTimeout; time.Sleep(20 * time.Second) {
+			By("Waiting for NotTriggerScaleUp event")
+			events, err := f.Client.Events(f.Namespace.Name).List(api.ListOptions{})
+			framework.ExpectNoError(err)
+
+			for _, e := range events.Items {
+				if e.InvolvedObject.Kind == "Pod" && e.Reason == "NotTriggerScaleUp" && strings.Contains(e.Message, "it wouldn't fit if a new node is added") {
+					By("NotTriggerScaleUp event found")
+					eventFound = true
+					break EventsLoop
+				}
+			}
+		}
+		Expect(eventFound).Should(Equal(true))
+		// Verify, that cluster size is not changed.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
+
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
