@@ -44,6 +44,11 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// "federation-apiserver-secret" is a reserved secret name which stores the kubeconfig for federation-apiserver.
+	FederationAPIServerSecretName = "federation-apiserver-secret"
+)
+
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
 	s := options.NewCMServer()
@@ -71,7 +76,9 @@ func Run(s *options.CMServer) error {
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
-	restClientCfg, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+	// Create the config to talk to federation-apiserver.
+	kubeconfigGetter := clustercontroller.KubeconfigGetterForSecret(FederationAPIServerSecretName)
+	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
 	if err != nil {
 		return err
 	}
