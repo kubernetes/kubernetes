@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -38,6 +39,10 @@ type Foo struct {
 	OtherField int    `json:"otherField"`
 }
 
+func (*Foo) GetObjectKind() unversioned.ObjectKind {
+	return unversioned.EmptyObjectKind
+}
+
 type FooList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
@@ -47,21 +52,37 @@ type FooList struct {
 
 func TestCodec(t *testing.T) {
 	tests := []struct {
+		into      runtime.Object
 		obj       *Foo
 		expectErr bool
 		name      string
 	}{
+		{
+			into: &runtime.VersionedObjects{},
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				TypeMeta:   unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
+			},
+			expectErr: false,
+			name:      "versioned objects list",
+		},
 		{
 			obj:       &Foo{ObjectMeta: api.ObjectMeta{Name: "bar"}},
 			expectErr: true,
 			name:      "missing kind",
 		},
 		{
-			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar"}, TypeMeta: unversioned.TypeMeta{Kind: "Foo"}},
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				TypeMeta:   unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
+			},
 			name: "basic",
 		},
 		{
-			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"}, TypeMeta: unversioned.TypeMeta{Kind: "Foo"}},
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"},
+				TypeMeta:   unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
+			},
 			name: "resource version",
 		},
 		{
@@ -70,7 +91,10 @@ func TestCodec(t *testing.T) {
 					Name:              "bar",
 					CreationTimestamp: unversioned.Time{Time: time.Unix(100, 0)},
 				},
-				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
+				TypeMeta: unversioned.TypeMeta{
+					APIVersion: "company.com/v1",
+					Kind:       "Foo",
+				},
 			},
 			name: "creation time",
 		},
@@ -81,20 +105,31 @@ func TestCodec(t *testing.T) {
 					ResourceVersion: "baz",
 					Labels:          map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
+				TypeMeta: unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
 			},
 			name: "labels",
 		},
 	}
+	registered.AddThirdPartyAPIGroupVersions(unversioned.GroupVersion{Group: "company.com", Version: "v1"})
 	for _, test := range tests {
 		d := &thirdPartyResourceDataDecoder{kind: "Foo", delegate: testapi.Extensions.Codec()}
-		e := &thirdPartyResourceDataEncoder{kind: "Foo", delegate: testapi.Extensions.Codec()}
+		e := &thirdPartyResourceDataEncoder{gvk: unversioned.GroupVersionKind{
+			Group:   "company.com",
+			Version: "v1",
+			Kind:    "Foo",
+		}, delegate: testapi.Extensions.Codec()}
 		data, err := json.Marshal(test.obj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
 		}
-		obj, err := runtime.Decode(d, data)
+		var obj runtime.Object
+		if test.into != nil {
+			err = runtime.DecodeInto(d, data, test.into)
+			obj = test.into
+		} else {
+			obj, err = runtime.Decode(d, data)
+		}
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
@@ -105,8 +140,13 @@ func TestCodec(t *testing.T) {
 			}
 			continue
 		}
-		rsrcObj, ok := obj.(*extensions.ThirdPartyResourceData)
-		if !ok {
+		var rsrcObj *extensions.ThirdPartyResourceData
+		switch o := obj.(type) {
+		case *extensions.ThirdPartyResourceData:
+			rsrcObj = o
+		case *runtime.VersionedObjects:
+			rsrcObj = o.First().(*extensions.ThirdPartyResourceData)
+		default:
 			t.Errorf("[%s] unexpected object: %v", test.name, obj)
 			continue
 		}

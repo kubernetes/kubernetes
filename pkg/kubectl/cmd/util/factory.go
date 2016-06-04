@@ -373,7 +373,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				gv := gvk.GroupVersion()
 				cfg.GroupVersion = &gv
 				cfg.APIPath = "/apis"
-				cfg.Codec = thirdpartyresourcedata.NewCodec(c.ExtensionsClient.RESTClient.Codec(), gvk.Kind)
+				cfg.Codec = thirdpartyresourcedata.NewCodec(c.ExtensionsClient.RESTClient.Codec(), gvk)
+				cfg.NegotiatedSerializer = thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, gvk.Kind, gv, gv)
 				return restclient.RESTClientFor(cfg)
 			}
 		},
@@ -398,10 +399,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
 		},
 		Decoder: func(toInternal bool) runtime.Decoder {
+			var decoder runtime.Decoder
 			if toInternal {
-				return api.Codecs.UniversalDecoder()
+				decoder = api.Codecs.UniversalDecoder()
+			} else {
+				decoder = api.Codecs.UniversalDeserializer()
 			}
-			return api.Codecs.UniversalDeserializer()
+			return thirdpartyresourcedata.NewDecoder(decoder, "")
+
 		},
 		JSONEncoder: func() runtime.Encoder {
 			return api.Codecs.LegacyCodec(registered.EnabledVersions()...)

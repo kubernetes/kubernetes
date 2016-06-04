@@ -531,7 +531,6 @@ type FooList struct {
 
 func initThirdParty(t *testing.T, version, name string) (*Master, *etcdtesting.EtcdTestServer, *httptest.Server, *assert.Assertions) {
 	master, etcdserver, _, assert := newMaster(t)
-
 	api := &extensions.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -773,6 +772,8 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 }
 
 func TestInstallThirdPartyAPIPost(t *testing.T) {
+	registered.AddThirdPartyAPIGroupVersions(unversioned.GroupVersion{Group: "company.com", Version: "v1"}, unversioned.GroupVersion{Group: "company.com", Version: "v3"})
+
 	for _, version := range versionsToTest {
 		testInstallThirdPartyAPIPostForVersion(t, version)
 	}
