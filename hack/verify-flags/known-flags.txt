@@ -469,4 +469,3 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
-
