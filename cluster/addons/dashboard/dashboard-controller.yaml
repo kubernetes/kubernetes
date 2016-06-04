@@ -33,6 +33,7 @@ spec:
             memory: 50Mi
         ports:
         - containerPort: 9090
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /
