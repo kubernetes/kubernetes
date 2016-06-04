@@ -1,7 +1,7 @@
 {
   "swaggerVersion": "1.2",
   "apiVersion": "extensions/v1beta1",
-  "basePath": "https://10.10.10.10:443",
+  "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/apis/extensions/v1beta1",
   "apis": [
    {
