@@ -63,30 +63,40 @@ and remote passwordless sudo access over ssh)
 * using [run_e2e.go](../../test/e2e_node/runner/run_e2e.go) to build a tar.gz
 and executing on host (requires host access w/ remote sudo)
 
-### Configuring a new remote host for testing
+### Option 1: Configuring a new remote host from scratch for testing
 
-The host must contain a environment capable of supporting a mini-kubernetes
-cluster. Includes:
+The host must contain an environment capable of running a minimal kubernetes cluster
+consisting of etcd, the kube-apiserver, and kubelet. The steps required to step a host vary between distributions
+(coreos, rhel, ubuntu, etc), but may include:
 * install etcd
 * install docker
+* add user running tests to docker group
 * install lxc and update grub commandline
 * enable tty-less sudo access
 
-See [setup_host.sh](../../test/e2e_node/environment/setup_host.sh)
+These steps should be captured in [setup_host.sh](../../test/e2e_node/environment/setup_host.sh)
+
+### Option 2: Copying an existing host image from another project
+
+If there is an existing image in another project you would like to use, you can use the script
+[copy-e2e-image.sh](../../test/e2e_node/jenkins/copy-e2e-image.sh) to copy an image
+from one GCE project to another.
+
+```sh
+copy-e2e-image.sh <image-to-be-copied-name> <from-gce-project> <to-gce-project>
+```
 
 ### Running the tests
 
-1. If running against a host on gce
+1. If running tests against a running host on gce
+
+  * Make sure host names are resolvable to ssh by running `gcloud compute config-ssh` to
+    update ~/.ssh/config with the GCE hosts.  After running this command, check the hostnames
+    in the ~/.ssh/config file and verify you have the correct access by running `ssh <host>`.
 
   * Copy [template.properties](../../test/e2e_node/jenkins/template.properties)
 
-    * Fill in `GCE_HOSTS`
-    * Set `INSTALL_GODEP=true` to install `godep`, `gomega`, `ginkgo`
-
-  * Make sure host names are resolvable to ssh `ssh <host>`.
-
-    * If needed, you can run `gcloud compute config-ssh` to add gce hostnames to
-your .ssh/config so they are resolvable by ssh.
+    * Fill in `GCE_HOSTS` with the name of the host
 
   * Run `test/e2e_node/jenkins/e2e-node-jenkins.sh <path to properties file>`
     * **Must be run from kubernetes root**
@@ -103,17 +113,12 @@ tests with `--ssh-options`
 separated hosts>`
 
     * **Must be run from kubernetes root**
-    * requires (go get): `github.com/tools/godep`, `github.com/onsi/gomega`,
-`github.com/onsi/ginkgo/ginkgo`
 
 3. Alternatively, manually build and copy `e2e_node_test.tar.gz` to a remote
 host
 
   * Build the tar.gz `go run test/e2e_node/runner/run_e2e.go --logtostderr
 --build-only`
-
-    * requires (go get): `github.com/tools/godep`, `github.com/onsi/gomega`,
-`github.com/onsi/ginkgo/ginkgo`
 
   * Copy `e2e_node_test.tar.gz` to the remote host
 
@@ -127,13 +132,15 @@ kube-apiserver binaries.
 
 ## Running tests against a gce image
 
-* Build a gce image from a prepared gce host
+* Option 1: Build a gce image from a prepared gce host
   * Create the host from a base image and configure it (see above)
     * Run tests against this remote host to ensure that it is setup correctly
 before doing anything else
   * Create a gce *snapshot* of the instance
   * Create a gce *disk* from the snapshot
   * Create a gce *image* from the disk
+* Option 2: Copy a prepared image from another project
+  * Instructions above
 * Test that the necessary gcloud credentials are setup for the project
   * `gcloud compute --project <project> --zone <zone> images list`
   * Verify that your image appears in the list
@@ -146,9 +153,7 @@ before doing anything else
 
 Node e2e tests are run against a static list of host environments continuously
 or when manually triggered on a github.com pull requests using the trigger
-phrase `@k8s-bot test node e2e experimental` - *results not yet publish, pending
-evaluation of test stability.*.
-
+phrase `@k8s-bot test node e2e`
 
 ### CI Host environments
 
@@ -159,14 +164,12 @@ TBD
 | linux distro    | distro version | docker version | etcd version | cloud provider |
 |-----------------|----------------|----------------|--------------|----------------|
 | containervm     |                | 1.8            |              | gce            |
-| rhel            | 7              | 1.10           |              | gce            |
-| centos          | 7              | 1.10           |              | gce            |
 | coreos          | stable         | 1.8            |              | gce            |
 | debian          | jessie         | 1.10           |              | gce            |
 | ubuntu          | trusty         | 1.8            |              | gce            |
 | ubuntu          | trusty         | 1.9            |              | gce            |
 | ubuntu          | trusty         | 1.10           |              | gce            |
-| ubuntu          | wily           | 1.10           |              | gce            |
+
 
 
 
