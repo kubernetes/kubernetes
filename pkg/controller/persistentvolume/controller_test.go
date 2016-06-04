@@ -111,8 +111,12 @@ func TestControllerSync(t *testing.T) {
 		defer ctrl.Stop()
 		go ctrl.Run()
 
-		// Wait for the controller to pass initial sync.
-		for !ctrl.volumeController.HasSynced() || !ctrl.claimController.HasSynced() {
+		// Wait for the controller to pass initial sync and fill its caches.
+		for !ctrl.volumeController.HasSynced() ||
+			!ctrl.claimController.HasSynced() ||
+			len(ctrl.claims.ListKeys()) < len(test.initialClaims) ||
+			len(ctrl.volumes.store.ListKeys()) < len(test.initialVolumes) {
+
 			time.Sleep(10 * time.Millisecond)
 		}
 		glog.V(4).Infof("controller synced, starting test")
