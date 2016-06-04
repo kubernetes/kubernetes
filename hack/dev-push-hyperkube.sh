@@ -17,7 +17,12 @@
 # This script will build the hyperkube image and push it to the repository
 # referred to by KUBE_DOCKER_REGISTRY and KUBE_DOCKER_OWNER. The image will
 # be given a version tag with the value from KUBE_DOCKER_VERSION.
-
+# e.g. run as: 
+# KUBE_DOCKER_REGISTRY=localhost:5000 KUBE_DOCKER_OWNER=liyi \
+# KUBE_DOCKER_VERSION=1.3.0-dev ./hack/dev-push-hyperkube.sh
+#
+# will build image localhost:5000/liyi/hyperkube-amd64:1.3.0-dev
+ 
 set -o errexit
 set -o nounset
 set -o pipefail
