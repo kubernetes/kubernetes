@@ -63,11 +63,15 @@ func PrePullAllImages() error {
 			err    error
 			output []byte
 		)
-		for i := maxImagePullRetries; i > 0; i++ {
+		for i := 0; i < maxImagePullRetries; i++ {
+			if i > 0 {
+				time.Sleep(imagePullRetryDelay)
+			}
 			if output, err = exec.Command("docker", "pull", image).CombinedOutput(); err == nil {
 				break
 			}
-			time.Sleep(imagePullRetryDelay)
+			glog.Warningf("Failed to pull %s, retrying in %s (%d of %d): %v",
+				image, imagePullRetryDelay.String(), i+1, maxImagePullRetries, err)
 		}
 		if err != nil {
 			glog.Warningf("Could not pre-pull image %s %v output:  %s", image, err, output)
