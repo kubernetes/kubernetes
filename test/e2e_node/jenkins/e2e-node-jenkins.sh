@@ -28,12 +28,6 @@ set -x
 
 . $1
 
-if [ "$INSTALL_GODEP" = true ] ; then
-  go get -u github.com/tools/godep
-  go get -u github.com/onsi/ginkgo/ginkgo
-  go get -u github.com/onsi/gomega
-fi
-
 go build test/e2e_node/environment/conformance.go
 ARTIFACTS=${WORKSPACE}/_artifacts
 mkdir -p ${ARTIFACTS}
