@@ -1876,6 +1876,13 @@ func (r *rktExitError) ExitStatus() int {
 	return 0
 }
 
+func newRktExitError(e error) error {
+	if exitErr, ok := e.(*exec.ExitError); ok {
+		return &rktExitError{exitErr}
+	}
+	return e
+}
+
 func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	return fmt.Errorf("unimplemented")
 }
@@ -1910,7 +1917,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 		if stdout != nil {
 			go io.Copy(stdout, p)
 		}
-		return command.Wait()
+		return newRktExitError(command.Wait())
 	}
 	if stdin != nil {
 		// Use an os.Pipe here as it returns true *os.File objects.
@@ -1919,7 +1926,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 		// of the pipe.
 		r, w, err := r.os.Pipe()
 		if err != nil {
-			return err
+			return newRktExitError(err)
 		}
 		go io.Copy(w, stdin)
 
@@ -1931,7 +1938,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 	if stderr != nil {
 		command.Stderr = stderr
 	}
-	return command.Run()
+	return newRktExitError(command.Run())
 }
 
 // PortForward executes socat in the pod's network namespace and copies
