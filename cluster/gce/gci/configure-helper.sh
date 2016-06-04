@@ -764,7 +764,9 @@ function start-fluentd {
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]]; then
     if [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
       cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-gcp.yaml" /etc/kubernetes/manifests/
-    elif [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]]; then
+    elif [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
+      # Running fluentd-es on the master is pointless, as it can't communicate
+      # with elasticsearch from there in the default configuration.
       cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-es.yaml" /etc/kubernetes/manifests/
     fi
   fi
