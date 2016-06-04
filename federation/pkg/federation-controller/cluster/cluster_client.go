@@ -48,6 +48,19 @@ const (
 // We dont use the standard one which calls NewInCluster in tests to avoid having to setup service accounts and mount files with secret tokens.
 var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.KubeconfigGetter {
 	return func() (*clientcmdapi.Config, error) {
+		secretRefName := ""
+		if c.Spec.SecretRef != nil {
+			secretRefName = c.Spec.SecretRef.Name
+		} else {
+			glog.Infof("didnt find secretRef for cluster %s. Trying insecure access", c.Name)
+		}
+		return KubeconfigGetterForSecret(secretRefName)()
+	}
+}
+
+// KubeconfigGettterForSecret is used to get the kubeconfig from the given secret.
+var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGetter {
+	return func() (*clientcmdapi.Config, error) {
 		// Get the namespace this is running in from the env variable.
 		namespace := os.Getenv("POD_NAMESPACE")
 		if namespace == "" {
@@ -59,8 +72,8 @@ var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.
 			return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
 		}
 		data := []byte{}
-		if c.Spec.SecretRef != nil {
-			secret, err := client.Secrets(namespace).Get(c.Spec.SecretRef.Name)
+		if secretName != "" {
+			secret, err := client.Secrets(namespace).Get(secretName)
 			if err != nil {
 				return nil, fmt.Errorf("error in fetching secret: %s", err)
 			}
@@ -69,8 +82,6 @@ var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.
 			if !ok {
 				return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
 			}
-		} else {
-			glog.Infof("didnt find secretRef for cluster %s. Trying insecure access", c.Name)
 		}
 		return clientcmd.Load(data)
 	}
