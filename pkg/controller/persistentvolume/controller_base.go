@@ -142,7 +142,11 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		return
 	}
 	for _, volume := range volumeList.Items {
-		storeObjectUpdate(ctrl.volumes.store, volume, "volume")
+		// Ignore template volumes from kubernetes 1.2
+		deleted := ctrl.upgradeVolumeFrom1_2(volume.(*api.PersistentVolume))
+		if !deleted {
+			storeObjectUpdate(ctrl.volumes.store, volume, "volume")
+		}
 	}
 
 	claimListObj, err := claimSource.List(api.ListOptions{})
@@ -164,6 +168,17 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 // addVolume is callback from framework.Controller watching PersistentVolume
 // events.
 func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
+	pv, ok := obj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("expected PersistentVolume but handler received %+v", obj)
+		return
+	}
+
+	if ctrl.upgradeVolumeFrom1_2(pv) {
+		// volume deleted
+		return
+	}
+
 	// Store the new volume version in the cache and do not process it if this
 	// is an old version.
 	new, err := storeObjectUpdate(ctrl.volumes.store, obj, "volume")
@@ -174,11 +189,6 @@ func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 		return
 	}
 
-	pv, ok := obj.(*api.PersistentVolume)
-	if !ok {
-		glog.Errorf("expected PersistentVolume but handler received %+v", obj)
-		return
-	}
 	if err := ctrl.syncVolume(pv); err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
@@ -193,6 +203,17 @@ func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 // updateVolume is callback from framework.Controller watching PersistentVolume
 // events.
 func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{}) {
+	newVolume, ok := newObj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %+v", newObj)
+		return
+	}
+
+	if ctrl.upgradeVolumeFrom1_2(newVolume) {
+		// volume deleted
+		return
+	}
+
 	// Store the new volume version in the cache and do not process it if this
 	// is an old version.
 	new, err := storeObjectUpdate(ctrl.volumes.store, newObj, "volume")
@@ -203,11 +224,6 @@ func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{})
 		return
 	}
 
-	newVolume, ok := newObj.(*api.PersistentVolume)
-	if !ok {
-		glog.Errorf("Expected PersistentVolume but handler received %+v", newObj)
-		return
-	}
 	if err := ctrl.syncVolume(newVolume); err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
@@ -398,6 +414,44 @@ func (ctrl *PersistentVolumeController) Stop() {
 	glog.V(4).Infof("stopping PersistentVolumeController")
 	close(ctrl.volumeControllerStopCh)
 	close(ctrl.claimControllerStopCh)
+}
+
+const (
+	// these pair of constants are used by the provisioner in Kubernetes 1.2.
+	pvProvisioningRequiredAnnotationKey    = "volume.experimental.kubernetes.io/provisioning-required"
+	pvProvisioningCompletedAnnotationValue = "volume.experimental.kubernetes.io/provisioning-completed"
+)
+
+// upgradeVolumeFrom1_2 updates PV from Kubernetes 1.2 to 1.3 and newer. In 1.2,
+// we used template PersistentVolume instances for dynamic provisioning. In 1.3
+// and later, these template (and not provisioned) instances must be removed to
+// make the controller to provision a new PV.
+// It returns true if the volume was deleted.
+// TODO: remove this function when upgrade from 1.2 becomes unsupported.
+func (ctrl *PersistentVolumeController) upgradeVolumeFrom1_2(volume *api.PersistentVolume) bool {
+	annValue, found := volume.Annotations[pvProvisioningRequiredAnnotationKey]
+	if !found {
+		// The volume is not template
+		return false
+	}
+	if annValue == pvProvisioningCompletedAnnotationValue {
+		// The volume is already fully provisioned. The new controller will
+		// ignore this annotation and it will obey its ReclaimPolicy, which is
+		// likely to delete the volume when appropriate claim is deleted.
+		return false
+	}
+	glog.V(2).Infof("deleting unprovisioned template volume %q from Kubernetes 1.2.", volume.Name)
+	err := ctrl.kubeClient.Core().PersistentVolumes().Delete(volume.Name, nil)
+	if err != nil {
+		glog.Errorf("cannot delete unprovisioned template volume %q: %v", volume.Name, err)
+	}
+	// Remove from local cache
+	err = ctrl.volumes.store.Delete(volume)
+	if err != nil {
+		glog.Errorf("cannot remove volume %q from local cache: %v", volume.Name, err)
+	}
+
+	return true
 }
 
 // Stateless functions
