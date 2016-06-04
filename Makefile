@@ -93,15 +93,27 @@ test_e2e:
 # Build and run node end-to-end tests.
 #
 # Args:
-#  FOCUS: regexp that matches the tests to be run
-#  SKIP: regexp that matches the tests that needs to be skipped
+#  FOCUS: regexp that matches the tests to be run.  Defaults to "".
+#  SKIP: regexp that matches the tests that needs to be skipped.  Defaults to "".
+#  RUN_UNTIL_FAILURE: Ff true, pass --untilItFails to ginkgo so tests are run repeatedly until they fail.  Defaults to false.
+#  REMOTE: If true, run the tests on a remote host instance on GCE.  Defaults to false.
+#  IMAGES: for REMOTE=true only.  Comma delimited list of images for creating remote hosts to run tests against.  Defaults to "e2e-node-containervm-v20160321-image".
+#  LIST_IMAGES: If true, don't run tests.  Just output the list of available images for testing.  Defaults to false.
+#  HOSTS: for REMOTE=true only.  Comma delimited list of running gce hosts to run tests against.  Defaults to "".
+#  DELETE_INSTANCES: for REMOTE=true only.  Delete any instances created as part of this test run.  Defaults to false.
+#  ARTIFACTS: for REMOTE=true only.  Local directory to scp test artifacts into from the remote hosts.  Defaults to ""/tmp/_artifacts".
+#  REPORT: for REMOTE=false only.  Local directory to write juntil xml results to.  Defaults to "/tmp/".
+#  CLEANUP: for REMOTE=true only.  If false, do not stop processes or delete test files on remote hosts.  Defaults to true.
+#  IMAGE_PROJECT: for REMOTE=true only.  Project containing images provided to IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#  INSTANCE_PREFIX: for REMOTE=true only.  Instances created from images will have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test"/
+#
 # Example:
 #   make test_e2e_node FOCUS=kubelet SKIP=container
+#   make test_e2e_node REMOTE=true DELETE_INSTANCES=true
 # Build and run tests.
 test_e2e_node:
-	hack/e2e-node-test.sh FOCUS=$(FOCUS) SKIP=$(SKIP)
+	hack/e2e-node-test.sh
 .PHONY: test_e2e_node
-
 
 # Remove all build artifacts.
 #
