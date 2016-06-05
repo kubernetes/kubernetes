@@ -350,6 +350,17 @@ DEEPCOPY_DIRS := $(shell                               \
 )
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_deepcopy
+gen_deepcopy: $(DEEPCOPY_FILES)
+	@if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then               \
+	    $(DEEPCOPY_GEN)                                               \
+	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd,)  \
+	        --bounding-dirs $(PRJ_SRC_PATH)                           \
+	        -O $(DEEPCOPY_BASENAME);                                  \
+	fi
+
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
 #
@@ -367,12 +378,13 @@ $(foreach dir, $(DEEPCOPY_DIRS), $(eval                                    \
                                    $(gofiles__$(dir))                      \
 ))
 
-# How to regenerate deep-copy code.
+# Unilaterally remove any leftovers from previous runs.
+$(shell rm -f $(META_DIR)/$(DEEPCOPY_GEN)*.todo)
+
+# How to regenerate deep-copy code.  This is a little slow to run, so we batch
+# it up and trigger the batch from the 'generated_files' target.
 $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
-	@$(DEEPCOPY_GEN)                       \
-	    -i $(PRJ_SRC_PATH)/$$(dirname $@)  \
-	    --bounding-dirs $(PRJ_SRC_PATH)    \
-	    -O $(DEEPCOPY_BASENAME)
+	@echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEEPCOPY_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
@@ -447,6 +459,16 @@ CONVERSION_DIRS := $(shell                                \
 )
 
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
+
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_conversion
+gen_conversion: $(CONVERSION_FILES)
+	@if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then               \
+	    $(CONVERSION_GEN)                                               \
+	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd,)  \
+	        -O $(CONVERSION_BASENAME);                                  \
+	fi
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
 # changes (files added or removed) the deps file will be considered stale.
@@ -532,11 +554,13 @@ $(foreach dir, $(CONVERSION_DIRS),                                              
     ))                                                                           \
 )
 
-# How to regenerate conversion code.
+# Unilaterally remove any leftovers from previous runs.
+$(shell rm -f $(META_DIR)/$(CONVERSION_GEN)*.todo)
+
+# How to regenerate conversion code.  This is a little slow to run, so we batch
+# it up and trigger the batch from the 'generated_files' target.
 $(CONVERSION_FILES): $(CONVERSION_GEN)
-	@$(CONVERSION_GEN)            \
-	    -i $(PRJ_SRC_PATH)/$(@D)  \
-	    -O $(CONVERSION_BASENAME)
+	@echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
@@ -563,7 +587,6 @@ sinclude $(META_DIR)/$(CONVERSION_GEN).mk
 # How to build the generator tool.  The deps for this are defined in
 # the $(CONVERSION_GEN).mk, above.
 #
-#
 # A word on the need to touch: This rule might trigger if, for example, a
 # non-Go file was added or deleted from a directory on which this depends.
 # This target needs to be reconsidered, but Go realizes it doesn't actually
@@ -576,4 +599,6 @@ $(CONVERSION_GEN):
 
 # This rule collects all the generated file sets into a single dep, which is
 # defined BELOW the *_FILES variables and leaves higher-level rules clean.
-generated_files: $(DEEPCOPY_FILES) $(CONVERSION_FILES)
+# Top-level rules should depend on this to ensure generated files are rebuilt.
+.PHONY: generated_files
+generated_files: gen_deepcopy gen_conversion
