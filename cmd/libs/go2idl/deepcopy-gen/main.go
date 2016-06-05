@@ -59,7 +59,7 @@ func main() {
 	arguments := args.Default()
 
 	// Override defaults.
-	arguments.OutputFileBaseName = "deep_copy_generated"
+	arguments.OutputFileBaseName = "deepcopy_generated"
 
 	// Custom args.
 	customArgs := &generators.CustomArgs{}
