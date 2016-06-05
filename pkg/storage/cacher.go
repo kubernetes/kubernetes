@@ -158,22 +158,18 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	}
 
 	cacher := &Cacher{
-		usable:     sync.RWMutex{},
 		storage:    config.Storage,
 		watchCache: watchCache,
 		reflector:  cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
-		watcherIdx: 0,
 		watchers:   make(map[int]*cacheWatcher),
 		versioner:  config.Versioner,
 		keyFunc:    config.KeyFunc,
-		stopped:    false,
 		// We need to (potentially) stop both:
 		// - wait.Until go-routine
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
 		stopCh: make(chan struct{}),
-		stopWg: sync.WaitGroup{},
 	}
 	// See startCaching method for explanation and where this is unlocked.
 	cacher.usable.Lock()
