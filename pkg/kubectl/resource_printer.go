@@ -418,7 +418,7 @@ var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
-var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS", "AGE"}
+var ingressColumns = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 var petSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "STATUS", "AGE"}
@@ -1027,11 +1027,39 @@ func backendStringer(backend *extensions.IngressBackend) string {
 	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
 }
 
+func formatHosts(rules []extensions.IngressRule) string {
+	list := []string{}
+	max := 3
+	more := false
+	for _, rule := range rules {
+		if len(list) == max {
+			more = true
+		}
+		if !more && len(rule.Host) != 0 {
+			list = append(list, rule.Host)
+		}
+	}
+	if len(list) == 0 {
+		return "*"
+	}
+	ret := strings.Join(list, ",")
+	if more {
+		return fmt.Sprintf("%s + %d more...", ret, len(rules)-max)
+	}
+	return ret
+}
+
+func formatPorts(tls []extensions.IngressTLS) string {
+	if len(tls) != 0 {
+		return "80, 443"
+	}
+	return "80"
+}
+
 func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions) error {
 	name := ingress.Name
 	namespace := ingress.Namespace
 
-	hostRules := ingress.Spec.Rules
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
 			return err
@@ -1040,9 +1068,9 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 
 	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%s",
 		name,
-		"-",
-		backendStringer(ingress.Spec.Backend),
+		formatHosts(ingress.Spec.Rules),
 		loadBalancerStatusStringer(ingress.Status.LoadBalancer),
+		formatPorts(ingress.Spec.TLS),
 		translateTimestamp(ingress.CreationTimestamp),
 	); err != nil {
 		return err
@@ -1054,35 +1082,6 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 	if _, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, ingress.Labels)); err != nil {
 		return err
 	}
-
-	// Lay out all the rules on separate lines if use wide output.
-	// TODO(AdoHe): improve ingress output
-	extraLinePrefix := ""
-	if options.WithNamespace {
-		extraLinePrefix = "\t"
-	}
-	for _, rules := range hostRules {
-		if rules.HTTP == nil {
-			continue
-		}
-		_, err := fmt.Fprintf(w, "%s\t%v\t", extraLinePrefix, rules.Host)
-		if err != nil {
-			return err
-		}
-		if _, err := fmt.Fprint(w, AppendLabelTabs(options.ColumnLabels)); err != nil {
-			return err
-		}
-		for _, rule := range rules.HTTP.Paths {
-			_, err := fmt.Fprintf(w, "%s\t%v\t%v", extraLinePrefix, rule.Path, backendStringer(&rule.Backend))
-			if err != nil {
-				return err
-			}
-			if _, err := fmt.Fprint(w, AppendLabelTabs(options.ColumnLabels)); err != nil {
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 
