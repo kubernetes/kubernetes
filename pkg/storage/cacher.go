@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -109,37 +108,6 @@ type Cacher struct {
 	stopped  bool
 	stopCh   chan struct{}
 	stopWg   sync.WaitGroup
-}
-
-// Create a new Cacher responsible from service WATCH and LIST requests from its
-// internal cache and updating its cache in the background based on the given
-// configuration.
-func NewCacher(
-	storage Interface,
-	capacity int,
-	versioner Versioner,
-	objectType runtime.Object,
-	resourcePrefix string,
-	scopeStrategy rest.NamespaceScopedStrategy,
-	newListFunc func() runtime.Object) Interface {
-	config := CacherConfig{
-		CacheCapacity:  capacity,
-		Storage:        storage,
-		Versioner:      versioner,
-		Type:           objectType,
-		ResourcePrefix: resourcePrefix,
-		NewListFunc:    newListFunc,
-	}
-	if scopeStrategy.NamespaceScoped() {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
-			return NamespaceKeyFunc(resourcePrefix, obj)
-		}
-	} else {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
-			return NoNamespaceKeyFunc(resourcePrefix, obj)
-		}
-	}
-	return NewCacherFromConfig(config)
 }
 
 // Create a new Cacher responsible from service WATCH and LIST requests from its
