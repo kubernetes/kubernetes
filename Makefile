@@ -333,24 +333,24 @@ ALL_K8S_TAG_FILES := $(shell                             \
 #               scheme
 
 # The result file, in each pkg, of deep-copy generation.
-DEEP_COPY_BASENAME := $(GENERATED_FILE_PREFIX)deep_copy
-DEEP_COPY_FILENAME := $(DEEP_COPY_BASENAME).go
+DEEPCOPY_BASENAME := $(GENERATED_FILE_PREFIX)deepcopy
+DEEPCOPY_FILENAME := $(DEEPCOPY_BASENAME).go
 
 # The tool used to generate deep copies.
-DEEP_COPY_GEN := $(BIN_DIR)/deepcopy-gen
+DEEPCOPY_GEN := $(BIN_DIR)/deepcopy-gen
 
 # Find all the directories that request deep-copy generation.
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:deepcopy-gen tags)
 endif
-DEEP_COPY_DIRS := $(shell \
+DEEPCOPY_DIRS := $(shell                               \
     grep -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
         | xargs dirname                                \
         | sort -u                                      \
 )
-DEEP_COPY_FILES := $(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS))
+DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 
-# For each dir in DEEP_COPY_DIRS, this establishes a dependency between the
+# For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
 #
 # Note that this is a deps-only statement, not a full rule (see below).  This
@@ -362,25 +362,25 @@ DEEP_COPY_FILES := $(addsuffix /$(DEEP_COPY_FILENAME), $(DEEP_COPY_DIRS))
 #
 # We depend on the $(GOFILES_META).stamp to detect when the set of input files
 # has changed.  This allows us to detect deleted input files.
-$(foreach dir, $(DEEP_COPY_DIRS), $(eval                                    \
-    $(dir)/$(DEEP_COPY_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
-                                   $(gofiles__$(dir))                       \
+$(foreach dir, $(DEEPCOPY_DIRS), $(eval                                    \
+    $(dir)/$(DEEPCOPY_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
+                                   $(gofiles__$(dir))                      \
 ))
 
 # How to regenerate deep-copy code.
-$(DEEP_COPY_FILES): $(DEEP_COPY_GEN)
-	@$(DEEP_COPY_GEN)                                   \
-	    -i $(PRJ_SRC_PATH)/$$(dirname $@)               \
-	    --bounding-dirs $(PRJ_SRC_PATH)                 \
-	    -O $(DEEP_COPY_BASENAME)
+$(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
+	@$(DEEPCOPY_GEN)                       \
+	    -i $(PRJ_SRC_PATH)/$$(dirname $@)  \
+	    --bounding-dirs $(PRJ_SRC_PATH)    \
+	    -O $(DEEPCOPY_BASENAME)
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
 # file if the contents have actually changed.  We 'sinclude' this later.
-.PHONY: $(META_DIR)/$(DEEP_COPY_GEN).mk
-$(META_DIR)/$(DEEP_COPY_GEN).mk:
+.PHONY: $(META_DIR)/$(DEEPCOPY_GEN).mk
+$(META_DIR)/$(DEEPCOPY_GEN).mk:
 	@mkdir -p $(@D);                                       \
-	(echo -n "$(DEEP_COPY_GEN): ";                         \
+	(echo -n "$(DEEPCOPY_GEN): ";                          \
 	 DIRECT=$$(go list -e -f '{{.Dir}} {{.Dir}}/*.go'      \
 	     ./cmd/libs/go2idl/deepcopy-gen);                  \
 	 INDIRECT=$$(go list -e                                \
@@ -394,10 +394,10 @@ $(META_DIR)/$(DEEP_COPY_GEN).mk:
 
 # Include dependency info for the generator tool.  This will cause the rule of
 # the same name to be considered and if it is updated, make will restart.
-sinclude $(META_DIR)/$(DEEP_COPY_GEN).mk
+sinclude $(META_DIR)/$(DEEPCOPY_GEN).mk
 
 # How to build the generator tool.  The deps for this are defined in
-# the $(DEEP_COPY_GEN).mk, above.
+# the $(DEEPCOPY_GEN).mk, above.
 #
 # A word on the need to touch: This rule might trigger if, for example, a
 # non-Go file was added or deleted from a directory on which this depends.
@@ -405,7 +405,7 @@ sinclude $(META_DIR)/$(DEEP_COPY_GEN).mk
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
-$(DEEP_COPY_GEN):
+$(DEEPCOPY_GEN):
 	@hack/make-rules/build.sh cmd/libs/go2idl/deepcopy-gen
 	@touch $@
 
@@ -576,4 +576,4 @@ $(CONVERSION_GEN):
 
 # This rule collects all the generated file sets into a single dep, which is
 # defined BELOW the *_FILES variables and leaves higher-level rules clean.
-generated_files: $(DEEP_COPY_FILES) $(CONVERSION_FILES)
+generated_files: $(DEEPCOPY_FILES) $(CONVERSION_FILES)
