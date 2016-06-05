@@ -1,27 +1,40 @@
+/*
+Copyright 2014 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package cloudstack
 
 import (
 	"fmt"
-	"io"
-	"gopkg.in/gcfg.v1"
-	"github.com/xanzy/go-cloudstack/cloudstack"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/api"
-	 //"github.com/kubernetes/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
-	 //"github.com/kubernetes/kubernetes/pkg/api/service"
 	"github.com/golang/glog"
+	"github.com/xanzy/go-cloudstack/cloudstack"
+	"gopkg.in/gcfg.v1"
+	"io"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 const ProviderName = "cloudstack"
 
 type Config struct {
 	Global struct {
-		       APIUrl     string `gcfg:"api-url"`
-		       APIKey     string `gcfg:"api-key"`
-		       SecretKey  string `gcfg:"secret-key"`
-		       VerifySSL  bool `gcfg:"verify-ssl"`
-	       }
+		APIUrl    string `gcfg:"api-url"`
+		APIKey    string `gcfg:"api-key"`
+		SecretKey string `gcfg:"secret-key"`
+		VerifySSL bool   `gcfg:"verify-ssl"`
+	}
 }
 
 // CSCloud is an implementation of cloud provider Interface for CloudStack.
@@ -66,7 +79,7 @@ func newCSCloud(cfg Config) (*CSCloud, error) {
 	}
 
 	cs := CSCloud{
-		client:        client,
+		client:          client,
 		localInstanceID: id,
 	}
 
@@ -129,7 +142,7 @@ func (i *Instances) ExternalID(name string) (string, error) {
 	var hosts []string
 	hosts = append(hosts, name)
 	vmIDs, err := lb.getVirtualMachineIds(hosts)
-	if  err != nil {
+	if err != nil {
 		return "", err
 	}
 	return vmIDs[0], nil
@@ -142,7 +155,7 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	var hosts []string
 	hosts = append(hosts, name)
 	vmIDs, err := lb.getVirtualMachineIds(hosts)
-	if  err != nil {
+	if err != nil {
 		return "", cloudprovider.InstanceNotFound
 	}
 	return vmIDs[0], nil
@@ -152,6 +165,7 @@ func (i *Instances) InstanceID(name string) (string, error) {
 func (i *Instances) InstanceType(name string) (string, error) {
 	return "", nil
 }
+
 // List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 func (i *Instances) List(name_filter string) ([]string, error) {
 	vmParams := i.cs.client.VirtualMachine.NewListVirtualMachinesParams()
@@ -166,6 +180,7 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 	}
 	return vms, nil
 }
+
 // NodeAddresses returns the addresses of the specified instance.
 // TODO(roberthbailey): This currently is only used in such a way that it
 // returns the address of the calling instance. We should do a rename to
@@ -191,11 +206,11 @@ func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 }
 
 type LoadBalancer struct {
-	cs	*CSCloud
+	cs *CSCloud
 }
 
 type Instances struct {
-	cs 	*CSCloud
+	cs *CSCloud
 }
 
 func (lb *LoadBalancer) GetLoadBalancer(apiService *api.Service) (*api.LoadBalancerStatus, bool, error) {
@@ -213,17 +228,8 @@ func (lb *LoadBalancer) GetLoadBalancer(apiService *api.Service) (*api.LoadBalan
 	return status, true, err
 }
 
-func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
-
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
-	if err != nil {
-		return nil, err
-	}
-
-	if !service.IsAllowAll(sourceRanges) {
-		return nil, fmt.Errorf("Source range restrictions are not supported for CloudStack load balancers")
-	}
+func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts)
 
 	glog.V(2).Infof("Checking if CloudStack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
 	_, exists, err := lb.GetLoadBalancer(apiService)
@@ -277,8 +283,8 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		lbParams := lb.cs.client.LoadBalancer.NewCreateLoadBalancerRuleParams(
 			algorithm,
 			lbName,
-			port.NodePort,
-			port.Port,
+			int(port.NodePort),
+			int(port.Port),
 		)
 
 		//Config protocol for new LB
@@ -410,7 +416,6 @@ func (lb *LoadBalancer) UpdateLoadBalancer(apiService *api.Service, hosts []stri
 func (lb *LoadBalancer) EnsureLoadBalancerDeleted(apiService *api.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v)", loadBalancerName)
-
 
 	lbIpAddr := apiService.Spec.LoadBalancerIP
 	if lbIpAddr != "" {
