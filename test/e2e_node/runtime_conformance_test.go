@@ -37,7 +37,7 @@ const (
 	pollInterval           = time.Second * 5
 )
 
-type testStatus struct {
+type testCase struct {
 	Name             string
 	RestartPolicy    api.RestartPolicy
 	Phase            api.PodPhase
@@ -47,7 +47,7 @@ type testStatus struct {
 	Ready            bool
 }
 
-var _ = Describe("[FLAKY] Container runtime Conformance Test", func() {
+var _ = Describe("Container Runtime Conformance Test", func() {
 	var cl *client.Client
 
 	BeforeEach(func() {
@@ -56,28 +56,24 @@ var _ = Describe("[FLAKY] Container runtime Conformance Test", func() {
 	})
 
 	Describe("container runtime conformance blackbox test", func() {
-		var testCContainers []ConformanceContainer
 		namespace := "runtime-conformance"
 
-		BeforeEach(func() {
-			testCContainers = []ConformanceContainer{}
-		})
-
-		Context("when start a container that exits successfully", func() {
+		Context("when starting a container that exits", func() {
 			It("it should run with the expected status [Conformance]", func() {
+				restartCountVolumeName := "restart-count"
+				restartCountVolumePath := "/restart-count"
 				testContainer := api.Container{
 					Image: ImageRegistry[busyBoxImage],
 					VolumeMounts: []api.VolumeMount{
 						{
-							MountPath: "/restart-count",
-							Name:      "restart-count",
+							MountPath: restartCountVolumePath,
+							Name:      restartCountVolumeName,
 						},
 					},
-					ImagePullPolicy: api.PullIfNotPresent,
 				}
 				testVolumes := []api.Volume{
 					{
-						Name: "restart-count",
+						Name: restartCountVolumeName,
 						VolumeSource: api.VolumeSource{
 							HostPath: &api.HostPathVolumeSource{
 								Path: os.TempDir(),
@@ -85,171 +81,63 @@ var _ = Describe("[FLAKY] Container runtime Conformance Test", func() {
 						},
 					},
 				}
-				testCount := int32(3)
-				testStatuses := []testStatus{
-					{"terminate-cmd-rpa", api.RestartPolicyAlways, api.PodRunning, ContainerStateWaiting | ContainerStateRunning | ContainerStateTerminated, ">", testCount, false},
-					{"terminate-cmd-rpof", api.RestartPolicyOnFailure, api.PodSucceeded, ContainerStateTerminated, "==", testCount, false},
-					{"terminate-cmd-rpn", api.RestartPolicyNever, api.PodSucceeded, ContainerStateTerminated, "==", 0, false},
+				testCases := []testCase{
+					{"terminate-cmd-rpa", api.RestartPolicyAlways, api.PodRunning, ContainerStateRunning, "==", 2, true},
+					{"terminate-cmd-rpof", api.RestartPolicyOnFailure, api.PodSucceeded, ContainerStateTerminated, "==", 1, false},
+					{"terminate-cmd-rpn", api.RestartPolicyNever, api.PodFailed, ContainerStateTerminated, "==", 0, false},
 				}
-
-				for _, testStatus := range testStatuses {
+				for _, testCase := range testCases {
 					tmpFile, err := ioutil.TempFile("", "restartCount")
 					Expect(err).NotTo(HaveOccurred())
 					defer os.Remove(tmpFile.Name())
 
-					// It fails in the first three runs and succeeds after that.
-					tmpCmd := fmt.Sprintf("echo 'hello' >> /restart-count/%s ; test $(wc -l /restart-count/%s| awk {'print $1'}) -ge %d", path.Base(tmpFile.Name()), path.Base(tmpFile.Name()), testCount+1)
-					testContainer.Name = testStatus.Name
+					// It failed at the 1st run, then succeeded at 2nd run, then run forever
+					cmdScripts := `
+f=%s
+count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
+if [ $count -eq 1 ]; then
+	exit 1
+fi
+if [ $count -eq 2 ]; then
+	exit 0
+fi
+while true; do sleep 1; done
+`
+					tmpCmd := fmt.Sprintf(cmdScripts, path.Join(restartCountVolumePath, path.Base(tmpFile.Name())))
+					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
 						Container:     testContainer,
 						Client:        cl,
-						RestartPolicy: testStatus.RestartPolicy,
+						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
 						NodeName:      *nodeName,
 						Namespace:     namespace,
 					}
-					err = terminateContainer.Create()
-					Expect(err).NotTo(HaveOccurred())
-					testCContainers = append(testCContainers, terminateContainer)
-
-					Eventually(func() api.PodPhase {
-						_, phase, _ := terminateContainer.GetStatus()
-						return phase
-					}, retryTimeout, pollInterval).ShouldNot(Equal(api.PodPending))
-
-					var status api.ContainerStatus
-					By("it should get the expected 'RestartCount'")
-					Eventually(func() int32 {
-						status, _, _ = terminateContainer.GetStatus()
-						return status.RestartCount
-					}, retryTimeout, pollInterval).Should(BeNumerically(testStatus.RestartCountOper, testStatus.RestartCount))
-
-					By("it should get the expected 'Ready' status")
-					Expect(status.Ready).To(Equal(testStatus.Ready))
-
-					By("it should get the expected 'State'")
-					Expect(GetContainerState(status.State) & testStatus.State).NotTo(Equal(0))
-
-					By("it should be possible to delete [Conformance]")
-					err = terminateContainer.Delete()
-					Expect(err).NotTo(HaveOccurred())
-					Eventually(func() bool {
-						isPresent, err := terminateContainer.Present()
-						return err == nil && !isPresent
-					}, retryTimeout, pollInterval).Should(BeTrue())
-				}
-			})
-		})
-
-		Context("when start a container that keeps running", func() {
-			It("it should run with the expected status [Conformance]", func() {
-				testContainer := api.Container{
-					Image:           ImageRegistry[busyBoxImage],
-					Command:         []string{"sh", "-c", "while true; do echo hello; sleep 1; done"},
-					ImagePullPolicy: api.PullIfNotPresent,
-				}
-				testStatuses := []testStatus{
-					{"loop-cmd-rpa", api.RestartPolicyAlways, api.PodRunning, ContainerStateRunning, "==", 0, true},
-					{"loop-cmd-rpof", api.RestartPolicyOnFailure, api.PodRunning, ContainerStateRunning, "==", 0, true},
-					{"loop-cmd-rpn", api.RestartPolicyNever, api.PodRunning, ContainerStateRunning, "==", 0, true},
-				}
-				for _, testStatus := range testStatuses {
-					testContainer.Name = testStatus.Name
-					runningContainer := ConformanceContainer{
-						Container:     testContainer,
-						Client:        cl,
-						RestartPolicy: testStatus.RestartPolicy,
-						NodeName:      *nodeName,
-						Namespace:     namespace,
-					}
-					err := runningContainer.Create()
-					Expect(err).NotTo(HaveOccurred())
-					testCContainers = append(testCContainers, runningContainer)
-
-					Eventually(func() api.PodPhase {
-						_, phase, _ := runningContainer.GetStatus()
-						return phase
-					}, retryTimeout, pollInterval).Should(Equal(api.PodRunning))
-
-					var status api.ContainerStatus
-					var phase api.PodPhase
-					Consistently(func() api.PodPhase {
-						status, phase, err = runningContainer.GetStatus()
-						return phase
-					}, consistentCheckTimeout, pollInterval).Should(Equal(testStatus.Phase))
-					Expect(err).NotTo(HaveOccurred())
+					Expect(terminateContainer.Create()).To(Succeed())
+					defer terminateContainer.Delete()
 
 					By("it should get the expected 'RestartCount'")
-					Expect(status.RestartCount).To(BeNumerically(testStatus.RestartCountOper, testStatus.RestartCount))
+					Eventually(func() (int32, error) {
+						status, err := terminateContainer.GetStatus()
+						return status.RestartCount, err
+					}, retryTimeout, pollInterval).Should(BeNumerically(testCase.RestartCountOper, testCase.RestartCount))
 
-					By("it should get the expected 'Ready' status")
-					Expect(status.Ready).To(Equal(testStatus.Ready))
+					By("it should get the expected 'Phase'")
+					Eventually(terminateContainer.GetPhase, retryTimeout, pollInterval).Should(Equal(testCase.Phase))
 
-					By("it should get the expected 'State'")
-					Expect(GetContainerState(status.State) & testStatus.State).NotTo(Equal(0))
+					By("it should get the expected 'Ready' condition")
+					Expect(terminateContainer.IsReady()).Should(Equal(testCase.Ready))
 
-					By("it should be possible to delete [Conformance]")
-					err = runningContainer.Delete()
-					Expect(err).NotTo(HaveOccurred())
-					Eventually(func() bool {
-						isPresent, err := runningContainer.Present()
-						return err == nil && !isPresent
-					}, retryTimeout, pollInterval).Should(BeTrue())
-				}
-			})
-		})
-
-		Context("when start a container that exits failure", func() {
-			It("it should run with the expected status [Conformance]", func() {
-				testContainer := api.Container{
-					Image:           ImageRegistry[busyBoxImage],
-					Command:         []string{"false"},
-					ImagePullPolicy: api.PullIfNotPresent,
-				}
-				testStatuses := []testStatus{
-					{"fail-cmd-rpa", api.RestartPolicyAlways, api.PodRunning, ContainerStateWaiting | ContainerStateRunning | ContainerStateTerminated, ">", 0, false},
-					{"fail-cmd-rpof", api.RestartPolicyOnFailure, api.PodRunning, ContainerStateTerminated, ">", 0, false},
-					{"fail-cmd-rpn", api.RestartPolicyNever, api.PodFailed, ContainerStateTerminated, "==", 0, false},
-				}
-				for _, testStatus := range testStatuses {
-					testContainer.Name = testStatus.Name
-					failureContainer := ConformanceContainer{
-						Container:     testContainer,
-						Client:        cl,
-						RestartPolicy: testStatus.RestartPolicy,
-						NodeName:      *nodeName,
-						Namespace:     namespace,
-					}
-					err := failureContainer.Create()
-					Expect(err).NotTo(HaveOccurred())
-					testCContainers = append(testCContainers, failureContainer)
-
-					Eventually(func() api.PodPhase {
-						_, phase, _ := failureContainer.GetStatus()
-						return phase
-					}, retryTimeout, pollInterval).ShouldNot(Equal(api.PodPending))
-
-					var status api.ContainerStatus
-					By("it should get the expected 'RestartCount'")
-					Eventually(func() int32 {
-						status, _, _ = failureContainer.GetStatus()
-						return status.RestartCount
-					}, retryTimeout, pollInterval).Should(BeNumerically(testStatus.RestartCountOper, testStatus.RestartCount))
-
-					By("it should get the expected 'Ready' status")
-					Expect(status.Ready).To(Equal(testStatus.Ready))
+					status, err := terminateContainer.GetStatus()
+					Expect(err).ShouldNot(HaveOccurred())
 
 					By("it should get the expected 'State'")
-					Expect(GetContainerState(status.State) & testStatus.State).NotTo(Equal(0))
+					Expect(GetContainerState(status.State)).To(Equal(testCase.State))
 
 					By("it should be possible to delete [Conformance]")
-					err = failureContainer.Delete()
-					Expect(err).NotTo(HaveOccurred())
-					Eventually(func() bool {
-						isPresent, err := failureContainer.Present()
-						return err == nil && !isPresent
-					}, retryTimeout, pollInterval).Should(BeTrue())
+					Expect(terminateContainer.Delete()).To(Succeed())
+					Eventually(terminateContainer.Present, retryTimeout, pollInterval).Should(BeFalse())
 				}
 			})
 		})
@@ -257,58 +145,40 @@ var _ = Describe("[FLAKY] Container runtime Conformance Test", func() {
 		Context("when running a container with invalid image", func() {
 			It("it should run with the expected status [Conformance]", func() {
 				testContainer := api.Container{
-					Image:           "foo.com/foo/foo",
-					Command:         []string{"false"},
-					ImagePullPolicy: api.PullIfNotPresent,
+					Image:   "foo.com/foo/foo",
+					Command: []string{"false"},
 				}
-				testStatus := testStatus{"invalid-image-rpa", api.RestartPolicyAlways, api.PodPending, ContainerStateWaiting, "==", 0, false}
-				testContainer.Name = testStatus.Name
+				testCase := testCase{"invalid-image-rpa", api.RestartPolicyAlways, api.PodPending, ContainerStateWaiting, "==", 0, false}
+				testContainer.Name = testCase.Name
 				invalidImageContainer := ConformanceContainer{
 					Container:     testContainer,
 					Client:        cl,
-					RestartPolicy: testStatus.RestartPolicy,
+					RestartPolicy: testCase.RestartPolicy,
 					NodeName:      *nodeName,
 					Namespace:     namespace,
 				}
-				err := invalidImageContainer.Create()
-				Expect(err).NotTo(HaveOccurred())
-				testCContainers = append(testCContainers, invalidImageContainer)
+				Expect(invalidImageContainer.Create()).To(Succeed())
+				defer invalidImageContainer.Delete()
 
-				var status api.ContainerStatus
-				var phase api.PodPhase
+				Eventually(invalidImageContainer.GetPhase, retryTimeout, pollInterval).Should(Equal(testCase.Phase))
+				Consistently(invalidImageContainer.GetPhase, consistentCheckTimeout, pollInterval).Should(Equal(testCase.Phase))
 
-				Consistently(func() api.PodPhase {
-					if status, phase, err = invalidImageContainer.GetStatus(); err != nil {
-						return api.PodPending
-					} else {
-						return phase
-					}
-				}, consistentCheckTimeout, pollInterval).Should(Equal(testStatus.Phase))
+				status, err := invalidImageContainer.GetStatus()
 				Expect(err).NotTo(HaveOccurred())
 
 				By("it should get the expected 'RestartCount'")
-				Expect(status.RestartCount).To(BeNumerically(testStatus.RestartCountOper, testStatus.RestartCount))
+				Expect(status.RestartCount).To(BeNumerically(testCase.RestartCountOper, testCase.RestartCount))
 
 				By("it should get the expected 'Ready' status")
-				Expect(status.Ready).To(Equal(testStatus.Ready))
+				Expect(status.Ready).To(Equal(testCase.Ready))
 
 				By("it should get the expected 'State'")
-				Expect(GetContainerState(status.State) & testStatus.State).NotTo(Equal(0))
+				Expect(GetContainerState(status.State)).To(Equal(testCase.State))
 
 				By("it should be possible to delete [Conformance]")
-				err = invalidImageContainer.Delete()
-				Expect(err).NotTo(HaveOccurred())
-				Eventually(func() bool {
-					isPresent, err := invalidImageContainer.Present()
-					return err == nil && !isPresent
-				}, retryTimeout, pollInterval).Should(BeTrue())
+				Expect(invalidImageContainer.Delete()).To(Succeed())
+				Eventually(invalidImageContainer.Present, retryTimeout, pollInterval).Should(BeFalse())
 			})
-		})
-
-		AfterEach(func() {
-			for _, cc := range testCContainers {
-				cc.Delete()
-			}
 		})
 	})
 })
