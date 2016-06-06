@@ -174,7 +174,8 @@ func InstallVersionHandler(mux Mux, container *restful.Container) {
 			Doc("get the code version").
 			Operation("getCodeVersion").
 			Produces(restful.MIME_JSON).
-			Consumes(restful.MIME_JSON))
+			Consumes(restful.MIME_JSON).
+			Writes(version.Info{}))
 
 	container.Add(versionWS)
 }
