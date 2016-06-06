@@ -25,6 +25,17 @@ kube::util::wait-for-jobs() {
   return ${fail}
 }
 
+# kube::util::join <delim> <list...>
+# Concatenates the list elements with the delimiter passed as first parameter
+#
+# Ex: kube::util::join , a b c
+#  -> a,b,c
+function kube::util::join {
+  local IFS="$1"
+  shift
+  echo "$*"
+}
+
 # Some useful colors.
 if [[ -z "${color_start-}" ]]; then
   declare -r color_start="\033["
