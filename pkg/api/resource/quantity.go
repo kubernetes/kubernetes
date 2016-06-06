@@ -626,10 +626,7 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 		q.i = int64Amount{}
 		return nil
 	}
-	if l < 2 {
-		return ErrFormatWrong
-	}
-	if value[0] == '"' && value[l-1] == '"' {
+	if l >= 2 && value[0] == '"' && value[l-1] == '"' {
 		value = value[1 : l-1]
 	}
 

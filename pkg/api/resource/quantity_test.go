@@ -826,11 +826,24 @@ func TestJSON(t *testing.T) {
 
 func TestJSONWhitespace(t *testing.T) {
 	q := Quantity{}
-	for _, s := range []string{" 1", "1 "} {
-		if err := json.Unmarshal([]byte(`"`+s+`"`), &q); err != nil {
-			t.Errorf("%q: %v", s, err)
+	testCases := []struct {
+		in     string
+		expect string
+	}{
+		{`" 1"`, "1"},
+		{`"1 "`, "1"},
+		{`1`, "1"},
+		{` 1`, "1"},
+		{`1 `, "1"},
+		{`10`, "10"},
+		{`-1`, "-1"},
+		{` -1`, "-1"},
+	}
+	for _, test := range testCases {
+		if err := json.Unmarshal([]byte(test.in), &q); err != nil {
+			t.Errorf("%q: %v", test.in, err)
 		}
-		if q.String() != "1" {
+		if q.String() != test.expect {
 			t.Errorf("unexpected string: %q", q.String())
 		}
 	}
