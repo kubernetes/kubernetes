@@ -107,9 +107,10 @@ func (f *fakeRktInterface) GetLogs(ctx context.Context, in *rktapi.GetLogsReques
 // See https://github.com/coreos/rkt/issues/1769.
 type fakeSystemd struct {
 	sync.Mutex
-	called  []string
-	version string
-	err     error
+	called           []string
+	resetFailedUnits []string
+	version          string
+	err              error
 }
 
 func newFakeSystemd() *fakeSystemd {
@@ -143,15 +144,9 @@ func (f *fakeSystemd) RestartUnit(name string, mode string, ch chan<- string) (i
 	return 0, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeSystemd) Reload() error {
-	return fmt.Errorf("Not implemented")
-}
-
-func (f *fakeSystemd) ResetFailed() error {
-	f.Lock()
-	defer f.Unlock()
-
-	f.called = append(f.called, "ResetFailed")
+func (f *fakeSystemd) ResetFailedUnit(name string) error {
+	f.called = append(f.called, "ResetFailedUnit")
+	f.resetFailedUnits = append(f.resetFailedUnits, name)
 	return f.err
 }
 

@@ -44,7 +44,7 @@ func (g GlogFormatter) Format(pkg string, level LogLevel, depth int, entries ...
 
 func GlogHeader(level LogLevel, depth int) []byte {
 	// Lmmdd hh:mm:ss.uuuuuu threadid file:line]
-	now := time.Now()
+	now := time.Now().UTC()
 	_, file, line, ok := runtime.Caller(depth) // It's always the same number of frames to the user's call.
 	if !ok {
 		file = "???"
@@ -73,6 +73,7 @@ func GlogHeader(level LogLevel, depth int) []byte {
 	twoDigits(buf, second)
 	buf.WriteByte('.')
 	buf.WriteString(strconv.Itoa(now.Nanosecond() / 1000))
+	buf.WriteByte('Z')
 	buf.WriteByte(' ')
 	buf.WriteString(strconv.Itoa(pid))
 	buf.WriteByte(' ')
