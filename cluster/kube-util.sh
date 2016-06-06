@@ -23,18 +23,26 @@ KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
 
 # Must ensure that the following ENV vars are set
 function detect-master {
-	echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
-	echo "KUBE_MASTER: $KUBE_MASTER" 1>&2
+	if [[ -n ${KUBE_MASTER_IP:-} ]]; then
+		echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
+	fi
+	if [[ -n ${KUBE_MASTER:-} ]]; then
+		echo "KUBE_MASTER: $KUBE_MASTER" 1>&2
+	fi
 }
 
 # Get node names if they are not static.
 function detect-node-names {
-	echo "NODE_NAMES: [${NODE_NAMES[*]}]" 1>&2
+	if [[ -n ${NODE_NAMES[*]:-} ]]; then
+		echo "NODE_NAMES: [${NODE_NAMES[*]}]" 1>&2
+	fi
 }
 
 # Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 function detect-nodes {
-	echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
+	if [[ -n ${KUBE_NODE_IP_ADDRESSES[*]:-} ]]; then
+		echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
+	fi
 }
 
 # Verify prereqs on host machine
