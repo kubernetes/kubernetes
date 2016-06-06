@@ -23,7 +23,7 @@ function create-node-instance-template() {
   local template_name="$1"
   create-node-template "$template_name" "${scope_flags}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node.yaml" \
+    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node-${CONTAINER_RUNTIME}.yaml" \
     "configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh" \
     "configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh" \
     "cluster-name=${KUBE_TEMP}/cluster-name.txt"
@@ -65,7 +65,7 @@ function create-master-instance() {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/coreos/master.yaml,configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh,configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/coreos/master-${CONTAINER_RUNTIME}.yaml,configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh,configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
       ${preemptible_master}
