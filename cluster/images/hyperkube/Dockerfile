@@ -23,6 +23,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     iptables \
     ethtool \
     ca-certificates \
+    conntrack \
     file \
     util-linux \
     socat \
