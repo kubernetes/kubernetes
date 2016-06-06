@@ -14,9 +14,9 @@ spec:
         pod.alpha.kubernetes.io/init-containers: '[
             {
                 "name": "install",
-                "image": "gcr.io/google_containers/zookeeper-install:0.1",
+                "image": "gcr.io/google_containers/zookeeper-install-3.5.0-alpha:e2e",
                 "imagePullPolicy": "Always",
-                "args": ["--version=3.5.0-alpha", "--install-into=/opt", "--work-dir=/work-dir"],
+                "args": ["--install-into=/opt", "--work-dir=/work-dir"],
                 "volumeMounts": [
                     {
                         "name": "opt",
@@ -47,7 +47,7 @@ spec:
                 "volumeMounts": [
                     {
                         "name": "opt",
-                        "mountPath": "/opt/"
+                        "mountPath": "/opt"
                     },
                     {
                         "name": "workdir",
@@ -61,6 +61,7 @@ spec:
             }
         ]'
     spec:
+      terminationGracePeriodSeconds: 0
       containers:
       - name: zk
         image: java:openjdk-8-jre
@@ -85,7 +86,10 @@ spec:
         - name: datadir
           mountPath: /tmp/zookeeper
         - name: opt
-          mountPath: /opt/
+          mountPath: /opt
+        # Mount the work-dir just for debugging
+        - name: workdir
+          mountPath: /work-dir
       volumes:
       - name: opt
         emptyDir: {}
@@ -100,4 +104,4 @@ spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: 10Gi
+          storage: 1Gi

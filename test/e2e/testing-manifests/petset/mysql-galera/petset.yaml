@@ -57,6 +57,7 @@ spec:
             }
         ]'
     spec:
+      terminationGracePeriodSeconds: 0
       containers:
       - name: mysql
         image: gcr.io/google_containers/mysql-galera:e2e
@@ -73,10 +74,12 @@ spec:
         - --defaults-file=/etc/mysql/my-galera.cnf
         - --user=root
         readinessProbe:
-          # TODO: If docker exec is buggy just use nc mysql-id 3306 as a ping.
-          httpGet:
-            path: /healthz
-            port: 8080
+          # TODO: If docker exec is buggy just use gcr.io/google_containers/mysql-healthz:1.0
+          exec:
+            command:
+            - sh
+            - -c
+            - "mysql -u root -e 'show databases;'"
           initialDelaySeconds: 15
           timeoutSeconds: 5
           successThreshold: 2
@@ -85,11 +88,6 @@ spec:
           mountPath: /var/lib/
         - name: config
           mountPath: /etc/mysql
-      - name: healthz
-        image: gcr.io/google_containers/mysql-healthz:1.0
-        args:
-        - --port=8080
-        - --verbose=true
       volumes:
       - name: config
         emptyDir: {}
@@ -104,4 +102,4 @@ spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: 10Gi
+          storage: 1Gi
