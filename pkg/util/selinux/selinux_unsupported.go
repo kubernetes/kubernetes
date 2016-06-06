@@ -18,9 +18,14 @@ limitations under the License.
 
 package selinux
 
-type realChconRunner struct{}
+type realSelinuxContextRunner struct{}
 
-func (_ *realChconRunner) SetContext(dir, context string) error {
+func (_ *realSelinuxContextRunner) SetContext(dir, context string) error {
 	// NOP
 	return nil
+}
+
+func (_ *realSelinuxContextRunner) Getfilecon(path string) (string, error) {
+	// NOP
+	return "", nil
 }
