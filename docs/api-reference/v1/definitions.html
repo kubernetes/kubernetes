@@ -4971,28 +4971,28 @@ The resulting set of endpoints can be viewed as:<br>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">pool</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The rados pool name. Default is rbd. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a>.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The rados user name. Default is admin. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">keyring</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is empty. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -8105,7 +8105,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-05-30 16:33:41 UTC
+Last updated 2016-06-06 17:05:06 UTC
 </div>
 </div>
 </body>
