@@ -1013,7 +1013,7 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, nil
 	}
 
-	if !strings.HasPrefix(profile, "localhost") {
+	if !strings.HasPrefix(profile, "localhost/") {
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
 	}
 
