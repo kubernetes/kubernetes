@@ -459,7 +459,7 @@ func (g *genDeepCopy) doInterface(t *types.Type, sw *generator.SnippetWriter) {
 
 func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("*out = new($.Elem|raw$)\n", t)
-	if t.Elem.Kind == types.Builtin {
+	if t.Elem.IsAssignable() {
 		sw.Do("**out = *in", nil)
 	} else if g.canInlineTypeFn(g.context, t.Elem) {
 		funcName := g.funcNameTmpl(t.Elem)
