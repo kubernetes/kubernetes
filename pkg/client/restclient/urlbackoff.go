@@ -52,11 +52,13 @@ type NoBackoff struct {
 func (n *NoBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
 	// do nothing.
 }
+
 func (n *NoBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
 	return 0 * time.Second
 }
+
 func (n *NoBackoff) Sleep(d time.Duration) {
-	return
+	time.Sleep(d)
 }
 
 // Disable makes the backoff trivial, i.e., sets it to zero.  This might be used
