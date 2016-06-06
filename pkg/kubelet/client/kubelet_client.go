@@ -72,7 +72,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 
 	rt := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
-		rt = utilnet.SetTransportDefaults(&http.Transport{
+		rt = utilnet.SetOldTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
 		})
