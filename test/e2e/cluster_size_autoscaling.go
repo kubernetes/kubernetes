@@ -137,14 +137,24 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("should correctly handle pending and scale down after deletion [Feature:ClusterSizeAutoscalingScaleDown]", func() {
-		By("Small pending pods increase cluster size")
-		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
-		// Verify, that cluster size is increased
+		By("Manually increase cluster size")
+		increasedSize := 0
+		newSizes := make(map[string]int)
+		for key, val := range originalSizes {
+			newSizes[key] = val + 2
+			increasedSize += val + 2
+		}
+		restoreSizes(newSizes)
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
-		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
+			func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
+
+		By("Some node should be removed")
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size < nodeCount+1 }, scaleDownTimeout))
+			func(size int) bool { return size < increasedSize }, scaleDownTimeout))
+
+		restoreSizes(originalSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
 	})
 
 	It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
