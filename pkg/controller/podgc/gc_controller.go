@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gc
+package podgc
 
 import (
 	"sort"
@@ -41,7 +41,7 @@ const (
 	gcCheckPeriod = 20 * time.Second
 )
 
-type GCController struct {
+type PodGCController struct {
 	kubeClient     clientset.Interface
 	podStore       cache.StoreToPodLister
 	podStoreSyncer *framework.Controller
@@ -49,11 +49,11 @@ type GCController struct {
 	threshold      int
 }
 
-func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
+func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *PodGCController {
 	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
 	}
-	gcc := &GCController{
+	gcc := &PodGCController{
 		kubeClient: kubeClient,
 		threshold:  threshold,
 		deletePod: func(namespace, name string) error {
@@ -85,13 +85,13 @@ func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFun
 	return gcc
 }
 
-func (gcc *GCController) Run(stop <-chan struct{}) {
+func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	go gcc.podStoreSyncer.Run(stop)
 	go wait.Until(gcc.gc, gcCheckPeriod, stop)
 	<-stop
 }
 
-func (gcc *GCController) gc() {
+func (gcc *PodGCController) gc() {
 	terminatedPods, _ := gcc.podStore.List(labels.Everything())
 	terminatedPodCount := len(terminatedPods)
 	sort.Sort(byCreationTimestamp(terminatedPods))
