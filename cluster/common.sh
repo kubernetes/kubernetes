@@ -59,6 +59,7 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(be
 #   KUBE_KEY
 #   CA_CERT
 function create-kubeconfig() {
+  KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   SECONDARY_KUBECONFIG=${SECONDARY_KUBECONFIG:-}
   OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
@@ -67,7 +68,6 @@ function create-kubeconfig() {
       CONTEXT=$OVERRIDE_CONTEXT
   fi
 
-  export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   # KUBECONFIG determines the file we write to, but it may not exist yet
   if [[ ! -e "${KUBECONFIG}" ]]; then
     mkdir -p $(dirname "${KUBECONFIG}")
@@ -104,21 +104,21 @@ function create-kubeconfig() {
     )
   fi
 
-  "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
+  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
   if [[ -n "${user_args[@]:-}" ]]; then
-    "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
+    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
   fi
-  "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
+  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
 
   if [[ "${SECONDARY_KUBECONFIG}" != "true" ]];then
-      "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
+      KUBECONFIG="${KUBECONFIG}" "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
   fi
 
   # If we have a bearer token, also create a credential entry with basic auth
   # so that it is easy to discover the basic auth password for your cluster
   # to use in a web browser.
   if [[ ! -z "${KUBE_BEARER_TOKEN:-}" && ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
-    "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
+    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 
    echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
@@ -128,8 +128,16 @@ function create-kubeconfig() {
 # Assumed vars:
 #   KUBECONFIG
 #   CONTEXT
+#
+# To explicitly name the context being removed, use OVERRIDE_CONTEXT
 function clear-kubeconfig() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+  OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
+
+  if [[ "$OVERRIDE_CONTEXT" != "" ]];then
+      CONTEXT=$OVERRIDE_CONTEXT
+  fi
+
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   "${kubectl}" config unset "clusters.${CONTEXT}"
   "${kubectl}" config unset "users.${CONTEXT}"
