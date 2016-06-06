@@ -452,6 +452,9 @@ func shuffle(statuses []api.ContainerStatus) []api.ContainerStatus {
 }
 
 func TestStatusEquality(t *testing.T) {
+	pod := api.Pod{
+		Spec: api.PodSpec{},
+	}
 	containerStatus := []api.ContainerStatus{}
 	for i := 0; i < 10; i++ {
 		s := api.ContainerStatus{
@@ -466,8 +469,8 @@ func TestStatusEquality(t *testing.T) {
 		oldPodStatus := api.PodStatus{
 			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
 		}
-		normalizeStatus(&oldPodStatus)
-		normalizeStatus(&podStatus)
+		normalizeStatus(&pod, &oldPodStatus)
+		normalizeStatus(&pod, &podStatus)
 		if !isStatusEqual(&oldPodStatus, &podStatus) {
 			t.Fatalf("Order of container statuses should not affect normalized equality.")
 		}
@@ -498,7 +501,7 @@ func TestStaticPodStatus(t *testing.T) {
 
 	m.SetPodStatus(staticPod, status)
 	retrievedStatus := expectPodStatus(t, m, staticPod)
-	normalizeStatus(&status)
+	normalizeStatus(staticPod, &status)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
