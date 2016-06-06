@@ -21,9 +21,8 @@ limitations under the License.
 package unversioned
 
 import (
-	"time"
-
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	time "time"
 )
 
 func DeepCopy_unversioned_APIGroup(in APIGroup, out *APIGroup, c *conversion.Cloner) error {

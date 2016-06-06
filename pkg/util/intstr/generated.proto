@@ -30,6 +30,7 @@ option go_package = "intstr";
 // accept a name or number.
 // TODO: Rename to Int32OrString
 // 
+// +gencopy=true
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message IntOrString {
