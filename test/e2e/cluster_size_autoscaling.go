@@ -84,6 +84,13 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		Expect(nodeCount).Should(Equal(sum))
 	})
 
+	AfterEach(func() {
+		By(fmt.Sprintf("Restoring initial size of the cluster"))
+		setSizes(originalSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
+	})
+
 	It("shouldn't increase cluster size if pending pod it too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		ReserveMemory(f, "memory-reservation", 1, memCapacityMb, false)
 		time.Sleep(scaleUpTimeout)
@@ -120,9 +127,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation"))
-		restoreSizes(originalSizes)
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
 	})
 
 	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -130,10 +134,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "host-port"))
-		restoreSizes(originalSizes)
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
-
 	})
 
 	It("should correctly handle pending and scale down after deletion [Feature:ClusterSizeAutoscalingScaleDown]", func() {
@@ -144,17 +144,13 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			newSizes[key] = val + 2
 			increasedSize += val + 2
 		}
-		restoreSizes(newSizes)
+		setSizes(newSizes)
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
 
 		By("Some node should be removed")
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size < increasedSize }, scaleDownTimeout))
-
-		restoreSizes(originalSizes)
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
 	})
 
 	It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -199,10 +195,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		for _, node := range newNodes {
 			updateLabelsForNode(f, node, map[string]string{}, []string{"cluster-autoscaling-test.special-node"})
 		}
-		restoreSizes(originalSizes)
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
-
 	})
 })
 
@@ -379,8 +371,7 @@ func WaitForClusterSizeFunc(c *client.Client, sizeFunc func(int) bool, timeout t
 	return fmt.Errorf("timeout waiting %v for appropriate cluster size", timeout)
 }
 
-func restoreSizes(sizes map[string]int) {
-	By(fmt.Sprintf("Restoring initial size of the cluster"))
+func setSizes(sizes map[string]int) {
 	for mig, desiredSize := range sizes {
 		currentSize, err := GroupSize(mig)
 		framework.ExpectNoError(err)
