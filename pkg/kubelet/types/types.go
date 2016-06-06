@@ -68,6 +68,22 @@ func (s SortedContainerStatuses) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
 }
 
+// SortInitContainerStatuses ensures that statuses are in the order that their
+// init container appears in the pod spec
+func SortInitContainerStatuses(p *api.Pod, statuses []api.ContainerStatus) {
+	containers := p.Spec.InitContainers
+	current := 0
+	for _, container := range containers {
+		for j := current; j < len(statuses); j++ {
+			if container.Name == statuses[j].Name {
+				statuses[current], statuses[j] = statuses[j], statuses[current]
+				current++
+				break
+			}
+		}
+	}
+}
+
 // Reservation represents reserved resources for non-pod components.
 type Reservation struct {
 	// System represents resources reserved for non-kubernetes components.
