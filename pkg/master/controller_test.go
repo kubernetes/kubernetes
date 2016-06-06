@@ -371,12 +371,11 @@ func TestReconcileEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range reconcile_tests {
-		master := Controller{MasterCount: test.additionalMasters + 1}
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
-		master.EndpointRegistry = registry
-		err := master.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
+		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry)
+		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -461,12 +460,11 @@ func TestReconcileEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range non_reconcile_tests {
-		master := Controller{MasterCount: test.additionalMasters + 1}
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
-		master.EndpointRegistry = registry
-		err := master.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
+		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry)
+		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -519,7 +517,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range create_tests {
-		master := Controller{MasterCount: 1}
+		master := Controller{}
 		registry := &registrytest.ServiceRegistry{
 			Err: errors.New("unable to get svc"),
 		}
@@ -794,7 +792,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range reconcile_tests {
-		master := Controller{MasterCount: 1}
+		master := Controller{}
 		registry := &registrytest.ServiceRegistry{
 			Service: test.service,
 		}
@@ -846,7 +844,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range non_reconcile_tests {
-		master := Controller{MasterCount: 1}
+		master := Controller{}
 		registry := &registrytest.ServiceRegistry{
 			Service: test.service,
 		}
