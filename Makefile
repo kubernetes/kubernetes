@@ -241,6 +241,74 @@ cross:
 #
 # Code-generation logic.
 #
+# This stuff can be pretty tricky, and there's probably some corner cases that
+# we don't handle well.  That said, here's a straightforward test to prove that
+# the most common cases work.  Sadly, it is manual.
+#
+#     make clean
+#     find . -name .make\* | xargs rm -f
+#     find . -name zz_generated\* | xargs rm -f
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` is 0
+#     # verify `find . -name .make | wc -l` is 0
+#
+#     make nonexistent
+#     # expect "No rule to make target"
+#     # verify `find .make/ -type f | wc -l` has many files
+#
+#     make gen_deepcopy
+#     # expect deepcopy-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` has files
+#     make gen_deepcopy
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch pkg/api/types.go
+#     make gen_deepcopy
+#     # expect one file to be regenerated
+#     make gen_deepcopy
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch cmd/libs/go2idl/deepcopy-gen/main.go
+#     make gen_deepcopy
+#     # expect deepcopy-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` has files
+#     make gen_deepcopy
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#
+#     make gen_conversion
+#     # expect conversion-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.conversion.go | wc -l` has files
+#     make gen_conversion
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch pkg/api/types.go
+#     make gen_conversion
+#     # expect one file to be regenerated
+#     make gen_conversion
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#     touch cmd/libs/go2idl/conversion-gen/main.go
+#     make gen_conversion
+#     # expect conversion-gen is built exactly once
+#     # expect many files to be regenerated
+#     # verify `find . -name zz_generated.conversion.go | wc -l` has files
+#     make gen_conversion
+#     # expect nothing to be rebuilt, finish in O(seconds)
+#
+#     make all
+#     # expect it to build
+#
+#     make test
+#     # expect it to pass
+#
+#     make clean
+#     # verify `find . -name zz_generated.deepcopy.go | wc -l` is 0
+#     # verify `find . -name .make | wc -l` is 0
+#
+#     make all WHAT=cmd/kube-proxy
+#     # expect it to build
+#
+#     make clean
+#     make test WHAT=cmd/kube-proxy
+#     # expect it to pass
 
 # This variable holds a list of every directory that contains Go files in this
 # project.  Other rules and variables can use this as a starting point to
