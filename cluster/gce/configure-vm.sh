@@ -899,6 +899,13 @@ function node-docker-opts() {
   if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
     DOCKER_OPTS="${DOCKER_OPTS:-} ${EXTRA_DOCKER_OPTS}"
   fi
+
+  # Decide whether to enable a docker registry mirror. This is taken from
+  # the "kube-env" metadata value.
+  if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
+    echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
+    DOCKER_OPTS="${DOCKER_OPTS:-} --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+  fi
 }
 
 function salt-grains() {
