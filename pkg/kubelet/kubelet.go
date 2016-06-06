@@ -1209,7 +1209,7 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 		return err
 	}
 
-	chconRunner := selinux.NewChconRunner()
+	selinuxRunner := selinux.NewSelinuxContextRunner()
 	// Apply the pod's Level to the rootDirContext
 	rootDirSELinuxOptions, err := securitycontext.ParseSELinuxOptions(rootDirContext)
 	if err != nil {
@@ -1226,7 +1226,7 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 				if err != nil {
 					return err
 				}
-				return chconRunner.SetContext(path, volumeContext)
+				return selinuxRunner.SetContext(path, volumeContext)
 			})
 			if err != nil {
 				return err

@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/selinux"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	utilwait "k8s.io/kubernetes/pkg/util/wait"
 )
@@ -1002,6 +1003,34 @@ func (r *Runtime) preparePodArgs(manifest *appcschema.PodManifest, manifestFileN
 	return cmds
 }
 
+func (r *Runtime) getSelinuxContext(opt *api.SELinuxOptions) (string, error) {
+	selinuxRunner := selinux.NewSelinuxContextRunner()
+	str, err := selinuxRunner.Getfilecon(r.config.Dir)
+	if err != nil {
+		return "", err
+	}
+
+	ctx := strings.SplitN(str, ":", 4)
+	if len(ctx) != 4 {
+		return "", fmt.Errorf("malformated selinux context")
+	}
+
+	if opt.User != "" {
+		ctx[0] = opt.User
+	}
+	if opt.Role != "" {
+		ctx[1] = opt.Role
+	}
+	if opt.Type != "" {
+		ctx[2] = opt.Type
+	}
+	if opt.Level != "" {
+		ctx[3] = opt.Level
+	}
+
+	return strings.Join(ctx, ":"), nil
+}
+
 // preparePod will:
 //
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
@@ -1073,7 +1102,11 @@ func (r *Runtime) preparePod(pod *api.Pod, podIP string, pullSecrets []api.Secre
 
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil {
 		opt := pod.Spec.SecurityContext.SELinuxOptions
-		selinuxContext := fmt.Sprintf("%s:%s:%s:%s", opt.User, opt.Role, opt.Type, opt.Level)
+		selinuxContext, err := r.getSelinuxContext(opt)
+		if err != nil {
+			glog.Errorf("rkt: Failed to construct selinux context with selinux option %q: %v", opt, err)
+			return "", nil, err
+		}
 		units = append(units, newUnitOption("Service", "SELinuxContext", selinuxContext))
 	}
 
