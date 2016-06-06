@@ -191,6 +191,10 @@ function set-preferred-region() {
   else
     KUBE_ADDON_REGISTRY="gcr.io/google_containers"
   fi
+
+  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
+    DOCKER_REGISTRY_MIRROR_URL="https://${preferred}-mirror.gcr.io"
+  fi
 }
 
 # Take the local tar files and upload them to Google Storage.  They will then be

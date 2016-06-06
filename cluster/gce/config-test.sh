@@ -66,6 +66,9 @@ EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
 
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
+# When set to true, Docker Cache is enabled by default as part of the cluster bring up.
+ENABLE_DOCKER_REGISTRY_CACHE=true
+
 # Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
 #   glbc           - CE L7 Load Balancer Controller
 ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
