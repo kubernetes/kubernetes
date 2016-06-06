@@ -452,6 +452,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		makeIPTablesUtilChains:       kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:        int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
+		updatePodStatusChannel:       make(chan PodUpdateRequest),
 	}
 
 	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.ConfigureCBR0, kubeCfg.NetworkPluginName); err != nil {
@@ -1019,6 +1020,16 @@ type Kubelet struct {
 
 	// The AppArmor validator for checking whether AppArmor is supported.
 	appArmorValidator apparmor.Validator
+
+	// the channel to update pod status
+	updatePodStatusChannel chan PodUpdateRequest
+}
+
+type PodUpdateRequest struct {
+	Pod    *api.Pod
+	Status api.PodStatus
+	IsSync bool
+	syncCh chan bool
 }
 
 // setupDataDirs creates:
@@ -1171,7 +1182,26 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
+
+	// Start a goroutine responsible for pod status update
+	kl.startPodStatusUpdateLoop()
+
 	kl.syncLoop(updates, kl)
+
+}
+
+// startPodStatusUpdateLoop waits for pod status update request and use statusManager to set pod status
+func (kl *Kubelet) startPodStatusUpdateLoop() {
+	// get events from channel and set pod status, return only after set is success.
+	go wait.Forever(func() {
+		select {
+		case updateRequest := <-kl.updatePodStatusChannel:
+			kl.statusManager.SetPodStatus(updateRequest.Pod, updateRequest.Status)
+			if updateRequest.IsSync {
+				updateRequest.syncCh <- true
+			}
+		}
+	}, 0)
 }
 
 // GetClusterDNS returns a list of the DNS servers and a list of the DNS search
@@ -1234,6 +1264,20 @@ func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	return dns, dnsSearch, nil
 }
 
+// updatePodStatusByEvent sends update event to pod status update loop
+func (kl *Kubelet) updatePodStatusByEvent(pod *api.Pod, status api.PodStatus, isSync bool) {
+	syncCh := make(chan bool)
+	kl.updatePodStatusChannel <- PodUpdateRequest{
+		Pod:    pod,
+		Status: status,
+		IsSync: isSync,
+		syncCh: syncCh,
+	}
+	if isSync {
+		<-syncCh
+	}
+}
+
 // syncPod is the transaction script for the sync of a single pod.
 //
 // Arguments:
@@ -1271,7 +1315,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			return fmt.Errorf("kill pod options are required if update type is kill")
 		}
 		apiPodStatus := killPodOptions.PodStatusFunc(pod, podStatus)
-		kl.statusManager.SetPodStatus(pod, apiPodStatus)
+
+		kl.updatePodStatusByEvent(pod, apiPodStatus, true)
+
 		// we kill the pod with the specified grace period since this is a termination
 		if err := kl.killPod(pod, nil, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
 			// there was an error killing the pod, so we return that error directly
@@ -1315,7 +1361,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Update status in the status manager
-	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	kl.updatePodStatusByEvent(pod, apiPodStatus, true)
 
 	// Kill pod if it should not be running
 	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
@@ -1491,10 +1537,12 @@ func (kl *Kubelet) isOutOfDisk() bool {
 // and updates the pod to the failed phase in the status manage.
 func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 	kl.recorder.Eventf(pod, api.EventTypeWarning, reason, message)
-	kl.statusManager.SetPodStatus(pod, api.PodStatus{
+	status := api.PodStatus{
 		Phase:   api.PodFailed,
 		Reason:  reason,
-		Message: "Pod " + message})
+		Message: "Pod " + message,
+	}
+	kl.updatePodStatusByEvent(pod, status, true)
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
