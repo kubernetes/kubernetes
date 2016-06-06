@@ -103,6 +103,7 @@ func testSleep() {
 }
 
 func TestPersistentVolumeRecycler(t *testing.T) {
+	glog.V(2).Infof("TestPersistentVolumeRecycler started")
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
@@ -123,23 +124,30 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolume: %v", err)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv1 created")
 
 	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pvc1 created")
 
 	// wait until the controller pairs the volume and claim
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv1 bound")
 	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pvc1 bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
 	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pvc1 deleted")
 
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeReleased)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv1 released")
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeAvailable)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv1 available")
 
 	// end of Recycler test.
 	// Deleter test begins now.
@@ -154,19 +162,25 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolume: %v", err)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv2 created")
 	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pvc2 created")
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv2 bound")
 	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pvc2 bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
 	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pvc2 deleted")
 
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeReleased)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv2 released")
 
 	for {
 		event := <-watchPV.ResultChan()
@@ -174,6 +188,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 			break
 		}
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv2 deleted")
 
 	// test the race between claims and volumes.  ensure only a volume only binds to a single claim.
 	deleteAllEtcdKeys()
@@ -191,6 +206,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 		}
 		claims = append(claims, claim)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler claims 3 created")
 
 	// putting a bind manually on a pv should only match the claim it is bound to
 	rand.Seed(time.Now().Unix())
@@ -200,14 +216,18 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 		t.Fatalf("Unexpected error getting claimRef: %v", err)
 	}
 	pv.Spec.ClaimRef = claimRef
+	pv.Spec.ClaimRef.UID = ""
 
 	pv, err = testClient.PersistentVolumes().Create(pv)
 	if err != nil {
 		t.Fatalf("Unexpected error creating pv: %v", err)
 	}
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv3 created, pre-bound to %s", claim.Name)
 
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pv3 bound")
 	waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
+	glog.V(2).Infof("TestPersistentVolumeRecycler pvc3 bound")
 
 	pv, err = testClient.PersistentVolumes().Get(pv.Name)
 	if err != nil {
