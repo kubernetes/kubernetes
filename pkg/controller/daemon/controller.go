@@ -17,14 +17,14 @@ limitations under the License.
 package daemon
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
-	"fmt"
-
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -298,7 +298,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.Daemo
 			glog.Errorf("lookup cache does not retuen a ReplicationController object")
 			return nil
 		}
-		if cached && dsc.isCacheValid(pod, ds) {
+		if dsc.isCacheValid(pod, ds) {
 			return ds
 		}
 	}
@@ -497,17 +497,18 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 
 		daemonPods, isRunning := nodeToDaemonPods[node.Name]
 
-		if shouldRun && !isRunning {
+		switch {
+		case shouldRun && !isRunning:
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
 			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
-		} else if shouldRun && len(daemonPods) > 1 {
+		case shouldRun && len(daemonPods) > 1:
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 			// Sort the daemon pods by creation time, so the the oldest is preserved.
 			sort.Sort(podByCreationTimestamp(daemonPods))
 			for i := 1; i < len(daemonPods); i++ {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)
 			}
-		} else if !shouldRun && isRunning {
+		case !shouldRun && isRunning:
 			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 			for i := range daemonPods {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)
