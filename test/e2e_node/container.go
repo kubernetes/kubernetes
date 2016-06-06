@@ -110,6 +110,14 @@ func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
 	return ConformanceContainer{containers[0], cc.Client, pod.Spec.RestartPolicy, pod.Spec.Volumes, pod.Spec.NodeName, cc.Namespace, cc.podName}, nil
 }
 
+func (cc *ConformanceContainer) IsReady() (bool, error) {
+	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	if err != nil {
+		return false, err
+	}
+	return api.IsPodReady(pod), nil
+}
+
 func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, api.PodPhase, error) {
 	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
 	if err != nil {
