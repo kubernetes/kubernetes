@@ -119,7 +119,7 @@ function wait-url-up() {
   done
 }
 
-# Configure addon yamls, and run salt/kube-addons/kube-addon.sh
+# Configure addon yamls, and run salt/kube-addons/kube-addons.sh
 function configure-master-addons() {
   echo "Configuring master addons"
 
