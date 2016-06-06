@@ -258,13 +258,14 @@ function load-or-gen-kube-bearertoken() {
 # current-context user does not exist or contain a server entry.
 function detect-master-from-kubeconfig() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+  export KUBECTL_PATH=${KUBECTL_PATH:-${KUBE_ROOT}/cluster/kubectl.sh}
 
-  local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+  local cc=$(${KUBECTL_PATH} config view -o jsonpath="{.current-context}")
   if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
-  local cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
-  KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
+  local cluster=$(${KUBECTL_PATH} config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
+  KUBE_MASTER_URL=$(${KUBECTL_PATH} config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
 }
 
 # Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
