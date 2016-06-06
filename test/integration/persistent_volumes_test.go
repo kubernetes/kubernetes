@@ -242,6 +242,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 		t.Fatalf("Unexpected error getting claimRef: %v", err)
 	}
 	pv.Spec.ClaimRef = claimRef
+	pv.Spec.ClaimRef.UID = ""
 
 	pv, err = testClient.PersistentVolumes().Create(pv)
 	if err != nil {
