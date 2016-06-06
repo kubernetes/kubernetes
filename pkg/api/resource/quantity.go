@@ -259,7 +259,6 @@ Suffix:
 		switch str[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		default:
-			pos = i
 			break Suffix
 		}
 	}
@@ -619,6 +618,7 @@ func (q Quantity) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
+// TODO: Remove support for leading/trailing whitespace
 func (q *Quantity) UnmarshalJSON(value []byte) error {
 	l := len(value)
 	if l == 4 && bytes.Equal(value, []byte("null")) {
@@ -633,7 +633,7 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 		value = value[1 : l-1]
 	}
 
-	parsed, err := ParseQuantity(string(value))
+	parsed, err := ParseQuantity(strings.TrimSpace(string(value)))
 	if err != nil {
 		return err
 	}
