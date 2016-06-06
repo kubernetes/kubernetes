@@ -1093,7 +1093,7 @@ func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 	}
 }
 
-func TestFindInstancesByNodeName(t *testing.T) {
+func TestFindInstancesByNodeNameCached(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 
 	nodeNameOne := "my-dns.internal"
@@ -1132,8 +1132,8 @@ func TestFindInstancesByNodeName(t *testing.T) {
 		return
 	}
 
-	nodeNames := []string{nodeNameOne}
-	returnedInstances, errr := c.getInstancesByNodeNames(nodeNames)
+	nodeNames := sets.NewString(nodeNameOne)
+	returnedInstances, errr := c.getInstancesByNodeNamesCached(nodeNames)
 
 	if errr != nil {
 		t.Errorf("Failed to find instance: %v", err)
