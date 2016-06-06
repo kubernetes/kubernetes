@@ -41,7 +41,7 @@ OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-gci}
 # By default a cluster will be started with the master on GCI and nodes on
 # containervm. If you are updating the containervm version, update this
 # variable.
-CVM_VERSION=container-v1-3-v20160517
+CVM_VERSION=container-v1-3-v20160604
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"${MASTER_IMAGE}"}
