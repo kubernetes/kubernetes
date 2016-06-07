@@ -172,16 +172,7 @@ func PodMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bo
 }
 
 func isBestEffort(pod *api.Pod) bool {
-	// TODO: when we have request/limits on a pod scope, we need to revisit this
-	for _, container := range pod.Spec.Containers {
-		qosPerResource := util.GetQoS(&container)
-		for _, qos := range qosPerResource {
-			if util.BestEffort == qos {
-				return true
-			}
-		}
-	}
-	return false
+	return util.GetPodQos(pod) == util.BestEffort
 }
 
 func isTerminating(pod *api.Pod) bool {
