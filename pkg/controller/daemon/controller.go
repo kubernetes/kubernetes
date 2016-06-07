@@ -567,21 +567,22 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 }
 
 func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
-	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled && int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled && int(ds.Status.NumberMisscheduled) == numberMisscheduled {
+	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
+		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
+		int(ds.Status.NumberMisscheduled) == numberMisscheduled {
 		return nil
 	}
 
 	var updateErr, getErr error
-	for i := 0; i <= StatusUpdateRetries; i++ {
+	for i := 0; i < StatusUpdateRetries; i++ {
 		ds.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
 		ds.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
 		ds.Status.NumberMisscheduled = int32(numberMisscheduled)
 
-		_, updateErr = dsClient.UpdateStatus(ds)
-		if updateErr == nil {
-			// successful update
+		if _, updateErr = dsClient.UpdateStatus(ds); updateErr == nil {
 			return nil
 		}
+
 		// Update the set with the latest resource version for the next poll
 		if ds, getErr = dsClient.Get(ds.Name); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
@@ -597,29 +598,30 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
 		glog.Errorf("Error getting node to daemon pod mapping for daemon set %+v: %v", ds, err)
+		return
 	}
 
 	nodeList, err := dsc.nodeStore.List()
 	if err != nil {
 		glog.Errorf("Couldn't get list of nodes when updating daemon set %+v: %v", ds, err)
+		return
 	}
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int
 	for _, node := range nodeList.Items {
 		shouldRun := dsc.nodeShouldRunDaemonPod(&node, ds)
 
-		numDaemonPods := len(nodeToDaemonPods[node.Name])
-
-		if shouldRun && numDaemonPods > 0 {
-			currentNumberScheduled++
-		}
+		scheduled := len(nodeToDaemonPods[node.Name]) > 0
 
 		if shouldRun {
 			desiredNumberScheduled++
-		}
-
-		if !shouldRun && numDaemonPods > 0 {
-			numberMisscheduled++
+			if scheduled {
+				currentNumberScheduled++
+			}
+		} else {
+			if scheduled {
+				numberMisscheduled++
+			}
 		}
 	}
 
