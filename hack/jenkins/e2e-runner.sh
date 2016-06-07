@@ -79,57 +79,11 @@ function unpack_binaries() {
     tar -xzf kubernetes-test.tar.gz
 }
 
-# GCP Project to fetch GCI images.
-function get_gci_image_project() {
-  local project=""
-  # Retry the gsutil command a couple times to mitigate the effect of
-  # transient server errors.
-  for n in $(seq 3); do
-    project="$(gsutil cat "gs://gci-staging/image-project.txt")" && break || sleep 1
-  done
-  if [[ -z "${project}" ]]; then
-    echo "Failed to find the image project for GCI images."
-    exit 1
-  fi
-  echo "${project}"
-  # Clean up gsutil artifacts otherwise the later test stage will complain.
-  rm -rf .config &> /dev/null
-  rm -rf .gsutil &> /dev/null
-}
-
-# Get the latest GCI image of a type.
+# Get the latest GCI image in a family.
 function get_latest_gci_image() {
-    local image_project="$1"
-    local image_type="$2"
-    local image_index=""
-    if [[ "${image_type}" == head ]]; then
-      image_index="latest-base-image-gci-head"
-    elif [[ "${image_type}" == dev ]]; then
-      image_index="latest-base-image-gci-dev"
-    elif [[ "${image_type}" == beta ]]; then
-      image_index="latest-base-image-gci-beta"
-    elif [[ "${image_type}" == stable ]]; then
-      image_index="latest-base-image-gci-stable"
-    elif [[ "${image_type}" == preview-test ]]; then
-      # A GCI preview image that is able to override its Docker installation on
-      # boot.
-      image_index="latest-test-image-gci-preview"
-    fi
-
-    local image=""
-    # Retry the gsutil command a couple times to mitigate the effect of
-    # transient server errors.
-    for n in $(seq 3); do
-      image="$(gsutil cat "gs://${image_project}/image-indices/${image_index}")" && break || sleep 1
-    done
-    if [[ -z "${image}" ]]; then
-      echo "Failed to find GCI image for ${image_type}"
-      exit 1
-    fi
-    echo "${image}"
-    # Clean up gsutil artifacts otherwise the later test stage will complain.
-    rm -rf .config &> /dev/null
-    rm -rf .gsutil &> /dev/null
+    local -r image_project="$1"
+    local -r image_family="$2"
+    echo "$(gcloud compute images describe-from-family ${image_family} --project=${image_project} --format='value(name)')"
 }
 
 function get_latest_docker_release() {
@@ -206,11 +160,10 @@ if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
 fi
 
 # We get the image project and name for GCI dynamically.
-if [[ -n "${JENKINS_GCI_IMAGE_TYPE:-}" ]]; then
-  gci_image_project="$(get_gci_image_project)"
-  gci_image="$(get_latest_gci_image "${gci_image_project}" "${JENKINS_GCI_IMAGE_TYPE}")"
-  export KUBE_GCE_MASTER_PROJECT="${gci_image_project}"
-  export KUBE_GCE_MASTER_IMAGE="${gci_image}"
+if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
+  GCI_STAGING_PROJECT=container-vm-image-staging
+  export KUBE_GCE_MASTER_PROJECT="${GCI_STAGING_PROJECT}"
+  export KUBE_GCE_MASTER_IMAGE="$(get_latest_gci_image "${GCI_STAGING_PROJECT}" "${JENKINS_GCI_IMAGE_FAMILY}")"
   export KUBE_OS_DISTRIBUTION="gci"
   if [[ "${JENKINS_GCI_IMAGE_TYPE}" == preview-test ]]; then
     export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
