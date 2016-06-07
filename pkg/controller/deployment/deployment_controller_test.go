@@ -54,13 +54,14 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 	return rs
 }
 
-func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString) exp.Deployment {
+func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString, selector map[string]string) exp.Deployment {
 	return exp.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
 		Spec: exp.DeploymentSpec{
 			Replicas: int32(replicas),
+			Selector: &unversioned.LabelSelector{MatchLabels: selector},
 			Strategy: exp.DeploymentStrategy{
 				Type: exp.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &exp.RollingUpdateDeployment{
@@ -190,7 +191,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		newRS := rs("foo-v2", test.newReplicas, nil)
 		oldRS := rs("foo-v2", test.oldReplicas, nil)
 		allRSs := []*exp.ReplicaSet{newRS, oldRS}
-		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0))
+		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0), nil)
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fake,
@@ -293,7 +294,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		oldRSs := []*exp.ReplicaSet{oldRS}
 		allRSs := []*exp.ReplicaSet{oldRS, newRS}
 
-		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
+		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
@@ -430,7 +431,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil)
 		oldRSs := []*exp.ReplicaSet{oldRS}
-		deployment := deployment("foo", 10, intstr.FromInt(2), intstr.FromInt(2))
+		deployment := deployment("foo", 10, intstr.FromInt(2), intstr.FromInt(2), nil)
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
@@ -540,7 +541,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		oldRS := rs("foo-v2", test.oldReplicas, nil)
 		allRSs := []*exp.ReplicaSet{oldRS}
 		oldRSs := []*exp.ReplicaSet{oldRS}
-		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
+		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable, map[string]string{"foo": "bar"})
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
@@ -783,12 +784,10 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	// then is updated to 1 replica
 	rs := newReplicaSet(d, "deploymentrs-4186632231", 0)
 	updatedRS := newReplicaSet(d, "deploymentrs-4186632231", 1)
-	opt := newListOptions()
 
 	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentAction(d)
 	f.expectUpdateRSAction(updatedRS)
-	f.expectListPodAction(rs.Namespace, opt)
 	f.expectUpdateDeploymentAction(d)
 
 	f.run(getKey(d, t))
