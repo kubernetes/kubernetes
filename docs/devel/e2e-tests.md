@@ -354,6 +354,7 @@ credentials.
 # setup for conformance tests
 export KUBECONFIG=/path/to/kubeconfig
 export KUBERNETES_CONFORMANCE_TEST=y
+export KUBERNETES_PROVIDER=skeleton
 
 # run all conformance tests
 go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Conformance\]"
