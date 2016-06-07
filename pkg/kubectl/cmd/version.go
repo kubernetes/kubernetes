@@ -28,7 +28,7 @@ import (
 func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the client and server version information.",
+		Short: "Print the client and server version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(f, out, cmd)
 			cmdutil.CheckErr(err)

@@ -70,7 +70,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
 		Aliases: []string{"resize"},
-		Short:   "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.",
+		Short:   "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job",
 		Long:    scale_long,
 		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
