@@ -54,9 +54,8 @@ type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example "rbac/v1alpha1".
-	APIVersion string `json:"apiVersion" protobuf:"bytes,2,opt.name=apiVersion"`
+	// APIVersion holds the API group and version of the referenced object.
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt.name=apiVersion"`
 	// Name of the object being referenced.
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
