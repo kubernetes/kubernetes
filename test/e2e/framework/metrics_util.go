@@ -42,10 +42,12 @@ const (
 	NodeStartupThreshold = 4 * time.Second
 
 	podStartupThreshold time.Duration = 5 * time.Second
-	// TODO: Decrease the small threshold to 250ms once tests are fixed.
-	apiCallLatencySmallThreshold  time.Duration = 500 * time.Millisecond
-	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
-	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
+	// We are setting 1s threshold for apicalls even in small clusters to avoid flakes.
+	// The problem is that if long GC is happening in small clusters (where we have e.g.
+	// 1-core master machines) and tests are pretty short, it may consume significant
+	// portion of CPU and basically stop all the real work.
+	// Increasing threshold to 1s is within our SLO and should solve this problem.
+	apiCallLatencyThreshold time.Duration = 1 * time.Second
 )
 
 type MetricsForE2E metrics.MetricsCollection
@@ -225,31 +227,9 @@ func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
 	return a, err
 }
 
-// Returns threshold for API call depending on the size of the cluster.
-// In general our goal is 1s, but for smaller clusters, we want to enforce
-// smaller limits, to allow noticing regressions.
-func apiCallLatencyThreshold(numNodes int) time.Duration {
-	if numNodes <= 250 {
-		return apiCallLatencySmallThreshold
-	}
-	if numNodes <= 500 {
-		return apiCallLatencyMediumThreshold
-	}
-	return apiCallLatencyLargeThreshold
-}
-
-func listNodesLatencyThreshold(numNodes int) time.Duration {
-	return apiCallLatencyLargeThreshold
-}
-
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
 func HighLatencyRequests(c *client.Client) (int, error) {
-	nodes, err := c.Nodes().List(api.ListOptions{})
-	if err != nil {
-		return 0, err
-	}
-	numNodes := len(nodes.Items)
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, err
@@ -258,13 +238,8 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 	badMetrics := 0
 	top := 5
 	for _, metric := range metrics.APICalls {
-		threshold := apiCallLatencyThreshold(numNodes)
-		if metric.Verb == "LIST" && metric.Resource == "nodes" {
-			threshold = listNodesLatencyThreshold(numNodes)
-		}
-
 		isBad := false
-		if metric.Latency.Perc99 > threshold {
+		if metric.Latency.Perc99 > apiCallLatencyThreshold {
 			badMetrics++
 			isBad = true
 		}
