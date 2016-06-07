@@ -2081,7 +2081,7 @@ type ServiceSpec struct {
 	// API for compatibility until at least 8/20/2016.  It will be removed from
 	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
 	// set, deprecatedPublicIPs is used.
-	// +genconversion=false
+	// +k8s:conversion-gen=false
 	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty" protobuf:"bytes,6,rep,name=deprecatedPublicIPs"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
@@ -3096,7 +3096,7 @@ type Secret struct {
 	// It is provided as a write-only convenience method.
 	// All keys and values are merged into the data field on write, overwriting any existing values.
 	// It is never output when reading from the API.
-	// +genconversion=false
+	// +k8s:conversion-gen=false
 	StringData map[string]string `json:"stringData,omitempty" protobuf:"bytes,4,rep,name=stringData"`
 
 	// Used to facilitate programmatic handling of secret data.

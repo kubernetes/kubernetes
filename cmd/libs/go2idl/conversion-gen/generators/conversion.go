@@ -32,6 +32,19 @@ import (
 	"github.com/golang/glog"
 )
 
+// CustomArgs is used tby the go2idl framework to pass args specific to this
+// generator.
+type CustomArgs struct {
+	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
+}
+
+// This is the comment tag that carries parameters for conversion generation.
+const tagName = "k8s:conversion-gen"
+
+func extractTag(comments []string) []string {
+	return types.ExtractCommentTags("+", comments)[tagName]
+}
+
 // TODO: This is created only to reduce number of changes in a single PR.
 // Remove it and use PublicNamer instead.
 func conversionNamer() *namer.NameStrategy {
@@ -67,25 +80,17 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-var fallbackPackages = []string{
-	"k8s.io/kubernetes/pkg/api/unversioned",
-	"k8s.io/kubernetes/pkg/apis/extensions",
-	"k8s.io/kubernetes/pkg/apis/autoscaling",
-	"k8s.io/kubernetes/pkg/apis/batch",
-}
-
-func getInternalTypeFor(context *generator.Context, t *types.Type) (*types.Type, bool) {
-	internalPackage := filepath.Dir(t.Name.Package)
-	if !context.Universe.Package(internalPackage).Has(t.Name.Name) {
-		for _, fallbackPackage := range fallbackPackages {
-			if fallbackPackage == t.Name.Package || !context.Universe.Package(fallbackPackage).Has(t.Name.Name) {
-				continue
-			}
-			return context.Universe.Package(fallbackPackage).Type(t.Name.Name), true
+func getPeerTypeFor(context *generator.Context, t *types.Type, potenialPeerPkgs []string) *types.Type {
+	for _, ppp := range potenialPeerPkgs {
+		p := context.Universe.Package(ppp)
+		if p == nil {
+			continue
 		}
-		return nil, false
+		if p.Has(t.Name.Name) {
+			return p.Type(t.Name.Name)
+		}
 	}
-	return context.Universe.Package(internalPackage).Type(t.Name.Name), true
+	return nil
 }
 
 type conversionPair struct {
@@ -97,109 +102,103 @@ type conversionPair struct {
 // the underlying type being "Func".
 type conversionFuncMap map[conversionPair]*types.Type
 
-// Returns all manually-defined conversion functions that we are able to find.
-func getManualConversionFunctions(context *generator.Context) conversionFuncMap {
+// Returns all manually-defined conversion functions in the package.
+func getManualConversionFunctions(context *generator.Context, pkg *types.Package, manualMap conversionFuncMap) {
 	scopeName := types.Name{Package: conversionPackagePath, Name: "Scope"}
 	errorName := types.Name{Package: "", Name: "error"}
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 
-	manualMap := make(conversionFuncMap)
-	for _, p := range context.Universe {
-		for _, f := range p.Functions {
-			if f.Underlying == nil || f.Underlying.Kind != types.Func {
-				glog.Errorf("Malformed function: %#v", f)
-				continue
-			}
-			if f.Underlying.Signature == nil {
-				glog.Errorf("Function without signature: %#v", f)
-				continue
-			}
-			signature := f.Underlying.Signature
-			// Check whether the function is conversion function.
-			// Note that all of them have signature:
-			// func Convert_inType_To_outType(inType, outType, conversion.Scope) error
-			if signature.Receiver != nil {
-				continue
-			}
-			if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
-				continue
-			}
-			if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
-				continue
-			}
-			inType := signature.Parameters[0]
-			outType := signature.Parameters[1]
-			if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
-				continue
-			}
-			// Now check if the name satisfies the convention.
-			args := argsFromType(inType.Elem, outType.Elem)
-			sw.Do("Convert_$.inType|public$_To_$.outType|public$", args)
-			if f.Name.Name == buffer.String() {
-				key := conversionPair{inType.Elem, outType.Elem}
-				if v, ok := manualMap[key]; ok && v != nil {
-					panic(fmt.Sprintf("duplicate static conversion defined: %#v", key))
-				}
-				manualMap[key] = f
-			}
-			buffer.Reset()
+	for _, f := range pkg.Functions {
+		if f.Underlying == nil || f.Underlying.Kind != types.Func {
+			glog.Errorf("Malformed function: %#v", f)
+			continue
 		}
+		if f.Underlying.Signature == nil {
+			glog.Errorf("Function without signature: %#v", f)
+			continue
+		}
+		signature := f.Underlying.Signature
+		// Check whether the function is conversion function.
+		// Note that all of them have signature:
+		// func Convert_inType_To_outType(inType, outType, conversion.Scope) error
+		if signature.Receiver != nil {
+			continue
+		}
+		if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
+			continue
+		}
+		if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
+			continue
+		}
+		inType := signature.Parameters[0]
+		outType := signature.Parameters[1]
+		if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
+			continue
+		}
+		// Now check if the name satisfies the convention.
+		args := argsFromType(inType.Elem, outType.Elem)
+		sw.Do("Convert_$.inType|public$_To_$.outType|public$", args)
+		if f.Name.Name == buffer.String() {
+			key := conversionPair{inType.Elem, outType.Elem}
+			// We might scan the same package twice, and that's OK.
+			if v, ok := manualMap[key]; ok && v != nil && v.Name.Package != pkg.Path {
+				panic(fmt.Sprintf("duplicate static conversion defined: %#v", key))
+			}
+			manualMap[key] = f
+		}
+		buffer.Reset()
 	}
-	return manualMap
 }
 
 // All of the types in conversions map are of type "DeclarationOf" with
 // the underlying type being "Func".
 type defaulterFuncMap map[*types.Type]*types.Type
 
-// Returns all manually-defined defaulting functions that we are able to find.
-func getManualDefaultingFunctions(context *generator.Context) defaulterFuncMap {
+// Returns all manually-defined defaulting functions in the package.
+func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package, manualMap defaulterFuncMap) {
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 
-	manualMap := make(defaulterFuncMap)
-	for _, p := range context.Universe {
-		for _, f := range p.Functions {
-			if f.Underlying == nil || f.Underlying.Kind != types.Func {
-				glog.Errorf("Malformed function: %#v", f)
-				continue
-			}
-			if f.Underlying.Signature == nil {
-				glog.Errorf("Function without signature: %#v", f)
-				continue
-			}
-			signature := f.Underlying.Signature
-			// Check whether the function is conversion function.
-			// Note that all of them have signature:
-			// func Convert_inType_To_outType(inType, outType, conversion.Scope) error
-			if signature.Receiver != nil {
-				continue
-			}
-			if len(signature.Parameters) != 1 {
-				continue
-			}
-			if len(signature.Results) != 0 {
-				continue
-			}
-			inType := signature.Parameters[0]
-			if inType.Kind != types.Pointer {
-				continue
-			}
-			// Now check if the name satisfies the convention.
-			args := defaultingArgsFromType(inType.Elem)
-			sw.Do("$.inType|defaultfn$", args)
-			if f.Name.Name == buffer.String() {
-				key := inType.Elem
-				if v, ok := manualMap[key]; ok && v != nil {
-					panic(fmt.Sprintf("duplicate static defaulter defined: %#v", key))
-				}
-				manualMap[key] = f
-			}
-			buffer.Reset()
+	for _, f := range pkg.Functions {
+		if f.Underlying == nil || f.Underlying.Kind != types.Func {
+			glog.Errorf("Malformed function: %#v", f)
+			continue
 		}
+		if f.Underlying.Signature == nil {
+			glog.Errorf("Function without signature: %#v", f)
+			continue
+		}
+		signature := f.Underlying.Signature
+		// Check whether the function is conversion function.
+		// Note that all of them have signature:
+		// func Convert_inType_To_outType(inType, outType, conversion.Scope) error
+		if signature.Receiver != nil {
+			continue
+		}
+		if len(signature.Parameters) != 1 {
+			continue
+		}
+		if len(signature.Results) != 0 {
+			continue
+		}
+		inType := signature.Parameters[0]
+		if inType.Kind != types.Pointer {
+			continue
+		}
+		// Now check if the name satisfies the convention.
+		args := defaultingArgsFromType(inType.Elem)
+		sw.Do("$.inType|defaultfn$", args)
+		if f.Name.Name == buffer.String() {
+			key := inType.Elem
+			// We might scan the same package twice, and that's OK.
+			if v, ok := manualMap[key]; ok && v != nil && v.Name.Package != pkg.Path {
+				panic(fmt.Sprintf("duplicate static defaulter defined: %#v", key))
+			}
+			manualMap[key] = f
+		}
+		buffer.Reset()
 	}
-	return manualMap
 }
 
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
@@ -208,7 +207,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		glog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	inputs := sets.NewString(arguments.InputDirs...)
+	inputs := sets.NewString(context.Inputs...)
 	packages := generator.Packages{}
 	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 	header = append(header, []byte(
@@ -217,65 +216,89 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 `)...)
 
-	// Compute all pre-existing conversion functions.
-	manualConversions := getManualConversionFunctions(context)
-	manualDefaulters := getManualDefaultingFunctions(context)
+	// Accumulate pre-existing conversion and default functions.
+	// TODO: This is too ad-hoc.  We need a better way.
+	manualConversions := conversionFuncMap{}
+	manualDefaults := defaulterFuncMap{}
 
 	// We are generating conversions only for packages that are explicitly
-	// passed as InputDir, and only for those that have a corresponding type
-	// (in the directory one above) and can be automatically converted to.
-	for _, p := range context.Universe {
-		path := p.Path
-		if !inputs.Has(path) {
-			continue
-		}
-		// Only generate conversions for package which explicitly requested it
-		// byt setting "+genversion=true" in their doc.go file.
-		filtered := false
-		if extractBoolTagOrDie("genconversion", false, p.DocComments) == true {
-			filtered = true
-		}
-		if !filtered {
+	// passed as InputDir.
+	for i := range inputs {
+		glog.V(5).Infof("considering pkg %q", i)
+		pkg := context.Universe[i]
+		if pkg == nil {
+			// If the input had no Go files, for example.
 			continue
 		}
 
-		convertibleType := false
-		for _, t := range p.Types {
-			// Check whether this type can be auto-converted to the internal
-			// version.
-			internalType, exists := getInternalTypeFor(context, t)
-			if !exists {
-				// There is no corresponding type in the internal package.
+		// Add conversion and defaulting functions.
+		getManualConversionFunctions(context, pkg, manualConversions)
+		getManualDefaultingFunctions(context, pkg, manualDefaults)
+
+		// Only generate conversions for packages which explicitly request it
+		// by specifying one or more "+k8s:conversion-gen=<peer-pkg>"
+		// in their doc.go file.
+		peerPkgs := extractTag(pkg.Comments)
+		if peerPkgs != nil {
+			glog.V(5).Infof("  tags: %q", peerPkgs)
+		} else {
+			glog.V(5).Infof("  no tag")
+			continue
+		}
+		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
+			if len(customArgs.ExtraPeerDirs) > 0 {
+				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
+			}
+		}
+		// Make sure our peer-packages are added and fully parsed.
+		for _, pp := range peerPkgs {
+			context.AddDir(pp)
+			getManualConversionFunctions(context, context.Universe[pp], manualConversions)
+			getManualDefaultingFunctions(context, context.Universe[pp], manualDefaults)
+		}
+
+		pkgNeedsGeneration := false
+		for _, t := range pkg.Types {
+			// Check whether this type can be auto-converted to the peer
+			// package type.
+			peerType := getPeerTypeFor(context, t, peerPkgs)
+			if peerType == nil {
+				// We did not find a corresponding type.
 				continue
 			}
-			// We won't be able to convert to private type.
-			if namer.IsPrivateGoName(internalType.Name.Name) {
+			if namer.IsPrivateGoName(peerType.Name.Name) {
+				// We won't be able to convert to a private type.
+				glog.V(5).Infof("  found a peer type %v, but it is a private name", t)
 				continue
 			}
+
 			// If we can generate conversion in any direction, we should
 			// generate this package.
-			if isConvertible(t, internalType, manualConversions) || isConvertible(internalType, t, manualConversions) {
-				convertibleType = true
+			if isConvertible(t, peerType, manualConversions) || isConvertible(peerType, t, manualConversions) {
+				pkgNeedsGeneration = true
+				break
 			}
 		}
-
-		if convertibleType {
-			packages = append(packages,
-				&generator.DefaultPackage{
-					PackageName: filepath.Base(path),
-					PackagePath: path,
-					HeaderText:  header,
-					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
-						generators = []generator.Generator{}
-						generators = append(
-							generators, NewGenConversion("conversion_generated", path, manualConversions, manualDefaulters))
-						return generators
-					},
-					FilterFunc: func(c *generator.Context, t *types.Type) bool {
-						return t.Name.Package == path
-					},
-				})
+		if !pkgNeedsGeneration {
+			glog.V(5).Infof("  no viable conversions, not generating for this package")
+			continue
 		}
+
+		packages = append(packages,
+			&generator.DefaultPackage{
+				PackageName: filepath.Base(pkg.Path),
+				PackagePath: pkg.Path,
+				HeaderText:  header,
+				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+					generators = []generator.Generator{}
+					generators = append(
+						generators, NewGenConversion(arguments.OutputFileBaseName, pkg.Path, manualConversions, manualDefaults, peerPkgs))
+					return generators
+				},
+				FilterFunc: func(c *generator.Context, t *types.Type) bool {
+					return t.Name.Package == pkg.Path
+				},
+			})
 	}
 	return packages
 }
@@ -324,9 +347,6 @@ func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFunc
 
 	switch in.Kind {
 	case types.Builtin:
-		if in == out {
-			return true
-		}
 		// TODO: Support more conversion types.
 		return types.IsInteger(in) && types.IsInteger(out)
 	case types.Struct:
@@ -335,11 +355,11 @@ func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFunc
 			// Check if there is an out member with that name.
 			outMember, found := findMember(out, inMember.Name)
 			if !found {
-				// Check if the member doesn't have comment:
-				// "+ genconversion=false"
-				// comment to ignore this field for conversion.
+				// Check if the member has opted out with:
+				//   "+k8s:conversion-gen=false"
 				// TODO: Switch to SecondClosestCommentLines.
-				if extractBoolTagOrDie("genconversion", true, inMember.CommentLines) == false {
+				if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
+					glog.V(5).Infof("field %v.%s requests no conversion generation, skipping", in, inMember.Name)
 					continue
 				}
 				return false
@@ -387,6 +407,7 @@ const (
 type genConversion struct {
 	generator.DefaultGen
 	targetPackage     string
+	peerPackages      []string
 	manualConversions conversionFuncMap
 	manualDefaulters  defaulterFuncMap
 	imports           namer.ImportTracker
@@ -395,12 +416,13 @@ type genConversion struct {
 	globalVariables map[string]interface{}
 }
 
-func NewGenConversion(sanitizedName, targetPackage string, manualConversions conversionFuncMap, manualDefaulters defaulterFuncMap) generator.Generator {
+func NewGenConversion(sanitizedName, targetPackage string, manualConversions conversionFuncMap, manualDefaulters defaulterFuncMap, peerPkgs []string) generator.Generator {
 	return &genConversion{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
 		targetPackage:     targetPackage,
+		peerPackages:      peerPkgs,
 		manualConversions: manualConversions,
 		manualDefaulters:  manualDefaulters,
 		imports:           generator.NewImportTracker(),
@@ -425,7 +447,13 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 	if t.Name.Package != g.targetPackage {
 		return false
 	}
-	if extractBoolTagOrDie("genconversion", true, t.CommentLines) == false {
+	// If the type has opted out, skip it.
+	tagvals := extractTag(t.CommentLines)
+	if tagvals != nil {
+		if tagvals[0] != "false" {
+			glog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tagvals[0])
+		}
+		glog.V(5).Infof("type %v requests no conversion generation, skipping", t)
 		return false
 	}
 	// TODO: Consider generating functions for other kinds too.
@@ -440,22 +468,22 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 }
 
 func (g *genConversion) Filter(c *generator.Context, t *types.Type) bool {
-	internalType, exists := getInternalTypeFor(c, t)
-	if !exists {
+	peerType := getPeerTypeFor(c, t, g.peerPackages)
+	if peerType == nil {
 		return false
 	}
-	if !g.convertibleOnlyWithinPackage(t, internalType) {
+	if !g.convertibleOnlyWithinPackage(t, peerType) {
 		return false
 	}
 	// We explicitly return true if any conversion is possible - this needs
 	// to be checked again while generating code for that type.
 	convertible := false
-	if isConvertible(t, internalType, g.manualConversions) {
-		g.typesForInit = append(g.typesForInit, conversionPair{t, internalType})
+	if isConvertible(t, peerType, g.manualConversions) {
+		g.typesForInit = append(g.typesForInit, conversionPair{t, peerType})
 		convertible = true
 	}
-	if isConvertible(internalType, t, g.manualConversions) {
-		g.typesForInit = append(g.typesForInit, conversionPair{internalType, t})
+	if isConvertible(peerType, t, g.manualConversions) {
+		g.typesForInit = append(g.typesForInit, conversionPair{peerType, t})
 		convertible = true
 	}
 	return convertible
@@ -542,13 +570,14 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 }
 
 func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
+	glog.V(5).Infof("generating for type %v", t)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	internalType, _ := getInternalTypeFor(c, t)
-	if isDirectlyConvertible(t, internalType, g.manualConversions) {
-		g.generateConversion(t, internalType, sw)
+	peerType := getPeerTypeFor(c, t, g.peerPackages)
+	if isDirectlyConvertible(t, peerType, g.manualConversions) {
+		g.generateConversion(t, peerType, sw)
 	}
-	if isDirectlyConvertible(internalType, t, g.manualConversions) {
-		g.generateConversion(internalType, t, sw)
+	if isDirectlyConvertible(peerType, t, g.manualConversions) {
+		g.generateConversion(peerType, t, sw)
 	}
 	return sw.Error()
 }
@@ -681,7 +710,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 		outMember, isOutMember := findMember(outType, m.Name)
 		if !isOutMember {
 			// Since this object wasn't filtered out, this means that
-			// this field has "genconversion=false" comment to ignore it.
+			// this field has "+k8s:conversion-gen=false" comment to ignore it.
 			continue
 		}
 		t, outT := m.Type, outMember.Type
