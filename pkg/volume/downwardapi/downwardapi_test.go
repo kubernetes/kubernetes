@@ -116,7 +116,7 @@ func TestLabels(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -194,7 +194,7 @@ func TestAnnotations(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Annotations: annotations}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestName(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Name: testName}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestNamespace(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Namespace: testNamespace}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -470,7 +470,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -578,7 +578,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels, Annotations: annotations}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -660,7 +660,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	}
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec, "default"), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	} else if mounter == nil {

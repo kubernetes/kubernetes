@@ -220,6 +220,7 @@ type Spec struct {
 	Volume           *api.Volume
 	PersistentVolume *api.PersistentVolume
 	ReadOnly         bool
+	Namespace        string
 }
 
 // Name returns the name of either Volume or PersistentVolume, one of which must not be nil.
@@ -286,17 +287,19 @@ type VolumeConfig struct {
 }
 
 // NewSpecFromVolume creates an Spec from an api.Volume
-func NewSpecFromVolume(vs *api.Volume) *Spec {
+func NewSpecFromVolume(vs *api.Volume, namespace string) *Spec {
 	return &Spec{
-		Volume: vs,
+		Volume:    vs,
+		Namespace: namespace,
 	}
 }
 
 // NewSpecFromPersistentVolume creates an Spec from an api.PersistentVolume
-func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool) *Spec {
+func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool, namespace string) *Spec {
 	return &Spec{
 		PersistentVolume: pv,
 		ReadOnly:         readOnly,
+		Namespace:        namespace,
 	}
 }
 

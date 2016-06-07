@@ -90,6 +90,10 @@ func (fake *FakeCmd) Output() ([]byte, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 
+func (fake *FakeCmd) Stop() {
+	// no-op
+}
+
 // A simple fake ExitError type.
 type FakeExitError struct {
 	Status int
