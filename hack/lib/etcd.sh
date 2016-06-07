@@ -41,8 +41,13 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
-  kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null"
-  etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null &
+  if [[ -d "${ARTIFACTS_DIR:-}" ]]; then
+    ETCD_LOGFILE="${ARTIFACTS_DIR}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
+  else
+    ETCD_LOGFILE=/dev/null
+  fi
+  kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
+  etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
