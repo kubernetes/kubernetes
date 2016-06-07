@@ -105,27 +105,22 @@ fi
 # Should NOT be called within the global scope, unless setting the desired global zone vars
 # This function is currently NOT USED in the global scope
 function set-federated-zone-vars {
-    zone="$1"
-    export OVERRIDE_CONTEXT="federation-e2e-${KUBERNETES_PROVIDER}-$zone"
-    echo "Setting zone vars to: $OVERRIDE_CONTEXT"
-    if [[ "$KUBERNETES_PROVIDER" == "gce"  ]];then
-
-	export KUBE_GCE_ZONE="$zone"
-	# gcloud has a 61 character limit, and for firewall rules this
-	# prefix gets appended to itslef, with some extra information
-	# need tot keep it short
-	export KUBE_GCE_INSTANCE_PREFIX="${USER}-${zone}"
-
-    elif [[ "$KUBERNETES_PROVIDER" == "gke"  ]];then
-
-	export CLUSTER_NAME="${USER}-${zone}"
-
-    elif [[ "$KUBERNETES_PROVIDER" == "aws"  ]];then
-
-	export KUBE_AWS_ZONE="$zone"
-	export KUBE_AWS_INSTANCE_PREFIX="${USER}-${zone}"
-    else
-	echo "Provider \"${KUBERNETES_PROVIDER}\" is not supported"
-	exit 1
-    fi
+	zone="$1"
+	export OVERRIDE_CONTEXT="federation-e2e-${KUBERNETES_PROVIDER}-$zone"
+	echo "Setting zone vars to: $OVERRIDE_CONTEXT"
+	if [[ "$KUBERNETES_PROVIDER" == "gce"  ]]; then
+		export KUBE_GCE_ZONE="$zone"
+		# gcloud has a 61 character limit, and for firewall rules this
+		# prefix gets appended to itslef, with some extra information
+		# need tot keep it short
+		export KUBE_GCE_INSTANCE_PREFIX="${USER}-${zone}"
+	elif [[ "$KUBERNETES_PROVIDER" == "gke"  ]]; then
+		export CLUSTER_NAME="${USER}-${zone}"
+	elif [[ "$KUBERNETES_PROVIDER" == "aws"  ]]; then
+		export KUBE_AWS_ZONE="$zone"
+		export KUBE_AWS_INSTANCE_PREFIX="${USER}-${zone}"
+	else
+		echo "Provider \"${KUBERNETES_PROVIDER}\" is not supported"
+		exit 1
+	fi
 }
