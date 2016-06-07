@@ -16,10 +16,14 @@ limitations under the License.
 
 package unversioned
 
-type ClusterRoleExpansion interface{}
+type ClusterProtectedAttributeExpansion interface{}
 
 type ClusterRoleBindingExpansion interface{}
 
-type RoleExpansion interface{}
+type ClusterRoleExpansion interface{}
+
+type ProtectedAttributeExpansion interface{}
 
 type RoleBindingExpansion interface{}
+
+type RoleExpansion interface{}
