@@ -45,7 +45,7 @@ if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
 fi
 
 # Verfiy cluster autoscaler configuration.
-if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   if [ -z $AUTOSCALER_MIN_NODES ]; then
     echo "AUTOSCALER_MIN_NODES not set."
     exit 1
@@ -848,12 +848,12 @@ function create-cluster-autoscaler-mig-config() {
 # - NODE_INSTANCE_PREFIX
 # - PROJECT
 # - ZONE
-# - ENABLE_NODE_AUTOSCALER
+# - ENABLE_CLUSTER_AUTOSCALER
 # - AUTOSCALER_MAX_NODES
 # - AUTOSCALER_MIN_NODES
 function create-autoscaler-config() {
   # Create autoscaler for nodes configuration if requested
-  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
     create-cluster-autoscaler-mig-config
     echo "Using autoscaler config: ${AUTOSCALER_MIG_CONFIG}"
   fi

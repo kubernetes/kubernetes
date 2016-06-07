@@ -634,7 +634,7 @@ function start-kube-scheduler {
 
 # Starts cluster autoscaler.
 function start-cluster-autoscaler {
-  if [[ "${ENABLE_NODE_AUTOSCALER:-}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_AUTOSCALER:-}" == "true" || "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
     prepare-log-file /var/log/cluster-autoscaler.log
 

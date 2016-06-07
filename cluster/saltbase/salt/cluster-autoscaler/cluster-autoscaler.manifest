@@ -1,4 +1,4 @@
-{% if pillar.get('enable_node_autoscaler', '').lower() == 'true' %}
+{% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
 {% set cloud_config = "" -%}
 {% set cloud_config_mount = "" -%}
 {% set cloud_config_volume = "" -%}
