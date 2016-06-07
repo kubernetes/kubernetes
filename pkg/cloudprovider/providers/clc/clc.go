@@ -160,7 +160,7 @@ func (clc *CLCCloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerSta
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-func (clc *CLCCloud) EnsureLoadBalancer(service *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
+func (clc *CLCCloud) EnsureLoadBalancer(service *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	ports := service.Spec.Ports
@@ -173,7 +173,7 @@ func (clc *CLCCloud) EnsureLoadBalancer(service *api.Service, hosts []string, an
 
 	serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 
-	return clc.clcLB.EnsureLoadBalancer(loadBalancerName, zone.Region, loadBalancerIP, ports, hosts, serviceName, affinityType, annotations)
+	return clc.clcLB.EnsureLoadBalancer(loadBalancerName, zone.Region, loadBalancerIP, ports, hosts, serviceName, affinityType)
 }
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.

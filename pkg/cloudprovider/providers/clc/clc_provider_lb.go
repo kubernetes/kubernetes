@@ -93,7 +93,7 @@ func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
 	loadBalancerIP string, // ignore this.  AWS actually returns error if it's non-nil
 	ports []api.ServicePort, hosts []string, serviceName types.NamespacedName,
 	affinityType api.ServiceAffinity,
-	annotations map[string]string) (*api.LoadBalancerStatus, error) {
+	) (*api.LoadBalancerStatus, error) {
 
 	glog.Info("CLC: inside EnsureLoadBalancer")
 
