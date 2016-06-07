@@ -62,7 +62,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/crypto"
@@ -71,6 +70,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -688,7 +688,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
 
-	util.ApplyRLimitForSelf(kcfg.MaxOpenFiles)
+	resourcecontainer.ApplyRLimitForSelf(kcfg.MaxOpenFiles)
 
 	// TODO(dawnchen): remove this once we deprecated old debian containervm images.
 	// This is a workaround for issue: https://github.com/opencontainers/runc/issues/726

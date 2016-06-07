@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -16,16 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package strings
 
 import (
-	"errors"
+	"fmt"
+	"os"
 )
 
-func RunInResourceContainer(containerName string) error {
-	return errors.New("resource-only containers unsupported in this platform")
+func Example_trailingNewline() {
+	ld := NewLineDelimiter(os.Stdout, "|")
+	defer ld.Flush()
+	fmt.Fprint(ld, "  Hello  \n  World  \n")
+	// Output:
+	// |  Hello  |
+	// |  World  |
+	// ||
 }
-
-func ApplyRLimitForSelf(maxOpenFiles uint64) error {
-	return errors.New("SetRLimit unsupported in this platform")
+func Example_noTrailingNewline() {
+	ld := NewLineDelimiter(os.Stdout, "|")
+	defer ld.Flush()
+	fmt.Fprint(ld, "  Hello  \n  World  ")
+	// Output:
+	// |  Hello  |
+	// |  World  |
 }
