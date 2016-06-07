@@ -33,8 +33,8 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, out io.Writer) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "config SUBCOMMAND",
-		Short: "config modifies kubeconfig files",
-		Long: `config modifies kubeconfig files using subcommands like "kubectl config set current-context my-context"
+		Short: "Modify kubeconfig files",
+		Long: `Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"
 
 The loading order follows these rules:
 1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded.  The flag may only be set once and no merging takes place.

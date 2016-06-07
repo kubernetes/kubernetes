@@ -41,7 +41,7 @@ func NewCmdCreateNamespace(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:     "namespace NAME [--dry-run]",
 		Aliases: []string{"ns"},
-		Short:   "Create a namespace with the specified name.",
+		Short:   "Create a namespace with the specified name",
 		Long:    namespaceLong,
 		Example: namespaceExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -41,7 +41,7 @@ func NewCmdCreateServiceAccount(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Com
 	cmd := &cobra.Command{
 		Use:     "serviceaccount NAME [--dry-run]",
 		Aliases: []string{"sa"},
-		Short:   "Create a service account with the specified name.",
+		Short:   "Create a service account with the specified name",
 		Long:    serviceAccountLong,
 		Example: serviceAccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
