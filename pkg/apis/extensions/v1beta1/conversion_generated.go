@@ -62,6 +62,8 @@ func init() {
 		Convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
 		Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
+		Convert_v1beta1_ExportOptions_To_api_ExportOptions,
+		Convert_api_ExportOptions_To_v1beta1_ExportOptions,
 		Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions,
 		Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions,
 		Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath,
@@ -110,6 +112,8 @@ func init() {
 		Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector,
 		Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement,
+		Convert_v1beta1_ListOptions_To_api_ListOptions,
+		Convert_api_ListOptions_To_v1beta1_ListOptions,
 		Convert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy,
 		Convert_extensions_NetworkPolicy_To_v1beta1_NetworkPolicy,
 		Convert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngressRule,
@@ -642,6 +646,32 @@ func autoConvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in 
 		out.RollingUpdate = nil
 	}
 	return nil
+}
+
+func autoConvert_v1beta1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return nil
+}
+
+func Convert_v1beta1_ExportOptions_To_api_ExportOptions(in *ExportOptions, out *api.ExportOptions, s conversion.Scope) error {
+	return autoConvert_v1beta1_ExportOptions_To_api_ExportOptions(in, out, s)
+}
+
+func autoConvert_api_ExportOptions_To_v1beta1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return nil
+}
+
+func Convert_api_ExportOptions_To_v1beta1_ExportOptions(in *api.ExportOptions, out *ExportOptions, s conversion.Scope) error {
+	return autoConvert_api_ExportOptions_To_v1beta1_ExportOptions(in, out, s)
 }
 
 func autoConvert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in *FSGroupStrategyOptions, out *extensions.FSGroupStrategyOptions, s conversion.Scope) error {
@@ -1438,6 +1468,46 @@ func autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRe
 
 func Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
 	return autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in, out, s)
+}
+
+func autoConvert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_string_To_labels_Selector(&in.LabelSelector, &out.LabelSelector, s); err != nil {
+		return err
+	}
+	if err := api.Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	out.TimeoutSeconds = in.TimeoutSeconds
+	return nil
+}
+
+func Convert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
+	return autoConvert_v1beta1_ListOptions_To_api_ListOptions(in, out, s)
+}
+
+func autoConvert_api_ListOptions_To_v1beta1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_labels_Selector_To_string(&in.LabelSelector, &out.LabelSelector, s); err != nil {
+		return err
+	}
+	if err := api.Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	out.TimeoutSeconds = in.TimeoutSeconds
+	return nil
+}
+
+func Convert_api_ListOptions_To_v1beta1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
+	return autoConvert_api_ListOptions_To_v1beta1_ListOptions(in, out, s)
 }
 
 func autoConvert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy(in *NetworkPolicy, out *extensions.NetworkPolicy, s conversion.Scope) error {
