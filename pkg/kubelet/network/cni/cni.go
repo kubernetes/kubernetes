@@ -196,11 +196,6 @@ func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubec
 		ContainerID: podInfraContainerID.ID,
 		NetNS:       podNetnsPath,
 		IfName:      network.DefaultInterfaceName,
-		Args: [][2]string{
-			{"K8S_POD_NAMESPACE", podNs},
-			{"K8S_POD_NAME", podName},
-			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID.ID},
-		},
 	}
 
 	return rt, nil
