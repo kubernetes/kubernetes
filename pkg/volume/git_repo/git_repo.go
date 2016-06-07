@@ -114,7 +114,8 @@ func (plugin *gitRepoPlugin) ConstructVolumeSpec(volumeName, mountPath string) (
 			GitRepo: &api.GitRepoVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(gitVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(gitVolume, ""), nil
 }
 
 // gitRepo volumes are directories which are pre-filled from a git repository.

@@ -118,7 +118,7 @@ func mountExternalVolumes(pod) error {
         }
 
         // Try to use a plugin for this volume.
-        plugin := volume.NewSpecFromVolume(volSpec)
+        plugin := volume.NewSpecFromVolume(volSpec, pod.Namespace)
         builder, err := kl.newVolumeBuilderFromPlugins(plugin, pod)
         if err != nil {
             return err

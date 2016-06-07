@@ -197,7 +197,8 @@ func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(gceVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(gceVolume, ""), nil
 }
 
 // Abstract interface to PD operations.

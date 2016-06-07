@@ -114,7 +114,8 @@ func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath strin
 			DownwardAPI: &api.DownwardAPIVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(downwardAPIVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(downwardAPIVolume, ""), nil
 }
 
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.

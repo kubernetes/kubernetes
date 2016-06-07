@@ -156,7 +156,8 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(iscsiVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(iscsiVolume, ""), nil
 }
 
 type iscsiDisk struct {
