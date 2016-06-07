@@ -29,6 +29,7 @@ type Resource string
 
 const (
 	CertificateSigningRequests Resource = "certificatesigningrequests"
+	ClusterProtectedAttributes Resource = "clusterprotectedattributes"
 	ClusterRoles               Resource = "clusterroles"
 	ClusterRoleBindings        Resource = "clusterrolebindings"
 	Controllers                Resource = "controllers"
@@ -48,6 +49,7 @@ const (
 	PersistentVolumeClaims     Resource = "persistentvolumeclaims"
 	Pods                       Resource = "pods"
 	PodTemplates               Resource = "podtemplates"
+	ProtectedAttributes        Resource = "protectedattributes"
 	Replicasets                Resource = "replicasets"
 	ResourceQuotas             Resource = "resourcequotas"
 	ScheduledJobs              Resource = "scheduledjobs"
@@ -65,6 +67,7 @@ func init() {
 	watchCacheSizes[CertificateSigningRequests] = 1000
 	watchCacheSizes[ClusterRoles] = 100
 	watchCacheSizes[ClusterRoleBindings] = 100
+	watchCacheSizes[ClusterProtectedAttributes] = 100
 	watchCacheSizes[Controllers] = 100
 	watchCacheSizes[Daemonsets] = 100
 	watchCacheSizes[Deployments] = 100
@@ -82,6 +85,7 @@ func init() {
 	watchCacheSizes[PersistentVolumeClaims] = 100
 	watchCacheSizes[Pods] = 1000
 	watchCacheSizes[PodTemplates] = 100
+	watchCacheSizes[ProtectedAttributes] = 100
 	watchCacheSizes[Replicasets] = 100
 	watchCacheSizes[ResourceQuotas] = 100
 	watchCacheSizes[ScheduledJobs] = 100

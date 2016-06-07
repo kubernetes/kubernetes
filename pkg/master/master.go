@@ -56,6 +56,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/etcd"
+	clusterprotectedattributeetcd "k8s.io/kubernetes/pkg/registry/clusterprotectedattribute/etcd"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/clusterrole/policybased"
@@ -86,6 +87,7 @@ import (
 	poddisruptionbudgetetcd "k8s.io/kubernetes/pkg/registry/poddisruptionbudget/etcd"
 	pspetcd "k8s.io/kubernetes/pkg/registry/podsecuritypolicy/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
+	protectedattributeetcd "k8s.io/kubernetes/pkg/registry/protectedattribute/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	"k8s.io/kubernetes/pkg/registry/role"
@@ -988,6 +990,9 @@ func (m *Master) getRBACResources(c *Config) map[string]rest.Storage {
 		roleBindingsStorage := rolebindingetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("rolebindings")))
 		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), c.AuthorizerRBACSuperUser)
 	}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("protectedattributes")) {
+		storage["protectedattributes"] = protectedattributeetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("protectedattributes")))
+	}
 	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
 		clusterRolesStorage := clusterroleetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("clusterroles")))
 		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), c.AuthorizerRBACSuperUser)
@@ -995,6 +1000,9 @@ func (m *Master) getRBACResources(c *Config) map[string]rest.Storage {
 	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
 		clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("clusterrolebindings")))
 		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), c.AuthorizerRBACSuperUser)
+	}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("clusterprotectedattributes")) {
+		storage["clusterprotectedattributes"] = clusterprotectedattributeetcd.NewREST(m.GetRESTOptionsOrDie(c, rbac.Resource("clusterprotectedattributes")))
 	}
 	return storage
 }

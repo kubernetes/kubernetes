@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
 	"testing"
 
 	api "k8s.io/kubernetes/pkg/api"
@@ -217,5 +218,265 @@ func TestValidateRole(t *testing.T) {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
 		}
+	}
+}
+
+func TestValidateProtectedAttribute(t *testing.T) {
+	goodOnes := []*rbac.ProtectedAttribute{
+		&rbac.ProtectedAttribute{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: api.NamespaceDefault,
+				Name:      "attr-1",
+			},
+			AttributeKind: rbac.LabelKind,
+			AttributeName: "environment",
+			RoleRef: api.ObjectReference{
+				Kind:      "Role",
+				Namespace: api.NamespaceDefault,
+				Name:      "admin",
+			},
+			ProtectedValues: []string{"prod", "dev"},
+		},
+		&rbac.ProtectedAttribute{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: api.NamespaceDefault,
+				Name:      "attr-1",
+			},
+			AttributeKind: rbac.AnnotationKind,
+			AttributeName: "k8s.io/annotation",
+			RoleRef: api.ObjectReference{
+				Kind: "ClusterRole",
+				Name: "admin",
+			},
+		},
+	}
+
+	for _, v := range goodOnes {
+		errs := ValidateProtectedAttribute(v)
+		if len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]struct {
+		attr rbac.ProtectedAttribute
+		msg  string
+	}{
+		"empty namespace": {
+			rbac.ProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{Name: "default"},
+			},
+			"metadata.namespace: Required value",
+		},
+		"empty metadata.name": {
+			rbac.ProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault},
+			},
+			"metadata.name: Required value",
+		},
+		"unsupported kind": {
+			rbac.ProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: api.NamespaceDefault,
+					Name:      "test",
+				},
+				AttributeKind: "foo1",
+			},
+			"attributeKind: Unsupported value",
+		},
+		"empty name": {
+			rbac.ProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: api.NamespaceDefault,
+					Name:      "test",
+				},
+				AttributeKind: "Label",
+			},
+			"attributeName: Required value",
+		},
+		"roleRef namespace mismatch": {
+			rbac.ProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: api.NamespaceDefault,
+					Name:      "test",
+				},
+				AttributeKind: "Label",
+				AttributeName: "env",
+				RoleRef: api.ObjectReference{
+					Kind:      "Role",
+					Namespace: "test",
+					Name:      "admin",
+				},
+			},
+			"role reference namespace mismatch",
+		},
+	}
+
+	for k, v := range errorCases {
+		if errs := ValidateProtectedAttribute(&v.attr); len(errs) == 0 {
+			t.Errorf("expected failure on %s for %v", k, v.attr)
+		} else if !strings.Contains(errs[0].Error(), v.msg) {
+			t.Errorf("unexpected error on %s: %q, expected: %q", k, errs[0], v.msg)
+		}
+	}
+}
+
+func TestValidateProtectedAttributeUpdate(t *testing.T) {
+	oldAttr := &rbac.ProtectedAttribute{
+		ObjectMeta: api.ObjectMeta{
+			Namespace:       api.NamespaceDefault,
+			Name:            "attr-1",
+			ResourceVersion: "17",
+		},
+		AttributeKind: rbac.LabelKind,
+		AttributeName: "environment",
+		RoleRef: api.ObjectReference{
+			Kind:      "Role",
+			Namespace: api.NamespaceDefault,
+			Name:      "admin",
+		},
+		ProtectedValues: []string{"prod", "dev"},
+	}
+
+	newAttr := &rbac.ProtectedAttribute{
+		ObjectMeta: api.ObjectMeta{
+			Namespace:       api.NamespaceDefault,
+			Name:            "attr-1",
+			ResourceVersion: "17",
+		},
+		AttributeKind: rbac.AnnotationKind,
+		AttributeName: "ks8.io/test",
+		RoleRef: api.ObjectReference{
+			Kind: "ClusterRole",
+			Name: "operator",
+		},
+	}
+
+	errs := ValidateProtectedAttributeUpdate(newAttr, oldAttr)
+	if len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+}
+
+func TestValidateClusterProtectedAttribute(t *testing.T) {
+	goodOnes := []rbac.ClusterProtectedAttribute{
+		rbac.ClusterProtectedAttribute{
+			ObjectMeta:    api.ObjectMeta{Name: "attr-1"},
+			AttributeKind: rbac.LabelKind,
+			AttributeName: "environment",
+			RoleRef: api.ObjectReference{
+				Kind: "ClusterRole",
+				Name: "admin",
+			},
+			ProtectedValues: []string{"prod", "dev"},
+		},
+		rbac.ClusterProtectedAttribute{
+			ObjectMeta:    api.ObjectMeta{Name: "attr-2"},
+			AttributeKind: rbac.AnnotationKind,
+			AttributeName: "k8s.io/annotation",
+			RoleRef: api.ObjectReference{
+				Kind: "ClusterRole",
+				Name: "admin",
+			},
+		},
+	}
+
+	for _, v := range goodOnes {
+		errs := ValidateClusterProtectedAttribute(&v)
+		if len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]struct {
+		attr rbac.ClusterProtectedAttribute
+		msg  string
+	}{
+		"metadata.namespace is present": {
+			rbac.ClusterProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "test",
+					Name:      "foo1",
+				},
+			},
+			"metadata.namespace: Forbidden",
+		},
+		"empty metadata.name": {
+			rbac.ClusterProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{},
+			},
+			"metadata.name: Required value",
+		},
+		"unsupported kind": {
+			rbac.ClusterProtectedAttribute{
+				ObjectMeta:    api.ObjectMeta{Name: "test"},
+				AttributeKind: "foo1",
+			},
+			"attributeKind: Unsupported value",
+		},
+		"empty name": {
+			rbac.ClusterProtectedAttribute{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				AttributeKind: "Label",
+			},
+			"attributeName: Required value",
+		},
+		"roleRef with namespace": {
+			rbac.ClusterProtectedAttribute{
+				ObjectMeta:    api.ObjectMeta{Name: "test"},
+				AttributeKind: "Label",
+				AttributeName: "env",
+				RoleRef: api.ObjectReference{
+					Kind:      "ClusterRole",
+					Namespace: "test",
+					Name:      "admin",
+				},
+			},
+			"role reference namespace mismatch",
+		},
+	}
+
+	for k, v := range errorCases {
+		if errs := ValidateClusterProtectedAttribute(&v.attr); len(errs) == 0 {
+			t.Errorf("expected failure on %s for %v", k, v.attr)
+		} else if !strings.Contains(errs[0].Error(), v.msg) {
+			t.Errorf("unexpected error on %s: %q, expected: %q", k, errs[0], v.msg)
+		}
+	}
+}
+
+func TestValidateClusterProtectedAttributeUpdate(t *testing.T) {
+	oldAttr := &rbac.ClusterProtectedAttribute{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "attr-1",
+			ResourceVersion: "17",
+		},
+		AttributeKind: rbac.LabelKind,
+		AttributeName: "environment",
+		RoleRef: api.ObjectReference{
+			Kind: "ClusterRole",
+			Name: "admin",
+		},
+		ProtectedValues: []string{"prod", "dev"},
+	}
+
+	newAttr := &rbac.ClusterProtectedAttribute{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "attr-1",
+			ResourceVersion: "17",
+		},
+		AttributeKind: rbac.AnnotationKind,
+		AttributeName: "ks8.io/test",
+		RoleRef: api.ObjectReference{
+			Kind: "ClusterRole",
+			Name: "operator",
+		},
+	}
+
+	errs := ValidateClusterProtectedAttributeUpdate(newAttr, oldAttr)
+	if len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
 	}
 }
