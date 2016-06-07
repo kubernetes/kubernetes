@@ -8,8 +8,6 @@ cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
 cluster/aws/templates/configure-vm-aws.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/centos/util.sh:  local node_ip=${node#*@}
-cluster/gce/config-default.sh:# reloads <os_distro>/helper.sh in the gap between when the master is created
-cluster/gce/config-test.sh:# reloads <os_distro>/helper.sh in the gap between when the master is created
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
@@ -46,6 +44,7 @@ cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --c
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
+cluster/saltbase/salt/kubelet/default:  {% set eviction_hard="--eviction-hard=" + pillar['eviction_hard'] %}
 cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
 cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
 cluster/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}
