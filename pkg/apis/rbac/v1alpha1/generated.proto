@@ -46,7 +46,7 @@ message ClusterRoleBinding {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
-  repeated Subject subject = 2;
+  repeated Subject subjects = 2;
 
   // RoleRef can only reference a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
@@ -114,7 +114,7 @@ message RoleBinding {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
-  repeated Subject subject = 2;
+  repeated Subject subjects = 2;
 
   // RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
