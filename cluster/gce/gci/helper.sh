@@ -59,7 +59,6 @@ function create-node-instance-template {
 # It requires a whole slew of assumed variables, partially due to to
 # the call to write-master-env. Listing them would be rather
 # futile. Instead, we list the required calls to ensure any additional
-#
 # variables are set:
 #   ensure-temp-dir
 #   detect-project
