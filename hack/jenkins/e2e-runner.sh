@@ -336,11 +336,7 @@ fi
 # GINKGO_UPGRADE_TESTS_ARGS for the test run.
 #
 # JENKINS_USE_SKEW_TESTS=true will run tests from the skewed version rather
-# than the original version; it is mutuall exclusive with
-# JENKINS_USE_SKEW_KUBECTL.
-#
-# JENKINS_USE_SKEW_KUBECTL=true will use the skewed version of Kubectl; it is
-# mutually exclusive with JENKINS_USE_SKEW_TESTS.
+# than the original version.
 if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
     cd ..
     mv kubernetes kubernetes_old
@@ -355,10 +351,12 @@ if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
     if [[ "${JENKINS_USE_SKEW_TESTS:-}" != "true" ]]; then
         # Back out into the old tests now that we've downloaded & maybe upgraded.
         cd ../kubernetes_old
-        if [[ "${JENKINS_USE_SKEW_KUBECTL:-}" == "true" ]]; then
-            # Append kubectl-path of skewed kubectl to test args
-            GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-} --kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
-        fi
+	# Append kubectl-path of skewed kubectl to test args, since we always
+	# want that to use the skewed kubectl version:
+	#
+	# - for upgrade jobs, we want kubectl to be at the same version as master.
+	# - for client skew tests, we want to use the skewed kubectl (that's what we're testing).
+        GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-} --kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
     fi
 fi
 
