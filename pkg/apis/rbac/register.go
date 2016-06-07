@@ -56,6 +56,12 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ClusterRoleBindingList{},
 		&ClusterRoleList{},
 
+		&ProtectedAttribute{},
+		&ProtectedAttributeList{},
+
+		&ClusterProtectedAttribute{},
+		&ClusterProtectedAttributeList{},
+
 		&api.ListOptions{},
 		&api.DeleteOptions{},
 		&api.ExportOptions{},

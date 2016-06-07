@@ -161,3 +161,79 @@ type ClusterRoleList struct {
 	// Items is a list of ClusterRoles
 	Items []ClusterRole `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +genclient=true
+
+// ProtectedAttribute allows a fine-grained control of who can set or
+// remove certain atributes (e.g. labels/annotations) on resources. In
+// order to set or remove the protected attribute, requester must be a
+// member of a role that has access to that attribute. Applies only to
+// resources in the same namespace as ProtectedAttribute itself.
+type ProtectedAttribute struct {
+	unversioned.TypeMeta `json:",inline"`
+	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// AttributeKind is a type of an attribute this restriction
+	// applies to.  Can be "Label" or "Annotation".
+	AttributeKind string `json:"attributeKind" protobuf:"bytes,2,opt,name=attributeKind"`
+
+	// AttributeName is the name of an attribute this restriction
+	// applies to.
+	AttributeName string `json:"attributeName" protobuf:"bytes,3,opt,name=attributeName"`
+
+	// RoleRef references a Role or a ClusterRole that can set or
+	// remove the attribute.
+	RoleRef v1.ObjectReference `json:"roleRef" protobuf:"bytes,4,opt,name=roleRef"`
+
+	// ProtectedValues is an optional list of values protected by the
+	// role. By default every value is protected, ProtectedValues
+	// allows narrowing it down to a fixed list.
+	ProtectedValues []string `json:"protectedValues,omitempty" protobuf:"bytes,5,rep,name=protectedValues"`
+}
+
+// ProtectedAttributeList is a collection of ProtectedAttribute's.
+type ProtectedAttributeList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is a list of ProtectedAttribute's.
+	Items []ProtectedAttribute `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient=true,nonNamespaced=true
+
+// ClusterProtectedAttribute allows a fine-grained control of who can
+// set or remove certain atributes (e.g. labels/annotations) on
+// resources. In order to set or remove the protected attribute,
+// requester must be a member of a role that has access to that
+// attribute. Applies to all namespaces in the cluster.
+type ClusterProtectedAttribute struct {
+	unversioned.TypeMeta `json:",inline"`
+	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// AttributeKind is a kind of an attribute this restriction applies to.
+	// Can be "Label" or "Annotation".
+	AttributeKind string `json:"attributeKind" protobuf:"bytes,2,opt,name=attributeKind"`
+
+	// AttributeName is the name of an attribute this restriction applies to.
+	AttributeName string `json:"attributeName" protobuf:"bytes,3,opt,name=attributeName"`
+
+	// RoleRef references a Role or a ClusterRole that can set or
+	// remove the attribute.
+	RoleRef v1.ObjectReference `json:"roleRef" protobuf:"bytes,4,opt,name=roleRef"`
+
+	// ProtectedValues is an optional list of values protected by the
+	// role. By default every value is protected, Values allows
+	// narrowing it down to a fixed list.
+	ProtectedValues []string `json:"protectedValues,omitempty" protobuf:"bytes,5,rep,name=protectedValues"`
+}
+
+// ClusterProtectedAttributeList is a collection of
+// ClusterProtectedAttribute's.
+type ClusterProtectedAttributeList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is a list of ClusterProtectedAttribute's.
+	Items []ClusterProtectedAttribute `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
