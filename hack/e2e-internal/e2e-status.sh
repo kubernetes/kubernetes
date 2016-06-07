@@ -31,11 +31,11 @@ prepare-e2e
 
 if [[ "${FEDERATION:-}" == "true" ]];then
     FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-e2e}
-    #TODO(colhom): the last cluster that was created in the loop above is the current context.
+    # TODO(colhom): the last cluster that was created in the loop above is the current context.
     # Hence, it will be the cluster that hosts the federated components.
     # In the future, we will want to loop through the all the federated contexts,
     # select each one and call federated-up
-    for zone in ${E2E_ZONES};do
+    for zone in ${E2E_ZONES}; do
 	(
 	    set-federation-zone-vars "$zone"
 	    printf "\n\tChecking version for $OVERRIDE_CONTEXT\n"
