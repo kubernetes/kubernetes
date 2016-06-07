@@ -542,9 +542,9 @@ EOF
 eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
 EOF
     fi
-    if [[ "${ENABLE_NODE_AUTOSCALER:-false}" == "true" ]]; then
+    if [[ "${ENABLE_CLUSTER_AUTOSCALER:-false}" == "true" ]]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-enable_node_autoscaler: '$(echo "${ENABLE_NODE_AUTOSCALER}" | sed -e "s/'/''/g")'
+enable_cluster_autoscaler: '$(echo "${ENABLE_CLUSTER_AUTOSCALER}" | sed -e "s/'/''/g")'
 autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
 EOF
     fi
