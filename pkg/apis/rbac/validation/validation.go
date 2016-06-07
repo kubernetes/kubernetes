@@ -105,9 +105,6 @@ func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
-	if len(subject.APIVersion) != 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("apiVersion"), subject.APIVersion))
-	}
 
 	switch subject.Kind {
 	case rbac.ServiceAccountKind:
