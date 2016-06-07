@@ -18,12 +18,12 @@ package flexvolume
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path"
 	"testing"
 	"text/template"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
@@ -43,15 +43,47 @@ if [ "$1" == "init" -a $# -eq 1 ]; then
 fi
 
 PATH=$2
-if [ "$1" == "attach" -a $# -eq 2 ]; then
+if [ "$1" == "getvolumename" -a $# -eq 2 ]; then
   echo -n '{
-    "device": "{{.DevicePath}}",
+    "device": "{{.DeviceName}}",
     "status": "Success"
+  }'
+  exit 0
+elif [ "$1" == "attach" -a $# -eq 3 ]; then
+  echo -n '{
+    "status": "Success",
+    "device": "{{.DevicePath}}"
+  }'
+  exit 0
+elif [ "$1" == "waitforattach" -a $# -eq 2 ]; then
+  echo -n '{
+    "status": "Success",
+    "device": "{{.DevicePath}}"
+  }'
+  exit 0
+elif [ "$1" == "getdevicemountpath" -a $# -eq 2 ]; then
+  echo -n '{
+    "status": "Not supported"
+  }'
+  exit 0
+elif [ "$1" == "mountdevice" -a $# -eq 4 ]; then
+  echo -n '{
+    "status": "Not supported"
   }'
   exit 0
 elif [ "$1" == "detach" -a $# -eq 2 ]; then
   echo -n '{
     "status": "Success"
+  }'
+  exit 0
+elif [ "$1" == "waitfordetach" -a $# -eq 2 ]; then
+  echo -n '{
+    "status": "Not supported"
+  }'
+  exit 0
+elif [ "$1" == "unmountdevice" -a $# -eq 2 ]; then
+  echo -n '{
+    "status": "Not supported"
   }'
   exit 0
 elif [ "$1" == "mount" -a $# -eq 4 ]; then
@@ -84,31 +116,53 @@ if [ "$1" == "init" -a $# -eq 1 ]; then
   exit 0
 fi
 
-if [ "$1" == "attach" -a $# -eq 2 ]; then
+if [ "$1" == "getvolumename" -a $# -eq 2 ]; then
+  echo -n '{
+    "device": "{{.DeviceName}}",
+    "status": "Success"
+  }'
+  exit 0
+elif [ "$1" == "attach" -a $# -eq 3 ]; then
   echo -n '{
     "status": "Not supported"
   }'
   exit 0
-elif [ "$1" == "detach" -a $# -eq 2 ]; then
+elif [ "$1" == "waitforattach" -a $# -eq 2 ]; then
+  echo -n '{
+    "status": "Success",
+    "device": "{{.DevicePath}}"
+  }'
+  exit 0
+elif [ "$1" == "getdevicemountpath" -a $# -eq 2 ]; then
   echo -n '{
     "status": "Not supported"
   }'
   exit 0
-elif [ "$1" == "mount" -a $# -eq 4 ]; then
-  PATH=$2
-  /bin/mkdir -p $PATH
-  if [ $? -ne 0 ]; then
+elif [ "$1" == "mountdevice" -a $# -eq 4 ]; then
+  PATH=$4
+  if /bin/mkdir -p $PATH; then
+    echo -n '{
+      "status": "Success"
+    }'
+  else
     echo -n '{
       "status": "Failure",
       "reason": "Failed to create $PATH"
     }'
     exit 1
   fi
+  exit 0
+elif [ "$1" == "detach" -a $# -eq 2 ]; then
   echo -n '{
-    "status": "Success"
+    "status": "Not supported"
   }'
   exit 0
-elif [ "$1" == "unmount" -a $# -eq 2 ]; then
+elif [ "$1" == "waitfordetach" -a $# -eq 2 ]; then
+  echo -n '{
+    "status": "Not supported"
+  }'
+  exit 0
+elif [ "$1" == "unmountdevice" -a $# -eq 2 ]; then
   PATH=$2
   /bin/rm -r $PATH
   if [ $? -ne 0 ]; then
@@ -120,6 +174,16 @@ elif [ "$1" == "unmount" -a $# -eq 2 ]; then
   fi
   echo -n '{
     "status": "Success"
+  }'
+  exit 0
+elif [ "$1" == "mount" -a $# -eq 4 ]; then
+  echo -n '{
+    "status": "Not supported"
+  }'
+  exit 0
+elif [ "$1" == "unmount" -a $# -eq 2 ]; then
+  echo -n '{
+    "status": "Not supported"
   }'
   exit 0
 fi
@@ -155,6 +219,7 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 	}
 	if execTemplateData == nil {
 		execTemplateData = &map[string]interface{}{
+			"DeviceName": "sdx",
 			"DevicePath": "/dev/sdx",
 			"OutputFile": path.Join(pluginDir, plugName+".out"),
 		}
@@ -234,41 +299,54 @@ func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec, tmpDir string) {
 	plugMgr := volume.VolumePluginMgr{}
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
 	plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volumetest.NewFakeVolumeHost(tmpDir, nil, nil, "" /* rootContext */))
-	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
+	volPlugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fake := &mount.FakeMounter{}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	secretMap := make(map[string]string)
-	secretMap["flexsecret"] = base64.StdEncoding.EncodeToString([]byte("foo"))
-	mounter, err := plugin.(*flexVolumePlugin).newMounterInternal(spec, pod, &flexVolumeUtil{}, fake, exec.New(), secretMap)
-	volumePath := mounter.GetPath()
+	plugin := volPlugin.(*flexVolumePlugin)
+
+	fake := plugin.host.GetMounter().(*mount.FakeMounter)
+
+	attacher, err := plugin.NewAttacher()
 	if err != nil {
-		t.Errorf("Failed to make a new Mounter: %v", err)
+		t.Errorf("NewAttacher failed: %v", err)
 	}
-	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
+
+	devicePath, err := attacher.WaitForAttach(spec, "/dev/sdx", 1*time.Second)
+	if err != nil {
+		t.Errorf("WaitForAttach failed: %v", err)
 	}
-	path := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fakeAttacher/vol1", tmpDir)
+
+	driverDir := tmpDir + "/plugins/kubernetes.io/flexvolume/kubernetes.io/fakeAttacher"
+
+	path, err := attacher.GetDeviceMountPath(spec)
+	if err != nil {
+		t.Errorf("GetDeviceMountPath() failed: %v", err)
+	}
+	expectedPath := driverDir + "/mounts/sdx"
 	if path != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
-	if err := mounter.SetUp(nil); err != nil {
-		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(volumePath); err != nil {
+
+	prepareForMount(fake, path)
+	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", volumePath)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
+			t.Errorf("prepareForMount() failed, volume path not created: %s", path)
 		}
 	}
-	t.Logf("Setup successful")
-	if mounter.(*flexVolumeMounter).readOnly {
-		t.Errorf("The volume source should not be read-only and it is.")
+
+	t.Logf("MountDevice(%v, %v, %v, fake)", spec, devicePath, path)
+	if err := attacher.MountDevice(spec, devicePath, path); err != nil {
+		t.Errorf("Expected success, got: %v", err)
 	}
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("MountDevice() failed, volume path not created: %s", path)
+		} else {
+			t.Errorf("MountDevice() failed: %v", err)
+		}
+	}
+	t.Logf("MountDevice successful")
 
 	if len(fake.Log) != 1 {
 		t.Errorf("Mount was not called exactly one time. It was called %d times.", len(fake.Log))
@@ -279,20 +357,18 @@ func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec, tmpDir string) {
 	}
 	fake.ResetLog()
 
-	unmounter, err := plugin.(*flexVolumePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &flexVolumeUtil{}, fake, exec.New())
+	detacher, err := plugin.NewDetacher()
 	if err != nil {
-		t.Errorf("Failed to make a new Unmounter: %v", err)
+		t.Errorf("NewDetacher failed: %v", err)
 	}
-	if unmounter == nil {
-		t.Errorf("Got a nil Unmounter")
+
+	if err := detacher.UnmountDevice(path); err != nil {
+		t.Errorf("UnmountDevice failed: %v", err)
 	}
-	if err := unmounter.TearDown(); err != nil {
-		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(volumePath); err == nil {
-		t.Errorf("TearDown() failed, volume path still exists: %s", volumePath)
+	if _, err := os.Stat(path); err == nil {
+		t.Errorf("UnmountDevice() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("UnmountDevice() failed: %v", err)
 	}
 	if len(fake.Log) != 1 {
 		t.Errorf("Unmount was not called exactly one time. It was called %d times.", len(fake.Log))
@@ -322,35 +398,13 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec, tmpDir string) {
 	fake := &mount.FakeMounter{}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	// Use nil secret to test for nil secret case.
-	mounter, err := plugin.(*flexVolumePlugin).newMounterInternal(spec, pod, &flexVolumeUtil{}, fake, exec.New(), nil)
-	volumePath := mounter.GetPath()
-	if err != nil {
-		t.Errorf("Failed to make a new Mounter: %v", err)
-	}
-	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
-	}
-	path := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fakeMounter/vol1", tmpDir)
-	if path != expectedPath {
-		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
-	}
+	mounter, err := plugin.(*flexVolumePlugin).newMounterInternal(spec, pod, fake, exec.New(), nil)
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(volumePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", volumePath)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
-	}
 	t.Logf("Setup successful")
-	if mounter.(*flexVolumeMounter).readOnly {
-		t.Errorf("The volume source should not be read-only and it is.")
-	}
 
-	unmounter, err := plugin.(*flexVolumePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &flexVolumeUtil{}, fake, exec.New())
+	unmounter, err := plugin.(*flexVolumePlugin).newUnmounterInternal("vol1", types.UID("poduid"), fake, exec.New())
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -359,11 +413,6 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec, tmpDir string) {
 	}
 	if err := unmounter.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(volumePath); err == nil {
-		t.Errorf("TearDown() failed, volume path still exists: %s", volumePath)
-	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
 	}
 }
 
@@ -378,7 +427,7 @@ func TestPluginVolumeAttacher(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeAttacher", ReadOnly: false}},
 	}
-	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol), tmpDir)
+	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol, "default"), tmpDir)
 }
 
 func TestPluginVolumeMounter(t *testing.T) {
@@ -392,7 +441,7 @@ func TestPluginVolumeMounter(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeMounter", ReadOnly: false}},
 	}
-	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol), tmpDir)
+	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol, "default"), tmpDir)
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -413,5 +462,5 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false), tmpDir)
+	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false, "default"), tmpDir)
 }

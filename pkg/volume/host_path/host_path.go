@@ -139,7 +139,8 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(hostPathVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(hostPathVolume, ""), nil
 }
 
 func newRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {

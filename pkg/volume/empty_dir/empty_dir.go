@@ -135,7 +135,8 @@ func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*v
 			EmptyDir: &api.EmptyDirVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(emptyDirVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(emptyDirVolume, ""), nil
 }
 
 // mountDetector abstracts how to find what kind of mount a path is backed by.
