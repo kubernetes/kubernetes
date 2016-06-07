@@ -754,7 +754,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "7dd4489c2eb6073e5a9d7746c3274c5b5f0387df"
+			"Rev": "465937c80b3c07a7c7ad20cc934898646a91c1de"
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/internal",
