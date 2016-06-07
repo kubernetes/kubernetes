@@ -149,7 +149,7 @@ if [ "${STORAGE_FS}" != "overlay" -o "${OVERLAY_WORKS}" == false ]; then
   mount -o loop "${STORAGE_FILE}" "${STORAGE_DIR}"
 fi
 
-DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:-} --storage-driver=${STORAGE_FS}"
+DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:-} --storage-driver=${STORAGE_FS} --log-driver=json-file"
 
 # If a pidfile is still around (for example after a container restart),
 # delete it so that docker can start.
