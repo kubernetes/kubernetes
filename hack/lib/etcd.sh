@@ -19,6 +19,7 @@
 ETCD_VERSION=${ETCD_VERSION:-2.2.1}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PIDFILE=${ETCD_PIDFILE:-/tmp/etcd.pid}
 
 kube::etcd::start() {
   which etcd >/dev/null || {
@@ -44,6 +45,7 @@ kube::etcd::start() {
   kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null"
   etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null &
   ETCD_PID=$!
+  echo $ETCD_PID > $ETCD_PIDFILE
 
   echo "Waiting for etcd to come up."
   kube::util::wait_for_url "http://${ETCD_HOST}:${ETCD_PORT}/v2/machines" "etcd: " 0.25 80
@@ -51,6 +53,7 @@ kube::etcd::start() {
 }
 
 kube::etcd::stop() {
+  ETCD_PID=`cat ${ETCD_PIDFILE}`
   kill "${ETCD_PID-}" >/dev/null 2>&1 || :
   wait "${ETCD_PID-}" >/dev/null 2>&1 || :
 }
