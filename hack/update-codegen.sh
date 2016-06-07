@@ -48,7 +48,34 @@ ${clientgen} --clientset-name="release_1_4" --input="api/v1,extensions/v1beta1,a
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/" --included-types-overrides="api/Service"   "$@"
 ${clientgen} --clientset-name=federation_release_1_4 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1" --included-types-overrides="api/v1/Service"   "$@"
 ${conversiongen} "$@"
-${deepcopygen} "$@"
 ${setgen} "$@"
 
 # You may add additional calls of code generators like set-gen above.
+
+# Generate a list of all files that have a `+k8s:` comment-tag.  This will be
+# used to derive lists of files/dirs for generation tools.
+ALL_K8S_TAG_FILES=$(
+    grep -l '^// \?+k8s:' $(
+        find . \
+            -not \( \
+                \( \
+                    -path ./vendor -o \
+                    -path ./_output -o \
+                    -path ./.git \
+                \) -prune \
+            \) \
+            -type f -name \*.go \
+            | sed 's|^./||'
+        )
+    )
+DEEP_COPY_DIRS=$(
+    grep -l '+k8s:deepcopy-gen=' ${ALL_K8S_TAG_FILES} \
+        | xargs dirname \
+        | sort -u
+    )
+INPUTS=$(
+    for d in ${DEEP_COPY_DIRS}; do
+        echo k8s.io/kubernetes/$d
+    done | paste -sd,
+    )
+${deepcopygen} -i ${INPUTS}

@@ -21,8 +21,38 @@ limitations under the License.
 package runtime
 
 import (
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
 )
+
+func DeepCopy_runtime_NoopDecoder(in NoopDecoder, out *NoopDecoder, c *conversion.Cloner) error {
+	if in.Encoder == nil {
+		out.Encoder = nil
+	} else if newVal, err := c.DeepCopy(in.Encoder); err != nil {
+		return err
+	} else {
+		out.Encoder = newVal.(Encoder)
+	}
+	return nil
+}
+
+func DeepCopy_runtime_NoopEncoder(in NoopEncoder, out *NoopEncoder, c *conversion.Cloner) error {
+	if in.Decoder == nil {
+		out.Decoder = nil
+	} else if newVal, err := c.DeepCopy(in.Decoder); err != nil {
+		return err
+	} else {
+		out.Decoder = newVal.(Decoder)
+	}
+	return nil
+}
+
+func DeepCopy_runtime_Pair(in Pair, out *Pair, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.Doc = in.Doc
+	return nil
+}
 
 func DeepCopy_runtime_RawExtension(in RawExtension, out *RawExtension, c *conversion.Cloner) error {
 	if in.Raw != nil {
@@ -42,6 +72,115 @@ func DeepCopy_runtime_RawExtension(in RawExtension, out *RawExtension, c *conver
 	return nil
 }
 
+func DeepCopy_runtime_Scheme(in Scheme, out *Scheme, c *conversion.Cloner) error {
+	if in.gvkToType != nil {
+		in, out := in.gvkToType, &out.gvkToType
+		*out = make(map[unversioned.GroupVersionKind]reflect.Type)
+		for key, val := range in {
+			if newVal, err := c.DeepCopy(val); err != nil {
+				return err
+			} else {
+				(*out)[key] = newVal.(reflect.Type)
+			}
+		}
+	} else {
+		out.gvkToType = nil
+	}
+	if in.typeToGVK != nil {
+		in, out := in.typeToGVK, &out.typeToGVK
+		*out = make(map[reflect.Type][]unversioned.GroupVersionKind)
+		for range in {
+			// FIXME: Copying unassignable keys unsupported reflect.Type
+		}
+	} else {
+		out.typeToGVK = nil
+	}
+	if in.unversionedTypes != nil {
+		in, out := in.unversionedTypes, &out.unversionedTypes
+		*out = make(map[reflect.Type]unversioned.GroupVersionKind)
+		for range in {
+			// FIXME: Copying unassignable keys unsupported reflect.Type
+		}
+	} else {
+		out.unversionedTypes = nil
+	}
+	if in.unversionedKinds != nil {
+		in, out := in.unversionedKinds, &out.unversionedKinds
+		*out = make(map[string]reflect.Type)
+		for key, val := range in {
+			if newVal, err := c.DeepCopy(val); err != nil {
+				return err
+			} else {
+				(*out)[key] = newVal.(reflect.Type)
+			}
+		}
+	} else {
+		out.unversionedKinds = nil
+	}
+	if in.fieldLabelConversionFuncs != nil {
+		in, out := in.fieldLabelConversionFuncs, &out.fieldLabelConversionFuncs
+		*out = make(map[string]map[string]FieldLabelConversionFunc)
+		for key, val := range in {
+			if newVal, err := c.DeepCopy(val); err != nil {
+				return err
+			} else {
+				(*out)[key] = newVal.(map[string]FieldLabelConversionFunc)
+			}
+		}
+	} else {
+		out.fieldLabelConversionFuncs = nil
+	}
+	if in.converter != nil {
+		in, out := in.converter, &out.converter
+		*out = new(conversion.Converter)
+		if err := conversion.DeepCopy_conversion_Converter(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.converter = nil
+	}
+	if in.cloner != nil {
+		in, out := in.cloner, &out.cloner
+		*out = new(conversion.Cloner)
+		if err := conversion.DeepCopy_conversion_Cloner(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.cloner = nil
+	}
+	return nil
+}
+
+func DeepCopy_runtime_SerializerInfo(in SerializerInfo, out *SerializerInfo, c *conversion.Cloner) error {
+	if in.Serializer == nil {
+		out.Serializer = nil
+	} else if newVal, err := c.DeepCopy(in.Serializer); err != nil {
+		return err
+	} else {
+		out.Serializer = newVal.(Serializer)
+	}
+	out.EncodesAsText = in.EncodesAsText
+	out.MediaType = in.MediaType
+	return nil
+}
+
+func DeepCopy_runtime_StreamSerializerInfo(in StreamSerializerInfo, out *StreamSerializerInfo, c *conversion.Cloner) error {
+	if err := DeepCopy_runtime_SerializerInfo(in.SerializerInfo, &out.SerializerInfo, c); err != nil {
+		return err
+	}
+	if in.Framer == nil {
+		out.Framer = nil
+	} else if newVal, err := c.DeepCopy(in.Framer); err != nil {
+		return err
+	} else {
+		out.Framer = newVal.(Framer)
+	}
+	if err := DeepCopy_runtime_SerializerInfo(in.Embedded, &out.Embedded, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func DeepCopy_runtime_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner) error {
 	out.APIVersion = in.APIVersion
 	out.Kind = in.Kind
@@ -49,9 +188,7 @@ func DeepCopy_runtime_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner)
 }
 
 func DeepCopy_runtime_Unknown(in Unknown, out *Unknown, c *conversion.Cloner) error {
-	if err := DeepCopy_runtime_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if in.Raw != nil {
 		in, out := in.Raw, &out.Raw
 		*out = make([]byte, len(in))
@@ -61,5 +198,73 @@ func DeepCopy_runtime_Unknown(in Unknown, out *Unknown, c *conversion.Cloner) er
 	}
 	out.ContentEncoding = in.ContentEncoding
 	out.ContentType = in.ContentType
+	return nil
+}
+
+func DeepCopy_runtime_Unstructured(in Unstructured, out *Unstructured, c *conversion.Cloner) error {
+	if in.Object != nil {
+		in, out := in.Object, &out.Object
+		*out = make(map[string]interface{})
+		for key, val := range in {
+			if newVal, err := c.DeepCopy(val); err != nil {
+				return err
+			} else {
+				(*out)[key] = newVal.(interface{})
+			}
+		}
+	} else {
+		out.Object = nil
+	}
+	return nil
+}
+
+func DeepCopy_runtime_UnstructuredList(in UnstructuredList, out *UnstructuredList, c *conversion.Cloner) error {
+	if in.Object != nil {
+		in, out := in.Object, &out.Object
+		*out = make(map[string]interface{})
+		for key, val := range in {
+			if newVal, err := c.DeepCopy(val); err != nil {
+				return err
+			} else {
+				(*out)[key] = newVal.(interface{})
+			}
+		}
+	} else {
+		out.Object = nil
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]*Unstructured, len(in))
+		for i := range in {
+			if newVal, err := c.DeepCopy(in[i]); err != nil {
+				return err
+			} else {
+				(*out)[i] = newVal.(*Unstructured)
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_runtime_UnstructuredObjectConverter(in UnstructuredObjectConverter, out *UnstructuredObjectConverter, c *conversion.Cloner) error {
+	return nil
+}
+
+func DeepCopy_runtime_VersionedObjects(in VersionedObjects, out *VersionedObjects, c *conversion.Cloner) error {
+	if in.Objects != nil {
+		in, out := in.Objects, &out.Objects
+		*out = make([]Object, len(in))
+		for i := range in {
+			if newVal, err := c.DeepCopy(in[i]); err != nil {
+				return err
+			} else {
+				(*out)[i] = newVal.(Object)
+			}
+		}
+	} else {
+		out.Objects = nil
+	}
 	return nil
 }
