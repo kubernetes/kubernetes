@@ -24,7 +24,19 @@
 
 : "${KUBE_ROOT?Must set KUBE_ROOT env var}"
 
+# Provides the $KUBERNETES_PROVIDER variable and detect-project function
+source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+# Populates $PROJECT
+detect-project
+if [[ ${PROJECT} == *':'* ]]
+then
+	echo "${PROJECT} contains ':' and can not be used as FEDERATION_PUSH_REPO_BASE. Please set FEDERATION_PUSH_REPO_BASE explicitly."
+	exit 1
+fi
+
 FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}
+FEDERATION_PUSH_REPO_BASE=${FEDERATION_PUSH_REPO_BASE:-gcr.io/${PROJECT}}
 FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-e2e}
 
 KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
