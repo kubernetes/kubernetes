@@ -364,7 +364,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 // the API server extracts the name of the PV it is pointing to and returns it.
 // An error is returned if the PVC object's phase is not "Bound".
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
-	namespace string, claimName string) (string, types.UID, error) {
+	namespace, claimName string) (string, types.UID, error) {
 	pvc, err :=
 		dswp.kubeClient.Core().PersistentVolumeClaims(namespace).Get(claimName)
 	if err != nil || pvc == nil {
