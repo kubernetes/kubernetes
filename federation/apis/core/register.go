@@ -73,7 +73,6 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&unversioned.APIResourceList{},
 	)
 
-	addDeepCopyFuncs(scheme)
 	addDefaultingFuncs(scheme)
 	addConversionFuncs(scheme)
 }

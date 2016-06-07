@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +k8s:deepcopy-gen=generate
+
 // Package conversion provides go object versioning.
 //
 // Specifically, conversion provides a way for you to define multiple versions

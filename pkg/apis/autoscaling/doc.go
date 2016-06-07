@@ -16,5 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=register
 
-// +genconversion=true
-package v1alpha1
+package autoscaling

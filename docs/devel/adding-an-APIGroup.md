@@ -75,12 +75,14 @@ cmd/libs/go2idl/ tool.
 1. Generate conversions and deep-copies:
 
     1. Add your "group/" or "group/version" into
-       cmd/libs/go2idl/{conversion-gen, deep-copy-gen}/main.go;
+       cmd/libs/go2idl/conversion-gen/main.go;
     2. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
+       with the comment `// +k8s:deepcopy-gen=register`, to catch the attention
+       of our generation tools.
+    3. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
        with the comment `// +genconversion=true`, to catch the attention of our
        gen-conversion script.
-    3. Run hack/update-all.sh.
-
+    4. Run hack/update-all.sh.
 
 2. Generate files for Ugorji codec:
 
