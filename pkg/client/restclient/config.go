@@ -228,6 +228,10 @@ func SetKubernetesDefaults(config *Config) error {
 
 // DefaultKubernetesUserAgent returns the default user agent that clients can use.
 func DefaultKubernetesUserAgent() string {
+	agent := os.Getenv("KUBE_USER_AGENT")
+	if len(agent) != 0 {
+		return agent
+	}
 	commit := version.Get().GitCommit
 	if len(commit) > 7 {
 		commit = commit[:7]
