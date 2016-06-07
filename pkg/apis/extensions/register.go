@@ -18,6 +18,7 @@ package extensions
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -78,22 +79,39 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	)
 }
 
+func (obj *Deployment) GetObjectMeta() meta.Object                            { return &obj.ObjectMeta }
 func (obj *Deployment) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
 func (obj *DeploymentList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *DeploymentList) GetListMeta() meta.List                            { return &obj.ListMeta }
 func (obj *DeploymentRollback) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
 func (obj *ReplicationControllerDummy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *Scale) GetObjectMeta() meta.Object                                 { return &obj.ObjectMeta }
 func (obj *Scale) GetObjectKind() unversioned.ObjectKind                      { return &obj.TypeMeta }
+func (obj *ThirdPartyResource) GetObjectMeta() meta.Object                    { return &obj.ObjectMeta }
 func (obj *ThirdPartyResource) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
 func (obj *ThirdPartyResourceList) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *ThirdPartyResourceList) GetListMeta() meta.List                    { return &obj.ListMeta }
+func (obj *DaemonSet) GetObjectMeta() meta.Object                             { return &obj.ObjectMeta }
 func (obj *DaemonSet) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
 func (obj *DaemonSetList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
+func (obj *DaemonSetList) GetListMeta() meta.List                             { return &obj.ListMeta }
+func (obj *ThirdPartyResourceData) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
 func (obj *ThirdPartyResourceData) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *ThirdPartyResourceDataList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ThirdPartyResourceDataList) GetListMeta() meta.List                { return &obj.ListMeta }
+func (obj *Ingress) GetObjectMeta() meta.Object                               { return &obj.ObjectMeta }
 func (obj *Ingress) GetObjectKind() unversioned.ObjectKind                    { return &obj.TypeMeta }
 func (obj *IngressList) GetObjectKind() unversioned.ObjectKind                { return &obj.TypeMeta }
+func (obj *IngressList) GetListMeta() meta.List                               { return &obj.ListMeta }
+func (obj *ReplicaSet) GetObjectMeta() meta.Object                            { return &obj.ObjectMeta }
 func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
 func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *ReplicaSetList) GetListMeta() meta.List                            { return &obj.ListMeta }
+func (obj *PodSecurityPolicy) GetObjectMeta() meta.Object                     { return &obj.ObjectMeta }
 func (obj *PodSecurityPolicy) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
 func (obj *PodSecurityPolicyList) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
+func (obj *PodSecurityPolicyList) GetListMeta() meta.List                     { return &obj.ListMeta }
+func (obj *NetworkPolicy) GetObjectMeta() meta.Object                         { return &obj.ObjectMeta }
 func (obj *NetworkPolicy) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
 func (obj *NetworkPolicyList) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
+func (obj *NetworkPolicyList) GetListMeta() meta.List                         { return &obj.ListMeta }

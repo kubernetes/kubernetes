@@ -18,6 +18,7 @@ package batch
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -55,8 +56,13 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	)
 }
 
+func (obj *Job) GetObjectMeta() meta.Object                         { return &obj.ObjectMeta }
 func (obj *Job) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
 func (obj *JobList) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
+func (obj *JobList) GetListMeta() meta.List                         { return &obj.ListMeta }
+func (obj *JobTemplate) GetObjectMeta() meta.Object                 { return &obj.ObjectMeta }
 func (obj *JobTemplate) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
+func (obj *ScheduledJob) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
 func (obj *ScheduledJob) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *ScheduledJobList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ScheduledJobList) GetListMeta() meta.List                { return &obj.ListMeta }

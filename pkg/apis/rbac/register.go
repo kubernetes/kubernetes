@@ -18,6 +18,7 @@ package rbac
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch/versioned"
@@ -63,12 +64,20 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
 
+func (obj *ClusterRole) GetObjectMeta() meta.Object                       { return &obj.ObjectMeta }
 func (obj *ClusterRole) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
+func (obj *ClusterRoleBinding) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
 func (obj *ClusterRoleBinding) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *ClusterRoleBindingList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ClusterRoleBindingList) GetListMeta() meta.List                { return &obj.ListMeta }
 func (obj *ClusterRoleList) GetObjectKind() unversioned.ObjectKind        { return &obj.TypeMeta }
+func (obj *ClusterRoleList) GetListMeta() meta.List                       { return &obj.ListMeta }
 
+func (obj *Role) GetObjectMeta() meta.Object                       { return &obj.ObjectMeta }
 func (obj *Role) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
+func (obj *RoleBinding) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
 func (obj *RoleBinding) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *RoleBindingList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *RoleBindingList) GetListMeta() meta.List                { return &obj.ListMeta }
 func (obj *RoleList) GetObjectKind() unversioned.ObjectKind        { return &obj.TypeMeta }
+func (obj *RoleList) GetListMeta() meta.List                       { return &obj.ListMeta }
