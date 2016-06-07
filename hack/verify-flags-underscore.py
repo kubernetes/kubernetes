@@ -55,6 +55,8 @@ def get_all_files(rootdir):
         # don't visit certain dirs
         if 'vendor' in dirs:
             dirs.remove('vendor')
+        if '_output' in dirs:
+            dirs.remove('_output')
         if '_gopath' in dirs:
             dirs.remove('_gopath')
         if 'third_party' in dirs:
