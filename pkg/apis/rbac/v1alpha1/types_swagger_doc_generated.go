@@ -40,7 +40,7 @@ func (ClusterRole) SwaggerDoc() map[string]string {
 var map_ClusterRoleBinding = map[string]string{
 	"":         "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
 	"metadata": "Standard object's metadata.",
-	"subject":  "Subjects holds references to the objects the role applies to.",
+	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
 }
 
@@ -95,7 +95,7 @@ func (Role) SwaggerDoc() map[string]string {
 var map_RoleBinding = map[string]string{
 	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
 	"metadata": "Standard object's metadata.",
-	"subject":  "Subjects holds references to the objects the role applies to.",
+	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
 }
 
