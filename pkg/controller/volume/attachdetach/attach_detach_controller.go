@@ -376,7 +376,7 @@ func (adc *attachDetachController) createVolumeSpec(
 
 		// Fetch actual PV object
 		volumeSpec, err := adc.getPVSpecFromCache(
-			pvName, pvcSource.ReadOnly, pvcUID)
+			podNamespace, pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"error processing PVC %q/%q: %v",
@@ -409,7 +409,7 @@ func (adc *attachDetachController) createVolumeSpec(
 		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to api.Volume", clonedPodVolumeObj)
 	}
 
-	return volume.NewSpecFromVolume(&clonedPodVolume), nil
+	return volume.NewSpecFromVolume(&clonedPodVolume, podNamespace), nil
 }
 
 // getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
@@ -459,6 +459,7 @@ func (adc *attachDetachController) getPVCFromCacheExtractPV(
 // This method deep copies the PV object so the caller may use the returned
 // volume.Spec object without worrying about it mutating unexpectedly.
 func (adc *attachDetachController) getPVSpecFromCache(
+	namespace string,
 	name string,
 	pvcReadOnly bool,
 	expectedClaimUID types.UID) (*volume.Spec, error) {
@@ -502,7 +503,7 @@ func (adc *attachDetachController) getPVSpecFromCache(
 			"failed to cast %q clonedPV %#v to PersistentVolume", name, pvObj)
 	}
 
-	return volume.NewSpecFromPersistentVolume(&clonedPV, pvcReadOnly), nil
+	return volume.NewSpecFromPersistentVolume(&clonedPV, pvcReadOnly, namespace), nil
 }
 
 // processVolumesInUse processes the list of volumes marked as "in-use"
