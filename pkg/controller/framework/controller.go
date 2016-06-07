@@ -105,7 +105,10 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 // Returns true once this controller has completed an initial resource listing
 func (c *Controller) HasSynced() bool {
-	return c.config.Queue.HasSynced()
+	if c.config.Queue != nil {
+		return c.config.Queue.HasSynced()
+	}
+	return false
 }
 
 // Requeue adds the provided object back into the queue if it does not already exist.
