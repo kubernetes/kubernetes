@@ -243,16 +243,6 @@ var jobV1 string = `
 }
 `
 
-var deleteResp string = `
-{
-    "kind": "Status",
-    "apiVersion": "v1",
-    "metadata":{},
-    "status":"Success",
-    "code":200
-}
-`
-
 // TestBatchGroupBackwardCompatibility is testing that batch/v1 and ext/v1beta1
 // Job share storage.  This test can be deleted when Jobs is removed from ext/v1beta1,
 // (expected to happen in 1.4).
