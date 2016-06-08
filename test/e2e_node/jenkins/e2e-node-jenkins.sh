@@ -29,7 +29,10 @@ set -x
 . $1
 
 go build test/e2e_node/environment/conformance.go
+
+WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
+
 mkdir -p ${ARTIFACTS}
 go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
   --zone="$GCE_ZONE" --project="$GCE_PROJECT" --image-project="$GCE_IMAGE_PROJECT" \

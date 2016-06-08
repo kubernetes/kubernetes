@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/test/e2e_node"
@@ -45,10 +46,19 @@ var imageProject = flag.String("image-project", "", "gce project the hosts live 
 var images = flag.String("images", "", "images to test")
 var hosts = flag.String("hosts", "", "hosts to test")
 var cleanup = flag.Bool("cleanup", true, "If true remove files from remote hosts and delete temporary instances")
+var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any instances created")
 var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
 var setupNode = flag.Bool("setup-node", false, "When true, current user will be added to docker group on the test machine")
 
 var computeService *compute.Service
+
+type Archive struct {
+	sync.Once
+	path string
+	err  error
+}
+
+var arc Archive
 
 type TestResult struct {
 	output string
@@ -94,35 +104,22 @@ func main() {
 		noColour = "\033[0m"
 	}
 
-	archive := e2e_node.CreateTestArchive()
-	defer os.Remove(archive)
+	go arc.getArchive()
+	defer arc.deleteArchive()
+
+	var err error
+	computeService, err = getComputeClient()
+	if err != nil {
+		glog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
+	}
 
 	results := make(chan *TestResult)
 	running := 0
 	if *images != "" {
-		// Setup the gce client for provisioning instances
-		// Getting credentials on gce jenkins is flaky, so try a couple times
-		var err error
-		for i := 0; i < 10; i++ {
-			var client *http.Client
-			client, err = google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
-			if err != nil {
-				continue
-			}
-			computeService, err = compute.New(client)
-			if err != nil {
-				continue
-			}
-			time.Sleep(time.Second * 6)
-		}
-		if err != nil {
-			glog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
-		}
-
 		for _, image := range strings.Split(*images, ",") {
 			running++
 			fmt.Printf("Initializing e2e tests using image %s.\n", image)
-			go func(image string, junitFileNum int) { results <- testImage(image, archive, junitFileNum) }(image, running)
+			go func(image string, junitFileNum int) { results <- testImage(image, junitFileNum) }(image, running)
 		}
 	}
 	if *hosts != "" {
@@ -130,7 +127,7 @@ func main() {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
 			go func(host string, junitFileNum int) {
-				results <- testHost(host, archive, *cleanup, junitFileNum, *setupNode)
+				results <- testHost(host, *cleanup, junitFileNum, *setupNode)
 			}(host, running)
 		}
 	}
@@ -159,9 +156,51 @@ func main() {
 	}
 }
 
+func (a *Archive) getArchive() (string, error) {
+	a.Do(func() { a.path, a.err = e2e_node.CreateTestArchive() })
+	return a.path, a.err
+}
+
+func (a *Archive) deleteArchive() {
+	path, err := a.getArchive()
+	if err != nil {
+		return
+	}
+	os.Remove(path)
+}
+
 // Run tests in archive against host
-func testHost(host, archive string, deleteFiles bool, junitFileNum int, setupNode bool) *TestResult {
-	output, exitOk, err := e2e_node.RunRemote(archive, host, deleteFiles, junitFileNum, setupNode)
+func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *TestResult {
+	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
+	if err != nil {
+		return &TestResult{
+			err:    err,
+			host:   host,
+			exitOk: false,
+		}
+	}
+	if strings.ToUpper(instance.Status) != "RUNNING" {
+		err = fmt.Errorf("instance %s not in state RUNNING, was %s.", host, instance.Status)
+		return &TestResult{
+			err:    err,
+			host:   host,
+			exitOk: false,
+		}
+	}
+	externalIp := getExternalIp(instance)
+	if len(externalIp) > 0 {
+		e2e_node.AddHostnameIp(host, externalIp)
+	}
+
+	path, err := arc.getArchive()
+	if err != nil {
+		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
+		return &TestResult{
+			err: fmt.Errorf("unable to create test archive %v.", err),
+		}
+	}
+
+	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFileNum, setupNode)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -172,17 +211,21 @@ func testHost(host, archive string, deleteFiles bool, junitFileNum int, setupNod
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(image, archive string, junitFileNum int) *TestResult {
+func testImage(image string, junitFileNum int) *TestResult {
 	host, err := createInstance(image)
-	if *cleanup {
+	if *deleteInstances {
 		defer deleteInstance(image)
 	}
 	if err != nil {
 		return &TestResult{
-			err: fmt.Errorf("Unable to create gce instance with running docker daemon for image %s.  %v", image, err),
+			err: fmt.Errorf("unable to create gce instance with running docker daemon for image %s.  %v", image, err),
 		}
 	}
-	return testHost(host, archive, false, junitFileNum, *setupNode)
+
+	// Only delete the files if we are keeping the instance and want it cleaned up.
+	// If we are going to delete the instance, don't bother with cleaning up the files
+	deleteFiles := !*deleteInstances && *cleanup
+	return testHost(host, deleteFiles, junitFileNum, *setupNode)
 }
 
 // Provision a gce instance using image
@@ -216,7 +259,7 @@ func createInstance(image string) (string, error) {
 		return "", err
 	}
 	if op.Error != nil {
-		return "", fmt.Errorf("Could not create instance %s: %+v", name, op.Error)
+		return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
 	}
 
 	instanceRunning := false
@@ -230,22 +273,67 @@ func createInstance(image string) (string, error) {
 			continue
 		}
 		if strings.ToUpper(instance.Status) != "RUNNING" {
-			err = fmt.Errorf("Instance %s not in state RUNNING, was %s.", name, instance.Status)
+			err = fmt.Errorf("instance %s not in state RUNNING, was %s.", name, instance.Status)
 			continue
 		}
+		externalIp := getExternalIp(instance)
+		if len(externalIp) > 0 {
+			e2e_node.AddHostnameIp(name, externalIp)
+		}
 		var output string
-		output, err = e2e_node.RunSshCommand("ssh", name, "--", "sudo", "docker", "version")
+		output, err = e2e_node.RunSshCommand("ssh", e2e_node.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
 		if err != nil {
-			err = fmt.Errorf("Instance %s not running docker daemon - Command failed: %s", name, output)
+			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
 			continue
 		}
 		if !strings.Contains(output, "Server") {
-			err = fmt.Errorf("Instance %s not running docker daemon - Server not found: %s", name, output)
+			err = fmt.Errorf("instance %s not running docker daemon - Server not found: %s", name, output)
 			continue
 		}
 		instanceRunning = true
 	}
 	return name, err
+}
+
+func getExternalIp(instance *compute.Instance) string {
+	for i := range instance.NetworkInterfaces {
+		ni := instance.NetworkInterfaces[i]
+		for j := range ni.AccessConfigs {
+			ac := ni.AccessConfigs[j]
+			if len(ac.NatIP) > 0 {
+				return ac.NatIP
+			}
+		}
+	}
+	return ""
+}
+
+func getComputeClient() (*compute.Service, error) {
+	const retries = 10
+	const backoff = time.Second * 6
+
+	// Setup the gce client for provisioning instances
+	// Getting credentials on gce jenkins is flaky, so try a couple times
+	var err error
+	var cs *compute.Service
+	for i := 0; i < retries; i++ {
+		if i > 0 {
+			time.Sleep(backoff)
+		}
+
+		var client *http.Client
+		client, err = google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+		if err != nil {
+			continue
+		}
+
+		cs, err = compute.New(client)
+		if err != nil {
+			continue
+		}
+		return cs, nil
+	}
+	return nil, err
 }
 
 func deleteInstance(image string) {

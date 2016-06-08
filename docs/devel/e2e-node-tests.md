@@ -34,147 +34,187 @@ Documentation for other releases can be found at
 
 # Node End-To-End tests
 
-Node e2e tests start kubelet and minimal supporting infrastructure to validate
-the kubelet on a host. Tests can be run either locally, against a remote host or
-against a GCE image.
+Node e2e tests are component tests meant for testing the Kubelet code on a custom host environment.
+
+Tests can be run either locally or against a host running on GCE.
+
+Node e2e tests are run as both pre- and post- submit tests by the Kubernetes project.
 
 *Note: Linux only. Mac and Windows unsupported.*
 
-## Running tests locally
+# Running tests
 
-etcd must be installed and on the PATH to run the node e2e tests.  To verify
-etcd is installed: `which etcd`. You can find instructions for installing etcd
-[on the etcd releases page](https://github.com/coreos/etcd/releases).
+## Locally
 
-Run the tests locally: `make test_e2e_node`
+Why run tests *Locally*?  Much faster than running tests Remotely.
 
-Running the node e2e tests locally will build the kubernetes go source files and
-then start the kubelet, kube-apiserver, and etcd binaries on localhost before
-executing the ginkgo tests under test/e2e_node against the local kubelet
-instance.
+Prerequisites:
+- [Install etcd](https://github.com/coreos/etcd/releases) on your PATH
+  - Verify etcd is installed correctly by running `which etcd`
+- [Install ginkgo](https://github.com/onsi/ginkgo) on your PATH
+  - Verify ginkgo is installed correctly by running `which ginkgo`
 
-## Running tests against a remote host
-
-The node e2e tests can be run against one or more remote hosts using one of:
-* [e2e-node-jenkins.sh](../../test/e2e_node/jenkins/e2e-node-jenkins.sh) (gce
-only)
-* [run_e2e.go](../../test/e2e_node/runner/run_e2e.go) (requires passwordless ssh
-and remote passwordless sudo access over ssh)
-* using [run_e2e.go](../../test/e2e_node/runner/run_e2e.go) to build a tar.gz
-and executing on host (requires host access w/ remote sudo)
-
-### Option 1: Configuring a new remote host from scratch for testing
-
-The host must contain an environment capable of running a minimal kubernetes cluster
-consisting of etcd, the kube-apiserver, and kubelet. The steps required to step a host vary between distributions
-(coreos, rhel, ubuntu, etc), but may include:
-* install etcd
-* install docker
-* add user running tests to docker group
-* install lxc and update grub commandline
-* enable tty-less sudo access
-
-These steps should be captured in [setup_host.sh](../../test/e2e_node/environment/setup_host.sh)
-
-### Option 2: Copying an existing host image from another project
-
-If there is an existing image in another project you would like to use, you can use the script
-[copy-e2e-image.sh](../../test/e2e_node/jenkins/copy-e2e-image.sh) to copy an image
-from one GCE project to another.
+From the Kubernetes base directory, run:
 
 ```sh
-copy-e2e-image.sh <image-to-be-copied-name> <from-gce-project> <to-gce-project>
+make test_e2e_node
 ```
 
-### Running the tests
+This will: run the *ginkgo* binary against the subdirectory *test/e2e_node*, which will in turn:
+- Ask for sudo access (needed for running some of the processes)
+- Build the Kubernetes source code
+- Pre-pull docker images used by the tests
+- Start a local instance of *etcd*
+- Start a local instance of *kube-apiserver*
+- Start a local instance of *kubelet*
+- Run the test using the locally started processes
+- Output the test results to STDOUT
+- Stop *kubelet*, *kube-apiserver*, and *etcd*
 
-1. If running tests against a running host on gce
+## Remotely
 
-  * Make sure host names are resolvable to ssh by running `gcloud compute config-ssh` to
-    update ~/.ssh/config with the GCE hosts.  After running this command, check the hostnames
-    in the ~/.ssh/config file and verify you have the correct access by running `ssh <host>`.
+Why Run tests *Remotely*?  Tests will be run in a customized pristine environment.  Closely mimics what will be done
+as pre- and post- submit testing performed by the project.
 
-  * Copy [template.properties](../../test/e2e_node/jenkins/template.properties)
+Prerequisites:
+- [join the googlegroup](https://groups.google.com/forum/#!forum/kubernetes-dev)
+`kubernetes-dev@googlegroups.com`
+  - *This provides read access to the node test images.*
+- Setup a [Google Cloud Platform](https://cloud.google.com/) account and project with Google Compute Engine enabled
+- Install and setup the [gcloud sdk](https://cloud.google.com/sdk/downloads)
+  - Verify the sdk is setup correctly by running `gcloud compute instances list` and `gcloud compute images list --project kubernetes-node-e2e-images`
 
-    * Fill in `GCE_HOSTS` with the name of the host
+Run:
 
-  * Run `test/e2e_node/jenkins/e2e-node-jenkins.sh <path to properties file>`
-    * **Must be run from kubernetes root**
+```sh
+make test_e2e_node REMOTE=true
+```
 
-2. If running against a host anywhere else
+This will:
+- Build the Kubernetes source code
+- Create a new GCE instance using the default test image
+  - Instance will be called **test-e2e-node-containervm-v20160321-image**
+- Lookup the instance public ip address
+- Copy a compressed archive file to the host containing the following binaries:
+  - ginkgo
+  - kubelet
+  - kube-apiserver
+  - e2e_node.test (this binary contains the actual tests to be run)
+- Unzip the archive to a directory under **/tmp/gcloud**
+- Run the tests using the `ginkgo` command
+  - Starts etcd, kube-apiserver, kubelet
+  - The ginkgo command is used because this supports more features than running the test binary directly
+- Output the remote test results to STDOUT
+- `scp` the log files back to the local host under /tmp/_artifacts/e2e-node-containervm-v20160321-image
+- Stop the processes on the remote host
+- **Leave the GCE instance running**
 
-  * **Requires password-less ssh and sudo access**
-
-    * Make sure this works - e.g. `ssh <hostname> -- sudo echo "ok"`
-    * If ssh flags are required (e.g. `-i`), they can be used and passed to the
-tests with `--ssh-options`
-
-  * `go run test/e2e_node/runner/run_e2e.go --logtostderr --hosts <comma
-separated hosts>`
-
-    * **Must be run from kubernetes root**
-
-3. Alternatively, manually build and copy `e2e_node_test.tar.gz` to a remote
-host
-
-  * Build the tar.gz `go run test/e2e_node/runner/run_e2e.go --logtostderr
---build-only`
-
-  * Copy `e2e_node_test.tar.gz` to the remote host
-
-  * Extract the archive on the remote host `tar -xzvf e2e_node_test.tar.gz`
-
-  * Run the tests `./e2e_node.test --logtostderr --vmodule=*=2
---build-services=false --node-name=<hostname>`
-
-      * Note: This must be run from the directory containing the kubelet and
-kube-apiserver binaries.
-
-## Running tests against a gce image
-
-* Option 1: Build a gce image from a prepared gce host
-  * Create the host from a base image and configure it (see above)
-    * Run tests against this remote host to ensure that it is setup correctly
-before doing anything else
-  * Create a gce *snapshot* of the instance
-  * Create a gce *disk* from the snapshot
-  * Create a gce *image* from the disk
-* Option 2: Copy a prepared image from another project
-  * Instructions above
-* Test that the necessary gcloud credentials are setup for the project
-  * `gcloud compute --project <project> --zone <zone> images list`
-  * Verify that your image appears in the list
-* Copy [template.properties](../../test/e2e_node/jenkins/template.properties)
-  * Fill in `GCE_PROJECT`, `GCE_ZONE`, `GCE_IMAGES`
-* Run `test/e2e_node/jenkins/e2e-node-jenkins.sh <path to properties file>`
-  * **Must be run from kubernetes root**
-
-## Kubernetes Jenkins CI and PR builder
-
-Node e2e tests are run against a static list of host environments continuously
-or when manually triggered on a github.com pull requests using the trigger
-phrase `@k8s-bot test node e2e`
-
-### CI Host environments
-
-TBD
-
-### PR builder host environments
-
-| linux distro    | distro version | docker version | etcd version | cloud provider |
-|-----------------|----------------|----------------|--------------|----------------|
-| containervm     |                | 1.8            |              | gce            |
-| coreos          | stable         | 1.8            |              | gce            |
-| debian          | jessie         | 1.10           |              | gce            |
-| ubuntu          | trusty         | 1.8            |              | gce            |
-| ubuntu          | trusty         | 1.9            |              | gce            |
-| ubuntu          | trusty         | 1.10           |              | gce            |
+**Note: Subsequent tests run using the same image will *reuse the existing host* instead of deleting it and
+provisioning a new one.  To delete the GCE instance after each test see
+*[DELETE_INSTANCE](#delete-instance-after-tests-run)*.**
 
 
+# Additional Remote Options
 
+## Run tests using different images
 
+This is useful if you want to run tests against a host using a different OS distro or container runtime than
+provided by the default image.
 
+List the available test images using gcloud.
 
+```sh
+make test_e2e_node LIST_IMAGES=true
+```
+
+This will output a list of the available images for the default image project.
+
+Then run:
+
+```sh
+make test_e2e_node REMOTE=true IMAGES="<comma-separated-list-images>"
+```
+
+## Run tests against a running GCE instance (not an image)
+
+This is useful if you have an host instance running already and want to run the tests there instead of on a new instance.
+
+```sh
+make test_e2e_node REMOTE=true HOSTS="<comma-separated-list-of-hostnames>"
+```
+
+## Delete instance after tests run
+
+This is useful if you want recreate the instance for each test run to trigger flakes related to starting the instance.
+
+```sh
+make test_e2e_node REMOTE=true DELETE_INSTANCES=true
+```
+
+## Keep instance, test binaries, and *processes* around after tests run
+
+This is useful if you want to manually inspect or debug the kubelet process run as part of the tests.
+
+```sh
+make test_e2e_node REMOTE=true CLEANUP=false
+```
+
+## Run tests using an image in another project
+
+This is useful if you want to create your own host image in another project and use it for testing.
+
+```sh
+make test_e2e_node REMOTE=true IMAGE_PROJECT="<name-of-project-with-images>" IMAGES="<image-name>"
+```
+
+Setting up your own host image may require additional steps such as installing etcd or docker.  See
+[setup_host.sh](../../test/e2e_node/environment/setup_host.sh) for common steps to setup hosts to run node tests.
+
+## Create instances using a different instance name prefix
+
+This is useful if you want to create instances using a different name so that you can run multiple copies of the
+test in parallel against different instances of the same image.
+
+```sh
+make test_e2e_node REMOTE=true INSTANCE_PREFIX="my-prefix"
+```
+
+# Additional Test Options for both Remote and Local execution
+
+## Only run a subset of the tests
+
+To run tests matching a regex:
+
+```sh
+make test_e2e_node REMOTE=true FOCUS="<regex-to-match>"
+```
+
+To run tests NOT matching a regex:
+
+```sh
+make test_e2e_node REMOTE=true SKIP="<regex-to-match>"
+```
+
+## Run tests continually until they fail
+
+This is useful if you are trying to debug a flaky test failure.  This will cause ginkgo to continually
+run the tests until they fail.  **Note: this will only perform test setup once (e.g. creating the instance) and is
+less useful for catching flakes related creating the instance from an image.**
+
+```sh
+make test_e2e_node REMOTE=true RUN_UNTIL_FAILURE=true
+```
+
+# Notes on tests run by the Kubernetes project during pre-, post- submit.
+
+The node e2e tests are run by the PR builder for each Pull Request and the results published at
+the bottom of the comments section.  To re-run just the node e2e tests from the PR builder add the comment
+`@k8s-bot node e2e test this issue: #<Flake-Issue-Number or IGNORE>` and **include a link to the test
+failure logs if caused by a flake.**
+
+The PR builder runs tests against the images listed in [jenkins-pull.properties](../../test/e2e_node/jenkins/jenkins-pull.properties)
+
+The post submit tests run against the images listed in [jenkins-ci.properties](../../test/e2e_node/jenkins/jenkins-ci.properties)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -120,7 +120,7 @@ func getK8sNodeTestDir() (string, error) {
 func getKubeletServerBin() string {
 	bin, err := getK8sBin("kubelet")
 	if err != nil {
-		panic(fmt.Sprintf("Could not locate kubelet binary."))
+		glog.Fatalf("Could not locate kubelet binary %v.", err)
 	}
 	return bin
 }
@@ -128,7 +128,7 @@ func getKubeletServerBin() string {
 func getApiServerBin() string {
 	bin, err := getK8sBin("kube-apiserver")
 	if err != nil {
-		panic(fmt.Sprintf("Could not locate kube-apiserver binary."))
+		glog.Fatalf("Could not locate kube-apiserver binary %v.", err)
 	}
 	return bin
 }
