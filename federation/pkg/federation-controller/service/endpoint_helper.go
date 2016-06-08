@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	"k8s.io/kubernetes/pkg/api"
+	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -54,7 +54,7 @@ func (sc *ServiceController) clusterEndpointWorker() {
 
 // Whenever there is change on endpoint, the federation service should be updated
 // key is the namespaced name of endpoint
-func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federationclientset.Interface, serviceController *ServiceController) error {
+func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface, serviceController *ServiceController) error {
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
 		// here we filtered all non-federation services
@@ -67,7 +67,7 @@ func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache
 		return err
 	}
 	if exists {
-		endpoint, ok := endpointInterface.(*api.Endpoints)
+		endpoint, ok := endpointInterface.(*v1.Endpoints)
 		if ok {
 			glog.V(4).Infof("Found endpoint for federation service %s/%s from cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
 			err = cc.processEndpointUpdate(cachedService, endpoint, clusterName, serviceController)
@@ -117,7 +117,7 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 
 // Update dns info when endpoint update event received
 // We do not care about the endpoint info, what we need to make sure here is len(endpoints.subsets)>0
-func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService, endpoint *api.Endpoints, clusterName string, serviceController *ServiceController) error {
+func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService, endpoint *v1.Endpoints, clusterName string, serviceController *ServiceController) error {
 	glog.V(4).Infof("Processing endpoint update for %s/%s, cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
 	cachedService.rwlock.Lock()
 	defer cachedService.rwlock.Unlock()
