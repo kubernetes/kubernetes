@@ -235,4 +235,7 @@ function cleanup-federated-api-objects {
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
   # Delete all resources in FEDERATION_NAMESPACE.
   $host_kubectl delete pods,svc,rc,deployment,secret --namespace=${FEDERATION_NAMESPACE} --all
+  # Also delete the kubeconfig files that were used to create secrets.
+  KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
+  rm -rf ${KUBECONFIG_DIR}/federation
 }
