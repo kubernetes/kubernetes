@@ -179,8 +179,11 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.ControllerHasDesiredReplicas(scaler.c, rc))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ControllerHasDesiredReplicas(scaler.c, rc))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
@@ -240,8 +243,11 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
@@ -306,8 +312,11 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.JobHasDesiredParallelism(scaler.c, job))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.JobHasDesiredParallelism(scaler.c, job))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
@@ -370,8 +379,11 @@ func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.DeploymentHasDesiredReplicas(scaler.c, deployment))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.DeploymentHasDesiredReplicas(scaler.c, deployment))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
