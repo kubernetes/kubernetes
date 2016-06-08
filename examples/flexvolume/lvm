@@ -49,7 +49,7 @@ attach() {
 	VG=$(echo $1|jq -r '.volumegroup')
 
 	# LVM substitutes - with --
-	VOLUMEID= `echo $VOLUMEID|sed s/-/--/g`
+	VOLUMEID=`echo $VOLUMEID|sed s/-/--/g`
 	VG=`echo $VG|sed s/-/--/g`
 
 	DMDEV="/dev/mapper/${VG}-${VOLUMEID}"
