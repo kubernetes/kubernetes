@@ -566,6 +566,7 @@ function kube::build::ensure_data_container() {
       "${DOCKER_DATA_MOUNT_ARGS[@]}"
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
       --user "$(id -u):$(id -g)"
+      --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
       true
     )
@@ -585,6 +586,7 @@ function kube::build::run_build_command() {
   local -a docker_run_opts=(
     "--name=${KUBE_BUILD_CONTAINER_NAME}"
     "--user=$(id -u):$(id -g)"
+    "--hostname=${HOSTNAME}"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 
