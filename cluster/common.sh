@@ -649,6 +649,11 @@ EOF
 NODE_LABELS: $(yaml-quote ${NODE_LABELS})
 EOF
     fi
+  if [ -n "${EVICTION_HARD:-}" ]; then
+      cat >>$file <<EOF
+EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
+EOF
+    fi
   if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
     # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF
