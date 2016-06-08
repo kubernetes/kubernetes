@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	"k8s.io/kubernetes/pkg/api"
+	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api/errors"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -55,7 +55,7 @@ func (sc *ServiceController) clusterServiceWorker() {
 }
 
 // Whenever there is change on service, the federation service should be updated
-func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federationclientset.Interface) error {
+func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface) error {
 	// obj holds the latest service info from apiserver, return if there is no federation cache for the service
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
@@ -70,7 +70,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 	}
 	var needUpdate bool
 	if exists {
-		service, ok := serviceInterface.(*api.Service)
+		service, ok := serviceInterface.(*v1.Service)
 		if ok {
 			glog.V(4).Infof("Found service for federation service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
 			needUpdate = cc.processServiceUpdate(cachedService, service, clusterName)
@@ -140,7 +140,7 @@ func (cc *clusterClientCache) processServiceDeletion(cachedService *cachedServic
 // processServiceUpdate Update ingress info when service updated
 // the function returns a bool to indicate if actual update happend on federation service cache
 // and if the federation service cache is updated, the updated info should be post to federation apiserver
-func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService, service *api.Service, clusterName string) bool {
+func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService, service *v1.Service, clusterName string) bool {
 	glog.V(4).Infof("Processing service update for %s/%s, cluster %s", service.Namespace, service.Name, clusterName)
 	cachedService.rwlock.Lock()
 	defer cachedService.rwlock.Unlock()
@@ -214,7 +214,7 @@ func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService,
 	return needUpdate
 }
 
-func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedService, fedClient federationclientset.Interface) error {
+func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedService, fedClient federation_release_1_3.Interface) error {
 	service := cachedService.lastState
 	glog.V(5).Infof("Persist federation service status %s/%s", service.Namespace, service.Name)
 	var err error
