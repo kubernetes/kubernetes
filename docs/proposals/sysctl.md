@@ -91,6 +91,7 @@ Some real-world examples for the use of sysctls:
 - certain Java applications require "hugepages" support to perform well
   (compare [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-77426026)),
   configured through `vm.nr_hugepages`.
+  **Note:** `vm.*` is not namespaced and for that reason not supported by Docker/rkt. Moreover, there would be more steps necessary than just sysctl to get hugepages working in Kubernetes like memlock ulimit settings (compare http://andrigoss.blogspot.de/2008/02/jvm-performance-tuning.html).
 - a containerized IPv6 routing daemon requires e.g. `/proc/sys/net/ipv6/conf/all/forwarding` and
   `/proc/sys/net/ipv6/conf/all/accept_redirects` (compare
   [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-98653017)).
