@@ -840,7 +840,7 @@ function create-cluster-autoscaler-mig-config() {
     AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --nodes=${this_mig_min}:${this_mig_max}:${mig_url}"
   done
 
-  AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --experimental-scale-down-enabled=${AUTOSCALER_ENABLE_SCALE_DOWN}"
+  AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --scale-down-enabled=${AUTOSCALER_ENABLE_SCALE_DOWN}"
 }
 
 # Assumes:
