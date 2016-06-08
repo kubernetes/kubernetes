@@ -537,6 +537,11 @@ EOF
 node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${EVICTION_HARD:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [[ "${ENABLE_NODE_AUTOSCALER:-false}" == "true" ]]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 enable_node_autoscaler: '$(echo "${ENABLE_NODE_AUTOSCALER}" | sed -e "s/'/''/g")'
