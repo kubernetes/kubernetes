@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta2
+apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: heapster-v1.1.0.beta2
