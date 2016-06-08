@@ -19,7 +19,9 @@ package resource
 import (
 	"encoding/json"
 	"math/rand"
+	"strings"
 	"testing"
+	"unicode"
 
 	fuzz "github.com/google/gofuzz"
 	"github.com/spf13/pflag"
@@ -231,6 +233,9 @@ func TestQuantityParse(t *testing.T) {
 		{"0Ti", decQuantity(0, 0, BinarySI)},
 		{"0T", decQuantity(0, 0, DecimalSI)},
 
+		// Quantity less numbers are allowed
+		{"1", decQuantity(1, 0, DecimalSI)},
+
 		// Binary suffixes
 		{"1Ki", decQuantity(1024, 0, BinarySI)},
 		{"8Ki", decQuantity(8*1024, 0, BinarySI)},
@@ -422,7 +427,7 @@ func TestQuantityParse(t *testing.T) {
 		desired := &inf.Dec{}
 		expect := Quantity{d: infDecAmount{Dec: desired}}
 		for _, item := range table {
-			got, err := ParseQuantity("-" + item.input)
+			got, err := ParseQuantity("-" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
 			if err != nil {
 				t.Errorf("-%v: unexpected error: %v", item.input, err)
 				continue
@@ -444,7 +449,7 @@ func TestQuantityParse(t *testing.T) {
 
 		// Try everything with an explicit +
 		for _, item := range table {
-			got, err := ParseQuantity("+" + item.input)
+			got, err := ParseQuantity("+" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
 			if err != nil {
 				t.Errorf("-%v: unexpected error: %v", item.input, err)
 				continue
@@ -472,6 +477,10 @@ func TestQuantityParse(t *testing.T) {
 		"1i",
 		"-3.01i",
 		"-3.01e-",
+
+		// trailing whitespace is forbidden
+		" 1",
+		"1 ",
 	}
 	for _, item := range invalid {
 		_, err := ParseQuantity(item)
@@ -811,6 +820,31 @@ func TestJSON(t *testing.T) {
 		}
 		if q2.Cmp(*q) != 0 {
 			t.Errorf("Expected equal: %v, %v (json was '%v')", q, q2, string(b))
+		}
+	}
+}
+
+func TestJSONWhitespace(t *testing.T) {
+	q := Quantity{}
+	testCases := []struct {
+		in     string
+		expect string
+	}{
+		{`" 1"`, "1"},
+		{`"1 "`, "1"},
+		{`1`, "1"},
+		{` 1`, "1"},
+		{`1 `, "1"},
+		{`10`, "10"},
+		{`-1`, "-1"},
+		{` -1`, "-1"},
+	}
+	for _, test := range testCases {
+		if err := json.Unmarshal([]byte(test.in), &q); err != nil {
+			t.Errorf("%q: %v", test.in, err)
+		}
+		if q.String() != test.expect {
+			t.Errorf("unexpected string: %q", q.String())
 		}
 	}
 }
