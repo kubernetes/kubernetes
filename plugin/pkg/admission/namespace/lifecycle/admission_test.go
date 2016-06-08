@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -44,9 +45,10 @@ func TestAdmission(t *testing.T) {
 	}
 	var namespaceLock sync.RWMutex
 
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	store.Add(namespaceObj)
 	mockClient := fake.NewSimpleClientset()
+	informer := informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute)
+	informer.GetStore().Add(namespaceObj)
+
 	mockClient.PrependReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		namespaceLock.RLock()
 		defer namespaceLock.RUnlock()
@@ -62,7 +64,7 @@ func TestAdmission(t *testing.T) {
 	})
 
 	lfhandler := NewLifecycle(mockClient, sets.NewString("default")).(*lifecycle)
-	lfhandler.store = store
+	lfhandler.informer = informer
 	handler := admission.NewChainHandler(lfhandler)
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespaceObj.Name},
@@ -87,7 +89,7 @@ func TestAdmission(t *testing.T) {
 	namespaceLock.Lock()
 	namespaceObj.Status.Phase = api.NamespaceTerminating
 	namespaceLock.Unlock()
-	store.Add(namespaceObj)
+	informer.GetStore().Add(namespaceObj)
 
 	// verify create operations in the namespace cause an error
 	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
