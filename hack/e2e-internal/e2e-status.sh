@@ -37,7 +37,7 @@ if [[ "${FEDERATION:-}" == "true" ]];then
     # select each one and call federated-up
     for zone in ${E2E_ZONES};do
 	(
-	    set-federated-zone-vars "$zone"
+	    set-federation-zone-vars "$zone"
 	    printf "\n\tChecking version for $OVERRIDE_CONTEXT\n"
 	    ${KUBECTL} --context="$OVERRIDE_CONTEXT" version
 	)

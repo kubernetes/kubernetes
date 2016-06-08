@@ -26,4 +26,4 @@ source "${KUBE_ROOT}/build/util.sh"
 
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
-FEDERATION_IMAGE_TAG="$(kube::release::semantic_image_tag_version)" push-federated-images
+FEDERATION_IMAGE_TAG="$(kube::release::semantic_image_tag_version)" push-federation-images
