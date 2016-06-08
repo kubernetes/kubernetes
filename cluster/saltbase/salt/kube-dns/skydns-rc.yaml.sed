@@ -108,6 +108,7 @@ spec:
         args:
         - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null
         - -port=8080
+        - -quiet
         ports:
         - containerPort: 8080
           protocol: TCP
