@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -32,7 +33,8 @@ import (
 )
 
 type gcePersistentDiskAttacher struct {
-	host volume.VolumeHost
+	host     volume.VolumeHost
+	gceDisks gce.Disks
 }
 
 var _ volume.Attacher = &gcePersistentDiskAttacher{}
@@ -40,7 +42,15 @@ var _ volume.Attacher = &gcePersistentDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &gcePersistentDiskPlugin{}
 
 func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	return &gcePersistentDiskAttacher{host: plugin.host}, nil
+	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+
+	return &gcePersistentDiskAttacher{
+		host:     plugin.host,
+		gceDisks: gceCloud,
+	}, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) GetDeviceName(spec *volume.Spec) (string, error) {
@@ -63,12 +73,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName st
 	volumeSource, readOnly := getVolumeSource(spec)
 	pdName := volumeSource.PDName
 
-	gceCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
-	if err != nil {
-		return err
-	}
-
-	attached, err := gceCloud.DiskIsAttached(pdName, hostName)
+	attached, err := attacher.gceDisks.DiskIsAttached(pdName, hostName)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
@@ -82,7 +87,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName st
 		return nil
 	}
 
-	if err = gceCloud.AttachDisk(pdName, hostName, readOnly); err != nil {
+	if err = attacher.gceDisks.AttachDisk(pdName, hostName, readOnly); err != nil {
 		glog.Errorf("Error attaching PD %q to node %q: %+v", pdName, hostName, err)
 		return err
 	}
@@ -166,13 +171,20 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 }
 
 type gcePersistentDiskDetacher struct {
-	host volume.VolumeHost
+	gceDisks gce.Disks
 }
 
 var _ volume.Detacher = &gcePersistentDiskDetacher{}
 
 func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
-	return &gcePersistentDiskDetacher{host: plugin.host}, nil
+	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+
+	return &gcePersistentDiskDetacher{
+		gceDisks: gceCloud,
+	}, nil
 }
 
 // Detach checks with the GCE cloud provider if the specified volume is already
@@ -185,12 +197,7 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, hostName string) error {
 	pdName := path.Base(deviceMountPath)
 
-	gceCloud, err := getCloudProvider(detacher.host.GetCloudProvider())
-	if err != nil {
-		return err
-	}
-
-	attached, err := gceCloud.DiskIsAttached(pdName, hostName)
+	attached, err := detacher.gceDisks.DiskIsAttached(pdName, hostName)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -204,7 +211,7 @@ func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, hostNa
 		return nil
 	}
 
-	if err = gceCloud.DetachDisk(pdName, hostName); err != nil {
+	if err = detacher.gceDisks.DetachDisk(pdName, hostName); err != nil {
 		glog.Errorf("Error detaching PD %q from node %q: %v", pdName, hostName, err)
 		return err
 	}
