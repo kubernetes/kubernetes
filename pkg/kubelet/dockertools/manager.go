@@ -1016,10 +1016,14 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 	}
 
 	name := strings.TrimPrefix(profile, "localhost/")
-	fname := filepath.Join(dm.seccompProfileRoot, filepath.FromSlash(path.Clean("/"+name)))
+	cleanName := strings.TrimPrefix(path.Clean("/"+name), "/")
+	if name != cleanName {
+		return nil, fmt.Errorf("invalid seccomp profile name: %s", name)
+	}
+	fname := filepath.Join(dm.seccompProfileRoot, filepath.FromSlash(cleanName))
 	file, err := ioutil.ReadFile(fname)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
 	}
 
 	b := bytes.NewBuffer(nil)
@@ -1978,7 +1982,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		podInfraContainerID, err, msg = dm.createPodInfraContainer(pod)
 		if err != nil {
 			startContainerResult.Fail(err, msg)
-			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
+			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q: %s", err, format.Pod(pod), msg)
 			return
 		}
 
