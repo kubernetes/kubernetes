@@ -26,6 +26,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -41,6 +42,11 @@ var sshOptionsMap map[string]string
 
 const archiveName = "e2e_node_test.tar.gz"
 
+var hostnameIpOverrides = struct {
+	sync.RWMutex
+	m map[string]string
+}{m: make(map[string]string)}
+
 func init() {
 	usr, err := user.Current()
 	if err != nil {
@@ -51,9 +57,24 @@ func init() {
 	}
 }
 
+func AddHostnameIp(hostname, ip string) {
+	hostnameIpOverrides.Lock()
+	defer hostnameIpOverrides.Unlock()
+	hostnameIpOverrides.m[hostname] = ip
+}
+
+func GetHostnameOrIp(hostname string) string {
+	hostnameIpOverrides.RLock()
+	defer hostnameIpOverrides.RUnlock()
+	if ip, found := hostnameIpOverrides.m[hostname]; found {
+		return ip
+	}
+	return hostname
+}
+
 // CreateTestArchive builds the local source and creates a tar archive e2e_node_test.tar.gz containing
 // the binaries k8s required for node e2e tests
-func CreateTestArchive() string {
+func CreateTestArchive() (string, error) {
 	// Build the executables
 	buildGo()
 
@@ -65,50 +86,57 @@ func CreateTestArchive() string {
 
 	ginkgoTest := filepath.Join(buildOutputDir, "e2e_node.test")
 	if _, err := os.Stat(ginkgoTest); err != nil {
-		glog.Fatalf("Failed to locate test binary %s", ginkgoTest)
+		return "", fmt.Errorf("failed to locate test binary %s", ginkgoTest)
 	}
-
 	kubelet := filepath.Join(buildOutputDir, "kubelet")
 	if _, err := os.Stat(kubelet); err != nil {
-		glog.Fatalf("Failed to locate binary %s", kubelet)
+		return "", fmt.Errorf("failed to locate binary %s", kubelet)
 	}
 	apiserver := filepath.Join(buildOutputDir, "kube-apiserver")
 	if _, err := os.Stat(apiserver); err != nil {
-		glog.Fatalf("Failed to locate binary %s", apiserver)
+		return "", fmt.Errorf("failed to locate binary %s", apiserver)
+	}
+	ginkgo := filepath.Join(buildOutputDir, "ginkgo")
+	if _, err := os.Stat(apiserver); err != nil {
+		return "", fmt.Errorf("failed to locate binary %s", ginkgo)
 	}
 
 	glog.Infof("Building archive...")
 	tardir, err := ioutil.TempDir("", "node-e2e-archive")
 	if err != nil {
-		glog.Fatalf("Failed to create temporary directory %v.", err)
+		return "", fmt.Errorf("failed to create temporary directory %v.", err)
 	}
 	defer os.RemoveAll(tardir)
 
 	// Copy binaries
 	out, err := exec.Command("cp", ginkgoTest, filepath.Join(tardir, "e2e_node.test")).CombinedOutput()
 	if err != nil {
-		glog.Fatalf("Failed to copy e2e_node.test %v.", err)
+		return "", fmt.Errorf("failed to copy e2e_node.test %v.", err)
 	}
 	out, err = exec.Command("cp", kubelet, filepath.Join(tardir, "kubelet")).CombinedOutput()
 	if err != nil {
-		glog.Fatalf("Failed to copy kubelet %v.", err)
+		return "", fmt.Errorf("failed to copy kubelet %v.", err)
 	}
 	out, err = exec.Command("cp", apiserver, filepath.Join(tardir, "kube-apiserver")).CombinedOutput()
 	if err != nil {
-		glog.Fatalf("Failed to copy kube-apiserver %v.", err)
+		return "", fmt.Errorf("failed to copy kube-apiserver %v.", err)
+	}
+	out, err = exec.Command("cp", ginkgo, filepath.Join(tardir, "ginkgo")).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to copy ginkgo %v.", err)
 	}
 
 	// Build the tar
 	out, err = exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
 	if err != nil {
-		glog.Fatalf("Failed to build tar %v.  Output:\n%s", err, out)
+		return "", fmt.Errorf("failed to build tar %v.  Output:\n%s", err, out)
 	}
 
 	dir, err := os.Getwd()
 	if err != nil {
-		glog.Fatalf("Failed to get working directory %v.", err)
+		return "", fmt.Errorf("failed to get working directory %v.", err)
 	}
-	return filepath.Join(dir, archiveName)
+	return filepath.Join(dir, archiveName), nil
 }
 
 // Returns the command output, whether the exit was ok, and any errors
@@ -118,31 +146,31 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 		if err != nil {
 			return "", false, fmt.Errorf("could not find username: %v", err)
 		}
-		output, err := RunSshCommand("ssh", host, "--", "sudo", "usermod", "-a", "-G", "docker", uname.Username)
+		output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sudo", "usermod", "-a", "-G", "docker", uname.Username)
 		if err != nil {
-			return "", false, fmt.Errorf("Instance %s not running docker daemon - Command failed: %s", host, output)
+			return "", false, fmt.Errorf("instance %s not running docker daemon - Command failed: %s", host, output)
 		}
 	}
 
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
-	_, err := RunSshCommand("ssh", host, "--", "mkdir", tmp)
+	_, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "mkdir", tmp)
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
 	}
 	if cleanup {
 		defer func() {
-			output, err := RunSshCommand("ssh", host, "--", "rm", "-rf", tmp)
+			output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "rm", "-rf", tmp)
 			if err != nil {
-				glog.Errorf("Failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
+				glog.Errorf("failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
 			}
 		}()
 	}
 
 	// Copy the archive to the staging directory
-	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", host, tmp))
+	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), tmp))
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
@@ -158,12 +186,12 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 	// If we are unable to stop existing running k8s processes, we should see messages in the kubelet/apiserver/etcd
 	// logs about failing to bind the required ports.
 	glog.Infof("Killing any existing node processes on %s", host)
-	RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
+	RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
 
 	// Extract the archive
 	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", tmp), fmt.Sprintf("tar -xzvf ./%s", archiveName))
 	glog.Infof("Extracting tar on %s", host)
-	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
+	output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
@@ -172,12 +200,13 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("timeout -k 30s %ds ./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d %s", *testTimeoutSeconds, cleanup, host, tmp, junitFileNumber, *ginkgoFlags),
+		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFileNumber),
 	)
 	aggErrs := []error{}
 
 	glog.Infof("Starting tests on %s", host)
-	output, err = RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
+	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
+
 	if err != nil {
 		aggErrs = append(aggErrs, err)
 	}
@@ -195,13 +224,13 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 }
 
 func getTestArtifacts(host, testDir string) error {
-	_, err := RunSshCommand("scp", "-r", fmt.Sprintf("%s:%s/results/", host, testDir), fmt.Sprintf("%s/%s", *resultsDir, host))
+	_, err := RunSshCommand("scp", "-r", fmt.Sprintf("%s:%s/results/", GetHostnameOrIp(host), testDir), fmt.Sprintf("%s/%s", *resultsDir, host))
 	if err != nil {
 		return err
 	}
 
 	// Copy junit to the top of artifacts
-	_, err = RunSshCommand("scp", fmt.Sprintf("%s:%s/results/junit*", host, testDir), fmt.Sprintf("%s/", *resultsDir))
+	_, err = RunSshCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), fmt.Sprintf("%s/", *resultsDir))
 	if err != nil {
 		return err
 	}
@@ -223,7 +252,7 @@ func RunSshCommand(cmd string, args ...string) (string, error) {
 	}
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Sprintf("%s", output), fmt.Errorf("Command [%s %s] failed with error: %v and output:\n%s", cmd, strings.Join(args, " "), err, output)
+		return fmt.Sprintf("%s", output), fmt.Errorf("command [%s %s] failed with error: %v and output:\n%s", cmd, strings.Join(args, " "), err, output)
 	}
 	return fmt.Sprintf("%s", output), nil
 }
