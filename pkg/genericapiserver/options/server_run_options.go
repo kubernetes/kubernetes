@@ -67,6 +67,7 @@ type ServerRunOptions struct {
 	DeleteCollectionWorkers    int
 	// Used to specify the storage version that should be used for the legacy v1 api group.
 	DeprecatedStorageVersion  string
+	AuditLogPath              string
 	EnableLogsSupport         bool
 	EnableProfiling           bool
 	EnableSwaggerUI           bool
@@ -293,6 +294,9 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
+
+	fs.StringVar(&s.AuditLogPath, "audit-log", s.AuditLogPath,
+		"If set, all requests coming to the apiserver will be logged to this file.")
 
 	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
