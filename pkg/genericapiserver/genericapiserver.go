@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/audit"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
@@ -94,6 +95,7 @@ type APIGroupInfo struct {
 type Config struct {
 	// The storage factory for other objects
 	StorageFactory StorageFactory
+	AuditLog       string
 	// allow downstream consumers to disable the core controller loops
 	EnableLogsSupport bool
 	EnableUISupport   bool
@@ -475,6 +477,14 @@ func (s *GenericAPIServer) init(c *Config) {
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(s.RequestContextMapper, s.NewRequestInfoResolver())
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, s.authorizer)
+	if len(c.AuditLog) != 0 {
+		auditLog, err := os.OpenFile(c.AuditLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			glog.Fatalf("Could not open audit log file: %v", err)
+		}
+		// audit handler must comes before the impersonationFilter to read the original user
+		handler = audit.WithAudit(handler, s.RequestContextMapper, auditLog)
+	}
 	handler = apiserver.WithImpersonation(handler, s.RequestContextMapper, s.authorizer)
 
 	// Install Authenticator
@@ -553,6 +563,7 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		APIGroupPrefix:            options.APIGroupPrefix,
 		APIPrefix:                 options.APIPrefix,
 		CorsAllowedOriginList:     options.CorsAllowedOriginList,
+		AuditLog:                  options.AuditLog,
 		EnableIndex:               true,
 		EnableLogsSupport:         options.EnableLogsSupport,
 		EnableProfiling:           options.EnableProfiling,
