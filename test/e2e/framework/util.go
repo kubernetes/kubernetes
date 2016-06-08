@@ -2623,7 +2623,7 @@ func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
 }
 
 func WaitForAllNodesSchedulable(c *client.Client) error {
-	return wait.PollImmediate(30*time.Second, 2*time.Hour, func() (bool, error) {
+	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
 		opts := api.ListOptions{
 			ResourceVersion: "0",
 			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector(),
@@ -2634,10 +2634,15 @@ func WaitForAllNodesSchedulable(c *client.Client) error {
 			// Ignore the error here - it will be retried.
 			return false, nil
 		}
+		schedulable := 0
 		for _, node := range nodes.Items {
-			if !isNodeSchedulable(&node) {
-				return false, nil
+			if isNodeSchedulable(&node) {
+				schedulable++
 			}
+		}
+		if schedulable != len(nodes.Items) {
+			Logf("%d/%d nodes schedulable (polling after 30s)", schedulable, len(nodes.Items))
+			return false, nil
 		}
 		return true, nil
 	})
