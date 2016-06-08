@@ -87,6 +87,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	AfterEach(func() {
+		By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount, scaleDownTimeout))
 	})
@@ -173,11 +174,11 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 
-		By(fmt.Sprintf("Annotating nodes of the smallest MIG: %s", minMig))
 		nodes, err := GetGroupNodes(minMig)
 		defer removeLabels(nodes)
 		nodesMap := map[string]struct{}{}
 		ExpectNoError(err)
+		By(fmt.Sprintf("Annotating nodes of the smallest MIG(%s): %v", minMig, nodes))
 		for _, node := range nodes {
 			updateLabelsForNode(f, node, labels, nil)
 			nodesMap[node] = struct{}{}
@@ -191,11 +192,10 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
-		By("Setting labels for new nodes")
 		newNodes, err := GetGroupNodes(minMig)
 		defer removeLabels(newNodes)
-
 		ExpectNoError(err)
+		By(fmt.Sprintf("Setting labels for new nodes: %v", newNodes))
 		for _, node := range newNodes {
 			if _, old := nodesMap[node]; !old {
 				updateLabelsForNode(f, node, labels, nil)
@@ -383,7 +383,6 @@ func WaitForClusterSizeFunc(c *client.Client, sizeFunc func(int) bool, timeout t
 }
 
 func setMigSizes(sizes map[string]int) {
-	By(fmt.Sprintf("Restoring initial size of the cluster"))
 	for mig, desiredSize := range sizes {
 		currentSize, err := GroupSize(mig)
 		framework.ExpectNoError(err)
@@ -406,4 +405,5 @@ func updateLabelsForNode(f *framework.Framework, node string, addLabels map[stri
 	}
 	_, err = f.Client.Nodes().Update(n)
 	ExpectNoError(err)
+	By(fmt.Sprintf("Labels successfully updated for node %s", node))
 }
