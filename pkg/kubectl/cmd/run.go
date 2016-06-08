@@ -155,9 +155,9 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			return err
 		}
 		resourcesList, err := client.Discovery().ServerResources()
+		// ServerResources ignores errors for old servers do not expose discovery
 		if err != nil {
-			// this cover the cases where old servers do not expose discovery
-			resourcesList = nil
+			return fmt.Errorf("failed to discover supported resources: %v", err)
 		}
 		switch restartPolicy {
 		case api.RestartPolicyAlways:
