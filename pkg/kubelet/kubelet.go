@@ -3830,7 +3830,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *api.Pod, podStatus *kubeco
 
 	// Sort the container statuses since clients of this interface expect the list
 	// of containers in a pod has a deterministic order.
-	sort.Sort(kubetypes.SortedContainerStatuses(containerStatuses))
+	if isInitContainer {
+		kubetypes.SortInitContainerStatuses(pod, containerStatuses)
+	} else {
+		sort.Sort(kubetypes.SortedContainerStatuses(containerStatuses))
+	}
 	return containerStatuses
 }
 
