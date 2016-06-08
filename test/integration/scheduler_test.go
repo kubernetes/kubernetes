@@ -170,8 +170,11 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 					t.Fatalf("Failed to update node with unschedulable=true: %v", err)
 				}
 				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
-					// An unschedulable node should get deleted from the store
-					return node == nil
+					// An unschedulable node should still be present in the store
+					// Nodes that are unschedulable or that are not ready or
+					// have their disk full (Node.Spec.Conditions) are exluded
+					// based on NodeConditionPredicate, a separate check
+					return node != nil && node.(*api.Node).Spec.Unschedulable == true
 				})
 				if err != nil {
 					t.Fatalf("Failed to observe reflected update for setting unschedulable=true: %v", err)
