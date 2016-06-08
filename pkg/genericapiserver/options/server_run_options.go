@@ -67,6 +67,10 @@ type ServerRunOptions struct {
 	DeleteCollectionWorkers    int
 	// Used to specify the storage version that should be used for the legacy v1 api group.
 	DeprecatedStorageVersion  string
+	AuditLogPath              string
+	AuditLogMaxAge            int
+	AuditLogMaxBackups        int
+	AuditLogMaxSize           int
 	EnableLogsSupport         bool
 	EnableProfiling           bool
 	EnableSwaggerUI           bool
@@ -293,6 +297,15 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
+
+	fs.StringVar(&s.AuditLogPath, "audit-log-path", s.AuditLogPath,
+		"If set, all requests coming to the apiserver will be logged to this file.")
+	fs.IntVar(&s.AuditLogMaxAge, "audit-log-maxage", s.AuditLogMaxBackups,
+		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
+	fs.IntVar(&s.AuditLogMaxBackups, "audit-log-maxbackup", s.AuditLogMaxBackups,
+		"The maximum number of old audit log files to retain.")
+	fs.IntVar(&s.AuditLogMaxSize, "audit-log-maxsize", s.AuditLogMaxSize,
+		"The maximum size in megabytes of the audit log file before it gets rotated. Defaults to 100MB.")
 
 	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
