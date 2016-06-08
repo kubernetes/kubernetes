@@ -41,6 +41,15 @@ KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 
+kube::test::find_integration_test_dirs() {
+  (
+    cd ${KUBE_ROOT}
+    find test/integration -name '*_test.go' -print0 \
+      | xargs -0n1 dirname \
+      | sort -u
+  )
+}
+
 cleanup() {
   kube::log::status "Cleaning up etcd"
   kube::etcd::cleanup
@@ -58,7 +67,7 @@ runTests() {
     KUBE_RACE="" \
     KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
-    "${KUBE_ROOT}/hack/test-go.sh" test/integration
+    "${KUBE_ROOT}/hack/test-go.sh" $(kube::test::find_integration_test_dirs)
 
   # Run the watch cache tests
   # KUBE_TEST_ARGS doesn't mean anything to the watch cache test.

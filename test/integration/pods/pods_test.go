@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package pods
 
 import (
 	"fmt"
@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -142,7 +143,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 			t.Errorf("%v: unexpected allowed update to pod", tc.name)
 		}
 
-		deletePodOrErrorf(t, client, ns.Name, pod.Name)
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 	}
 }
 
@@ -177,5 +178,5 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 
-	deletePodOrErrorf(t, client, ns.Name, pod.Name)
+	integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 }
