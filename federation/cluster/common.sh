@@ -111,20 +111,26 @@ function create-federated-api-objects {
     $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
     $template "${manifests_root}/federation-controller-manager-deployment.yaml" | $host_kubectl create -f -
 
-    # Create a kubeconfig with credentails for federation-apiserver and create a
-    # secret for it.
-
-    # Create kubeconfig. Note that the file name should be "kubeconfig"
-    # so that the secret key gets the same name.
-    kube::util::ensure-temp-dir
+    # Create a kubeconfig with credentails for federation-apiserver. We will
+    # then use this kubeconfig to create a secret which the federation
+    # controller manager can use to talk to the federation-apiserver.
+    # Note that the file name should be "kubeconfig" so that the secret key gets the same name.
+    KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
     CONTEXT=federated-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
-           KUBECONFIG="${KUBE_TEMP}/federation/federation-apiserver/kubeconfig" \
+           KUBECONFIG="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" \
 	   create-kubeconfig
 
-    # Create the secret
-    $host_kubectl create secret generic federation-apiserver-secret --from-file="${KUBE_TEMP}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+    # Create secret with federation-apiserver's kubeconfig
+    $host_kubectl create secret generic federation-apiserver-secret --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
 
+    # Create secrets with all the kubernetes-apiserver's kubeconfigs.
+    for dir in ${KUBECONFIG_DIR}/federation/kubernetes-apiserver/*; do
+      # We create a secret with the same name as the directory name (which is
+      # same as cluster name in kubeconfig)
+      name=$(basename $dir)
+      $host_kubectl create secret generic ${name} --from-file="${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+    done
 
     # Update the users kubeconfig to include federation-apiserver credentials.
     CONTEXT=federated-cluster \
@@ -225,5 +231,8 @@ function push-federated-images {
     done
 }
 function cleanup-federated-api-objects {
-    $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
+  # Delete all resources with the federated-cluster label.
+  $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
+  # Delete all resources in FEDERATION_NAMESPACE.
+  $host_kubectl delete pods,svc,rc,deployment,secret --namespace=${FEDERATION_NAMESPACE} --all
 }
