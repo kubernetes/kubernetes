@@ -1326,6 +1326,10 @@
 			"Rev": "b6ce30ccdcad3ed9d5ca80329829f5aeaa856e99"
 		},
 		{
+			"ImportPath": "github.com/mikebeyer/env",
+			"Rev": "b6ce30ccdcad3ed9d5ca80329829f5aeaa856e99"
+		},
+		{
 			"ImportPath": "github.com/mistifyio/go-zfs",
 			"Comment": "v2.1.1-5-g1b4ae6f",
 			"Rev": "1b4ae6fb4e77b095934d4430860ff202060169f8"
