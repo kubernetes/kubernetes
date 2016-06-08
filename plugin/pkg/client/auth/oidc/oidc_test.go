@@ -39,11 +39,16 @@ import (
 )
 
 func TestNewOIDCAuthProvider(t *testing.T) {
-	cert := path.Join(os.TempDir(), "oidc-cert")
-	key := path.Join(os.TempDir(), "oidc-key")
+	tempDir, err := ioutil.TempDir(os.TempDir(), "oidc_test")
+	if err != nil {
+		t.Fatalf("Cannot make temp dir %v", err)
+	}
+	cert := path.Join(tempDir, "oidc-cert")
+	key := path.Join(tempDir, "oidc-key")
 
 	defer os.Remove(cert)
 	defer os.Remove(key)
+	defer os.Remove(tempDir)
 
 	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
 	op := oidctesting.NewOIDCProvider(t)
