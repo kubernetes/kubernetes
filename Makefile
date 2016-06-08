@@ -329,7 +329,7 @@ ALL_GO_DIRS := $(shell             \
         \)                         \
         -type f -name \*.go        \
         | sed 's|^./||'            \
-        | xargs dirname            \
+        | xargs -n1 dirname        \
         | sort -u                  \
 )
 
@@ -413,7 +413,7 @@ ifeq ($(DBG_MAKEFILE),1)
 endif
 DEEPCOPY_DIRS := $(shell                               \
     grep -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
-        | xargs dirname                                \
+        | xargs -n1 dirname                            \
         | sort -u                                      \
 )
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
@@ -522,7 +522,7 @@ endif
 CONVERSION_DIRS := $(shell                                \
     grep '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
         | cut -f1 -d:                                     \
-        | xargs dirname                                   \
+        | xargs -n1 dirname                               \
         | sort -u                                         \
 )
 
