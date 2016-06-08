@@ -32,6 +32,7 @@ import (
 // accept a name or number.
 // TODO: Rename to Int32OrString
 //
+// +gencopy=true
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 type IntOrString struct {

@@ -2428,11 +2428,7 @@ func DeepCopy_v1_Preconditions(in Preconditions, out *Preconditions, c *conversi
 	if in.UID != nil {
 		in, out := in.UID, &out.UID
 		*out = new(types.UID)
-		if newVal, err := c.DeepCopy(*in); err != nil {
-			return err
-		} else {
-			**out = newVal.(types.UID)
-		}
+		**out = *in
 	} else {
 		out.UID = nil
 	}
