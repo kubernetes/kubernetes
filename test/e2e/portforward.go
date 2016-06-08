@@ -180,14 +180,17 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			conn.Close()
 
 			By("Waiting for the target pod to stop running")
-			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not stop running: %v", err)
-			}
+			waitErr := f.WaitForPodNoLongerRunning(pod.Name)
 
 			By("Retrieving logs from the target pod")
 			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
 			if err != nil {
 				framework.Failf("Error retrieving logs: %v", err)
+			}
+
+			if waitErr != nil {
+				framework.Logf("Pod log:\n%s", logOutput)
+				framework.Failf("Pod did not stop running: %v", waitErr)
 			}
 
 			By("Verifying logs")
@@ -240,14 +243,17 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not stop running: %v", err)
-			}
+			waitErr := f.WaitForPodNoLongerRunning(pod.Name)
 
 			By("Retrieving logs from the target pod")
 			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
 			if err != nil {
 				framework.Failf("Error retrieving logs: %v", err)
+			}
+
+			if waitErr != nil {
+				framework.Logf("Pod log:\n%s", logOutput)
+				framework.Failf("Pod did not stop running: %v", waitErr)
 			}
 
 			By("Verifying logs")
@@ -292,14 +298,17 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not stop running: %v", err)
-			}
+			waitErr := f.WaitForPodNoLongerRunning(pod.Name)
 
 			By("Retrieving logs from the target pod")
 			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
 			if err != nil {
 				framework.Failf("Error retrieving logs: %v", err)
+			}
+
+			if waitErr != nil {
+				framework.Logf("Pod log:\n%s", logOutput)
+				framework.Failf("Pod did not stop running: %v", waitErr)
 			}
 
 			By("Verifying logs")
