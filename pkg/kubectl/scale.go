@@ -81,7 +81,7 @@ type ScaleErrorType int
 const (
 	ScaleGetFailure ScaleErrorType = iota
 	ScaleUpdateFailure
-	ScaleUpdateInvalidFailure
+	ScaleUpdateConflictFailure
 )
 
 // A ScaleError is returned when a scale request passes
@@ -115,11 +115,8 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		case nil:
 			return true, nil
 		case ScaleError:
-			// if it's invalid we shouldn't keep waiting
-			if e.FailureType == ScaleUpdateInvalidFailure {
-				return false, err
-			}
-			if e.FailureType == ScaleUpdateFailure {
+			// Retry only on update conflicts.
+			if e.FailureType == ScaleUpdateConflictFailure {
 				return false, nil
 			}
 		}
@@ -153,10 +150,9 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 		}
 	}
 	controller.Spec.Replicas = int32(newSize)
-	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.ReplicationControllers(namespace).Update(controller); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, controller.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, controller.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, controller.ResourceVersion, err}
 	}
@@ -215,10 +211,9 @@ func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, precondition
 		}
 	}
 	rs.Spec.Replicas = int32(newSize)
-	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.ReplicaSets(namespace).Update(rs); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, rs.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, rs.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, rs.ResourceVersion, err}
 	}
@@ -283,8 +278,8 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 	parallelism := int32(newSize)
 	job.Spec.Parallelism = &parallelism
 	if _, err := scaler.c.Jobs(namespace).Update(job); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, job.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, job.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, job.ResourceVersion, err}
 	}
@@ -348,8 +343,8 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 	// For now I'm falling back to regular Deployment update operation.
 	deployment.Spec.Replicas = int32(newSize)
 	if _, err := scaler.c.Deployments(namespace).Update(deployment); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, deployment.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, deployment.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
 	}
