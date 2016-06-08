@@ -111,6 +111,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.Client))
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 
 		if len(nodes.Items) == 1 {
