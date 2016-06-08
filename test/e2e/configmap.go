@@ -134,7 +134,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		_, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		pollLogs := func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)

@@ -175,6 +175,6 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 			}
 		}()
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 	})
 })

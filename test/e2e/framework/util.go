@@ -1114,6 +1114,8 @@ func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 
 // Waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
+// TODO(timstclair): Dedup with Framework#WaitForPodRunning by creating a "framework.Namespace"
+// abstraction to hold all these helpers.
 func WaitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
 	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
 	if err != nil {
@@ -1123,16 +1125,9 @@ func WaitForPodRunningInNamespace(c *client.Client, podName string, namespace st
 	return err
 }
 
-func waitTimeoutForPodReadyInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
-	if err != nil {
-		return err
-	}
-	_, err = watch.Until(timeout, w, client.PodRunningAndReady)
-	return err
-}
-
 // WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
+// TODO(timstclair): Dedup with Framework#WaitForPodNotPending by creating a "framework.Namespace"
+// abstraction to hold all these helpers.
 func WaitForPodNotPending(c *client.Client, ns, podName string) error {
 	w, err := c.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
 	if err != nil {
@@ -3275,11 +3270,11 @@ func RunHostCmdOrDie(ns, name, cmd string) string {
 
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
-func LaunchHostExecPod(client *client.Client, ns, name string) *api.Pod {
-	hostExecPod := NewHostExecPodSpec(ns, name)
-	pod, err := client.Pods(ns).Create(hostExecPod)
+func (f *Framework) LaunchHostExecPod(name string) *api.Pod {
+	hostExecPod := NewHostExecPodSpec(f.Namespace.Name, name)
+	pod, err := f.PodClient().Create(hostExecPod)
 	ExpectNoError(err)
-	err = WaitForPodRunningInNamespace(client, pod.Name, pod.Namespace)
+	err = f.WaitForPodRunning(pod.Name)
 	ExpectNoError(err)
 	return pod
 }

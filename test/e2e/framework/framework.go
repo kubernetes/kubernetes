@@ -329,7 +329,7 @@ func (f *Framework) WaitForPodTerminated(podName, reason string) error {
 		}))
 }
 
-// WaitForPodRunning waits for the pod to run in the namespace.
+// WaitForPodRunning waits for the pod to run in the framework's namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
 	return f.WaitForPodCondition(podName, "pod running", PodStartTimeout, client.PodRunning)
 }
@@ -337,6 +337,11 @@ func (f *Framework) WaitForPodRunning(podName string) error {
 // WaitForPodReady waits for the pod to flip to ready in the namespace.
 func (f *Framework) WaitForPodReady(podName string) error {
 	return f.WaitForPodCondition(podName, "pod running", PodStartTimeout, client.PodRunningAndReady)
+}
+
+// WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
+func (f *Framework) WaitForPodNotPending(podName string) error {
+	return f.WaitForPodCondition(podName, "pod not pending", PodStartTimeout, client.PodNotPending)
 }
 
 // WaitForPodRunningSlow waits for the pod to run in the namespace.

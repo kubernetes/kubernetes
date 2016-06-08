@@ -73,7 +73,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		By("Creating the pod")
 		_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred())

@@ -52,7 +52,8 @@ var (
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
 )
 
-func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRestarts int, timeout time.Duration) {
+func runLivenessTest(f *framework.Framework, podDescr *api.Pod, expectNumRestarts int, timeout time.Duration) {
+	c, ns := f.Client, f.Namespace.Name
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
 	_, err := c.Pods(ns).Create(podDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
@@ -66,7 +67,7 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podDescr.Name),
+	framework.ExpectNoError(f.WaitForPodNotPending(podDescr.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", podDescr.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", podDescr.Name, ns)
 
@@ -111,8 +112,8 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 }
 
 // testHostIP tests that a pod gets a host IP
-func testHostIP(c *client.Client, ns string, pod *api.Pod) {
-	podClient := c.Pods(ns)
+func testHostIP(f *framework.Framework, pod *api.Pod) {
+	podClient := f.PodClient()
 	By("creating pod")
 	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 	if _, err := podClient.Create(pod); err != nil {
@@ -121,7 +122,7 @@ func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 	By("ensuring that pod is running and has a hostIP")
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	err := framework.WaitForPodRunningInNamespace(c, pod.Name, ns)
+	err := f.WaitForPodRunning(pod.Name)
 	Expect(err).NotTo(HaveOccurred())
 	// Try to make sure we get a hostIP for each pod.
 	hostIPTimeout := 2 * time.Minute
@@ -211,7 +212,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	It("should get a host IP [Conformance]", func() {
 		name := "pod-hostip-" + string(util.NewUUID())
-		testHostIP(f.Client, f.Namespace.Name, &api.Pod{
+		testHostIP(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
 			},
@@ -1018,7 +1019,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should be restarted with a docker exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
@@ -1045,7 +1046,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
@@ -1072,7 +1073,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should be restarted with a /healthz http liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
@@ -1101,7 +1102,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	// Slow by design (5 min)
 	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
@@ -1129,7 +1130,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should *not* be restarted with a /healthz http liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},

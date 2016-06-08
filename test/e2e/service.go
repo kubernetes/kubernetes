@@ -392,7 +392,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		jig.TestReachableHTTP(nodeIP, nodePort, kubeProxyLagTimeout)
 
 		By("verifying the node port is locked")
-		hostExec := framework.LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		hostExec := f.LaunchHostExecPod("hostexec")
 		// Even if the node-ip:node-port check above passed, this hostexec pod
 		// might fall on a node with a laggy kube-proxy.
 		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
@@ -878,7 +878,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		hostExec := framework.LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		hostExec := f.LaunchHostExecPod("hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
