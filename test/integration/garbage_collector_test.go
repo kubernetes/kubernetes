@@ -346,7 +346,9 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, rcNum, 
 	return ret, nil
 }
 
-// This stress test the garbage collector
+// The stress test is not very stressful, because we need to control the running
+// time of our pre-submit tests to increase submit-queue throughput. We'll add
+// e2e tests that put more stress.
 func TestStressingCascadingDeletion(t *testing.T) {
 	t.Logf("starts garbage collector stress test")
 	gc, clientSet := setup(t)
@@ -357,7 +359,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
 
-	const collections = 30
+	const collections = 10
 	var wg sync.WaitGroup
 	wg.Add(collections * 4)
 	rcUIDs := make(chan types.UID, collections*4)
