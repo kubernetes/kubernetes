@@ -235,7 +235,7 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 	}
 	go wait.Until(s.clusterEndpointWorker, time.Second, stopCh)
 	go wait.Until(s.clusterServiceWorker, time.Second, stopCh)
-	go wait.Until(s.clusterSyncLoop, clusterSyncPeriod, stopCh)
+	go wait.Until(s.clusterSyncLoop, time.Second, stopCh)
 	<-stopCh
 	glog.Infof("Shutting down Federation Service Controller")
 	s.queue.ShutDown()
@@ -619,14 +619,14 @@ func (s *ServiceController) clusterSyncLoop() {
 	increase = newSet.Difference(s.knownClusterSet)
 	// do nothing when cluster is removed.
 	if increase != nil {
-		for newCluster := range increase {
-			glog.Infof("New cluster observed %s", newCluster)
-			s.updateAllServicesToCluster(servicesToUpdate, newCluster)
-		}
 		// Try updating all services, and save the ones that fail to try again next
 		// round.
 		servicesToUpdate = s.serviceCache.allServices()
 		numServices := len(servicesToUpdate)
+		for newCluster := range increase {
+			glog.Infof("New cluster observed %s", newCluster)
+			s.updateAllServicesToCluster(servicesToUpdate, newCluster)
+		}
 		servicesToUpdate = s.updateDNSRecords(servicesToUpdate, newClusters)
 		glog.Infof("Successfully updated %d out of %d DNS records to direct traffic to the updated cluster",
 			numServices-len(servicesToUpdate), numServices)
@@ -638,7 +638,7 @@ func (s *ServiceController) updateAllServicesToCluster(services []*cachedService
 	cluster, ok := s.clusterCache.clientMap[clusterName]
 	if ok {
 		for _, cachedService := range services {
-			appliedState := cachedService.appliedState
+			appliedState := cachedService.lastState
 			s.processServiceForCluster(cachedService, clusterName, appliedState, cluster.clientset)
 		}
 	}
