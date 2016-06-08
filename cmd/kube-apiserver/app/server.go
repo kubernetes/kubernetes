@@ -250,7 +250,10 @@ func Run(s *options.APIServer) error {
 	pluginInit := admission.NewPluginInitializer()
 	pluginInit.SetNamespaceInformer(namespaceInformer)
 
-	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInit)
+	if err != nil {
+		glog.Errorf("Failed to initialize plugins: %v", err)
+	}
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
