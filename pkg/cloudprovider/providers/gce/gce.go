@@ -110,6 +110,9 @@ type Disks interface {
 	// is used when instanceID is empty string.
 	DetachDisk(devicePath, instanceID string) error
 
+	// DiskIsAttached checks if a disk is attached to the given node.
+	DiskIsAttached(diskName, instanceID string) (bool, error)
+
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
 	CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error
