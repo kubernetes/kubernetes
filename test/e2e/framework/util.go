@@ -2604,7 +2604,7 @@ func waitListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
 func isNodeSchedulable(node *api.Node) bool {
 	nodeReady := IsNodeConditionSetAsExpected(node, api.NodeReady, true)
 	networkReady := IsNodeConditionUnset(node, api.NodeNetworkUnavailable) ||
-		IsNodeConditionSetAsExpected(node, api.NodeNetworkUnavailable, false)
+		IsNodeConditionSetAsExpectedSilent(node, api.NodeNetworkUnavailable, false)
 	return !node.Spec.Unschedulable && nodeReady && networkReady
 }
 
@@ -3412,7 +3412,7 @@ func WaitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 	return WaitForNodeToBe(c, name, api.NodeReady, false, timeout)
 }
 
-func IsNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
+func isNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue, silent bool) bool {
 	// Check the node readiness condition (logging all).
 	for _, cond := range node.Status.Conditions {
 		// Ensure that the condition type and the status matches as desired.
@@ -3420,14 +3420,26 @@ func IsNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditio
 			if (cond.Status == api.ConditionTrue) == wantTrue {
 				return true
 			} else {
-				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-					conditionType, node.Name, cond.Status == api.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				if !silent {
+					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+						conditionType, node.Name, cond.Status == api.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				}
 				return false
 			}
 		}
 	}
-	Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
+	if !silent {
+		Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
+	}
 	return false
+}
+
+func IsNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+}
+
+func IsNodeConditionSetAsExpectedSilent(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
 
 func IsNodeConditionUnset(node *api.Node, conditionType api.NodeConditionType) bool {
