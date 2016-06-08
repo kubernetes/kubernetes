@@ -359,6 +359,11 @@ function start-kubelet {
   fi
   echo "KUBELET_OPTS=\"${flags}\"" > /etc/default/kubelet
 
+  # Delete docker0 to avoid interference
+  iptables -t nat -F || true
+  ip link set docker0 down || true
+  brctl delbr docker0 || true
+
   systemctl start kubelet.service
 }
 
