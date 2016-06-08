@@ -60,38 +60,84 @@ func TestGetServerVersion(t *testing.T) {
 }
 
 func TestGetServerGroupsWithV1Server(t *testing.T) {
+
+	var getResponse func() (obj interface{}, statusCode int)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var obj interface{}
-		switch req.URL.Path {
-		case "/api":
-			obj = &unversioned.APIVersions{
-				Versions: []string{
-					"v1",
-				},
-			}
-		default:
+		if req.URL.Path != "/api" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		obj, statusCode := getResponse()
 		output, err := json.Marshal(obj)
 		if err != nil {
 			t.Fatalf("unexpected encoding error: %v", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(statusCode)
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	// ServerGroups should not return an error even if server returns error at /api and /apis
-	apiGroupList, err := client.ServerGroups()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+
+	tests := []struct {
+		respObj      interface{}
+		statusCode   int
+		wantVersions interface{}
+		wantErr      bool
+	}{
+		{
+			respObj: &unversioned.APIVersions{
+				Versions: []string{
+					"v1",
+				},
+			},
+			statusCode:   http.StatusOK,
+			wantVersions: []string{"v1"},
+			wantErr:      false,
+		},
+		{
+			respObj: &unversioned.APIVersions{
+				Versions: []string{
+					"v1", "v1alpha1",
+				},
+			},
+			statusCode:   http.StatusOK,
+			wantVersions: []string{"v1", "v1alpha1"},
+			wantErr:      false,
+		},
+		{
+			respObj: &unversioned.APIVersions{
+				Versions: []string{},
+			},
+			statusCode: http.StatusForbidden,
+			wantErr:    true,
+		},
 	}
-	groupVersions := unversioned.ExtractGroupVersions(apiGroupList)
-	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
-		t.Errorf("expected: %q, got: %q", []string{"v1"}, groupVersions)
+
+	for i, tc := range tests {
+		getResponse = func() (obj interface{}, statusCode int) {
+			return tc.respObj, tc.statusCode
+		}
+
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		// ServerGroups should not return an error even if server returns error at /api and /apis
+		apiGroupList, err := client.ServerGroups()
+		if err != nil {
+			if !tc.wantErr {
+				t.Errorf("case %d: unexpected error: %v", i, err)
+			}
+			continue
+		}
+		if tc.wantErr {
+			t.Errorf("case %d: expected an error but client.ServerGroups() completed without one", i)
+			continue
+		}
+
+		groupVersions := unversioned.ExtractGroupVersions(apiGroupList)
+		if !reflect.DeepEqual(groupVersions, tc.wantVersions) {
+			t.Errorf("case %d: expected: %q, got: %q", i, tc.wantVersions, groupVersions)
+		}
 	}
 }
 

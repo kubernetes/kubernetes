@@ -53,15 +53,20 @@ func (checker GenericHttpResponseChecker) Check(resp *http.Response) error {
 		}
 		bodyText := string(bodyBytes)
 
+		path := ""
+		if resp.Request != nil {
+			path = resp.Request.URL.Path
+		}
+
 		switch {
 		case resp.StatusCode == http.StatusInternalServerError:
 			return errors.NewInternalError(fmt.Errorf("%s", bodyText))
 		case resp.StatusCode == http.StatusBadRequest:
 			return errors.NewBadRequest(bodyText)
 		case resp.StatusCode == http.StatusNotFound:
-			return errors.NewGenericServerResponse(resp.StatusCode, "", checker.QualifiedResource, checker.Name, bodyText, 0, false)
+			return errors.NewGenericServerResponse(path, resp.StatusCode, "", checker.QualifiedResource, checker.Name, bodyText, 0, false)
 		}
-		return errors.NewGenericServerResponse(resp.StatusCode, "", checker.QualifiedResource, checker.Name, bodyText, 0, false)
+		return errors.NewGenericServerResponse(path, resp.StatusCode, "", checker.QualifiedResource, checker.Name, bodyText, 0, false)
 	}
 	return nil
 }
