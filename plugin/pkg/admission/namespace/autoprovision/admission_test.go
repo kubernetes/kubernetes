@@ -18,13 +18,14 @@ package autoprovision
 
 import (
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -33,8 +34,8 @@ func TestAdmission(t *testing.T) {
 	namespace := "test"
 	mockClient := &fake.Clientset{}
 	handler := &provision{
-		client: mockClient,
-		store:  cache.NewStore(cache.MetaNamespaceKeyFunc),
+		client:   mockClient,
+		informer: informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute),
 	}
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
@@ -60,13 +61,13 @@ func TestAdmission(t *testing.T) {
 func TestAdmissionNamespaceExists(t *testing.T) {
 	namespace := "test"
 	mockClient := &fake.Clientset{}
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	store.Add(&api.Namespace{
+	informer := informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute)
+	informer.GetStore().Add(&api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: namespace},
 	})
 	handler := &provision{
-		client: mockClient,
-		store:  store,
+		client:   mockClient,
+		informer: informer,
 	}
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
@@ -88,7 +89,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 func TestIgnoreAdmission(t *testing.T) {
 	namespace := "test"
 	mockClient := &fake.Clientset{}
-	handler := admission.NewChainHandler(createProvision(mockClient, nil))
+	handler := admission.NewChainHandler(NewProvision(mockClient))
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
@@ -113,10 +114,9 @@ func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 		return true, nil, errors.NewAlreadyExists(api.Resource("namespaces"), namespace)
 	})
 
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	handler := &provision{
-		client: mockClient,
-		store:  store,
+		client:   mockClient,
+		informer: informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute),
 	}
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
@@ -128,5 +128,19 @@ func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 	err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
+	}
+}
+
+// TestAdmissionNamespaceValidate
+func TestAdmissionNamespaceValidate(t *testing.T) {
+	mockClient := &fake.Clientset{}
+	informer := informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute)
+	handler := &provision{
+		client: mockClient,
+	}
+	handler.SetNamespaceInformer(informer)
+	err := handler.Validate()
+	if err != nil {
+		t.Errorf("Failed to initialize informer")
 	}
 }

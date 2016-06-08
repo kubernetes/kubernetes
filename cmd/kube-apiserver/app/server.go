@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -243,6 +245,11 @@ func Run(s *options.APIServer) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
+
+	namespaceInformer := informers.CreateSharedNamespaceIndexInformer(client, 5*time.Minute)
+	pluginInit := admission.NewPluginInitializer()
+	pluginInit.SetNamespaceInformer(namespaceInformer)
+
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)

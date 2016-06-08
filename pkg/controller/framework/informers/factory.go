@@ -118,3 +118,21 @@ func CreateSharedPVIndexInformer(client clientset.Interface, resyncPeriod time.D
 
 	return sharedIndexInformer
 }
+
+// CreateSharedNamespaceIndexInformer returns a SharedIndexInformer that lists and watches namespaces
+func CreateSharedNamespaceIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+	sharedIndexInformer := framework.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().Namespaces().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().Namespaces().Watch(options)
+			},
+		},
+		&api.Namespace{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}
