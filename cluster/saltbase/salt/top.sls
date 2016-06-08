@@ -85,6 +85,6 @@ base:
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
 {% endif %}
-{% if pillar.get('enable_node_autoscaler', '').lower() == 'true' %}
+{% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
     - cluster-autoscaler
 {% endif %}
