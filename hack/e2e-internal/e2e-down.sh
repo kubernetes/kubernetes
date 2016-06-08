@@ -34,8 +34,8 @@ if [[ "${FEDERATION:-}" == "true" ]];then
     for zone in ${E2E_ZONES};do
 	# bring up e2e cluster
 	(
-	    set-federated-zone-vars "$zone"
-	    cleanup-federated-api-objects || echo "Couldn't cleanup federated api objects"
+	    set-federation-zone-vars "$zone"
+	    cleanup-federation-api-objects || echo "Couldn't cleanup federation api objects"
 	    test-teardown
 	)
     done

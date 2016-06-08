@@ -41,7 +41,7 @@ host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE
 
 # Optional
 # FEDERATION_IMAGE_TAG: reference and pull all federated images with this tag. Used for ci testing
-function create-federated-api-objects {
+function create-federation-api-objects {
 (
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
     export FEDERATION_APISERVER_DEPLOYMENT_NAME="federation-apiserver"
@@ -69,7 +69,7 @@ function create-federated-api-objects {
 
     $template "${manifests_root}/federation-ns.yaml" | $host_kubectl apply -f -
 
-    cleanup-federated-api-objects
+    cleanup-federation-api-objects
 
     export FEDERATION_API_HOST=""
     export KUBE_MASTER_IP=""
@@ -181,7 +181,7 @@ function create-federated-api-objects {
 
 # Optional
 # FEDERATION_IMAGE_TAG: push all federated images with this tag. Used for ci testing
-function push-federated-images {
+function push-federation-images {
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
     local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"federation-apiserver federation-controller-manager"}
 
@@ -230,7 +230,7 @@ function push-federated-images {
 
     done
 }
-function cleanup-federated-api-objects {
+function cleanup-federation-api-objects {
   # Delete all resources with the federated-cluster label.
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
   # Delete all resources in FEDERATION_NAMESPACE.

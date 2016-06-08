@@ -29,6 +29,6 @@ for zone in ${E2E_ZONES};do
     lastZone="$zone"
 done
 (
-    set-federated-zone-vars "$zone"
+    set-federation-zone-vars "$zone"
     "${KUBE_ROOT}/hack/ginkgo-e2e.sh" $@
 )

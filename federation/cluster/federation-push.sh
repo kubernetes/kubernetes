@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Bring up a Kubernetes cluster.
+#
+# If the full release name (gs://<bucket>/<release>) is passed in then we take
+# that directly.  If not then we assume we are doing development stuff and take
+# the defaults in the release config.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -22,4 +28,5 @@ KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
 . ${KUBE_ROOT}/federation/cluster/common.sh
 
-create-federated-api-objects
+push-federation-images
+

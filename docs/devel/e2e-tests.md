@@ -45,6 +45,14 @@ Updated: 5/3/2016
     - [Cleaning up](#cleaning-up)
   - [Advanced testing](#advanced-testing)
     - [Bringing up a cluster for testing](#bringing-up-a-cluster-for-testing)
+    - [Federation e2e tests](#federation-e2e-tests)
+      - [Configuring federation e2e tests](#configuring-federation-e2e-tests)
+      - [Image Push Repository](#image-push-repository)
+      - [Build](#build)
+      - [Deploy federation control plane](#deploy-federation-control-plane)
+      - [Run the Tests](#run-the-tests)
+      - [Teardown](#teardown)
+      - [Shortcuts for test developers](#shortcuts-for-test-developers)
     - [Debugging clusters](#debugging-clusters)
     - [Local clusters](#local-clusters)
       - [Testing against local clusters](#testing-against-local-clusters)
@@ -231,6 +239,119 @@ to periodically perform some manual cleanup:
 stale permissions can cause problems.
 
   - `sudo iptables -F`, clear ip tables rules left by the kube-proxy.
+
+### Federation e2e tests
+
+By default, `e2e.go` provisions a single Kubernetes cluster, and any `Feature:Federation` ginkgo tests will be skipped.
+
+Federation e2e testing involve bringing up multiple "underlying" Kubernetes clusters,
+and deploying the federation control plane as a Kubernetes application on the underlying clusters.
+
+The federation e2e tests are still managed via `e2e.go`, but require some extra configuration items.
+
+#### Configuring federation e2e tests
+
+The following environment variables will enable federation e2e building, provisioning and testing.
+
+```sh
+$ export FEDERATION=true
+$ export E2E_ZONES="us-central1-a us-central1-b us-central1-f"
+```
+
+A Kubernetes cluster will be provisioned in each zone listed in `E2E_ZONES`. A zone can only appear once in the `E2E_ZONES` list.
+
+#### Image Push Repository
+
+Next, specify the docker repository where your ci images will be pushed.
+
+* **If `KUBERNETES_PROVIDER=gce` or `KUBERNETES_PROVIDER=gke`**:
+
+	You can simply set your push repo base based on your project name, and the necessary repositories will be auto-created when you
+	first push your container images.
+
+	```sh
+	$ export FEDERATION_PUSH_REPO_BASE="gcr.io/${GCE_PROJECT_NAME}"
+	```
+
+	Skip ahead to the **Build** section.
+
+* **For all other providers**:
+
+	You'll be responsible for creating and managing access to the repositories manually.
+
+	```sh
+	$ export FEDERATION_PUSH_REPO_BASE="quay.io/colin_hom"
+	```
+
+	Given this example, the `federation-apiserver` container image will be pushed to the repository
+	`quay.io/colin_hom/federation-apiserver`.
+
+	The docker client on the machine running `e2e.go` must have push access for the following pre-existing repositories:
+
+	* `${FEDERATION_PUSH_REPO_BASE}/federation-apiserver`
+	* `${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager`
+
+	These repositories must allow public read access, as the e2e node docker daemons will not have any credentials. If you're using
+	gce/gke as your provider, the repositories will have read-access by default.
+
+#### Build
+
+* Compile the binaries and build container images:
+
+  ```sh
+  $ KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true go run hack/e2e.go -v -build
+  ```
+
+* Push the federation container images
+
+  ```sh
+  $ build/push-federation-images.sh
+  ```
+
+#### Deploy federation control plane
+
+The following command will create the underlying Kubernetes clusters in each of `E2E_ZONES`, and then provision the
+federation control plane in the cluster occupying the last zone in the `E2E_ZONES` list.
+
+```sh
+$ go run hack/e2e.go -v -up
+```
+
+#### Run the Tests
+
+This will run only the `Feature:Federation` e2e tests. You can omit the `ginkgo.focus` argument to run the entire e2e suite.
+
+```sh
+$ go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Feature:Federation\]"
+```
+
+#### Teardown
+
+```sh
+$ go run hack/e2e.go -v -down
+```
+
+#### Shortcuts for test developers
+
+* To speed up `e2e.go -up`, provision a single-node kubernetes cluster in a single e2e zone:
+
+  `NUM_NODES=1 E2E_ZONES="us-central1-f"`
+
+  Keep in mind that some tests may require multiple underlying clusters and/or minimum compute resource availability.
+
+* You can quickly recompile the e2e testing framework via `go install ./test/e2e`. This will not do anything besides
+  allow you to verify that the go code compiles.
+
+* If you want to run your e2e testing framework without re-provisioning the e2e setup, you can do so via
+  `make WHAT=test/e2e/e2e.test` and then re-running the ginkgo tests.
+
+* If you're hacking around with the federation control plane deployment itself,
+  you can quickly re-deploy the federation control plane Kubernetes manifests without tearing any resources down.
+  To re-deploy the federation control plane after running `-up` for the first time:
+
+  ```sh
+  $ federation/cluster/federation-up.sh
+  ```
 
 ### Debugging clusters
 
