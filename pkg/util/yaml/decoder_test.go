@@ -126,6 +126,19 @@ stuff: 1
 	}
 }
 
+func TestReallyLongYAML(t *testing.T) {
+	text := `---
+username: ` + strings.Repeat("x", 128 * 1024)
+	text += `
+
+---`
+	obj := generic{}
+	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(text)))
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestDecodeBrokenYAML(t *testing.T) {
 	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1

@@ -30,6 +30,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	MaxScanTokenSize = 512 * 1024
+)
+
 // ToJSON converts a single YAML document into a JSON document
 // or returns an error. If the document appears to be JSON the
 // YAML decoding path is not used (so that error messages are
@@ -54,6 +58,7 @@ type YAMLToJSONDecoder struct {
 // yaml.YAMLToJSON, and then passing it to json.Decoder.
 func NewYAMLToJSONDecoder(r io.Reader) *YAMLToJSONDecoder {
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(nil, MaxScanTokenSize)
 	scanner.Split(splitYAMLDocument)
 	return &YAMLToJSONDecoder{
 		scanner: scanner,
@@ -93,6 +98,7 @@ type YAMLDecoder struct {
 // the caller in framing the chunk.
 func NewDocumentDecoder(r io.ReadCloser) io.ReadCloser {
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(nil, MaxScanTokenSize)
 	scanner.Split(splitYAMLDocument)
 	return &YAMLDecoder{
 		r:       r,
