@@ -1015,7 +1015,9 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
 	}
 
-	file, err := ioutil.ReadFile(filepath.Join(dm.seccompProfileRoot, strings.TrimPrefix(profile, "localhost/")))
+	name := strings.TrimPrefix(profile, "localhost/")
+	fname := filepath.Join(dm.seccompProfileRoot, filepath.FromSlash(path.Clean("/"+name)))
+	file, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return nil, err
 	}
