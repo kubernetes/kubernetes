@@ -699,7 +699,6 @@ func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *fiel
 		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
 		for _, f := range i.From {
 			numFroms := 0
-			allErrs := field.ErrorList{}
 			if f.PodSelector != nil {
 				numFroms++
 				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.PodSelector, fldPath.Child("podSelector"))...)
@@ -730,9 +729,10 @@ func ValidateNetworkPolicy(np *extensions.NetworkPolicy) field.ErrorList {
 }
 
 // ValidateNetworkPolicyUpdate tests if an update to a NetworkPolicy is valid.
-func ValidateNetworkPolicyUpdate(np, oldNP *extensions.NetworkPolicy) field.ErrorList {
+func ValidateNetworkPolicyUpdate(update, old *extensions.NetworkPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !reflect.DeepEqual(np, oldNP) {
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	if !reflect.DeepEqual(update.Spec, old.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to networkpolicy spec are forbidden."))
 	}
 	return allErrs
