@@ -69,8 +69,8 @@ found at [API Conventions](api-conventions.md).
 Before attempting a change to the API, you should familiarize yourself with a
 number of existing API types and with the [API conventions](api-conventions.md).
 If creating a new API type/resource, we also recommend that you first send a PR
-containing just a proposal for the new API types, and that you initially target
-the extensions API (pkg/apis/extensions).
+containing just a proposal for the new API types, including specifically which
+API group they will be in.
 
 The Kubernetes API has two major components - the internal structures and
 the versioned APIs. The versioned APIs are intended to be stable, while the
@@ -336,16 +336,13 @@ If you found that your change accidentally broke clients, it should be reverted.
 
 In short, the expected API evolution is as follows:
 
-* `extensions/v1alpha1` ->
 * `newapigroup/v1alpha1` -> ... -> `newapigroup/v1alphaN` ->
 * `newapigroup/v1beta1` -> ... -> `newapigroup/v1betaN` ->
 * `newapigroup/v1` ->
 * `newapigroup/v2alpha1` -> ...
 
-While in extensions we have no obligation to move forward with the API at all
-and may delete or break it at any time.
-
-While in alpha we expect to move forward with it, but may break it.
+While in alpha we expect--but have no obligation--to move forward with the API
+at all.  In any case, we may break it.
 
 Once in beta we will preserve forward compatibility, but may introduce new
 versions and delete old ones.
