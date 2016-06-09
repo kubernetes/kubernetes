@@ -113,6 +113,17 @@ var _ = framework.KubeDescribe("Networking", func() {
 
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.Client))
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		// This test is super expensive in terms of network usage - large services
+		// result in huge "Endpoint" objects and all underlying pods read them
+		// periodically. Moreover, all KubeProxies watch all of them.
+		// Thus we limit the maximum number of pods under a service.
+		//
+		// TODO: Remove this limitation once services, endpoints and data flows
+		// between nodes and master are better optimized.
+		maxNodeCount := 250
+		if len(nodes.Items) > maxNodeCount {
+			nodes.Items = nodes.Items[:maxNodeCount]
+		}
 
 		if len(nodes.Items) == 1 {
 			// in general, the test requires two nodes. But for local development, often a one node cluster
@@ -276,7 +287,7 @@ func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name s
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:1.8",
+						Image: "gcr.io/google_containers/nettest:1.9",
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.
