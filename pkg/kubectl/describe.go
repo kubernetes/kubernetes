@@ -1294,7 +1294,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%v\n", ing.Name)
 		fmt.Fprintf(out, "Namespace:\t%v\n", ing.Namespace)
-		fmt.Fprintf(out, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer))
+		fmt.Fprintf(out, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
 		def := ing.Spec.Backend
 		ns := ing.Namespace
 		if def == nil {
