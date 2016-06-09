@@ -100,6 +100,31 @@ type Config struct {
 	}
 }
 
+// Disks is interface for manipulation with GCE PDs.
+type Disks interface {
+	// AttachDisk attaches given disk to given instance. Current instance
+	// is used when instanceID is empty string.
+	AttachDisk(diskName, instanceID string, readOnly bool) error
+
+	// DetachDisk detaches given disk to given instance. Current instance
+	// is used when instanceID is empty string.
+	DetachDisk(devicePath, instanceID string) error
+
+	// DiskIsAttached checks if a disk is attached to the given node.
+	DiskIsAttached(diskName, instanceID string) (bool, error)
+
+	// CreateDisk creates a new PD with given properties. Tags are serialized
+	// as JSON into Description field.
+	CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error
+
+	// DeleteDisk deletes PD.
+	DeleteDisk(diskToDelete string) error
+
+	// GetAutoLabelsForPD returns labels to apply to PeristentVolume
+	// representing this PD, namely failure domain and zone.
+	GetAutoLabelsForPD(name string) (map[string]string, error)
+}
+
 type instRefSlice []*compute.InstanceReference
 
 func (p instRefSlice) Len() int      { return len(p) }
