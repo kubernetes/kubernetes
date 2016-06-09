@@ -39,8 +39,8 @@ import (
 // attempted before returning.
 //
 // In case there is a pod with the same namespace+name already running, this
-// function assumes it's an older instance of the recycler pod and watches this
-// old pod instead of starting a new one.
+// function assumes it's an older instance of the recycler pod and watches
+// this old pod instead of starting a new one.
 //
 //  pod - the pod designed by a volume plugin to recycle the volume. pod.Name
 //        will be overwritten with unique name based on PV.Name.
@@ -49,7 +49,8 @@ func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.Pod, kube
 	return internalRecycleVolumeByWatchingPodUntilCompletion(pvName, pod, newRecyclerClient(kubeClient))
 }
 
-// same as above func comments, except 'recyclerClient' is a narrower pod API interface to ease testing
+// same as above func comments, except 'recyclerClient' is a narrower pod API
+// interface to ease testing
 func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.Pod, recyclerClient recyclerClient) error {
 	glog.V(5).Infof("creating recycler pod for volume %s\n", pod.Name)
 
@@ -93,7 +94,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *api.P
 }
 
 // recyclerClient abstracts access to a Pod by providing a narrower interface.
-// this makes it easier to mock a client for testing
+// This makes it easier to mock a client for testing.
 type recyclerClient interface {
 	CreatePod(pod *api.Pod) (*api.Pod, error)
 	GetPod(name, namespace string) (*api.Pod, error)
@@ -122,8 +123,8 @@ func (c *realRecyclerClient) DeletePod(name, namespace string) error {
 }
 
 // WatchPod returns a ListWatch for watching a pod.  The stopChannel is used
-// to close the reflector backing the watch.  The caller is responsible for derring a close on the channel to
-// stop the reflector.
+// to close the reflector backing the watch.  The caller is responsible for
+// derring a close on the channel to stop the reflector.
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) func() *api.Pod {
 	fieldSelector, _ := fields.ParseSelector("metadata.name=" + name)
 
@@ -146,8 +147,10 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 	}
 }
 
-// CalculateTimeoutForVolume calculates time for a Recycler pod to complete a recycle operation.
-// The calculation and return value is either the minimumTimeout or the timeoutIncrement per Gi of storage size, whichever is greater.
+// CalculateTimeoutForVolume calculates time for a Recycler pod to complete a
+// recycle operation. The calculation and return value is either the
+// minimumTimeout or the timeoutIncrement per Gi of storage size, whichever is
+// greater.
 func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *api.PersistentVolume) int64 {
 	giQty := resource.MustParse("1Gi")
 	pvQty := pv.Spec.Capacity[api.ResourceStorage]
@@ -170,11 +173,10 @@ func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
 }
 
-// GenerateVolumeName returns a PV name with clusterName prefix.
-// The function should be used to generate a name of GCE PD or Cinder volume.
-// It basically adds "<clusterName>-dynamic-" before the PV name,
-// making sure the resulting string fits given length and cuts "dynamic"
-// if not.
+// GenerateVolumeName returns a PV name with clusterName prefix. The function
+// should be used to generate a name of GCE PD or Cinder volume. It basically
+// adds "<clusterName>-dynamic-" before the PV name, making sure the resulting
+// string fits given length and cuts "dynamic" if not.
 func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
 	prefix := clusterName + "-dynamic"
 	pvLen := len(pvName)
