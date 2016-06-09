@@ -673,9 +673,9 @@ RKT_PATH: $(yaml-quote ${RKT_PATH:-})
 KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
-  if [[ "${ENABLE_NODE_AUTOSCALER:-}" == "true" || "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
       cat >>$file <<EOF
-ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote "true")
+ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 EOF
   fi
