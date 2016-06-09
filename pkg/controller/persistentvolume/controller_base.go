@@ -52,6 +52,7 @@ func NewPersistentVolumeController(
 	clusterName string,
 	volumeSource, claimSource cache.ListerWatcher,
 	eventRecorder record.EventRecorder,
+	enableDynamicProvisioning bool,
 ) *PersistentVolumeController {
 
 	if eventRecorder == nil {
@@ -68,6 +69,7 @@ func NewPersistentVolumeController(
 		runningOperations:             goroutinemap.NewGoRoutineMap(),
 		cloud:                         cloud,
 		provisioner:                   provisioner,
+		enableDynamicProvisioning:     enableDynamicProvisioning,
 		clusterName:                   clusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,

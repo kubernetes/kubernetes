@@ -577,6 +577,9 @@ type VolumeConfiguration struct {
 	// provisioning is not supported in any way, won't work in a multi-node cluster, and
 	// should not be used for anything other than testing or development.
 	EnableHostPathProvisioning bool `json:"enableHostPathProvisioning"`
+	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
+	// that supports dynamic provisioning. Defaults to true.
+	EnableDynamicProvisioning bool `json:"enableDynamicProvisioning"`
 	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
 	// volumePluginDir is the full path of the directory in which the flex
