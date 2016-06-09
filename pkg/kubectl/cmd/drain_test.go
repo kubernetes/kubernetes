@@ -325,6 +325,24 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
+	emptydir_pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			Labels:            labels,
+		},
+		Spec: api.PodSpec{
+			NodeName: "node",
+			Volumes: []api.Volume{
+				{
+					Name:         "scratch",
+					VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: ""}},
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		description  string
 		node         *api.Node
@@ -403,6 +421,24 @@ func TestDrain(t *testing.T) {
 			pods:         []api.Pod{naked_pod},
 			rcs:          []api.ReplicationController{},
 			args:         []string{"node", "--force"},
+			expectFatal:  false,
+			expectDelete: true,
+		},
+		{
+			description:  "pod with EmptyDir",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []api.Pod{emptydir_pod},
+			args:         []string{"node", "--force"},
+			expectFatal:  true,
+			expectDelete: false,
+		},
+		{
+			description:  "pod with EmptyDir and --delete-local-data",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []api.Pod{emptydir_pod},
+			args:         []string{"node", "--force", "--delete-local-data=true"},
 			expectFatal:  false,
 			expectDelete: true,
 		},

@@ -16,6 +16,10 @@ description: |
   When you are ready to put the node back into service, use kubectl uncordon, which
   will make the node schedulable again.
 options:
+- name: delete-local-data
+  default_value: "false"
+  usage: |
+    Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).
 - name: force
   default_value: "false"
   usage: |
