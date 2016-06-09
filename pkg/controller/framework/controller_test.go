@@ -56,7 +56,7 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, downstream)
+	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, cache.NewSyncStore(downstream))
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)

@@ -48,7 +48,7 @@ import (
 //                 fix.
 //
 // Also see the comment on DeltaFIFO.
-func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyListerGetter) *DeltaFIFO {
+func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects *SyncStore) *DeltaFIFO {
 	f := &DeltaFIFO{
 		items:           map[string]Deltas{},
 		queue:           []string{},
@@ -56,6 +56,7 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyL
 		deltaCompressor: compressor,
 		knownObjects:    knownObjects,
 	}
+	knownObjects.cond.L = &f.lock
 	f.cond.L = &f.lock
 	return f
 }
@@ -117,7 +118,7 @@ type DeltaFIFO struct {
 	// knownObjects list keys that are "known", for the
 	// purpose of figuring out which items have been deleted
 	// when Replace() or Delete() is called.
-	knownObjects KeyListerGetter
+	knownObjects *SyncStore
 }
 
 var (
@@ -161,7 +162,9 @@ func (f *DeltaFIFO) Add(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
-	return f.queueActionLocked(Added, obj)
+	err := f.queueActionLocked(Added, obj)
+	f.knownObjects.Sync()
+	return err
 }
 
 // Update is just like Add, but makes an Updated Delta.
@@ -169,7 +172,9 @@ func (f *DeltaFIFO) Update(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
-	return f.queueActionLocked(Updated, obj)
+	err := f.queueActionLocked(Updated, obj)
+	f.knownObjects.Sync()
+	return err
 }
 
 // Delete is just like Add, but makes an Deleted Delta. If the item does not
@@ -197,7 +202,9 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 		return nil
 	}
 
-	return f.queueActionLocked(Deleted, obj)
+	err = f.queueActionLocked(Deleted, obj)
+	f.knownObjects.Sync()
+	return err
 }
 
 // AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
@@ -413,6 +420,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		if err := f.queueActionLocked(Sync, item); err != nil {
 			return fmt.Errorf("couldn't enqueue object: %v", err)
 		}
+		f.knownObjects.Sync()
 	}
 
 	if f.knownObjects == nil {
@@ -428,6 +436,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 			if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 				return err
 			}
+			f.knownObjects.Sync()
 		}
 		return nil
 	}
@@ -452,6 +461,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 			return err
 		}
+		f.knownObjects.Sync()
 	}
 	return nil
 }
@@ -460,6 +470,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 func (f *DeltaFIFO) Resync() error {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+	// NOTE: race condition here.
 	for _, k := range f.knownObjects.ListKeys() {
 		obj, exists, err := f.knownObjects.GetByKey(k)
 		if err != nil {
