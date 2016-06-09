@@ -16,7 +16,11 @@ DBG_MAKEFILE ?=
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** starting makefile for goal(s) "$(MAKECMDGOALS)")
     $(warning ***** $(shell date))
+else
+    # If we're not debugging the Makefile, don't echo recipes.
+    MAKEFLAGS += -s
 endif
+
 
 # Old-skool build tools.
 #
@@ -74,7 +78,7 @@ export KUBE_GOLDFLAGS GOLDFLAGS
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
 .PHONY: all
 all: generated_files
-	@hack/make-rules/build.sh $(WHAT)
+	hack/make-rules/build.sh $(WHAT)
 
 # Build ginkgo
 #
@@ -94,7 +98,7 @@ ginkgo:
 #   make verify BRANCH=branch_x
 .PHONY: verify
 verify:
-	@KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
+	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 
 # Build and run tests.
 #
@@ -111,7 +115,7 @@ verify:
 #   make check WHAT=pkg/kubelet GOFLAGS=-v
 .PHONY: check test
 check test: generated_files
-	@hack/make-rules/test.sh $(WHAT) $(TESTS)
+	hack/make-rules/test.sh $(WHAT) $(TESTS)
 
 # Build and run integration tests.
 #
@@ -119,7 +123,7 @@ check test: generated_files
 #   make test-integration
 .PHONY: test-integration
 test-integration: generated_files
-	@hack/make-rules/test-integration.sh
+	hack/make-rules/test-integration.sh
 
 # Build and run end-to-end tests.
 #
@@ -127,7 +131,7 @@ test-integration: generated_files
 #   make test-e2e
 .PHONY: test-e2e
 test-e2e: ginkgo generated_files
-	@go run hack/e2e.go -v --build --up --test --down
+	go run hack/e2e.go -v --build --up --test --down
 
 # Build and run node end-to-end tests.
 #
@@ -164,7 +168,7 @@ test-e2e: ginkgo generated_files
 # Build and run tests.
 .PHONY: test-e2e-node
 test-e2e-node: ginkgo generated_files
-	@hack/make-rules/test-e2e-node.sh
+	hack/make-rules/test-e2e-node.sh
 
 # Build and run cmdline tests.
 #
@@ -212,7 +216,7 @@ clean_generated:
 #   make vet WHAT=pkg/kubelet
 .PHONY: vet
 vet:
-	@hack/make-rules/vet.sh $(WHAT)
+	hack/make-rules/vet.sh $(WHAT)
 
 # Build a release
 #
@@ -220,7 +224,7 @@ vet:
 #   make release
 .PHONY: release
 release: generated_files
-	@build/release.sh
+	build/release.sh
 
 # Build a release, but skip tests
 #
@@ -228,7 +232,7 @@ release: generated_files
 #   make release-skip-tests
 .PHONY: release-skip-tests quick-release
 release-skip-tests quick-release: generated_files
-	@KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
+	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 
 # Cross-compile for all platforms
 #
@@ -236,7 +240,7 @@ release-skip-tests quick-release: generated_files
 #   make cross
 .PHONY: cross
 cross:
-	@hack/make-rules/cross.sh
+	hack/make-rules/cross.sh
 
 #
 # Code-generation logic.
@@ -364,7 +368,7 @@ $(foreach dir, $(ALL_GO_DIRS), $(eval           \
 # but we only need to rebuild targets if the contents actually changed.  That
 # is what the .stamp file represents.
 $(foreach dir, $(ALL_GO_DIRS), $(META_DIR)/$(dir)/$(GOFILES_META)):
-	@FILES=$$(ls $</*.go | grep -v $(GENERATED_FILE_PREFIX)); \
+	FILES=$$(ls $</*.go | grep -v $(GENERATED_FILE_PREFIX));  \
 	mkdir -p $(@D);                                           \
 	echo "gofiles__$< := $$(echo $${FILES})" >$@.tmp;         \
 	cmp -s $@.tmp $@ || touch $@.stamp;                       \
@@ -422,7 +426,7 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 # in a single run of the tool.
 .PHONY: gen_deepcopy
 gen_deepcopy: $(DEEPCOPY_FILES)
-	@if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then               \
+	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                \
 	    $(DEEPCOPY_GEN)                                               \
 	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd,)  \
 	        --bounding-dirs $(PRJ_SRC_PATH)                           \
@@ -452,14 +456,14 @@ $(shell rm -f $(META_DIR)/$(DEEPCOPY_GEN)*.todo)
 # How to regenerate deep-copy code.  This is a little slow to run, so we batch
 # it up and trigger the batch from the 'generated_files' target.
 $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
-	@echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEEPCOPY_GEN).todo
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEEPCOPY_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
 # file if the contents have actually changed.  We 'sinclude' this later.
 .PHONY: $(META_DIR)/$(DEEPCOPY_GEN).mk
 $(META_DIR)/$(DEEPCOPY_GEN).mk:
-	@mkdir -p $(@D);                                       \
+	mkdir -p $(@D);                                        \
 	(echo -n "$(DEEPCOPY_GEN): ";                          \
 	 DIRECT=$$(go list -e -f '{{.Dir}} {{.Dir}}/*.go'      \
 	     ./cmd/libs/go2idl/deepcopy-gen);                  \
@@ -486,8 +490,8 @@ sinclude $(META_DIR)/$(DEEPCOPY_GEN).mk
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(DEEPCOPY_GEN):
-	@hack/make-rules/build.sh cmd/libs/go2idl/deepcopy-gen
-	@touch $@
+	hack/make-rules/build.sh cmd/libs/go2idl/deepcopy-gen
+	touch $@
 
 #
 # Conversion generation
@@ -532,7 +536,7 @@ CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 # in a single run of the tool.
 .PHONY: gen_conversion
 gen_conversion: $(CONVERSION_FILES)
-	@if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then               \
+	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                \
 	    $(CONVERSION_GEN)                                               \
 	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd,)  \
 	        -O $(CONVERSION_BASENAME);                                  \
@@ -563,12 +567,12 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval           \
 # but we only need to rebuild targets if the contents actually changed.  That
 # is what the .stamp file represents.
 $(foreach dir, $(CONVERSION_DIRS), $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
-	@TAGS=$$(grep -h '^// *+k8s:conversion-gen=' $</*.go                   \
-	    | cut -f2- -d=                                                     \
-	    | sed 's|$(PRJ_SRC_PATH)/||');                                     \
-	mkdir -p $(@D);                                                        \
-	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;                   \
-	cmp -s $@.tmp $@ || touch $@.stamp;                                    \
+	TAGS=$$(grep -h '^// *+k8s:conversion-gen=' $</*.go   \
+	    | cut -f2- -d=                                    \
+	    | sed 's|$(PRJ_SRC_PATH)/||');                    \
+	mkdir -p $(@D);                                       \
+	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;  \
+	cmp -s $@.tmp $@ || touch $@.stamp;                   \
 	mv $@.tmp $@
 
 # Include any deps files as additional Makefile rules.  This triggers make to
@@ -628,14 +632,14 @@ $(shell rm -f $(META_DIR)/$(CONVERSION_GEN)*.todo)
 # How to regenerate conversion code.  This is a little slow to run, so we batch
 # it up and trigger the batch from the 'generated_files' target.
 $(CONVERSION_FILES): $(CONVERSION_GEN)
-	@echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
 # file if the contents have actually changed.  We 'sinclude' this later.
 .PHONY: $(META_DIR)/$(CONVERSION_GEN).mk
 $(META_DIR)/$(CONVERSION_GEN).mk:
-	@mkdir -p $(@D);                                       \
+	mkdir -p $(@D);                                        \
 	(echo -n "$(CONVERSION_GEN): ";                        \
 	 DIRECT=$$(go list -e -f '{{.Dir}} {{.Dir}}/*.go'      \
 	     ./cmd/libs/go2idl/conversion-gen);                \
@@ -662,8 +666,8 @@ sinclude $(META_DIR)/$(CONVERSION_GEN).mk
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(CONVERSION_GEN):
-	@hack/make-rules/build.sh cmd/libs/go2idl/conversion-gen
-	@touch $@
+	hack/make-rules/build.sh cmd/libs/go2idl/conversion-gen
+	touch $@
 
 # This rule collects all the generated file sets into a single dep, which is
 # defined BELOW the *_FILES variables and leaves higher-level rules clean.
