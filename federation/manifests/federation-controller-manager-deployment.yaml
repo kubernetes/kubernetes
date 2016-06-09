@@ -19,6 +19,8 @@ spec:
         command:
         - /usr/local/bin/federation-controller-manager
         - --master=https://{{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}:443
+        - --dns-provider={{.FEDERATION_DNS_PROVIDER}}
+        - --dns-provider-config={{.FEDERATION_DNS_PROVIDER_CONFIG}}
         ports:
         - containerPort: 443
           name: https
