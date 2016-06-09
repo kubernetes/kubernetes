@@ -88,10 +88,6 @@ Some real-world examples for the use of sysctls:
 - RabbitMQ proposes a number of sysctl settings to optimize networking: https://www.rabbitmq.com/networking.html.
 - web applications with many concurrent connections require high values for
   `net.core.somaxconn`.
-- certain Java applications require "hugepages" support to perform well
-  (compare [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-77426026)),
-  configured through `vm.nr_hugepages`.
-  **Note:** `vm.*` is not namespaced and for that reason not supported by Docker/rkt. Moreover, there would be more steps necessary than just sysctl to get hugepages working in Kubernetes like memlock ulimit settings (compare http://andrigoss.blogspot.de/2008/02/jvm-performance-tuning.html).
 - a containerized IPv6 routing daemon requires e.g. `/proc/sys/net/ipv6/conf/all/forwarding` and
   `/proc/sys/net/ipv6/conf/all/accept_redirects` (compare
   [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-98653017)).
@@ -109,6 +105,7 @@ Some real-world examples for the use of sysctls:
 
 * Update kernel parameters in running containers.
 * Integration with new container runtime proposal: https://github.com/kubernetes/kubernetes/pull/25899.
+* Hugepages support (compare [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-77426026)) - while also partly configured through sysctls (`vm.nr_hugepages`, compare http://andrigoss.blogspot.de/2008/02/jvm-performance-tuning.html) - is out-of-scope for this proposal as it is not namespaced and as a limited resource (similar to normal memory) needs deeper integration e.g. with the scheduler.
 
 ## Use Cases
 
