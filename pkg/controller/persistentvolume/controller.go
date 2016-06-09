@@ -106,18 +106,19 @@ const createProvisionedPVInterval = 10 * time.Second
 // framework.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController       *framework.Controller
-	volumeControllerStopCh chan struct{}
-	volumeSource           cache.ListerWatcher
-	claimController        *framework.Controller
-	claimControllerStopCh  chan struct{}
-	claimSource            cache.ListerWatcher
-	kubeClient             clientset.Interface
-	eventRecorder          record.EventRecorder
-	cloud                  cloudprovider.Interface
-	recyclePluginMgr       vol.VolumePluginMgr
-	provisioner            vol.ProvisionableVolumePlugin
-	clusterName            string
+	volumeController          *framework.Controller
+	volumeControllerStopCh    chan struct{}
+	volumeSource              cache.ListerWatcher
+	claimController           *framework.Controller
+	claimControllerStopCh     chan struct{}
+	claimSource               cache.ListerWatcher
+	kubeClient                clientset.Interface
+	eventRecorder             record.EventRecorder
+	cloud                     cloudprovider.Interface
+	recyclePluginMgr          vol.VolumePluginMgr
+	provisioner               vol.ProvisionableVolumePlugin
+	enableDynamicProvisioning bool
+	clusterName               string
 
 	// Cache of the last known version of volumes and claims. This cache is
 	// thread safe as long as the volumes/claims there are not modified, they
@@ -1060,8 +1061,11 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 	return nil
 }
 
-// provisionClaim starts new asynchronous operation to provision a claim.
+// provisionClaim starts new asynchronous operation to provision a claim if provisioning is enabled.
 func (ctrl *PersistentVolumeController) provisionClaim(claim *api.PersistentVolumeClaim) error {
+	if !ctrl.enableDynamicProvisioning {
+		return nil
+	}
 	glog.V(4).Infof("provisionClaim[%s]: started", claimToClaimKey(claim))
 	opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 	ctrl.scheduleOperation(opName, func() error {

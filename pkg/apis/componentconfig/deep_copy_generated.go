@@ -361,6 +361,7 @@ func DeepCopy_componentconfig_PortRangeVar(in PortRangeVar, out *PortRangeVar, c
 
 func DeepCopy_componentconfig_VolumeConfiguration(in VolumeConfiguration, out *VolumeConfiguration, c *conversion.Cloner) error {
 	out.EnableHostPathProvisioning = in.EnableHostPathProvisioning
+	out.EnableDynamicProvisioning = in.EnableDynamicProvisioning
 	if err := DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in.PersistentVolumeRecyclerConfiguration, &out.PersistentVolumeRecyclerConfiguration, c); err != nil {
 		return err
 	}

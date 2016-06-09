@@ -254,3 +254,12 @@ func TestProvisionMultiSync(t *testing.T) {
 
 	runMultisyncTests(t, tests)
 }
+
+// When provisioning is disabled, provisioning a claim should instantly return nil
+func TestDisablingDynamicProvisioner(t *testing.T) {
+	ctrl := newTestController(nil, nil, nil, false)
+	retVal := ctrl.provisionClaim(nil)
+	if retVal != nil {
+		t.Errorf("Expected nil return but got %v", retVal)
+	}
+}
