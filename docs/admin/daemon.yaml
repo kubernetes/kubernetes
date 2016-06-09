@@ -3,6 +3,7 @@ kind: DaemonSet
 metadata:
   name: prometheus-node-exporter
 spec:
+  selector: {}
   template:
     metadata:
       name: prometheus-node-exporter

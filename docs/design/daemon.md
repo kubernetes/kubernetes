@@ -107,6 +107,7 @@ nodes, preempting other pods if necessary.
       app: datastore
     name: datastore
   spec:
+    selector: {}
     template:
       metadata:
         labels:
