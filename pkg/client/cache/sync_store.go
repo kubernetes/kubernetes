@@ -13,22 +13,30 @@ func NewSyncStore(s Store) *SyncStore {
 
 func (s *SyncStore) Add(obj interface{}) error {
 	err := s.Store.Add(obj)
-	s.cond.Signal()
+	if s.cond.L != nil {
+		s.cond.Signal()
+	}
 	return err
 }
 
 func (s *SyncStore) Update(obj interface{}) error {
 	err := s.Store.Update(obj)
-	s.cond.Signal()
+	if s.cond.L != nil {
+		s.cond.Signal()
+	}
 	return err
 }
 
 func (s *SyncStore) Delete(obj interface{}) error {
 	err := s.Store.Delete(obj)
-	s.cond.Signal()
+	if s.cond.L != nil {
+		s.cond.Signal()
+	}
 	return err
 }
 
 func (s *SyncStore) Sync() {
-	s.cond.Wait()
+	if s.cond.L != nil {
+		s.cond.Wait()
+	}
 }

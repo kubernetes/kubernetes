@@ -61,6 +61,18 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects *Syn
 	return f
 }
 
+func NewDeltaFIFOWithKeyListerGetter(keyFunc KeyFunc, compressor DeltaCompressor, keyLG KeyListerGetter) *DeltaFIFO {
+	f := &DeltaFIFO{
+		items:           map[string]Deltas{},
+		queue:           []string{},
+		keyFunc:         keyFunc,
+		deltaCompressor: compressor,
+		knownObjects:    NewSyncStore(&keyLG2Store{keyLG}),
+	}
+	f.cond.L = &f.lock
+	return f
+}
+
 // DeltaFIFO is like FIFO, but allows you to process deletes.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
@@ -584,3 +596,17 @@ type DeletedFinalStateUnknown struct {
 	Key string
 	Obj interface{}
 }
+
+type keyLG2Store struct {
+	KeyListerGetter
+}
+
+func (s *keyLG2Store) Add(obj interface{}) error    { return nil }
+func (s *keyLG2Store) Update(obj interface{}) error { return nil }
+func (s *keyLG2Store) Delete(obj interface{}) error { return nil }
+func (s *keyLG2Store) List() []interface{}          { return nil }
+func (s *keyLG2Store) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	return nil, false, nil
+}
+func (s *keyLG2Store) Replace([]interface{}, string) error { return nil }
+func (s *keyLG2Store) Resync() error                       { return nil }
