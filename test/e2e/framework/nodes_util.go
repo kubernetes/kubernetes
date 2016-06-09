@@ -50,9 +50,9 @@ func masterUpgradeGCE(rawV string) error {
 func masterUpgradeGKE(v string) error {
 	Logf("Upgrading master to %q", v)
 	_, _, err := RunCmd("gcloud", "container",
+		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
 		fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
-		"clusters",
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		"--master",
@@ -252,9 +252,9 @@ func cleanupNodeUpgradeGCE(tmplBefore string) {
 func nodeUpgradeGKE(v string) error {
 	Logf("Upgrading nodes to %q", v)
 	_, _, err := RunCmd("gcloud", "container",
+		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
 		fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
-		"clusters",
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		fmt.Sprintf("--cluster-version=%s", v),
