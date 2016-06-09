@@ -132,9 +132,8 @@ script
 	set -o errexit
 	set -o nounset
 
-	echo "Start kubelet upstart job"
-	. /etc/default/kubelet
-	/usr/bin/kubelet ${KUBELET_OPTS} 1>>/var/log/kubelet.log 2>&1
+	. /etc/kube-configure-helper.sh
+	start_kubelet
 } 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
