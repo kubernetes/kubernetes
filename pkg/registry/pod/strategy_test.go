@@ -199,6 +199,22 @@ func TestCheckLogLocation(t *testing.T) {
 						{Name: "container1"},
 						{Name: "container2"},
 					},
+					InitContainers: []api.Container{
+						{Name: "initcontainer1"},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts:        &api.PodLogOptions{},
+			expectedErr: errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2] or one of the init containers: [initcontainer1]"),
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
 				},
 				Status: api.PodStatus{},
 			},
