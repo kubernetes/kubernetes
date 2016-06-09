@@ -89,6 +89,7 @@ default-container-mem-limit
 delay-shutdown
 delete-collection-workers
 delete-instances
+delete-local-data
 delete-namespace
 deleting-pods-burst
 deleting-pods-qps
