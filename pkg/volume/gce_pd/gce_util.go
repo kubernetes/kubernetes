@@ -43,7 +43,12 @@ const (
 	maxChecks            = 60
 	maxRetries           = 10
 	checkSleepDuration   = time.Second
-	errorSleepDuration   = 5 * time.Second
+)
+
+// These variables are modified only in unit tests and should be constant
+// otherwise.
+var (
+	errorSleepDuration time.Duration = 5 * time.Second
 )
 
 type GCEDiskUtil struct{}
