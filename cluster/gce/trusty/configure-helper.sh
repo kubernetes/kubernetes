@@ -713,14 +713,14 @@ start_kube_addons() {
     file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup_addon_manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    base_metrics_memory="200Mi"
+    base_metrics_memory="140Mi"
     metrics_memory="${base_metrics_memory}"
-    base_eventer_memory="200Mi"
+    base_eventer_memory="190Mi"
     eventer_memory="${base_eventer_memory}"
     readonly metrics_memory_per_node="4"
     readonly eventer_memory_per_node="500"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -ge 1 ]; then
-      num_kube_nodes="$((${NUM_NODES}-1))"
+      num_kube_nodes="$((${NUM_NODES}+1))"
       metrics_memory="$((${num_kube_nodes} * ${metrics_memory_per_node} + 200))Mi"
       eventer_memory="$((${num_kube_nodes} * ${eventer_memory_per_node} + 200 * 1024))Ki"
     fi
