@@ -44,6 +44,26 @@ const (
 	LabelRktImages    = "rkt-images"
 )
 
+// The maximum number of `du` tasks that can be running at once.
+const maxConsecutiveDus = 20
+
+// A pool for restricting the number of consecutive `du` tasks running.
+var duPool = make(chan struct{}, maxConsecutiveDus)
+
+func init() {
+	for i := 0; i < maxConsecutiveDus; i++ {
+		releaseDuToken()
+	}
+}
+
+func claimDuToken() {
+	<-duPool
+}
+
+func releaseDuToken() {
+	duPool <- struct{}{}
+}
+
 type partition struct {
 	mountpoint string
 	major      uint
@@ -391,6 +411,8 @@ func (self *RealFsInfo) GetDirUsage(dir string, timeout time.Duration) (uint64, 
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
+	claimDuToken()
+	defer releaseDuToken()
 	cmd := exec.Command("nice", "-n", "19", "du", "-s", dir)
 	stdoutp, err := cmd.StdoutPipe()
 	if err != nil {
