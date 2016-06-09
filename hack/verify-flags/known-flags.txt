@@ -206,6 +206,7 @@ insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
 instance-name-prefix
+integration-timeout
 iptables-masquerade-bit
 iptables-sync-period
 ir-data-source
@@ -448,6 +449,7 @@ target-port
 tcp-services
 terminated-pod-gc-threshold
 test-timeout
+timeout-full-stack
 tls-cert-file
 tls-private-key-file
 to-version
