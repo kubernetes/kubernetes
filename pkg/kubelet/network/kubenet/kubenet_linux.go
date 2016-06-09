@@ -79,7 +79,8 @@ type kubenetNetworkPlugin struct {
 	iptables        utiliptables.Interface
 	// vendorDir is passed by kubelet network-plugin-dir parameter.
 	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
-	vendorDir string
+	vendorDir         string
+	nonMasqueradeCIDR string
 }
 
 func NewPlugin(networkPluginDir string) network.NetworkPlugin {
@@ -88,16 +89,17 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	dbus := utildbus.New()
 	iptInterface := utiliptables.New(execer, dbus, protocol)
 	return &kubenetNetworkPlugin{
-		podIPs:      make(map[kubecontainer.ContainerID]string),
-		hostPortMap: make(map[hostport]closeable),
-		MTU:         1460, //TODO: don't hardcode this
-		execer:      utilexec.New(),
-		iptables:    iptInterface,
-		vendorDir:   networkPluginDir,
+		podIPs:            make(map[kubecontainer.ContainerID]string),
+		hostPortMap:       make(map[hostport]closeable),
+		MTU:               1460, //TODO: don't hardcode this
+		execer:            utilexec.New(),
+		iptables:          iptInterface,
+		vendorDir:         networkPluginDir,
+		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
 
-func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode) error {
+func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
 	plugin.host = host
 	plugin.hairpinMode = hairpinMode
 	plugin.cniConfig = &libcni.CNIConfig{
@@ -132,6 +134,23 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 		return fmt.Errorf("Failed to generate loopback config: %v", err)
 	}
 
+	plugin.nonMasqueradeCIDR = nonMasqueradeCIDR
+	// Need to SNAT outbound traffic from cluster
+	if err = plugin.ensureMasqRule(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// TODO: move thic logic into cni bridge plugin and remove this from kubenet
+func (plugin *kubenetNetworkPlugin) ensureMasqRule() error {
+	if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
+		"-m", "comment", "--comment", "kubenet: SNAT for outbound traffic from cluster",
+		"-m", "addrtype", "!", "--dst-type", "LOCAL",
+		"!", "-d", plugin.nonMasqueradeCIDR,
+		"-j", "MASQUERADE"); err != nil {
+		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
+	}
 	return nil
 }
 
@@ -167,7 +186,7 @@ const NET_CONFIG_TEMPLATE = `{
   "mtu": %d,
   "addIf": "%s",
   "isGateway": true,
-  "ipMasq": true,
+  "ipMasq": false,
   "ipam": {
     "type": "host-local",
     "subnet": "%s",
@@ -354,6 +373,11 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	}
 
 	plugin.syncHostportsRules()
+
+	// Need to SNAT outbound traffic from cluster
+	if err = plugin.ensureMasqRule(); err != nil {
+		glog.Errorf("Failed to ensure MASQ rule: %v", err)
+	}
 	return nil
 }
 
@@ -391,6 +415,11 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	delete(plugin.podIPs, id)
 
 	plugin.syncHostportsRules()
+
+	// Need to SNAT outbound traffic from cluster
+	if err := plugin.ensureMasqRule(); err != nil {
+		glog.Errorf("Failed to ensure MASQ rule: %v", err)
+	}
 	return nil
 }
 

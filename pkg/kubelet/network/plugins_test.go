@@ -25,7 +25,7 @@ import (
 
 func TestSelectDefaultPlugin(t *testing.T) {
 	all_plugins := []NetworkPlugin{}
-	plug, err := InitNetworkPlugin(all_plugins, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone)
+	plug, err := InitNetworkPlugin(all_plugins, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8")
 	if err != nil {
 		t.Fatalf("Unexpected error in selecting default plugin: %v", err)
 	}

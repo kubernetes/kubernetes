@@ -145,7 +145,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 	fakeDocker := dockertools.NewFakeDockerClient()
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
-	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone)
+	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8")
 	dockerManager := dockertools.NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
@@ -175,7 +175,7 @@ func TestCNIPlugin(t *testing.T) {
 	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName)
 
 	np := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), testVendorCNIDirPrefix)
-	plug, err := network.InitNetworkPlugin(np, "cni", NewFakeHost(nil), componentconfig.HairpinNone)
+	plug, err := network.InitNetworkPlugin(np, "cni", NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8")
 	if err != nil {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
