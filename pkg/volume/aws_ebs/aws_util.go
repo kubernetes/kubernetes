@@ -214,6 +214,26 @@ func attachDiskAndVerify(b *awsElasticBlockStoreMounter, xvdBeforeSet sets.Strin
 		}
 	}
 
+	glog.V(5).Infof("Failed to attach volume %s: %v", b.volumeID, attachError)
+
+	if awsCloud != nil {
+		detached, err := awsCloud.IsDiskDetached(b.volumeID)
+		if err == nil && !detached {
+			// The volume we were trying to attach is either attached or being
+			// attached. This may be the last time we see it - associated pod
+			// may have been already deleted in the meantime. Detach it (without
+			// waiting for result), kubelet will try to attach it shortly if the
+			// pod still exists.
+			glog.V(3).Infof("Trying to clean up volume %s after failed attach", b.volumeID)
+			if _, err = awsCloud.DetachDisk(b.volumeID, "", false); err != nil {
+				// Detach failed. We tried our best, but there can be a volume
+				// attached. If DetachDisk timed out, AWS will be still trying
+				// to detach the volume.
+				glog.V(3).Infof("Cleanup of volume %s after failed attach failed: %v", b.volumeID, err)
+			}
+		}
+	}
+
 	if attachError != nil {
 		return "", fmt.Errorf("Could not attach EBS Disk %q: %v", b.volumeID, attachError)
 	}
@@ -262,7 +282,7 @@ func detachDiskAndVerify(c *awsElasticBlockStoreUnmounter) {
 			glog.Warningf("Retrying detach for EBS Disk %q (retry count=%v).", c.volumeID, numRetries)
 		}
 
-		devicePath, err := awsCloud.DetachDisk(c.volumeID, "")
+		devicePath, err := awsCloud.DetachDisk(c.volumeID, "", true)
 		if err != nil {
 			glog.Errorf("Error detaching PD %q: %v", c.volumeID, err)
 			time.Sleep(errorSleepDuration)

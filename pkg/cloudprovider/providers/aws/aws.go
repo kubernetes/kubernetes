@@ -203,9 +203,16 @@ type Volumes interface {
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
 	AttachDisk(diskName string, instanceName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
+	// instanceName can be empty to mean "the instance on which we are running".
+	// If wait==true, it waits for the detachment for 1 minute.
+	// If wait==false, it fires DetachVolume operation in AWS and does not wait
+	// for result. This should be as the last resort when error cleanup is
+	// needed.
 	// Returns the device where the volume was attached
-	DetachDisk(diskName string, instanceName string) (string, error)
+	DetachDisk(diskName string, instanceName string, wait bool) (string, error)
+	// Return 'true' if given disk is currently detached.
+	// Returns 'false' in all other cases ("attaching", "attached", "detaching")
+	IsDiskDetached(diskName string) (bool, error)
 
 	// Create a volume with the specified options
 	CreateDisk(volumeOptions *VolumeOptions) (volumeName string, err error)
@@ -1153,6 +1160,33 @@ func (self *awsDisk) describeVolume() (*ec2.Volume, error) {
 	return volumes[0], nil
 }
 
+// getAttachmentStatus returns current attachment status of the volume
+func (self *awsDisk) getAttachmentStatus() (string, error) {
+	info, err := self.describeVolume()
+	if err != nil {
+		return "", err
+	}
+	if len(info.Attachments) > 1 {
+		glog.Warningf("Found multiple attachments for volume: %v", info)
+	}
+	attachmentStatus := ""
+	for _, attachment := range info.Attachments {
+		if attachmentStatus != "" {
+			glog.Warning("Found multiple attachments: ", info)
+		}
+		if attachment.State != nil {
+			attachmentStatus = *attachment.State
+		} else {
+			// Shouldn't happen, but don't panic...
+			glog.Warning("Ignoring nil attachment state: ", attachment)
+		}
+	}
+	if attachmentStatus == "" {
+		attachmentStatus = "detached"
+	}
+	return attachmentStatus, nil
+}
+
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // TODO(justinsb): return (bool, error)
 func (self *awsDisk) waitForAttachmentStatus(status string) error {
@@ -1161,33 +1195,16 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 	maxAttempts := 60
 
 	for {
-		info, err := self.describeVolume()
+		attachmentStatus, err := self.getAttachmentStatus()
 		if err != nil {
 			return err
 		}
-		if len(info.Attachments) > 1 {
-			glog.Warningf("Found multiple attachments for volume: %v", info)
-		}
-		attachmentStatus := ""
-		for _, attachment := range info.Attachments {
-			if attachmentStatus != "" {
-				glog.Warning("Found multiple attachments: ", info)
-			}
-			if attachment.State != nil {
-				attachmentStatus = *attachment.State
-			} else {
-				// Shouldn't happen, but don't panic...
-				glog.Warning("Ignoring nil attachment state: ", attachment)
-			}
-		}
-		if attachmentStatus == "" {
-			attachmentStatus = "detached"
-		}
+
 		if attachmentStatus == status {
 			return nil
 		}
 
-		glog.V(2).Infof("Waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
+		glog.V(2).Infof("Waiting for volume %s state: actual=%s, desired=%s", self.awsID, attachmentStatus, status)
 
 		attempt++
 		if attempt > maxAttempts {
@@ -1257,8 +1274,19 @@ func (c *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 	return awsInstance, nil
 }
 
+func (c *AWSCloud) IsDiskDetached(diskName string) (bool, error) {
+	disk, err := newAWSDisk(c, diskName)
+	if err != nil {
+		return false, err
+	}
+	status, err := disk.getAttachmentStatus()
+	glog.V(5).Infof("IsDiskDetached for %s: %s, %v", diskName, status, err)
+	return status == "detached", err
+}
+
 // Implements Volumes.AttachDisk
 func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
+	glog.V(5).Infof("AttachDisk %s", diskName)
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
@@ -1309,7 +1337,7 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 		if err != nil {
 			attachEnded = true
 			// TODO: Check if the volume was concurrently attached?
-			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
+			return ec2Device, fmt.Errorf("Error attaching EBS volume: %v", err)
 		}
 
 		glog.V(2).Infof("AttachVolume request returned %v", attachResponse)
@@ -1317,7 +1345,10 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 
 	err = disk.waitForAttachmentStatus("attached")
 	if err != nil {
-		return "", err
+		// Return the device even if there was an error - it could be time out
+		// and AWS is still trying to attach the volume. Caller may want to
+		// detach it manually.
+		return ec2Device, err
 	}
 
 	attachEnded = true
@@ -1326,7 +1357,9 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 }
 
 // Implements Volumes.DetachDisk
-func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, error) {
+func (aws *AWSCloud) DetachDisk(diskName string, instanceName string, wait bool) (string, error) {
+	glog.V(5).Infof("DetachDisk %s", diskName)
+
 	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
 		return "", err
@@ -1360,9 +1393,11 @@ func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, e
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	err = disk.waitForAttachmentStatus("detached")
-	if err != nil {
-		return "", err
+	if wait {
+		err = disk.waitForAttachmentStatus("detached")
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if mountDevice != "" {
