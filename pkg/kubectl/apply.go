@@ -31,8 +31,8 @@ type debugError interface {
 
 // GetOriginalConfiguration retrieves the original configuration of the object
 // from the annotation, or nil if no annotation was found.
-func GetOriginalConfiguration(info *resource.Info) ([]byte, error) {
-	annots, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
+func GetOriginalConfiguration(mapping *meta.RESTMapping, obj runtime.Object) ([]byte, error) {
+	annots, err := mapping.MetadataAccessor.Annotations(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 // UpdateApplyAnnotation calls CreateApplyAnnotation if the last applied
 // configuration annotation is already present. Otherwise, it does nothing.
 func UpdateApplyAnnotation(info *resource.Info, codec runtime.Encoder) error {
-	if original, err := GetOriginalConfiguration(info); err != nil || len(original) <= 0 {
+	if original, err := GetOriginalConfiguration(info.Mapping, info.Object); err != nil || len(original) <= 0 {
 		return err
 	}
 	return CreateApplyAnnotation(info, codec)

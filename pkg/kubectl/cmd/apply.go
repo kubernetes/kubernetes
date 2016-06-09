@@ -19,11 +19,14 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -37,6 +40,15 @@ type ApplyOptions struct {
 	Filenames []string
 	Recursive bool
 }
+
+const (
+	// maxPatchRetry is the maximum number of conflicts retry for during a patch operation before returning failure
+	maxPatchRetry = 5
+	// backOffPeriod is the period to back off when apply patch resutls in error.
+	backOffPeriod = 1 * time.Second
+	// how many times we can retry before back off
+	triesBeforeBackOff = 1
+)
 
 const (
 	apply_long = `Apply a configuration to a resource by filename or stdin.
@@ -154,43 +166,16 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 			return nil
 		}
 
-		// Serialize the current configuration of the object from the server.
-		current, err := runtime.Encode(encoder, info.Object)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("serializing current configuration from:\n%v\nfor:", info), info.Source, err)
-		}
-
-		// Retrieve the original configuration of the object from the annotation.
-		original, err := kubectl.GetOriginalConfiguration(info)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", info), info.Source, err)
-		}
-
-		// Create the versioned struct from the original from the server for
-		// strategic patch.
-		// TODO: Move all structs in apply to use raw data. Can be done once
-		// builder has a RawResult method which delivers raw data instead of
-		// internal objects.
-		versionedObject, _, err := decoder.Decode(current, nil, nil)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("converting encoded server-side object back to versioned struct:\n%v\nfor:", info), info.Source, err)
-		}
-
-		// Compute a three way strategic merge patch to send to server.
-		patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, true)
-		if err != nil {
-			format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfrom:\n%v\nfor:"
-			return cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current, info), info.Source, err)
-		}
-
 		helper := resource.NewHelper(info.Client, info.Mapping)
-		_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+		patcher := NewPatcher(encoder, decoder, info.Mapping, helper)
+
+		patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
 		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
+			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
-			patch, err = cmdutil.ChangeResourcePatch(info, f.Command())
+			patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
 				return err
 			}
@@ -214,4 +199,75 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 	}
 
 	return nil
+}
+
+type patcher struct {
+	encoder runtime.Encoder
+	decoder runtime.Decoder
+
+	mapping *meta.RESTMapping
+	helper  *resource.Helper
+
+	backOff clockwork.Clock
+}
+
+func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.RESTMapping, helper *resource.Helper) *patcher {
+	return &patcher{
+		encoder: encoder,
+		decoder: decoder,
+		mapping: mapping,
+		helper:  helper,
+		backOff: clockwork.NewRealClock(),
+	}
+}
+
+func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+	// Serialize the current configuration of the object from the server.
+	current, err := runtime.Encode(p.encoder, obj)
+	if err != nil {
+		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("serializing current configuration from:\n%v\nfor:", obj), source, err)
+	}
+
+	// Retrieve the original configuration of the object from the annotation.
+	original, err := kubectl.GetOriginalConfiguration(p.mapping, obj)
+	if err != nil {
+		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), source, err)
+	}
+
+	// Create the versioned struct from the original from the server for
+	// strategic patch.
+	// TODO: Move all structs in apply to use raw data. Can be done once
+	// builder has a RawResult method which delivers raw data instead of
+	// internal objects.
+	versionedObject, _, err := p.decoder.Decode(current, nil, nil)
+	if err != nil {
+		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("converting encoded server-side object back to versioned struct:\n%v\nfor:", obj), source, err)
+	}
+
+	// Compute a three way strategic merge patch to send to server.
+	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, true)
+	if err != nil {
+		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
+		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
+	}
+
+	_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchType, patch)
+	return patch, err
+}
+
+func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+	var getErr error
+	patchBytes, err := p.patchSimple(current, modified, source, namespace, name)
+	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
+		if i > triesBeforeBackOff {
+			p.backOff.Sleep(backOffPeriod)
+		}
+		current, getErr = p.helper.Get(namespace, name, false)
+		if getErr != nil {
+			return nil, getErr
+		}
+		patchBytes, err = p.patchSimple(current, modified, source, namespace, name)
+	}
+
+	return patchBytes, err
 }
