@@ -153,8 +153,7 @@ addon-dir-create:
 {% if pillar.get('enable_node_problem_detector', '').lower() == 'true' %}
 /etc/kubernetes/addons/node-problem-detector/node-problem-detector.yaml:
   file.managed:
-    - source: salt://kube-addons/node-problem-detector/node-problem-detector.yaml.in
-    - template: jinja
+    - source: salt://kube-addons/node-problem-detector/node-problem-detector.yaml
     - user: root
     - group: root
     - file_mode: 644
