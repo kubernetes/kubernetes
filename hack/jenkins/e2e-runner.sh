@@ -34,8 +34,9 @@ function fetch_output_tars() {
 }
 
 function fetch_server_version_tars() {
-    local -r build_version="v$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE}  --format='value(defaultClusterVersion)')"
-    fetch_tars_from_gcs "release" "${build_version}"
+    local -r build_version="$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE}  --format='value(defaultClusterVersion)')"
+    # Use latest build of the server version's branch.
+    fetch_tars_from_gcs "release" "ci/latest-${build_version:0:3}"
     unpack_binaries
 }
 
