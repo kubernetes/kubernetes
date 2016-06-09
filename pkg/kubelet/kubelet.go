@@ -385,7 +385,7 @@ func NewMainKubelet(
 	}
 	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
-	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}, klet.hairpinMode); err != nil {
+	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug

@@ -52,7 +52,7 @@ const (
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
-	Init(host Host, hairpinMode componentconfig.HairpinMode) error
+	Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error
 
 	// Called on various events like:
 	// NET_PLUGIN_EVENT_POD_CIDR_CHANGE
@@ -105,11 +105,11 @@ type Host interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode) (NetworkPlugin, error) {
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
-		if err := plug.Init(host, hairpinMode); err != nil {
+		if err := plug.Init(host, hairpinMode, nonMasqueradeCIDR); err != nil {
 			return nil, err
 		}
 		return plug, nil
@@ -134,7 +134,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 
 	chosenPlugin := pluginMap[networkPluginName]
 	if chosenPlugin != nil {
-		err := chosenPlugin.Init(host, hairpinMode)
+		err := chosenPlugin.Init(host, hairpinMode, nonMasqueradeCIDR)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("Network plugin %q failed init: %v", networkPluginName, err))
 		} else {
@@ -156,7 +156,7 @@ type NoopNetworkPlugin struct {
 
 const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 
-func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode) error {
+func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
 	// kubernetes versions to ensure the iptables-based kube proxy functions
 	// correctly.  Other plugins are responsible for setting this correctly
