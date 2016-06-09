@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+REDIS_MASTER_NAME=${REDIS_MASTER_NAME:-mymaster}
+
 function launchmaster() {
   if [[ ! -e /redis-master-data ]]; then
     echo "Redis master data doesn't exist, data won't be persistent!"
@@ -24,7 +26,7 @@ function launchmaster() {
 
 function launchsentinel() {
   while true; do
-    master=$(redis-cli -h ${REDIS_SENTINEL_SERVICE_HOST} -p ${REDIS_SENTINEL_SERVICE_PORT} --csv SENTINEL get-master-addr-by-name mymaster | tr ',' ' ' | cut -d' ' -f1)
+    master=$(redis-cli -h ${REDIS_SENTINEL_SERVICE_HOST} -p ${REDIS_SENTINEL_SERVICE_PORT} --csv SENTINEL get-master-addr-by-name ${REDIS_MASTER_NAME} | tr ',' ' ' | cut -d' ' -f1)
     if [[ -n ${master} ]]; then
       master="${master//\"}"
     else
@@ -41,24 +43,24 @@ function launchsentinel() {
 
   sentinel_conf=sentinel.conf
 
-  echo "sentinel monitor mymaster ${master} 6379 2" > ${sentinel_conf}
-  echo "sentinel down-after-milliseconds mymaster 60000" >> ${sentinel_conf}
-  echo "sentinel failover-timeout mymaster 180000" >> ${sentinel_conf}
-  echo "sentinel parallel-syncs mymaster 1" >> ${sentinel_conf}
+  echo "sentinel monitor ${REDIS_MASTER_NAME} ${master} 6379 2" > ${sentinel_conf}
+  echo "sentinel down-after-milliseconds ${REDIS_MASTER_NAME} 60000" >> ${sentinel_conf}
+  echo "sentinel failover-timeout ${REDIS_MASTER_NAME} 180000" >> ${sentinel_conf}
+  echo "sentinel parallel-syncs ${REDIS_MASTER_NAME} 1" >> ${sentinel_conf}
 
   redis-sentinel ${sentinel_conf}
 }
 
 function launchslave() {
   while true; do
-    master=$(redis-cli -h ${REDIS_SENTINEL_SERVICE_HOST} -p ${REDIS_SENTINEL_SERVICE_PORT} --csv SENTINEL get-master-addr-by-name mymaster | tr ',' ' ' | cut -d' ' -f1)
+    master=$(redis-cli -h ${REDIS_SENTINEL_SERVICE_HOST} -p ${REDIS_SENTINEL_SERVICE_PORT} --csv SENTINEL get-master-addr-by-name ${REDIS_MASTER_NAME} | tr ',' ' ' | cut -d' ' -f1)
     if [[ -n ${master} ]]; then
       master="${master//\"}"
     else
       echo "Failed to find master."
       sleep 60
       exit 1
-    fi 
+    fi
     redis-cli -h ${master} INFO
     if [[ "$?" == "0" ]]; then
       break
