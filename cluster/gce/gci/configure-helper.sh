@@ -249,10 +249,17 @@ EOF
 }
 
 function assemble-docker-flags {
-  local docker_opts="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
+  echo "Assemble docker command line flags"
+  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
     docker_opts+=" --debug"
   fi
+  local use_net_plugin="true"
+  if [[ "${NETWORK_PROVIDER:-}" != "kubenet" && "${NETWORK_PROVIDER:-}" != "cni" ]]; then
+    use_net_plugin="false"
+    docker_opts+=" --bridge=cbr0"
+  fi
+
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
@@ -261,6 +268,12 @@ function assemble-docker-flags {
   fi
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  # If using a network plugin, we need to explicitly restart docker daemon, because
+  # kubelet will not do it. 
+  if [[ "${use_net_plugin}" == "true" ]]; then
+    echo "Docker command line is updated. Restart docker to pick it up"
+    systemctl restart docker
+  fi
 }
 
 # A helper function for loading a docker image. It keeps trying up to 5 times.
@@ -321,14 +334,15 @@ function start-kubelet {
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
+  local reconcile_cidr="true"
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ ! -z "${KUBELET_APISERVER:-}" && ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
-      flags+=" --reconcile-cidr=false"
       flags+=" --pod-cidr=10.123.45.0/30"
+      reconcile_cidr="false"
     else
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
@@ -340,6 +354,15 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
+  fi
+  # Network plugin
+  if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
+    flags+=" --network-plugin-dir=/home/kubernetes/bin"
+    flags+=" --network-plugin=${NETWORK_PROVIDER}"
+  fi
+  flags+=" --reconcile-cidr=${reconcile_cidr}"
+  if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
+    flag+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
   if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
     flags+=" --manifest-url=${MANIFEST_URL}"
@@ -591,7 +614,9 @@ function start-kube-controller-manager {
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
-  if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
+    params+=" --allocate-node-cidrs=true"
+  elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
     params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
@@ -797,7 +822,6 @@ function start-lb-controller {
        /etc/kubernetes/manifests/
   fi
 }
-
 
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
