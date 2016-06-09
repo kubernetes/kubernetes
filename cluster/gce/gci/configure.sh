@@ -146,17 +146,6 @@ function install-kube-binary-config {
   else
     rm -f "${kube_bin}/kubelet"
   fi
-  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
-     [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-    #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-    local -r cni_tar="cni-26b61728ac940c3faf827927782326e921be17b0.tar.gz"
-    download-or-bust "" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
-    tar xzf "${KUBE_HOME}/${cni_tar}" -C "${kube_bin}" --overwrite
-    mv "${kube_bin}/bin"/* "${kube_bin}"
-    rmdir "${kube_bin}/bin"
-    rm -f "${KUBE_HOME}/${cni_tar}"
-  fi
-
   cp "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
