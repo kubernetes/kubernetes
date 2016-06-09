@@ -111,7 +111,7 @@ else
 fi
 
 # find filesystem below /var/lib/docker
-STORAGE_DIR="/var/lib/docker"
+STORAGE_DIR="/var/lib/docker/$(hostname)"
 mkdir -p "${STORAGE_DIR}"
 
 # Smoke test the overlay filesystem:
@@ -149,7 +149,7 @@ if [ "${STORAGE_FS}" != "overlay" -o "${OVERLAY_WORKS}" == false ]; then
   mount -o loop "${STORAGE_FILE}" "${STORAGE_DIR}"
 fi
 
-DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:-} --storage-driver=${STORAGE_FS} --log-driver=json-file"
+DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:-} --storage-driver=${STORAGE_FS} -g ${STORAGE_DIR} --log-driver=json-file"
 
 # If a pidfile is still around (for example after a container restart),
 # delete it so that docker can start.

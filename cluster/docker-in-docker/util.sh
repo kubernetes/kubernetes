@@ -53,6 +53,8 @@ function cluster::docker_in_docker::docker_compose {
       export ${var_name}="${!var_name}"
     done
 
+    export DOCKER_IN_DOCKER_STORAGE_DIR=${DOCKER_IN_DOCKER_STORAGE_DIR:-${DOCKER_IN_DOCKER_WORK_DIR}/storage}
+
     docker-compose -p dind -f "${provider_root}/docker-compose.yml" ${params}
   )
 }

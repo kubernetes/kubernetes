@@ -23,6 +23,7 @@ node:
   - >
     NAME=$$(cut -f2 -d/ <<<$${APISERVER_NAME}) &&
     N=$${NAME##*_} &&
+    hostname $$(echo $${NAME} | tr _ -) &&
     HOSTNAME_OVERRIDE=$$(getent hosts node | cut -d' ' -f1 | sort -u | tail -1) &&
     DOCKER_NETWORK_OFFSET=0.0.$${N}.0
     exec wrapdocker bash -c "
@@ -45,6 +46,8 @@ node:
   environment:
   - VAR_LIB_DOCKER_SIZE=10
   - DOCKER_DAEMON_ARGS
+  volumes:
+  - ${DOCKER_IN_DOCKER_STORAGE_DIR}:/var/lib/docker
   links:
   - etcd
   - "ambassador:apiserver"
