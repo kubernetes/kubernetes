@@ -30,19 +30,13 @@ import (
 
 var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet and kube-apiserver binaries.")
 
-var buildTargets = []string{
-	"cmd/kubelet",
-	"cmd/kube-apiserver",
-	"test/e2e_node/e2e_node.test",
-}
-
 func buildGo() {
 	glog.Infof("Building k8s binaries...")
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
 		glog.Fatalf("Failed to locate kubernetes root directory %v.", err)
 	}
-	cmd := exec.Command(filepath.Join(k8sRoot, "hack/build-go.sh"), buildTargets...)
+	cmd := exec.Command(filepath.Join(k8sRoot, "hack/build-go.sh"))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
@@ -59,7 +53,7 @@ func getK8sBin(bin string) (string, error) {
 			return "", err
 		}
 		if _, err := os.Stat(filepath.Join(*k8sBinDir, bin)); err != nil {
-			return "", fmt.Errorf("Could not find %s under directory %s.", bin, absPath)
+			return "", fmt.Errorf("Could not find kube-apiserver under directory %s.", absPath)
 		}
 		return filepath.Join(absPath, bin), nil
 	}
