@@ -47,6 +47,10 @@ var _ = framework.KubeDescribe("EmptyDir volumes", func() {
 			doTestSetgidFSGroup(f, testImageNonRootUid, api.StorageMediumMemory)
 		})
 
+		It("files with FSGroup ownership should support (root,0644,tmpfs)", func() {
+			doTest0644FSGroup(f, testImageRootUid, api.StorageMediumMemory)
+		})
+
 		It("volume on default medium should have the correct mode using FSGroup", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, api.StorageMediumDefault)
 		})
