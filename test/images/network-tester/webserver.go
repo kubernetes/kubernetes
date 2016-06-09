@@ -43,6 +43,7 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -214,9 +215,27 @@ func main() {
 
 // Find all sibling pods in the service and post to their /write handler.
 func contactOthers(state *State) {
-	const waitTimeout = 5 * time.Minute
+	sleepTime := 5 * time.Second
+	// In large cluster getting all endpoints is pretty expensive.
+	// Thus, we will limit ourselves to send on average at most 10 such
+	// requests per second
+	if sleepTime < time.Duration(*peerCount/10)*time.Second {
+		sleepTime = time.Duration(*peerCount/10) * time.Second
+	}
+	timeout := 5 * time.Minute
+	// Similarly we need to bump timeout so that it is reasonable in large
+	// clusters.
+	if timeout < time.Duration(*peerCount)*time.Second {
+		timeout = time.Duration(*peerCount) * time.Second
+	}
 	defer state.doneContactingPeers()
-	client, err := client.NewInCluster()
+
+	config, err := restclient.InClusterConfig()
+	if err != nil {
+		log.Fatalf("Unable to create config; error: %v\n", err)
+	}
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+	client, err := client.New(config)
 	if err != nil {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
@@ -227,7 +246,7 @@ func contactOthers(state *State) {
 		log.Printf("Server version: %#v\n", v)
 	}
 
-	for start := time.Now(); time.Since(start) < waitTimeout; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
 		eps := getWebserverEndpoints(client)
 		if eps.Len() >= *peerCount {
 			break
@@ -243,7 +262,7 @@ func contactOthers(state *State) {
 			state.Logf("Attempting to contact %s", ep)
 			contactSingle(ep, state)
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(sleepTime)
 	}
 }
 
