@@ -206,7 +206,17 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 		return nil, err
 	}
 	es.kubeletStaticPodDir = dataDir
-	cmd := exec.Command("sudo", getKubeletServerBin(),
+	cmdArgs := []string{}
+	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
+		// On systemd services, detection of a service / unit works reliably while
+		// detection of a process started from an ssh session does not work.
+		// Since kubelet will typically be run as a service it also makes more
+		// sense to test it that way
+		cmdArgs = append(cmdArgs, systemdRun, getKubeletServerBin())
+	} else {
+		cmdArgs = append(cmdArgs, getKubeletServerBin())
+	}
+	cmdArgs = append(cmdArgs,
 		"--api-servers", "http://127.0.0.1:8080",
 		"--address", "0.0.0.0",
 		"--port", "10250",
@@ -218,6 +228,7 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", "8", "--logtostderr",
 	)
+	cmd := exec.Command("sudo", cmdArgs...)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",
 		cmd,
