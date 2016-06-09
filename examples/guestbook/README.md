@@ -67,7 +67,7 @@ spec:
     spec:
       containers:
       - name: master
-        image: redis
+        image: gcr.io/google_containers/redis:e2e
         ports:
         - containerPort: 6379
 ```
