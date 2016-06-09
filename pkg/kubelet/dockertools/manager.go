@@ -1504,8 +1504,9 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Can't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	} else {
+		glog.V(5).Infof("Generating ref for container %s: %#v", container.Name, ref)
 	}
-	glog.Infof("Generating ref for container %s: %#v", container.Name, ref)
 
 	opts, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
