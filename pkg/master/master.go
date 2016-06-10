@@ -689,7 +689,7 @@ func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataet
 	}
 	for ix := range list.Items {
 		item := &list.Items[ix]
-		if _, err := registry.Delete(ctx, item.Name, nil); err != nil {
+		if _, err := registry.Delete(ctx, item.Name, nil, nil); err != nil {
 			return err
 		}
 	}

@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -151,16 +152,16 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 }
 
 // Delete implements storage.Interface.Delete.
-func (s *store) Delete(ctx context.Context, key string, out runtime.Object, precondtions *storage.Preconditions) error {
+func (s *store) Delete(ctx context.Context, key string, out runtime.Object, precondition rest.ObjectFunc) error {
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
-	if precondtions == nil {
+	if precondition == nil {
 		return s.unconditionalDelete(ctx, key, out)
 	}
-	return s.conditionalDelete(ctx, key, out, v, precondtions)
+	return s.conditionalDelete(ctx, key, out, v, precondition)
 }
 
 func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime.Object) error {
@@ -182,7 +183,7 @@ func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime
 	return decode(s.codec, s.versioner, kv.Value, out, kv.ModRevision)
 }
 
-func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, precondtions *storage.Preconditions) error {
+func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, precondition rest.ObjectFunc) error {
 	getResp, err := s.client.KV.Get(ctx, key)
 	if err != nil {
 		return err
@@ -192,7 +193,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		if err != nil {
 			return err
 		}
-		if err := checkPreconditions(key, precondtions, origState.obj); err != nil {
+		if err := precondition(origState.obj); err != nil {
 			return err
 		}
 		txnResp, err := s.client.KV.Txn(ctx).If(

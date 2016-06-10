@@ -75,6 +75,6 @@ func (s *storage) UpdateThirdPartyResourceData(ctx api.Context, ThirdPartyResour
 }
 
 func (s *storage) DeleteThirdPartyResourceData(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

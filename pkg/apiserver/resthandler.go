@@ -38,8 +38,8 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
-	"github.com/emicklei/go-restful"
-	"github.com/evanphx/json-patch"
+	restful "github.com/emicklei/go-restful"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 )
 
@@ -784,19 +784,21 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
+		var precondition rest.ObjectFunc
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
-
-			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
-			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
-				return
+			precondition = func(obj runtime.Object) error {
+				return admit.Admit(admission.NewAttributesRecord(nil, obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			}
 		}
 
-		trace.Step("About do delete object from database")
+		if options.Preconditions != nil && options.Preconditions.UID != nil {
+			precondition = rest.AllFuncs(precondition, rest.NewUIDObjectFunc(*options.Preconditions.UID, scope.Resource.GroupResource()))
+		}
+
+		trace.Step("About to delete object from database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.Delete(ctx, name, options)
+			return r.Delete(ctx, name, options, precondition)
 		})
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
@@ -845,16 +847,6 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		if admit != nil && admit.Handles(admission.Delete) {
-			userInfo, _ := api.UserFrom(ctx)
-
-			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
-			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
-				return
-			}
-		}
-
 		listOptions := api.ListOptions{}
 		if err := scope.ParameterCodec.DecodeParameters(req.Request.URL.Query(), scope.Kind.GroupVersion(), &listOptions); err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
@@ -901,8 +893,24 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
+		var precondition rest.ObjectFunc
+		if admit != nil && admit.Handles(admission.Delete) {
+			userInfo, _ := api.UserFrom(ctx)
+			precondition = func(obj runtime.Object) error {
+				objMeta, err := api.ObjectMetaFor(obj)
+				if err != nil {
+					return errors.NewInternalError(fmt.Errorf("failed to introspect object %v: %s", obj, err))
+				}
+				return admit.Admit(admission.NewAttributesRecord(nil, obj, scope.Kind, namespace, objMeta.Name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			}
+		}
+
+		if options.Preconditions != nil && options.Preconditions.UID != nil {
+			precondition = rest.AllFuncs(precondition, rest.NewUIDObjectFunc(*options.Preconditions.UID, scope.Resource.GroupResource()))
+		}
+
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.DeleteCollection(ctx, options, &listOptions)
+			return r.DeleteCollection(ctx, options, &listOptions, precondition)
 		})
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)

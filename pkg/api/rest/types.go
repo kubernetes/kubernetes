@@ -17,7 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned
@@ -36,6 +42,21 @@ func AllFuncs(fns ...ObjectFunc) ObjectFunc {
 			if err := fn(obj); err != nil {
 				return err
 			}
+		}
+		return nil
+	}
+}
+
+// NewUIDObjectFunc returns an ObjectFunc which asserts that an object has the
+// specified UID, and returns an error if the UID does not match.
+func NewUIDObjectFunc(uid types.UID, gr unversioned.GroupResource) ObjectFunc {
+	return func(obj runtime.Object) error {
+		objectMeta, err := api.ObjectMetaFor(obj)
+		if err != nil {
+			return errors.NewConflict(gr, objectMeta.Name, fmt.Errorf("can't enforce precondition on un-introspectable object %v, got error: %v", obj, err))
+		}
+		if objectMeta.UID != uid {
+			return errors.NewConflict(gr, objectMeta.Name, fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", uid, objectMeta.UID))
 		}
 		return nil
 	}

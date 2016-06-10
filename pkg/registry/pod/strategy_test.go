@@ -139,7 +139,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 			t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
 		}
 		if *(out.GracePeriodSeconds) != tc.gracePeriod {
-			t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
+			t.Errorf("out grace period was %v but was expected to be %v", *out.GracePeriodSeconds, tc.gracePeriod)
 		}
 	}
 }

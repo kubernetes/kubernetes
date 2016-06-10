@@ -77,6 +77,6 @@ func (s *storage) GetRoleBinding(ctx api.Context, name string) (*rbac.RoleBindin
 }
 
 func (s *storage) DeleteRoleBinding(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

@@ -75,6 +75,6 @@ func (s *storage) GetNode(ctx api.Context, name string) (*api.Node, error) {
 }
 
 func (s *storage) DeleteNode(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

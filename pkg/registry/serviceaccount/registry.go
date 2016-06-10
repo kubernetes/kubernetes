@@ -74,6 +74,6 @@ func (s *storage) UpdateServiceAccount(ctx api.Context, serviceAccount *api.Serv
 }
 
 func (s *storage) DeleteServiceAccount(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

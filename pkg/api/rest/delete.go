@@ -17,11 +17,9 @@ limitations under the License.
 package rest
 
 import (
-	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -46,15 +44,20 @@ type RESTGracefulDeleteStrategy interface {
 // condition cannot be checked or the gracePeriodSeconds is invalid. The options argument may be updated with
 // default values if graceful is true. Second place where we set deletionTimestamp is pkg/registry/generic/registry/store.go
 // this function is responsible for setting deletionTimestamp during gracefulDeletion, other one for cascading deletions.
-func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Object, options *api.DeleteOptions) (graceful, gracefulPending bool, err error) {
-	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
+// default values if graceful is true.
+func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Object, options *api.DeleteOptions, precondition ObjectFunc) (graceful, gracefulPending bool, err error) {
+	objectMeta, _, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return false, false, kerr
 	}
-	// Checking the Preconditions here to fail early. They'll be enforced later on when we actually do the deletion, too.
-	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.UID {
-		return false, false, errors.NewConflict(unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, objectMeta.Name, fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.UID))
+
+	if precondition != nil {
+		err = precondition(obj)
+		if err != nil {
+			return false, false, err
+		}
 	}
+
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
 	if !ok {
 		// If we're not deleting gracefully there's no point in updating Generation, as we won't update

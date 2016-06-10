@@ -74,6 +74,6 @@ func (s *storage) UpdateSecret(ctx api.Context, secret *api.Secret) (*api.Secret
 }
 
 func (s *storage) DeleteSecret(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

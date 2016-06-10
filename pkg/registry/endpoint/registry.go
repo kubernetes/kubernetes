@@ -68,6 +68,6 @@ func (s *storage) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) err
 }
 
 func (s *storage) DeleteEndpoints(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

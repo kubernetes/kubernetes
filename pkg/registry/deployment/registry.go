@@ -79,6 +79,6 @@ func (s *storage) UpdateDeployment(ctx api.Context, deployment *extensions.Deplo
 }
 
 func (s *storage) DeleteDeployment(ctx api.Context, deploymentID string) error {
-	_, err := s.Delete(ctx, deploymentID, nil)
+	_, err := s.Delete(ctx, deploymentID, nil, nil)
 	return err
 }

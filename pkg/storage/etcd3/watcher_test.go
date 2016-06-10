@@ -232,7 +232,7 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	}
 	etcdW := cluster.RandClient().Watch(ctx, "/", clientv3.WithPrefix())
 
-	if err := store.Delete(ctx, key, &api.Pod{}, &storage.Preconditions{}); err != nil {
+	if err := store.Delete(ctx, key, &api.Pod{}, nil); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 

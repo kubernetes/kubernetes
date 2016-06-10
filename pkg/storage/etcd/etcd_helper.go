@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -165,7 +166,7 @@ func checkPreconditions(preconditions *storage.Preconditions, out runtime.Object
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions) error {
+func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object, precondition rest.ObjectFunc) error {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
@@ -175,7 +176,7 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object,
 		panic("unable to convert output object to pointer")
 	}
 
-	if preconditions == nil {
+	if precondition == nil {
 		startTime := time.Now()
 		response, err := h.etcdKeysAPI.Delete(ctx, key, nil)
 		metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
@@ -195,8 +196,8 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object,
 		if err != nil {
 			return toStorageErr(err, key, 0)
 		}
-		if err := checkPreconditions(preconditions, obj); err != nil {
-			return toStorageErr(err, key, 0)
+		if err := precondition(obj); err != nil {
+			return storage.NewInvalidObjError(key, err.Error())
 		}
 		index := uint64(0)
 		if node != nil {
