@@ -718,3 +718,35 @@ func (os *OpenStack) DeleteVolume(volumeName string) error {
 	}
 	return err
 }
+
+// Get device path of attached volume to the compute running kubelet
+func (os *OpenStack) GetAttachmentDiskPath(instanceID string, diskName string) (string, error) {
+	disk, err := os.getVolume(diskName)
+	if err != nil {
+		return "", err
+	}
+	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil {
+		if instanceID == disk.Attachments[0]["server_id"] {
+			// Attachment[0]["device"] points to the device path
+			// see http://developer.openstack.org/api-ref-blockstorage-v1.html
+			return disk.Attachments[0]["device"].(string), nil
+		} else {
+			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
+			glog.Errorf(errMsg)
+			return "", errors.New(errMsg)
+		}
+	}
+	return "", fmt.Errorf("volume %s is not attached to %s", diskName, instanceID)
+}
+
+// query if a volume is attached to a compute instance
+func (os *OpenStack) DiskIsAttached(diskName, instanceID string) (bool, error) {
+	disk, err := os.getVolume(diskName)
+	if err != nil {
+		return false, err
+	}
+	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && instanceID == disk.Attachments[0]["server_id"] {
+		return true, nil
+	}
+	return false, nil
+}

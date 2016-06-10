@@ -88,35 +88,10 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 }
 
 type fakePDManager struct {
-	attachCalled bool
-	detachCalled bool
 }
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachAndMountDisk(b *awsElasticBlockStoreMounter, globalPDPath string) error {
-	globalPath := makeGlobalPDPath(b.plugin.host, b.volumeID)
-	err := os.MkdirAll(globalPath, 0750)
-	if err != nil {
-		return err
-	}
-	fake.attachCalled = true
-	// Simulate the global mount so that the fakeMounter returns the
-	// expected number of mounts for the attached disk.
-	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
-	return nil
-}
-
-func (fake *fakePDManager) DetachDisk(c *awsElasticBlockStoreUnmounter) error {
-	globalPath := makeGlobalPDPath(c.plugin.host, c.volumeID)
-	err := os.RemoveAll(globalPath)
-	if err != nil {
-		return err
-	}
-	fake.detachCalled = true
-	return nil
-}
-
 func (fake *fakePDManager) CreateVolume(c *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
@@ -185,9 +160,6 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if !fakeManager.attachCalled {
-		t.Errorf("Attach watch not called")
-	}
 
 	fakeManager = &fakePDManager{}
 	unmounter, err := plug.(*awsElasticBlockStorePlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
@@ -205,9 +177,6 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
-	}
-	if !fakeManager.detachCalled {
-		t.Errorf("Detach watch not called")
 	}
 
 	// Test Provisioner

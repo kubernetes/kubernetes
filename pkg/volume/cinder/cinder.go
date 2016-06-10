@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
 	"k8s.io/kubernetes/pkg/types"
@@ -47,6 +48,9 @@ type CinderProvider interface {
 	CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error)
 	GetDevicePath(diskId string) string
 	InstanceID() (string, error)
+	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
+	DiskIsAttached(diskName, instanceID string) (bool, error)
+	Instances() (cloudprovider.Instances, bool)
 }
 
 type cinderPlugin struct {
@@ -163,6 +167,16 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 	}, nil
 }
 
+func getCloudProvider(cloudProvider cloudprovider.Interface) (CinderProvider, error) {
+	if cloud, ok := cloudProvider.(*rackspace.Rackspace); ok && cloud != nil {
+		return cloud, nil
+	}
+	if cloud, ok := cloudProvider.(*openstack.OpenStack); ok && cloud != nil {
+		return cloud, nil
+	}
+	return nil, fmt.Errorf("wrong cloud type")
+}
+
 func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
 	cloud := plugin.host.GetCloudProvider()
 	if cloud == nil {
@@ -243,7 +257,7 @@ func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-// SetUp attaches the disk and bind mounts to the volume path.
+// SetUp bind mounts to the volume path.
 func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
 
@@ -261,11 +275,6 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
-	if err := b.manager.AttachDisk(b, globalPDPath); err != nil {
-		glog.V(4).Infof("AttachDisk failed: %v", err)
-		return err
-	}
-	glog.V(3).Infof("Cinder volume %s attached", b.pdName)
 
 	options := []string{"bind"}
 	if b.readOnly {
@@ -382,15 +391,6 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	}
 	glog.V(3).Infof("Successfully unmounted: %s\n", dir)
 
-	// If refCount is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		if err := c.manager.DetachDisk(c); err != nil {
-			glog.V(4).Infof("DetachDisk failed: %v", err)
-			return err
-		}
-		glog.V(3).Infof("Volume %s detached", c.pdName)
-	}
 	notmnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
