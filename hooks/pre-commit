@@ -123,11 +123,11 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for docs that need updating... "
-if ! hack/verify-generated-docs.sh > /dev/null; then
+if ! hack/verify-munge-docs.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some docs are out of sync between CLI and markdown."
   echo "To regenerate docs, run:"
-  echo "  hack/update-generated-docs.sh"
+  echo "  hack/update-munge-docs.sh"
   exit_code=1
 else
   echo "${green}OK"

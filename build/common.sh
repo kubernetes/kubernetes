@@ -483,7 +483,6 @@ function kube::build::source_targets() {
     third_party
     vendor
     contrib/mesos
-    .generated_docs
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
