@@ -76,6 +76,8 @@ type ServerRunOptions struct {
 	InsecureBindAddress       net.IP
 	InsecurePort              int
 	KeystoneURL               string
+	KeystoneConfig            string
+	KeystoneAuthMode          string
 	KubernetesServiceNodePort int
 	LongRunningRequestRE      string
 	MasterCount               int
@@ -278,6 +280,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("port", "see --insecure-port instead")
 
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
+	fs.StringVar(&s.KeystoneConfig, "experimental-keystone-config", s.KeystoneConfig, "If passed, activates the keystone authentication plugin")
+	fs.StringVar(&s.KeystoneAuthMode, "experimental-keystone-auth-mode", s.KeystoneAuthMode, "If passed, selects between token and password modes")
 
 	// See #14282 for details on how to test/try this option out.  TODO remove this comment once this option is tested in CI.
 	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, "If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be of type NodePort, using this as the value of the port. If zero, the Kubernetes master service will be of type ClusterIP.")
