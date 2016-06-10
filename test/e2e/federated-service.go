@@ -84,6 +84,12 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 							ServerAddress: context.Cluster.Cluster.Server,
 						},
 					},
+					SecretRef: &api.LocalObjectReference{
+						// Note: Name must correlate with federation build script secret name,
+						//       which currently matches the cluster name.
+						//       See federation/cluster/common.sh:132
+						Name: context.Name,
+					},
 				},
 			}
 			_, err := f.FederationClientset.Federation().Clusters().Create(&cluster)
