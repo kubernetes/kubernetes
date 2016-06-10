@@ -644,7 +644,7 @@ start_kube_scheduler() {
 
 # Starts k8s cluster autoscaler.
 start_cluster_autoscaler() {
-  if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ] || [ "${ENABLE_CLUSTER_AUTOSCALER:-}" = "true" ]; then
+  if [ "${ENABLE_CLUSTER_AUTOSCALER:-}" = "true" ]; then
     prepare-log-file /var/log/cluster-autoscaler.log
 
      # Remove salt comments and replace variables with values
