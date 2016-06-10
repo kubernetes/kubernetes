@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -49,9 +50,15 @@ const (
 	zookeeperManifestPath   = "test/e2e/testing-manifests/petset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/petset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/petset/redis"
+	// Should the test restart petset clusters?
+	// TODO: enable when we've productionzed bringup of pets in this e2e.
+	restartCluster = false
 )
 
-var _ = framework.KubeDescribe("PetSet", func() {
+// Time: 25m, slow by design.
+// GCE Quota requirements: 3 pds, one per pet manifest declared above.
+// GCE Api requirements: nodes and master need storage r/w permissions.
+var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 	f := framework.NewDefaultFramework("petset")
 	var ns string
 	var c *client.Client
@@ -81,13 +88,16 @@ var _ = framework.KubeDescribe("PetSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				dumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all petset in ns %v", ns)
+			deleteAllPetSets(c, ns)
+		})
+
 		It("should provide basic identity [Feature:PetSet]", func() {
 			By("creating petset " + psName + " in namespace " + ns)
-			defer func() {
-				err := c.Apps().PetSets(ns).Delete(psName, nil)
-				Expect(err).NotTo(HaveOccurred())
-			}()
-
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newPetSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
@@ -99,7 +109,7 @@ var _ = framework.KubeDescribe("PetSet", func() {
 			By("Saturating pet set " + ps.Name)
 			pst.saturate(ps)
 
-			cmd := "echo $(hostname) > /data/hostname"
+			cmd := "echo $(hostname) > /data/hostname; sync;"
 			By("Running " + cmd + " in all pets")
 			pst.execInPets(ps, cmd)
 
@@ -114,10 +124,6 @@ var _ = framework.KubeDescribe("PetSet", func() {
 
 		It("should handle healthy pet restarts during scale [Feature:PetSet]", func() {
 			By("creating petset " + psName + " in namespace " + ns)
-			defer func() {
-				err := c.Apps().PetSets(ns).Delete(psName, nil)
-				Expect(err).NotTo(HaveOccurred())
-			}()
 
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
@@ -126,6 +132,7 @@ var _ = framework.KubeDescribe("PetSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			pst := petSetTester{c: c}
+
 			pst.waitForRunning(1, ps)
 
 			By("Marking pet at index 0 as healthy.")
@@ -152,17 +159,17 @@ var _ = framework.KubeDescribe("PetSet", func() {
 		})
 	})
 
-	framework.KubeDescribe("Deploy clustered applications", func() {
+	framework.KubeDescribe("Deploy clustered applications [Slow] [Feature:PetSet]", func() {
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce")
 		})
 
 		AfterEach(func() {
-			// TODO: delete pvs
-			if !CurrentGinkgoTestDescription().Failed {
-				return
+			if CurrentGinkgoTestDescription().Failed {
+				dumpDebugInfo(c, ns)
 			}
-			dumpDebugInfo(c, ns)
+			framework.Logf("Deleting all petset in ns %v", ns)
+			deleteAllPetSets(c, ns)
 		})
 
 		It("should creating a working zookeeper cluster [Feature:PetSet]", func() {
@@ -174,9 +181,11 @@ var _ = framework.KubeDescribe("PetSet", func() {
 			By("Creating foo:bar in member with index 0")
 			pet.write(0, map[string]string{"foo": "bar"})
 
-			By("Restarting pet set " + ps.Name)
-			pst.restart(ps)
-			pst.waitForRunning(ps.Spec.Replicas, ps)
+			if restartCluster {
+				By("Restarting pet set " + ps.Name)
+				pst.restart(ps)
+				pst.waitForRunning(ps.Spec.Replicas, ps)
+			}
 
 			By("Reading value under foo from member with index 2")
 			if v := pet.read(2, "foo"); v != "bar" {
@@ -193,9 +202,11 @@ var _ = framework.KubeDescribe("PetSet", func() {
 			By("Creating foo:bar in member with index 0")
 			pet.write(0, map[string]string{"foo": "bar"})
 
-			By("Restarting pet set " + ps.Name)
-			pst.restart(ps)
-			pst.waitForRunning(ps.Spec.Replicas, ps)
+			if restartCluster {
+				By("Restarting pet set " + ps.Name)
+				pst.restart(ps)
+				pst.waitForRunning(ps.Spec.Replicas, ps)
+			}
 
 			By("Reading value under foo from member with index 2")
 			if v := pet.read(2, "foo"); v != "bar" {
@@ -212,9 +223,11 @@ var _ = framework.KubeDescribe("PetSet", func() {
 			By("Creating foo:bar in member with index 0")
 			pet.write(0, map[string]string{"foo": "bar"})
 
-			By("Restarting pet set " + ps.Name)
-			pst.restart(ps)
-			pst.waitForRunning(ps.Spec.Replicas, ps)
+			if restartCluster {
+				By("Restarting pet set " + ps.Name)
+				pst.restart(ps)
+				pst.waitForRunning(ps.Spec.Replicas, ps)
+			}
 
 			By("Reading value under foo from member with index 2")
 			if v := pet.read(2, "foo"); v != "bar" {
@@ -381,6 +394,7 @@ func petSetFromManifest(fileName, ns string) *apps.PetSet {
 	return &ps
 }
 
+// petSetTester has all methods required to test a single petset.
 type petSetTester struct {
 	c *client.Client
 }
@@ -429,30 +443,36 @@ func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
 	}
 }
 
-func (p *petSetTester) restart(ps *apps.PetSet) {
+func (p *petSetTester) scale(ps *apps.PetSet, count int) error {
 	name := ps.Name
 	ns := ps.Namespace
-	oldReplicas := ps.Spec.Replicas
-	p.update(ns, name, func(ps *apps.PetSet) { ps.Spec.Replicas = 0 })
+	p.update(ns, name, func(ps *apps.PetSet) { ps.Spec.Replicas = count })
 
 	var petList *api.PodList
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout, func() (bool, error) {
 		petList = p.getPodList(ps)
-		if len(petList.Items) == 0 {
+		if len(petList.Items) == count {
 			return true, nil
 		}
 		return false, nil
 	})
 	if pollErr != nil {
-		ts := []string{}
+		unhealthy := []string{}
 		for _, pet := range petList.Items {
-			if pet.DeletionTimestamp != nil {
-				ts = append(ts, fmt.Sprintf("%v", pet.DeletionTimestamp.Time))
+			delTs, phase, readiness := pet.DeletionTimestamp, pet.Status.Phase, api.IsPodReady(&pet)
+			if delTs != nil || phase != api.PodRunning || !readiness {
+				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", pet.Name, delTs, phase, readiness))
 			}
 		}
-		framework.Failf("Failed to scale petset down to 0, %d remaining pods with deletion timestamps: %v", len(petList.Items), ts)
+		return fmt.Errorf("Failed to scale petset to %d in %v. Remaining pods:\n%v", count, petsetTimeout, unhealthy)
 	}
-	p.update(ns, name, func(ps *apps.PetSet) { ps.Spec.Replicas = oldReplicas })
+	return nil
+}
+
+func (p *petSetTester) restart(ps *apps.PetSet) {
+	oldReplicas := ps.Spec.Replicas
+	ExpectNoError(p.scale(ps, 0))
+	p.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = oldReplicas })
 }
 
 func (p *petSetTester) update(ns, name string, update func(ps *apps.PetSet)) {
@@ -539,6 +559,74 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 		ExpectNoError(err)
 		framework.Logf("Set annotation %v to %v on pod %v", petset.PetSetInitAnnotation, p.Annotations[petset.PetSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
+	}
+}
+
+func deleteAllPetSets(c *client.Client, ns string) {
+	pst := &petSetTester{c: c}
+	psList, err := c.Apps().PetSets(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+	ExpectNoError(err)
+
+	// Scale down each petset, then delete it completely.
+	// Deleting a pvc without doing this will leak volumes, #25101.
+	errList := []string{}
+	for _, ps := range psList.Items {
+		framework.Logf("Scaling petset %v to 0", ps.Name)
+		if err := pst.scale(&ps, 0); err != nil {
+			errList = append(errList, fmt.Sprintf("%v", err))
+		}
+		framework.Logf("Deleting petset %v", ps.Name)
+		if err := c.Apps().PetSets(ps.Namespace).Delete(ps.Name, nil); err != nil {
+			errList = append(errList, fmt.Sprintf("%v", err))
+		}
+	}
+
+	// pvs are global, so we need to wait for the exact ones bound to the petset pvcs.
+	pvNames := sets.NewString()
+	// TODO: Don't assume all pvcs in the ns belong to a petset
+	pvcPollErr := wait.PollImmediate(petsetPoll, petsetTimeout, func() (bool, error) {
+		pvcList, err := c.PersistentVolumeClaims(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
+			return false, nil
+		}
+		for _, pvc := range pvcList.Items {
+			pvNames.Insert(pvc.Spec.VolumeName)
+			// TODO: Double check that there are no pods referencing the pvc
+			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
+			if err := c.PersistentVolumeClaims(ns).Delete(pvc.Name); err != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if pvcPollErr != nil {
+		errList = append(errList, fmt.Sprintf("Timeout waiting for pvc deletion."))
+	}
+
+	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout, func() (bool, error) {
+		pvList, err := c.PersistentVolumes().List(api.ListOptions{LabelSelector: labels.Everything()})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
+			return false, nil
+		}
+		waitingFor := []string{}
+		for _, pv := range pvList.Items {
+			if pvNames.Has(pv.Name) {
+				waitingFor = append(waitingFor, fmt.Sprintf("%v: %+v", pv.Name, pv.Status))
+			}
+		}
+		if len(waitingFor) == 0 {
+			return true, nil
+		}
+		framework.Logf("Still waiting for pvs of petset to disappear:\n%v", strings.Join(waitingFor, "\n"))
+		return false, nil
+	})
+	if pollErr != nil {
+		errList = append(errList, fmt.Sprintf("Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs."))
+	}
+	if len(errList) != 0 {
+		ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))
 	}
 }
 
