@@ -17,6 +17,7 @@ limitations under the License.
 package policy
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -51,5 +52,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	)
 }
 
+func (obj *PodDisruptionBudget) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
 func (obj *PodDisruptionBudget) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *PodDisruptionBudgetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *PodDisruptionBudgetList) GetListMeta() meta.List                { return &obj.ListMeta }

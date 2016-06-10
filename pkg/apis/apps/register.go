@@ -18,6 +18,7 @@ package apps
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -53,5 +54,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	)
 }
 
+func (obj *PetSet) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
 func (obj *PetSet) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *PetSetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *PetSetList) GetListMeta() meta.List                { return &obj.ListMeta }
