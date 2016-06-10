@@ -256,7 +256,7 @@ func (gc *GarbageCollector) orhpanDependents(owner objectReference, dependents [
 	if len(failedDependents) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
-	fmt.Println("CHAO: successfully updated all dependents")
+	glog.V(6).Infof("successfully updated all dependents")
 	return nil
 }
 
