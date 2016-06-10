@@ -122,6 +122,8 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 		}
 	}
 
+	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
+
 	return allErrs
 }
 
@@ -1841,6 +1843,33 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	}
 	if len(tolerations) > 0 {
 		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
+	}
+
+	return allErrs
+}
+
+func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
+	if p == "docker/default" {
+		return nil
+	}
+	if p == "unconfined" {
+		return nil
+	}
+	if strings.HasPrefix(p, "localhost/") {
+		return validateSubPath(strings.TrimPrefix(p, "localhost/"), fldPath)
+	}
+	return field.ErrorList{field.Invalid(fldPath, p, "must be a valid seccomp profile")}
+}
+
+func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if p, exists := annotations[api.SeccompPodAnnotationKey]; exists {
+		allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
+	}
+	for k, p := range annotations {
+		if strings.HasPrefix(k, api.SeccompContainerAnnotationKeyPrefix) {
+			allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(k))...)
+		}
 	}
 
 	return allErrs
