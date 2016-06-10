@@ -1172,27 +1172,6 @@ func TestGenerateRunCommand(t *testing.T) {
 			nil,
 			fmt.Sprintf("/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=%s rkt-uuid-foo", hostName),
 		},
-		// Case #5, returns --net=host --no-overlay
-		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "pod-name-foo",
-				},
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork:    true,
-						SELinuxOptions: &api.SELinuxOptions{},
-					},
-				},
-			},
-			"rkt-uuid-foo",
-			"",
-			[]string{""},
-			[]string{""},
-			"pod-hostname-foo",
-			nil,
-			fmt.Sprintf("/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --no-overlay=true --net=host --hostname=%s rkt-uuid-foo", hostName),
-		},
 	}
 
 	rkt := &Runtime{
