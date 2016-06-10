@@ -35,7 +35,7 @@ if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
   # Otherwise, we respect whatever is set by the user.
   gci_images=( $(gcloud compute images list --project google-containers \
       --show-deprecated --no-standard-images --sort-by='~creationTimestamp' \
-      --regexp='gci-[a-z]+-52-.*' --format='table[no-heading](name)') )
+      --regexp='gci-[a-z]+-53-.*' --format='table[no-heading](name)') )
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-"${gci_images[0]}"}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
   # The default node image when using GCI is still the Debian based ContainerVM
