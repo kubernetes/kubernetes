@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -107,6 +108,29 @@ func TestClient(t *testing.T) {
 	if actual.Spec.NodeName != "" {
 		t.Errorf("expected pod to be unscheduled, got %#v", actual)
 	}
+}
+
+func TestAPIVersions(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	clientVersion := c.APIVersion().String()
+	g, err := c.ServerGroups()
+	if err != nil {
+		t.Fatalf("Failed to get api versions: %v", err)
+	}
+	versions := unversioned.ExtractGroupVersions(g)
+
+	// Verify that the server supports the API version used by the client.
+	for _, version := range versions {
+		if version == clientVersion {
+			return
+		}
+	}
+	t.Errorf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", versions, clientVersion)
 }
 
 func TestSingleWatch(t *testing.T) {
