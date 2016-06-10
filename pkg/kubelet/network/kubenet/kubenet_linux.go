@@ -613,7 +613,8 @@ func (plugin *kubenetNetworkPlugin) gatherAllHostports() (map[api.ContainerPort]
 		}
 		// Need the complete api.Pod object
 		pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name)
-		if ok {
+		// kubenet should not handle hostports for hostnetwork pods
+		if ok && !pod.Spec.SecurityContext.HostNetwork {
 			for _, container := range pod.Spec.Containers {
 				for _, port := range container.Ports {
 					if port.HostPort != 0 {
