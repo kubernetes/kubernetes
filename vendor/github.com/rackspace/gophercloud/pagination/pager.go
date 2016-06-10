@@ -138,6 +138,11 @@ func (p Pager) AllPages() (Page, error) {
 	// that type.
 	pageType := reflect.TypeOf(testPage)
 
+	// if it's a single page, just return the testPage (first page)
+	if _, found := pageType.FieldByName("SinglePageBase"); found {
+		return testPage, nil
+	}
+
 	// Switch on the page body type. Recognized types are `map[string]interface{}`,
 	// `[]byte`, and `[]interface{}`.
 	switch testPage.GetBody().(type) {
@@ -153,7 +158,14 @@ func (p Pager) AllPages() (Page, error) {
 					key = k
 				}
 			}
-			pagesSlice = append(pagesSlice, b[key].([]interface{})...)
+			switch keyType := b[key].(type) {
+			case map[string]interface{}:
+				pagesSlice = append(pagesSlice, keyType)
+			case []interface{}:
+				pagesSlice = append(pagesSlice, b[key].([]interface{})...)
+			default:
+				return false, fmt.Errorf("Unsupported page body type: %+v", keyType)
+			}
 			return true, nil
 		})
 		if err != nil {
