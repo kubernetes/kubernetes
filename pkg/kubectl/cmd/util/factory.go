@@ -1396,3 +1396,20 @@ func registerThirdPartyResources(discoveryClient discovery.DiscoveryInterface) e
 
 	return nil
 }
+
+func ResourcesWithPodSpecs() []*meta.RESTMapping {
+	restMaps := []*meta.RESTMapping{}
+	resourcesWithTemplates := []string{"ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
+	mapper, _ := NewFactory(nil).Object()
+
+	for _, resource := range resourcesWithTemplates {
+		restmap, err := mapper.RESTMapping(unversioned.GroupKind{Kind: resource})
+		if err == nil {
+			restMaps = append(restMaps, restmap)
+		} else {
+			mapping, _ := mapper.RESTMapping(extensions.Kind(resource))
+			restMaps = append(restMaps, mapping)
+		}
+	}
+	return restMaps
+}
