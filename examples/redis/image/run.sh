@@ -19,7 +19,7 @@ function launchmaster() {
     echo "Redis master data doesn't exist, data won't be persistent!"
     mkdir /redis-master-data
   fi
-  redis-server /redis-master/redis.conf
+  redis-server /redis-master/redis.conf --protected-mode no
 }
 
 function launchsentinel() {
@@ -45,8 +45,9 @@ function launchsentinel() {
   echo "sentinel down-after-milliseconds mymaster 60000" >> ${sentinel_conf}
   echo "sentinel failover-timeout mymaster 180000" >> ${sentinel_conf}
   echo "sentinel parallel-syncs mymaster 1" >> ${sentinel_conf}
+  echo "bind 0.0.0.0"
 
-  redis-sentinel ${sentinel_conf}
+  redis-sentinel ${sentinel_conf} --protected-mode no
 }
 
 function launchslave() {
@@ -66,9 +67,9 @@ function launchslave() {
     echo "Connecting to master failed.  Waiting..."
     sleep 10
   done
-  perl -pi -e "s/%master-ip%/${master}/" /redis-slave/redis.conf
-  perl -pi -e "s/%master-port%/6379/" /redis-slave/redis.conf
-  redis-server /redis-slave/redis.conf
+  sed -i "s/%master-ip%/${master}/" /redis-slave/redis.conf
+  sed -i "s/%master-port%/6379/" /redis-slave/redis.conf
+  redis-server /redis-slave/redis.conf --protected-mode no
 }
 
 if [[ "${MASTER}" == "true" ]]; then
