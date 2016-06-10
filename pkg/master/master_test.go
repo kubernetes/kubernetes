@@ -430,19 +430,6 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 				Version:      testapi.Autoscaling.GroupVersion().Version,
 			},
 		},
-		// batch is using its pkg/apis/batch/ types here since during installation
-		// both versions get installed and testapi.go currently does not support
-		// multi-versioned clients
-		batch.GroupName: {
-			{
-				GroupVersion: batchapiv1.SchemeGroupVersion.String(),
-				Version:      batchapiv1.SchemeGroupVersion.Version,
-			},
-			{
-				GroupVersion: batchapiv2alpha1.SchemeGroupVersion.String(),
-				Version:      batchapiv2alpha1.SchemeGroupVersion.Version,
-			},
-		},
 		apps.GroupName: {
 			{
 				GroupVersion: testapi.Apps.GroupVersion().String(),
@@ -456,6 +443,15 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 			},
 		},
 	}
+	var batchVersions []unversioned.GroupVersionForDiscovery
+	for _, gv := range testapi.Batch.GroupVersions() {
+		batchVersions = append(batchVersions, unversioned.GroupVersionForDiscovery{
+			GroupVersion: gv.String(),
+			Version:      gv.Version,
+		})
+	}
+	expectVersions[batch.GroupName] = batchVersions
+
 	expectPreferredVersion := map[string]unversioned.GroupVersionForDiscovery{
 		autoscaling.GroupName: {
 			GroupVersion: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.String(),
