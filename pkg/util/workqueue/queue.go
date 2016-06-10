@@ -54,6 +54,8 @@ type Type struct {
 	// it's in the dirty set, and if so, add it to the queue.
 	processing set
 
+	items set
+
 	cond *sync.Cond
 
 	shuttingDown bool
@@ -90,6 +92,8 @@ func (q *Type) Add(item interface{}) {
 	if q.processing.has(item) {
 		return
 	}
+
+	q.items.insert(item)
 	q.queue = append(q.queue, item)
 	q.cond.Signal()
 }
@@ -129,10 +133,15 @@ func (q *Type) Done(item interface{}) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 	q.processing.delete(item)
+	q.items.delete(item)
 	if q.dirty.has(item) {
 		q.queue = append(q.queue, item)
 		q.cond.Signal()
 	}
+}
+
+func (q *Type) Has(item interface{}) {
+	return q.items.has(t(item))
 }
 
 // Shutdown will cause q to ignore all new items added to it. As soon as the
