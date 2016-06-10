@@ -1,14 +1,18 @@
 {% set base_metrics_memory = "140Mi" -%}
 {% set metrics_memory = base_metrics_memory -%}
+{% set base_metrics_cpu = "80m" -%}
+{% set metrics_cpu = base_metrics_cpu -%}
 {% set base_eventer_memory = "190Mi" -%}
 {% set eventer_memory = base_eventer_memory -%}
 {% set metrics_memory_per_node = 4 -%}
+{% set metrics_cpu_per_node = 0.5 -%}
 {% set eventer_memory_per_node = 500 -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
 {% set nanny_memory = "90Mi" -%}
 {% set nanny_memory_per_node = 200 -%}
 {% if num_nodes >= 0 -%}
   {% set metrics_memory = (200 + num_nodes * metrics_memory_per_node)|string + "Mi" -%}
+  {% set metrics_cpu = (80 + num_nodes * metrics_cpu_per_node)|string + "m" -%}
   {% set eventer_memory = (200 * 1024 + num_nodes * eventer_memory_per_node)|string + "Ki" -%}
   {% set nanny_memory = (90 * 1024 + num_nodes * nanny_memory_per_node)|string + "Ki" -%}
 {% endif -%}
@@ -40,10 +44,10 @@ spec:
           resources:
             # keep request = limit to keep this container in guaranteed class
             limits:
-              cpu: 100m
+              cpu: {{ metrics_cpu }}
               memory: {{ metrics_memory }}
             requests:
-              cpu: 100m
+              cpu: {{ metrics_cpu }}
               memory: {{ metrics_memory }}
           command:
             - /heapster
@@ -91,8 +95,8 @@ spec:
                   fieldPath: metadata.namespace
           command:
             - /pod_nanny
-            - --cpu=80m
-            - --extra-cpu=0.5m
+            - --cpu={{ base_metrics_cpu }}
+            - --extra-cpu={{ metrics_cpu_per_node }}m
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{metrics_memory_per_node}}Mi
             - --threshold=5
