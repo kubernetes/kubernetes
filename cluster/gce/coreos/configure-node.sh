@@ -160,6 +160,10 @@ function configure-master-addons() {
     CLUSTER_REGISTRY_DISK_SIZE=$(convert-bytes-gce-kube "${CLUSTER_REGISTRY_DISK_SIZE}")
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/registry  ${addon_dir}/registry
   fi
+
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR}" == "true" ]]; then
+    evaluate-manifests-dir ${MANIFESTS_DIR}/addons/node-problem-detector  ${addon_dir}/node-problem-detector
+  fi
 }
 
 function configure-master-components() {
