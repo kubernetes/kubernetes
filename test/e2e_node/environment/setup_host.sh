@@ -41,6 +41,11 @@ EOF
   sudo systemctl daemon-reload
 fi
 
+# For coreos, disable updates
+if $(sudo systemctl status update-engine &>/dev/null); then
+  sudo systemctl mask update-engine locksmithd
+fi
+
 # Fixup sudoers require tty
 sudo grep -q "# Defaults    requiretty" /etc/sudoers
 if [ $? -ne 0 ] ; then
