@@ -72,6 +72,7 @@ docs/man/man1/kubectl-rollout.1
 docs/man/man1/kubectl-run.1
 docs/man/man1/kubectl-scale.1
 docs/man/man1/kubectl-set-image.1
+docs/man/man1/kubectl-set-resources.1
 docs/man/man1/kubectl-set.1
 docs/man/man1/kubectl-stop.1
 docs/man/man1/kubectl-taint.1
@@ -146,6 +147,7 @@ docs/user-guide/kubectl/kubectl_run.md
 docs/user-guide/kubectl/kubectl_scale.md
 docs/user-guide/kubectl/kubectl_set.md
 docs/user-guide/kubectl/kubectl_set_image.md
+docs/user-guide/kubectl/kubectl_set_resources.md
 docs/user-guide/kubectl/kubectl_taint.md
 docs/user-guide/kubectl/kubectl_top.md
 docs/user-guide/kubectl/kubectl_top_node.md
