@@ -54,7 +54,7 @@ func createNodePoolWithLocalSsds(nodePoolName string) {
 }
 
 func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
-	var pod = testPodWithSsd("echo 'hello world' > /mnt/ssd0/data  && sleep 1 && cat /mnt/ssd0/data")
+	var pod = testPodWithSsd("echo 'hello world' > /mnt/disks/ssd0/data  && sleep 1 && cat /mnt/disks/ssd0/data")
 	var msg string
 	var out = []string{"hello world"}
 
@@ -64,7 +64,7 @@ func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
 func testPodWithSsd(command string) *api.Pod {
 	containerName := "test-container"
 	volumeName := "test-ssd-volume"
-	path := "/mnt/ssd0"
+	path := "/mnt/disks/ssd0"
 	podName := "pod-" + string(util.NewUUID())
 	image := "ubuntu:14.04"
 	return &api.Pod{
