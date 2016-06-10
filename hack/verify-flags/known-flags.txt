@@ -65,6 +65,8 @@ concurrent-namespace-syncs
 concurrent-replicaset-syncs
 concurrent-service-syncs
 concurrent-resource-quota-syncs
+config-map-name
+config-map-namespace
 config-sync-period
 configure-cbr0
 configure-cloud-routes

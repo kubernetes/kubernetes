@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -69,22 +70,47 @@ through the API as necessary.`,
 
 // Run runs the specified SchedulerServer.  This should never exit.
 func Run(s *options.SchedulerServer) error {
-	if c, err := configz.New("componentconfig"); err == nil {
-		c.Set(s.KubeSchedulerConfiguration)
-	} else {
-		glog.Errorf("unable to register configz: %s", err)
-	}
+
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
 		return err
 	}
 
+	kubeClient, err := client.New(kubeconfig)
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+
+	if s.ConfigMapName != "" && s.ConfigMapNamespace != "" {
+		cm, err := kubeClient.ConfigMaps(s.ConfigMapNamespace).Get(s.ConfigMapName)
+		if err != nil {
+			return err
+		}
+		b, ok := cm.Data["config"]
+		if !ok {
+			return fmt.Errorf("scheduler configmap must have a byte field")
+		}
+		config := componentconfig.KubeSchedulerConfiguration{}
+		runtime.DecodeInto(api.Codecs.LegacyCodec(), []byte(b), &config)
+		s.KubeSchedulerConfiguration = config
+	}
+
+	if c, err := configz.New("componentconfig"); err == nil {
+		c.Set(s.KubeSchedulerConfiguration)
+	} else {
+		glog.Errorf("unable to register configz: %s", err)
+	}
+
+	kubeconfig, err = clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+	if err != nil {
+		return err
+	}
 	kubeconfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
 
-	kubeClient, err := client.New(kubeconfig)
+	kubeClient, err = client.New(kubeconfig)
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
