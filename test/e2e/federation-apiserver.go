@@ -34,7 +34,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 		contexts := f.GetUnderlyingFederatedContexts()
 
 		for _, context := range contexts {
-			framework.Logf("Creating cluster object: %s (%s)", context.Name, context.Cluster.Cluster.Server)
+			framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 			cluster := federationapi.Cluster{
 				ObjectMeta: api.ObjectMeta{
 					Name: context.Name,
@@ -46,7 +46,12 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 							ServerAddress: context.Cluster.Cluster.Server,
 						},
 					},
-					//TODO(colhom): add SecretRef when #26132 lands
+					SecretRef: &api.LocalObjectReference{
+						// Note: Name must correlate with federation build script secret name,
+						//       which currently matches the cluster name.
+						//       See federation/cluster/common.sh:132
+						Name: context.Name,
+					},
 				},
 			}
 			_, err := f.FederationClient.Clusters().Create(&cluster)
