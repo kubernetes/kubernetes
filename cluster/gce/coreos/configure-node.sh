@@ -173,8 +173,8 @@ function configure-master-components() {
   configure-kube-apiserver
   configure-kube-scheduler
   configure-kube-controller-manager
-  configure-addon-manager
   configure-master-addons
+  configure-addon-manager
 }
 
 # TODO(yifan): Merge this with mount-master-pd() in configure-vm.sh
@@ -301,9 +301,10 @@ function load-docker-images() {
 }
 
 
-# TODO(yifan): Making this function more generic for other runtimes.
 function load-master-components-images() {
   echo "Loading docker images for master components"
+  export RKT_BIN=/opt/rkt/rkt
+  export DOCKER2ACI_BIN=/opt/docker2aci/docker2aci
   ${SALT_DIR}/install.sh ${KUBE_BIN_TAR}
   ${SALT_DIR}/salt/kube-master-addons/kube-master-addons.sh
 
