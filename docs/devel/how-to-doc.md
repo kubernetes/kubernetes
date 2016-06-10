@@ -1,29 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -73,7 +49,7 @@ After running `hack/update-munge-docs.sh`, you'll see a table of contents genera
 
 It's important to follow the rules when writing links. It helps us correctly versionize documents for each release.
 
-Use inline links instead of urls at all times. When you add internal links to `docs/` or `examples/`, use relative links; otherwise, use `http://releases.k8s.io/HEAD/<path/to/link>`. For example, avoid using:
+Use inline links instead of urls at all times. When you add internal links to `docs/` or `examples/`, use relative links; otherwise, use `http://releases.k8s.io/v1.4.0-alpha.0/<path/to/link>`. For example, avoid using:
 
 ```
 [GCE](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/gce.md)  # note that it's under docs/
@@ -85,11 +61,11 @@ Instead, use:
 
 ```
 [GCE](../getting-started-guides/gce.md)                 # note that it's under docs/
-[Kubernetes package](http://releases.k8s.io/HEAD/pkg/)  # note that it's under pkg/
+[Kubernetes package](http://releases.k8s.io/v1.4.0-alpha.0/pkg/)  # note that it's under pkg/
 [Kubernetes](http://kubernetes.io/)                     # external link
 ```
 
-The above example generates the following links: [GCE](../getting-started-guides/gce.md), [Kubernetes package](http://releases.k8s.io/HEAD/pkg/), and [Kubernetes](http://kubernetes.io/).
+The above example generates the following links: [GCE](../getting-started-guides/gce.md), [Kubernetes package](http://releases.k8s.io/v1.4.0-alpha.0/pkg/), and [Kubernetes](http://kubernetes.io/).
 
 ## How to Include an Example
 
@@ -170,7 +146,7 @@ Mungers are like gofmt for md docs which we use to format documents. To use it, 
 <!-- END MUNGE: xxxx -->
 ```
 
-in your md files. Note that xxxx is the placeholder for a specific munger. Appropriate content will be generated and inserted between two brackets after you run `hack/update-munge-docs.sh`. See [munger document](http://releases.k8s.io/HEAD/cmd/mungedocs/) for more details.
+in your md files. Note that xxxx is the placeholder for a specific munger. Appropriate content will be generated and inserted between two brackets after you run `hack/update-munge-docs.sh`. See [munger document](http://releases.k8s.io/v1.4.0-alpha.0/cmd/mungedocs/) for more details.
 
 ## Auto-added Mungers
 
@@ -183,8 +159,6 @@ UNVERSIONED_WARNING munger inserts unversioned warning which warns the users whe
 ```
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 ```
