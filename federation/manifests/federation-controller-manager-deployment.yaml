@@ -18,7 +18,7 @@ spec:
         image: {{.FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO}}:{{.FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG}}
         command:
         - /usr/local/bin/federation-controller-manager
-        - --master={{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}:443
+        - --master=https://{{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}:443
         ports:
         - containerPort: 443
           name: https
