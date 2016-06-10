@@ -1764,7 +1764,7 @@ func TestUnconfinedSeccompProfileWithDockerV110(t *testing.T) {
 			Name:      "foo4",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "unconfined",
+				api.SeccompPodAnnotationKey: "unconfined",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1806,7 +1806,7 @@ func TestDefaultSeccompProfileWithDockerV110(t *testing.T) {
 			Name:      "foo1",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
+				api.SeccompPodAnnotationKey: "docker/default",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1848,8 +1848,8 @@ func TestSeccompContainerAnnotationTrumpsPod(t *testing.T) {
 			Name:      "foo2",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod":            "unconfined",
-				"container.seccomp.security.alpha.kubernetes.io/bar2": "docker/default",
+				api.SeccompPodAnnotationKey:                      "unconfined",
+				api.SeccompContainerAnnotationKeyPrefix + "bar2": "docker/default",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1891,45 +1891,21 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 	}{
 		{
 			annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "localhost/test",
+				api.SeccompPodAnnotationKey: "localhost/test",
 			},
 			expectedSecOpt: `seccomp={"foo":"bar"}`,
 		},
 		{
 			annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "localhost/sub/subtest",
+				api.SeccompPodAnnotationKey: "localhost/sub/subtest",
 			},
 			expectedSecOpt: `seccomp={"abc":"def"}`,
 		},
 		{
 			annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "localhost/not-existing",
+				api.SeccompPodAnnotationKey: "localhost/not-existing",
 			},
 			expectedError: "cannot load seccomp profile",
-		},
-		{
-			annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "localhost/../test",
-			},
-			expectedError: "invalid seccomp profile name",
-		},
-		{
-			annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "localhost//test",
-			},
-			expectedError: "invalid seccomp profile name",
-		},
-		{
-			annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "localhost/sub//subtest",
-			},
-			expectedError: "invalid seccomp profile name",
-		},
-		{
-			annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "localhost/test/",
-			},
-			expectedError: "invalid seccomp profile name",
 		},
 	}
 

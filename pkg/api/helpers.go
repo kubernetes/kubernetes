@@ -416,6 +416,14 @@ const (
 	// TaintsAnnotationKey represents the key of taints data (json serialized)
 	// in the Annotations of a Node.
 	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
+
+	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
+	// to all containers of a pod.
+	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
+
+	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
+	// to one container of a pod.
+	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
