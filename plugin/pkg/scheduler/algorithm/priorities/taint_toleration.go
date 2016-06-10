@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -104,6 +105,8 @@ func (s *TaintToleration) ComputeTaintTolerationPriority(pod *api.Pod, nodeNameT
 		if maxCount > 0 {
 			fScore = (1.0 - float64(counts[node.Name])/float64(maxCount)) * 10
 		}
+		glog.V(10).Infof("%v -> %v: Taint Toleration Priority, Score: (%d)", pod.Name, node.Name, int(fScore))
+
 		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
 	}
 	return result, nil
