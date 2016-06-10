@@ -53,11 +53,11 @@ func TestNewOIDCAuthProvider(t *testing.T) {
 	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
 	op := oidctesting.NewOIDCProvider(t)
 	srv, err := op.ServeTLSWithKeyPair(cert, key)
-	op.AddMinimalProviderConfig(srv)
 	if err != nil {
 		t.Fatalf("Cannot start server %v", err)
 	}
 	defer srv.Close()
+	op.AddMinimalProviderConfig(srv)
 
 	certData, err := ioutil.ReadFile(cert)
 	if err != nil {
