@@ -1310,3 +1310,20 @@ func (f *Factory) NewBuilder(thirdPartyDiscovery bool) *resource.Builder {
 
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
+
+func (f *Factory) ResourcesWithPodSpecs() []*meta.RESTMapping {
+	restMaps := []*meta.RESTMapping{}
+	resourcesWithTemplates := []string{"ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
+	mapper, _ := f.Object(false)
+
+	for _, resource := range resourcesWithTemplates {
+		restmap, err := mapper.RESTMapping(unversioned.GroupKind{Kind: resource})
+		if err == nil {
+			restMaps = append(restMaps, restmap)
+		} else {
+			mapping, _ := mapper.RESTMapping(extensions.Kind(resource))
+			restMaps = append(restMaps, mapping)
+		}
+	}
+	return restMaps
+}
