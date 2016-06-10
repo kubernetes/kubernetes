@@ -23,6 +23,7 @@ import (
 
 	etcd2client "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/pkg/transport"
+	"golang.org/x/net/context"
 
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -48,6 +49,13 @@ func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client
 		Endpoints: serverList,
 		Transport: tr,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Sanity test to see if we are access the etcd API
+	membersAPI := etcd2client.NewMembersAPI(cli)
+	_, err = membersAPI.Leader(context.TODO())
 	if err != nil {
 		return nil, err
 	}
