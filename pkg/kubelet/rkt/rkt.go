@@ -67,8 +67,8 @@ const (
 	RktType                      = "rkt"
 	DefaultRktAPIServiceEndpoint = "localhost:15441"
 
-	minimumRktBinVersion     = "1.7.0"
-	recommendedRktBinVersion = "1.7.0"
+	minimumRktBinVersion     = "1.8.0"
+	recommendedRktBinVersion = "1.8.0"
 
 	minimumRktApiVersion  = "1.0.0-alpha"
 	minimumSystemdVersion = "219"
