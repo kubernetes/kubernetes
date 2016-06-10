@@ -48,6 +48,23 @@ function create-dirs {
   fi
 }
 
+# Local ssds, if present, are mounted at /mnt/disks/ssdN.
+function ensure-local-ssds() {
+  for ssd in /dev/disk/by-id/google-local-ssd-*; do
+    if [ -e "${ssd}" ]; then
+      ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
+      ssdmount="/mnt/disks/ssd${ssdnum}/"
+      echo "Formatting and mounting local SSD $ssd to ${ssdmount}"
+      mkdir -p ${ssdmount}
+      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" ${ssdmount} || \
+      { echo "Local SSD $ssdnum mount failed"; return 1; }
+      chmod a+w ${ssdmount}
+    else
+      echo "No local SSD disks found."
+    fi
+  done
+}
+
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
 function find-master-pd {
   MASTER_PD_DEVICE=""
@@ -848,6 +865,7 @@ fi
 source "${KUBE_HOME}/kube-env"
 config-ip-firewall
 create-dirs
+ensure-local-ssds
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-master-auth
