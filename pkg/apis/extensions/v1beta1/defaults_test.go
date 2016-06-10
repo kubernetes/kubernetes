@@ -659,6 +659,296 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 	}
 }
 
+func newStringPtr(val string) *string { return &val }
+
+func newBoolPtr(val bool) *bool { return &val }
+
+func newTemplate(p Parameter) Template {
+	return Template{
+		Spec: TemplateSpec{
+			Parameters: []Parameter{
+				p,
+			},
+		},
+	}
+}
+
+func TestSetDefaultParameterRequired(t *testing.T) {
+	tests := []struct {
+		t                Template
+		expectedRequired bool
+	}{
+		{
+			t:                newTemplate(Parameter{}),
+			expectedRequired: false,
+		},
+		{
+			t: newTemplate(Parameter{
+				Required: newBoolPtr(false),
+			}),
+			expectedRequired: false,
+		},
+		{
+			t: newTemplate(Parameter{
+				Required: newBoolPtr(true),
+			}),
+			expectedRequired: true,
+		},
+	}
+
+	for _, test := range tests {
+		tem := &test.t
+		obj2 := roundTrip(t, runtime.Object(tem))
+		tem2, ok := obj2.(*Template)
+		if !ok {
+			t.Errorf("unexpected object: %v", tem2)
+			t.FailNow()
+		}
+		p := tem2.Spec.Parameters[0]
+		if p.Type == nil {
+			t.Errorf("unexpected nil Required")
+		} else if test.expectedRequired != *p.Required {
+			t.Errorf("expected: %t Required, got: %t", test.expectedRequired, *p.Required)
+		}
+	}
+}
+
+func TestSetDefaultParameterType(t *testing.T) {
+	tests := []struct {
+		t            Template
+		expectedType string
+	}{
+		{
+			t:            newTemplate(Parameter{}),
+			expectedType: "string",
+		},
+		{
+			t: newTemplate(Parameter{
+				Type: newStringPtr(""),
+			}),
+			expectedType: "",
+		},
+		{
+			t: newTemplate(Parameter{
+				Type: newStringPtr("string"),
+			}),
+			expectedType: "string",
+		},
+		{
+			t: newTemplate(Parameter{
+				Type: newStringPtr("invalid"),
+			}),
+			expectedType: "invalid",
+		},
+		{
+			t: newTemplate(Parameter{
+				Type: newStringPtr("boolean"),
+			}),
+			expectedType: "boolean",
+		},
+	}
+
+	for _, test := range tests {
+		tem := &test.t
+		obj2 := roundTrip(t, runtime.Object(tem))
+		tem2, ok := obj2.(*Template)
+		if !ok {
+			t.Errorf("unexpected object: %v", tem2)
+			t.FailNow()
+		}
+		p := tem2.Spec.Parameters[0]
+		if p.Type == nil {
+			t.Errorf("unexpected nil Type")
+		} else if test.expectedType != *p.Type {
+			t.Errorf("expected: %s Type, got: %s", test.expectedType, *p.Type)
+		}
+	}
+}
+
+func TestSetDefaultParameterValue(t *testing.T) {
+	tests := []struct {
+		t             Template
+		expectedValue string
+	}{
+		{
+			t:             newTemplate(Parameter{}), // Nil value
+			expectedValue: "",
+		},
+		{
+			t: newTemplate(Parameter{
+				Value: newStringPtr(""), // Empty value
+			}),
+			expectedValue: "",
+		},
+		{
+			t: newTemplate(Parameter{
+				Value: newStringPtr("hello-world"), // String value
+			}),
+			expectedValue: "hello-world",
+		},
+		{
+			t: newTemplate(Parameter{
+				Value: newStringPtr("5"), // Int value
+			}),
+			expectedValue: "5",
+		},
+	}
+
+	for _, test := range tests {
+		tem := &test.t
+		obj2 := roundTrip(t, runtime.Object(tem))
+		tem2, ok := obj2.(*Template)
+		if !ok {
+			t.Errorf("unexpected object: %v", tem2)
+			t.FailNow()
+		}
+		p := tem2.Spec.Parameters[0]
+		if p.Type == nil {
+			t.Errorf("unexpected nil Value")
+		} else if test.expectedValue != *p.Value {
+			t.Errorf("expected: %s Value, got: %s", test.expectedValue, *p.Value)
+		}
+	}
+}
+
+func TestSetDefaultParameterDisplayName(t *testing.T) {
+	tests := []struct {
+		t                   Template
+		expectedDisplayName string
+	}{
+		{
+			t:                   newTemplate(Parameter{}), // Nil value
+			expectedDisplayName: "",
+		},
+		{
+			t: newTemplate(Parameter{
+				DisplayName: newStringPtr(""), // Empty value
+			}),
+			expectedDisplayName: "",
+		},
+		{
+			t: newTemplate(Parameter{
+				DisplayName: newStringPtr("hello-world"), // String value
+			}),
+			expectedDisplayName: "hello-world",
+		},
+		{
+			t: newTemplate(Parameter{
+				DisplayName: newStringPtr("5"), // Int value
+			}),
+			expectedDisplayName: "5",
+		},
+	}
+
+	for _, test := range tests {
+		tem := &test.t
+		obj2 := roundTrip(t, runtime.Object(tem))
+		tem2, ok := obj2.(*Template)
+		if !ok {
+			t.Errorf("unexpected object: %v", tem2)
+			t.FailNow()
+		}
+		p := tem2.Spec.Parameters[0]
+		if p.Type == nil {
+			t.Errorf("unexpected nil DisplayName")
+		} else if test.expectedDisplayName != *p.DisplayName {
+			t.Errorf("expected: %s Description, got: %s", test.expectedDisplayName, *p.DisplayName)
+		}
+	}
+}
+
+func TestSetDefaultParameterDescription(t *testing.T) {
+	tests := []struct {
+		t                   Template
+		expectedDescription string
+	}{
+		{
+			t:                   newTemplate(Parameter{}), // Nil value
+			expectedDescription: "",
+		},
+		{
+			t: newTemplate(Parameter{
+				Description: newStringPtr(""), // Empty value
+			}),
+			expectedDescription: "",
+		},
+		{
+			t: newTemplate(Parameter{
+				Description: newStringPtr("hello-world"), // String value
+			}),
+			expectedDescription: "hello-world",
+		},
+		{
+			t: newTemplate(Parameter{
+				Description: newStringPtr("5"), // Int value
+			}),
+			expectedDescription: "5",
+		},
+	}
+
+	for _, test := range tests {
+		tem := &test.t
+		obj2 := roundTrip(t, runtime.Object(tem))
+		tem2, ok := obj2.(*Template)
+		if !ok {
+			t.Errorf("unexpected object: %v", tem2)
+			t.FailNow()
+		}
+		p := tem2.Spec.Parameters[0]
+		if p.Type == nil {
+			t.Errorf("unexpected nil Description")
+		} else if test.expectedDescription != *p.Description {
+			t.Errorf("expected: %s Description, got: %s", test.expectedDescription, *p.Description)
+		}
+	}
+}
+
+func TestSetDefaultTemplateParametersValues(t *testing.T) {
+	tests := []struct {
+		t              TemplateParameters
+		expectedValues map[string]string
+	}{
+		{
+			t:              TemplateParameters{}, // Nil value
+			expectedValues: map[string]string{},
+		},
+		{
+			t:              TemplateParameters{ParameterValues: map[string]string{}},
+			expectedValues: map[string]string{},
+		},
+		{
+			t:              TemplateParameters{ParameterValues: map[string]string{"hello": "world"}},
+			expectedValues: map[string]string{"hello": "world"},
+		},
+		{
+			t:              TemplateParameters{ParameterValues: map[string]string{"hello": "world", "hi": "earth"}},
+			expectedValues: map[string]string{"hello": "world", "hi": "earth"},
+		},
+	}
+
+	for _, test := range tests {
+		tem := &test.t
+		obj2 := roundTrip(t, runtime.Object(tem))
+		tem2, ok := obj2.(*TemplateParameters)
+		if !ok {
+			t.Errorf("unexpected object: %v", tem2)
+			t.FailNow()
+		}
+		if tem2.ParameterValues == nil {
+			t.Errorf("unexpected nil ParameterValues")
+		} else if len(tem2.ParameterValues) != len(test.expectedValues) {
+			t.Errorf("expected: %s ParameterValues, got: %s", test.expectedValues, tem2.ParameterValues)
+		} else {
+			for k, v := range tem.ParameterValues {
+				if test.expectedValues[k] != v {
+					t.Errorf("expected: %s ParameterValues, got: %s", test.expectedValues, tem2.ParameterValues)
+					break
+				}
+			}
+		}
+	}
+}
+
 func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Containers = []v1.Container{

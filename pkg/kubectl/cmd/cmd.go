@@ -204,6 +204,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdReplace(f, out))
 	cmds.AddCommand(NewCmdPatch(f, out))
 	cmds.AddCommand(NewCmdDelete(f, out))
+	cmds.AddCommand(NewCmdProcess(f, out))
 	cmds.AddCommand(NewCmdEdit(f, out, err))
 	cmds.AddCommand(NewCmdApply(f, out))
 

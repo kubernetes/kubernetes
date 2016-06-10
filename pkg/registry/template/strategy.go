@@ -62,7 +62,6 @@ func (templateStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // Canonicalize normalizes the object after validation.
 func (templateStrategy) Canonicalize(obj runtime.Object) {
-	// TODO: write this
 }
 
 // Validate validates a new template.
@@ -75,6 +74,7 @@ func (templateStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// AllowCreateOnUpdate is true for templates - turning this off causes etcd_tests to fail.
 func (templateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -84,7 +84,7 @@ func (templateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object)
 	return validation.ValidateTemplateUpdate(obj.(*extensions.Template), old.(*extensions.Template))
 }
 
-// templateToSelectableFields returns a label set that represents the object
+// TemplateToSelectableFields returns a label set that represents the object
 // changes to the returned keys require registering conversions for existing versions using Scheme.AddFieldLabelConversionFunc
 func TemplateToSelectableFields(template *extensions.Template) fields.Set {
 	return fields.Set{

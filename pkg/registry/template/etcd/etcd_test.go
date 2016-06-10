@@ -58,10 +58,15 @@ func TestCreate(t *testing.T) {
 	test := registrytest.New(t, rest.Store)
 	template := validNewTemplate()
 	template.ObjectMeta = api.ObjectMeta{}
+
+	invalid := []runtime.Object{}
+	for _, t := range GetInvalidTemplates(t) {
+		invalid = append(invalid, t)
+	}
 	test.TestCreate(
 		// valid
 		template,
-		// TODO: Add invalid cases once template Validation is implemented
+		invalid...,
 	)
 }
 
@@ -69,6 +74,15 @@ func TestUpdate(t *testing.T) {
 	rest, _, server := newRest(t)
 	defer server.Terminate(t)
 	test := registrytest.New(t, rest.Store)
+
+	invalidUpdates := []registrytest.UpdateFunc{}
+	for _, i := range GetInvalidTemplates(t) {
+		t := *i
+		invalidUpdates = append(invalidUpdates, func(obj runtime.Object) runtime.Object {
+			object := &t
+			return object
+		})
+	}
 	test.TestUpdate(
 		// valid object
 		validNewTemplate(),
@@ -77,7 +91,8 @@ func TestUpdate(t *testing.T) {
 			object := obj.(*extensions.Template)
 			return object
 		},
-		// TODO: Add invalid cases once template Validation is implemented
+		// Cases are already tested in the extensions/v1beta1/validation_test.go
+		invalidUpdates...,
 	)
 }
 
@@ -125,4 +140,131 @@ func TestWatch(t *testing.T) {
 			{"name": name},
 		},
 	)
+}
+
+// Adapted from extensions/v1beta1/validation_test.go
+func GetInvalidTemplates(t *testing.T) []*extensions.Template {
+	invalid := []*extensions.Template{}
+	for _, spec := range GetInvalidTemplateSpecss(t) {
+		invalid = append(invalid, &extensions.Template{
+			Spec:       *spec,
+			ObjectMeta: api.ObjectMeta{},
+		})
+	}
+	return invalid
+}
+
+// Copied from extensions/v1beta1/validation_test.go
+func GetInvalidTemplateSpecss(t *testing.T) []*extensions.TemplateSpec {
+	invalid := []*extensions.TemplateSpec{
+		// Parameter with invalid name
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "",
+					Description: "parameter Name is empty.",
+				},
+			},
+		},
+
+		// Parameter with invalid name
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name: "NAME",
+				},
+				{
+					Name:        "badNAME",
+					Description: "parameter Name does not match [A-Z0-9_]+.",
+				},
+			},
+		},
+
+		// Same parameter defined multiple times
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name: "NAME",
+				},
+				{
+					Name:        "NAME",
+					Description: "same parameter Name specified multiple times.",
+				},
+			},
+		},
+
+		// Unknown Type
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "unknown",
+					Description: "invalid Type.",
+				},
+			},
+		},
+	}
+
+	// Boolean Type Validation
+	invalid = append(invalid,
+		// No Value and not Required
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "boolean",
+					Description: "boolean missing default Value and not Required.",
+				},
+			},
+		},
+		// Unparseable
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "boolean",
+					Value:       "5",
+					Description: "boolean should not be able to parse '5'.",
+				},
+			},
+		},
+	)
+
+	// Integer Type Validation
+	invalid = append(invalid,
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "integer",
+					Description: "integer missing default Value and not Required.",
+				},
+			},
+		},
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "integer",
+					Value:       "true",
+					Description: "integer should not be able to parse 'true'",
+				},
+			},
+		},
+	)
+
+	// Base64 Type Validation
+	invalid = append(invalid,
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "base64",
+					Value:       "aG VsbG8gd29ybGQ=",
+					Description: "base64 data should not be parseable",
+				},
+			},
+		},
+	)
+	return invalid
 }

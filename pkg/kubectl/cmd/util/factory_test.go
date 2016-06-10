@@ -234,6 +234,36 @@ func TestFlagUnderscoreRenaming(t *testing.T) {
 	}
 }
 
+func newRestClientForSwagger(t *testing.T) (*fake.RESTClient, string) {
+	schema, err := loadSchemaForTest()
+	if err != nil {
+		t.Errorf("Error loading schema: %v", err)
+		t.FailNow()
+	}
+	output, err := json.Marshal(schema)
+	if err != nil {
+		t.Errorf("Error serializing schema: %v", err)
+		t.FailNow()
+	}
+	requests := map[string]int{}
+
+	c := &fake.RESTClient{
+		Codec: testapi.Default.Codec(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
+				requests[p] = requests[p] + 1
+				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	dir := os.TempDir() + "/schemaCache"
+	return c, dir
+}
+
 func loadSchemaForTest() (validation.Schema, error) {
 	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
 	data, err := ioutil.ReadFile(pathToSwaggerSpec)
@@ -298,7 +328,7 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 	}
 
 	// Re-get request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if requests["/swaggerapi/foo/bar"] != 1 {
@@ -343,7 +373,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Initial request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if _, err := os.Stat(path.Join(dir, "foo", "bar", schemaFileName)); err != nil {
@@ -354,7 +384,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Same version and group, should skip HTTP
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if requests["/swaggerapi/foo/bar"] != 2 {
@@ -362,7 +392,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Different API group, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "baz", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "baz", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if _, err := os.Stat(path.Join(dir, "foo", "baz", schemaFileName)); err != nil {
@@ -373,7 +403,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Different version, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo2", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo2", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if _, err := os.Stat(path.Join(dir, "foo2", "bar", schemaFileName)); err != nil {
@@ -384,7 +414,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// No cache dir, should go straight to HTTP and not write
-	if getSchemaAndValidate(c, data, "foo", "blah", "", nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "blah", "", nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if requests["/swaggerapi/foo/blah"] != 1 {

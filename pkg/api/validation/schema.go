@@ -56,11 +56,15 @@ func (tnfe TypeNotFoundError) Error() string {
 // Schema is an interface that knows how to validate an API object serialized to a byte array.
 type Schema interface {
 	ValidateBytes(data []byte) error
+	ValidateBytesWithTemplates(data []byte, templateParamTypes map[string]string) error
 }
 
 type NullSchema struct{}
 
 func (NullSchema) ValidateBytes(data []byte) error { return nil }
+func (NullSchema) ValidateBytesWithTemplates(data []byte, templateParamTypes map[string]string) error {
+	return nil
+}
 
 type SwaggerSchema struct {
 	api      swagger.ApiDeclaration
@@ -80,26 +84,26 @@ func NewSwaggerSchemaFromBytes(data []byte, factory Schema) (Schema, error) {
 // validateList unpacks a list and validate every item in the list.
 // It return nil if every item is ok.
 // Otherwise it return an error list contain errors of every item.
-func (s *SwaggerSchema) validateList(obj map[string]interface{}) []error {
+func (s *SwaggerSchema) validateList(obj map[string]interface{}, templateParamTypes map[string]string) []error {
 	items, exists := obj["items"]
 	if !exists {
 		return []error{fmt.Errorf("no items field in %#v", obj)}
 	}
-	return s.validateItems(items)
+	return s.validateItems(items, templateParamTypes)
 }
 
-func (s *SwaggerSchema) validateItems(items interface{}) []error {
+func (s *SwaggerSchema) validateItems(items interface{}, templateParamTypes map[string]string) []error {
 	allErrs := []error{}
 	itemList, ok := items.([]interface{})
 	if !ok {
 		return append(allErrs, fmt.Errorf("items isn't a slice"))
 	}
-	return s.validateObjectSlice("items", itemList)
+	return s.validateObjectSlice("items", itemList, templateParamTypes)
 }
 
 // validateObjectSlice validates a field on an Object that is a collection of Generic objects.
 // Each object in slice has its metadata fields checked and is then passed to ValidateObject
-func (s *SwaggerSchema) validateObjectSlice(fieldName string, slice []interface{}) []error {
+func (s *SwaggerSchema) validateObjectSlice(fieldName string, slice []interface{}, templateParamTypes map[string]string) []error {
 	allErrs := []error{}
 	for i, item := range slice {
 		fields, ok := item.(map[string]interface{})
@@ -134,16 +138,19 @@ func (s *SwaggerSchema) validateObjectSlice(fieldName string, slice []interface{
 			allErrs = append(allErrs, fmt.Errorf("%s[%d].kind is empty", fieldName, i))
 		}
 		version := apiutil.GetVersion(itemVersion)
-		errs := s.ValidateObject(item, "", version+"."+itemKind)
+		errs := s.ValidateObject(item, "", version+"."+itemKind, templateParamTypes)
 		if len(errs) >= 1 {
 			allErrs = append(allErrs, errs...)
 		}
 	}
-
 	return allErrs
 }
 
 func (s *SwaggerSchema) ValidateBytes(data []byte) error {
+	return s.ValidateBytesWithTemplates(data, map[string]string{})
+}
+
+func (s *SwaggerSchema) ValidateBytesWithTemplates(data []byte, templateParamTypes map[string]string) error {
 	var obj interface{}
 	out, err := yaml.ToJSON(data)
 	if err != nil {
@@ -171,18 +178,44 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	if _, ok := kind.(string); !ok {
 		return fmt.Errorf("kind isn't string type")
 	}
+
+	// Special case validation of Templates to perform validatation on the Parameter
+	// type, not the Parameter name (which is what appears in the config as the field value).
+	if kind == "Template" {
+		AddParameterNamesFromTemplate(fields, templateParamTypes)
+	}
+
+	// Add wildcard strings here
 	if strings.HasSuffix(kind.(string), "List") {
-		return utilerrors.NewAggregate(s.validateList(fields))
+		return utilerrors.NewAggregate(s.validateList(fields, templateParamTypes))
 	}
 	version := apiutil.GetVersion(groupVersion.(string))
-	allErrs := s.ValidateObject(obj, "", version+"."+kind.(string))
+	allErrs := s.ValidateObject(obj, "", version+"."+kind.(string), templateParamTypes)
 	if len(allErrs) == 1 {
 		return allErrs[0]
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName string) []error {
+// Map Template.Parameter Names to Types and add to pmap
+func AddParameterNamesFromTemplate(fields interface{}, pmap map[string]string) {
+	if spec, ok := fields.(map[string]interface{})["spec"]; ok {
+		if params, ok := spec.(map[string]interface{})["parameters"]; ok {
+			for _, p := range params.([]interface{}) {
+				param := p.(map[string]interface{})
+				// Add each parameter to the map.  Include the type if it is specified.
+				paramName := fmt.Sprintf("$(%s)", param["name"])
+				if paramType, ok := param["type"]; ok {
+					pmap[paramName] = paramType.(string)
+				} else {
+					pmap[paramName] = "string"
+				}
+			}
+		}
+	}
+}
+
+func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName string, templateParamTypes map[string]string) []error {
 	allErrs := []error{}
 	models := s.api.Models
 	model, ok := models.At(typeName)
@@ -197,7 +230,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 		if !mapOk {
 			return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
 		}
-		if delegated, err := s.delegateIfDifferentApiVersion(runtime.Unstructured{Object: fields}); delegated {
+		if delegated, err := s.delegateIfDifferentApiVersion(runtime.Unstructured{Object: fields}, templateParamTypes); delegated {
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -233,13 +266,12 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 		// This is because the actual values will be of some sub-type (e.g. Deployment) not the expected
 		// super-type (RawExtention)
 		if s.isGenericArray(details) {
-			allErrs := []error{}
 			genericSlice, ok := value.([]interface{})
 			if !ok {
 				allErrs = append(allErrs, fmt.Errorf("genericSlice isn't a slice"))
 				continue
 			}
-			errs := s.validateObjectSlice(key, genericSlice)
+			errs := s.validateObjectSlice(key, genericSlice, templateParamTypes)
 			if len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			}
@@ -262,7 +294,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			glog.V(2).Infof("Skipping nil field: %s", key)
 			continue
 		}
-		errs := s.validateField(value, fieldName+key, fieldType, &details)
+		errs := s.validateField(value, fieldName+key, fieldType, &details, templateParamTypes)
 		if len(errs) > 0 {
 			allErrs = append(allErrs, errs...)
 		}
@@ -274,7 +306,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 // current SwaggerSchema.
 // First return value is true if the validation was delegated (by a different ApiGroup SwaggerSchema)
 // Second return value is the result of the delegated validation if performed.
-func (s *SwaggerSchema) delegateIfDifferentApiVersion(obj runtime.Unstructured) (bool, error) {
+func (s *SwaggerSchema) delegateIfDifferentApiVersion(obj runtime.Unstructured, templateParamTypes map[string]string) (bool, error) {
 	// Never delegate objects in the same ApiVersion or we will get infinite recursion
 	if !s.isDifferentApiVersion(obj) {
 		return false, nil
@@ -287,7 +319,7 @@ func (s *SwaggerSchema) delegateIfDifferentApiVersion(obj runtime.Unstructured) 
 	}
 
 	// Delegate validation of this object to the correct SwaggerSchema for its ApiGroup
-	return true, s.delegate.ValidateBytes(m)
+	return true, s.delegate.ValidateBytesWithTemplates(m, templateParamTypes)
 }
 
 // isDifferentApiVersion Returns true if obj lives in a different ApiVersion than the SwaggerSchema does.
@@ -309,7 +341,7 @@ func (s *SwaggerSchema) isGenericArray(p swagger.ModelProperty) bool {
 // This matches type name in the swagger spec, such as "v1.Binding".
 var versionRegexp = regexp.MustCompile(`^v.+\..*`)
 
-func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) []error {
+func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType string, fieldDetails *swagger.ModelProperty, templateParamTypes map[string]string) []error {
 	// TODO: caesarxuchao: because we have multiple group/versions and objects
 	// may reference objects in other group, the commented out way of checking
 	// if a filedType is a type defined by us is outdated. We use a hacky way
@@ -321,7 +353,7 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 	// groups correctly.
 	if versionRegexp.MatchString(fieldType) {
 		// if strings.HasPrefix(fieldType, apiVersion) {
-		return s.ValidateObject(value, fieldName, fieldType)
+		return s.ValidateObject(value, fieldName, fieldType, templateParamTypes)
 	}
 	allErrs := []error{}
 	switch fieldType {
@@ -348,14 +380,24 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 			arrType = *fieldDetails.Items.Type
 		}
 		for ix := range arr {
-			errs := s.validateField(arr[ix], fmt.Sprintf("%s[%d]", fieldName, ix), arrType, nil)
+			errs := s.validateField(arr[ix], fmt.Sprintf("%s[%d]", fieldName, ix), arrType, nil, templateParamTypes)
 			if len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			}
 		}
-	case "uint64":
-	case "int64":
-	case "integer":
+	case "uint64", "int64", "integer":
+		// Check if the field value is a Template substitution Parameter and if it is validate that the Parameter Type is an integer
+		if s, isString := value.(string); isString {
+			if t, ok := templateParamTypes[s]; ok {
+				if t == "integer" {
+					return allErrs
+				} else {
+					// Parameter type is not restricted to "integer", this can fail when the value is substituted
+					return append(allErrs, fmt.Errorf("TemplateParameter %s must be of type 'integer'.  Reason: %v",
+						s, NewInvalidTypeError(reflect.Int, reflect.TypeOf(value).Kind(), fieldName)))
+				}
+			}
+		}
 		_, isNumber := value.(float64)
 		_, isInteger := value.(int)
 		if !isNumber && !isInteger {
@@ -366,6 +408,18 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 			return append(allErrs, NewInvalidTypeError(reflect.Float64, reflect.TypeOf(value).Kind(), fieldName))
 		}
 	case "boolean":
+		// Check if the field value is a Template substitution Parameter and if it is validate that the Parameter Type is a boolean
+		if s, isString := value.(string); isString {
+			if t, ok := templateParamTypes[s]; ok {
+				if t == "boolean" {
+					return allErrs
+				} else {
+					// Parameter type is not restricted to "boolean", this can fail when the value is substituted
+					return append(allErrs, fmt.Errorf("TemplateParameter %s must be of type 'boolean'.  Reason: %v",
+						s, NewInvalidTypeError(reflect.Bool, reflect.TypeOf(value).Kind(), fieldName)))
+				}
+			}
+		}
 		if _, ok := value.(bool); !ok {
 			return append(allErrs, NewInvalidTypeError(reflect.Bool, reflect.TypeOf(value).Kind(), fieldName))
 		}

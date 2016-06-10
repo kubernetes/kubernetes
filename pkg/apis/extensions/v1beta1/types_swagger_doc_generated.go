@@ -461,9 +461,9 @@ var map_Parameter = map[string]string{
 	"name":        "Required: Parameter name must be set and it can be referenced in Template Items (See Value)",
 	"displayName": "Optional: The name that will show in UI instead of parameter 'Name'",
 	"description": "Optional: Parameter can have description",
-	"value":       "Optional: Value holds the Parameter data. The value replaces all occurrences of the Parameter $(Name) expression during the Template to Config transformation.",
-	"required":    "Optional: Indicates the parameter must have a value.  Defaults to false.",
-	"type":        "Optional: Type-value of the parameter (one of string, int, bool, or base64) Used by clients to provide validation of user input and guide users.",
+	"value":       "Optional: Value holds the Parameter data. The value replaces all occurrences of the Parameter $(Name) expression during the Template to Config transformation. Defaults to the empty string.  Parameters of Type != 'string' must provide a non-empty value or be Required.",
+	"required":    "Optional: Indicates the parameter must have a value.  Defaults to false. Defaults to false.",
+	"type":        "Optional: Type-value of the parameter (one of string, int, bool, or base64) Used by clients to provide validation of user input and guide users. Defaults to 'string'",
 }
 
 func (Parameter) SwaggerDoc() map[string]string {

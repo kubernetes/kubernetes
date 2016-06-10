@@ -69,6 +69,10 @@ var _ Schema = &Factory{}
 // TODO: Consider using a mocking library instead or fully fleshing this out into a fake impl and putting it in some
 // generally available location
 func (f *Factory) ValidateBytes(data []byte) error {
+	return f.ValidateBytesWithTemplates(data, map[string]string{})
+}
+
+func (f *Factory) ValidateBytesWithTemplates(data []byte, templateParamTypes map[string]string) error {
 	var obj interface{}
 	out, err := k8syaml.ToJSON(data)
 	if err != nil {
@@ -86,9 +90,9 @@ func (f *Factory) ValidateBytes(data []byte) error {
 	groupVersion := fields["apiVersion"]
 	switch groupVersion {
 	case "v1":
-		return f.defaultSchema.ValidateBytes(data)
+		return f.defaultSchema.ValidateBytesWithTemplates(data, templateParamTypes)
 	case "extensions/v1beta1":
-		return f.extensionsSchema.ValidateBytes(data)
+		return f.extensionsSchema.ValidateBytesWithTemplates(data, templateParamTypes)
 	default:
 		return fmt.Errorf("Unsupported API version %s", groupVersion)
 	}
@@ -161,6 +165,84 @@ func TestValidateOk(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}
+	}
+}
+
+func TestValidateTemplate(t *testing.T) {
+	schema, err := loadSchemaForTest()
+	if err != nil {
+		t.Errorf("Failed to load: %v", err)
+	}
+
+	obj := `apiVersion: v1
+kind: Service
+metadata:
+  name: service-name
+spec:
+  selector:
+    app: app-se;
+  ports:
+  - protocol: TCP
+    port: $(SERVICE_PORT)
+`
+
+	params := map[string]string{"$(SERVICE_PORT)": "integer"}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	params = map[string]string{"$(SERVICE_PORT)": "string"}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err == nil {
+		t.Errorf("expected error when template value is not an integer, but got nil")
+	}
+
+	params = map[string]string{"$(SERVICE_PORT)": "boolean"}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err == nil {
+		t.Errorf("expected error when template value is not an integer, but got nil")
+	}
+
+	params = map[string]string{"$(SERVICE_PORT)": "base64"}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err == nil {
+		t.Errorf("expected error when template value is not an integer, but got nil")
+	}
+
+	params = map[string]string{}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err == nil {
+		t.Errorf("expected error when template value is not an integer, but got nil")
+	}
+
+	obj = `apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-name
+spec:
+  containers:
+  - name: container-name
+    image: container-image
+    stdinOnce: $(STDIN_ONCE)
+`
+
+	params = map[string]string{"$(STDIN_ONCE)": "boolean"}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	params = map[string]string{"$(NON_ROOT)": "integer"}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err == nil {
+		t.Errorf("expected error when template value is not a boolean, but got nil")
+	}
+
+	params = map[string]string{}
+	err = schema.ValidateBytesWithTemplates([]byte(obj), params)
+	if err == nil {
+		t.Errorf("expected error when template value is not an boolean, but got nil")
 	}
 }
 

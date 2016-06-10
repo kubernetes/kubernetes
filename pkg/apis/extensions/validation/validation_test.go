@@ -27,6 +27,8 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateDaemonSetStatusUpdate(t *testing.T) {
@@ -1672,6 +1674,332 @@ func TestValidatePSPVolumes(t *testing.T) {
 			t.Errorf("%s validation expected no errors but received %v", strVolume, errs)
 		}
 	}
+}
+
+func GetValidTemplates(t *testing.T) []*extensions.Template {
+	valid := []*extensions.Template{}
+	for _, spec := range GetValidTemplateSpecss(t) {
+		valid = append(valid, &extensions.Template{
+			Spec: *spec,
+			ObjectMeta: api.ObjectMeta{
+				Name:      "template.name",
+				Namespace: "default",
+			},
+		})
+	}
+	return valid
+}
+
+func GetValidTemplateSpecss(t *testing.T) []*extensions.TemplateSpec {
+	valid := []*extensions.TemplateSpec{
+		{},
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name: "NAME",
+				},
+			},
+		},
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "string",
+					Description: "string Type has not requirements.",
+				},
+			},
+		},
+	}
+
+	// Boolean Type Validation
+	valid = append(valid,
+		// Valid Default
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "boolean",
+					Value:       "true",
+					Description: "boolean Value is provided.",
+				},
+			},
+		},
+		// Required
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "boolean",
+					Required:    true,
+					Description: "boolean is Required.",
+				},
+			},
+		},
+	)
+
+	// Integer Type Validation
+	valid = append(valid,
+		// Valid Default
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "integer",
+					Value:       "5",
+					Description: "integer Value is provided.",
+				},
+			},
+		},
+		// Required
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "integer",
+					Required:    true,
+					Description: "integer is Required.",
+				},
+			},
+		},
+	)
+
+	// Base64 Type Validation
+	valid = append(valid,
+		// Valid Default
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "base64",
+					Value:       "aGVsbG8gd29ybGQ=",
+					Description: "base64 default passes validation.",
+				},
+			},
+		},
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "base64",
+					Description: "base64 default is empty.",
+				},
+			},
+		},
+	)
+	return valid
+}
+
+func GetInvalidTemplates(t *testing.T) []*extensions.Template {
+	invalid := []*extensions.Template{}
+	for _, spec := range GetInvalidTemplateSpecss(t) {
+		invalid = append(invalid, &extensions.Template{
+			Spec: *spec,
+			ObjectMeta: api.ObjectMeta{
+				Name:      "template.name",
+				Namespace: "default",
+			},
+		})
+	}
+
+	invalid = append(invalid,
+		// Missing Name
+		&extensions.Template{
+			Spec: extensions.TemplateSpec{},
+			ObjectMeta: api.ObjectMeta{
+				Namespace: "default",
+			},
+		},
+		// Missing Namespace
+		&extensions.Template{
+			Spec: extensions.TemplateSpec{},
+			ObjectMeta: api.ObjectMeta{
+				Name: "template.name",
+			},
+		},
+	)
+	return invalid
+}
+
+func GetInvalidTemplateSpecss(t *testing.T) []*extensions.TemplateSpec {
+	invalid := []*extensions.TemplateSpec{
+		// Parameter with invalid name
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "",
+					Description: "parameter Name is empty.",
+				},
+			},
+		},
+
+		// Parameter with invalid name
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name: "NAME",
+				},
+				{
+					Name:        "badNAME",
+					Description: "parameter Name does not match [A-Z0-9_]+.",
+				},
+			},
+		},
+
+		// Same parameter defined multiple times
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name: "NAME",
+				},
+				{
+					Name:        "NAME",
+					Description: "same parameter Name specified multiple times.",
+				},
+			},
+		},
+
+		// Unknown Type
+		{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "unknown",
+					Description: "invalid Type.",
+				},
+			},
+		},
+	}
+
+	// Boolean Type Validation
+	invalid = append(invalid,
+		// No Value and not Required
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "boolean",
+					Description: "boolean missing default Value and not Required.",
+				},
+			},
+		},
+		// Unparseable
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "boolean",
+					Value:       "5",
+					Description: "boolean should not be able to parse '5'.",
+				},
+			},
+		},
+	)
+
+	// Integer Type Validation
+	invalid = append(invalid,
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "integer",
+					Description: "integer missing default Value and not Required.",
+				},
+			},
+		},
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "integer",
+					Value:       "true",
+					Description: "integer should not be able to parse 'true'",
+				},
+			},
+		},
+	)
+
+	// Base64 Type Validation
+	invalid = append(invalid,
+		&extensions.TemplateSpec{
+			Parameters: []extensions.Parameter{
+				{
+					Name:        "NAME",
+					Type:        "base64",
+					Value:       "aG VsbG8gd29ybGQ=",
+					Description: "base64 data should not be parseable",
+				},
+			},
+		},
+	)
+	return invalid
+}
+
+func TestValidateTemplateUpdate(t *testing.T) {
+	old := extensions.Template{
+		Spec: extensions.TemplateSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:      "template.name",
+			Namespace: "default",
+		},
+	}
+
+	for _, template := range GetInvalidTemplates(t) {
+		old.ObjectMeta.ResourceVersion = "1"
+		template.ObjectMeta.ResourceVersion = "1"
+		assert.Error(t, ValidateTemplateUpdate(template, &old).ToAggregate(), fmt.Sprintf("%+v", template))
+	}
+
+	for _, template := range GetValidTemplates(t) {
+		old.ObjectMeta.ResourceVersion = "1"
+		template.ObjectMeta.ResourceVersion = "1"
+		assert.NoError(t, ValidateTemplateUpdate(template, &old).ToAggregate(), fmt.Sprintf("%+v", template))
+	}
+}
+
+func TestValidateTemplate(t *testing.T) {
+	for _, template := range GetInvalidTemplates(t) {
+		assert.Error(t, ValidateTemplate(template).ToAggregate(), fmt.Sprintf("%+v", template))
+	}
+
+	for _, template := range GetValidTemplates(t) {
+		assert.NoError(t, ValidateTemplate(template).ToAggregate(), fmt.Sprintf("%+v", template))
+	}
+}
+
+func TestValidateTemplateParameters(t *testing.T) {
+	parameters := &extensions.TemplateParameters{}
+
+	// Name missing - fail
+	assert.Error(t, ValidateTemplateParams(parameters).ToAggregate())
+
+	// Name present - pass
+	parameters.Name = "template.name"
+	assert.NoError(t, ValidateTemplateParams(parameters).ToAggregate())
+
+	// Bad name -fail
+	parameters.Name = "$template.name"
+	assert.Error(t, ValidateTemplateParams(parameters).ToAggregate())
+	parameters.Name = "template.name"
+
+	// Values ok - pass
+	parameters.ParameterValues = map[string]string{
+		"OK": "value",
+	}
+	assert.NoError(t, ValidateTemplateParams(parameters).ToAggregate())
+
+	// Missing param name - fail
+	parameters.ParameterValues = map[string]string{
+		"OK": "value",
+		"":   "NotOkValue",
+	}
+	assert.Error(t, ValidateTemplateParams(parameters).ToAggregate())
+
+	// Not allowed characters - fail
+	parameters.ParameterValues = map[string]string{
+		"OK":    "value",
+		"notOk": "NotOkValue",
+	}
+	assert.Error(t, ValidateTemplateParams(parameters).ToAggregate())
 }
 
 func newBool(val bool) *bool {
