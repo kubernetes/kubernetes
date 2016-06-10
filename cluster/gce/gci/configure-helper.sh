@@ -24,16 +24,18 @@ set -o pipefail
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
   # The GCI image has host firewall which drop most inbound/forwarded packets.
-  # We need to add rules to accept all TCP/UDP packets.
+  # We need to add rules to accept all TCP/UDP/ICMP packets.
   if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all inbound TCP/UDP packets"
+    echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
+    iptables -A INPUT -w -p ICMP -j ACCEPT
   fi
   if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all forwarded TCP/UDP packets"
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
+    iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 }
 
