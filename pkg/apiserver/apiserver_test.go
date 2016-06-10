@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 )
 
 func convert(obj runtime.Object) (runtime.Object, error) {
@@ -2017,6 +2017,55 @@ func TestDeleteMissing(t *testing.T) {
 	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
+}
+
+type testDeleteAdmission struct {
+	expectedObjectName string
+}
+
+func (t *testDeleteAdmission) Handles(o admission.Operation) bool {
+	return true
+}
+
+func (t *testDeleteAdmission) Admit(a admission.Attributes) error {
+	obj := a.GetOldObject()
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("unexpected error creating accessor for %#v: %s", obj, err)
+	}
+
+	if accessor.GetName() != t.expectedObjectName {
+		return fmt.Errorf("expected OldObject to be populated on attributes, got nil")
+	}
+	return nil
+}
+
+// TestDeletePopulateOldObject verifies that the OldObject field on
+// AdmissionAttributes is populated with the current state of the object being
+// deleted.
+func TestDeletePopulateOldObject(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	handler := handleInternal(storage, &testDeleteAdmission{simpleStorage.item.Name}, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %#v", res)
+	}
+	if simpleStorage.deleted != ID {
+		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+	}
+
+	return
 }
 
 func TestPatch(t *testing.T) {
