@@ -29,7 +29,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 # TODO: It's going to be:
 # KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1"}
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"batch/v1;batch/v2alpha1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1;v1,autoscaling/v1,batch/v1,apps/v1alpha1,policy/v1alpha1,extensions/v1beta1,rbac.authorization.k8s.io/v1alpha1"}
 
 # Give integration tests longer to run
 # TODO: allow a larger value to be passed in
