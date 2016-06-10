@@ -28,5 +28,5 @@ KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
 . ${KUBE_ROOT}/federation/cluster/common.sh
 
-push-federated-images
+push-federation-images
 

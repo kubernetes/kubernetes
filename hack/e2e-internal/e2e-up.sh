@@ -36,14 +36,14 @@ if [[ "${FEDERATION:-}" == "true" ]];then
     # select each one and call federated-up
     for zone in ${E2E_ZONES};do
 	(
-	    set-federated-zone-vars "$zone"
+	    set-federation-zone-vars "$zone"
 	    test-setup
 	)
     done
     if [[ -f "${KUBE_ROOT}/federation/manifests/federated-image.tag" ]];then
 	export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
     fi
-    "${KUBE_ROOT}/federation/cluster/federated-up.sh"
+    "${KUBE_ROOT}/federation/cluster/federation-up.sh"
 else
     test-setup
 fi

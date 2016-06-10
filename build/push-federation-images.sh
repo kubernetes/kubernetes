@@ -14,12 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Pushes federation container images to existing repositories
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-. ${KUBE_ROOT}/federation/cluster/common.sh
+source "${KUBE_ROOT}/build/util.sh"
 
-create-federated-api-objects
+source "${KUBE_ROOT}/federation/cluster/common.sh"
+
+FEDERATION_IMAGE_TAG="$(kube::release::semantic_image_tag_version)" push-federation-images
