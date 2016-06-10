@@ -52,7 +52,7 @@ runTests() {
   # KUBE_RACE="-race"
   KUBE_GOFLAGS="-tags 'integration no-docker' " \
     KUBE_RACE="" \
-    KUBE_TEST_ARGS="--integration-timeout=${KUBE_TIMEOUT}"
+    KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
