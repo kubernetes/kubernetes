@@ -26,7 +26,7 @@ import (
 // This test references methods that OpenShift uses to customize the master on startup, that
 // are not referenced directly by a master.
 func TestMasterExportsSymbols(t *testing.T) {
-	_ = &master.Config{
+	c := &master.Config{
 		Config: &genericapiserver.Config{
 			EnableUISupport:      false,
 			EnableSwaggerSupport: false,
@@ -37,5 +37,5 @@ func TestMasterExportsSymbols(t *testing.T) {
 	m := &master.Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
-	_ = (m).NewBootstrapController()
+	_ = (m).NewBootstrapController(c)
 }
