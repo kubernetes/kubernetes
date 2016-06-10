@@ -261,7 +261,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 				NewCmdCreate(f, out),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
-				set.NewCmdSet(f, out),
+				set.NewCmdSet(f, out, err),
 			},
 		},
 		{
