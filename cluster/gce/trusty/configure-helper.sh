@@ -29,16 +29,18 @@ config_hostname() {
 config_ip_firewall() {
   # We have seen that GCE image may have strict host firewall rules which drop
   # most inbound/forwarded packets. In such a case, add rules to accept all
-  # TCP/UDP packets.
+  # TCP/UDP/ICMP packets.
   if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    echo "Add rules to accpet all inbound TCP/UDP packets"
+    echo "Add rules to accpet all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
+    iptables -A INPUT -w -p ICMP -j ACCEPT
   fi
   if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accpet all forwarded TCP/UDP packets"
+    echo "Add rules to accpet all forwarded TCP/UDP/ICMP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
+    iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 }
 
@@ -182,6 +184,16 @@ assemble_kubelet_flags() {
   echo "KUBELET_OPTS=\"${KUBELET_CMD_FLAGS}\"" > /etc/default/kubelet
 }
 
+start_kubelet(){
+  echo "Start kubelet"
+  # Delete docker0 to avoid interference
+  iptables -t nat -F || true
+  ip link set docker0 down || true
+  brctl delbr docker0 || true
+  . /etc/default/kubelet
+  /usr/bin/kubelet ${KUBELET_OPTS} 1>>/var/log/kubelet.log 2>&1
+}
+
 restart_docker_daemon() {
   DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
   if [ "${TEST_CLUSTER:-}" = "true" ]; then
@@ -200,9 +212,6 @@ restart_docker_daemon() {
     echo "Sleep 1 second to wait for cbr0"
     sleep 1
   done
-  # Remove docker0
-  ifconfig docker0 down
-  brctl delbr docker0
   # Ensure docker daemon is really functional before exiting. Operations afterwards may
   # assume it is running.
   while ! docker version > /dev/null; do
