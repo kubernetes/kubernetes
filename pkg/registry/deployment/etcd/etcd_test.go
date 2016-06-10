@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 const defaultReplicas = 100
@@ -56,6 +57,13 @@ func validNewDeployment() *extensions.Deployment {
 		},
 		Spec: extensions.DeploymentSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Strategy: extensions.DeploymentStrategy{
+				Type: extensions.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDeployment{
+					MaxSurge:       intstr.FromInt(1),
+					MaxUnavailable: intstr.FromInt(1),
+				},
+			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
