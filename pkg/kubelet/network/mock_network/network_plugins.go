@@ -78,7 +78,7 @@ func (_mr *_MockNetworkPluginRecorder) GetPodNetworkStatus(arg0, arg1, arg2 inte
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetPodNetworkStatus", arg0, arg1, arg2)
 }
 
-func (_m *MockNetworkPlugin) Init(_param0 network.Host, _param1 componentconfig.HairpinMode) error {
+func (_m *MockNetworkPlugin) Init(_param0 network.Host, _param1 componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
 	ret := _m.ctrl.Call(_m, "Init", _param0, _param1)
 	ret0, _ := ret[0].(error)
 	return ret0
