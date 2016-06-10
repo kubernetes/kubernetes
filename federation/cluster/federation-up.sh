@@ -22,6 +22,4 @@ KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
 . ${KUBE_ROOT}/federation/cluster/common.sh
 
-cleanup-federated-api-objects
-
-$host_kubectl delete ns/${FEDERATION_NAMESPACE}
+create-federation-api-objects

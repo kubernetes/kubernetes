@@ -49,7 +49,5 @@ if [[ ! ${attempt} -lt ${MAX_ATTEMPTS} ]];then
 fi
 
 if [[ "${FEDERATION:-}" == "true" ]];then
-    source "${KUBE_ROOT}/federation/cluster/common.sh"
-    # Docker compatiblity
-    FEDERATION_IMAGE_TAG="$(kube::release::semantic_image_tag_version)" push-federated-images
+    "${KUBE_ROOT}/build/push-federation-images.sh"
 fi

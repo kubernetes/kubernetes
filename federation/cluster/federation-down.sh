@@ -18,17 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+. ${KUBE_ROOT}/federation/cluster/common.sh
 
-#A little hack to get the last zone. we always deploy federated cluster to the last zone.
-#TODO(colhom): deploy federated control plane to multiple underlying clusters in robust way
-lastZone=""
-for zone in ${E2E_ZONES};do
-    lastZone="$zone"
-done
-(
-    set-federation-zone-vars "$zone"
-    "${KUBE_ROOT}/hack/ginkgo-e2e.sh" $@
-)
+cleanup-federation-api-objects
+
+$host_kubectl delete ns/${FEDERATION_NAMESPACE}
