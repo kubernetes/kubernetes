@@ -308,68 +308,6 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 	}
 }
 
-func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
-	svcBody := api.Service{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "selflinktest",
-			Namespace: namespace,
-			Labels: map[string]string{
-				"name": "selflinktest",
-			},
-		},
-		Spec: api.ServiceSpec{
-			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
-			},
-			Ports: []api.ServicePort{{
-				Port:     12345,
-				Protocol: "TCP",
-			}},
-			SessionAffinity: "None",
-		},
-	}
-	services := c.Services(namespace)
-	svc, err := services.Create(&svcBody)
-	if err != nil {
-		glog.Fatalf("Failed creating selflinktest service: %v", err)
-	}
-	err = c.Get().RequestURI(svc.SelfLink).Do().Into(svc)
-	if err != nil {
-		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
-	}
-
-	svcList, err := services.List(api.ListOptions{})
-	if err != nil {
-		glog.Fatalf("Failed listing services: %v", err)
-	}
-
-	err = c.Get().RequestURI(svcList.SelfLink).Do().Into(svcList)
-	if err != nil {
-		glog.Fatalf("Failed listing services with supplied self link '%v': %v", svcList.SelfLink, err)
-	}
-
-	found := false
-	for i := range svcList.Items {
-		item := &svcList.Items[i]
-		if item.Name != "selflinktest" {
-			continue
-		}
-		found = true
-		err = c.Get().RequestURI(item.SelfLink).Do().Into(svc)
-		if err != nil {
-			glog.Fatalf("Failed listing service with supplied self link '%v': %v", item.SelfLink, err)
-		}
-		break
-	}
-	if !found {
-		glog.Fatalf("never found selflinktest service in namespace %s", namespace)
-	}
-	glog.Infof("Self link test passed in namespace %s", namespace)
-
-	// TODO: Should test PUT at some point, too.
-}
-
 func runAtomicPutTest(c *client.Client) {
 	svcBody := api.Service{
 		TypeMeta: unversioned.TypeMeta{
@@ -803,10 +741,6 @@ func main() {
 		runAtomicPutTest,
 		runPatchTest,
 		runMasterServiceTest,
-		func(c *client.Client) {
-			runSelfLinkTestOnNamespace(c, api.NamespaceDefault)
-			runSelfLinkTestOnNamespace(c, "other")
-		},
 	}
 
 	// Only run at most maxConcurrency tests in parallel.

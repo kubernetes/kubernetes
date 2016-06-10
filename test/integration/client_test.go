@@ -421,3 +421,64 @@ func TestMultiWatch(t *testing.T) {
 	log.Printf("all watches ended")
 	t.Errorf("durations: %v", dur)
 }
+
+func runSelfLinkTestOnNamespace(t *testing.T, c *client.Client, namespace string) {
+	podBody := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "selflinktest",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"name": "selflinktest",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "name", Image: "image"},
+			},
+		},
+	}
+	pod, err := c.Pods(namespace).Create(&podBody)
+	if err != nil {
+		t.Fatalf("Failed creating selflinktest pod: %v", err)
+	}
+	if err = c.Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
+		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
+	}
+
+	podList, err := c.Pods(namespace).List(api.ListOptions{})
+	if err != nil {
+		t.Errorf("Failed listing pods: %v", err)
+	}
+
+	if err = c.Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
+		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
+	}
+
+	found := false
+	for i := range podList.Items {
+		item := &podList.Items[i]
+		if item.Name != "selflinktest" {
+			continue
+		}
+		found = true
+		err = c.Get().RequestURI(item.SelfLink).Do().Into(pod)
+		if err != nil {
+			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
+		}
+		break
+	}
+	if !found {
+		t.Errorf("never found selflinktest pod in namespace %s", namespace)
+	}
+}
+
+func TestSelfLinkOnNamespace(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	runSelfLinkTestOnNamespace(t, c, api.NamespaceDefault)
+	runSelfLinkTestOnNamespace(t, c, "other-namespace")
+}
