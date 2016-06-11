@@ -144,6 +144,7 @@ var shortForms = map[string]string{
 	// Please keep this alphabetized
 	// If you add an entry here, please also take a look at pkg/kubectl/cmd/cmd.go
 	// and add an entry to valid_resources when appropriate.
+	"cpa":    "clusterprotectedattributes",
 	"cs":     "componentstatuses",
 	"ds":     "daemonsets",
 	"ep":     "endpoints",
@@ -153,6 +154,7 @@ var shortForms = map[string]string{
 	"limits": "limitranges",
 	"no":     "nodes",
 	"ns":     "namespaces",
+	"pa":     "protectedattributes",
 	"po":     "pods",
 	"psp":    "podSecurityPolicies",
 	"pvc":    "persistentvolumeclaims",
