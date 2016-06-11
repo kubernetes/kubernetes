@@ -219,20 +219,18 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return err
 	}
 
-	allErrs := []error{}
-	infos, err := r.Infos()
-	if err != nil {
-		allErrs = append(allErrs, err)
-	}
-
 	if generic {
 		clientConfig, err := f.ClientConfig()
 		if err != nil {
 			return err
 		}
 
+		allErrs := []error{}
 		singular := false
-		r.IntoSingular(&singular)
+		infos, err := r.IntoSingular(&singular).Infos()
+		if err != nil {
+			allErrs = append(allErrs, err)
+		}
 
 		// the outermost object will be converted to the output-version, but inner
 		// objects can use their mappings
@@ -240,12 +238,22 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
+
 		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
 		if err != nil {
 			return err
 		}
 
-		return printer.PrintObj(obj, out)
+		if err := printer.PrintObj(obj, out); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		return utilerrors.NewAggregate(allErrs)
+	}
+
+	allErrs := []error{}
+	infos, err := r.Infos()
+	if err != nil {
+		allErrs = append(allErrs, err)
 	}
 
 	objs := make([]runtime.Object, len(infos))
@@ -315,5 +323,5 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			continue
 		}
 	}
-	return utilerrors.Flatten(utilerrors.NewAggregate(allErrs))
+	return utilerrors.NewAggregate(allErrs)
 }
