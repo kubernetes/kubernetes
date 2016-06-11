@@ -2886,18 +2886,18 @@ func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			}
 		}
 		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-		totalAvailable, err := deploymentutil.GetAvailablePodsForReplicaSets(c, allRSs, minReadySeconds)
+		totalAvailable, err := deploymentutil.GetAvailablePodsForDeployment(c, deployment, minReadySeconds)
 		if err != nil {
 			return false, err
 		}
 		if totalCreated > maxCreated {
 			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
+			logPodsOfDeployment(c, deployment, minReadySeconds)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
 			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
+			logPodsOfDeployment(c, deployment, minReadySeconds)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
@@ -2913,7 +2913,7 @@ func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 
 	if err == wait.ErrWaitTimeout {
 		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-		logPodsOfReplicaSets(c, allRSs, minReadySeconds)
+		logPodsOfDeployment(c, deployment, minReadySeconds)
 	}
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %s status to match expectation: %v", deploymentName, err)
@@ -3062,10 +3062,17 @@ func WaitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
 }
 
-func logPodsOfReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int32) {
-	allPods, err := deploymentutil.GetPodsForReplicaSets(c, rss)
+func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment, minReadySeconds int32) {
+	podList, err := deploymentutil.ListPods(deployment,
+		func(namespace string, options api.ListOptions) (*api.PodList, error) {
+			return c.Core().Pods(namespace).List(options)
+		})
+	if err != nil {
+		Logf("Failed to list pods of deployment %s: %v", deployment.Name, err)
+		return
+	}
 	if err == nil {
-		for _, pod := range allPods {
+		for _, pod := range podList.Items {
 			availability := "not available"
 			if deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
 				availability = "available"
