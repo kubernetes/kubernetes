@@ -204,6 +204,30 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
+					Replicas: newInt32(3),
+					Strategy: DeploymentStrategy{
+						Type:          RollingUpdateDeploymentStrategyType,
+						RollingUpdate: nil,
+					},
+				},
+			},
+			expected: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt32(3),
+					Strategy: DeploymentStrategy{
+						Type: RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &RollingUpdateDeployment{
+							MaxSurge:       &defaultIntOrString,
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					Template: defaultTemplate,
+				},
+			},
+		},
+		{
+			original: &Deployment{
+				Spec: DeploymentSpec{
 					Replicas: newInt32(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
