@@ -993,10 +993,10 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, nil
 	}
 
-	profile, profileOK := pod.ObjectMeta.Annotations["security.alpha.kubernetes.io/seccomp/container/"+ctrName]
+	profile, profileOK := pod.ObjectMeta.Annotations["container.seccomp.security.alpha.kubernetes.io/"+ctrName]
 	if !profileOK {
 		// try the pod profile
-		profile, profileOK = pod.ObjectMeta.Annotations["security.alpha.kubernetes.io/seccomp/pod"]
+		profile, profileOK = pod.ObjectMeta.Annotations["seccomp.security.alpha.kubernetes.io/pod"]
 		if !profileOK {
 			// return early the default
 			return defaultSecurityOpt, nil
@@ -1013,7 +1013,7 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, nil
 	}
 
-	if !strings.HasPrefix(profile, "localhost") {
+	if !strings.HasPrefix(profile, "localhost/") {
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
 	}
 

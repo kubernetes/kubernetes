@@ -37,8 +37,9 @@ func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
 	podName := "security-context-" + string(util.NewUUID())
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:   podName,
-			Labels: map[string]string{"name": podName},
+			Name:        podName,
+			Labels:      map[string]string{"name": podName},
+			Annotations: map[string]string{},
 		},
 		Spec: api.PodSpec{
 			SecurityContext: &api.PodSecurityContext{
@@ -106,6 +107,37 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 		testPodSELinuxLabeling(f, false, true)
 	})
 
+	It("should support seccomp alpha unconfined annotation on the container [Feature:Seccomp]", func() {
+		// TODO: port to SecurityContext as soon as seccomp is out of alpha
+		pod := scTestPod(false, false)
+		pod.Annotations["container.seccomp.security.alpha.kubernetes.io/test-container"] = "unconfined"
+		pod.Annotations["seccomp.security.alpha.kubernetes.io/pod"] = "docker/default"
+		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		f.TestContainerOutput("pod.Spec.SecurityContext.Seccomp", pod, 0, []string{"0"}) // seccomp disabled
+	})
+
+	It("should support seccomp alpha unconfined annotation on the pod [Feature:Seccomp]", func() {
+		// TODO: port to SecurityContext as soon as seccomp is out of alpha
+		pod := scTestPod(false, false)
+		pod.Annotations["seccomp.security.alpha.kubernetes.io/pod"] = "unconfined"
+		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		f.TestContainerOutput("pod.Spec.SecurityContext.Seccomp", pod, 0, []string{"0"}) // seccomp disabled
+	})
+
+	It("should support seccomp alpha docker/default annotation [Feature:Seccomp]", func() {
+		// TODO: port to SecurityContext as soon as seccomp is out of alpha
+		pod := scTestPod(false, false)
+		pod.Annotations["container.seccomp.security.alpha.kubernetes.io/test-container"] = "docker/default"
+		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		f.TestContainerOutput("pod.Spec.SecurityContext.Seccomp", pod, 0, []string{"2"}) // seccomp filtered
+	})
+
+	It("should support seccomp default which is unconfined [Feature:Seccomp]", func() {
+		// TODO: port to SecurityContext as soon as seccomp is out of alpha
+		pod := scTestPod(false, false)
+		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		f.TestContainerOutput("pod.Spec.SecurityContext.Seccomp", pod, 0, []string{"0"}) // seccomp disabled
+	})
 })
 
 func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) {
