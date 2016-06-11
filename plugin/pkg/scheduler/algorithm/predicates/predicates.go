@@ -18,6 +18,9 @@ package predicates
 
 import (
 	"fmt"
+	"math/rand"
+	"strconv"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -156,7 +159,13 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 			}
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil {
-				return err
+				// if the PVC is not found, log the error and count the PV towards the PV limit
+				// generate a random volume ID since its required for de-dup
+				glog.Error(err)
+				source := rand.NewSource(time.Now().UnixNano())
+				generatedID := "missingPVC" + strconv.Itoa(rand.New(source).Intn(1000000))
+				filteredVolumes[generatedID] = true
+				return nil
 			}
 
 			pvName := pvc.Spec.VolumeName
@@ -166,7 +175,14 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 			if err != nil {
-				return err
+				// if the PV is not found, log the error
+				// and count the PV towards the PV limit
+				// generate a random volume ID since its required for de-dup
+				glog.Error(err)
+				source := rand.NewSource(time.Now().UnixNano())
+				generatedID := "missingPV" + strconv.Itoa(rand.New(source).Intn(1000000))
+				filteredVolumes[generatedID] = true
+				return nil
 			}
 
 			if id, ok := c.filter.FilterPersistentVolume(pv); ok {
