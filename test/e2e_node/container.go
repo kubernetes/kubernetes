@@ -110,17 +110,32 @@ func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
 	return ConformanceContainer{containers[0], cc.Client, pod.Spec.RestartPolicy, pod.Spec.Volumes, pod.Spec.NodeName, cc.Namespace, cc.podName}, nil
 }
 
-func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, api.PodPhase, error) {
+func (cc *ConformanceContainer) IsReady() (bool, error) {
 	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
 	if err != nil {
-		return api.ContainerStatus{}, api.PodUnknown, err
+		return false, err
 	}
+	return api.IsPodReady(pod), nil
+}
 
-	statuses := pod.Status.ContainerStatuses
-	if len(statuses) != 1 {
-		return api.ContainerStatus{}, api.PodUnknown, errors.New("Failed to get container status")
+func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
+	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	if err != nil {
+		return api.PodUnknown, err
 	}
-	return statuses[0], pod.Status.Phase, nil
+	return pod.Status.Phase, nil
+}
+
+func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
+	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	if err != nil {
+		return api.ContainerStatus{}, err
+	}
+	statuses := pod.Status.ContainerStatuses
+	if len(statuses) != 1 || statuses[0].Name != cc.Container.Name {
+		return api.ContainerStatus{}, fmt.Errorf("unexpected container statuses %v", statuses)
+	}
+	return statuses[0], nil
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
@@ -134,10 +149,10 @@ func (cc *ConformanceContainer) Present() (bool, error) {
 	return false, err
 }
 
-type ContainerState uint32
+type ContainerState int
 
 const (
-	ContainerStateWaiting ContainerState = 1 << iota
+	ContainerStateWaiting ContainerState = iota
 	ContainerStateRunning
 	ContainerStateTerminated
 	ContainerStateUnknown
