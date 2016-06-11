@@ -19,9 +19,12 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
+
+	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
@@ -35,7 +38,7 @@ type ControllerManagerConfiguration struct {
 	// dnsProvider is the provider for dns services.
 	DnsProvider string `json:"dnsProvider"`
 	// dnsConfigFile is the path to the dns provider configuration file.
-	DnsConfigFile string `json:"ndsConfigFile"`
+	DnsConfigFile string `json:"dnsConfigFile"`
 	// concurrentServiceSyncs is the number of services that are
 	// allowed to sync concurrently. Larger number = more responsive service
 	// management, but more CPU (and network) load.
@@ -95,5 +98,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "ContentType of requests sent to apiserver. Passing application/vnd.kubernetes.protobuf is an experimental feature now.")
 	fs.Float32Var(&s.APIServerQPS, "federated-api-qps", s.APIServerQPS, "QPS to use while talking with federation apiserver")
 	fs.IntVar(&s.APIServerBurst, "federated-api-burst", s.APIServerBurst, "Burst to use while talking with federation apiserver")
+	fs.StringVar(&s.DnsProvider, "dns-provider", s.DnsProvider, "DNS provider. Valid values are: "+fmt.Sprintf("%q", dnsprovider.RegisteredDnsProviders()))
+	fs.StringVar(&s.DnsConfigFile, "dns-provider-config", s.DnsConfigFile, "Path to config file for configuring DNS provider.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }
