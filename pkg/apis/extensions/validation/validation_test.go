@@ -547,6 +547,13 @@ func validDeployment() *extensions.Deployment {
 					"name": "abc",
 				},
 			},
+			Strategy: extensions.DeploymentStrategy{
+				Type: extensions.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDeployment{
+					MaxSurge:       intstr.FromInt(1),
+					MaxUnavailable: intstr.FromInt(1),
+				},
+			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "abc",
@@ -603,6 +610,11 @@ func TestValidateDeployment(t *testing.T) {
 	invalidRestartPolicyDeployment := validDeployment()
 	invalidRestartPolicyDeployment.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
 	errorCases["Unsupported value: \"Never\""] = invalidRestartPolicyDeployment
+
+	// must have valid strategy type
+	invalidStrategyDeployment := validDeployment()
+	invalidStrategyDeployment.Spec.Strategy.Type = extensions.DeploymentStrategyType("randomType")
+	errorCases["supported values: Recreate, RollingUpdate"] = invalidStrategyDeployment
 
 	// rollingUpdate should be nil for recreate.
 	invalidRecreateDeployment := validDeployment()
