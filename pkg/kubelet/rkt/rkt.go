@@ -554,13 +554,16 @@ func setApp(imgManifest *appcschema.ImageManifest, c *api.Container, opts *kubec
 
 	// If 'User' or 'Group' are still empty at this point,
 	// then apply the root UID and GID.
-	// TODO(yifan): Instead of using root GID, we should use
-	// the GID which the user is in.
+	// TODO(yifan): If only the GID is empty, rkt should be able to determine the GID
+	// using the /etc/passwd file in the image.
+	// See https://github.com/appc/docker2aci/issues/175.
+	// Maybe we can remove this check in the future.
 	if app.User == "" {
 		app.User = "0"
+		app.Group = "0"
 	}
 	if app.Group == "" {
-		app.Group = "0"
+		return fmt.Errorf("cannot determine the GID of the app %q", imgManifest.Name)
 	}
 
 	// Set working directory.

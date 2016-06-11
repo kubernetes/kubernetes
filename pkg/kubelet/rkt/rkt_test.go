@@ -846,6 +846,8 @@ func generateMemoryIsolator(t *testing.T, request, limit string) appctypes.Isola
 
 func baseApp(t *testing.T) *appctypes.App {
 	return &appctypes.App{
+		User:              "0",
+		Group:             "0",
 		Exec:              appctypes.Exec{"/bin/foo", "bar"},
 		SupplementaryGIDs: []int{4, 5, 6},
 		WorkingDirectory:  "/foo",
