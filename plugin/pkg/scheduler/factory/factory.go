@@ -449,6 +449,11 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 				return false
 			}
 		}
+		// Ignore nodes that are marked unschedulable
+		if node.Spec.Unschedulable {
+			glog.V(4).Infof("Ignoring node %v since it is unschedulable", node.Name)
+			return false
+		}
 		return true
 	}
 }
@@ -470,9 +475,10 @@ func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatc
 
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.
 func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
-	// TODO: Filter out nodes that doesn't have NodeReady condition.
-	fields := fields.Set{api.NodeUnschedulableField: "false"}.AsSelector()
-	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields)
+	// all nodes are considered to ensure that the scheduler cache has access to all nodes for lookups
+	// the NodeCondition is used to filter out the nodes that are not ready or unschedulable
+	// the filtered list is used as the super set of nodes to consider for scheduling
+	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // createPersistentVolumeLW returns a cache.ListWatch that gets all changes to persistentVolumes.
