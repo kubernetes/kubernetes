@@ -202,11 +202,11 @@ use annotations instead of extending the API with new fields.
 In the alpha version of this feature we will use annotations to store the
 names of seccomp profiles.  The keys will be:
 
-`security.alpha.kubernetes.io/seccomp/container/<container name>`
+`container.seccomp.security.alpha.kubernetes.io/<container name>`
 
 which will be used to set the seccomp profile of a container, and:
 
-`security.alpha.kubernetes.io/seccomp/pod`
+`seccomp.security.alpha.kubernetes.io/pod`
 
 which will set the seccomp profile for the containers of an entire pod.  If a
 pod-level annotation is present, and a container-level annotation present for
@@ -240,7 +240,7 @@ subdirectory of the kubelet root directory.
 
 The `PodSecurityPolicy` type should be annotated with the allowed seccomp
 profiles using the key
-`security.alpha.kubernetes.io/allowedSeccompProfileNames`.  The value of this
+`seccomp.security.alpha.kubernetes.io/allowedProfileNames`.  The value of this
 key should be a comma delimited list.
 
 ## Examples
@@ -255,7 +255,7 @@ kind: Pod
 metadata:
   name: trustworthy-pod
   annotations:
-    security.alpha.kubernetes.io/seccomp/pod: unconfined
+    seccomp.security.alpha.kubernetes.io/pod: unconfined
 spec:
   containers:
     - name: trustworthy-container
@@ -273,7 +273,7 @@ kind: Pod
 metadata:
   name: explorer
   annotations:
-    security.alpha.kubernetes.io/seccomp/container/explorer: localhost/example-explorer-profile
+    container.seccomp.security.alpha.kubernetes.io/explorer: localhost/example-explorer-profile
 spec:
   containers:
     - name: explorer

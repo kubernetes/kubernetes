@@ -1762,7 +1762,7 @@ func TestUnconfinedSeccompProfileWithDockerV110(t *testing.T) {
 			Name:      "foo4",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"security.alpha.kubernetes.io/seccomp/pod": "unconfined",
+				"seccomp.security.alpha.kubernetes.io/pod": "unconfined",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1804,7 +1804,7 @@ func TestDefaultSeccompProfileWithDockerV110(t *testing.T) {
 			Name:      "foo1",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"security.alpha.kubernetes.io/seccomp/pod": "docker/default",
+				"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1846,8 +1846,8 @@ func TestSeccompContainerAnnotationTrumpsPod(t *testing.T) {
 			Name:      "foo2",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"security.alpha.kubernetes.io/seccomp/pod":            "unconfined",
-				"security.alpha.kubernetes.io/seccomp/container/bar2": "docker/default",
+				"seccomp.security.alpha.kubernetes.io/pod":            "unconfined",
+				"container.seccomp.security.alpha.kubernetes.io/bar2": "docker/default",
 			},
 		},
 		Spec: api.PodSpec{
