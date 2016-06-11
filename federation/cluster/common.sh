@@ -52,6 +52,20 @@ function create-federation-api-objects {
     export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager"
     export FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-controller-manager.docker_tag)}"
 
+    if [[ -z "${FEDERATION_DNS_PROVIDER:-}" ]]; then
+      # Set the appropriate value based on cloud provider.
+      if [[ "$KUBERNETES_PROVIDER" == "gce" || "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+        echo "setting dns provider to google-clouddns"
+        export FEDERATION_DNS_PROVIDER="google-clouddns"
+      elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+        echo "setting dns provider to aws-route53"
+        export FEDERATION_DNS_PROVIDER="aws-route53"
+      else
+        echo "Must set FEDERATION_DNS_PROVIDER env var"
+        exit 1
+      fi
+    fi
+
     export FEDERATION_SERVICE_CIDR=${FEDERATION_SERVICE_CIDR:-"10.10.0.0/24"}
 
     #Only used for providers that require a nodeport service (vagrant for now)

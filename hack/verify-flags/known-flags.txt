@@ -99,6 +99,8 @@ deserialization-cache-size
 dest-file
 disable-filter
 dns-port
+dns-provider
+dns-provider-config
 docker-email
 docker-endpoint
 docker-exec-handler
