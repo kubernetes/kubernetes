@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ func PurgeFile(dirname string, suffix string, max uint, interval time.Duration, 
 			sort.Strings(newfnames)
 			for len(newfnames) > int(max) {
 				f := path.Join(dirname, newfnames[0])
-				l, err := TryLockFile(f, os.O_WRONLY, 0600)
+				l, err := TryLockFile(f, os.O_WRONLY, PrivateFileMode)
 				if err != nil {
 					break
 				}

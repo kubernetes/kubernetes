@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -168,10 +168,10 @@ func (rn *RawNode) ApplyConfChange(cc pb.ConfChange) *pb.ConfState {
 // Step advances the state machine using the given message.
 func (rn *RawNode) Step(m pb.Message) error {
 	// ignore unexpected local messages receiving over network
-	if IsLocalMsg(m) {
+	if IsLocalMsg(m.Type) {
 		return ErrStepLocalMsg
 	}
-	if _, ok := rn.raft.prs[m.From]; ok || !IsResponseMsg(m) {
+	if _, ok := rn.raft.prs[m.From]; ok || !IsResponseMsg(m.Type) {
 		return rn.raft.Step(m)
 	}
 	return ErrStepPeerNotFound
@@ -225,4 +225,9 @@ func (rn *RawNode) ReportSnapshot(id uint64, status SnapshotStatus) {
 	rej := status == SnapshotFailure
 
 	_ = rn.raft.Step(pb.Message{Type: pb.MsgSnapStatus, From: id, Reject: rej})
+}
+
+// TransferLeader tries to transfer leadership to the given transferee.
+func (rn *RawNode) TransferLeader(transferee uint64) {
+	_ = rn.raft.Step(pb.Message{Type: pb.MsgTransferLeader, From: transferee})
 }

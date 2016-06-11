@@ -36,9 +36,6 @@ func NewRealClock() Clock {
 func NewFakeClock() FakeClock {
 	return &fakeClock{
 		l: sync.RWMutex{},
-
-		// use a fixture that does not fulfill Time.IsZero()
-		time: time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
 

@@ -24,23 +24,6 @@ import (
 	"unicode"
 )
 
-const (
-	// SYSTEMD_LINE_MAX mimics the maximum line length that systemd can use.
-	// On typical systemd platforms (i.e. modern Linux), this will most
-	// commonly be 2048, so let's use that as a sanity check.
-	// Technically, we should probably pull this at runtime:
-	//    SYSTEMD_LINE_MAX = int(C.sysconf(C.__SC_LINE_MAX))
-	// but this would introduce an (unfortunate) dependency on cgo
-	SYSTEMD_LINE_MAX = 2048
-
-	// characters that systemd considers indicate a newline
-	SYSTEMD_NEWLINE = "\r\n"
-)
-
-var (
-	ErrLineTooLong = fmt.Errorf("line too long (max %d bytes)", SYSTEMD_LINE_MAX)
-)
-
 // Deserialize parses a systemd unit file into a list of UnitOption objects.
 func Deserialize(f io.Reader) (opts []*UnitOption, err error) {
 	lexer, optchan, errchan := newLexer(f)
@@ -71,34 +54,17 @@ type lexer struct {
 
 func (l *lexer) lex() {
 	var err error
-	defer func() {
-		close(l.optchan)
-		close(l.errchan)
-	}()
 	next := l.lexNextSection
 	for next != nil {
-		if l.buf.Buffered() >= SYSTEMD_LINE_MAX {
-			// systemd truncates lines longer than LINE_MAX
-			// https://bugs.freedesktop.org/show_bug.cgi?id=85308
-			// Rather than allowing this to pass silently, let's
-			// explicitly gate people from encountering this
-			line, err := l.buf.Peek(SYSTEMD_LINE_MAX)
-			if err != nil {
-				l.errchan <- err
-				return
-			}
-			if bytes.IndexAny(line, SYSTEMD_NEWLINE) == -1 {
-				l.errchan <- ErrLineTooLong
-				return
-			}
-		}
-
 		next, err = next()
 		if err != nil {
 			l.errchan <- err
-			return
+			break
 		}
 	}
+
+	close(l.optchan)
+	close(l.errchan)
 }
 
 type lexStep func() (lexStep, error)
@@ -114,7 +80,7 @@ func (l *lexer) lexSectionName() (lexStep, error) {
 
 func (l *lexer) lexSectionSuffixFunc(section string) lexStep {
 	return func() (lexStep, error) {
-		garbage, _, err := l.toEOL()
+		garbage, err := l.toEOL()
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +97,7 @@ func (l *lexer) lexSectionSuffixFunc(section string) lexStep {
 func (l *lexer) ignoreLineFunc(next lexStep) lexStep {
 	return func() (lexStep, error) {
 		for {
-			line, _, err := l.toEOL()
+			line, err := l.toEOL()
 			if err != nil {
 				return nil, err
 			}
@@ -211,64 +177,49 @@ func (l *lexer) lexOptionNameFunc(section string) lexStep {
 		}
 
 		name := strings.TrimSpace(partial.String())
-		return l.lexOptionValueFunc(section, name, bytes.Buffer{}), nil
+		return l.lexOptionValueFunc(section, name), nil
 	}
 }
 
-func (l *lexer) lexOptionValueFunc(section, name string, partial bytes.Buffer) lexStep {
+func (l *lexer) lexOptionValueFunc(section, name string) lexStep {
 	return func() (lexStep, error) {
+		var partial bytes.Buffer
+
 		for {
-			line, eof, err := l.toEOL()
+			line, err := l.toEOL()
 			if err != nil {
 				return nil, err
 			}
 
-			if len(bytes.TrimSpace(line)) == 0 {
-				break
-			}
-
-			partial.Write(line)
-
 			// lack of continuation means this value has been exhausted
 			idx := bytes.LastIndex(line, []byte{'\\'})
 			if idx == -1 || idx != (len(line)-1) {
+				partial.Write(line)
 				break
 			}
 
-			if !eof {
-				partial.WriteRune('\n')
-			}
-
-			return l.lexOptionValueFunc(section, name, partial), nil
+			partial.Write(line[0:idx])
+			partial.WriteRune(' ')
 		}
 
-		val := partial.String()
-		if strings.HasSuffix(val, "\n") {
-			// A newline was added to the end, so the file didn't end with a backslash.
-			// => Keep the newline
-			val = strings.TrimSpace(val) + "\n"
-		} else {
-			val = strings.TrimSpace(val)
-		}
+		val := strings.TrimSpace(partial.String())
 		l.optchan <- &UnitOption{Section: section, Name: name, Value: val}
 
 		return l.lexNextSectionOrOptionFunc(section), nil
 	}
 }
 
-// toEOL reads until the end-of-line or end-of-file.
-// Returns (data, EOFfound, error)
-func (l *lexer) toEOL() ([]byte, bool, error) {
+func (l *lexer) toEOL() ([]byte, error) {
 	line, err := l.buf.ReadBytes('\n')
 	// ignore EOF here since it's roughly equivalent to EOL
 	if err != nil && err != io.EOF {
-		return nil, false, err
+		return nil, err
 	}
 
 	line = bytes.TrimSuffix(line, []byte{'\r'})
 	line = bytes.TrimSuffix(line, []byte{'\n'})
 
-	return line, err == io.EOF, nil
+	return line, nil
 }
 
 func isComment(r rune) bool {

@@ -8,4 +8,13 @@ Maintainers of this repository:
 The following individuals have contributed code to this repository
 (listed in alphabetical order):
 
-* Tobias Schmidt <ts@soundcloud.com>
+* Armen Baghumian <abaghumian@noggin.com.au>
+* Bjoern Rabenstein <beorn@soundcloud.com>
+* David Cournapeau <cournape@gmail.com>
+* Ji-Hoon, Seol <jihoon.seol@gmail.com>
+* Jonas Große Sundrup <cherti@letopolis.de>
+* Julius Volz <julius@soundcloud.com>
+* Matthias Rampke <mr@soundcloud.com>
+* Nicky Gerritsen <nicky@streamone.nl>
+* Rémi Audebert <contact@halfr.net>
+* Tobias Schmidt <tobidt@gmail.com>

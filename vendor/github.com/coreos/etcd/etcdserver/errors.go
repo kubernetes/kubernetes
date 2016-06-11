@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ var (
 	ErrNoLeader                   = errors.New("etcdserver: no leader")
 	ErrRequestTooLarge            = errors.New("etcdserver: request is too large")
 	ErrNoSpace                    = errors.New("etcdserver: no space")
+	ErrInvalidAuthToken           = errors.New("etcdserver: invalid auth token")
 )
 
 type DiscoveryError struct {

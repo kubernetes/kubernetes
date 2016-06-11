@@ -105,6 +105,11 @@ func (p *Buffer) EncodeVarint(x uint64) error {
 	return nil
 }
 
+// SizeVarint returns the varint encoding size of an integer.
+func SizeVarint(x uint64) int {
+	return sizeVarint(x)
+}
+
 func sizeVarint(x uint64) (n int) {
 	for {
 		n++
@@ -1248,24 +1253,9 @@ func size_struct(prop *StructProperties, base structPointer) (n int) {
 	}
 
 	// Factor in any oneof fields.
-	// TODO: This could be faster and use less reflection.
-	if prop.oneofMarshaler != nil {
-		sv := reflect.ValueOf(structPointer_Interface(base, prop.stype)).Elem()
-		for i := 0; i < prop.stype.NumField(); i++ {
-			fv := sv.Field(i)
-			if fv.Kind() != reflect.Interface || fv.IsNil() {
-				continue
-			}
-			if prop.stype.Field(i).Tag.Get("protobuf_oneof") == "" {
-				continue
-			}
-			spv := fv.Elem()         // interface -> *T
-			sv := spv.Elem()         // *T -> T
-			sf := sv.Type().Field(0) // StructField inside T
-			var prop Properties
-			prop.Init(sf.Type, "whatever", sf.Tag.Get("protobuf"), &sf)
-			n += prop.size(&prop, toStructPointer(spv))
-		}
+	if prop.oneofSizer != nil {
+		m := structPointer_Interface(base, prop.stype).(Message)
+		n += prop.oneofSizer(m)
 	}
 
 	return

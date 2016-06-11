@@ -206,14 +206,6 @@ func (c *Config) SetDefaults() {
 	if c.Ciphers == nil {
 		c.Ciphers = supportedCiphers
 	}
-	var ciphers []string
-	for _, c := range c.Ciphers {
-		if cipherModes[c] != nil {
-			// reject the cipher if we have no cipherModes definition
-			ciphers = append(ciphers, c)
-		}
-	}
-	c.Ciphers = ciphers
 
 	if c.KeyExchanges == nil {
 		c.KeyExchanges = supportedKexAlgos

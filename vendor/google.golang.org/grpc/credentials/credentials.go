@@ -54,9 +54,9 @@ var (
 	alpnProtoStr = []string{"h2"}
 )
 
-// Credentials defines the common interface all supported credentials must
-// implement.
-type Credentials interface {
+// PerRPCCredentials defines the common interface for the credentials which need to
+// attach security information to every RPC (e.g., oauth2).
+type PerRPCCredentials interface {
 	// GetRequestMetadata gets the current request metadata, refreshing
 	// tokens if required. This should be called by the transport layer on
 	// each request, and the data should be populated in headers or other
@@ -87,9 +87,9 @@ type AuthInfo interface {
 	AuthType() string
 }
 
-// TransportAuthenticator defines the common interface for all the live gRPC wire
+// TransportCredentials defines the common interface for all the live gRPC wire
 // protocols and supported transport security protocols (e.g., TLS, SSL).
-type TransportAuthenticator interface {
+type TransportCredentials interface {
 	// ClientHandshake does the authentication handshake specified by the corresponding
 	// authentication protocol on rawConn for clients. It returns the authenticated
 	// connection and the corresponding auth information about the connection.
@@ -98,9 +98,8 @@ type TransportAuthenticator interface {
 	// the authenticated connection and the corresponding auth information about
 	// the connection.
 	ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error)
-	// Info provides the ProtocolInfo of this TransportAuthenticator.
+	// Info provides the ProtocolInfo of this TransportCredentials.
 	Info() ProtocolInfo
-	Credentials
 }
 
 // TLSInfo contains the auth information for a TLS authenticated connection.
@@ -109,6 +108,7 @@ type TLSInfo struct {
 	State tls.ConnectionState
 }
 
+// AuthType returns the type of TLSInfo as a string.
 func (t TLSInfo) AuthType() string {
 	return "tls"
 }
@@ -185,20 +185,20 @@ func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error)
 	return conn, TLSInfo{conn.ConnectionState()}, nil
 }
 
-// NewTLS uses c to construct a TransportAuthenticator based on TLS.
-func NewTLS(c *tls.Config) TransportAuthenticator {
+// NewTLS uses c to construct a TransportCredentials based on TLS.
+func NewTLS(c *tls.Config) TransportCredentials {
 	tc := &tlsCreds{*c}
 	tc.config.NextProtos = alpnProtoStr
 	return tc
 }
 
 // NewClientTLSFromCert constructs a TLS from the input certificate for client.
-func NewClientTLSFromCert(cp *x509.CertPool, serverName string) TransportAuthenticator {
+func NewClientTLSFromCert(cp *x509.CertPool, serverName string) TransportCredentials {
 	return NewTLS(&tls.Config{ServerName: serverName, RootCAs: cp})
 }
 
 // NewClientTLSFromFile constructs a TLS from the input certificate file for client.
-func NewClientTLSFromFile(certFile, serverName string) (TransportAuthenticator, error) {
+func NewClientTLSFromFile(certFile, serverName string) (TransportCredentials, error) {
 	b, err := ioutil.ReadFile(certFile)
 	if err != nil {
 		return nil, err
@@ -211,13 +211,13 @@ func NewClientTLSFromFile(certFile, serverName string) (TransportAuthenticator, 
 }
 
 // NewServerTLSFromCert constructs a TLS from the input certificate for server.
-func NewServerTLSFromCert(cert *tls.Certificate) TransportAuthenticator {
+func NewServerTLSFromCert(cert *tls.Certificate) TransportCredentials {
 	return NewTLS(&tls.Config{Certificates: []tls.Certificate{*cert}})
 }
 
 // NewServerTLSFromFile constructs a TLS from the input certificate file and key
 // file for server.
-func NewServerTLSFromFile(certFile, keyFile string) (TransportAuthenticator, error) {
+func NewServerTLSFromFile(certFile, keyFile string) (TransportCredentials, error) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return nil, err

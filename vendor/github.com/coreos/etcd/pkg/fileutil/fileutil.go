@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	privateFileMode = 0600
-	// owner can make/remove files inside the directory
-	privateDirMode = 0700
+	// PrivateFileMode grants owner to read/write a file.
+	PrivateFileMode = 0600
+	// PrivateDirMode grants owner to make/remove files inside the directory.
+	PrivateDirMode = 0700
 )
 
 var (
@@ -38,7 +39,7 @@ var (
 // to dir. It returns nil if dir is writable.
 func IsDirWriteable(dir string) error {
 	f := path.Join(dir, ".touch")
-	if err := ioutil.WriteFile(f, []byte(""), privateFileMode); err != nil {
+	if err := ioutil.WriteFile(f, []byte(""), PrivateFileMode); err != nil {
 		return err
 	}
 	return os.Remove(f)
@@ -62,7 +63,7 @@ func ReadDir(dirpath string) ([]string, error) {
 // TouchDirAll is similar to os.MkdirAll. It creates directories with 0700 permission if any directory
 // does not exists. TouchDirAll also ensures the given directory is writable.
 func TouchDirAll(dir string) error {
-	err := os.MkdirAll(dir, privateDirMode)
+	err := os.MkdirAll(dir, PrivateDirMode)
 	if err != nil && err != os.ErrExist {
 		return err
 	}

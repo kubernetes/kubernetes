@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package ioutil
 import (
 	"io"
 	"os"
+
+	"github.com/coreos/etcd/pkg/fileutil"
 )
 
 // WriteAndSyncFile behaves just like ioutil.WriteFile in the standard library,
@@ -32,7 +34,7 @@ func WriteAndSyncFile(filename string, data []byte, perm os.FileMode) error {
 		err = io.ErrShortWrite
 	}
 	if err == nil {
-		err = f.Sync()
+		err = fileutil.Fsync(f)
 	}
 	if err1 := f.Close(); err == nil {
 		err = err1

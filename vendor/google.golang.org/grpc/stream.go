@@ -47,12 +47,14 @@ import (
 	"google.golang.org/grpc/transport"
 )
 
-type streamHandler func(srv interface{}, stream ServerStream) error
+// StreamHandler defines the handler called by gRPC server to complete the
+// execution of a streaming RPC.
+type StreamHandler func(srv interface{}, stream ServerStream) error
 
 // StreamDesc represents a streaming RPC service's method specification.
 type StreamDesc struct {
 	StreamName string
-	Handler    streamHandler
+	Handler    StreamHandler
 
 	// At least one of these is true.
 	ServerStreams bool
@@ -67,18 +69,19 @@ type Stream interface {
 	// breaks.
 	// On error, it aborts the stream and returns an RPC status on client
 	// side. On server side, it simply returns the error to the caller.
-	// SendMsg is called by generated code.
+	// SendMsg is called by generated code. Also Users can call SendMsg
+	// directly when it is really needed in their use cases.
 	SendMsg(m interface{}) error
 	// RecvMsg blocks until it receives a message or the stream is
 	// done. On client side, it returns io.EOF when the stream is done. On
-	// any other error, it aborts the streama nd returns an RPC status. On
+	// any other error, it aborts the stream and returns an RPC status. On
 	// server side, it simply returns the error to the caller.
 	RecvMsg(m interface{}) error
 }
 
-// ClientStream defines the interface a client stream has to satify.
+// ClientStream defines the interface a client stream has to satisfy.
 type ClientStream interface {
-	// Header returns the header metedata received from the server if there
+	// Header returns the header metadata received from the server if there
 	// is any. It blocks if the metadata is not ready to read.
 	Header() (metadata.MD, error)
 	// Trailer returns the trailer metadata from the server. It must be called
@@ -100,22 +103,27 @@ func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, meth
 	var (
 		t   transport.ClientTransport
 		err error
+		put func()
 	)
-	t, err = cc.dopts.picker.Pick(ctx)
+	// TODO(zhaoq): CallOption is omitted. Add support when it is needed.
+	gopts := BalancerGetOptions{
+		BlockingWait: false,
+	}
+	t, put, err = cc.getTransport(ctx, gopts)
 	if err != nil {
 		return nil, toRPCErr(err)
 	}
-	// TODO(zhaoq): CallOption is omitted. Add support when it is needed.
 	callHdr := &transport.CallHdr{
 		Host:   cc.authority,
 		Method: method,
-		Flush:  desc.ServerStreams&&desc.ClientStreams,
+		Flush:  desc.ServerStreams && desc.ClientStreams,
 	}
 	if cc.dopts.cp != nil {
 		callHdr.SendCompress = cc.dopts.cp.Type()
 	}
 	cs := &clientStream{
 		desc:    desc,
+		put:     put,
 		codec:   cc.dopts.codec,
 		cp:      cc.dopts.cp,
 		dc:      cc.dopts.dc,
@@ -141,7 +149,7 @@ func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, meth
 	}
 	cs.t = t
 	cs.s = s
-	cs.p = &parser{s: s}
+	cs.p = &parser{r: s}
 	// Listen on ctx.Done() to detect cancellation when there is no pending
 	// I/O operations on this stream.
 	go func() {
@@ -171,6 +179,7 @@ type clientStream struct {
 	tracing bool // set to EnableTracing when the clientStream is created.
 
 	mu     sync.Mutex
+	put    func()
 	closed bool
 	// trInfo.tr is set when the clientStream is created (if EnableTracing is true),
 	// and is set to nil when the clientStream's finish method is called.
@@ -204,6 +213,9 @@ func (cs *clientStream) SendMsg(m interface{}) (err error) {
 		cs.mu.Unlock()
 	}
 	defer func() {
+		if err != nil {
+			cs.finish(err)
+		}
 		if err == nil || err == io.EOF {
 			return
 		}
@@ -251,9 +263,10 @@ func (cs *clientStream) RecvMsg(m interface{}) (err error) {
 		}
 		if err == io.EOF {
 			if cs.s.StatusCode() == codes.OK {
+				cs.finish(err)
 				return nil
 			}
-			return Errorf(cs.s.StatusCode(), cs.s.StatusDesc())
+			return Errorf(cs.s.StatusCode(), "%s", cs.s.StatusDesc())
 		}
 		return toRPCErr(err)
 	}
@@ -265,13 +278,18 @@ func (cs *clientStream) RecvMsg(m interface{}) (err error) {
 			// Returns io.EOF to indicate the end of the stream.
 			return
 		}
-		return Errorf(cs.s.StatusCode(), cs.s.StatusDesc())
+		return Errorf(cs.s.StatusCode(), "%s", cs.s.StatusDesc())
 	}
 	return toRPCErr(err)
 }
 
 func (cs *clientStream) CloseSend() (err error) {
 	err = cs.t.Write(cs.s, nil, &transport.Options{Last: true})
+	defer func() {
+		if err != nil {
+			cs.finish(err)
+		}
+	}()
 	if err == nil || err == io.EOF {
 		return
 	}
@@ -299,6 +317,10 @@ func (cs *clientStream) finish(err error) {
 	}
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
+	if cs.put != nil {
+		cs.put()
+		cs.put = nil
+	}
 	if cs.trInfo.tr != nil {
 		if err == nil || err == io.EOF {
 			cs.trInfo.tr.LazyPrintf("RPC: [OK]")

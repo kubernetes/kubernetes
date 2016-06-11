@@ -447,6 +447,7 @@ func FileName(file *FileDescriptor) string {
 	fname := path.Base(file.FileDescriptorProto.GetName())
 	fname = strings.Replace(fname, ".proto", "", -1)
 	fname = strings.Replace(fname, "-", "_", -1)
+	fname = strings.Replace(fname, ".", "_", -1)
 	return CamelCase(fname)
 }
 

@@ -124,6 +124,14 @@ func isWhitespace(c byte) bool {
 	return false
 }
 
+func isQuote(c byte) bool {
+	switch c {
+	case '"', '\'':
+		return true
+	}
+	return false
+}
+
 func (p *textParser) skipWhitespace() {
 	i := 0
 	for i < len(p.s) && (isWhitespace(p.s[i]) || p.s[i] == '#') {
@@ -338,13 +346,13 @@ func (p *textParser) next() *token {
 	p.advance()
 	if p.done {
 		p.cur.value = ""
-	} else if len(p.cur.value) > 0 && p.cur.value[0] == '"' {
+	} else if len(p.cur.value) > 0 && isQuote(p.cur.value[0]) {
 		// Look for multiple quoted strings separated by whitespace,
 		// and concatenate them.
 		cat := p.cur
 		for {
 			p.skipWhitespace()
-			if p.done || p.s[0] != '"' {
+			if p.done || !isQuote(p.s[0]) {
 				break
 			}
 			p.advance()
@@ -724,15 +732,15 @@ func (p *textParser) readAny(v reflect.Value, props *Properties) error {
 				if err != nil {
 					return err
 				}
-				tok := p.next()
-				if tok.err != nil {
-					return tok.err
+				ntok := p.next()
+				if ntok.err != nil {
+					return ntok.err
 				}
-				if tok.value == "]" {
+				if ntok.value == "]" {
 					break
 				}
-				if tok.value != "," {
-					return p.errorf("Expected ']' or ',' found %q", tok.value)
+				if ntok.value != "," {
+					return p.errorf("Expected ']' or ',' found %q", ntok.value)
 				}
 			}
 			return nil

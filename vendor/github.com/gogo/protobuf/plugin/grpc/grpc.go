@@ -44,6 +44,12 @@ import (
 	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 )
 
+// generatedCodeVersion indicates a version of the generated code.
+// It is incremented whenever an incompatibility between the generated code and
+// the grpc package is introduced; the generated code references
+// a constant, grpc.SupportPackageIsVersionN (where N is generatedCodeVersion).
+const generatedCodeVersion = 2
+
 // Paths for packages used by code generated in this file,
 // relative to the import_prefix of the generator.Generator.
 const (
@@ -101,10 +107,18 @@ func (g *grpc) Generate(file *generator.FileDescriptor) {
 	if len(file.FileDescriptorProto.Service) == 0 {
 		return
 	}
+
 	g.P("// Reference imports to suppress errors if they are not otherwise used.")
 	g.P("var _ ", contextPkg, ".Context")
 	g.P("var _ ", grpcPkg, ".ClientConn")
 	g.P()
+
+	// Assert version compatibility.
+	g.P("// This is a compile-time assertion to ensure that this generated file")
+	g.P("// is compatible with the grpc package it is being compiled against.")
+	g.P("const _ = ", grpcPkg, ".SupportPackageIsVersion", generatedCodeVersion)
+	g.P()
+
 	for i, service := range file.FileDescriptorProto.Service {
 		g.generateService(file, service, i)
 	}
@@ -134,7 +148,10 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	path := fmt.Sprintf("6,%d", index) // 6 means service.
 
 	origServName := service.GetName()
-	fullServName := file.GetPackage() + "." + origServName
+	fullServName := origServName
+	if pkg := file.GetPackage(); pkg != "" {
+		fullServName = pkg + "." + fullServName
+	}
 	servName := generator.CamelCase(origServName)
 
 	g.P()
@@ -201,7 +218,7 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	// Server handler implementations.
 	var handlerNames []string
 	for _, method := range service.Method {
-		hname := g.generateServerMethod(servName, method)
+		hname := g.generateServerMethod(servName, fullServName, method)
 		handlerNames = append(handlerNames, hname)
 	}
 
@@ -361,19 +378,25 @@ func (g *grpc) generateServerSignature(servName string, method *pb.MethodDescrip
 	return methName + "(" + strings.Join(reqArgs, ", ") + ") " + ret
 }
 
-func (g *grpc) generateServerMethod(servName string, method *pb.MethodDescriptorProto) string {
+func (g *grpc) generateServerMethod(servName, fullServName string, method *pb.MethodDescriptorProto) string {
 	methName := generator.CamelCase(method.GetName())
 	hname := fmt.Sprintf("_%s_%s_Handler", servName, methName)
 	inType := g.typeName(method.GetInputType())
 	outType := g.typeName(method.GetOutputType())
 
 	if !method.GetServerStreaming() && !method.GetClientStreaming() {
-		g.P("func ", hname, "(srv interface{}, ctx ", contextPkg, ".Context, dec func(interface{}) error) (interface{}, error) {")
+		g.P("func ", hname, "(srv interface{}, ctx ", contextPkg, ".Context, dec func(interface{}) error, interceptor ", grpcPkg, ".UnaryServerInterceptor) (interface{}, error) {")
 		g.P("in := new(", inType, ")")
 		g.P("if err := dec(in); err != nil { return nil, err }")
-		g.P("out, err := srv.(", servName, "Server).", methName, "(ctx, in)")
-		g.P("if err != nil { return nil, err }")
-		g.P("return out, nil")
+		g.P("if interceptor == nil { return srv.(", servName, "Server).", methName, "(ctx, in) }")
+		g.P("info := &", grpcPkg, ".UnaryServerInfo{")
+		g.P("Server: srv,")
+		g.P("FullMethod: ", strconv.Quote(fmt.Sprintf("/%s/%s", fullServName, methName)), ",")
+		g.P("}")
+		g.P("handler := func(ctx ", contextPkg, ".Context, req interface{}) (interface{}, error) {")
+		g.P("return srv.(", servName, "Server).", methName, "(ctx, req.(*", inType, "))")
+		g.P("}")
+		g.P("return interceptor(ctx, in, info, handler)")
 		g.P("}")
 		g.P()
 		return hname
