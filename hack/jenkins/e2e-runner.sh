@@ -35,11 +35,8 @@ function fetch_output_tars() {
 
 function fetch_server_version_tars() {
     local -r build_version="$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE}  --format='value(defaultClusterVersion)')"
-    # Use latest build of the server version's branch for test files.
-    fetch_published_version_tars "ci/latest-${build_version:0:3}"
-    # Unset cluster api version; we want to use server default for the cluster
-    # version.
-    unset CLUSTER_API_VERSION
+    # Use latest build of the server version's branch.
+    fetch_tars_from_gcs "ci" "latest-${build_version:0:3}"
     unpack_binaries
 }
 
