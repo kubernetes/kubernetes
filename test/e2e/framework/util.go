@@ -1839,8 +1839,31 @@ func (b kubectlBuilder) WithStdinReader(reader io.Reader) *kubectlBuilder {
 func (b kubectlBuilder) ExecOrDie() string {
 	str, err := b.Exec()
 	Logf("stdout: %q", str)
+	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
+	// Note that we're still dying after retrying so that we can get visibility to triage it further.
+	if isTimeout(err) {
+		Logf("Hit i/o timeout error, talking to the server 2s later to see if it's temporary.")
+		time.Sleep(2 * time.Second)
+		retryStr, retryErr := RunKubectl("version")
+		Logf("stdout: %q", retryStr)
+		Logf("err: %v", retryErr)
+	}
 	Expect(err).NotTo(HaveOccurred())
 	return str
+}
+
+func isTimeout(err error) bool {
+	switch err := err.(type) {
+	case net.Error:
+		if err.Timeout() {
+			return true
+		}
+	case *url.Error:
+		if err, ok := err.Err.(net.Error); ok && err.Timeout() {
+			return true
+		}
+	}
+	return false
 }
 
 func (b kubectlBuilder) Exec() (string, error) {
