@@ -71,6 +71,7 @@ for ver in $VERSIONS; do
     --rm -v "${TMP_IN_HOST}":/output:z \
     -v "${SWAGGER_PATH}":/swagger-source:z \
     -v "${REGISTER_FILE}":/register.go:z \
+    --net=host -e "https_proxy=${KUBERNETES_HTTPS_PROXY:-}" \
     gcr.io/google_containers/gen-swagger-docs:v6 \
     "${SWAGGER_JSON_NAME}"
 done
