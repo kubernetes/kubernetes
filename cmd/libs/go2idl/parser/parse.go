@@ -576,7 +576,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		return out
 	case *tc.Named:
 		switch t.Underlying().(type) {
-		case *tc.Named, *tc.Basic:
+		case *tc.Named, *tc.Basic, *tc.Map, *tc.Slice:
 			name := tcNameToName(t.String())
 			out := u.Type(name)
 			if out.Kind != types.Unknown {
@@ -591,6 +591,9 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			// "feature" for users. This flattens those types
 			// together.
 			name := tcNameToName(t.String())
+			if name.Name == "OptionalMap" {
+				fmt.Printf("DEBUG: flattening %T -> %T\n", t, t.Underlying())
+			}
 			if out := u.Type(name); out.Kind != types.Unknown {
 				return out // short circuit if we've already made this.
 			}
