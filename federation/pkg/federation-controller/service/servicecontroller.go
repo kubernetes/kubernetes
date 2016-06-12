@@ -227,6 +227,9 @@ func (s *ServiceController) enqueueService(obj interface{}) {
 // It's an error to call Run() more than once for a given ServiceController
 // object.
 func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
+	if err := s.init(); err != nil {
+		return err
+	}
 	defer runtime.HandleCrash()
 	go s.serviceController.Run(stopCh)
 	go s.clusterController.Run(stopCh)
@@ -239,6 +242,18 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 	<-stopCh
 	glog.Infof("Shutting down Federation Service Controller")
 	s.queue.ShutDown()
+	return nil
+}
+
+func (s *ServiceController) init() error {
+	if s.dns == nil {
+		return fmt.Errorf("ServiceController should not be run without a dnsprovider.")
+	}
+	zones, ok := s.dns.Zones()
+	if !ok {
+		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
+	}
+	s.dnsZones = zones
 	return nil
 }
 
@@ -316,6 +331,8 @@ func (s *ServiceController) deleteFederationService(cachedService *cachedService
 	for clusterName, cluster := range s.clusterCache.clientMap {
 		err := s.deleteClusterService(clusterName, cachedService, cluster.clientset)
 		if err != nil {
+			hasErr = true
+		} else if err := s.ensureDnsRecords(clusterName, cachedService); err != nil {
 			hasErr = true
 		}
 	}
