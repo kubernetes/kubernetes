@@ -58,7 +58,7 @@ function restart_docker {
   sudo brctl delbr docker0
 
   source /run/flannel/subnet.env
-
+  source /etc/default/docker
   echo DOCKER_OPTS=\"${DOCKER_OPTS} -H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock \
        --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}\" > /etc/default/docker
   sudo service docker restart
