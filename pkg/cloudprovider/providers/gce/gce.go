@@ -427,19 +427,33 @@ func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operatio
 		return getErrorFromOp(op)
 	}
 
+	opStart := time.Now()
 	opName := op.Name
 	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
 		start := time.Now()
 		gce.operationPollRateLimiter.Accept()
 		duration := time.Now().Sub(start)
 		if duration > 5*time.Second {
-			glog.Infof("pollOperation: waited %v for %v", duration, opName)
+			glog.Infof("pollOperation: throttled %v for %v", duration, opName)
 		}
 		pollOp, err := getOperation(opName)
 		if err != nil {
 			glog.Warningf("GCE poll operation %s failed: pollOp: [%v] err: [%v] getErrorFromOp: [%v]", opName, pollOp, err, getErrorFromOp(pollOp))
 		}
-		return opIsDone(pollOp), getErrorFromOp(pollOp)
+		done := opIsDone(pollOp)
+		if done {
+			duration := time.Now().Sub(opStart)
+			if duration > 1*time.Minute {
+				// Log the JSON. It's cleaner than the %v structure.
+				enc, err := op.MarshalJSON()
+				if err != nil {
+					glog.Warningf("waitForOperation: long operation (%v): %v (failed to encode to JSON: %v)", duration, op, err)
+				} else {
+					glog.Infof("waitForOperation: long operation (%v): %v", duration, string(enc))
+				}
+			}
+		}
+		return done, getErrorFromOp(pollOp)
 	})
 }
 
