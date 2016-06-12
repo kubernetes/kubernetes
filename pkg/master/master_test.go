@@ -257,10 +257,9 @@ func TestNewBootstrapController(t *testing.T) {
 	controller := master.NewBootstrapController()
 
 	assert.Equal(controller.NamespaceRegistry, master.namespaceRegistry)
-	assert.Equal(controller.EndpointRegistry, master.endpointRegistry)
+	assert.Equal(controller.EndpointReconciler, NewMasterCountEndpointReconciler(master.MasterCount, master.endpointRegistry))
 	assert.Equal(controller.ServiceRegistry, master.serviceRegistry)
 	assert.Equal(controller.ServiceNodePortRange, portRange)
-	assert.Equal(controller.MasterCount, master.MasterCount)
 	assert.Equal(controller.ServicePort, master.ServiceReadWritePort)
 	assert.Equal(controller.PublicServicePort, master.PublicReadWritePort)
 }
