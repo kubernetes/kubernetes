@@ -54,7 +54,7 @@ func doDeepCopyTest(t *testing.T, kind unversioned.GroupVersionKind, f *fuzz.Fuz
 	}
 
 	if !reflect.DeepEqual(item, itemCopy) {
-		t.Errorf("\nexpected: %#v\n\ngot:      %#v\n\ndiff:      %v", item, itemCopy, diff.ObjectGoPrintSideBySide(item, itemCopy))
+		t.Errorf("\nexpected: %#v\n\ngot:      %#v\n\ndiff:      %v", item, itemCopy, diff.ObjectReflectDiff(item, itemCopy))
 	}
 }
 
