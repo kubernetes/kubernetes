@@ -124,6 +124,9 @@ func Run(g *Generator) {
 	protobufNames := NewProtobufNamer()
 	outputPackages := generator.Packages{}
 	for _, d := range strings.Split(g.Packages, ",") {
+		if strings.Contains(d, "-") {
+			log.Fatalf("Package names must be valid protobuf package identifiers, which allow only [a-z0-9_]: %s", d)
+		}
 		generateAllTypes, outputPackage := true, true
 		switch {
 		case strings.HasPrefix(d, "+"):
@@ -235,7 +238,7 @@ func Run(g *Generator) {
 
 		// alter the generated protobuf file to remove the generated types (but leave the serializers) and rewrite the
 		// package statement to match the desired package name
-		if err := RewriteGeneratedGogoProtobufFile(outputPath, p.ExtractGeneratedType, buf.Bytes()); err != nil {
+		if err := RewriteGeneratedGogoProtobufFile(outputPath, p.ExtractGeneratedType, p.OptionalTypeName, buf.Bytes()); err != nil {
 			log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
 		}
 
