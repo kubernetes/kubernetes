@@ -169,6 +169,12 @@ func (v *VolumeIdentityMapper) GetClaims(id string) map[string]api.PersistentVol
 		claim.Namespace = v.ps.Namespace
 		claim.Labels = v.ps.Spec.Selector.MatchLabels
 
+		// Include the petset id in the annotations, to force spreading across zones
+		if claim.Annotations == nil {
+			claim.Annotations = make(map[string]string)
+		}
+		claim.Annotations["volume.alpha.kubernetes.io/spread"] = id
+
 		// TODO: We're assuming that the claim template has a volume QoS key, eg:
 		// volume.alpha.kubernetes.io/storage-class: anything
 		petClaims[pvc.Name] = claim

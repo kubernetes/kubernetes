@@ -1119,6 +1119,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	tags[cloudVolumeCreatedForClaimNameTag] = claim.Name
 	tags[cloudVolumeCreatedForVolumeNameTag] = pvName
 
+	zoneHint := claim.Annotations["volume.alpha.kubernetes.io/spread"]
 	options := vol.VolumeOptions{
 		Capacity:                      claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
@@ -1126,6 +1127,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
+		ZoneHint:                      zoneHint,
 	}
 
 	// Provision the volume

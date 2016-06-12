@@ -48,6 +48,11 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	aws_credentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/types"
+
+	"github.com/golang/glog"
+	"hash/fnv"
+	"k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -198,6 +203,7 @@ type EC2Metadata interface {
 type VolumeOptions struct {
 	CapacityGB int
 	Tags       map[string]string
+	ZoneHint   string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1390,8 +1396,45 @@ func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, e
 // Implements Volumes.CreateVolume
 func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	// Default to creating in the current zone
-	// TODO: Spread across zones?
-	createAZ := s.selfAWSInstance.availabilityZone
+
+	allZones, err := s.getAllZones()
+	if err != nil {
+		return "", fmt.Errorf("error querying for all zones")
+	}
+
+	createAZ := ""
+	zoneHint := volumeOptions.ZoneHint
+	if zoneHint != "" {
+		if allZones.Has(zoneHint) {
+			// zoneHint is an explicit zone name
+			createAZ = zoneHint
+		} else {
+			zoneHintInteger, err := strconv.Atoi(zoneHint)
+			if err == nil && zoneHintInteger >= 0 {
+				// zoneHint is an integer index (e.g. PetSets)
+				zoneSlice := allZones.List()
+				createAZ = zoneSlice[zoneHintInteger%len(zoneSlice)]
+			} else {
+				glog.Warningf("Could not parse zone hint %q into a running zone name or an integer value", zoneHint)
+			}
+		}
+	} else {
+		// Default zoneHint to a name
+		zoneHint = volumeOptions.Tags["Name"]
+		if zoneHint == "" {
+			// We should always be called with a name; this shouldn't happen
+			glog.Warningf("No Name defined during volume create")
+		}
+	}
+
+	if createAZ == "" {
+		// We couldn't find a good mapping; spread around available zones using hashing
+		h := fnv.New32()
+		h.Write([]byte(zoneHint))
+		hash := h.Sum32()
+		zoneSlice := allZones.List()
+		createAZ = zoneSlice[hash%uint32(len(zoneSlice))]
+	}
 
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}
@@ -2851,4 +2894,42 @@ func (s *AWSCloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 // Returns the cluster name or an empty string
 func (s *AWSCloud) getClusterName() string {
 	return s.filterTags[TagNameKubernetesCluster]
+}
+
+// Return all EC2 instances in our cluster
+func (s *AWSCloud) getAllInstances() ([]*ec2.Instance, error) {
+	// TODO: Caching
+
+	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
+	filters = s.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	instances, err := s.ec2.DescribeInstances(request)
+	if err != nil {
+		return nil, err
+	}
+	return instances, nil
+}
+
+// Return a list of all the zones in which nodes are running
+func (c *AWSCloud) getAllZones() (sets.String, error) {
+	// TODO: We could also query for subnets, I think
+	// or we could get the list of nodes, maybe
+
+	instances, err := c.getAllInstances()
+	if err != nil {
+		return nil, err
+	}
+
+	zones := sets.NewString()
+	for _, i := range instances {
+		if i.Placement == nil {
+			continue
+		}
+		zones.Insert(aws.StringValue(i.Placement.AvailabilityZone))
+	}
+
+	return zones, nil
 }
