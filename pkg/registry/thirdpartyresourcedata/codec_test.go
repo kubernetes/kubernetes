@@ -17,6 +17,7 @@ limitations under the License.
 package thirdpartyresourcedata
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 type Foo struct {
@@ -217,5 +219,30 @@ func TestCreater(t *testing.T) {
 			t.Errorf("[%s] unexpected error: expect: %v, got: %v", test.name, test.expectedObj, out)
 		}
 
+	}
+}
+
+func TestEncodeToStreamForInternalEvent(t *testing.T) {
+	e := &thirdPartyResourceDataEncoder{gvk: unversioned.GroupVersionKind{
+		Group:   "company.com",
+		Version: "v1",
+		Kind:    "Foo",
+	}, delegate: testapi.Extensions.Codec()}
+	buf := bytes.NewBuffer([]byte{})
+	expected := &versioned.Event{
+		Type: "Added",
+	}
+	err := e.Encode(&versioned.InternalEvent{
+		Type: "Added",
+	}, buf)
+
+	jBytes, _ := json.Marshal(expected)
+
+	if string(jBytes) == buf.String() {
+		t.Errorf("unexpected encoding expected %s got %s", string(jBytes), buf.String())
+	}
+
+	if err != nil {
+		t.Errorf("unexpected error encoding: %v", err)
 	}
 }

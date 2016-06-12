@@ -485,8 +485,6 @@ func encodeToJSON(obj *extensions.ThirdPartyResourceData, stream io.Writer) erro
 
 func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Writer) (err error) {
 	switch obj := obj.(type) {
-	case *versioned.InternalEvent:
-		return t.delegate.Encode(obj, stream)
 	case *extensions.ThirdPartyResourceData:
 		return encodeToJSON(obj, stream)
 	case *extensions.ThirdPartyResourceDataList:
@@ -502,6 +500,20 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 		}
 		gv := t.gvk.GroupVersion()
 		fmt.Fprintf(stream, template, t.gvk.Kind+"List", gv.String(), strings.Join(dataStrings, ","))
+		return nil
+	case *versioned.InternalEvent:
+		event := &versioned.Event{}
+		err := versioned.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)
+		if err != nil {
+			return err
+		}
+
+		enc := json.NewEncoder(stream)
+		err = enc.Encode(event)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	case *unversioned.Status, *unversioned.APIResourceList:
 		return t.delegate.Encode(obj, stream)
