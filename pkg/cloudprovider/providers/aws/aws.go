@@ -39,16 +39,15 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/golang/glog"
 	"gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	aws_credentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/types"
-
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -262,7 +261,9 @@ type AWSCloud struct {
 	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
 	selfAWSInstance *awsInstance
 
-	mutex sync.Mutex
+	mutex                    sync.Mutex
+	lastNodeNames            sets.String
+	lastInstancesByNodeNames []*ec2.Instance
 }
 
 var _ Volumes = &AWSCloud{}
@@ -2237,7 +2238,8 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
-	instances, err := s.getInstancesByNodeNames(hosts)
+	hostSet := sets.NewString(hosts...)
+	instances, err := s.getInstancesByNodeNamesCached(hostSet)
 	if err != nil {
 		return nil, err
 	}
@@ -2675,7 +2677,8 @@ func (s *AWSCloud) EnsureLoadBalancerDeleted(service *api.Service) error {
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
 func (s *AWSCloud) UpdateLoadBalancer(service *api.Service, hosts []string) error {
-	instances, err := s.getInstancesByNodeNames(hosts)
+	hostSet := sets.NewString(hosts...)
+	instances, err := s.getInstancesByNodeNamesCached(hostSet)
 	if err != nil {
 		return err
 	}
@@ -2747,10 +2750,21 @@ func (a *AWSCloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Ins
 	return instancesByID, nil
 }
 
-// Fetches instances by node names; returns an error if any cannot be found.
+// Fetches and caches instances by node names; returns an error if any cannot be found.
 // This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
-func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
-	names := aws.StringSlice(nodeNames)
+// TODO(therc): make all the caching more rational during the 1.4 timeframe
+func (a *AWSCloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Instance, error) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	if nodeNames.Equal(a.lastNodeNames) {
+		if len(a.lastInstancesByNodeNames) > 0 {
+			// We assume that if the list of nodes is the same, the underlying
+			// instances have not changed. Later we might guard this with TTLs.
+			glog.V(2).Infof("Returning cached instances for %v", nodeNames)
+			return a.lastInstancesByNodeNames, nil
+		}
+	}
+	names := aws.StringSlice(nodeNames.List())
 
 	nodeNameFilter := &ec2.Filter{
 		Name:   aws.String("private-dns-name"),
@@ -2778,6 +2792,9 @@ func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance,
 		return nil, nil
 	}
 
+	glog.V(2).Infof("Caching instances for %v", nodeNames)
+	a.lastNodeNames = nodeNames
+	a.lastInstancesByNodeNames = instances
 	return instances, nil
 }
 
