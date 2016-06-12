@@ -242,6 +242,14 @@ release-skip-tests quick-release: generated_files
 cross:
 	hack/make-rules/cross.sh
 
+# Add rules for all directories in cmd/
+#
+# Example:
+#   make kubectl kube-proxy
+.PHONY: $(notdir $(abspath $(wildcard cmd/*/)))
+$(notdir $(abspath $(wildcard cmd/*/))): generated_files
+	hack/make-rules/build.sh cmd/$@
+
 #
 # Code-generation logic.
 #
