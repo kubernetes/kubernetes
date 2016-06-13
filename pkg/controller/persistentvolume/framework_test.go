@@ -454,22 +454,17 @@ func (r *volumeReactor) getChangeCount() int {
 	return r.changedSinceLastSync
 }
 
-func (r *volumeReactor) getOperationCount() int {
-	r.ctrl.runningOperationsMapLock.Lock()
-	defer r.ctrl.runningOperationsMapLock.Unlock()
-	return len(r.ctrl.runningOperations)
-}
-
 // waitTest waits until all tests, controllers and other goroutines do their
 // job and no new actions are registered for 10 milliseconds.
 func (r *volumeReactor) waitTest() {
+	r.ctrl.runningOperations.Wait()
 	// Check every 10ms if the controller does something and stop if it's
 	// idle.
 	oldChanges := -1
 	for {
 		time.Sleep(10 * time.Millisecond)
 		changes := r.getChangeCount()
-		if changes == oldChanges && r.getOperationCount() == 0 {
+		if changes == oldChanges {
 			// No changes for last 10ms -> controller must be idle.
 			break
 		}
@@ -774,7 +769,7 @@ func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(c
 
 	return func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 		// Inject a hook before async operation starts
-		ctrl.preOperationHook = func(operationName string, arg interface{}) {
+		ctrl.preOperationHook = func(operationName string) {
 			// Inside the hook, run the function to inject
 			glog.V(4).Infof("reactor: scheduleOperation reached, injecting call")
 			injectBeforeOperation(ctrl, reactor)

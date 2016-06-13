@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -64,7 +65,7 @@ func NewPersistentVolumeController(
 		claims:                        cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    kubeClient,
 		eventRecorder:                 eventRecorder,
-		runningOperations:             make(map[string]bool),
+		runningOperations:             goroutinemap.NewGoRoutineMap(),
 		cloud:                         cloud,
 		provisioner:                   provisioner,
 		clusterName:                   clusterName,
