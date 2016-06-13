@@ -69,7 +69,9 @@ const (
 
 	minimumDockerAPIVersion = "1.20"
 
-	dockerv110APIVersion = "1.21"
+	// Remote API version for docker daemon version v1.10
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	dockerV110APIVersion = "1.22"
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
@@ -88,10 +90,6 @@ const (
 	// networking). Must match the value returned by docker inspect -f
 	// '{{.HostConfig.NetworkMode}}'.
 	namespaceModeHost = "host"
-
-	// Remote API version for docker daemon version v1.10
-	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	dockerV110APIVersion = "1.22"
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
@@ -645,7 +643,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// If current api version is newer than docker 1.10 requested, set OomScoreAdj to HostConfig
-	result, err := dm.checkDockerAPIVersion(dockerv110APIVersion)
+	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
 	if err != nil {
 		glog.Errorf("Failed to check docker api version: %v", err)
 	} else if result >= 0 {
@@ -1578,7 +1576,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 
 func (dm *DockerManager) applyOOMScoreAdjIfNeeded(pod *api.Pod, container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
 	// Compare current API version with expected api version.
-	result, err := dm.checkDockerAPIVersion(dockerv110APIVersion)
+	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
 	if err != nil {
 		return fmt.Errorf("Failed to check docker api version: %v", err)
 	}
