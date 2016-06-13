@@ -32,6 +32,8 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
+<h2>Warning! This document might be outdated.</h2>
+
 # Horizontal Pod Autoscaling
 
 ## Preface
