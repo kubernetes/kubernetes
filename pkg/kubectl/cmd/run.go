@@ -227,6 +227,8 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			Stdin: interactive,
 			TTY:   tty,
 
+			CommandName: cmd.Parent().CommandPath() + " attach",
+
 			Attach: &DefaultRemoteAttach{},
 		}
 		config, err := f.ClientConfig()
@@ -346,7 +348,6 @@ func handleAttachPod(f *cmdutil.Factory, c *client.Client, pod *api.Pod, opts *A
 	opts.Client = c
 	opts.PodName = pod.Name
 	opts.Namespace = pod.Namespace
-	opts.CommandName = "kubectl attach"
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(opts.Out, "Error attaching, falling back to logs: %v\n", err)
 		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: opts.GetContainerName(pod)})
