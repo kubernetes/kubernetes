@@ -64,7 +64,7 @@ func main() {
 }
 
 func templateYamlFile(params map[string]string, inpath string, out io.Writer) error {
-	if tmpl, err := template.New(path.Base(inpath)).ParseFiles(inpath); err != nil {
+	if tmpl, err := template.New(path.Base(inpath)).Option("missingkey=zero").ParseFiles(inpath); err != nil {
 		return err
 	} else {
 		if err := tmpl.Execute(out, params); err != nil {

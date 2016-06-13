@@ -22,4 +22,8 @@ KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
 . ${KUBE_ROOT}/federation/cluster/common.sh
 
+if [[ -f "${KUBE_ROOT}/federation/manifests/federated-image.tag" ]]; then
+    export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
+fi
+
 create-federation-api-objects
