@@ -19,12 +19,6 @@ spec:
       containers:
       - name: node-problem-detector
         image: gcr.io/google_containers/node-problem-detector:v0.1
-        env:
-        # Config the host ip and port of apiserver.
-        - name: "KUBERNETES_SERVICE_HOST"
-          value: "{{ pillar['master_node'] }}"
-        - name: "KUBERNETES_SERVICE_PORT"
-          value: "443"
         securityContext:
           privileged: true
         resources:
