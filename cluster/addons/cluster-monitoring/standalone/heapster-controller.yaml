@@ -41,7 +41,7 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-        - image: gcr.io/google_containers/addon-resizer:1.2
+        - image: gcr.io/google_containers/addon-resizer:1.3
           name: heapster-nanny
           resources:
             limits:
@@ -61,8 +61,8 @@ spec:
                   fieldPath: metadata.namespace
           command:
             - /pod_nanny
-            - --cpu=100m
-            - --extra-cpu=0m
+            - --cpu=80m
+            - --extra-cpu=0.5m
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
             - --threshold=5
