@@ -44,7 +44,8 @@ type RESTGracefulDeleteStrategy interface {
 // should be gracefully deleted, if gracefulPending is set the object has already been gracefully deleted
 // (and the provided grace period is longer than the time to deletion), and an error is returned if the
 // condition cannot be checked or the gracePeriodSeconds is invalid. The options argument may be updated with
-// default values if graceful is true.
+// default values if graceful is true. Second place where we set deletionTimestamp is pkg/registry/generic/registry/store.go
+// this function is responsible for setting deletionTimestamp during gracefulDeletion, other one for cascading deletions.
 func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Object, options *api.DeleteOptions) (graceful, gracefulPending bool, err error) {
 	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
@@ -56,9 +57,11 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 	}
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
 	if !ok {
+		// If we're not deleting gracefully there's no point in updating Generation, as we won't update
+		// the obcject before deleting it.
 		return false, false, nil
 	}
-	// if the object is already being deleted
+	// if the object is already being deleted, no need to update generation.
 	if objectMeta.DeletionTimestamp != nil {
 		// if we are already being deleted, we may only shorten the deletion grace period
 		// this means the object was gracefully deleted previously but deletionGracePeriodSeconds was not set,
@@ -89,5 +92,12 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 	now := unversioned.NewTime(unversioned.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
 	objectMeta.DeletionTimestamp = &now
 	objectMeta.DeletionGracePeriodSeconds = options.GracePeriodSeconds
+	// If it's the first graceful deletion we are going to set the DeletionTimestamp to non-nil.
+	// Controllers of the object that's being deleted shouldn't take any nontrivial actions, hence its behavior changes.
+	// Thus we need to bump object's Generation (if set). This handles generation bump during graceful deletion.
+	// The bump for objects that don't support graceful deletion is handled in pkg/registry/generic/registry/store.go.
+	if objectMeta.Generation > 0 {
+		objectMeta.Generation++
+	}
 	return true, false, nil
 }
