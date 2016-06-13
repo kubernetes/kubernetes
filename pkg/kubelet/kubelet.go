@@ -2464,13 +2464,17 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	// Check disk space once globally and reject or accept all new pods.
 	withinBounds, err := kl.diskSpaceManager.IsRuntimeDiskSpaceAvailable()
 	// Assume enough space in case of errors.
-	if err == nil && !withinBounds {
+	if err != nil {
+		glog.Errorf("failed to check if disk space is available for the runtime: %v", err)
+	} else if !withinBounds {
 		outOfDockerDisk = true
 	}
 
 	withinBounds, err = kl.diskSpaceManager.IsRootDiskSpaceAvailable()
 	// Assume enough space in case of errors.
-	if err == nil && !withinBounds {
+	if err != nil {
+		glog.Errorf("failed to check if disk space is available on the root partition: %v", err)
+	} else if !withinBounds {
 		outOfRootDisk = true
 	}
 	return outOfDockerDisk || outOfRootDisk
