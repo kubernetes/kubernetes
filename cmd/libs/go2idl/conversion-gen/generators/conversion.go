@@ -367,6 +367,14 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 	return false
 }
 
+// unwrapAlias recurses down aliased types to find the bedrock type.
+func unwrapAlias(in *types.Type) *types.Type {
+	if in.Kind == types.Alias {
+		return unwrapAlias(in.Underlying)
+	}
+	return in
+}
+
 func areTypesAliased(in, out *types.Type) bool {
 	// If one of the types is Alias, resolve it.
 	if in.Kind == types.Alias {
@@ -685,11 +693,25 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			// this field has "genconversion=false" comment to ignore it.
 			continue
 		}
+		t, outT := m.Type, outMember.Type
+		// create a copy of both underlying types but give them the top level alias name (since aliases
+		// are assignable)
+		if underlying := unwrapAlias(t); underlying != t {
+			copied := *underlying
+			copied.Name = t.Name
+			t = &copied
+		}
+		if underlying := unwrapAlias(outT); underlying != outT {
+			copied := *underlying
+			copied.Name = outT.Name
+			outT = &copied
+		}
 		args := map[string]interface{}{
-			"inType":  m.Type,
-			"outType": outMember.Type,
+			"inType":  t,
+			"outType": outT,
 			"name":    m.Name,
 		}
+		// check based on the top level name, not the underlying names
 		if function, ok := g.preexists(m.Type, outMember.Type); ok {
 			args["function"] = function
 			sw.Do("if err := $.function|raw$(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
@@ -697,32 +719,32 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("}\n", nil)
 			continue
 		}
-		switch m.Type.Kind {
+		switch t.Kind {
 		case types.Builtin:
-			if m.Type == outMember.Type {
+			if t == outT {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 			} else {
 				sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 			}
 		case types.Map, types.Slice, types.Pointer:
-			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+			if g.isDirectlyAssignable(t, outT) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 				continue
 			}
 
 			sw.Do("if in.$.name$ != nil {\n", args)
 			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
-			g.generateFor(m.Type, outMember.Type, sw)
+			g.generateFor(t, outT, sw)
 			sw.Do("} else {\n", nil)
 			sw.Do("out.$.name$ = nil\n", args)
 			sw.Do("}\n", nil)
 		case types.Struct:
-			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+			if g.isDirectlyAssignable(t, outT) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 				continue
 			}
-			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-				funcName := g.funcNameTmpl(m.Type, outMember.Type)
+			if g.convertibleOnlyWithinPackage(t, outT) {
+				funcName := g.funcNameTmpl(t, outT)
 				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
@@ -731,15 +753,15 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		case types.Alias:
-			if outMember.Type.IsAssignable() {
-				if m.Type == outMember.Type {
+			if outT.IsAssignable() {
+				if t == outT {
 					sw.Do("out.$.name$ = in.$.name$\n", args)
 				} else {
 					sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 				}
 			} else {
-				if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-					funcName := g.funcNameTmpl(m.Type, outMember.Type)
+				if g.convertibleOnlyWithinPackage(t, outT) {
+					funcName := g.funcNameTmpl(t, outT)
 					sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
 				} else {
 					sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
@@ -749,8 +771,8 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("}\n", nil)
 			}
 		default:
-			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-				funcName := g.funcNameTmpl(m.Type, outMember.Type)
+			if g.convertibleOnlyWithinPackage(t, outT) {
+				funcName := g.funcNameTmpl(t, outT)
 				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)

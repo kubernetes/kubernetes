@@ -591,9 +591,6 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			// "feature" for users. This flattens those types
 			// together.
 			name := tcNameToName(t.String())
-			if name.Name == "OptionalMap" {
-				fmt.Printf("DEBUG: flattening %T -> %T\n", t, t.Underlying())
-			}
 			if out := u.Type(name); out.Kind != types.Unknown {
 				return out // short circuit if we've already made this.
 			}
