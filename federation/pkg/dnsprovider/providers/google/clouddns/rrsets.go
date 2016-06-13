@@ -36,7 +36,7 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	}
 	list := make([]dnsprovider.ResourceRecordSet, len(response.Rrsets()))
 	for i, rrset := range response.Rrsets() {
-		list[i] = &ResourceRecordSet{rrset, &rrsets}
+		list[i] = ResourceRecordSet{rrset, &rrsets}
 	}
 	return list, nil
 }
@@ -58,7 +58,7 @@ func (rrsets ResourceRecordSets) Add(rrset dnsprovider.ResourceRecordSet) (dnspr
 
 func (rrsets ResourceRecordSets) Remove(rrset dnsprovider.ResourceRecordSet) error {
 	service := rrsets.zone.zones.interface_.service.Changes()
-	deletions := []interfaces.ResourceRecordSet{rrset.(*ResourceRecordSet).impl}
+	deletions := []interfaces.ResourceRecordSet{rrset.(ResourceRecordSet).impl}
 	change := service.NewChange([]interfaces.ResourceRecordSet{}, deletions)
 	newChange, err := service.Create(rrsets.project(), rrsets.zone.impl.Name(), change).Do()
 	if err != nil {

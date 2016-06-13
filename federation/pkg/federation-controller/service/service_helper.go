@@ -44,7 +44,7 @@ func (sc *ServiceController) clusterServiceWorker() {
 					if quit {
 						return
 					}
-					err := sc.clusterCache.syncService(key.(string), clusterName, cache, sc.serviceCache, fedClient)
+					err := sc.clusterCache.syncService(key.(string), clusterName, cache, sc.serviceCache, fedClient, sc)
 					if err != nil {
 						glog.Errorf("Failed to sync service: %+v", err)
 					}
@@ -55,7 +55,7 @@ func (sc *ServiceController) clusterServiceWorker() {
 }
 
 // Whenever there is change on service, the federation service should be updated
-func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface) error {
+func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface, sc *ServiceController) error {
 	// obj holds the latest service info from apiserver, return if there is no federation cache for the service
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
@@ -88,6 +88,15 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 	}
 
 	if needUpdate {
+		for i := 0; i < clientRetryCount; i++ {
+			if err := sc.ensureDnsRecords(clusterName, cachedService); err == nil {
+				break
+			}
+			glog.V(4).Infof("Error ensuring DNS Records for service %s on cluster %s: %v", key, clusterName, err)
+			time.Sleep(cachedService.nextDNSUpdateDelay())
+			clusterCache.serviceQueue.Add(key)
+			// did not retry here as we still want to persist federation apiserver even ensure dns records fails
+		}
 		err := cc.persistFedServiceUpdate(cachedService, fedClient)
 		if err == nil {
 			cachedService.appliedState = cachedService.lastState
@@ -219,7 +228,13 @@ func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedServi
 	glog.V(5).Infof("Persist federation service status %s/%s", service.Namespace, service.Name)
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err := fedClient.Core().Services(service.Namespace).UpdateStatus(service)
+		_, err := fedClient.Core().Services(service.Namespace).Get(service.Name)
+		if errors.IsNotFound(err) {
+			glog.Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
+				service.Namespace, service.Name, err)
+			return nil
+		}
+		_, err = fedClient.Core().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			glog.V(2).Infof("Successfully update service %s/%s to federation apiserver", service.Namespace, service.Name)
 			return nil
