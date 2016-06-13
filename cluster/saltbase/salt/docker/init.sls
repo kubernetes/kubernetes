@@ -94,13 +94,13 @@ fix-service-docker:
     - require:
       - pkg: docker-engine
 
-'apt-key':
+apt-key:
    cmd.run:
      - name: 'apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D'
      - unless: 'apt-key finger | grep "5811 8E89"'
 
-'apt-update':
-  cmd.wait:
+apt-update:
+  cmd.run:
     - name: '/usr/bin/apt-get update -y'
     - require:
        - cmd : 'apt-key'
