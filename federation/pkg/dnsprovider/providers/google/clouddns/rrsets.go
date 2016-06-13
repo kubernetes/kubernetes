@@ -58,7 +58,7 @@ func (rrsets ResourceRecordSets) Add(rrset dnsprovider.ResourceRecordSet) (dnspr
 
 func (rrsets ResourceRecordSets) Remove(rrset dnsprovider.ResourceRecordSet) error {
 	service := rrsets.zone.zones.interface_.service.Changes()
-	deletions := []interfaces.ResourceRecordSet{rrset.(ResourceRecordSet).impl}
+	deletions := []interfaces.ResourceRecordSet{rrset.(*ResourceRecordSet).impl}
 	change := service.NewChange([]interfaces.ResourceRecordSet{}, deletions)
 	newChange, err := service.Create(rrsets.project(), rrsets.zone.impl.Name(), change).Do()
 	if err != nil {

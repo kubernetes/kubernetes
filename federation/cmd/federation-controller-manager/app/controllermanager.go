@@ -121,7 +121,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
-	servicecontroller := servicecontroller.New(scClientset, dns)
+	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ZoneName)
 	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}

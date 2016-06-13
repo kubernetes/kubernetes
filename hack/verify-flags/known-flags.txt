@@ -158,6 +158,7 @@ fake-clientset
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-name
 file-check-frequency
 file-suffix
 file_content_in_loop
@@ -473,3 +474,4 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
+zone-name

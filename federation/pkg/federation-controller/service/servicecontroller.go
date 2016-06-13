@@ -101,6 +101,7 @@ type ServiceController struct {
 	dns              dnsprovider.Interface
 	federationClient federation_release_1_3.Interface
 	federationName   string
+	zoneName 		 string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
 	dnsZones     dnsprovider.Zones
 	serviceCache *serviceCache
@@ -123,7 +124,7 @@ type ServiceController struct {
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
-func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Interface) *ServiceController {
+func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -132,6 +133,8 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 	s := &ServiceController{
 		dns:              dns,
 		federationClient: federationClient,
+		federationName:   federationName,
+		zoneName:   	  zoneName,
 		serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 		clusterCache: &clusterClientCache{
 			rwlock:    sync.Mutex{},
@@ -246,6 +249,12 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 }
 
 func (s *ServiceController) init() error {
+	if s.federationName == "" {
+		return fmt.Errorf("ServiceController should not be run without federationName.")
+	}
+	if s.zoneName == "" {
+		return fmt.Errorf("ServiceController should not be run without zoneName.")
+	}
 	if s.dns == nil {
 		return fmt.Errorf("ServiceController should not be run without a dnsprovider.")
 	}
