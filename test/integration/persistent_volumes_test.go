@@ -296,6 +296,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to create PersistentVolume %d: %v", i, err)
 		}
+		waitForPersistentVolumePhase(testClient, pvs[i].Name, watchPV, api.VolumeAvailable)
 	}
 	t.Log("volumes created")
 
