@@ -445,9 +445,9 @@ func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operatio
 			duration := time.Now().Sub(opStart)
 			if duration > 1*time.Minute {
 				// Log the JSON. It's cleaner than the %v structure.
-				enc, err := op.MarshalJSON()
+				enc, err := pollOp.MarshalJSON()
 				if err != nil {
-					glog.Warningf("waitForOperation: long operation (%v): %v (failed to encode to JSON: %v)", duration, op, err)
+					glog.Warningf("waitForOperation: long operation (%v): %v (failed to encode to JSON: %v)", duration, pollOp, err)
 				} else {
 					glog.Infof("waitForOperation: long operation (%v): %v", duration, string(enc))
 				}
