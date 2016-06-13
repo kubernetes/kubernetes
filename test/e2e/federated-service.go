@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"k8s.io/kubernetes/federation/apis/federation"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -53,9 +56,18 @@ const (
 
 var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 	var clusterClientSets []*release_1_3.Clientset
+	var federationName string
 	f := framework.NewDefaultFederatedFramework("service")
 
 	BeforeEach(func() {
+		framework.SkipUnlessFederated(f.Client)
+
+		// TODO: Federation API server should be able to answer this.
+		if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
+			// Tests cannot proceed without this value, so fail early here.
+			framework.Failf("FEDERATION_NAME environment variable must be set")
+		}
+
 		contexts := f.GetUnderlyingFederatedContexts()
 
 		for _, context := range contexts {
@@ -77,10 +89,22 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 			framework.ExpectNoError(err, "Creating cluster")
 		}
 
+		var clusterList *federation.ClusterList
 		By("Obtaining a list of all the clusters")
-		clusterList, err := f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		framework.Logf("%d clusters found", len(clusterList.Items))
+		if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
+			var err error
+			clusterList, err = f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
+			if err != nil {
+				return false, err
+			}
+			framework.Logf("%d clusters registered, waiting for %d", len(clusterList.Items), len(contexts))
+			if len(clusterList.Items) == len(contexts) {
+				return true, nil
+			}
+			return false, nil
+		}); err != nil {
+			framework.Failf("Failed to list registered clusters: %+v", err)
+		}
 
 		for _, cluster := range clusterList.Items {
 			framework.Logf("Creating a clientset for the cluster %s", cluster.Name)
@@ -105,12 +129,33 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 		}
 	})
 
+	AfterEach(func() {
+		framework.SkipUnlessFederated(f.Client)
+
+		// Delete the registered clusters in the federation API server.
+		clusterList, err := f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		for _, cluster := range clusterList.Items {
+			err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &api.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
+	})
+
 	It("should be able to discover a federated service", func() {
 		framework.SkipUnlessFederated(f.Client)
 
 		createService(f.FederationClientset, clusterClientSets, f.Namespace.Name)
 
-		discoverService(f)
+		svcDNSNames := []string{
+			FederatedServiceName,
+			fmt.Sprintf("%s.%s", FederatedServiceName, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.%s", FederatedServiceName, f.Namespace.Name, federationName),
+			fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name, federationName),
+		}
+		for _, name := range svcDNSNames {
+			discoverService(f, name, true)
+		}
 	})
 
 	It("should be able to discover a non-local federated service", func() {
@@ -123,26 +168,49 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		waitForFederatedServiceShard(f.Clientset_1_3, f.Namespace.Name, nil, 0)
 
-		discoverService(f)
+		localSvcDNSNames := []string{
+			FederatedServiceName,
+			fmt.Sprintf("%s.%s", FederatedServiceName, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name),
+		}
+		for _, name := range localSvcDNSNames {
+			discoverService(f, name, false)
+		}
+
+		svcDNSNames := []string{
+			fmt.Sprintf("%s.%s.%s", FederatedServiceName, f.Namespace.Name, federationName),
+			fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name, federationName),
+		}
+		for _, name := range svcDNSNames {
+			discoverService(f, name, true)
+		}
 	})
 })
 
+// waitForFederatedServiceShard waits until the number of shards of a given federated
+// service reaches the expected value, i.e. numSvcs in the given individual Kubernetes
+// cluster. If the shard count, i.e. numSvcs is expected to be at least one, then
+// it also checks if the first shard's name and spec matches that of the given service.
 func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, service *api.Service, numSvcs int) {
 	By("Fetching a federated service shard")
 	var clSvcList *v1.ServiceList
-	for t := time.Now(); time.Since(t) < FederatedServiceTimeout; time.Sleep(framework.Poll) {
+	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
 		clSvcList, err = cs.Core().Services(namespace).List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			return false, err
+		}
 		n := len(clSvcList.Items)
 		if n == numSvcs {
-			break
+			return true, nil
 		}
-		framework.Logf("%d services found, trying again in %s", n, framework.Poll)
+		framework.Logf("%d services found, waiting for %d, trying again in %s", n, numSvcs, framework.Poll)
+		return false, nil
+	}); err != nil {
+		framework.Failf("Failed to list registered clusters: %+v", err)
 	}
 
-	Expect(len(clSvcList.Items)).To(Equal(numSvcs))
-	if numSvcs > 0 {
+	if numSvcs > 0 && service != nil {
 		// Renaming for clarity/readability
 		clSvc := clSvcList.Items[0]
 		Expect(clSvc.Name).To(Equal(service.Name))
@@ -150,7 +218,7 @@ func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, s
 	}
 }
 
-func createService(fcs *federation_internalclientset.Clientset, clusterClientSets []*release_1_3.Clientset, ns string) {
+func createService(fcs *federation_internalclientset.Clientset, clusterClientSets []*release_1_3.Clientset, namespace string) {
 	By("Creating a federated service")
 	labels := map[string]string{
 		"foo": "bar",
@@ -179,14 +247,14 @@ func createService(fcs *federation_internalclientset.Clientset, clusterClientSet
 			},
 		},
 	}
-	_, err := fcs.Core().Services(ns).Create(service)
+	_, err := fcs.Core().Services(namespace).Create(service)
 	Expect(err).NotTo(HaveOccurred())
 	for _, cs := range clusterClientSets {
-		waitForFederatedServiceShard(cs, ns, service, 1)
+		waitForFederatedServiceShard(cs, namespace, service, 1)
 	}
 }
 
-func discoverService(f *framework.Framework) {
+func discoverService(f *framework.Framework, name string, exists bool) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   FederatedServicePod,
@@ -197,13 +265,19 @@ func discoverService(f *framework.Framework) {
 				{
 					Name:    "federated-service-discovery-container",
 					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"sh", "-c", "nslookup", FederatedServiceName},
+					Command: []string{"sh", "-c", "nslookup", name},
 				},
 			},
 			RestartPolicy: api.RestartPolicyNever,
 		},
 	}
-	f.TestContainerOutputRegexp("federated service discovery", pod, 0, []string{
-		`Name:\s+` + FederatedDNS1123Regexp + `\nAddress \d+:\s+` + FederatedIPAddrRegexp + `\s+` + FederatedDNS1123Regexp,
-	})
+	if exists {
+		f.TestContainerOutputRegexp("federated service discovery", pod, 0, []string{
+			`Name:\s+` + FederatedDNS1123Regexp + `\nAddress \d+:\s+` + FederatedIPAddrRegexp + `\s+` + FederatedDNS1123Regexp,
+		})
+	} else {
+		f.TestContainerOutputRegexp("federated service discovery", pod, 0, []string{
+			`nslookup: can't resolve '` + name + `'`,
+		})
+	}
 }
