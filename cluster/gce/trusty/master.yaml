@@ -25,6 +25,7 @@ script
 		-o /etc/kube-configure.sh \
 		http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
 	. /etc/kube-configure.sh
+	set_broken_motd
 	echo "Downloading kube-env file"
 	download_kube_env
 	. /etc/kube-env
@@ -190,6 +191,7 @@ script
 	start_kube_controller_manager
 	start_kube_scheduler
 	prepare_kube_addons
+	reset_motd
 } 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
