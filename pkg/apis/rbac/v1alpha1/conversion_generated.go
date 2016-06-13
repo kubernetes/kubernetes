@@ -273,7 +273,13 @@ func autoConvert_v1alpha1_PolicyRule_To_rbac_PolicyRule(in *PolicyRule, out *rba
 		return err
 	}
 	out.APIGroups = in.APIGroups
-	out.Resources = in.Resources
+	if in.Resources != nil {
+		in, out := &in.Resources, &out.Resources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Resources = nil
+	}
 	out.ResourceNames = in.ResourceNames
 	out.NonResourceURLs = in.NonResourceURLs
 	return nil
@@ -289,7 +295,13 @@ func autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out
 		return err
 	}
 	out.APIGroups = in.APIGroups
-	out.Resources = in.Resources
+	if in.Resources != nil {
+		in, out := &in.Resources, &out.Resources
+		*out = make(Resources, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Resources = nil
+	}
 	out.ResourceNames = in.ResourceNames
 	out.NonResourceURLs = in.NonResourceURLs
 	return nil
