@@ -106,3 +106,13 @@ func (c *FakeNamespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(namespacesResource, opts))
 }
+
+// Patch applies the patch and returns the patched namespace.
+func (c *FakeNamespaces) Patch(name string, pt api.PatchType, data []byte) (result *v1.Namespace, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(namespacesResource, name, data), &v1.Namespace{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Namespace), err
+}

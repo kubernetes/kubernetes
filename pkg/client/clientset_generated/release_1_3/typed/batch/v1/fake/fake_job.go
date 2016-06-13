@@ -114,3 +114,14 @@ func (c *FakeJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(jobsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched job.
+func (c *FakeJobs) Patch(name string, pt api.PatchType, data []byte) (result *v1.Job, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(jobsResource, c.ns, name, data), &v1.Job{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Job), err
+}

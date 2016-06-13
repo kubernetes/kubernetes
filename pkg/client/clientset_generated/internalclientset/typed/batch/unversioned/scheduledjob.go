@@ -38,6 +38,7 @@ type ScheduledJobInterface interface {
 	Get(name string) (*batch.ScheduledJob, error)
 	List(opts api.ListOptions) (*batch.ScheduledJobList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *batch.ScheduledJob, err error)
 	ScheduledJobExpansion
 }
 
@@ -147,4 +148,17 @@ func (c *scheduledJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("scheduledjobs").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched scheduledJob.
+func (c *scheduledJobs) Patch(name string, pt api.PatchType, data []byte) (result *batch.ScheduledJob, err error) {
+	result = &batch.ScheduledJob{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("scheduledjobs").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

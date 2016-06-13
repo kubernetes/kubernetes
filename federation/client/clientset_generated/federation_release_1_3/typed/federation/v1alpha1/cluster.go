@@ -38,6 +38,7 @@ type ClusterInterface interface {
 	Get(name string) (*v1alpha1.Cluster, error)
 	List(opts api.ListOptions) (*v1alpha1.ClusterList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1alpha1.Cluster, err error)
 	ClusterExpansion
 }
 
@@ -137,4 +138,16 @@ func (c *clusters) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("clusters").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched cluster.
+func (c *clusters) Patch(name string, pt api.PatchType, data []byte) (result *v1alpha1.Cluster, err error) {
+	result = &v1alpha1.Cluster{}
+	err = c.client.Patch(pt).
+		Resource("clusters").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

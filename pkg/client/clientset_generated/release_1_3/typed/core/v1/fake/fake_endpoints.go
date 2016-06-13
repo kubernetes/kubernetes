@@ -104,3 +104,14 @@ func (c *FakeEndpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(endpointsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched endpoints.
+func (c *FakeEndpoints) Patch(name string, pt api.PatchType, data []byte) (result *v1.Endpoints, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(endpointsResource, c.ns, name, data), &v1.Endpoints{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Endpoints), err
+}

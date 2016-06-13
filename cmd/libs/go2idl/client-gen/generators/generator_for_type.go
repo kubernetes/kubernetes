@@ -76,6 +76,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"apiDeleteOptions":  c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
 		"apiListOptions":    c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
 		"apiParameterCodec": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
+		"PatchType":         c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
 		"namespaced":        namespaced,
 	}
 
@@ -118,6 +119,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		sw.Do(getTemplate, m)
 		sw.Do(listTemplate, m)
 		sw.Do(watchTemplate, m)
+		sw.Do(patchTemplate, m)
 	}
 
 	return sw.Error()
@@ -158,7 +160,8 @@ var interfaceTemplate3 = `
 	DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error
 	Get(name string) (*$.type|raw$, error)
 	List(opts $.apiListOptions|raw$) (*$.type|raw$List, error)
-	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)`
+	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
+	Patch(name string, pt $.PatchType|raw$, data []byte) (result *$.type|raw$, err error)`
 
 var interfaceTemplate4 = `
 	$.type|public$Expansion
@@ -307,5 +310,20 @@ func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterf
 		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&opts, $.apiParameterCodec|raw$).
 		Watch()
+}
+`
+
+var patchTemplate = `
+// Patch applies the patch and returns the patched $.type|private$.
+func (c *$.type|privatePlural$) Patch(name string, pt $.PatchType|raw$, data []byte) (result *$.type|raw$, err error) {
+	result = &$.type|raw${}
+	err = c.client.Patch(pt).
+		$if .namespaced$Namespace(c.ns).$end$
+		Resource("$.type|allLowercasePlural$").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }
 `

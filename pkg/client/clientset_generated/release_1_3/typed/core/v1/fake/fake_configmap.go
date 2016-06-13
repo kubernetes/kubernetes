@@ -104,3 +104,14 @@ func (c *FakeConfigMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(configmapsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched configMap.
+func (c *FakeConfigMaps) Patch(name string, pt api.PatchType, data []byte) (result *v1.ConfigMap, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(configmapsResource, c.ns, name, data), &v1.ConfigMap{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ConfigMap), err
+}

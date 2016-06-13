@@ -38,6 +38,7 @@ type NamespaceInterface interface {
 	Get(name string) (*v1.Namespace, error)
 	List(opts api.ListOptions) (*v1.NamespaceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1.Namespace, err error)
 	NamespaceExpansion
 }
 
@@ -137,4 +138,16 @@ func (c *namespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("namespaces").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched namespace.
+func (c *namespaces) Patch(name string, pt api.PatchType, data []byte) (result *v1.Namespace, err error) {
+	result = &v1.Namespace{}
+	err = c.client.Patch(pt).
+		Resource("namespaces").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

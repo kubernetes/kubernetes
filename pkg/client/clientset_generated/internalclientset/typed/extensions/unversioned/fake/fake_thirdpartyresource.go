@@ -97,3 +97,13 @@ func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, 
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(thirdpartyresourcesResource, opts))
 }
+
+// Patch applies the patch and returns the patched thirdPartyResource.
+func (c *FakeThirdPartyResources) Patch(name string, pt api.PatchType, data []byte) (result *extensions.ThirdPartyResource, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(thirdpartyresourcesResource, name, data), &extensions.ThirdPartyResource{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.ThirdPartyResource), err
+}

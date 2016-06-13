@@ -114,3 +114,14 @@ func (c *FakeScheduledJobs) Watch(opts api.ListOptions) (watch.Interface, error)
 		InvokesWatch(core.NewWatchAction(scheduledjobsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched scheduledJob.
+func (c *FakeScheduledJobs) Patch(name string, pt api.PatchType, data []byte) (result *batch.ScheduledJob, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(scheduledjobsResource, c.ns, name, data), &batch.ScheduledJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*batch.ScheduledJob), err
+}

@@ -118,21 +118,23 @@ func NewUpdateAction(resource unversioned.GroupVersionResource, namespace string
 	return action
 }
 
-func NewRootPatchAction(resource unversioned.GroupVersionResource, object runtime.Object) PatchActionImpl {
+func NewRootPatchAction(resource unversioned.GroupVersionResource, name string, patch []byte) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
-	action.Object = object
+	action.Name = name
+	action.Patch = patch
 
 	return action
 }
 
-func NewPatchAction(resource unversioned.GroupVersionResource, namespace string, object runtime.Object) PatchActionImpl {
+func NewPatchAction(resource unversioned.GroupVersionResource, namespace string, name string, patch []byte) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
 	action.Namespace = namespace
-	action.Object = object
+	action.Name = name
+	action.Patch = patch
 
 	return action
 }
@@ -392,11 +394,16 @@ func (a UpdateActionImpl) GetObject() runtime.Object {
 
 type PatchActionImpl struct {
 	ActionImpl
-	Object runtime.Object
+	Name  string
+	Patch []byte
 }
 
-func (a PatchActionImpl) GetObject() runtime.Object {
-	return a.Object
+func (a PatchActionImpl) GetName() string {
+	return a.Name
+}
+
+func (a PatchActionImpl) GetPatch() []byte {
+	return a.Patch
 }
 
 type DeleteActionImpl struct {
