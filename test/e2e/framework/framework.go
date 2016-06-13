@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -56,6 +57,8 @@ type Framework struct {
 	Clientset_1_2      *release_1_2.Clientset
 	Clientset_1_3      *release_1_3.Clientset
 
+	FederationClientset *federation_internalclientset.Clientset
+	// TODO: remove FederationClient, all the client access must be through FederationClientset
 	FederationClient *unversionedfederation.FederationClient
 
 	Namespace                *api.Namespace   // Every test has at least one namespace
@@ -152,11 +155,19 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	if f.federated && f.FederationClient == nil {
-		By("Creating a federated kubernetes client")
-		var err error
-		f.FederationClient, err = LoadFederationClient()
-		Expect(err).NotTo(HaveOccurred())
+	if f.federated {
+		if f.FederationClient == nil {
+			By("Creating a federated kubernetes client")
+			var err error
+			f.FederationClient, err = LoadFederationClient()
+			Expect(err).NotTo(HaveOccurred())
+		}
+		if f.FederationClientset == nil {
+			By("Creating a federation Clientset")
+			var err error
+			f.FederationClientset, err = LoadFederationClientset()
+			Expect(err).NotTo(HaveOccurred())
+		}
 	}
 
 	By("Building a namespace api object")
@@ -235,7 +246,11 @@ func (f *Framework) AfterEach() {
 	if f.federated {
 		defer func() {
 			if f.FederationClient == nil {
-				Logf("Warning: framework is marked federated, but has no FederationClient")
+				Logf("Warning: framework is marked federated, but has no federation client")
+				return
+			}
+			if f.FederationClientset == nil {
+				Logf("Warning: framework is marked federated, but has no federation clientset")
 				return
 			}
 			if err := f.FederationClient.Clusters().DeleteCollection(nil, api.ListOptions{}); err != nil {
