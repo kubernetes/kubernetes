@@ -936,6 +936,8 @@ function check-cluster() {
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
 # down the firewall rules and routes.
 function kube-down {
+  local -r batch=200
+
   detect-project
   detect-node-names # For INSTANCE_GROUPS
 
@@ -964,9 +966,14 @@ function kube-down {
         --project "${PROJECT}" \
         --quiet \
         --zone "${ZONE}" \
-        "${group}"
+        "${group}" &
     fi
   done
+
+  # Wait for last batch of jobs
+  kube::util::wait-for-jobs || {
+    echo -e "Failed to delete instance group(s)." >&2
+  }
 
   if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
     gcloud compute instance-templates delete \
@@ -1013,14 +1020,14 @@ function kube-down {
                 --format='value(name)') )
   # If any minions are running, delete them in batches.
   while (( "${#minions[@]}" > 0 )); do
-    echo Deleting nodes "${minions[*]::10}"
+    echo Deleting nodes "${minions[*]::${batch}}"
     gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
       --delete-disks boot \
       --zone "${ZONE}" \
-      "${minions[@]::10}"
-    minions=( "${minions[@]:10}" )
+      "${minions[@]::${batch}}"
+    minions=( "${minions[@]:${batch}}" )
   done
 
   # Delete firewall rule for the master.
@@ -1051,12 +1058,12 @@ function kube-down {
     --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}"  \
     --format='value(name)') )
   while (( "${#routes[@]}" > 0 )); do
-    echo Deleting routes "${routes[*]::10}"
+    echo Deleting routes "${routes[*]::${batch}}"
     gcloud compute routes delete \
       --project "${PROJECT}" \
       --quiet \
-      "${routes[@]::10}"
-    routes=( "${routes[@]:10}" )
+      "${routes[@]::${batch}}"
+    routes=( "${routes[@]:${batch}}" )
   done
 
   # Delete the master's reserved IP
