@@ -27,17 +27,22 @@
 # Provides the $KUBERNETES_PROVIDER variable and detect-project function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-# If $FEDERATION_PUSH_REPO_BASE isn't set set the GCR registry name based on the
-# detected project name.
+# If $FEDERATION_PUSH_REPO_BASE isn't set, then set the GCR registry name
+# based on the detected project name for gce and gke providers.
+FEDERATION_PUSH_REPO_BASE=${FEDERATION_PUSH_REPO_BASE:-}
 if [[ -z "${FEDERATION_PUSH_REPO_BASE}" ]]; then
-    # Populates $PROJECT
-    detect-project
-    if [[ ${PROJECT} == *':'* ]]
-    then
-	    echo "${PROJECT} contains ':' and can not be used as FEDERATION_PUSH_REPO_BASE. Please set FEDERATION_PUSH_REPO_BASE explicitly."
-	    exit 1
+    if [[ "${KUBERNETES_PROVIDER}" == "gke" || "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+        # Populates $PROJECT
+        detect-project
+        if [[ ${PROJECT} == *':'* ]]; then
+            echo "${PROJECT} contains ':' and can not be used as FEDERATION_PUSH_REPO_BASE. Please set FEDERATION_PUSH_REPO_BASE explicitly."
+            exit 1
+        fi
+        FEDERATION_PUSH_REPO_BASE=gcr.io/${PROJECT}
+    else
+        echo "Must set FEDERATION_PUSH_REPO_BASE env var"
+        exit 1
     fi
-    FEDERATION_PUSH_REPO_BASE=gcr.io/${PROJECT}
 fi
 
 FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}

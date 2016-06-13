@@ -266,8 +266,12 @@ Next, specify the docker repository where your ci images will be pushed.
 
 * **If `KUBERNETES_PROVIDER=gce` or `KUBERNETES_PROVIDER=gke`**:
 
-	You can simply set your push repo base based on your project name, and the necessary repositories will be auto-created when you
-	first push your container images.
+  If you use the same GCP project where you to run the e2e tests as the container image repository,
+  FEDERATION_PUSH_REPO_BASE environment variable will be defaulted to "gcr.io/${DEFAULT_GCP_PROJECT_NAME}".
+  You can skip ahead to the **Build** section.
+
+	You can simply set your push repo base based on your project name, and the necessary repositories will be
+  auto-created when you first push your container images.
 
 	```sh
 	$ export FEDERATION_PUSH_REPO_BASE="gcr.io/${GCE_PROJECT_NAME}"
