@@ -1,6 +1,6 @@
-{% set base_metrics_memory = "200Mi" -%}
+{% set base_metrics_memory = "140Mi" -%}
 {% set metrics_memory = base_metrics_memory -%}
-{% set base_eventer_memory = "200Mi" -%}
+{% set base_eventer_memory = "190Mi" -%}
 {% set eventer_memory = base_eventer_memory -%}
 {% set metrics_memory_per_node = 4 -%}
 {% set eventer_memory_per_node = 500 -%}
@@ -60,7 +60,7 @@ spec:
             - /eventer
             - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
-        - image: gcr.io/google_containers/addon-resizer:1.0
+        - image: gcr.io/google_containers/addon-resizer:1.2
           name: heapster-nanny
           resources:
             limits:
@@ -88,7 +88,8 @@ spec:
             - --deployment=heapster-v1.1.0.beta2
             - --container=heapster
             - --poll-period=300000
-        - image: gcr.io/google_containers/addon-resizer:1.0
+            - --estimator=exponential
+        - image: gcr.io/google_containers/addon-resizer:1.2
           name: eventer-nanny
           resources:
             limits:
@@ -116,4 +117,5 @@ spec:
             - --deployment=heapster-v1.1.0.beta2
             - --container=eventer
             - --poll-period=300000
+            - --estimator=exponential
 
