@@ -85,8 +85,7 @@ func (s *ServiceController) getClusterZoneNames(clusterName string) (zones []str
 
 // getFederationDNSZoneName returns the name of the managed DNS Zone configured for this federation
 func (s *ServiceController) getFederationDNSZoneName() (string, error) {
-	return "example.com", nil // TODO: quinton: Get this from the federation configuration.
-	// Note: For unit testing this must match the domain populated in the test/stub dnsprovider.
+	return s.zoneName, nil
 }
 
 // getDnsZone is a hack around the fact that dnsprovider does not yet support a Get() method, only a List() method.  TODO:  Fix that.
@@ -254,11 +253,11 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	// the state of the service when we last successfully sync'd it's DNS records.
 	// So this time around we only need to patch that (add new records, remove deleted records, and update changed records.
 	//
-	if s.dns == nil {
-		return nil
-	}
 	if s == nil {
 		return fmt.Errorf("nil ServiceController passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
+	}
+	if s.dns == nil {
+		return nil
 	}
 	if cachedService == nil {
 		return fmt.Errorf("nil cachedService passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
