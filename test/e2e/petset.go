@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			pst.saturate(ps)
 
 			By("Verifying petset mounted data directory is usable")
-			ExpectNoError(pst.verifyDirectoryIsUsable("/data"))
+			ExpectNoError(pst.checkMount(ps, "/data"))
 
 			cmd := "echo $(hostname) > /data/hostname; sync;"
 			By("Running " + cmd + " in all pets")
@@ -121,7 +121,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			pst.saturate(ps)
 
 			By("Verifying petset mounted data directory is usable")
-			ExpectNoError(pst.verifyDirectoryIsUsable("/data"))
+			ExpectNoError(pst.checkMount(ps, "/data"))
 
 			cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			By("Running " + cmd + " in all pets")
@@ -420,19 +420,20 @@ func (p *petSetTester) createPetSet(manifestPath, ns string) *apps.PetSet {
 	return ps
 }
 
-func (p *petSetTester) verifyDirectoryIsUsable(dirPath string) error {
+func (p *petSetTester) checkMount(ps *apps.PetSet, mountPath string) error {
 	for _, cmd := range []string{
 		// Print inode, size etc
-		fmt.Sprintf("ls -idlh %v", dirPath),
+		fmt.Sprintf("ls -idlh %v", mountPath),
 		// Print subdirs
-		fmt.Sprintf("find %v", dirPath),
+		fmt.Sprintf("find %v", mountPath),
 		// Try writing
-		fmt.Sprintf("touch %v", filepath.Join(dirPath, fmt.Sprintf("%v", time.Now().UnixNano()))),
+		fmt.Sprintf("touch %v", filepath.Join(mountPath, fmt.Sprintf("%v", time.Now().UnixNano()))),
 	} {
 		if err := p.execInPets(ps, cmd); err != nil {
 			return fmt.Errorf("failed to execute %v, error: %v", cmd, err)
 		}
 	}
+	return nil
 }
 
 func (p *petSetTester) execInPets(ps *apps.PetSet, cmd string) error {
