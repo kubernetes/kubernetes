@@ -409,23 +409,29 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 
 func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 	for _, m := range t.Members {
+		t := m.Type
+		if t.Kind == types.Alias {
+			copied := *t.Underlying
+			copied.Name = t.Name
+			t = &copied
+		}
 		args := map[string]interface{}{
-			"type": m.Type,
+			"type": t,
 			"name": m.Name,
 		}
-		switch m.Type.Kind {
+		switch t.Kind {
 		case types.Builtin:
 			sw.Do("out.$.name$ = in.$.name$\n", args)
 		case types.Map, types.Slice, types.Pointer:
 			sw.Do("if in.$.name$ != nil {\n", args)
 			sw.Do("in, out := in.$.name$, &out.$.name$\n", args)
-			g.generateFor(m.Type, sw)
+			g.generateFor(t, sw)
 			sw.Do("} else {\n", nil)
 			sw.Do("out.$.name$ = nil\n", args)
 			sw.Do("}\n", nil)
 		case types.Struct:
-			if g.canInlineTypeFn(g.context, m.Type) {
-				funcName := g.funcNameTmpl(m.Type)
+			if g.canInlineTypeFn(g.context, t) {
+				funcName := g.funcNameTmpl(t)
 				sw.Do(fmt.Sprintf("if err := %s(in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
@@ -437,17 +443,13 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("}\n", nil)
 			}
 		default:
-			if m.Type.Kind == types.Alias && m.Type.Underlying.Kind == types.Builtin {
-				sw.Do("out.$.name$ = in.$.name$\n", args)
-			} else {
-				sw.Do("if in.$.name$ == nil {\n", args)
-				sw.Do("out.$.name$ = nil\n", args)
-				sw.Do("} else if newVal, err := c.DeepCopy(in.$.name$); err != nil {\n", args)
-				sw.Do("return err\n", nil)
-				sw.Do("} else {\n", nil)
-				sw.Do("out.$.name$ = newVal.($.type|raw$)\n", args)
-				sw.Do("}\n", nil)
-			}
+			sw.Do("if in.$.name$ == nil {\n", args)
+			sw.Do("out.$.name$ = nil\n", args)
+			sw.Do("} else if newVal, err := c.DeepCopy(in.$.name$); err != nil {\n", args)
+			sw.Do("return err\n", nil)
+			sw.Do("} else {\n", nil)
+			sw.Do("out.$.name$ = newVal.($.type|raw$)\n", args)
+			sw.Do("}\n", nil)
 		}
 	}
 }
