@@ -612,22 +612,24 @@ function ensure-master-ip {
   fi
 }
 
-# Creates a new DHCP option set configured correctly for Kubernetes
+# Creates a new DHCP option set configured correctly for Kubernetes when DHCP_OPTION_SET_ID is not specified
 # Sets DHCP_OPTION_SET_ID
 function create-dhcp-option-set () {
-  case "${AWS_REGION}" in
-    us-east-1)
-      OPTION_SET_DOMAIN=ec2.internal
-      ;;
+  if [[ -z ${DHCP_OPTION_SET_ID-} ]]; then
+    case "${AWS_REGION}" in
+      us-east-1)
+        OPTION_SET_DOMAIN=ec2.internal
+        ;;
 
-    *)
-      OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
-  esac
+      *)
+        OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
+    esac
 
-  DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS --query DhcpOptions.DhcpOptionsId)
+    DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS --query DhcpOptions.DhcpOptionsId)
 
-  add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
-  add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+    add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
+    add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+  fi
 
   $AWS_CMD associate-dhcp-options --dhcp-options-id ${DHCP_OPTION_SET_ID} --vpc-id ${VPC_ID} > $LOG
 
