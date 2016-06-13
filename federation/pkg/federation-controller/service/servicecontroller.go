@@ -76,7 +76,7 @@ type cachedService struct {
 	appliedState *v1.Service
 	// cluster endpoint map hold subset info from kubernetes clusters
 	// key clusterName
-	// value is a flag that if there is ready address, 1 means there is ready address, 0 means no ready address
+	// value is a flag that if there is ready address, 1 means there is ready address
 	endpointMap map[string]int
 	// serviceStatusMap map holds service status info from kubernetes clusters, keyed on clusterName
 	serviceStatusMap map[string]v1.LoadBalancerStatus
@@ -101,7 +101,7 @@ type ServiceController struct {
 	dns              dnsprovider.Interface
 	federationClient federation_release_1_3.Interface
 	federationName   string
-	zoneName 		 string
+	zoneName         string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
 	dnsZones     dnsprovider.Zones
 	serviceCache *serviceCache
@@ -134,7 +134,7 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 		dns:              dns,
 		federationClient: federationClient,
 		federationName:   federationName,
-		zoneName:   	  zoneName,
+		zoneName:         zoneName,
 		serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 		clusterCache: &clusterClientCache{
 			rwlock:    sync.Mutex{},
