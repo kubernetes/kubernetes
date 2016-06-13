@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 	"k8s.io/kubernetes/pkg/labels"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -161,7 +162,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 			if err != nil {
 				// if the PVC is not found, log the error and count the PV towards the PV limit
 				// generate a random volume ID since its required for de-dup
-				glog.Error(err)
+				utilruntime.HandleError(fmt.Errorf("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err))
 				source := rand.NewSource(time.Now().UnixNano())
 				generatedID := "missingPVC" + strconv.Itoa(rand.New(source).Intn(1000000))
 				filteredVolumes[generatedID] = true
@@ -178,7 +179,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 				// if the PV is not found, log the error
 				// and count the PV towards the PV limit
 				// generate a random volume ID since its required for de-dup
-				glog.Error(err)
+				utilruntime.HandleError(fmt.Errorf("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err))
 				source := rand.NewSource(time.Now().UnixNano())
 				generatedID := "missingPV" + strconv.Itoa(rand.New(source).Intn(1000000))
 				filteredVolumes[generatedID] = true
