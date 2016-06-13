@@ -146,7 +146,7 @@ To run all unit tests and generate an HTML coverage report, run the following:
 KUBE_COVER=y hack/test-go.sh
 ```
 
-At the end of the run, an the HTML report will be generated with the path
+At the end of the run, an HTML report will be generated with the path
 printed to stdout.
 
 To run tests and collect coverage in only one package, pass its relative path
