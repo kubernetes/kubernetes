@@ -28,6 +28,7 @@ grains:
   cbr-cidr: $MASTER_IP_RANGE
   cloud: photon-controller
   master_extra_sans: $MASTER_EXTRA_SANS
+  api_servers: $MASTER_NAME
 EOF
 
 # Auto accept all keys from minions that try to join
