@@ -39,38 +39,37 @@ var _ = framework.KubeDescribe("[HPA] Horizontal pod autoscaling (scale resource
 	var rc *ResourceConsumer
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
-	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability"
-	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability"
+	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
+	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"
 
-	// These tests take ~20 minutes each.
 	framework.KubeDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
 		It(titleUp, func() {
-			scaleUp("test-deployment", kindDeployment, rc, f)
+			scaleUp("test-deployment", kindDeployment, false, rc, f)
 		})
 		It(titleDown, func() {
-			scaleDown("test-deployment", kindDeployment, rc, f)
+			scaleDown("test-deployment", kindDeployment, false, rc, f)
+		})
+	})
+
+	framework.KubeDescribe("[Serial] [Slow] ReplicaSet", func() {
+		// CPU tests via deployments
+		It(titleUp, func() {
+			scaleUp("rs", kindReplicaSet, false, rc, f)
+		})
+		It(titleDown, func() {
+			scaleDown("rs", kindReplicaSet, false, rc, f)
 		})
 	})
 
 	// These tests take ~20 minutes each.
-	framework.KubeDescribe("[Serial] [Slow] ReplicaSet", func() {
-		// CPU tests via deployments
-		It(titleUp, func() {
-			scaleUp("rs", kindReplicaSet, rc, f)
-		})
-		It(titleDown, func() {
-			scaleDown("rs", kindReplicaSet, rc, f)
-		})
-	})
-	// These tests take ~20 minutes each.
 	framework.KubeDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
-		It(titleUp, func() {
-			scaleUp("rc", kindRC, rc, f)
+		It(titleUp+" and verify decision stability", func() {
+			scaleUp("rc", kindRC, true, rc, f)
 		})
-		It(titleDown, func() {
-			scaleDown("rc", kindRC, rc, f)
+		It(titleDown+" and verify decision stability", func() {
+			scaleDown("rc", kindRC, true, rc, f)
 		})
 	})
 
@@ -136,7 +135,11 @@ func (scaleTest *HPAScaleTest) run(name, kind string, rc *ResourceConsumer, f *f
 	}
 }
 
-func scaleUp(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
+func scaleUp(name, kind string, checkStability bool, rc *ResourceConsumer, f *framework.Framework) {
+	stasis := 0 * time.Minute
+	if checkStability {
+		stasis = 10 * time.Minute
+	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    1,
 		totalInitialCPUUsage:        250,
@@ -145,23 +148,27 @@ func scaleUp(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
 		minPods:                     1,
 		maxPods:                     5,
 		firstScale:                  3,
-		firstScaleStasis:            10 * time.Minute,
+		firstScaleStasis:            stasis,
 		cpuBurst:                    700,
 		secondScale:                 5,
 	}
 	scaleTest.run(name, kind, rc, f)
 }
 
-func scaleDown(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
+func scaleDown(name, kind string, checkStability bool, rc *ResourceConsumer, f *framework.Framework) {
+	stasis := 0 * time.Minute
+	if checkStability {
+		stasis = 10 * time.Minute
+	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
-		totalInitialCPUUsage:        400,
+		totalInitialCPUUsage:        375,
 		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 30,
 		minPods:                     1,
 		maxPods:                     5,
 		firstScale:                  3,
-		firstScaleStasis:            10 * time.Minute,
+		firstScaleStasis:            stasis,
 		cpuBurst:                    100,
 		secondScale:                 1,
 	}
