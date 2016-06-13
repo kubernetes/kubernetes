@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/proposals/volume-ownership-management.md).
+[here](http://releases.k8s.io/release-1.3/docs/proposals/volume-ownership-management.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
