@@ -104,7 +104,7 @@ func main() {
 		noColour = "\033[0m"
 	}
 
-	arc.getArchive()
+	go arc.getArchive()
 	defer arc.deleteArchive()
 
 	var err error
