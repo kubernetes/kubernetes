@@ -210,7 +210,7 @@ func (rl *respLogger) recordStatus(status int) {
 	rl.statusRecorded = true
 	if rl.logStacktracePred(status) {
 		// Only log stacks for errors
-		stack := make([]byte, 2048)
+		stack := make([]byte, 50*1024)
 		stack = stack[:runtime.Stack(stack, false)]
 		rl.statusStack = "\n" + string(stack)
 	} else {
