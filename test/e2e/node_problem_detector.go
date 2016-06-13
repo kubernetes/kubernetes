@@ -193,18 +193,16 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(f.WaitForPodRunning(name)).To(Succeed())
 		})
 
-		It("should generate default node condition after started", func() {
+		It("should generate node condition and events for corresponding errors", func() {
 			By("Make sure no events are generated")
 			Consistently(func() error {
 				return verifyNoEvents(c.Events(eventNamespace), eventListOptions)
 			}, pollConsistent, pollInterval).Should(Succeed())
-			By("Make sure the node condition is false")
+			By("Make sure the default node condition is false")
 			Consistently(func() error {
 				return verifyCondition(c.Nodes(), node.Name, condition, api.ConditionFalse, defaultReason, defaultMessage)
 			}, pollConsistent, pollInterval).Should(Succeed())
-		})
 
-		It("should generate event when temporary error happens", func() {
 			num := 3
 			By(fmt.Sprintf("Inject %d temporary errors", num))
 			Expect(framework.IssueSSHCommand(injectCommand(tempMessage, num), framework.TestContext.Provider, node)).To(Succeed())
@@ -216,20 +214,18 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Consistently(func() error {
 				return verifyEvents(c.Events(eventNamespace), eventListOptions, num, tempReason, tempMessage)
 			}, pollConsistent, pollInterval).Should(Succeed())
-			By("Make sure the node condition is false")
+			By("Make sure the node condition is still false")
 			Expect(verifyCondition(c.Nodes(), node.Name, condition, api.ConditionFalse, defaultReason, defaultMessage)).To(Succeed())
-		})
 
-		It("should generate node condition when permanent error happens", func() {
 			By("Inject 1 permanent error")
 			Expect(framework.IssueSSHCommand(injectCommand(permMessage, 1), framework.TestContext.Provider, node)).To(Succeed())
 			By("Make sure the corresponding node condition is generated")
 			Eventually(func() error {
 				return verifyCondition(c.Nodes(), node.Name, condition, api.ConditionTrue, permReason, permMessage)
 			}, pollTimeout, pollInterval).Should(Succeed())
-			By("Make sure no events are generated")
+			By("Make sure no new events are generated")
 			Consistently(func() error {
-				return verifyNoEvents(c.Events(eventNamespace), eventListOptions)
+				return verifyEvents(c.Events(eventNamespace), eventListOptions, num, tempReason, tempMessage)
 			}, pollConsistent, pollInterval).Should(Succeed())
 		})
 
