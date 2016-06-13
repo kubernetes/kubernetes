@@ -24,8 +24,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -48,15 +46,9 @@ type testCase struct {
 }
 
 var _ = Describe("Container Runtime Conformance Test", func() {
-	var cl *client.Client
-
-	BeforeEach(func() {
-		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
-	})
+	f := NewDefaultFramework("runtime-conformance")
 
 	Describe("container runtime conformance blackbox test", func() {
-		namespace := "runtime-conformance"
 
 		Context("when starting a container that exits", func() {
 			It("it should run with the expected status [Conformance]", func() {
@@ -108,11 +100,11 @@ while true; do sleep 1; done
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
 						Container:     testContainer,
-						Client:        cl,
+						Client:        f.Client,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
 						NodeName:      *nodeName,
-						Namespace:     namespace,
+						Namespace:     f.Namespace.Name,
 					}
 					Expect(terminateContainer.Create()).To(Succeed())
 					defer terminateContainer.Delete()
@@ -152,10 +144,10 @@ while true; do sleep 1; done
 				testContainer.Name = testCase.Name
 				invalidImageContainer := ConformanceContainer{
 					Container:     testContainer,
-					Client:        cl,
+					Client:        f.Client,
 					RestartPolicy: testCase.RestartPolicy,
 					NodeName:      *nodeName,
-					Namespace:     namespace,
+					Namespace:     f.Namespace.Name,
 				}
 				Expect(invalidImageContainer.Create()).To(Succeed())
 				defer invalidImageContainer.Delete()
