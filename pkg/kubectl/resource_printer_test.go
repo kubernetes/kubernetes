@@ -216,7 +216,12 @@ func TestJSONPrinter(t *testing.T) {
 }
 
 func PrintCustomType(obj *TestPrintType, w io.Writer, options PrintOptions) error {
-	_, err := fmt.Fprintf(w, "%s", obj.Data)
+	data := obj.Data
+	kind := options.KindName
+	if options.WithKind {
+		data = kind + "/" + data
+	}
+	_, err := fmt.Fprintf(w, "%s", data)
 	return err
 }
 
@@ -236,6 +241,25 @@ func TestCustomTypePrinting(t *testing.T) {
 		t.Fatalf("An error occurred printing the custom type: %#v", err)
 	}
 	expectedOutput := "Data\ntest object"
+	if buffer.String() != expectedOutput {
+		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
+	}
+}
+
+func TestCustomTypePrintingWithKind(t *testing.T) {
+	columns := []string{"Data"}
+	printer := NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	printer.Handler(columns, PrintCustomType)
+	printer.Options.WithKind = true
+	printer.Options.KindName = "test"
+
+	obj := TestPrintType{"test object"}
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&obj, buffer)
+	if err != nil {
+		t.Fatalf("An error occurred printing the custom type: %#v", err)
+	}
+	expectedOutput := "Data\ntest/test object"
 	if buffer.String() != expectedOutput {
 		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
 	}

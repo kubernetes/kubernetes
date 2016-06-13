@@ -186,7 +186,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return p.printer.PrintObj(converted, w)
+	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.versions)
 }
 
 // TODO: implement HandledResources()
@@ -313,10 +313,12 @@ type handlerEntry struct {
 type PrintOptions struct {
 	NoHeaders          bool
 	WithNamespace      bool
+	WithKind           bool
 	Wide               bool
 	ShowAll            bool
 	ShowLabels         bool
 	AbsoluteTimestamps bool
+	KindName           string
 	ColumnLabels       []string
 }
 
@@ -337,6 +339,8 @@ func NewHumanReadablePrinter(noHeaders, withNamespace bool, wide bool, showAll b
 		options: PrintOptions{
 			NoHeaders:          noHeaders,
 			WithNamespace:      withNamespace,
+			WithKind:           false,
+			KindName:           "",
 			Wide:               wide,
 			ShowAll:            showAll,
 			ShowLabels:         showLabels,
