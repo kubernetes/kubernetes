@@ -1411,7 +1411,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 				{
 					VolumeSource: api.VolumeSource{
 						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
-							ClaimName: "deletedPV",
+							ClaimName: "pvcWithDeletedPV",
 						},
 					},
 				},
@@ -1549,8 +1549,8 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "deletedPV"},
-			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "deletedPV"},
+			ObjectMeta: api.ObjectMeta{Name: "pvcWithDeletedPV"},
+			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
 		},
 	}
 
