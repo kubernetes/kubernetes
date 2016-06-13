@@ -27,7 +27,7 @@ import (
 
 // Create/delete cluster api objects
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federated-cluster")
+	f := framework.NewDefaultFederatedFramework("federation-cluster")
 	It("should allow creation of cluster api objects", func() {
 		framework.SkipUnlessFederated(f.Client)
 

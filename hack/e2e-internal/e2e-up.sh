@@ -40,9 +40,13 @@ if [[ "${FEDERATION:-}" == "true" ]];then
 	    test-setup
 	)
     done
-    if [[ -f "${KUBE_ROOT}/federation/manifests/federated-image.tag" ]];then
-	export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
+    tagfile="${KUBE_ROOT}/federation/manifests/federated-image.tag"
+    if [[ ! -f "$tagfile" ]]; then
+        echo "FATAL: tagfile ${tagfile} does not exist. Make sure that you have run build/push-federation-images.sh"
+        exit 1
     fi
+    export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
+
     "${KUBE_ROOT}/federation/cluster/federation-up.sh"
 else
     test-setup
