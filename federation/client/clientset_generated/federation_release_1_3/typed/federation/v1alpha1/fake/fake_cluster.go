@@ -106,3 +106,13 @@ func (c *FakeClusters) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(clustersResource, opts))
 }
+
+// Patch applies the patch and returns the patched cluster.
+func (c *FakeClusters) Patch(name string, pt api.PatchType, data []byte) (result *v1alpha1.Cluster, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(clustersResource, name, data), &v1alpha1.Cluster{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Cluster), err
+}

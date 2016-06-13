@@ -97,3 +97,13 @@ func (c *FakeClusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) 
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(clusterrolesResource, opts))
 }
+
+// Patch applies the patch and returns the patched clusterRole.
+func (c *FakeClusterRoles) Patch(name string, pt api.PatchType, data []byte) (result *rbac.ClusterRole, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(clusterrolesResource, name, data), &rbac.ClusterRole{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*rbac.ClusterRole), err
+}

@@ -161,6 +161,10 @@ func (m *FakeNodeHandler) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return nil, nil
 }
 
+func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte) (*api.Node, error) {
+	return nil, nil
+}
+
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute

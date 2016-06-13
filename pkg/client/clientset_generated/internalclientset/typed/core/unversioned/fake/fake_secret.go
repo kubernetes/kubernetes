@@ -103,3 +103,14 @@ func (c *FakeSecrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(secretsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched secret.
+func (c *FakeSecrets) Patch(name string, pt api.PatchType, data []byte) (result *api.Secret, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(secretsResource, c.ns, name, data), &api.Secret{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Secret), err
+}

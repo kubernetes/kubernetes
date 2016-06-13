@@ -113,3 +113,14 @@ func (c *FakePods) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(podsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched pod.
+func (c *FakePods) Patch(name string, pt api.PatchType, data []byte) (result *api.Pod, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(podsResource, c.ns, name, data), &api.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Pod), err
+}

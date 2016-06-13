@@ -50,11 +50,11 @@ func (c *FakeEvents) UpdateWithEventNamespace(event *api.Event) (*api.Event, err
 	return obj.(*api.Event), err
 }
 
-// Patch patches an existing event. Returns the copy of the event the server returns, or an error.
-func (c *FakeEvents) Patch(event *api.Event, data []byte) (*api.Event, error) {
-	action := core.NewRootPatchAction(eventsResource, event)
+// PatchWithEventNamespace patches an existing event. Returns the copy of the event the server returns, or an error.
+func (c *FakeEvents) PatchWithEventNamespace(event *api.Event, data []byte) (*api.Event, error) {
+	action := core.NewRootPatchAction(eventsResource, event.Name, data)
 	if c.ns != "" {
-		action = core.NewPatchAction(eventsResource, c.ns, event)
+		action = core.NewPatchAction(eventsResource, c.ns, event.Name, data)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {

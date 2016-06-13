@@ -97,3 +97,13 @@ func (c *FakeComponentStatuses) Watch(opts api.ListOptions) (watch.Interface, er
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(componentstatusesResource, opts))
 }
+
+// Patch applies the patch and returns the patched componentStatus.
+func (c *FakeComponentStatuses) Patch(name string, pt api.PatchType, data []byte) (result *v1.ComponentStatus, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(componentstatusesResource, name, data), &v1.ComponentStatus{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ComponentStatus), err
+}

@@ -115,6 +115,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"apiDeleteOptions":     c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
 		"apiListOptions":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
 		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "GroupVersionResource"}),
+		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
 		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Everything"}),
 
 		"NewRootListAction":              c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootListAction"}),
@@ -133,6 +134,8 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"NewWatchAction":                 c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewWatchAction"}),
 		"NewUpdateSubresourceAction":     c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewUpdateSubresourceAction"}),
 		"NewRootUpdateSubresourceAction": c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootUpdateSubresourceAction"}),
+		"NewRootPatchAction":             c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootPatchAction"}),
+		"NewPatchAction":                 c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewPatchAction"}),
 	}
 
 	noMethods := types.ExtractCommentTags("+", t.SecondClosestCommentLines)["noMethods"] == "true"
@@ -160,7 +163,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 			sw.Do(listTemplate, m)
 		}
 		sw.Do(watchTemplate, m)
-
+		sw.Do(patchTemplate, m)
 	}
 
 	return sw.Error()
@@ -295,5 +298,18 @@ func (c *Fake$.type|publicPlural$) Watch(opts $.apiListOptions|raw$) ($.watchInt
 	return c.Fake.
 		$if .namespaced$InvokesWatch($.NewWatchAction|raw$($.type|allLowercasePlural$Resource, c.ns, opts))
 		$else$InvokesWatch($.NewRootWatchAction|raw$($.type|allLowercasePlural$Resource, opts))$end$
+}
+`
+
+var patchTemplate = `
+// Patch applies the patch and returns the patched $.type|private$.
+func (c *Fake$.type|publicPlural$) Patch(name string, pt $.PatchType|raw$, data []byte) (result *$.type|raw$, err error) {
+	obj, err := c.Fake.
+		$if .namespaced$Invokes($.NewPatchAction|raw$($.type|allLowercasePlural$Resource, c.ns, name, data), &$.type|raw${})
+		$else$Invokes($.NewRootPatchAction|raw$($.type|allLowercasePlural$Resource, name, data), &$.type|raw${})$end$
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*$.type|raw$), err
 }
 `
