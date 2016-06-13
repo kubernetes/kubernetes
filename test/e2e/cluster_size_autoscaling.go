@@ -127,6 +127,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
 	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -135,6 +136,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
 	It("should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]", func() {
@@ -205,6 +207,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "node-selector"))
 	})
 })
@@ -380,6 +383,35 @@ func WaitForClusterSizeFunc(c *client.Client, sizeFunc func(int) bool, timeout t
 		glog.Infof("Waiting for cluster, current size %d, not ready nodes %d", numNodes, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for appropriate cluster size", timeout)
+}
+
+func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c *client.Client) error {
+	var notready []string
+	for start := time.Now(); time.Now().Before(start.Add(scaleUpTimeout)); time.Sleep(20 * time.Second) {
+		pods, err := c.Pods(f.Namespace.Name).List(api.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get pods: %v", err)
+		}
+		notready = make([]string, 0)
+		for _, pod := range pods.Items {
+			ready := false
+			for _, c := range pod.Status.Conditions {
+				if c.Type == api.PodReady && c.Status == api.ConditionTrue {
+					ready = true
+				}
+			}
+			if !ready {
+				notready = append(notready, pod.Name)
+			}
+		}
+		if len(notready) == 0 {
+			glog.Infof("All pods ready")
+			return nil
+		}
+		glog.Infof("Some pods are not ready yet: %v", notready)
+	}
+	// Some pods are still not running.
+	return fmt.Errorf("Some pods are still not running: %v", notready)
 }
 
 func setMigSizes(sizes map[string]int) {
