@@ -360,6 +360,7 @@ func (s *ServiceController) deleteClusterService(clusterName string, cachedServi
 		err = clientset.Core().Services(service.Namespace).Delete(service.Name, &api.DeleteOptions{})
 		if err == nil || errors.IsNotFound(err) {
 			glog.V(4).Infof("Service %s/%s deleted from cluster %s", service.Namespace, service.Name, clusterName)
+			delete(cachedService.endpointMap, clusterName)
 			return nil
 		}
 		time.Sleep(cachedService.nextRetryDelay())
