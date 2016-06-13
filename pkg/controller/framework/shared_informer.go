@@ -279,21 +279,30 @@ func (p *processorListener) add(notification interface{}) {
 func (p *processorListener) pop(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
 	for {
-		for len(p.pendingNotifications) == 0 {
-			// check if we're shutdown
-			select {
-			case <-stopCh:
-				return
-			default:
+		blockingGet := func() (interface{}, bool) {
+			p.lock.Lock()
+			defer p.lock.Unlock()
+
+			for len(p.pendingNotifications) == 0 {
+				// check if we're shutdown
+				select {
+				case <-stopCh:
+					return nil, true
+				default:
+				}
+				p.cond.Wait()
 			}
 
-			p.cond.Wait()
+			nt := p.pendingNotifications[0]
+			p.pendingNotifications = p.pendingNotifications[1:]
+			return nt, false
 		}
-		notification := p.pendingNotifications[0]
-		p.pendingNotifications = p.pendingNotifications[1:]
+
+		notification, stopped := blockingGet()
+		if stopped {
+			return
+		}
 
 		select {
 		case <-stopCh:
