@@ -17,14 +17,15 @@ limitations under the License.
 package vsphere
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
-	"os/exec"
 	"strings"
 
+	"gopkg.in/gcfg.v1"
+
+	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -32,7 +33,6 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
-	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -96,16 +96,8 @@ func init() {
 }
 
 func readInstanceID(cfg *VSphereConfig) (string, error) {
-	cmd := exec.Command("bash", "-c", `dmidecode -t 1 | grep UUID | tr -d ' ' | cut -f 2 -d ':'`)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	if err != nil {
-		return "", err
-	}
-	if out.Len() == 0 {
-		return "", fmt.Errorf("unable to retrieve Instance ID")
-	}
+	sysFs, err := sysfs.NewRealSysFs()
+	out, err := sysFs.GetSystemUUID()
 
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -130,7 +122,7 @@ func readInstanceID(cfg *VSphereConfig) (string, error) {
 
 	s := object.NewSearchIndex(c.Client)
 
-	svm, err := s.FindByUuid(ctx, dc, strings.ToLower(strings.TrimSpace(out.String())), true, nil)
+	svm, err := s.FindByUuid(ctx, dc, strings.ToLower(strings.TrimSpace(out)), true, nil)
 	var vm mo.VirtualMachine
 	err = s.Properties(ctx, svm.Reference(), []string{"name"}, &vm)
 	if err != nil {
