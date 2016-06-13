@@ -126,7 +126,7 @@ func (RoleList) SwaggerDoc() map[string]string {
 var map_Subject = map[string]string{
 	"":           "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
 	"kind":       "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
-	"apiVersion": "APIVersion holds the API group and version of the referenced object. For non-object references such as \"Group\" and \"User\" this is expected to be API version of this API group. For example \"rbac/v1alpha1\".",
+	"apiVersion": "APIVersion holds the API group and version of the referenced object.",
 	"name":       "Name of the object being referenced.",
 	"namespace":  "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
 }
