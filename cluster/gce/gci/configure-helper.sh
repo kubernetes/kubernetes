@@ -467,13 +467,16 @@ function start-etcd-servers {
 
 # Calculates the following variables based on env variables, which will be used
 # by the manifests of several kube-master components.
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 function compute-master-manifest-variables {
+  CLOUD_CONFIG_OPT=""
   CLOUD_CONFIG_VOLUME=""
   CLOUD_CONFIG_MOUNT=""
-  if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
+  if [[ -f /etc/gce.conf ]]; then
+    CLOUD_CONFIG_OPT="--cloud-config=/etc/gce.conf"
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
@@ -499,6 +502,7 @@ function remove-salt-config-comments {
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
 # Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
@@ -507,7 +511,7 @@ function start-kube-apiserver {
   prepare-log-file /var/log/kube-apiserver.log
 
   # Calculate variables and assemble the command line.
-  local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-}"
+  local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
   params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
@@ -535,7 +539,6 @@ function start-kube-apiserver {
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     params+=" --advertise-address=${vm_external_ip}"
-    params+=" --cloud-config=/etc/gce.conf"
     params+=" --ssh-user=${PROXY_SSH_USER}"
     params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
   fi
@@ -586,6 +589,7 @@ function start-kube-apiserver {
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
 # Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
@@ -593,14 +597,11 @@ function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
-  local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-}"
+  local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --cloud-provider=gce"
   params+=" --master=127.0.0.1:8080"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
-  if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
-    params+=" --cloud-config=/etc/gce.conf"
-  fi
   if [[ -n "${INSTANCE_PREFIX:-}" ]]; then
     params+=" --cluster-name=${INSTANCE_PREFIX}"
   fi
@@ -657,6 +658,10 @@ function start-kube-scheduler {
 }
 
 # Starts cluster autoscaler.
+# Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
+#   CLOUD_CONFIG_VOLUME
+#   CLOUD_CONFIG_MOUNT
 function start-cluster-autoscaler {
   if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
@@ -666,11 +671,7 @@ function start-cluster-autoscaler {
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove-salt-config-comments "${src_file}"
 
-    local params="${AUTOSCALER_MIG_CONFIG}"
-    if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
-      params+=" --cloud-config=/etc/gce.conf"
-    fi
-
+    local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT}"
     sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
