@@ -18,7 +18,6 @@ package stats
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 	"time"
 
@@ -53,8 +52,6 @@ var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a new SummaryProvider
 func NewSummaryProvider(statsProvider StatsProvider, fsResourceAnalyzer fsResourceAnalyzerInterface, cruntime container.Runtime) SummaryProvider {
-	stackBuff := []byte{}
-	runtime.Stack(stackBuff, false)
 	return &summaryProviderImpl{statsProvider, fsResourceAnalyzer, cruntime}
 }
 
