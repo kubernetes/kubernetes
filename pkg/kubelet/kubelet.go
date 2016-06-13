@@ -832,6 +832,7 @@ type Kubelet struct {
 	// and disable kubelet from executing any attach/detach operations
 	enableControllerAttachDetach bool
 
+	// lastUpdatedNodeObject is a cached version of the node as last reported back to the api server.
 	lastUpdatedNodeObject atomic.Value
 }
 
@@ -1560,11 +1561,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 					return result, err
 				}
 			case envVar.ValueFrom.ResourceFieldRef != nil:
-				defaultedPod, err := kl.defaultPodLimitsForDownwardApi(pod)
+				defaultedPod, defaultedContainer, err := kl.defaultPodLimitsForDownwardApi(pod, container)
 				if err != nil {
 					return result, err
 				}
-				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, defaultedPod, container)
+				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, defaultedPod, defaultedContainer)
 				if err != nil {
 					return result, err
 				}
@@ -1905,7 +1906,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Mount volumes and update the volume manager
 	// Default limits for containers here to have downward API expose user-friendly limits to pods.
-	defaultedPod, err := kl.defaultPodLimitsForDownwardApi(pod)
+	defaultedPod, _, err := kl.defaultPodLimitsForDownwardApi(pod, nil)
 	if err != nil {
 		return err
 	}

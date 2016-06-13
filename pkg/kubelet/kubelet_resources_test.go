@@ -59,7 +59,7 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {
-		actual, err := tk.kubelet.defaultPodLimitsForDownwardApi(tc.pod)
+		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardApi(tc.pod, nil)
 		as.Nil(err, "failed to default pod limits: %v", err)
 		as.Equal(tc.expected, actual, "test case [%d] failed. Expected: %+v, Got: %+v", idx, tc.expected, actual)
 	}
@@ -67,7 +67,7 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 
 func getPod(cpuLimit, memoryLimit string) *api.Pod {
 	resources := api.ResourceRequirements{}
-	if cpuLimit != "" && memoryLimit != "" {
+	if cpuLimit != "" || memoryLimit != "" {
 		resources.Limits = make(api.ResourceList)
 	}
 	if cpuLimit != "" {
