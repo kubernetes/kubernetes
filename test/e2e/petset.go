@@ -109,17 +109,23 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			By("Saturating pet set " + ps.Name)
 			pst.saturate(ps)
 
+			By("Verifying petset mounted data directory is usable")
+			ExpectNoError(pst.verifyDirectoryIsUsable("/data"))
+
 			cmd := "echo $(hostname) > /data/hostname; sync;"
 			By("Running " + cmd + " in all pets")
-			pst.execInPets(ps, cmd)
+			ExpectNoError(pst.execInPets(ps, cmd))
 
 			By("Restarting pet set " + ps.Name)
 			pst.restart(ps)
 			pst.saturate(ps)
 
+			By("Verifying petset mounted data directory is usable")
+			ExpectNoError(pst.verifyDirectoryIsUsable("/data"))
+
 			cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			By("Running " + cmd + " in all pets")
-			pst.execInPets(ps, cmd)
+			ExpectNoError(pst.execInPets(ps, cmd))
 		})
 
 		It("should handle healthy pet restarts during scale [Feature:PetSet]", func() {
@@ -414,13 +420,31 @@ func (p *petSetTester) createPetSet(manifestPath, ns string) *apps.PetSet {
 	return ps
 }
 
-func (p *petSetTester) execInPets(ps *apps.PetSet, cmd string) {
+func (p *petSetTester) verifyDirectoryIsUsable(dirPath string) error {
+	for _, cmd := range []string{
+		// Print inode, size etc
+		fmt.Sprintf("ls -idlh %v", dirPath),
+		// Print subdirs
+		fmt.Sprintf("find %v", dirPath),
+		// Try writing
+		fmt.Sprintf("touch %v", filepath.Join(dirPath, fmt.Sprintf("%v", time.Now().UnixNano()))),
+	} {
+		if err := p.execInPets(ps, cmd); err != nil {
+			return fmt.Errorf("failed to execute %v, error: %v", cmd, err)
+		}
+	}
+}
+
+func (p *petSetTester) execInPets(ps *apps.PetSet, cmd string) error {
 	podList := p.getPodList(ps)
 	for _, pet := range podList.Items {
 		stdout, err := framework.RunHostCmd(pet.Namespace, pet.Name, cmd)
-		ExpectNoError(err)
 		framework.Logf("stdout of %v on %v: %v", cmd, pet.Name, stdout)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (p *petSetTester) saturate(ps *apps.PetSet) {
