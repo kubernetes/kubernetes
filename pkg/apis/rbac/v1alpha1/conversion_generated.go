@@ -402,6 +402,7 @@ func Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *Po
 }
 
 func autoConvert_v1alpha1_ProtectedAttribute_To_rbac_ProtectedAttribute(in *ProtectedAttribute, out *rbac.ProtectedAttribute, s conversion.Scope) error {
+	SetDefaults_ProtectedAttribute(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
