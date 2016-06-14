@@ -92,7 +92,7 @@ func RegisterFlags() {
 	flag.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
 	flag.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "", "ContentType used to communicate with apiserver")
-	flag.StringVar(&federatedKubeContext, "federated-kube-context", "federated-cluster", "kubeconfig context for federated-cluster.")
+	flag.StringVar(&federatedKubeContext, "federated-kube-context", "federation-cluster", "kubeconfig context for federation-cluster.")
 
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")

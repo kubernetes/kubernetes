@@ -18,16 +18,19 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // Create/delete cluster api objects
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federated-cluster")
+	f := framework.NewDefaultFederatedFramework("federation-cluster")
 	It("should allow creation of cluster api objects", func() {
 		framework.SkipUnlessFederated(f.Client)
 
@@ -54,16 +57,34 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 					},
 				},
 			}
-			_, err := f.FederationClient.Clusters().Create(&cluster)
+			_, err := f.FederationClientset.Federation().Clusters().Create(&cluster)
 			framework.ExpectNoError(err, fmt.Sprintf("creating cluster: %+v", err))
 		}
 
 		for _, context := range contexts {
-			c, err := f.FederationClient.Clusters().Get(context.Name)
+			c, err := f.FederationClientset.Federation().Clusters().Get(context.Name)
 			framework.ExpectNoError(err, fmt.Sprintf("get cluster: %+v", err))
 			if c.ObjectMeta.Name != context.Name {
 				framework.Failf("cluster name does not match input context: actual=%+v, expected=%+v", c, context)
 			}
+			err = isReady(context.Name, f.FederationClientset)
+			framework.ExpectNoError(err, fmt.Sprintf("unexpected error in verifying if cluster %s is ready: %+v", context.Name, err))
 		}
 	})
 })
+
+// Verify that the cluster is marked ready.
+func isReady(clusterName string, clientset *federation_internalclientset.Clientset) error {
+	return wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		c, err := clientset.Federation().Clusters().Get(clusterName)
+		if err != nil {
+			return false, err
+		}
+		for _, condition := range c.Status.Conditions {
+			if condition.Type == federationapi.ClusterReady && condition.Status == api.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
