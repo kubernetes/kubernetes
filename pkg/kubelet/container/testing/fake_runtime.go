@@ -346,7 +346,7 @@ func (f *FakeRuntime) GetNetNS(containerID ContainerID) (string, error) {
 	return "", f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy) error {
+func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
 	f.Lock()
 	defer f.Unlock()
 
