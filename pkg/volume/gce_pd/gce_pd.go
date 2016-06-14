@@ -86,11 +86,12 @@ func getVolumeSource(spec *volume.Spec) (*api.GCEPersistentDiskVolumeSource, boo
 	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
 		volumeSource = spec.Volume.GCEPersistentDisk
 		readOnly = volumeSource.ReadOnly
+		glog.V(4).Infof("volume source %v spec %v, readonly flag retrieved from source: %v", volumeSource.PDName, spec.Name(), readOnly)
 	} else {
 		volumeSource = spec.PersistentVolume.Spec.GCEPersistentDisk
 		readOnly = spec.ReadOnly
+		glog.V(4).Infof("volume source %v spec %v, readonly flag retrieved from spec: %v", volumeSource.PDName, spec.Name(), readOnly)
 	}
-
 	return volumeSource, readOnly
 }
 
@@ -219,7 +220,7 @@ func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
 func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
+	glog.V(4).Infof("PersistentDisk set up: %s %v %v, pd name %v readOnly %v", dir, !notMnt, err, b.pdName, b.readOnly)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
