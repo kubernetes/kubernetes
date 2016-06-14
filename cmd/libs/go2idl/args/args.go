@@ -105,7 +105,6 @@ func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 	b.AddBuildTags(g.GeneratedBuildTag)
 
 	for _, d := range g.InputDirs {
-		d = strings.TrimLeft(d, "+-*")
 		if g.Recursive {
 			if err := b.AddDirRecursive(d); err != nil {
 				return nil, fmt.Errorf("unable to add directory %q: %v", d, err)
