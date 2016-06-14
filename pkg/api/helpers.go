@@ -438,6 +438,12 @@ const (
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
+
+	// SysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
+	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
+	// key-value pairs. Pods with unsupported or not-whitespaced sysctls (by the container runtime)
+	// might fail to launch.
+	SysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
@@ -521,4 +527,37 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, 
 		}
 	}
 	return avoidPods, nil
+}
+
+// SysctlsFromPodAnnotation parses an annotation value of the key SysctlsPodAnnotationKey
+// into a slice of Sysctls.
+func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
+	if annotation == "" {
+		return nil, nil
+	}
+
+	kvs := strings.Split(annotation, ",")
+	sysctls := make([]Sysctl, len(kvs))
+	for i, kv := range kvs {
+		cs := strings.Split(kv, "=")
+		if len(cs) != 2 {
+			return nil, fmt.Errorf("sysctl %q not of the shape sysctl_name=value", kv)
+		}
+		sysctls[i].Name = cs[0]
+		sysctls[i].Value = cs[1]
+	}
+	return sysctls, nil
+}
+
+// PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.
+func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
+	if len(sysctls) == 0 {
+		return ""
+	}
+
+	kvs := make([]string, len(sysctls))
+	for i := range sysctls {
+		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
+	}
+	return strings.Join(kvs, ",")
 }
