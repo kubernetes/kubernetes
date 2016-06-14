@@ -3043,6 +3043,14 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{
+			SecurityContext: &api.PodSecurityContext{
+				Sysctls: []api.Sysctl{{Name: "test", Value: "4"}}},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -3172,6 +3180,15 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 		"bad nodeName": {
 			NodeName:      "node name",
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad sysctl name": {
+			SecurityContext: &api.PodSecurityContext{
+				Sysctls: []api.Sysctl{{Name: "test", Value: "4"}},
+			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicyAlways,
