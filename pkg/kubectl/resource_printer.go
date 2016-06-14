@@ -616,6 +616,7 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	initializing := false
 	for i := range pod.Status.InitContainerStatuses {
 		container := pod.Status.InitContainerStatuses[i]
+		restarts += int(container.RestartCount)
 		switch {
 		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
 			continue
@@ -641,6 +642,7 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 		break
 	}
 	if !initializing {
+		restarts = 0
 		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 			container := pod.Status.ContainerStatuses[i]
 
