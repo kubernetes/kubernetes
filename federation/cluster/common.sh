@@ -46,7 +46,7 @@ if [[ -z "${FEDERATION_PUSH_REPO_BASE}" ]]; then
 fi
 
 FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}
-FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-e2e}
+FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation}
 
 KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 KUBE_ARCH=${KUBE_ARCH:-amd64}
@@ -99,7 +99,7 @@ function create-federation-api-objects {
 
     FEDERATION_KUBECONFIG_PATH="${KUBE_ROOT}/federation/cluster/kubeconfig"
 
-    federation_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --context=federated-cluster --namespace=default"
+    federation_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --context=federation-cluster --namespace=default"
 
     manifests_root="${KUBE_ROOT}/federation/manifests/"
 
@@ -152,7 +152,7 @@ function create-federation-api-objects {
     # controller manager can use to talk to the federation-apiserver.
     # Note that the file name should be "kubeconfig" so that the secret key gets the same name.
     KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
-    CONTEXT=federated-cluster \
+    CONTEXT=federation-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
            KUBECONFIG="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" \
 	   create-kubeconfig
@@ -169,7 +169,7 @@ function create-federation-api-objects {
     done
 
     # Update the users kubeconfig to include federation-apiserver credentials.
-    CONTEXT=federated-cluster \
+    CONTEXT=federation-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
 	   SECONDARY_KUBECONFIG=true \
 	   create-kubeconfig
