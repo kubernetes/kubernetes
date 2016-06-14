@@ -233,7 +233,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, time.Durati
 		// cache for deleting.
 		key, ok := delta.Object.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			return fmt.Errorf("delta contained object that wasn't a service or a deleted key: %+v", delta), doNotRetry
+			return fmt.Errorf("delta contained object that wasn't a service or a deleted key: %#v", delta), doNotRetry
 		}
 		cachedService, ok = s.cache.get(key.Key)
 		if !ok {

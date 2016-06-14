@@ -343,7 +343,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	// Get the key for the controller
 	rcKey, err := controller.KeyFunc(controllerSpec)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", controllerSpec, err)
 	}
 
 	// Lowering expectations should lead to a sync that creates a replica, however the
@@ -686,7 +686,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 	rcKey, err := controller.KeyFunc(controllerSpec)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", controllerSpec, err)
 	}
 
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
@@ -865,7 +865,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	// Get the RC key
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", rc, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rc, err)
 	}
 
 	// This is to simulate a concurrent addPod, that has a handle on the expectations
@@ -965,7 +965,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.rcStore.Indexer.Add(controllerSpec)
 	rcKey, err := controller.KeyFunc(controllerSpec)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", controllerSpec, err)
 	}
 	pod := newPodList(nil, 1, api.PodPending, controllerSpec, "pod").Items[0]
 	pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
@@ -982,7 +982,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err := manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// An update from no deletion timestamp to having one should be treated
@@ -999,7 +999,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// An update to the pod (including an update to the deletion timestamp)
@@ -1017,7 +1017,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// A pod with a non-nil deletion timestamp should also be ignored by the
@@ -1025,7 +1025,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.deletePod(&pod)
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// Deleting the second pod should clear expectations.
@@ -1039,7 +1039,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 }
 

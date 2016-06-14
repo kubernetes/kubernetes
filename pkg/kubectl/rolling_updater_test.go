@@ -817,7 +817,7 @@ Scaling foo-v2 up to 2
 			oldReady := next(&oldReady)
 			newReady := next(&newReady)
 			if oldReady == -1 || newReady == -1 {
-				t.Fatalf("unexpected getReadyPods call for:\noldRc: %+v\nnewRc: %+v", oldRc, newRc)
+				t.Fatalf("unexpected getReadyPods call for:\noldRc: %#v\nnewRc: %#v", oldRc, newRc)
 			}
 			return int32(oldReady), int32(newReady), nil
 		}

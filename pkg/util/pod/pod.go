@@ -70,7 +70,7 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 
 	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("timed out trying to update pod: %+v", oldPod)
+		err = fmt.Errorf("timed out trying to update pod: %#v", oldPod)
 	}
 	// Ignore the pod not found error, but the pod isn't updated.
 	if errors.IsNotFound(err) {

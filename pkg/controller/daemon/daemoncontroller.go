@@ -217,12 +217,12 @@ func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			glog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
 		ds, ok = tombstone.Obj.(*extensions.DaemonSet)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a DaemonSet %+v", obj)
+			glog.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj)
 			return
 		}
 	}
@@ -267,7 +267,7 @@ func (dsc *DaemonSetsController) runWorker() {
 func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", ds, err)
+		glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
 		return
 	}
 
@@ -342,7 +342,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
-			glog.Errorf("Couldn't get key for object %+v: %v", ds, err)
+			glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
 			return
 		}
 		dsc.expectations.CreationObserved(dsKey)
@@ -386,12 +386,12 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			glog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
+			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
 			return
 		}
 	}
@@ -399,7 +399,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
-			glog.Errorf("Couldn't get key for object %+v: %v", ds, err)
+			glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
 			return
 		}
 		dsc.expectations.DeletionObserved(dsKey)
@@ -468,14 +468,14 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	// Find out which nodes are running the daemon pods selected by ds.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
-		glog.Errorf("Error getting node to daemon pod mapping for daemon set %+v: %v", ds, err)
+		glog.Errorf("Error getting node to daemon pod mapping for daemon set %#v: %v", ds, err)
 	}
 
 	// For each node, if the node is running the daemon pod but isn't supposed to, kill the daemon
 	// pod. If the node is supposed to run the daemon pod, but isn't, create the daemon pod on the node.
 	nodeList, err := dsc.nodeStore.List()
 	if err != nil {
-		glog.Errorf("Couldn't get list of nodes when syncing daemon set %+v: %v", ds, err)
+		glog.Errorf("Couldn't get list of nodes when syncing daemon set %#v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
 	for _, node := range nodeList.Items {
@@ -505,7 +505,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", ds, err)
+		glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
 		return
 	}
 
@@ -583,13 +583,13 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 	glog.V(4).Infof("Updating daemon set status")
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
-		glog.Errorf("Error getting node to daemon pod mapping for daemon set %+v: %v", ds, err)
+		glog.Errorf("Error getting node to daemon pod mapping for daemon set %#v: %v", ds, err)
 		return
 	}
 
 	nodeList, err := dsc.nodeStore.List()
 	if err != nil {
-		glog.Errorf("Couldn't get list of nodes when updating daemon set %+v: %v", ds, err)
+		glog.Errorf("Couldn't get list of nodes when updating daemon set %#v: %v", ds, err)
 		return
 	}
 
@@ -613,7 +613,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 
 	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled)
 	if err != nil {
-		glog.Errorf("Error storing status for daemon set %+v: %v", ds, err)
+		glog.Errorf("Error storing status for daemon set %#v: %v", ds, err)
 	}
 }
 
@@ -655,7 +655,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	// then we do not want to call manage on foo until the daemon pods have been created.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", ds, err)
+		glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
 		return err
 	}
 	dsNeedsSync := dsc.expectations.SatisfiedExpectations(dsKey)

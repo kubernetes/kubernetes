@@ -286,7 +286,7 @@ func TestGetNewRC(t *testing.T) {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
 		if !api.Semantic.DeepEqual(rs, test.expected) {
-			t.Errorf("In test case %s, expected %+v, got %+v", test.test, test.expected, rs)
+			t.Errorf("In test case %s, expected %#v, got %#v", test.test, test.expected, rs)
 		}
 	}
 }
@@ -381,11 +381,11 @@ func TestGetOldRCs(t *testing.T) {
 		if !equal(rss, test.expected) {
 			t.Errorf("In test case %q, expected:", test.test)
 			for _, rs := range test.expected {
-				t.Errorf("rs = %+v", rs)
+				t.Errorf("rs = %#v", rs)
 			}
 			t.Errorf("In test case %q, got:", test.test)
 			for _, rs := range rss {
-				t.Errorf("rs = %+v", rs)
+				t.Errorf("rs = %#v", rs)
 			}
 		}
 	}
