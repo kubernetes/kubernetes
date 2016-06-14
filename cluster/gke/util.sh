@@ -193,6 +193,22 @@ function kube-up() {
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
 
+  if [[ "${FEDERATION:-}" == "true" ]]; then
+    # Create a kubeconfig with credentials for this apiserver. We will later use
+    # this kubeconfig to create a secret which the federation control plane can
+    # use to talk to this apiserver.
+    KUBECONFIG=${KUBECONFIG:-${HOME}/.kube/config}
+    KUBECONFIG_DIR=$(dirname $KUBECONFIG)
+    CONTEXT=$($KUBECTL config current-context)
+    DEST_KUBECONFIG="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${CONTEXT}/kubeconfig"
+    mkdir -p $(dirname $DEST_KUBECONFIG) >&2
+    # TODO: Original kubeconfig can contain credential information about
+    # other clusters as well. Extract the information about only this cluster
+    # and then create a file with that.
+    # For now, we use the whole kubeconfig file.
+    cp $KUBECONFIG $DEST_KUBECONFIG >&2
+  fi
+
   if [[ ! -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
     "${GCLOUD}" ${CMD_GROUP:-} container node-pools create "heapster-pool" --cluster "${CLUSTER_NAME}" --num-nodes=1 --machine-type="${HEAPSTER_MACHINE_TYPE}" "${shared_args[@]}"
   fi
