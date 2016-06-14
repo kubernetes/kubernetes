@@ -109,39 +109,40 @@ function create-federation-api-objects {
 
     export FEDERATION_API_HOST=""
     export KUBE_MASTER_IP=""
-    if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]];then
-	# The vagrant approach is to use a nodeport service, and point kubectl at one of the nodes
-	$template "${manifests_root}/federation-apiserver-nodeport-service.yaml" | $host_kubectl create -f -
-	node_addresses=`$host_kubectl get nodes -o=jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'`
-	FEDERATION_API_HOST=`printf "$node_addresses" | cut -d " " -f1`
-	KUBE_MASTER_IP="${FEDERATION_API_HOST}:${FEDERATION_API_NODEPORT}"
-    elif [[ "$KUBERNETES_PROVIDER" == "gce" || "$KUBERNETES_PROVIDER" == "gke" || "$KUBERNETES_PROVIDER" == "aws" ]];then
-	# any capable providers should use a loadbalancer service
-	# we check for ingress.ip and ingress.hostname, so should work for any loadbalancer-providing provider
-	# allows 30x5 = 150 seconds for loadbalancer creation
-	$template "${manifests_root}/federation-apiserver-lb-service.yaml" | $host_kubectl create -f -
-	for i in {1..30};do
+    if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+	  # The vagrant approach is to use a nodeport service, and point kubectl at one of the nodes
+	  $template "${manifests_root}/federation-apiserver-nodeport-service.yaml" | $host_kubectl create -f -
+	  node_addresses=`$host_kubectl get nodes -o=jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'`
+	  FEDERATION_API_HOST=`printf "$node_addresses" | cut -d " " -f1`
+	  KUBE_MASTER_IP="${FEDERATION_API_HOST}:${FEDERATION_API_NODEPORT}"
+    elif [[ "$KUBERNETES_PROVIDER" == "gce" || "$KUBERNETES_PROVIDER" == "gke" || "$KUBERNETES_PROVIDER" == "aws" ]]; then
+	  # any capable providers should use a loadbalancer service
+	  # we check for ingress.ip and ingress.hostname, so should work for any loadbalancer-providing provider
+	  # allows 30x5 = 150 seconds for loadbalancer creation
+	  $template "${manifests_root}/federation-apiserver-lb-service.yaml" | $host_kubectl create -f -
+	  for i in {1..30}; do
 	    echo "attempting to get federation-apiserver loadbalancer hostname ($i / 30)"
-	    for field in ip hostname;do
-		FEDERATION_API_HOST=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer.ingress[*].'"${field}}"`
-		if [[ ! -z "${FEDERATION_API_HOST// }" ]];then
-		    break 2
-		fi
-	    done
-	    if [[ $i -eq 30 ]];then
-		echo "Could not find ingress hostname for federation-apiserver loadbalancer service"
-		exit 1
+	      for field in ip hostname; do
+		    FEDERATION_API_HOST=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer.ingress[*].'"${field}}"`
+		    if [[ ! -z "${FEDERATION_API_HOST// }" ]]; then
+		      break 2
+		    fi
+	      done
+	    if [[ $i -eq 30 ]]; then
+		  echo "Could not find ingress hostname for federation-apiserver loadbalancer service"
+		  exit 1
 	    fi
 	    sleep 5
-	done
-	KUBE_MASTER_IP="${FEDERATION_API_HOST}:443"
+      done
+	  KUBE_MASTER_IP="${FEDERATION_API_HOST}:443"
     else
-	echo "provider ${KUBERNETES_PROVIDER} is not (yet) supported for e2e testing"
-	exit 1
+	  echo "provider ${KUBERNETES_PROVIDER} is not (yet) supported for e2e testing"
+	  exit 1
     fi
+
     echo "Found federation-apiserver host at $FEDERATION_API_HOST"
 
-    FEDERATION_API_TOKEN="$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)"
+    FEDERATION_API_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
     export FEDERATION_API_KNOWN_TOKENS="${FEDERATION_API_TOKEN},admin,admin"
 
     $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
@@ -175,39 +176,39 @@ function create-federation-api-objects {
 	   create-kubeconfig
 
     # Don't finish provisioning until federation-apiserver pod is running
-    for i in {1..30};do
-	#TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
-	phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-apiserver --template '{.items[*].status.phase}')"
-	echo "Waiting for federation-apiserver to be running...(phase= $phase)"
-	if [[ "$phase" == "Running" ]];then
+    for i in {1..30}; do
+      #TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
+	  phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-apiserver --template '{.items[*].status.phase}')"
+	  echo "Waiting for federation-apiserver to be running...(phase= $phase)"
+	  if [[ "$phase" == "Running" ]]; then
 	    echo "federation-apiserver pod is running!"
 	    break
-	fi
+	  fi
 
-	if [[ $i -eq 30 ]];then
+	  if [[ $i -eq 30 ]]; then
 	    echo "federation-apiserver pod is not running! giving up."
 	    exit 1
-	fi
+	  fi
 
-	sleep 4
+	  sleep 4
     done
 
     # Verify that federation-controller-manager pod is running.
-    for i in {1..30};do
-	#TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
-	phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-controller-manager --template '{.items[*].status.phase}')"
-	echo "Waiting for federation-controller-manager to be running...(phase= $phase)"
-	if [[ "$phase" == "Running" ]];then
+    for i in {1..30}; do
+	  #TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
+	  phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-controller-manager --template '{.items[*].status.phase}')"
+	  echo "Waiting for federation-controller-manager to be running...(phase= $phase)"
+	  if [[ "$phase" == "Running" ]]; then
 	    echo "federation-controller-manager pod is running!"
 	    break
-	fi
+	  fi
 
-	if [[ $i -eq 30 ]];then
+	  if [[ $i -eq 30 ]]; then
 	    echo "federation-controller-manager pod is not running! giving up."
 	    exit 1
-	fi
+	  fi
 
-	sleep 4
+	  sleep 4
     done
 )
 }
@@ -223,49 +224,49 @@ function push-federation-images {
 
     local imageFolder="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin"
 
-    if [[ ! -d "$imageFolder" ]];then
-	echo "${imageFolder} does not exist! Run make quick-release or make release"
-	exit 1
+    if [[ ! -d "$imageFolder" ]]; then
+	  echo "${imageFolder} does not exist! Run make quick-release or make release"
+	  exit 1
     fi
 
-    for binary in $FEDERATION_BINARIES;do
-	local imageFile="${imageFolder}/${binary}.tar"
+    for binary in $FEDERATION_BINARIES; do
+	  local imageFile="${imageFolder}/${binary}.tar"
 
-	if [[ ! -f "$imageFile" ]];then
+	  if [[ ! -f "$imageFile" ]]; then
 	    echo "${imageFile} does not exist!"
 	    exit 1
-	fi
+	  fi
 
-	echo "Load: ${imageFile}"
-	# Load the image. Trust we know what it's called, as docker load provides no help there :(
-	docker load < "${imageFile}"
+	  echo "Load: ${imageFile}"
+	  # Load the image. Trust we know what it's called, as docker load provides no help there :(
+	  docker load < "${imageFile}"
 
-	local srcImageTag="$(cat ${imageFolder}/${binary}.docker_tag)"
-	local dstImageTag="${FEDERATION_IMAGE_TAG:-$srcImageTag}"
-	local srcImageName="${FEDERATION_IMAGE_REPO_BASE}/${binary}:${srcImageTag}"
-	local dstImageName="${FEDERATION_PUSH_REPO_BASE}/${binary}:${dstImageTag}"
+	  local srcImageTag="$(cat ${imageFolder}/${binary}.docker_tag)"
+	  local dstImageTag="${FEDERATION_IMAGE_TAG:-$srcImageTag}"
+	  local srcImageName="${FEDERATION_IMAGE_REPO_BASE}/${binary}:${srcImageTag}"
+	  local dstImageName="${FEDERATION_PUSH_REPO_BASE}/${binary}:${dstImageTag}"
 
-	echo "Tag: ${srcImageName} --> ${dstImageName}"
-	docker tag "$srcImageName" "$dstImageName"
+	  echo "Tag: ${srcImageName} --> ${dstImageName}"
+	  docker tag "$srcImageName" "$dstImageName"
 
-	echo "Push: $dstImageName"
-	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]];then
+	  echo "Push: $dstImageName"
+	  if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]]; then
 	    echo " -> GCR repository detected. Using gcloud"
 	    gcloud docker push "$dstImageName"
-	else
+	  else
 	    docker push "$dstImageName"
-	fi
+	  fi
 
-	echo "Remove: $srcImageName"
-	docker rmi "$srcImageName"
+	  echo "Remove: $srcImageName"
+	  docker rmi "$srcImageName"
 
-	if [[ "$srcImageName" != "dstImageName" ]];then
+	  if [[ "$srcImageName" != "dstImageName" ]]; then
 	    echo "Remove: $dstImageName"
 	    docker rmi "$dstImageName"
-	fi
-
+	  fi
     done
 }
+
 function cleanup-federation-api-objects {
   # Delete all resources with the federated-cluster label.
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
