@@ -35,6 +35,10 @@ type ControllerManagerConfiguration struct {
 	Port int `json:"port"`
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
 	Address string `json:"address"`
+	// federation name.
+	FederationName string `json:"federationName"`
+	// zone name, like example.com.
+	ZoneName string `json:"zoneName"`
 	// dnsProvider is the provider for dns services.
 	DnsProvider string `json:"dnsProvider"`
 	// dnsConfigFile is the path to the dns provider configuration file.
@@ -90,6 +94,8 @@ func NewCMServer() *CMServer {
 func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.StringVar(&s.FederationName, "federation-name", s.FederationName, "Federation name.")
+	fs.StringVar(&s.ZoneName, "zone-name", s.ZoneName, "Zone name, like example.com.")
 	fs.IntVar(&s.ConcurrentServiceSyncs, "concurrent-service-syncs", s.ConcurrentServiceSyncs, "The number of service syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.DurationVar(&s.ClusterMonitorPeriod.Duration, "cluster-monitor-period", s.ClusterMonitorPeriod.Duration, "The period for syncing ClusterStatus in ClusterController.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")

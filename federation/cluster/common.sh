@@ -94,6 +94,7 @@ function create-federation-api-objects {
     export FEDERATION_API_NODEPORT=32111
     export FEDERATION_NAMESPACE
     export FEDERATION_NAME="${FEDERATION_NAME:-federation}"
+    export DNS_ZONE_NAME="${DNS_ZONE_NAME:-example.com}"
 
     template="go run ${KUBE_ROOT}/federation/cluster/template.go"
 
