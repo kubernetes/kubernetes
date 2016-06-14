@@ -162,7 +162,7 @@ const (
 type SyncHandler interface {
 	HandlePodAdditions(pods []*api.Pod)
 	HandlePodUpdates(pods []*api.Pod)
-	HandlePodDeletions(pods []*api.Pod)
+	HandlePodRemoves(pods []*api.Pod)
 	HandlePodReconcile(pods []*api.Pod)
 	HandlePodSyncs(pods []*api.Pod)
 	HandlePodCleanups() error
@@ -1774,7 +1774,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 // pod - the pod to sync
 // mirrorPod - the mirror pod for the pod to sync, if it is a static pod
 // podStatus - the current status (TODO: always from the status manager?)
-// updateType - the type of update (ADD, UPDATE, REMOVE, RECONCILE)
+// updateType - the type of update (ADD, UPDATE, REMOVE, RECONCILE, DELETE)
 //
 // The workflow is:
 // * If the pod is being created, record pod worker start latency
@@ -2642,13 +2642,18 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
 			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, format.Pods(u.Pods))
-			handler.HandlePodDeletions(u.Pods)
+			handler.HandlePodRemoves(u.Pods)
 		case kubetypes.RECONCILE:
 			glog.V(4).Infof("SyncLoop (RECONCILE, %q): %q", u.Source, format.Pods(u.Pods))
 			handler.HandlePodReconcile(u.Pods)
+		case kubetypes.DELETE:
+			glog.V(2).Infof("SyncLoop (DELETE, %q): %q", u.Source, format.Pods(u.Pods))
+			// DELETE is treated as a UPDATE because of graceful deletion.
+			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
+
 		}
 	case e := <-plegCh:
 		// PLEG event for a pod; sync it.
@@ -2784,9 +2789,9 @@ func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
 	}
 }
 
-// HandlePodDeletions is the callback in the SyncHandler interface for pods
-// being deleted from a config source.
-func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
+// HandlePodRemoves is the callback in the SyncHandler interface for pods
+// being removed from a config source.
+func (kl *Kubelet) HandlePodRemoves(pods []*api.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.DeletePod(pod)

@@ -80,5 +80,5 @@ func (kl *executorKubelet) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
 
 	//TODO(jdef) revisit this if/when executor failover lands
 	// Force kubelet to delete all pods.
-	kl.HandlePodDeletions(kl.GetPods())
+	kl.HandlePodRemoves(kl.GetPods())
 }
