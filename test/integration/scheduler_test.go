@@ -109,7 +109,15 @@ func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n 
 		if n, _, err := s.GetByKey(key); err == nil && passFunc(n) {
 			return true, nil
 		} else {
-			nodes = append(nodes, n.(*api.Node))
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			} else {
+				if n == nil {
+					nodes = append(nodes, nil)
+				} else {
+					nodes = append(nodes, n.(*api.Node))
+				}
+			}
 			return false, nil
 		}
 	})
