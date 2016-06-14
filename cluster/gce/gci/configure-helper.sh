@@ -65,6 +65,41 @@ function ensure-local-ssds() {
   done
 }
 
+# Installs logrotate configuration files
+function setup-logrotate() {
+  mkdir -p /etc/logrotate.d/
+  cat >/etc/logrotate.d/docker-containers <<EOF
+/var/lib/docker/containers/*/*-json.log {
+    rotate 5
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize 10M
+    daily
+    create 0644 root root
+}
+EOF
+
+  # Configuration for k8s services that redirect logs to /var/log/<service>.log
+  # files.
+  local logrotate_files=( "kube-scheduler" "kube-proxy" "kube-apiserver" "kube-controller-manager" "kube-addons" )
+  for file in "${logrotate_files[@]}" ; do
+    cat > /etc/logrotate.d/${file} <<EOF
+/var/log/${file}.log {
+    rotate 5
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize 100M
+    daily
+    create 0644 root root
+}
+EOF
+  done
+}
+
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
 function find-master-pd {
   MASTER_PD_DEVICE=""
@@ -867,6 +902,7 @@ source "${KUBE_HOME}/kube-env"
 config-ip-firewall
 create-dirs
 ensure-local-ssds
+setup-logrotate
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-master-auth
