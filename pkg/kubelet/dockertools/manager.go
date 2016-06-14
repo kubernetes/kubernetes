@@ -2352,8 +2352,8 @@ func (dm *DockerManager) GetNetNS(containerID kubecontainer.ContainerID) (string
 }
 
 // Garbage collection of dead containers
-func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
-	return dm.containerGC.GarbageCollect(gcPolicy)
+func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+	return dm.containerGC.GarbageCollect(gcPolicy, allSourcesReady)
 }
 
 func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {

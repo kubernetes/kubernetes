@@ -39,7 +39,7 @@ type ContainerGCPolicy struct {
 // Implementation is thread-compatible.
 type ContainerGC interface {
 	// Garbage collect containers.
-	GarbageCollect() error
+	GarbageCollect(allSourcesReady bool) error
 }
 
 // TODO(vmarmol): Preferentially remove pod infra containers.
@@ -63,6 +63,6 @@ func NewContainerGC(runtime Runtime, policy ContainerGCPolicy) (ContainerGC, err
 	}, nil
 }
 
-func (cgc *realContainerGC) GarbageCollect() error {
-	return cgc.runtime.GarbageCollect(cgc.policy)
+func (cgc *realContainerGC) GarbageCollect(allSourcesReady bool) error {
+	return cgc.runtime.GarbageCollect(cgc.policy, allSourcesReady)
 }
