@@ -363,10 +363,12 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 // added/updated. The item is removed from the queue (and the store) before it
 // is returned, so if you don't successfully process it, you need to add it back
 // with AddIfNotPresent().
+// process function is called under lock, so it is safe update data structures
+// in it that need to be in sync with the queue (e.g. knownKeys).
 //
 // Pop returns a 'Deltas', which has a complete list of all the things
 // that happened to the object (deltas) while it was sitting in the queue.
-func (f *DeltaFIFO) Pop() interface{} {
+func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	for {
@@ -386,7 +388,7 @@ func (f *DeltaFIFO) Pop() interface{} {
 		delete(f.items, id)
 		// Don't need to copyDeltas here, because we're transferring
 		// ownership to the caller.
-		return item
+		return item, process(item)
 	}
 }
 

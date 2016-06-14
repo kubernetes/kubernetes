@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/cache"
+	clientcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/diff"
@@ -202,8 +202,8 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// Setup stores to test pod's workflow:
 	// - queuedPodStore: pods queued before processing
 	// - scheduledPodStore: pods that has a scheduling decision
-	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
+	scheduledPodStore := clientcache.NewStore(clientcache.MetaNamespaceKeyFunc)
+	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 
 	// Port is the easiest way to cause a fit predicate failure
 	podPort := 8080
@@ -232,7 +232,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 			return nil
 		}},
 		NextPod: func() *api.Pod {
-			return queuedPodStore.Pop().(*api.Pod)
+			return clientcache.Pop(queuedPodStore).(*api.Pod)
 		},
 		Error: func(p *api.Pod, err error) {
 			t.Errorf("Unexpected error when scheduling pod %+v: %v", p, err)
