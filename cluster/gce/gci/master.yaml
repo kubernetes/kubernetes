@@ -74,6 +74,33 @@ write_files:
       [Install]
       WantedBy=kubernetes.target
 
+  - path: /etc/systemd/system/kube-logrotate.timer
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Hourly kube-logrotate invocation
+
+      [Timer]
+      OnCalendar=hourly
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-logrotate.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes log rotation
+      After=kube-master-configuration.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=-/usr/sbin/logrotate /etc/logrotate.conf
+
+      [Install]
+      WantedBy=kubernetes.target
 
   - path: /etc/systemd/system/kubernetes.target
     permissions: 0644
@@ -88,4 +115,6 @@ runcmd:
  - systemctl enable kube-master-configuration.service
  - systemctl enable kube-docker-monitor.service
  - systemctl enable kubelet-monitor.service
+ - systemctl enable kube-logrotate.timer
+ - systemctl enable kube-logrotate.service
  - systemctl start kubernetes.target
