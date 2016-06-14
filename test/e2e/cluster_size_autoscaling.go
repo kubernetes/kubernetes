@@ -42,7 +42,6 @@ const (
 	scaleDownTimeout = 15 * time.Minute
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
-	zone             = "us-central1-b"
 	gkeUpdateTimeout = 10 * time.Minute
 )
 
@@ -57,14 +56,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	BeforeEach(func() {
 		c = f.Client
 		framework.SkipUnlessProviderIs("gce", "gke")
-		if framework.ProviderIs("gke") {
-			val, err := isAutoscalerEnabled()
-			framework.ExpectNoError(err)
-			if !val {
-				err = enableAutoscaler()
-				framework.ExpectNoError(err)
-			}
-		}
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		nodeCount = len(nodes.Items)
@@ -84,6 +75,15 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			sum += size
 		}
 		Expect(nodeCount).Should(Equal(sum))
+
+		if framework.ProviderIs("gke") {
+			val, err := isAutoscalerEnabled()
+			framework.ExpectNoError(err)
+			if !val {
+				err = enableAutoscaler()
+				framework.ExpectNoError(err)
+			}
+		}
 	})
 
 	AfterEach(func() {
@@ -139,23 +139,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
-	It("should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]", func() {
-		By("Manually increase cluster size")
-		increasedSize := 0
-		newSizes := make(map[string]int)
-		for key, val := range originalSizes {
-			newSizes[key] = val + 2
-			increasedSize += val + 2
-		}
-		setMigSizes(newSizes)
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
-
-		By("Some node should be removed")
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size < increasedSize }, scaleDownTimeout))
-	})
-
 	It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		labels := map[string]string{"cluster-autoscaling-test.special-node": "true"}
 
@@ -209,6 +192,47 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "node-selector"))
+	})
+
+	It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		By("Creating new node-pool with one n1-standard-4 machine")
+		output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", "extra-pool", "--quiet",
+			"--machine-type=n1-standard-4",
+			"--num-nodes=1",
+			"--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone,
+			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+		defer exec.Command("gcloud", "alpha", "container", "node-pools", "delete", "extra-pool", "--quiet",
+			"--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone,
+			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+		framework.ExpectNoError(err)
+		glog.Infof("Creating node-pool: %s", output)
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+
+		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
+		ReserveMemory(f, "memory-reservation", 2, 2*memCapacityMb, false)
+		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+2, scaleUpTimeout))
+	})
+
+	It("should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]", func() {
+		By("Manually increase cluster size")
+		increasedSize := 0
+		newSizes := make(map[string]int)
+		for key, val := range originalSizes {
+			newSizes[key] = val + 2
+			increasedSize += val + 2
+		}
+		setMigSizes(newSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
+
+		By("Some node should be removed")
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size < increasedSize }, scaleDownTimeout))
 	})
 })
 
