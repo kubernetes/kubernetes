@@ -1,8 +1,3 @@
-ambassador:
-  image: cpuguy83/docker-grand-ambassador:0.9.1
-  volumes:
-  - /var/run/docker.sock:/var/run/docker.sock
-  command: "-name dind_apiserver_1"
 etcd:
   hostname: etcd
   image: gcr.io/google_containers/etcd-amd64:2.2.5
@@ -49,8 +44,7 @@ node:
   volumes:
   - ${DOCKER_IN_DOCKER_STORAGE_DIR}:/var/lib/docker
   links:
-  - etcd
-  - "ambassador:apiserver"
+  - apiserver
 apiserver:
   hostname: apiserver
   image: k8s.io/kubernetes-dind
