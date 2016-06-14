@@ -2821,7 +2821,6 @@
     "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
     "required": [
      "kind",
-     "apiVersion",
      "name"
     ],
     "properties": {
@@ -2831,7 +2830,7 @@
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion holds the API group and version of the referenced object. For non-object references such as \"Group\" and \"User\" this is expected to be API version of this API group. For example \"rbac/v1alpha1\"."
+      "description": "APIVersion holds the API group and version of the referenced object."
      },
      "name": {
       "type": "string",
