@@ -184,29 +184,32 @@ func (s *ServiceController) init() error {
 // Loop infinitely, processing all service updates provided by the queue.
 func (s *ServiceController) watchServices(serviceQueue *cache.DeltaFIFO) {
 	for {
-		newItem := serviceQueue.Pop()
-		deltas, ok := newItem.(cache.Deltas)
-		if !ok {
-			glog.Errorf("Received object from service watcher that wasn't Deltas: %+v", newItem)
-		}
-		delta := deltas.Newest()
-		if delta == nil {
-			glog.Errorf("Received nil delta from watcher queue.")
-			continue
-		}
-		err, retryDelay := s.processDelta(delta)
-		if retryDelay != 0 {
-			// Add the failed service back to the queue so we'll retry it.
-			glog.Errorf("Failed to process service delta. Retrying in %s: %v", retryDelay, err)
-			go func(deltas cache.Deltas, delay time.Duration) {
-				time.Sleep(delay)
-				if err := serviceQueue.AddIfNotPresent(deltas); err != nil {
-					glog.Errorf("Error requeuing service delta - will not retry: %v", err)
-				}
-			}(deltas, retryDelay)
-		} else if err != nil {
-			runtime.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))
-		}
+		serviceQueue.Pop(func(obj interface{}) error {
+			deltas, ok := obj.(cache.Deltas)
+			if !ok {
+				runtime.HandleError(fmt.Errorf("Received object from service watcher that wasn't Deltas: %+v", obj))
+				return nil
+			}
+			delta := deltas.Newest()
+			if delta == nil {
+				runtime.HandleError(fmt.Errorf("Received nil delta from watcher queue."))
+				return nil
+			}
+			err, retryDelay := s.processDelta(delta)
+			if retryDelay != 0 {
+				// Add the failed service back to the queue so we'll retry it.
+				runtime.HandleError(fmt.Errorf("Failed to process service delta. Retrying in %s: %v", retryDelay, err))
+				go func(deltas cache.Deltas, delay time.Duration) {
+					time.Sleep(delay)
+					if err := serviceQueue.AddIfNotPresent(deltas); err != nil {
+						runtime.HandleError(fmt.Errorf("Error requeuing service delta - will not retry: %v", err))
+					}
+				}(deltas, retryDelay)
+			} else if err != nil {
+				runtime.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))
+			}
+			return nil
+		})
 	}
 }
 

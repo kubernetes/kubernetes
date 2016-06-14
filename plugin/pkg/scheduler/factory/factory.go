@@ -415,7 +415,7 @@ func (f *ConfigFactory) Run() {
 
 func (f *ConfigFactory) getNextPod() *api.Pod {
 	for {
-		pod := f.PodQueue.Pop().(*api.Pod)
+		pod := cache.Pop(f.PodQueue).(*api.Pod)
 		if f.responsibleForPod(pod) {
 			glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
 			return pod

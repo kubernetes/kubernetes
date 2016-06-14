@@ -52,7 +52,7 @@ func TestFIFO_basic(t *testing.T) {
 	lastInt := int(0)
 	lastUint := uint64(0)
 	for i := 0; i < amount*2; i++ {
-		switch obj := f.Pop().(testFifoObject).val.(type) {
+		switch obj := Pop(f).(testFifoObject).val.(type) {
 		case int:
 			if obj <= lastInt {
 				t.Errorf("got %v (int) out of order, last was %v", obj, lastInt)
@@ -85,7 +85,7 @@ func TestFIFO_addUpdate(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			got <- f.Pop().(testFifoObject)
+			got <- Pop(f).(testFifoObject)
 		}
 	}()
 
@@ -111,7 +111,7 @@ func TestFIFO_addReplace(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			got <- f.Pop().(testFifoObject)
+			got <- Pop(f).(testFifoObject)
 		}
 	}()
 
@@ -139,21 +139,21 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 	f.Add(mkFifoObj("foo", 13))
 	f.Add(mkFifoObj("zab", 30))
 
-	if e, a := 13, f.Pop().(testFifoObject).val; a != e {
+	if e, a := 13, Pop(f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 
 	f.Add(mkFifoObj("foo", 14)) // ensure foo doesn't jump back in line
 
-	if e, a := 1, f.Pop().(testFifoObject).val; a != e {
+	if e, a := 1, Pop(f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 
-	if e, a := 30, f.Pop().(testFifoObject).val; a != e {
+	if e, a := 30, Pop(f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 
-	if e, a := 14, f.Pop().(testFifoObject).val; a != e {
+	if e, a := 14, Pop(f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 }
@@ -172,7 +172,7 @@ func TestFIFO_addIfNotPresent(t *testing.T) {
 
 	expectedValues := []int{1, 2, 4}
 	for _, expected := range expectedValues {
-		if actual := f.Pop().(testFifoObject).val; actual != expected {
+		if actual := Pop(f).(testFifoObject).val; actual != expected {
 			t.Fatalf("expected value %d, got %d", expected, actual)
 		}
 	}
@@ -208,15 +208,15 @@ func TestFIFO_HasSynced(t *testing.T) {
 		{
 			actions: []func(f *FIFO){
 				func(f *FIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *FIFO) { f.Pop() },
+				func(f *FIFO) { Pop(f) },
 			},
 			expectedSynced: false,
 		},
 		{
 			actions: []func(f *FIFO){
 				func(f *FIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *FIFO) { f.Pop() },
-				func(f *FIFO) { f.Pop() },
+				func(f *FIFO) { Pop(f) },
+				func(f *FIFO) { Pop(f) },
 			},
 			expectedSynced: true,
 		},
