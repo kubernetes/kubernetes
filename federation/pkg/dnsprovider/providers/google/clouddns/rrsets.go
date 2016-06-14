@@ -36,7 +36,7 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	}
 	list := make([]dnsprovider.ResourceRecordSet, len(response.Rrsets()))
 	for i, rrset := range response.Rrsets() {
-		list[i] = &ResourceRecordSet{rrset, &rrsets}
+		list[i] = ResourceRecordSet{rrset, &rrsets}
 	}
 	return list, nil
 }

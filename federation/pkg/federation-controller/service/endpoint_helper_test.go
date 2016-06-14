@@ -29,9 +29,11 @@ var fakeDns, _ = clouddns.NewFakeInterface() // No need to check for unsupported
 var fakeDnsZones, _ = fakeDns.Zones()
 
 var fakeServiceController = ServiceController{
-	dns:          fakeDns,
-	dnsZones:     fakeDnsZones,
-	serviceCache: &serviceCache{fedServiceMap: make(map[string]*cachedService)},
+	dns:            fakeDns,
+	dnsZones:       fakeDnsZones,
+	federationName: "fed1",
+	zoneName:       "example.com",
+	serviceCache:   &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 	clusterCache: &clusterClientCache{
 		clientMap: make(map[string]*clusterCache),
 	},
@@ -52,8 +54,18 @@ func buildEndpoint(subsets [][]string) *v1.Endpoints {
 }
 
 func TestProcessEndpointUpdate(t *testing.T) {
+	clusterName := "foo"
 	cc := clusterClientCache{
-		clientMap: make(map[string]*clusterCache),
+		clientMap: map[string]*clusterCache{
+			clusterName: {
+				cluster: &v1alpha1.Cluster{
+					Status: v1alpha1.ClusterStatus{
+						Zones:  []string{"foozone"},
+						Region: "fooregion",
+					},
+				},
+			},
+		},
 	}
 	tests := []struct {
 		name          string
@@ -69,7 +81,7 @@ func TestProcessEndpointUpdate(t *testing.T) {
 				endpointMap: make(map[string]int),
 			},
 			buildEndpoint([][]string{{"ip1", ""}}),
-			"foo",
+			clusterName,
 			1,
 		},
 		{
@@ -81,11 +93,11 @@ func TestProcessEndpointUpdate(t *testing.T) {
 				},
 			},
 			buildEndpoint([][]string{{"ip1", ""}}),
-			"foo",
+			clusterName,
 			1,
 		},
 	}
-
+	fakeServiceController.clusterCache = &cc
 	for _, test := range tests {
 		cc.processEndpointUpdate(test.cachedService, test.endpoint, test.clusterName, &fakeServiceController)
 		if test.expectResult != test.cachedService.endpointMap[test.clusterName] {

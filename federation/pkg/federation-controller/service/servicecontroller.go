@@ -76,7 +76,7 @@ type cachedService struct {
 	appliedState *v1.Service
 	// cluster endpoint map hold subset info from kubernetes clusters
 	// key clusterName
-	// value is a flag that if there is ready address, 1 means there is ready address, 0 means no ready address
+	// value is a flag that if there is ready address, 1 means there is ready address
 	endpointMap map[string]int
 	// serviceStatusMap map holds service status info from kubernetes clusters, keyed on clusterName
 	serviceStatusMap map[string]v1.LoadBalancerStatus
@@ -101,6 +101,7 @@ type ServiceController struct {
 	dns              dnsprovider.Interface
 	federationClient federation_release_1_3.Interface
 	federationName   string
+	zoneName         string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
 	dnsZones     dnsprovider.Zones
 	serviceCache *serviceCache
@@ -123,7 +124,7 @@ type ServiceController struct {
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
-func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Interface) *ServiceController {
+func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -132,6 +133,8 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 	s := &ServiceController{
 		dns:              dns,
 		federationClient: federationClient,
+		federationName:   federationName,
+		zoneName:         zoneName,
 		serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 		clusterCache: &clusterClientCache{
 			rwlock:    sync.Mutex{},
@@ -227,6 +230,9 @@ func (s *ServiceController) enqueueService(obj interface{}) {
 // It's an error to call Run() more than once for a given ServiceController
 // object.
 func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
+	if err := s.init(); err != nil {
+		return err
+	}
 	defer runtime.HandleCrash()
 	go s.serviceController.Run(stopCh)
 	go s.clusterController.Run(stopCh)
@@ -239,6 +245,24 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 	<-stopCh
 	glog.Infof("Shutting down Federation Service Controller")
 	s.queue.ShutDown()
+	return nil
+}
+
+func (s *ServiceController) init() error {
+	if s.federationName == "" {
+		return fmt.Errorf("ServiceController should not be run without federationName.")
+	}
+	if s.zoneName == "" {
+		return fmt.Errorf("ServiceController should not be run without zoneName.")
+	}
+	if s.dns == nil {
+		return fmt.Errorf("ServiceController should not be run without a dnsprovider.")
+	}
+	zones, ok := s.dns.Zones()
+	if !ok {
+		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
+	}
+	s.dnsZones = zones
 	return nil
 }
 
@@ -317,6 +341,8 @@ func (s *ServiceController) deleteFederationService(cachedService *cachedService
 		err := s.deleteClusterService(clusterName, cachedService, cluster.clientset)
 		if err != nil {
 			hasErr = true
+		} else if err := s.ensureDnsRecords(clusterName, cachedService); err != nil {
+			hasErr = true
 		}
 	}
 	if hasErr {
@@ -334,6 +360,7 @@ func (s *ServiceController) deleteClusterService(clusterName string, cachedServi
 		err = clientset.Core().Services(service.Namespace).Delete(service.Name, &api.DeleteOptions{})
 		if err == nil || errors.IsNotFound(err) {
 			glog.V(4).Infof("Service %s/%s deleted from cluster %s", service.Namespace, service.Name, clusterName)
+			delete(cachedService.endpointMap, clusterName)
 			return nil
 		}
 		time.Sleep(cachedService.nextRetryDelay())
