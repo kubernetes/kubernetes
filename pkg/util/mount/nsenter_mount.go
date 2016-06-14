@@ -88,7 +88,7 @@ var _ = Interface(&NsenterMounter{})
 
 const (
 	hostRootFsPath     = "/rootfs"
-	hostProcMountsPath = "/rootfs/proc/mounts"
+	hostProcMountsPath = "/rootfs/proc/1/mounts"
 	nsenterPath        = "nsenter"
 )
 
