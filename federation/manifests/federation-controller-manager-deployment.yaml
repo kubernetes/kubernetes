@@ -21,6 +21,8 @@ spec:
         - --master=https://{{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}:443
         - --dns-provider={{.FEDERATION_DNS_PROVIDER}}
         - --dns-provider-config={{.FEDERATION_DNS_PROVIDER_CONFIG}}
+        - --federation-name={{.FEDERATION_NAME}}
+        - --zone-name={{.DNS_ZONE_NAME}}
         ports:
         - containerPort: 443
           name: https
