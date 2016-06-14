@@ -40,7 +40,6 @@ import (
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 //
-// +gencopy=true
 // +protobuf=true
 type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
@@ -93,7 +92,6 @@ const (
 // in the Object. (TODO: In the case where the object is of an unknown type, a
 // runtime.Unknown object will be created and stored.)
 //
-// +gencopy=true
 // +protobuf=true
 type RawExtension struct {
 	// Raw is the underlying serialization of this object.
@@ -111,7 +109,6 @@ type RawExtension struct {
 // TODO: Make this object have easy access to field based accessors and settors for
 // metadata and field mutatation.
 //
-// +gencopy=true
 // +protobuf=true
 type Unknown struct {
 	TypeMeta `json:",inline" protobuf:"bytes,1,opt,name=typeMeta"`
