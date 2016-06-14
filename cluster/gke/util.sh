@@ -128,6 +128,7 @@ function validate-cluster {
 #   ADDITIONAL_ZONES (optional)
 #   NODE_SCOPES
 #   MACHINE_TYPE
+#   HEAPSTER_MACHINE_TYPE (optional)
 #   CLUSTER_IP_RANGE (optional)
 #   GKE_CREATE_FLAGS (optional, space delineated)
 function kube-up() {
@@ -155,12 +156,26 @@ function kube-up() {
     echo "... Using firewall-rule: ${FIREWALL_SSH}" >&2
   fi
 
-  local create_args=(
+  local shared_args=(
     "--zone=${ZONE}"
     "--project=${PROJECT}"
-    "--num-nodes=${NUM_NODES}"
-    "--network=${NETWORK}"
     "--scopes=${NODE_SCOPES}"
+  )
+
+  if [[ ! -z "${IMAGE_TYPE:-}" ]]; then
+    shared_args+=("--image-type=${IMAGE_TYPE}")
+  fi
+
+  if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    local -r nodes="${NUM_NODES}"
+  else
+    local -r nodes=$(( NUM_NODES - 1 ))
+  fi
+
+  local create_args=(
+    ${shared_args[@]}
+    "--num-nodes=${nodes}"
+    "--network=${NETWORK}"
     "--cluster-version=${CLUSTER_API_VERSION}"
     "--machine-type=${MACHINE_TYPE}"
   )
@@ -173,14 +188,14 @@ function kube-up() {
     create_args+=("--cluster-ipv4-cidr=${CLUSTER_IP_RANGE}")
   fi
 
-  if [[ ! -z "${IMAGE_TYPE:-}" ]]; then
-    create_args+=("--image-type=${IMAGE_TYPE}")
-  fi
-
   create_args+=( ${GKE_CREATE_FLAGS:-} )
 
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
+
+  if [[ ! -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    "${GCLOUD}" ${CMD_GROUP:-} container node-pools create "heapster-pool" --cluster "${CLUSTER_NAME}" --num-nodes=1 --machine-type="${HEAPSTER_MACHINE_TYPE}" "${shared_args[@]}"
+  fi
 }
 
 # Execute prior to running tests to initialize required structure. This is
