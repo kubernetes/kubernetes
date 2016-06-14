@@ -3221,7 +3221,7 @@ func TestGetPodsToSync(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("expected pod not found: %+v", expect)
+				t.Errorf("expected pod not found: %#v", expect)
 			}
 		}
 	} else {

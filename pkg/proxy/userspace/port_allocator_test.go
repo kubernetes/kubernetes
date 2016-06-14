@@ -28,7 +28,7 @@ func TestRangeAllocatorEmpty(t *testing.T) {
 	r.Set("0-0")
 	defer func() {
 		if rv := recover(); rv == nil {
-			t.Fatalf("expected panic because of empty port range: %+v", r)
+			t.Fatalf("expected panic because of empty port range: %#v", r)
 		}
 	}()
 	_ = newPortRangeAllocator(*r)
