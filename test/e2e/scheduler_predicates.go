@@ -297,7 +297,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
-			if found && pod.Status.Phase == api.PodRunning {
+			if found && pod.Status.Phase != api.PodSucceeded && pod.Status.Phase != api.PodFailed {
 				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
