@@ -93,6 +93,7 @@ function create-federation-api-objects {
     #We will use loadbalancer services where we can
     export FEDERATION_API_NODEPORT=32111
     export FEDERATION_NAMESPACE
+    export FEDERATION_NAME="${FEDERATION_NAME:-federation}"
 
     template="go run ${KUBE_ROOT}/federation/cluster/template.go"
 
