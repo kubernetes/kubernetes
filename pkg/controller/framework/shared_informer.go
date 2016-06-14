@@ -76,6 +76,7 @@ func NewSharedIndexInformer(lw cache.ListerWatcher, objType runtime.Object, resy
 
 type sharedIndexInformer struct {
 	indexer    cache.Indexer
+	syncStore  *cache.SyncStore
 	controller *Controller
 
 	processor *sharedProcessor
@@ -121,7 +122,8 @@ type deleteNotification struct {
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, s.indexer)
+	s.syncStore = cache.NewSyncStore(s.indexer)
+	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, s.syncStore)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -203,18 +205,18 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 		switch d.Type {
 		case cache.Sync, cache.Added, cache.Updated:
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
-				if err := s.indexer.Update(d.Object); err != nil {
+				if err := s.syncStore.Update(d.Object); err != nil {
 					return err
 				}
 				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object})
 			} else {
-				if err := s.indexer.Add(d.Object); err != nil {
+				if err := s.syncStore.Add(d.Object); err != nil {
 					return err
 				}
 				s.processor.distribute(addNotification{newObj: d.Object})
 			}
 		case cache.Deleted:
-			if err := s.indexer.Delete(d.Object); err != nil {
+			if err := s.syncStore.Delete(d.Object); err != nil {
 				return err
 			}
 			s.processor.distribute(deleteNotification{oldObj: d.Object})

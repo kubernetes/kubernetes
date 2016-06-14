@@ -217,7 +217,7 @@ func NewInformer(
 	h ResourceEventHandler,
 ) (cache.Store, *Controller) {
 	// This will hold the client state, as we know it.
-	clientState := cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	clientState := cache.NewSyncStore(cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc))
 
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
@@ -283,7 +283,7 @@ func NewIndexerInformer(
 	indexers cache.Indexers,
 ) (cache.Indexer, *Controller) {
 	// This will hold the client state, as we know it.
-	clientState := cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
+	clientState := cache.NewSyncStore(cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers))
 
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
@@ -323,5 +323,5 @@ func NewIndexerInformer(
 			return nil
 		},
 	}
-	return clientState, New(cfg)
+	return clientState.Store.(cache.Indexer), New(cfg)
 }

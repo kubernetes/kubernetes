@@ -136,7 +136,7 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 	// and updates of services.
 	// A delta compressor is needed for the DeltaFIFO queue because we only ever
 	// care about the most recent state.
-	serviceQueue := cache.NewDeltaFIFO(
+	serviceQueue := cache.NewDeltaFIFOWithKeyListerGetter(
 		cache.MetaNamespaceKeyFunc,
 		cache.DeltaCompressorFunc(func(d cache.Deltas) cache.Deltas {
 			if len(d) == 0 {
