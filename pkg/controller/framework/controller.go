@@ -208,55 +208,15 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 //    long as possible (until the upstream source closes the watch or times out,
 //    or you stop the controller).
 //  * h is the object you want notifications sent to.
-//
 func NewInformer(
 	lw cache.ListerWatcher,
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
 ) (cache.Store, *Controller) {
-	// This will hold the client state, as we know it.
-	clientState := cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc)
-
-	// This will hold incoming changes. Note how we pass clientState in as a
-	// KeyLister, that way resync operations will result in the correct set
-	// of update/delete deltas.
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: func(obj interface{}) error {
-			// from oldest to newest
-			for _, d := range obj.(cache.Deltas) {
-				switch d.Type {
-				case cache.Sync, cache.Added, cache.Updated:
-					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
-						if err := clientState.Update(d.Object); err != nil {
-							return err
-						}
-						h.OnUpdate(old, d.Object)
-					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
-						}
-						h.OnAdd(d.Object)
-					}
-				case cache.Deleted:
-					if err := clientState.Delete(d.Object); err != nil {
-						return err
-					}
-					h.OnDelete(d.Object)
-				}
-			}
-			return nil
-		},
-	}
-	return clientState, New(cfg)
+	informer := newCoreInformer(lw, objType, resyncPeriod, cache.Indexers{})
+	informer.addEventHandler(h)
+	return informer.GetIndexer(), informer.controller
 }
 
 // NewIndexerInformer returns a cache.Indexer and a controller for populating the index
@@ -273,7 +233,6 @@ func NewInformer(
 //    long as possible (until the upstream source closes the watch or times out,
 //    or you stop the controller).
 //  * h is the object you want notifications sent to.
-//
 func NewIndexerInformer(
 	lw cache.ListerWatcher,
 	objType runtime.Object,
@@ -281,46 +240,7 @@ func NewIndexerInformer(
 	h ResourceEventHandler,
 	indexers cache.Indexers,
 ) (cache.Indexer, *Controller) {
-	// This will hold the client state, as we know it.
-	clientState := cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
-
-	// This will hold incoming changes. Note how we pass clientState in as a
-	// KeyLister, that way resync operations will result in the correct set
-	// of update/delete deltas.
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: func(obj interface{}) error {
-			// from oldest to newest
-			for _, d := range obj.(cache.Deltas) {
-				switch d.Type {
-				case cache.Sync, cache.Added, cache.Updated:
-					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
-						if err := clientState.Update(d.Object); err != nil {
-							return err
-						}
-						h.OnUpdate(old, d.Object)
-					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
-						}
-						h.OnAdd(d.Object)
-					}
-				case cache.Deleted:
-					if err := clientState.Delete(d.Object); err != nil {
-						return err
-					}
-					h.OnDelete(d.Object)
-				}
-			}
-			return nil
-		},
-	}
-	return clientState, New(cfg)
+	informer := newCoreInformer(lw, objType, resyncPeriod, indexers)
+	informer.addEventHandler(h)
+	return informer.GetIndexer(), informer.controller
 }
