@@ -24,7 +24,7 @@ import (
 
 // helper function to reduce stuttering
 func testPop(f *DeltaFIFO) testFifoObject {
-	return f.Pop().(Deltas).Newest().Object.(testFifoObject)
+	return Pop(f).(Deltas).Newest().Object.(testFifoObject)
 }
 
 // keyLookupFunc adapts a raw function to be a KeyLookup.
@@ -104,7 +104,7 @@ func TestDeltaFIFO_compressorWorks(t *testing.T) {
 	if e, a := expect, oldestTypes; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	if e, a := (Deltas{{Added, mkFifoObj("foo", 25)}}), f.Pop().(Deltas); !reflect.DeepEqual(e, a) {
+	if e, a := (Deltas{{Added, mkFifoObj("foo", 25)}}), Pop(f).(Deltas); !reflect.DeepEqual(e, a) {
 		t.Fatalf("Expected %#v, got %#v", e, a)
 	}
 
@@ -126,7 +126,7 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			obj := f.Pop().(Deltas).Newest().Object.(testFifoObject)
+			obj := testPop(f)
 			t.Logf("got a thing %#v", obj)
 			t.Logf("D len: %v", len(f.queue))
 			got <- obj
@@ -240,7 +240,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := f.Pop().(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -279,9 +279,9 @@ func TestDeltaFIFO_addIfNotPresent(t *testing.T) {
 	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
 
 	f.Add(mkFifoObj("b", 3))
-	b3 := f.Pop()
+	b3 := Pop(f)
 	f.Add(mkFifoObj("c", 4))
-	c4 := f.Pop()
+	c4 := Pop(f)
 	if e, a := 0, len(f.items); e != a {
 		t.Fatalf("Expected %v, got %v items in queue", e, a)
 	}
@@ -358,15 +358,15 @@ func TestDeltaFIFO_HasSynced(t *testing.T) {
 		{
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *DeltaFIFO) { f.Pop() },
+				func(f *DeltaFIFO) { Pop(f) },
 			},
 			expectedSynced: false,
 		},
 		{
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *DeltaFIFO) { f.Pop() },
-				func(f *DeltaFIFO) { f.Pop() },
+				func(f *DeltaFIFO) { Pop(f) },
+				func(f *DeltaFIFO) { Pop(f) },
 			},
 			expectedSynced: true,
 		},
