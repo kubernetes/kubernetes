@@ -5,9 +5,12 @@
 {% set metrics_memory_per_node = 4 -%}
 {% set eventer_memory_per_node = 500 -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
+{% set nanny_memory = "90Mi" -%}
+{% set nanny_memory_per_node = 200 -%}
 {% if num_nodes >= 0 -%}
   {% set metrics_memory = (200 + num_nodes * metrics_memory_per_node)|string + "Mi" -%}
   {% set eventer_memory = (200 * 1024 + num_nodes * eventer_memory_per_node)|string + "Ki" -%}
+  {% set nanny_memory = (90 * 1024 + num_nodes * nanny_memory_per_node)|string + "Ki" -%}
 {% endif -%}
 
 apiVersion: extensions/v1beta1
@@ -74,10 +77,10 @@ spec:
           resources:
             limits:
               cpu: 50m
-              memory: 100Mi
+              memory: {{ nanny_memory }}
             requests:
               cpu: 50m
-              memory: 100Mi
+              memory: {{ nanny_memory }}
           env:
             - name: MY_POD_NAME
               valueFrom:
@@ -103,10 +106,10 @@ spec:
           resources:
             limits:
               cpu: 50m
-              memory: 100Mi
+              memory: {{ nanny_memory }}
             requests:
               cpu: 50m
-              memory: 100Mi
+              memory: {{ nanny_memory }}
           env:
             - name: MY_POD_NAME
               valueFrom:
