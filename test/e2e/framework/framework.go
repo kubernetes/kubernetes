@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
@@ -57,7 +58,9 @@ type Framework struct {
 	Clientset_1_2      *release_1_2.Clientset
 	Clientset_1_3      *release_1_3.Clientset
 
-	FederationClientset *federation_internalclientset.Clientset
+	// TODO(mml): Remove this.  We should generally use the versioned clientset.
+	FederationClientset     *federation_internalclientset.Clientset
+	FederationClientset_1_3 *federation_release_1_3.Clientset
 	// TODO: remove FederationClient, all the client access must be through FederationClientset
 	FederationClient *unversionedfederation.FederationClient
 
@@ -163,9 +166,15 @@ func (f *Framework) BeforeEach() {
 			Expect(err).NotTo(HaveOccurred())
 		}
 		if f.FederationClientset == nil {
-			By("Creating a federation Clientset")
+			By("Creating an unversioned federation Clientset")
 			var err error
 			f.FederationClientset, err = LoadFederationClientset()
+			Expect(err).NotTo(HaveOccurred())
+		}
+		if f.FederationClientset_1_3 == nil {
+			By("Creating a release 1.3 federation Clientset")
+			var err error
+			f.FederationClientset_1_3, err = LoadFederationClientset_1_3()
 			Expect(err).NotTo(HaveOccurred())
 		}
 	}
