@@ -46,19 +46,21 @@ cleanup() {
 runTests() {
   kube::etcd::start
 
-  kube::log::status "Running integration test cases"
+  # kube::log::status "Running integration test cases"
 
-  # TODO: Re-enable race detection when we switch to a thread-safe etcd client
-  # KUBE_RACE="-race"
-  KUBE_GOFLAGS="-tags 'integration no-docker' " \
-    KUBE_RACE="" \
-    KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
-    KUBE_TEST_API_VERSIONS="$1" \
-    "${KUBE_ROOT}/hack/test-go.sh" test/integration
+  # # TODO: Re-enable race detection when we switch to a thread-safe etcd client
+  # # KUBE_RACE="-race"
+  # KUBE_GOFLAGS="-tags 'integration no-docker' " \
+  #   KUBE_RACE="" \
+  #   KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
+  #   KUBE_TEST_API_VERSIONS="$1" \
+  #   "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
-  kube::log::status "Running integration test scenario with watch cache on"
-  KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
-    --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}" --watch-cache=true
+  # kube::log::status "Running integration test scenario with watch cache on"
+  # KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
+  #   --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}" --watch-cache=true
+
+  sleep 6000000
 
   cleanup
 }

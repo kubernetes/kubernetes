@@ -267,6 +267,55 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	}
 }
 
+// TestPersistentVolumeClaimLabelSelector test binding using label selectors
+func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	defer watchPV.Stop()
+	defer watchPVC.Stop()
+
+	controller.Run()
+	defer controller.Stop()
+
+	var (
+		err     error
+		modes   = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+		reclaim = api.PersistentVolumeReclaimRetain
+
+		pv  = createPV("pv-ls-1", "/tmp/foo-label", "1G", modes, reclaim)
+		pvc = createPVC("pvc-ls-1", "1G", modes)
+	)
+
+	t.Log("creating PV")
+
+	_, err = testClient.PersistentVolumes().Create(pv)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolume: %v", err)
+	}
+
+	_, err = testClient.PersistentVolumeClaims().Create(pvc)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolumeClaim: %v", err)
+	}
+
+	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
+
+	pv, err = testClient.PersistentVolumes().Get(pv.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef == nil {
+		t.Fatalf("Unexpected nil claimRef")
+	}
+	if pv.Spec.ClaimRef.Namespace != claimRef.Namespace || pv.Spec.ClaimRef.Name != claimRef.Name {
+		t.Fatalf("Bind mismatch! Expected %s/%s but got %s/%s", claimRef.Namespace, claimRef.Name, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	}
+
+}
+
 // TestPersistentVolumeMultiPVs tests binding of one PVC to 100 PVs with
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
