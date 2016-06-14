@@ -181,6 +181,11 @@ function kube-up() {
 
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
+
+  if [[ ! -z "${HEAPSTER_MACHINE:-}" ]]; then
+    "${GCLOUD}" ${CMD_GROUP:-} container node-pools create "heapster-node-pool" --image-type="???" --machine-type="${HEAPSTER_MACHINE}"
+    # Probably some other flags.
+	fi
 }
 
 # Execute prior to running tests to initialize required structure. This is
