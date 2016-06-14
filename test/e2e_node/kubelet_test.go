@@ -38,9 +38,8 @@ import (
 )
 
 var _ = framework.KubeDescribe("Kubelet", func() {
+	f := NewDefaultFramework("kubelet-test")
 	Context("when scheduling a busybox command in a pod", func() {
-		// Setup the framework
-		f := NewDefaultFramework("pod-scheduling")
 		podName := "busybox-scheduling-" + string(util.NewUUID())
 		It("it should print the output to logs", func() {
 			podClient := f.Client.Pods(f.Namespace.Name)
@@ -81,7 +80,6 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 
 	Context("when scheduling a read only busybox container", func() {
-		f := NewDefaultFramework("pod-scheduling")
 		podName := "busybox-readonly-fs" + string(util.NewUUID())
 		It("it should not write to root filesystem", func() {
 			podClient := f.Client.Pods(f.Namespace.Name)
@@ -123,8 +121,6 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 	})
 	Describe("metrics api", func() {
-		// Setup the framework
-		f := NewDefaultFramework("kubelet-metrics-api")
 		Context("when querying /stats/summary", func() {
 			It("it should report resource usage through the stats api", func() {
 				podNamePrefix := "stats-busybox-" + string(util.NewUUID())

@@ -19,9 +19,6 @@ package e2e_node
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -34,20 +31,13 @@ const (
 )
 
 var _ = Describe("Image Container Conformance Test", func() {
-	var cl *client.Client
-
-	BeforeEach(func() {
-		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
-	})
-
 	Describe("[FLAKY] image conformance blackbox test", func() {
 		Context("when testing images that exist", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {
 				existImageTags := []string{
-					NoPullImagRegistry[pullTestExecHealthz],
-					NoPullImagRegistry[pullTestAlpineWithBash],
+					NoPullImageRegistry[pullTestExecHealthz],
+					NoPullImageRegistry[pullTestAlpineWithBash],
 				}
 				for _, existImageTag := range existImageTags {
 					conformImage, _ := NewConformanceImage("docker", existImageTag)
