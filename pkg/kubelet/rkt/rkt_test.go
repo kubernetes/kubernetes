@@ -1755,6 +1755,10 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 			out: &appcschema.PodManifest{
 				Annotations: []appctypes.Annotation{
 					{
+						Name:  "io.kubernetes.container.name",
+						Value: "POD",
+					},
+					{
 						Name:  appctypes.ACIdentifier(k8sRktStage1NameAnno),
 						Value: "stage1-override-img",
 					},
@@ -1787,11 +1791,11 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 		hint := fmt.Sprintf("case #%d", i)
 
 		result, err := r.makePodManifest(testCase.in, "", []api.Secret{})
-		assert.Equal(t, err, testCase.outerr, hint)
+		assert.Equal(t, testCase.outerr, err, hint)
 		if err == nil {
 			sort.Sort(annotationsByName(result.Annotations))
 			sort.Sort(annotationsByName(testCase.out.Annotations))
-			assert.Equal(t, result.Annotations, testCase.out.Annotations, hint)
+			assert.Equal(t, testCase.out.Annotations, result.Annotations, hint)
 		}
 	}
 }
