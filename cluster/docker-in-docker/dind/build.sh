@@ -51,7 +51,10 @@ kube_bin_path=$(dirname ${hyperkube_path})
 
 # download nsenter and socat
 overlay_dir=${DOCKER_IN_DOCKER_OVERLAY_DIR:-${script_dir}/overlay}
-mkdir -p "${overlay_dir}"
+if [ ! -d "${overlay_dir}" ]; then
+  mkdir "${overlay_dir}"
+  ! selinuxenabled 2>&1 || sudo chcon -Rt svirt_sandbox_file_t "${overlay_dir}"
+fi
 docker run --rm -v "${overlay_dir}:/target" jpetazzo/nsenter
 docker run --rm -v "${overlay_dir}:/target" mesosphere/kubernetes-socat
 

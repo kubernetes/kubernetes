@@ -199,6 +199,7 @@ function cluster::docker_in_docker::init_auth {
   # Nuke old auth
   echo "Creating Auth Dir: ${auth_dir}" 1>&2
   mkdir -p "${auth_dir}"
+  ! selinuxenabled 2>&1 || sudo chcon -Rt svirt_sandbox_file_t "${auth_dir}"
   rm -rf "${auth_dir}"/*
 
   echo "Creating Service Accounts Key: ${auth_dir}/service-accounts-key.pem" 1>&2
