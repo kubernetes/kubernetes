@@ -38,8 +38,10 @@ const (
 	pauseImage
 
 	// Images just used for explicitly testing pulling of images
-	pullTestExecHealthz
+	pullTestAlpine
 	pullTestAlpineWithBash
+	pullTestAuthenticatedAlpine
+	pullTestExecHealthz
 )
 
 var ImageRegistry = map[int]string{
@@ -51,9 +53,11 @@ var ImageRegistry = map[int]string{
 }
 
 // These are used by tests that explicitly test the ability to pull images
-var NoPullImagRegistry = map[int]string{
-	pullTestAlpineWithBash: "gcr.io/google_containers/alpine-with-bash:1.0",
-	pullTestExecHealthz:    "gcr.io/google_containers/exechealthz:1.0",
+var NoPullImageRegistry = map[int]string{
+	pullTestExecHealthz:         "gcr.io/google_containers/exechealthz:1.0",
+	pullTestAlpine:              "alpine:3.1",
+	pullTestAlpineWithBash:      "gcr.io/google_containers/alpine-with-bash:1.0",
+	pullTestAuthenticatedAlpine: "gcr.io/authenticated-image-pulling/alpine:3.1",
 }
 
 // Pre-fetch all images tests depend on so that we don't fail in an actual test

@@ -36,8 +36,8 @@ var _ = Describe("Image Container Conformance Test", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {
 				existImageTags := []string{
-					NoPullImagRegistry[pullTestExecHealthz],
-					NoPullImagRegistry[pullTestAlpineWithBash],
+					NoPullImageRegistry[pullTestExecHealthz],
+					NoPullImageRegistry[pullTestAlpineWithBash],
 				}
 				for _, existImageTag := range existImageTags {
 					conformImage, _ := NewConformanceImage("docker", existImageTag)
