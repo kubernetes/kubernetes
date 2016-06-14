@@ -25,6 +25,7 @@ script
 		-o /etc/kube-configure.sh \
 		http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
 	. /etc/kube-configure.sh
+	set_broken_motd
 	echo "Downloading kube-env file"
 	download_kube_env
 	. /etc/kube-env
@@ -221,6 +222,7 @@ script
 	if [ -n "${TEST_ADDON_CHECK_INTERVAL_SEC:-}" ]; then
 		export TEST_ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC}
 	fi
+	reset_motd
 	# Run the script to start and monitoring addon manifest changes.
 	exec /var/lib/cloud/scripts/kubernetes/kube-addons.sh 1>>/var/log/kube-addons.log 2>&1
 } 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
