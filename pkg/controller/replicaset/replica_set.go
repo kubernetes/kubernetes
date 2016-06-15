@@ -326,12 +326,8 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	}
 	curPod := cur.(*api.Pod)
 	oldPod := old.(*api.Pod)
-	glog.V(4).Infof("Pod %s updated %+v -> %+v.", curPod.Name, oldPod, curPod)
-	rs := rsc.getPodReplicaSet(curPod)
-	if rs == nil {
-		return
-	}
-
+	glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
@@ -339,11 +335,17 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rs never initiates a phase change, and so is never asleep waiting for the same.
 		rsc.deletePod(curPod)
+		if labelChanged {
+			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
+			rsc.deletePod(oldPod)
+		}
 		return
 	}
 
-	rsc.enqueueReplicaSet(rs)
-	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
+	if rs := rsc.getPodReplicaSet(curPod); rs != nil {
+		rsc.enqueueReplicaSet(rs)
+	}
+	if labelChanged {
 		// If the old and new ReplicaSet are the same, the first one that syncs
 		// will set expectations preventing any damage from the second.
 		if oldRS := rsc.getPodReplicaSet(oldPod); oldRS != nil {
