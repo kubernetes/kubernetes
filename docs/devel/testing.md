@@ -50,6 +50,7 @@ Updated: 5/21/2016
     - [Benchmark unit tests](#benchmark-unit-tests)
   - [Integration tests](#integration-tests)
     - [Install etcd dependency](#install-etcd-dependency)
+    - [Etcd test data](#etcd-test-data)
     - [Run integration tests](#run-integration-tests)
     - [Run a specific integration test](#run-a-specific-integration-test)
   - [End-to-End tests](#end-to-end-tests)
@@ -212,6 +213,14 @@ grep -E "image.*etcd" cluster/saltbase/etcd/etcd.manifest  # Find version
 # Install that version using yum/apt-get/etc
 echo export PATH="$PATH:<LOCATION>" >> ~/.profile  # Add to PATH
 ```
+
+### Etcd test data
+
+Many tests start an etcd server internally, storing test data in the operating system's temporary directory.
+
+If you see test failures because the temporary directory does not have sufficient space,
+or is on a volume with unpredictable write latency, you can override the test data directory
+for those internal etcd instances with the `TEST_ETCD_DIR` environment variable.
 
 ### Run integration tests
 
