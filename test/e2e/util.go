@@ -31,6 +31,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -131,6 +132,9 @@ const (
 	// How long claims have to become dynamically provisioned
 	claimProvisionTimeout = 5 * time.Minute
 )
+
+// For parsing Kubectl version for version-skewed testing.
+var gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
 
 // SubResource proxy should have been functional in v1.0.0, but SubResource
 // proxy via tunneling is known to be broken in v1.0.  See
@@ -1290,6 +1294,29 @@ func serverVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (boo
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.GTE(v), nil
+}
+
+// kubectlVersionGTE returns true if the kubectl version is greater than or
+// equal to v.
+func kubectlVersionGTE(v semver.Version) (bool, error) {
+	kv, err := kubectlVersion()
+	if err != nil {
+		return false, err
+	}
+	return kv.GTE(v), nil
+}
+
+// kubectlVersion gets the version of kubectl that's currently being used (see
+// --kubectl-path in e2e.go to use an alternate kubectl).
+func kubectlVersion() (semver.Version, error) {
+	output := runKubectlOrDie("version", "--client")
+	matches := gitVersionRegexp.FindStringSubmatch(output)
+	if len(matches) != 2 {
+		return semver.Version{}, fmt.Errorf("Could not find kubectl version in output %v", output)
+	}
+	// Don't use the full match, as it contains "GitVersion:\"" and a
+	// trailing "\"".  Just use the submatch.
+	return version.Parse(matches[1])
 }
 
 func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
