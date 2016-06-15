@@ -189,12 +189,20 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 			// Don't provide a second report of the same deletion.
 			return nil
 		}
-	} else if _, exists, err := f.knownObjects.GetByKey(id); err == nil && !exists {
-		// Presumably, this was deleted when a relist happened.
-		// Don't provide a second report of the same deletion.
-		// TODO(lavalamp): This may be racy-- we aren't properly locked
-		// with knownObjects.
-		return nil
+	} else {
+		// We only want to skip the "deletion" action if the object doesn't
+		// exist in knownObjects and it doesn't have corresponding item in items.
+		// Note that even if there is a "deletion" action in items, we can ignore it,
+		// because it will be deduped automatically in "queueActionLocked"
+		_, exists, err := f.knownObjects.GetByKey(id)
+		_, itemsExist := f.items[id]
+		if err == nil && !exists && !itemsExist {
+			// Presumably, this was deleted when a relist happened.
+			// Don't provide a second report of the same deletion.
+			// TODO(lavalamp): This may be racy-- we aren't properly locked
+			// with knownObjects.
+			return nil
+		}
 	}
 
 	return f.queueActionLocked(Deleted, obj)
@@ -270,6 +278,13 @@ func isDeletionDup(a, b *Delta) *Delta {
 	return b
 }
 
+// willObjectBeDeletedLocked returns true only if the last delta for the
+// given object is Delete. Caller must lock first.
+func (f *DeltaFIFO) willObjectBeDeletedLocked(id string) bool {
+	deltas := f.items[id]
+	return len(deltas) > 0 && deltas[len(deltas)-1].Type == Deleted
+}
+
 // queueActionLocked appends to the delta list for the object, calling
 // f.deltaCompressor if needed. Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
@@ -277,6 +292,14 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 	if err != nil {
 		return KeyError{obj, err}
 	}
+
+	// If object is supposed to be deleted (last event is Deleted),
+	// then we should ignore Sync events, because it would result in
+	// recreation of this object.
+	if actionType == Sync && f.willObjectBeDeletedLocked(id) {
+		return nil
+	}
+
 	newDeltas := append(f.items[id], Delta{actionType, obj})
 	newDeltas = dedupDeltas(newDeltas)
 	if f.deltaCompressor != nil {
