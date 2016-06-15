@@ -337,7 +337,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 	if volume.Spec.ClaimRef == nil {
 		// Volume is unused
 		glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is unused", volume.Name)
-		if _, err := ctrl.updateVolumePhase(volume, api.VolumeAvailable); err != nil {
+		if _, err := ctrl.updateVolumePhase(volume, api.VolumeAvailable, ""); err != nil {
 			// Nothing was saved; we will fall back into the same
 			// condition in the next call to this method
 			return err
@@ -349,7 +349,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			// The PV is reserved for a PVC; that PVC has not yet been
 			// bound to this PV; the PVC sync will handle it.
 			glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume is pre-bound to claim %s", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
-			if _, err := ctrl.updateVolumePhase(volume, api.VolumeAvailable); err != nil {
+			if _, err := ctrl.updateVolumePhase(volume, api.VolumeAvailable, ""); err != nil {
 				// Nothing was saved; we will fall back into the same
 				// condition in the next call to this method
 				return err
@@ -394,7 +394,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			if volume.Status.Phase != api.VolumeReleased && volume.Status.Phase != api.VolumeFailed {
 				// Also, log this only once:
 				glog.V(2).Infof("volume %q is released and reclaim policy %q will be executed", volume.Name, volume.Spec.PersistentVolumeReclaimPolicy)
-				if volume, err = ctrl.updateVolumePhase(volume, api.VolumeReleased); err != nil {
+				if volume, err = ctrl.updateVolumePhase(volume, api.VolumeReleased, ""); err != nil {
 					// Nothing was saved; we will fall back into the same condition
 					// in the next call to this method
 					return err
@@ -435,7 +435,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 		} else if claim.Spec.VolumeName == volume.Name {
 			// Volume is bound to a claim properly, update status if necessary
 			glog.V(4).Infof("synchronizing PersistentVolume[%s]: all is bound", volume.Name)
-			if _, err = ctrl.updateVolumePhase(volume, api.VolumeBound); err != nil {
+			if _, err = ctrl.updateVolumePhase(volume, api.VolumeBound, ""); err != nil {
 				// Nothing was saved; we will fall back into the same
 				// condition in the next call to this method
 				return err
@@ -539,7 +539,7 @@ func (ctrl *PersistentVolumeController) updateClaimPhaseWithEvent(claim *api.Per
 }
 
 // updateVolumePhase saves new volume phase to API server.
-func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.PersistentVolume, phase api.PersistentVolumePhase) (*api.PersistentVolume, error) {
+func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.PersistentVolume, phase api.PersistentVolumePhase, message string) (*api.PersistentVolume, error) {
 	glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s", volume.Name, phase)
 	if volume.Status.Phase == phase {
 		// Nothing to do.
@@ -557,6 +557,8 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.Persistent
 	}
 
 	volumeClone.Status.Phase = phase
+	volumeClone.Status.Message = message
+
 	newVol, err := ctrl.kubeClient.Core().PersistentVolumes().UpdateStatus(volumeClone)
 	if err != nil {
 		glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s failed: %v", volume.Name, phase, err)
@@ -582,7 +584,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *api.P
 		return volume, nil
 	}
 
-	newVol, err := ctrl.updateVolumePhase(volume, phase)
+	newVol, err := ctrl.updateVolumePhase(volume, phase, message)
 	if err != nil {
 		return nil, err
 	}
@@ -741,7 +743,7 @@ func (ctrl *PersistentVolumeController) bind(volume *api.PersistentVolume, claim
 	}
 	volume = updatedVolume
 
-	if updatedVolume, err = ctrl.updateVolumePhase(volume, api.VolumeBound); err != nil {
+	if updatedVolume, err = ctrl.updateVolumePhase(volume, api.VolumeBound, ""); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the volume status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
@@ -811,7 +813,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolum
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolled back", newVol.Name)
 
 	// Update the status
-	_, err = ctrl.updateVolumePhase(newVol, api.VolumeAvailable)
+	_, err = ctrl.updateVolumePhase(newVol, api.VolumeAvailable, "")
 	return err
 
 }

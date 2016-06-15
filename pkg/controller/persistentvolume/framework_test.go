@@ -665,6 +665,14 @@ func withLabelSelector(labels map[string]string, claims []*api.PersistentVolumeC
 	return claims
 }
 
+// withMessage saves given message into volume.Status.Message of the first
+// volume in the array and returns the array.  Meant to be used to compose
+// volumes specified inline in a test.
+func withMessage(message string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+	volumes[0].Status.Message = message
+	return volumes
+}
+
 // newVolumeArray returns array with a single volume that would be returned by
 // newVolume() with the same parameters.
 func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, reclaimPolicy api.PersistentVolumeReclaimPolicy, annotations ...string) []*api.PersistentVolume {
