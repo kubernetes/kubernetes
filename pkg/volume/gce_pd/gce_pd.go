@@ -95,19 +95,9 @@ func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *api.Po
 func getVolumeSource(
 	spec *volume.Spec) (*api.GCEPersistentDiskVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
-		glog.V(4).Infof(
-			"volume source %v spec %v, readonly flag retrieved from source: %v",
-			spec.Volume.GCEPersistentDisk.PDName,
-			spec.Name(),
-			spec.Volume.GCEPersistentDisk.ReadOnly)
 		return spec.Volume.GCEPersistentDisk, spec.Volume.GCEPersistentDisk.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
-		glog.V(4).Infof(
-			"volume source %v spec %v, readonly flag retrieved from spec: %v",
-			spec.PersistentVolume.Spec.GCEPersistentDisk.PDName,
-			spec.Name(),
-			spec.ReadOnly)
 		return spec.PersistentVolume.Spec.GCEPersistentDisk, spec.ReadOnly, nil
 	}
 
