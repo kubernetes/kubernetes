@@ -125,6 +125,3 @@ cluster_cidr: "$NODE_IP_RANGES"
 allocate_node_cidrs: "${ALLOCATE_NODE_CIDRS:-true}"
 admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 EOF
-
-mkdir -p /srv/salt-overlay/salt/nginx
-echo ${MASTER_HTPASSWD} > /srv/salt-overlay/salt/nginx/htpasswd
