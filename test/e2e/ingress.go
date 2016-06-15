@@ -393,7 +393,7 @@ var _ = framework.KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]
 	var responseTimes, creationTimes []time.Duration
 	var ingController *IngressController
 
-	f := framework.Framework{BaseName: "glbc"}
+	f := framework.NewDefaultFramework("glbc")
 
 	BeforeEach(func() {
 		// This test requires a GCE/GKE only cluster-addon
