@@ -86,11 +86,9 @@ func getVolumeSource(spec *volume.Spec) (*api.GCEPersistentDiskVolumeSource, boo
 	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
 		volumeSource = spec.Volume.GCEPersistentDisk
 		readOnly = volumeSource.ReadOnly
-		glog.V(4).Infof("volume source %v spec %v, readonly flag retrieved from source: %v", volumeSource.PDName, spec.Name(), readOnly)
 	} else {
 		volumeSource = spec.PersistentVolume.Spec.GCEPersistentDisk
 		readOnly = spec.ReadOnly
-		glog.V(4).Infof("volume source %v spec %v, readonly flag retrieved from spec: %v", volumeSource.PDName, spec.Name(), readOnly)
 	}
 	return volumeSource, readOnly
 }
