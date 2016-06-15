@@ -40,11 +40,6 @@ import (
 )
 
 const (
-	// podStartupTimeout is the time to allow all pods in the cluster to become
-	// running and ready before any e2e tests run. It includes pulling all of
-	// the pods (as of 5/18/15 this is 8 pods).
-	podStartupTimeout = 10 * time.Minute
-
 	// imagePrePullingTimeout is the time we wait for the e2e-image-puller
 	// static pods to pull the list of seeded images. If they don't pull
 	// images within this time we simply log their output and carry on
@@ -129,6 +124,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
+	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
 	if err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels); err != nil {
 		framework.DumpAllNamespaceInfo(c, api.NamespaceSystem)
 		framework.LogFailedContainers(c, api.NamespaceSystem)
@@ -141,7 +137,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		// and we don't even run the image puller on all platforms (including GKE).
 		// We wait for it so we get an indication of failures in the logs, and to
 		// maximize benefit of image pre-pulling.
-		framework.Logf("WARNING: Image pulling pods failed to enter success in %v: %v", podStartupTimeout, err)
+		framework.Logf("WARNING: Image pulling pods failed to enter success in %v: %v", imagePrePullingTimeout, err)
 	}
 
 	return nil

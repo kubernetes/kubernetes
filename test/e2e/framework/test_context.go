@@ -19,6 +19,7 @@ package framework
 import (
 	"flag"
 	"os"
+	"time"
 
 	"github.com/onsi/ginkgo/config"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -26,27 +27,29 @@ import (
 )
 
 type TestContextType struct {
-	KubeConfig            string
-	KubeContext           string
-	KubeAPIContentType    string
-	KubeVolumeDir         string
-	CertDir               string
-	Host                  string
-	RepoRoot              string
-	Provider              string
-	CloudConfig           CloudConfig
-	KubectlPath           string
-	OutputDir             string
-	ReportDir             string
-	ReportPrefix          string
-	Prefix                string
-	MinStartupPods        int
-	UpgradeTarget         string
-	PrometheusPushGateway string
-	OSDistro              string
-	VerifyServiceAccount  bool
-	DeleteNamespace       bool
-	CleanStart            bool
+	KubeConfig         string
+	KubeContext        string
+	KubeAPIContentType string
+	KubeVolumeDir      string
+	CertDir            string
+	Host               string
+	RepoRoot           string
+	Provider           string
+	CloudConfig        CloudConfig
+	KubectlPath        string
+	OutputDir          string
+	ReportDir          string
+	ReportPrefix       string
+	Prefix             string
+	MinStartupPods     int
+	// Timeout for waiting for system pods to be running
+	SystemPodsStartupTimeout time.Duration
+	UpgradeTarget            string
+	PrometheusPushGateway    string
+	OSDistro                 string
+	VerifyServiceAccount     bool
+	DeleteNamespace          bool
+	CleanStart               bool
 	// If set to 'true' or 'all' framework will start a goroutine monitoring resource usage of system add-ons.
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'master'
 	// only master Node will be monitored.
@@ -118,6 +121,7 @@ func RegisterFlags() {
 
 	flag.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
 	flag.IntVar(&TestContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
+	flag.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
 	flag.StringVar(&TestContext.UpgradeTarget, "upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
 	flag.StringVar(&TestContext.PrometheusPushGateway, "prom-push-gateway", "", "The URL to prometheus gateway, so that metrics can be pushed during e2es and scraped by prometheus. Typically something like 127.0.0.1:9091.")
 	flag.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
