@@ -218,3 +218,12 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	}
 	return nodeutil.GetNodeHostIP(node)
 }
+
+// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or the initialNodeStatus
+func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		return nil, err
+	}
+	return nodeutil.GetNodeHostIP(node)
+}
