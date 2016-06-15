@@ -25,3 +25,4 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::build_binaries "$@"
 kube::golang::place_bins
+

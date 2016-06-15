@@ -43,9 +43,11 @@ readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
 readonly KUBE_GCS_PUBLISH_VERSION=${KUBE_GCS_PUBLISH_VERSION:-}
 readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
+readonly KUBE_SKIP_BINARY_COMPRESSION="${KUBE_SKIP_BINARY_COMPRESSION:-n}"
+
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.2-2"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.2-3"
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>"
 
 # Here we map the output directories across both the local and remote _output
@@ -1612,4 +1614,20 @@ function kube::release::gcloud_account_is_active() {
   else
     return 1
   fi
+}
+
+# Run the upx command in the kube-build image.
+# This assumes that the image has already been built.
+function kube::build::compress_binaries() {
+  [[ ${KUBE_SKIP_BINARY_COMPRESSION:-} =~ ^[yY]$ ]] || {
+    # list of upx unsupported platforms to compress
+    local unsupported_platforms=( "linux/arm64" "darwin/386" "darwin/amd64" "linux/ppc64le")
+    local platforms_to_compress=($(echo ${KUBE_CLIENT_PLATFORMS[@]} ${unsupported_platforms[@]} | tr ' ' '\n' | sort | uniq -u))
+    kube::log::status "Compressing go binaries for ${platforms_to_compress[@]}"
+    local platform
+    for platform in "${platforms_to_compress[@]}"; do
+      local full_binpath_src="${REMOTE_OUTPUT_BINPATH}/${platform}"
+      kube::build::run_build_command bash -c "upx '${full_binpath_src}'/* || true"
+    done
+  }
 }
