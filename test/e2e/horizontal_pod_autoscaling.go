@@ -169,7 +169,7 @@ func scaleDown(name, kind string, checkStability bool, rc *ResourceConsumer, f *
 		maxPods:                     5,
 		firstScale:                  3,
 		firstScaleStasis:            stasis,
-		cpuBurst:                    100,
+		cpuBurst:                    10,
 		secondScale:                 1,
 	}
 	scaleTest.run(name, kind, rc, f)
