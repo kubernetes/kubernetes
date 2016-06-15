@@ -272,7 +272,7 @@ func (rc *ResourceConsumer) GetReplicas() int {
 }
 
 func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
-	timeout := 10 * time.Minute
+	timeout := 15 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		if desiredReplicas == rc.GetReplicas() {
 			framework.Logf("%s: current replicas number is equal to desired replicas number: %d", rc.kind, desiredReplicas)
