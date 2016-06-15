@@ -182,9 +182,20 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-		rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
-		if err != nil {
-			return err
+
+		// watching from resourceVersion 0, starts the watch at ~now and
+		// will return an initial watch event.  Starting form ~now, rather
+		// the rv of the object will insure that we start the watch from
+		// inside the watch window, which the rv of the object might not be.
+		rv := "0"
+		isList := meta.IsListType(obj)
+		if isList {
+			// the resourceVersion of list objects is ~now but won't return
+			// an initial watch event
+			rv, err = mapping.MetadataAccessor.ResourceVersion(obj)
+			if err != nil {
+				return err
+			}
 		}
 
 		// print the current object
@@ -200,7 +211,13 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			return err
 		}
 
+		first := true
 		kubectl.WatchLoop(w, func(e watch.Event) error {
+			if !isList && first {
+				// drop the initial watch event in the single resource case
+				first = false
+				return nil
+			}
 			return printer.PrintObj(e.Object, out)
 		})
 		return nil
