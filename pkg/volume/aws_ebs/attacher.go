@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -42,17 +41,12 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 	return &awsElasticBlockStoreAttacher{host: plugin.host}, nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) GetDeviceName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an EBS volume type")
+func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) error {
+	volumeSource, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return err
 	}
 
-	return volumeSource.VolumeID, nil
-}
-
-func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) error {
-	volumeSource, readOnly := getVolumeSource(spec)
 	volumeID := volumeSource.VolumeID
 
 	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
@@ -86,7 +80,12 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 	if err != nil {
 		return "", err
 	}
-	volumeSource, _ := getVolumeSource(spec)
+
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
 	volumeID := volumeSource.VolumeID
 	partition := ""
 	if volumeSource.Partition != 0 {
@@ -136,13 +135,19 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 	}
 }
 
-func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(spec *volume.Spec) string {
-	volumeSource, _ := getVolumeSource(spec)
-	return makeGlobalPDPath(attacher.host, volumeSource.VolumeID)
+func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
+	spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return makeGlobalPDPath(attacher.host, volumeSource.VolumeID), nil
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
+func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -155,7 +160,10 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		}
 	}
 
-	volumeSource, readOnly := getVolumeSource(spec)
+	volumeSource, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return err
+	}
 
 	options := []string{}
 	if readOnly {
@@ -231,26 +239,12 @@ func (detacher *awsElasticBlockStoreDetacher) WaitForDetach(devicePath string, t
 	}
 }
 
-func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string, mounter mount.Interface) error {
+func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
+	mounter := detacher.host.GetMounter()
 	volume := path.Base(deviceMountPath)
 	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, mounter); err != nil {
 		glog.Errorf("Error unmounting %q: %v", volume, err)
 	}
 
 	return nil
-}
-
-func getVolumeSource(spec *volume.Spec) (*api.AWSElasticBlockStoreVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.AWSElasticBlockStoreVolumeSource
-
-	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
-		volumeSource = spec.Volume.AWSElasticBlockStore
-		readOnly = volumeSource.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.AWSElasticBlockStore
-		readOnly = spec.ReadOnly
-	}
-
-	return volumeSource, readOnly
 }

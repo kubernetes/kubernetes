@@ -63,13 +63,29 @@ func (plugin *nfsPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *nfsPlugin) Name() string {
+func (plugin *nfsPlugin) GetPluginName() string {
 	return nfsPluginName
+}
+
+func (plugin *nfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		"%v/%v",
+		volumeSource.Server,
+		volumeSource.Path), nil
 }
 
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS != nil) ||
 		(spec.Volume != nil && spec.Volume.NFS != nil)
+}
+
+func (plugin *nfsPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -85,15 +101,11 @@ func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 }
 
 func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Mounter, error) {
-	var source *api.NFSVolumeSource
-	var readOnly bool
-	if spec.Volume != nil && spec.Volume.NFS != nil {
-		source = spec.Volume.NFS
-		readOnly = spec.Volume.NFS.ReadOnly
-	} else {
-		source = spec.PersistentVolume.Spec.NFS
-		readOnly = spec.ReadOnly
+	source, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
+
 	return &nfsMounter{
 		nfs: &nfs{
 			volName: spec.Name(),
@@ -295,4 +307,15 @@ func (r *nfsRecycler) Recycle() error {
 		},
 	}
 	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient())
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.NFSVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.NFS != nil {
+		return spec.Volume.NFS, spec.Volume.NFS.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.NFS != nil {
+		return spec.PersistentVolume.Spec.NFS, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a NFS volume type")
 }

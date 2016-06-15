@@ -582,7 +582,7 @@ func createClients(t *testing.T, s *httptest.Server) (*clientset.Clientset, *per
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000000, Burst: 1000000})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000000, Burst: 1000000})
 
-	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */)
 	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{
 		PluginName:             "plugin-name",
 		Host:                   host,

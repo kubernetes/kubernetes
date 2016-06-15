@@ -1304,7 +1304,7 @@ message NodeStatus {
   // List of container images on this node
   repeated ContainerImage images = 8;
 
-  // List of volumes in use (mounted) by the node.
+  // List of attachable volumes in use (mounted) by the node.
   repeated string volumesInUse = 9;
 }
 
