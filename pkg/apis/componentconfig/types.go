@@ -159,7 +159,8 @@ type KubeletConfiguration struct {
 	// Defaults to false.
 	AllowPrivileged bool `json:"allowPrivileged"`
 	// hostNetworkSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use of host network. Defaults to "*".
+	// Kubelet allows pods to use of host network. Defaults to "*". Valid
+	// options are "file", "http", "api", and "*" (all sources).
 	HostNetworkSources []string `json:"hostNetworkSources"`
 	// hostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".

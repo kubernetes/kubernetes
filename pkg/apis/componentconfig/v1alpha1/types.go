@@ -210,11 +210,14 @@ type KubeletConfiguration struct {
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string `json:"rootDirectory"`
+	// seccompProfileRoot is the directory path for seccomp profiles.
+	SeccompProfileRoot string `json:"seccompProfileRoot"`
 	// allowPrivileged enables containers to request privileged mode.
 	// Defaults to false.
 	AllowPrivileged *bool `json:"allowPrivileged"`
 	// hostNetworkSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use of host network. Defaults to "*".
+	// Kubelet allows pods to use of host network. Defaults to "*". Valid
+	// options are "file", "http", "api", and "*" (all sources).
 	HostNetworkSources []string `json:"hostNetworkSources"`
 	// hostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
@@ -224,7 +227,7 @@ type KubeletConfiguration struct {
 	HostIPCSources []string `json:"hostIPCSources"`
 	// registryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
-	RegistryPullQPS float64 `json:"registryPullQPS"`
+	RegistryPullQPS *float64 `json:"registryPullQPS"`
 	// registryBurst is the maximum size of a bursty pulls, temporarily allows
 	// pulls to burst to this number, while still not exceeding registryQps.
 	// Only used if registryQps > 0.
@@ -247,7 +250,7 @@ type KubeletConfiguration struct {
 	MaxPerPodContainerCount int64 `json:"maxPerPodContainerCount"`
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
-	MaxContainerCount *int64 `json:"maxContainerCount"`
+	MaxContainerCount *int32 `json:"maxContainerCount"`
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
 	CAdvisorPort int32 `json:"cAdvisorPort"`
 	// healthzPort is the port of the localhost healthz endpoint
@@ -257,7 +260,7 @@ type KubeletConfiguration struct {
 	HealthzBindAddress string `json:"healthzBindAddress"`
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
-	OOMScoreAdj int32 `json:"oomScoreAdj"`
+	OOMScoreAdj *int32 `json:"oomScoreAdj"`
 	// registerNode enables automatic registration with the apiserver.
 	RegisterNode *bool `json:"registerNode"`
 	// clusterDomain is the DNS domain for this cluster. If set, kubelet will
@@ -284,17 +287,17 @@ type KubeletConfiguration struct {
 	// imageGCHighThresholdPercent is the percent of disk usage after which
 	// image garbage collection is always run. The percent is calculated as
 	// this field value out of 100.
-	ImageGCHighThresholdPercent int32 `json:"imageGCHighThresholdPercent"`
+	ImageGCHighThresholdPercent *int32 `json:"imageGCHighThresholdPercent"`
 	// imageGCLowThresholdPercent is the percent of disk usage before which
 	// image garbage collection is never run. Lowest disk usage to garbage
 	// collect to. The percent is calculated as this field value out of 100.
-	ImageGCLowThresholdPercent int32 `json:"imageGCLowThresholdPercent"`
+	ImageGCLowThresholdPercent *int32 `json:"imageGCLowThresholdPercent"`
 	// lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
 	// maintain. When disk space falls below this threshold, new pods would
 	// be rejected.
 	LowDiskSpaceThresholdMB int64 `json:"lowDiskSpaceThresholdMB"`
 	// How frequently to calculate and cache volume disk usage for all pods
-	VolumeStatsAggPeriod unversioned.Duration `json:volumeStatsAggPeriod`
+	VolumeStatsAggPeriod unversioned.Duration `json:"volumeStatsAggPeriod"`
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
@@ -309,28 +312,38 @@ type KubeletConfiguration struct {
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	CloudConfigFile string `json:"cloudConfigFile"`
 	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
-	KubeletCgroups string `json:"kubeletCgroups,omitempty"`
+	KubeletCgroups string `json:"kubeletCgroups"`
 	// runtimeCgroups are cgroups that container runtime is expected to be isolated in.
-	RuntimeCgroups string `json:"runtimeCgroups,omitempty"`
+	RuntimeCgroups string `json:"runtimeCgroups"`
 	// systemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
-	SystemCgroups string `json:"systemCgroups,omitempty"`
+	SystemCgroups string `json:"systemCgroups"`
 	// cgroupRoot is the root cgroup to use for pods. This is handled by the
 	// container runtime on a best effort basis.
 	CgroupRoot string `json:"cgroupRoot"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
-	// rktPath is hte path of rkt binary. Leave empty to use the first rkt in
+	// runtimeRequestTimeout is the timeout for all runtime requests except long running
+	// requests - pull, logs, exec and attach.
+	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout"`
+	// rktPath is the  path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath"`
+	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
+	RktAPIEndpoint string `json:"rktAPIEndpoint"`
+	// rktStage1Image is the image to use as stage1. Local paths and
+	// http/https URLs are supported.
+	RktStage1Image string `json:"rktStage1Image"`
 	// lockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
 	LockFilePath *string `json:"lockFilePath"`
-	// rktStage1Image is the image to use as stage1. Local paths and
-	// http/https URLs are supported.
-	RktStage1Image string `json:"rktStage1Image"`
+	// ExitOnLockContention is a flag that signifies to the kubelet that it is running
+	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+	// This will cause the kubelet to listen to inotify events on the lock file,
+	// releasing it and exiting when another process tries to open that file.
+	ExitOnLockContention bool `json:"exitOnLockContention"`
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 *bool `json:"configureCbr0"`
@@ -344,8 +357,12 @@ type KubeletConfiguration struct {
 	// one must set --hairpin-mode=veth-flag, because bridge assumes the
 	// existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
+	// The node has babysitter process monitoring docker and kubelet.
+	BabysitDaemons bool `json:"babysitDaemons"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32 `json:"maxPods"`
+	// nvidiaGPUs is the number of NVIDIA GPU devices on this node.
+	NvidiaGPUs int32 `json:"nvidiaGPUs"`
 	// dockerExecHandlerName is the handler to use when executing a command
 	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
 	// 'native'.
@@ -369,6 +386,8 @@ type KubeletConfiguration struct {
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. No-op if register-node is false.
 	RegisterSchedulable *bool `json:"registerSchedulable"`
+	// contentType is contentType of requests sent to apiserver.
+	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
 	KubeAPIQPS float32 `json:"kubeAPIQPS"`
 	// kubeAPIBurst is the burst to allow while talking with kubernetes
@@ -382,7 +401,7 @@ type KubeletConfiguration struct {
 	// experimentalFlannelOverlay enables experimental support for starting the
 	// kubelet with the default overlay network (flannel). Assumes flanneld
 	// is already running in client mode.
-	ExperimentalFlannelOverlay *bool `json:"experimentalFlannelOverlay"`
+	ExperimentalFlannelOverlay bool `json:"experimentalFlannelOverlay"`
 	// outOfDiskTransitionFrequency is duration for which the kubelet has to
 	// wait before transitioning out of out-of-disk node condition status.
 	OutOfDiskTransitionFrequency unversioned.Duration `json:"outOfDiskTransitionFrequency"`
@@ -395,4 +414,20 @@ type KubeletConfiguration struct {
 	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool `json:"enableCustomMetrics"`
+	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
+	EvictionHard string `json:"evictionHard"`
+	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
+	EvictionSoft string `json:"evictionSoft"`
+	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+	EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod"`
+	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
+	EvictionPressureTransitionPeriod unversioned.Duration `json:"evictionPressureTransitionPeriod"`
+	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
+	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod"`
+	// Maximum number of pods per core. Cannot exceed MaxPods
+	PodsPerCore int32 `json:"podsPerCore"`
+	// enableControllerAttachDetach enables the Attach/Detach controller to
+	// manage attachment/detachment of volumes scheduled to this node, and
+	// disables kubelet from executing any attach/detach operations
+	EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach"`
 }
