@@ -289,6 +289,24 @@ func TestSufficentCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
+// DaemonSets not take any actions when being deleted
+func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
+	podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
+	manager, podControl := newTestController()
+	node := newNode("not-too-much-mem", nil)
+	node.Status.Allocatable = allocatableResources("200M", "200m")
+	manager.nodeStore.Add(node)
+	manager.podStore.Add(&api.Pod{
+		Spec: podSpec,
+	})
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	now := unversioned.Now()
+	ds.DeletionTimestamp = &now
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
 // DaemonSets should not place onto nodes that would cause port conflicts
 func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	podSpec := api.PodSpec{
