@@ -278,7 +278,7 @@ func newTestKubeletWithImageList(t *testing.T, imageList []kubecontainer.Image) 
 	}
 	kubelet.evictionManager = evictionManager
 	kubelet.AddPodAdmitHandler(evictionAdmitHandler)
-	kubelet.lastUpdatedNodeObject.Store(&api.Node{})
+
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil}
 }
 
