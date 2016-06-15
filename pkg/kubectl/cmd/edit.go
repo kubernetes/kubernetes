@@ -120,6 +120,7 @@ func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to file to use to edit the resource"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
@@ -252,6 +253,16 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 				os.Remove(results.file)
 			}
 			glog.V(4).Infof("User edited:\n%s", string(edited))
+
+			// Apply validation
+			schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+			if err != nil {
+				return preservedFile(err, file, errOut)
+			}
+			err = schema.ValidateBytes(stripComments(edited))
+			if err != nil {
+				return preservedFile(err, file, errOut)
+			}
 
 			// Compare content without comments
 			if bytes.Equal(stripComments(original), stripComments(edited)) {
