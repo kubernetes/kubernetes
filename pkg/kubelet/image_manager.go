@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -273,7 +274,7 @@ func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (in
 	sort.Sort(byLastUsedAndDetected(images))
 
 	// Delete unused images until we've freed up enough space.
-	var lastErr error
+	var deletionErrors []error
 	spaceFreed := int64(0)
 	for _, image := range images {
 		glog.V(5).Infof("Evaluating image ID %s for possible garbage collection", image.id)
@@ -295,7 +296,7 @@ func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (in
 		glog.Infof("[ImageManager]: Removing image %q to free %d bytes", image.id, image.size)
 		err := im.runtime.RemoveImage(container.ImageSpec{Image: image.id})
 		if err != nil {
-			lastErr = err
+			deletionErrors = append(deletionErrors, err)
 			continue
 		}
 		delete(im.imageRecords, image.id)
@@ -306,7 +307,10 @@ func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (in
 		}
 	}
 
-	return spaceFreed, lastErr
+	if len(deletionErrors) > 0 {
+		return spaceFreed, fmt.Errorf("wanted to free %d, but freed %d space with errors in image deletion: %v", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
+	}
+	return spaceFreed, nil
 }
 
 type evictionInfo struct {
