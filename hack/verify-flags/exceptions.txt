@@ -29,8 +29,9 @@ cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
 cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
 cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
+cluster/photon-controller/templates/salt-master.sh:  api_servers: $MASTER_NAME
 cluster/photon-controller/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
-cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -v "^-" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
+cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
 cluster/photon-controller/util.sh:  local cert_dir="/srv/kubernetes"
 cluster/photon-controller/util.sh:  node_name=${1}
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
