@@ -22,6 +22,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/vmware/govmomi"
@@ -71,6 +72,7 @@ type VSphereConfig struct {
 		InsecureFlag bool   `gcfg:"insecure-flag"`
 		Datacenter   string `gcfg:"datacenter"`
 		Datastore    string `gcfg:"datastore"`
+		WorkingDir   string `gcfg:"working-dir"`
 	}
 
 	Network struct {
@@ -171,6 +173,9 @@ func newVSphere(cfg VSphereConfig) (*VSphere, error) {
 		glog.Errorf("%v is not a supported SCSI Controller type. Please configure 'lsilogic-sas' OR 'pvscsi'", cfg.Disk.SCSIControllerType)
 		return nil, errors.New("Controller type not supported. Please configure 'lsilogic-sas' OR 'pvscsi'")
 	}
+	if cfg.Global.WorkingDir != "" {
+		cfg.Global.WorkingDir = path.Clean(cfg.Global.WorkingDir) + "/"
+	}
 	vs := VSphere{
 		cfg:             &cfg,
 		localInstanceID: id,
@@ -217,9 +222,11 @@ func getVirtualMachineByName(cfg *VSphereConfig, ctx context.Context, c *govmomi
 	}
 	f.SetDatacenter(dc)
 
+	vmRegex := cfg.Global.WorkingDir + name
+
 	// Retrieve vm by name
 	//TODO: also look for vm inside subfolders
-	vm, err := f.VirtualMachine(ctx, name)
+	vm, err := f.VirtualMachine(ctx, vmRegex)
 	if err != nil {
 		return nil, err
 	}
@@ -247,8 +254,10 @@ func getInstances(cfg *VSphereConfig, ctx context.Context, c *govmomi.Client, fi
 
 	f.SetDatacenter(dc)
 
+	vmRegex := cfg.Global.WorkingDir + filter
+
 	//TODO: get all vms inside subfolders
-	vms, err := f.VirtualMachineList(ctx, filter)
+	vms, err := f.VirtualMachineList(ctx, vmRegex)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +501,9 @@ func getVirtualMachineDevices(cfg *VSphereConfig, ctx context.Context, c *govmom
 		return nil, nil, nil, err
 	}
 
-	vm, err := f.VirtualMachine(ctx, name)
+	vmRegex := cfg.Global.WorkingDir + name
+
+	vm, err := f.VirtualMachine(ctx, vmRegex)
 	if err != nil {
 		return nil, nil, nil, err
 	}
