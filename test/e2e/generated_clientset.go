@@ -47,7 +47,7 @@ func testingPod(name, value string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/nginx:1.7.9",
+					Image: "gcr.io/google_containers/nginx-slim:0.7",
 					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					LivenessProbe: &v1.Probe{
 						Handler: v1.Handler{

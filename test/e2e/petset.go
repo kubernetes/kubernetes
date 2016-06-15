@@ -737,7 +737,7 @@ func newPetSet(name, ns, governingSvcName string, replicas int, petMounts []api.
 					Containers: []api.Container{
 						{
 							Name:         "nginx",
-							Image:        "gcr.io/google_containers/nginx-slim:0.5",
+							Image:        "gcr.io/google_containers/nginx-slim:0.7",
 							VolumeMounts: mounts,
 						},
 					},
