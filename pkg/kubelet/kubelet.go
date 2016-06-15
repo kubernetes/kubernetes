@@ -831,9 +831,6 @@ type Kubelet struct {
 	// should manage attachment/detachment of volumes scheduled to this node,
 	// and disable kubelet from executing any attach/detach operations
 	enableControllerAttachDetach bool
-
-	// lastUpdatedNodeObject is a cached version of the node as last reported back to the api server.
-	lastUpdatedNodeObject atomic.Value
 }
 
 // Validate given node IP belongs to the current host
@@ -1146,10 +1143,6 @@ func (kl *Kubelet) registerWithApiserver() {
 			glog.Errorf("Unable to construct api.Node object for kubelet: %v", err)
 			continue
 		}
-
-		// Cache the node object.
-		kl.lastUpdatedNodeObject.Store(node)
-
 		glog.V(2).Infof("Attempting to register node %s", node.Name)
 		if _, err := kl.kubeClient.Core().Nodes().Create(node); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
@@ -1561,11 +1554,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 					return result, err
 				}
 			case envVar.ValueFrom.ResourceFieldRef != nil:
-				defaultedPod, defaultedContainer, err := kl.defaultPodLimitsForDownwardApi(pod, container)
-				if err != nil {
-					return result, err
-				}
-				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, defaultedPod, defaultedContainer)
+				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, pod, container)
 				if err != nil {
 					return result, err
 				}
@@ -1905,12 +1894,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Mount volumes and update the volume manager
-	// Default limits for containers here to have downward API expose user-friendly limits to pods.
-	defaultedPod, _, err := kl.defaultPodLimitsForDownwardApi(pod, nil)
-	if err != nil {
-		return err
-	}
-	podVolumes, err := kl.mountExternalVolumes(defaultedPod)
+	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
 		ref, errGetRef := api.GetReference(pod)
 		if errGetRef == nil && ref != nil {
@@ -3523,10 +3507,6 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}
 	// Update the current status on the API server
 	_, err = kl.kubeClient.Core().Nodes().UpdateStatus(node)
-	if err == nil {
-		// store recently updated node information.
-		kl.lastUpdatedNodeObject.Store(node)
-	}
 	return err
 }
 
