@@ -69,7 +69,7 @@ else
     linux/amd64
     linux/arm
     linux/arm64
-    #linux/ppc64le # temporarily disabled due to a linking error
+    linux/ppc64le # note: hyperkube is temporarily disabled due to a linking error
   )
 
   # If we update this we should also update the set of golang compilers we build
@@ -79,7 +79,7 @@ else
     linux/386
     linux/arm
     linux/arm64
-    #linux/ppc64le # temporarily disabled due to a linking error
+    linux/ppc64le
     darwin/amd64
     darwin/386
     windows/amd64
@@ -454,7 +454,16 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   local -a tests=()
   for binary in "${binaries[@]}"; do
-    if [[ "${binary}" =~ ".test"$ ]]; then
+
+    # TODO(IBM): Enable hyperkube builds for ppc64le again
+    # The current workaround creates a text file with help text instead of a binary
+    # We're doing it this way so the build system isn't affected so much
+    if [[ "${binary}" == *"hyperkube" && "${platform}" == "linux/ppc64le" ]]; then
+      echo "hyperkube build for ppc64le is disabled. Creating dummy text file instead."
+      local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
+      mkdir -p $(dirname ${outfile})
+      echo "Not available at the moment. Please see: https://github.com/kubernetes/kubernetes/issues/25886 for more information." > ${outfile}
+    elif [[ "${binary}" =~ ".test"$ ]]; then
       tests+=($binary)
     elif kube::golang::is_statically_linked_library "${binary}"; then
       statics+=($binary)
@@ -462,6 +471,7 @@ kube::golang::build_binaries_for_platform() {
       nonstatics+=($binary)
     fi
   done
+
   if [[ "${#statics[@]}" != 0 ]]; then
       kube::golang::fallback_if_stdlib_not_installable;
   fi
