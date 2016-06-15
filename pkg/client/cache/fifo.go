@@ -45,6 +45,8 @@ type Queue interface {
 }
 
 // Helper function for popping from Queue.
+// WARNING: Do NOT use this function in non-test code to avoid races
+// unless you really really really really know what you are doing.
 func Pop(queue Queue) interface{} {
 	var result interface{}
 	queue.Pop(func(obj interface{}) error {
