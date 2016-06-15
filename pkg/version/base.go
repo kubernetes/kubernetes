@@ -39,7 +39,7 @@ var (
 	// them irrelevant. (Next we'll take it out, which may muck with
 	// scripts consuming the kubectl version output - but most of
 	// these should be looking at gitVersion already anyways.)
-	gitMajor string = "1" // major version, always numeric
+	gitMajor string = "1"  // major version, always numeric
 	gitMinor string = "3+" // minor version, numeric possibly followed by "+"
 
 	// semantic version, dervied by build scripts (see
