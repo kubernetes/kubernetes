@@ -1,4 +1,4 @@
-#!/bin/bash
+# bash completion for kubectl                              -*- shell-script -*-
 
 __debug()
 {
@@ -12,7 +12,7 @@ __debug()
 __my_init_completion()
 {
     COMPREPLY=()
-    _get_comp_words_by_ref cur prev words cword
+    _get_comp_words_by_ref "$@" cur prev words cword
 }
 
 __index_of_word()
@@ -38,7 +38,7 @@ __contains_word()
 
 __handle_reply()
 {
-    __debug "${FUNCNAME}"
+    __debug "${FUNCNAME[0]}"
     case $cur in
         -*)
             if [[ $(type -t compopt) = "builtin" ]]; then
@@ -52,7 +52,28 @@ __handle_reply()
             fi
             COMPREPLY=( $(compgen -W "${allflags[*]}" -- "$cur") )
             if [[ $(type -t compopt) = "builtin" ]]; then
-                [[ $COMPREPLY == *= ]] || compopt +o nospace
+                [[ "${COMPREPLY[0]}" == *= ]] || compopt +o nospace
+            fi
+
+            # complete after --flag=abc
+            if [[ $cur == *=* ]]; then
+                if [[ $(type -t compopt) = "builtin" ]]; then
+                    compopt +o nospace
+                fi
+
+                local index flag
+                flag="${cur%%=*}"
+                __index_of_word "${flag}" "${flags_with_completion[@]}"
+                if [[ ${index} -ge 0 ]]; then
+                    COMPREPLY=()
+                    PREFIX=""
+                    cur="${cur#*=}"
+                    ${flags_completion[${index}]}
+                    if [ -n "${ZSH_VERSION}" ]; then
+                        # zfs completion needs --flag= prefix
+                        eval "COMPREPLY=( \"\${COMPREPLY[@]/#/${flag}=}\" )"
+                    fi
+                fi
             fi
             return 0;
             ;;
@@ -81,9 +102,15 @@ __handle_reply()
     fi
     COMPREPLY=( $(compgen -W "${completions[*]}" -- "$cur") )
 
+    if [[ ${#COMPREPLY[@]} -eq 0 && ${#noun_aliases[@]} -gt 0 && ${#must_have_one_noun[@]} -ne 0 ]]; then
+        COMPREPLY=( $(compgen -W "${noun_aliases[*]}" -- "$cur") )
+    fi
+
     if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
         declare -F __custom_func >/dev/null && __custom_func
     fi
+
+    __ltrim_colon_completions "$cur"
 }
 
 # The arguments should be in the form "ext1|ext2|extn"
@@ -101,18 +128,29 @@ __handle_subdirs_in_dir_flag()
 
 __handle_flag()
 {
-    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
 
     # if a command required a flag, and we found it, unset must_have_one_flag()
     local flagname=${words[c]}
+    local flagvalue
     # if the word contained an =
     if [[ ${words[c]} == *"="* ]]; then
-        flagname=${flagname%=*} # strip everything after the =
+        flagvalue=${flagname#*=} # take in as flagvalue after the =
+        flagname=${flagname%%=*} # strip everything after the =
         flagname="${flagname}=" # but put the = back
     fi
-    __debug "${FUNCNAME}: looking for ${flagname}"
+    __debug "${FUNCNAME[0]}: looking for ${flagname}"
     if __contains_word "${flagname}" "${must_have_one_flag[@]}"; then
         must_have_one_flag=()
+    fi
+
+    # keep flag value with flagname as flaghash
+    if [ -n "${flagvalue}" ] ; then
+        flaghash[${flagname}]=${flagvalue}
+    elif [ -n "${words[ $((c+1)) ]}" ] ; then
+        flaghash[${flagname}]=${words[ $((c+1)) ]}
+    else
+        flaghash[${flagname}]="true" # pad "true" for bool flag
     fi
 
     # skip the argument to a two word flag
@@ -124,16 +162,17 @@ __handle_flag()
         fi
     fi
 
-    # skip the flag itself
     c=$((c+1))
 
 }
 
 __handle_noun()
 {
-    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
 
     if __contains_word "${words[c]}" "${must_have_one_noun[@]}"; then
+        must_have_one_noun=()
+    elif __contains_word "${words[c]}" "${noun_aliases[@]}"; then
         must_have_one_noun=()
     fi
 
@@ -143,16 +182,20 @@ __handle_noun()
 
 __handle_command()
 {
-    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
 
     local next_command
     if [[ -n ${last_command} ]]; then
-        next_command="_${last_command}_${words[c]}"
+        next_command="_${last_command}_${words[c]//:/__}"
     else
-        next_command="_${words[c]}"
+        if [[ $c -eq 0 ]]; then
+            next_command="_$(basename "${words[c]//:/__}")"
+        else
+            next_command="_${words[c]//:/__}"
+        fi
     fi
     c=$((c+1))
-    __debug "${FUNCNAME}: looking for ${next_command}"
+    __debug "${FUNCNAME[0]}: looking for ${next_command}"
     declare -F $next_command >/dev/null && $next_command
 }
 
@@ -162,10 +205,12 @@ __handle_word()
         __handle_reply
         return
     fi
-    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
     if [[ "${words[c]}" == -* ]]; then
         __handle_flag
     elif __contains_word "${words[c]}" "${commands[@]}"; then
+        __handle_command
+    elif [[ $c -eq 0 ]] && __contains_word "$(basename "${words[c]}")" "${commands[@]}"; then
         __handle_command
     else
         __handle_noun
@@ -340,6 +385,7 @@ _kubectl_get()
     must_have_one_noun+=("service")
     must_have_one_noun+=("serviceaccount")
     must_have_one_noun+=("thirdpartyresource")
+    noun_aliases=()
 }
 
 _kubectl_describe()
@@ -408,6 +454,7 @@ _kubectl_describe()
     must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
     must_have_one_noun+=("serviceaccount")
+    noun_aliases=()
 }
 
 _kubectl_create_namespace()
@@ -462,6 +509,7 @@ _kubectl_create_namespace()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_create_secret_docker-registry()
@@ -523,6 +571,7 @@ _kubectl_create_secret_docker-registry()
     must_have_one_flag+=("--docker-password=")
     must_have_one_flag+=("--docker-username=")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_create_secret_generic()
@@ -580,6 +629,7 @@ _kubectl_create_secret_generic()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_create_secret()
@@ -621,6 +671,7 @@ _kubectl_create_secret()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_create_configmap()
@@ -677,6 +728,7 @@ _kubectl_create_configmap()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_create_serviceaccount()
@@ -731,6 +783,7 @@ _kubectl_create_serviceaccount()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_create()
@@ -788,6 +841,7 @@ _kubectl_create()
     must_have_one_flag+=("--filename=")
     must_have_one_flag+=("-f")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_replace()
@@ -845,6 +899,7 @@ _kubectl_replace()
     must_have_one_flag+=("--filename=")
     must_have_one_flag+=("-f")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_patch()
@@ -898,6 +953,7 @@ _kubectl_patch()
     must_have_one_flag+=("--patch=")
     must_have_one_flag+=("-p")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_delete()
@@ -976,6 +1032,7 @@ _kubectl_delete()
     must_have_one_noun+=("service")
     must_have_one_noun+=("serviceaccount")
     must_have_one_noun+=("thirdpartyresource")
+    noun_aliases=()
 }
 
 _kubectl_edit()
@@ -1027,6 +1084,7 @@ _kubectl_edit()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_apply()
@@ -1079,6 +1137,7 @@ _kubectl_apply()
     must_have_one_flag+=("--filename=")
     must_have_one_flag+=("-f")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_namespace()
@@ -1118,6 +1177,7 @@ _kubectl_namespace()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_logs()
@@ -1169,6 +1229,7 @@ _kubectl_logs()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_rolling-update()
@@ -1238,6 +1299,7 @@ _kubectl_rolling-update()
     must_have_one_flag+=("-f")
     must_have_one_flag+=("--image=")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_scale()
@@ -1291,6 +1353,7 @@ _kubectl_scale()
     must_have_one_flag=()
     must_have_one_flag+=("--replicas=")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_cordon()
@@ -1330,6 +1393,7 @@ _kubectl_cordon()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_drain()
@@ -1372,6 +1436,7 @@ _kubectl_drain()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_uncordon()
@@ -1411,6 +1476,7 @@ _kubectl_uncordon()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_attach()
@@ -1456,6 +1522,7 @@ _kubectl_attach()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_exec()
@@ -1503,6 +1570,7 @@ _kubectl_exec()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_port-forward()
@@ -1544,6 +1612,7 @@ _kubectl_port-forward()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_proxy()
@@ -1598,6 +1667,7 @@ _kubectl_proxy()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_run()
@@ -1674,6 +1744,7 @@ _kubectl_run()
     must_have_one_flag=()
     must_have_one_flag+=("--image=")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_expose()
@@ -1747,6 +1818,7 @@ _kubectl_expose()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_autoscale()
@@ -1811,6 +1883,7 @@ _kubectl_autoscale()
     must_have_one_flag=()
     must_have_one_flag+=("--max=")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_rollout_history()
@@ -1857,6 +1930,7 @@ _kubectl_rollout_history()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_rollout_pause()
@@ -1902,6 +1976,7 @@ _kubectl_rollout_pause()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_rollout_resume()
@@ -1947,6 +2022,7 @@ _kubectl_rollout_resume()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_rollout_undo()
@@ -1993,6 +2069,7 @@ _kubectl_rollout_undo()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_rollout()
@@ -2036,6 +2113,7 @@ _kubectl_rollout()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_label()
@@ -2122,6 +2200,7 @@ _kubectl_label()
     must_have_one_noun+=("service")
     must_have_one_noun+=("serviceaccount")
     must_have_one_noun+=("thirdpartyresource")
+    noun_aliases=()
 }
 
 _kubectl_annotate()
@@ -2183,6 +2262,7 @@ _kubectl_annotate()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_view()
@@ -2236,6 +2316,7 @@ _kubectl_config_view()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_set-cluster()
@@ -2275,6 +2356,7 @@ _kubectl_config_set-cluster()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_set-credentials()
@@ -2315,6 +2397,7 @@ _kubectl_config_set-credentials()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_set-context()
@@ -2354,6 +2437,7 @@ _kubectl_config_set-context()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_set()
@@ -2393,6 +2477,7 @@ _kubectl_config_set()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_unset()
@@ -2432,6 +2517,7 @@ _kubectl_config_unset()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_current-context()
@@ -2471,6 +2557,7 @@ _kubectl_config_current-context()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config_use-context()
@@ -2510,6 +2597,7 @@ _kubectl_config_use-context()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_config()
@@ -2557,6 +2645,7 @@ _kubectl_config()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_cluster-info()
@@ -2596,6 +2685,7 @@ _kubectl_cluster-info()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_api-versions()
@@ -2635,6 +2725,7 @@ _kubectl_api-versions()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_version()
@@ -2676,6 +2767,7 @@ _kubectl_version()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_explain()
@@ -2716,6 +2808,7 @@ _kubectl_explain()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl_convert()
@@ -2776,6 +2869,7 @@ _kubectl_convert()
     must_have_one_flag+=("--filename=")
     must_have_one_flag+=("-f")
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 _kubectl()
@@ -2846,15 +2940,17 @@ _kubectl()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    noun_aliases=()
 }
 
 __start_kubectl()
 {
     local cur prev words cword
+    declare -A flaghash 2>/dev/null || :
     if declare -F _init_completion >/dev/null 2>&1; then
         _init_completion -s || return
     else
-        __my_init_completion || return
+        __my_init_completion -n "=" || return
     fi
 
     local c=0
@@ -2872,9 +2968,9 @@ __start_kubectl()
 }
 
 if [[ $(type -t compopt) = "builtin" ]]; then
-    complete -F __start_kubectl kubectl
+    complete -o default -F __start_kubectl kubectl
 else
-    complete -o nospace -F __start_kubectl kubectl
+    complete -o default -o nospace -F __start_kubectl kubectl
 fi
 
 # ex: ts=4 sw=4 et filetype=sh
