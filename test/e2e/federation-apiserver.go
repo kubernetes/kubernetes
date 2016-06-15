@@ -26,12 +26,28 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+
+	. "github.com/onsi/gomega"
 )
 
 // Create/delete cluster api objects
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federation-cluster")
-	It("should allow creation of cluster api objects", func() {
+
+	AfterEach(func() {
+		framework.SkipUnlessFederated(f.Client)
+
+		// Delete registered clusters.
+		// This is if a test failed, it should not affect other tests.
+		clusterList, err := f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		for _, cluster := range clusterList.Items {
+			err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &api.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
+	})
+
+	It("should allow creation and deletion of cluster api objects", func() {
 		framework.SkipUnlessFederated(f.Client)
 
 		contexts := f.GetUnderlyingFederatedContexts()
@@ -69,6 +85,20 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			}
 			err = isReady(context.Name, f.FederationClientset)
 			framework.ExpectNoError(err, fmt.Sprintf("unexpected error in verifying if cluster %s is ready: %+v", context.Name, err))
+		}
+
+		// Verify that deletion works.
+		for _, context := range contexts {
+			framework.Logf("Deleting cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
+			err := f.FederationClientset.Federation().Clusters().Delete(context.Name, &api.DeleteOptions{})
+			framework.ExpectNoError(err, fmt.Sprintf("unexpected error in deleting cluster %s: %+v", context.Name, err))
+		}
+
+		// There should not be any remaining cluster.
+		clusterList, err := f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		if len(clusterList.Items) != 0 {
+			framework.Failf("there should not have been any remaining clusters. Found: %+v", clusterList)
 		}
 	})
 })
