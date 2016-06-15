@@ -585,6 +585,9 @@ func (kc *KubeConfig) findCluster(name string) *KubeCluster {
 }
 
 type E2EContext struct {
+	// Raw context name,
+	RawName string `yaml:"rawName"`
+	// A valid dns subdomain which can be used as the name of kubernetes resources.
 	Name    string       `yaml:"name"`
 	Cluster *KubeCluster `yaml:"cluster"`
 	User    *KubeUser    `yaml:"user"`
@@ -615,8 +618,13 @@ func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 				Failf("Could not find cluster for context %+v", context)
 			}
 
+			dnsSubdomainName, err := GetValidDNSSubdomainName(context.Name)
+			if err != nil {
+				Failf("Could not convert context name %s to a valid dns subdomain name, error: %s", context.Name, err)
+			}
 			e2eContexts = append(e2eContexts, E2EContext{
-				Name:    context.Name,
+				RawName: context.Name,
+				Name:    dnsSubdomainName,
 				Cluster: cluster,
 				User:    user,
 			})

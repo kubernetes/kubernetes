@@ -206,6 +206,10 @@ function kube-up() {
     # other clusters as well. Extract the information about only this cluster
     # and then create a file with that.
     # For now, we use the whole kubeconfig file.
+    # Note: This is not as dangerous as it sounds because this code path is
+    # only expected to run during tests. Users are not expected to set
+    # FEDERATION=true while bringing up their kubernetes clusters.
+    # But there is nothing stopping them from doing so.
     cp $KUBECONFIG $DEST_KUBECONFIG >&2
   fi
 
