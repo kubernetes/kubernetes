@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.DeleteRC(f.Client, f.Namespace.Name, "node-selector"))
 	})
 
-	It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+	It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp] [Flaky]", func() {
 		framework.SkipUnlessProviderIs("gke")
 
 		By("Creating new node-pool with one n1-standard-4 machine")
