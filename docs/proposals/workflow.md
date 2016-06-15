@@ -55,13 +55,13 @@ type Workflow struct {
   unversioned.TypeMeta `json:",inline"`
 
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/v1.3.0-beta.0/docs/devel/api-conventions.md#metadata.
+  // More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata.
   api.ObjectMeta `json:"metadata,omitempty"`
 
-  // Spec defines the expected behavior of a Workflow. More info: http://releases.k8s.io/v1.3.0-beta.0/docs/devel/api-conventions.md#spec-and-status.
+  // Spec defines the expected behavior of a Workflow. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#spec-and-status.
   Spec WorkflowSpec `json:"spec,omitempty"`
 
-  // Status represents the current status of the Workflow. More info: http://releases.k8s.io/v1.3.0-beta.0/docs/devel/api-conventions.md#spec-and-status.
+  // Status represents the current status of the Workflow. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#spec-and-status.
   Status WorkflowStatus `json:"status,omitempty"`
 }
 
@@ -70,7 +70,7 @@ type WorkflowList struct {
   unversioned.TypeMeta `json:",inline"`
 
   // Standard list metadata
-  // More info: http://releases.k8s.io/v1.3.0-beta.0/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata
   unversioned.ListMeta `json:"metadata,omitempty"`
 
   // Items is the list of Workflow
@@ -80,7 +80,7 @@ type WorkflowList struct {
 // WorkflowSpec contains Workflow specification
 type WorkflowSpec struct {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/v1.3.0-beta.0/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata
   api.ObjectMeta `json:"metadata,omitempty"`
 
   //ActiveDealineSeconds contains
@@ -174,11 +174,11 @@ Reported for readability:
 ```go
 type JobTemplateSpec struct {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/v1.3.0-beta.0/docs/devel/api-conventions.md#metadata
+  // More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata
   api.ObjectMeta
 
   // Spec is a structure defining the expected behavior of a job.
-  // More info: http://releases.k8s.io/v1.3.0-beta.0/docs/devel/api-conventions.md#spec-and-status
+  // More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#spec-and-status
   Spec JobSpec
 }
 ```

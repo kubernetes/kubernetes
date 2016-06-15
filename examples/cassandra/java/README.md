@@ -3,7 +3,7 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Cassandra on Kubernetes Custom Seed Provider: releases.k8s.io/v1.3.0-beta.0
+# Cassandra on Kubernetes Custom Seed Provider: releases.k8s.io/release-1.3
 
 Within any deployment of Cassandra a Seed Provider is used to for node discovery and communication.  When a Cassandra node first starts it must discover which nodes, or seeds, for the information about the Cassandra nodes in the ring / rack / datacenter.
 
