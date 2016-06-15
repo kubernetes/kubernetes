@@ -49,6 +49,8 @@ const (
 	FederatedServiceName = "federated-service"
 	FederatedServicePod  = "federated-service-test-pod"
 
+	DefaultFederationName = "federation"
+
 	// TODO: Only suppoprts IPv4 addresses. Also add a regexp for IPv6 addresses.
 	FederatedIPAddrRegexp  = `(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])`
 	FederatedDNS1123Regexp = `([a-z0-9]([-a-z0-9]*[a-z0-9])?\.)*([a-z0-9]([-a-z0-9]*[a-z0-9])?)`
@@ -64,8 +66,7 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 
 		// TODO: Federation API server should be able to answer this.
 		if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
-			// Tests cannot proceed without this value, so fail early here.
-			framework.Failf("FEDERATION_NAME environment variable must be set")
+			federationName = DefaultFederationName
 		}
 
 		contexts := f.GetUnderlyingFederatedContexts()
