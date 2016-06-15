@@ -105,7 +105,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 // Verify that the cluster is marked ready.
 func isReady(clusterName string, clientset *federation_internalclientset.Clientset) error {
-	return wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	return wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 		c, err := clientset.Federation().Clusters().Get(clusterName)
 		if err != nil {
 			return false, err
