@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -264,6 +265,78 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	}
 	if pv.Spec.ClaimRef.Namespace != claimRef.Namespace || pv.Spec.ClaimRef.Name != claimRef.Name {
 		t.Fatalf("Bind mismatch! Expected %s/%s but got %s/%s", claimRef.Namespace, claimRef.Name, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	}
+}
+
+// TestPersistentVolumeClaimLabelSelector test binding using label selectors
+func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	defer watchPV.Stop()
+	defer watchPVC.Stop()
+
+	controller.Run()
+	defer controller.Stop()
+
+	var (
+		err     error
+		modes   = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+		reclaim = api.PersistentVolumeReclaimRetain
+
+		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
+		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
+		pvc      = createPVC("pvc-ls-1", "1G", modes)
+	)
+
+	pv_true.ObjectMeta.SetLabels(map[string]string{"foo": "true"})
+	pv_false.ObjectMeta.SetLabels(map[string]string{"foo": "false"})
+
+	_, err = testClient.PersistentVolumes().Create(pv_true)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolume: %v", err)
+	}
+	_, err = testClient.PersistentVolumes().Create(pv_false)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolume: %v", err)
+	}
+	t.Log("volumes created")
+
+	pvc.Spec.Selector = &unversioned.LabelSelector{
+		MatchLabels: map[string]string{
+			"foo": "true",
+		},
+	}
+
+	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolumeClaim: %v", err)
+	}
+	t.Log("claim created")
+
+	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+	t.Log("volume bound")
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	t.Log("claim bound")
+
+	pv, err := testClient.PersistentVolumes().Get("pv-false")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef != nil {
+		t.Fatalf("False PV shouldn't be bound")
+	}
+	pv, err = testClient.PersistentVolumes().Get("pv-true")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef == nil {
+		t.Fatalf("True PV should be bound")
+	}
+	if pv.Spec.ClaimRef.Namespace != pvc.Namespace || pv.Spec.ClaimRef.Name != pvc.Name {
+		t.Fatalf("Bind mismatch! Expected %s/%s but got %s/%s", pvc.Namespace, pvc.Name, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
 	}
 }
 
