@@ -42,7 +42,7 @@ entries.
 ## Design
 
 Instead of a single Timestamp, each event object
-[contains](http://releases.k8s.io/v1.3.0-beta.0/pkg/api/types.go#L1111) the following
+[contains](http://releases.k8s.io/release-1.3/pkg/api/types.go#L1111) the following
 fields:
  * `FirstTimestamp unversioned.Time`
    * The date/time of the first occurrence of the event.
@@ -103,7 +103,7 @@ of time and generates tons of unique events, the previously generated events
 cache will not grow unchecked in memory. Instead, after 4096 unique events are
 generated, the oldest events are evicted from the cache.
  * When an event is generated, the previously generated events cache is checked
-(see [`pkg/client/unversioned/record/event.go`](http://releases.k8s.io/v1.3.0-beta.0/pkg/client/record/event.go)).
+(see [`pkg/client/unversioned/record/event.go`](http://releases.k8s.io/release-1.3/pkg/client/record/event.go)).
    * If the key for the new event matches the key for a previously generated
 event (meaning all of the above fields match between the new event and some
 previously generated event), then the event is considered to be a duplicate and

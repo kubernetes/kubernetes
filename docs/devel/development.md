@@ -19,7 +19,7 @@ branch, but release branches of Kubernetes should not change.
 
 Official releases are built using Docker containers. To build Kubernetes using
 Docker please follow [these
-instructions](http://releases.k8s.io/v1.3.0-beta.0/build/README.md).
+instructions](http://releases.k8s.io/release-1.3/build/README.md).
 
 ### Go development environment
 

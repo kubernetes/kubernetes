@@ -77,7 +77,7 @@ requested - this should not be the norm, but it may happen.
 See the [cherrypick queue dashboard](http://cherrypick.k8s.io/#/queue) for
 status of PRs labeled as `cherrypick-candidate`.
 
-[Contributor License Agreements](http://releases.k8s.io/v1.3.0-beta.0/CONTRIBUTING.md) is
+[Contributor License Agreements](http://releases.k8s.io/release-1.3/CONTRIBUTING.md) is
 considered implicit for all code within cherry-pick pull requests, ***unless
 there is a large conflict***.
 
