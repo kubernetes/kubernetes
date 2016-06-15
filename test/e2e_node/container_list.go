@@ -48,7 +48,7 @@ var ImageRegistry = map[int]string{
 	busyBoxImage:  "gcr.io/google_containers/busybox:1.24",
 	hostExecImage: "gcr.io/google_containers/hostexec:1.2",
 	netExecImage:  "gcr.io/google_containers/netexec:1.4",
-	nginxImage:    "gcr.io/google_containers/nginx:1.7.9",
+	nginxImage:    "gcr.io/google_containers/nginx-slim:0.7",
 	pauseImage:    framework.GetPauseImageNameForHostArch(),
 }
 
