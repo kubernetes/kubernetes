@@ -187,7 +187,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins(), "" /* rootContext */)
 }
 
 func TestCanSupport(t *testing.T) {
@@ -199,8 +199,8 @@ func TestCanSupport(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plugin.Name() != secretPluginName {
-		t.Errorf("Wrong name: %s", plugin.Name())
+	if plugin.GetPluginName() != secretPluginName {
+		t.Errorf("Wrong name: %s", plugin.GetPluginName())
 	}
 	if !plugin.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: ""}}}}) {
 		t.Errorf("Expected true")

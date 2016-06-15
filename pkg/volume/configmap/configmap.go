@@ -50,12 +50,25 @@ func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *configMapPlugin) Name() string {
+func (plugin *configMapPlugin) GetPluginName() string {
 	return configMapPluginName
+}
+
+func (plugin *configMapPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a ConfigMap volume type")
+	}
+
+	return volumeSource.Name, nil
 }
 
 func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
+}
+
+func (plugin *configMapPlugin) RequiresRemount() bool {
+	return true
 }
 
 func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
@@ -225,4 +238,16 @@ func (c *configMapVolumeUnmounter) TearDownAt(dir string) error {
 		return err
 	}
 	return wrapped.TearDownAt(dir)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.ConfigMapVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.ConfigMapVolumeSource
+
+	if spec.Volume != nil && spec.Volume.ConfigMap != nil {
+		volumeSource = spec.Volume.ConfigMap
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

@@ -16765,9 +16765,9 @@
      "volumesInUse": {
       "type": "array",
       "items": {
-       "$ref": "v1.UniqueDeviceName"
+       "$ref": "v1.UniqueVolumeName"
       },
-      "description": "List of volumes in use (mounted) by the node."
+      "description": "List of attachable volumes in use (mounted) by the node."
      }
     }
    },
@@ -16926,8 +16926,8 @@
      }
     }
    },
-   "v1.UniqueDeviceName": {
-    "id": "v1.UniqueDeviceName",
+   "v1.UniqueVolumeName": {
+    "id": "v1.UniqueVolumeName",
     "properties": {}
    },
    "v1.PersistentVolumeClaimList": {

@@ -52,8 +52,20 @@ func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *glusterfsPlugin) Name() string {
+func (plugin *glusterfsPlugin) GetPluginName() string {
 	return glusterfsPluginName
+}
+
+func (plugin *glusterfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		"%v:%v",
+		volumeSource.EndpointsName,
+		volumeSource.Path), nil
 }
 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -63,7 +75,10 @@ func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	return true
+}
 
+func (plugin *glusterfsPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -274,4 +289,16 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		return fmt.Errorf("glusterfs: mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logerror)
 	}
 	return fmt.Errorf("glusterfs: mount failed: %v", errs)
+}
+
+func getVolumeSource(
+	spec *volume.Spec) (*api.GlusterfsVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
+		return spec.Volume.Glusterfs, spec.Volume.Glusterfs.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Glusterfs != nil {
+		return spec.PersistentVolume.Spec.Glusterfs, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a Gluster volume type")
 }

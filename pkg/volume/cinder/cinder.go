@@ -74,12 +74,25 @@ func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *cinderPlugin) Name() string {
+func (plugin *cinderPlugin) GetPluginName() string {
 	return cinderVolumePluginName
+}
+
+func (plugin *cinderPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.VolumeID, nil
 }
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.Cinder != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder != nil)
+}
+
+func (plugin *cinderPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *cinderPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -93,16 +106,13 @@ func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume
 }
 
 func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Mounter, error) {
-	var cinder *api.CinderVolumeSource
-	if spec.Volume != nil && spec.Volume.Cinder != nil {
-		cinder = spec.Volume.Cinder
-	} else {
-		cinder = spec.PersistentVolume.Spec.Cinder
+	cinder, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	pdName := cinder.VolumeID
 	fsType := cinder.FSType
-	readOnly := cinder.ReadOnly
 
 	return &cinderVolumeMounter{
 		cinderVolume: &cinderVolume{
@@ -457,4 +467,15 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 	}
 	return pv, nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.CinderVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.Cinder != nil {
+		return spec.Volume.Cinder, spec.Volume.Cinder.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Cinder != nil {
+		return spec.PersistentVolume.Spec.Cinder, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a Cinder volume type")
 }

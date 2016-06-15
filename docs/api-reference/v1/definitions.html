@@ -596,10 +596,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
-<h3 id="_v1_uniquedevicename">v1.UniqueDeviceName</h3>
-
-</div>
-<div class="sect2">
 <h3 id="_v1_preconditions">v1.Preconditions</h3>
 <div class="paragraph">
 <p>Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.</p>
@@ -2772,6 +2768,10 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
+<h3 id="_v1_uniquevolumename">v1.UniqueVolumeName</h3>
+
+</div>
+<div class="sect2">
 <h3 id="_unversioned_labelselector">unversioned.LabelSelector</h3>
 <div class="paragraph">
 <p>A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.</p>
@@ -4757,9 +4757,9 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">volumesInUse</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">List of volumes in use (mounted) by the node.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of attachable volumes in use (mounted) by the node.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_uniquedevicename">v1.UniqueDeviceName</a> array</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_uniquevolumename">v1.UniqueVolumeName</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -8105,7 +8105,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-06-06 17:05:06 UTC
+Last updated 2016-06-08 04:10:38 UTC
 </div>
 </div>
 </body>

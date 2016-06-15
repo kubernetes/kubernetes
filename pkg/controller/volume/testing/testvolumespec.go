@@ -22,7 +22,7 @@ import (
 )
 
 // GetTestVolumeSpec returns a test volume spec
-func GetTestVolumeSpec(volumeName string, diskName api.UniqueDeviceName) *volume.Spec {
+func GetTestVolumeSpec(volumeName string, diskName api.UniqueVolumeName) *volume.Spec {
 	return &volume.Spec{
 		Volume: &api.Volume{
 			Name: volumeName,

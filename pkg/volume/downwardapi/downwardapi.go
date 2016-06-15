@@ -58,12 +58,26 @@ func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *downwardAPIPlugin) Name() string {
+func (plugin *downwardAPIPlugin) GetPluginName() string {
 	return downwardAPIPluginName
+}
+
+func (plugin *downwardAPIPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a DownwardAPI volume type")
+	}
+
+	// Return user defined volume name, since this is an ephemeral volume type
+	return spec.Name(), nil
 }
 
 func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
+}
+
+func (plugin *downwardAPIPlugin) RequiresRemount() bool {
+	return true
 }
 
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
@@ -228,4 +242,16 @@ func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
 
 func (b *downwardAPIVolumeMounter) getMetaDir() string {
 	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.DownwardAPIVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.DownwardAPIVolumeSource
+
+	if spec.Volume != nil && spec.Volume.DownwardAPI != nil {
+		volumeSource = spec.Volume.DownwardAPI
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

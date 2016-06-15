@@ -32,7 +32,7 @@ func TestGetDeviceName_Volume(t *testing.T) {
 	name := "my-pd-volume"
 	spec := createVSpec(name, false)
 
-	deviceName, err := plugin.GetDeviceName(spec)
+	deviceName, err := plugin.GetVolumeName(spec)
 	if err != nil {
 		t.Errorf("GetDeviceName error: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestGetDeviceName_PersistentVolume(t *testing.T) {
 	name := "my-pd-pv"
 	spec := createPVSpec(name, true)
 
-	deviceName, err := plugin.GetDeviceName(spec)
+	deviceName, err := plugin.GetVolumeName(spec)
 	if err != nil {
 		t.Errorf("GetDeviceName error: %v", err)
 	}
@@ -181,7 +181,11 @@ func TestAttachDetach(t *testing.T) {
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin() *gcePersistentDiskPlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
+	host := volumetest.NewFakeVolumeHost(
+		"/tmp", /* rootDir */
+		nil,    /* kubeClient */
+		nil,    /* plugins */
+		"" /* rootContext */)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)

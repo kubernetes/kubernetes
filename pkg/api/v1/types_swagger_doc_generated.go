@@ -880,7 +880,7 @@ var map_NodeStatus = map[string]string{
 	"daemonEndpoints": "Endpoints of daemons running on the Node.",
 	"nodeInfo":        "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
 	"images":          "List of container images on this node",
-	"volumesInUse":    "List of volumes in use (mounted) by the node.",
+	"volumesInUse":    "List of attachable volumes in use (mounted) by the node.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {

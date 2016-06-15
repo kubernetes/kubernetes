@@ -17,6 +17,7 @@ limitations under the License.
 package iscsi
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -52,8 +53,21 @@ func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *iscsiPlugin) Name() string {
+func (plugin *iscsiPlugin) GetPluginName() string {
 	return iscsiPluginName
+}
+
+func (plugin *iscsiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		"%v:%v:%v",
+		volumeSource.TargetPortal,
+		volumeSource.IQN,
+		volumeSource.Lun), nil
 }
 
 func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
@@ -62,6 +76,10 @@ func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	return true
+}
+
+func (plugin *iscsiPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *iscsiPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -79,14 +97,9 @@ func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.
 func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Mounter, error) {
 	// iscsi volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// iscsi volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	var readOnly bool
-	var iscsi *api.ISCSIVolumeSource
-	if spec.Volume != nil && spec.Volume.ISCSI != nil {
-		iscsi = spec.Volume.ISCSI
-		readOnly = iscsi.ReadOnly
-	} else {
-		iscsi = spec.PersistentVolume.Spec.ISCSI
-		readOnly = spec.ReadOnly
+	iscsi, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	lun := strconv.Itoa(int(iscsi.Lun))
@@ -205,4 +218,15 @@ func portalMounter(portal string) string {
 		portal = portal + ":3260"
 	}
 	return portal
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.ISCSIVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.ISCSI != nil {
+		return spec.Volume.ISCSI, spec.Volume.ISCSI.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.ISCSI != nil {
+		return spec.PersistentVolume.Spec.ISCSI, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a ISCSI volume type")
 }

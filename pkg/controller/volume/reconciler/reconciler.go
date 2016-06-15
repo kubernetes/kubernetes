@@ -23,13 +23,16 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/controller/volume/attacherdetacher"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the with
 // the actual state of the world by triggering attach detach operations.
+// Note: This is distinct from the Reconciler implemented by the kubelet volume
+// manager. This reconciles state for the attach/detach controller. That
+// reconciles state for the kubelet volume manager.
 type Reconciler interface {
 	// Starts running the reconciliation loop which executes periodically, checks
 	// if volumes that should be attached are attached and volumes that should
@@ -52,7 +55,7 @@ func NewReconciler(
 	maxWaitForUnmountDuration time.Duration,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
-	attacherDetacher attacherdetacher.AttacherDetacher) Reconciler {
+	attacherDetacher operationexecutor.OperationExecutor) Reconciler {
 	return &reconciler{
 		loopPeriod:                loopPeriod,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
@@ -67,7 +70,7 @@ type reconciler struct {
 	maxWaitForUnmountDuration time.Duration
 	desiredStateOfWorld       cache.DesiredStateOfWorld
 	actualStateOfWorld        cache.ActualStateOfWorld
-	attacherDetacher          attacherdetacher.AttacherDetacher
+	attacherDetacher          operationexecutor.OperationExecutor
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -86,7 +89,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				// Volume exists in actual state of world but not desired
 				if !attachedVolume.MountedByNode {
 					glog.V(5).Infof("Attempting to start DetachVolume for volume %q to node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
-					err := rc.attacherDetacher.DetachVolume(attachedVolume, rc.actualStateOfWorld)
+					err := rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, rc.actualStateOfWorld)
 					if err == nil {
 						glog.Infof("Started DetachVolume for volume %q to node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 					}
@@ -98,7 +101,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					}
 					if timeElapsed > rc.maxWaitForUnmountDuration {
 						glog.V(5).Infof("Attempting to start DetachVolume for volume %q to node %q. Volume is not safe to detach, but maxWaitForUnmountDuration expired.", attachedVolume.VolumeName, attachedVolume.NodeName)
-						err := rc.attacherDetacher.DetachVolume(attachedVolume, rc.actualStateOfWorld)
+						err := rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, rc.actualStateOfWorld)
 						if err == nil {
 							glog.Infof("Started DetachVolume for volume %q to node %q due to maxWaitForUnmountDuration expiry.", attachedVolume.VolumeName, attachedVolume.NodeName)
 						}
@@ -121,7 +124,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 			} else {
 				// Volume/Node doesn't exist, spawn a goroutine to attach it
 				glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
-				err := rc.attacherDetacher.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
+				err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 				if err == nil {
 					glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
