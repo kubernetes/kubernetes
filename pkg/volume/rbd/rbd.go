@@ -17,6 +17,7 @@ limitations under the License.
 package rbd
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	"github.com/golang/glog"
@@ -85,7 +86,7 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 			return nil, err
 		}
 		for name, data := range secretName.Data {
-			secret = string(data)
+			secret = base64.StdEncoding.EncodeToString(data)
 			glog.V(1).Infof("ceph secret info: %s/%s", name, secret)
 		}
 
