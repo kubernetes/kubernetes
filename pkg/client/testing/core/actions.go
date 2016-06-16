@@ -137,6 +137,15 @@ func NewPatchAction(resource unversioned.GroupVersionResource, namespace string,
 	return action
 }
 
+func NewPatchSubresourceAction(resource unversioned.GroupVersionResource, subresource string) PatchActionImpl {
+	action := PatchActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Subresource = subresource
+
+	return action
+}
+
 func NewRootUpdateSubresourceAction(resource unversioned.GroupVersionResource, subresource string, object runtime.Object) UpdateActionImpl {
 	action := UpdateActionImpl{}
 	action.Verb = "update"
