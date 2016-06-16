@@ -263,6 +263,9 @@ type KubeletConfiguration struct {
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
+	// runtimeRequestTimeout is the timeout for all runtime requests except long running
+	// requests - pull, logs, exec and attach.
+	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout,omitempty"`
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath,omitempty"`
