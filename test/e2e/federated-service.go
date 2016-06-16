@@ -262,6 +262,10 @@ func createService(fcs *federation_internalclientset.Clientset, clusterClientSet
 }
 
 func discoverService(f *framework.Framework, name string, exists bool) {
+	command := []string{"nslookup", name}
+
+	framework.Logf("Looking for the service with pod command %q", command)
+
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   FederatedServicePod,
@@ -272,7 +276,7 @@ func discoverService(f *framework.Framework, name string, exists bool) {
 				{
 					Name:    "federated-service-discovery-container",
 					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"sh", "-c", "nslookup", name},
+					Command: command,
 				},
 			},
 			RestartPolicy: api.RestartPolicyNever,
