@@ -49,6 +49,7 @@ import (
 	aws_credentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const ProviderName = "aws"
@@ -198,6 +199,7 @@ type EC2Metadata interface {
 type VolumeOptions struct {
 	CapacityGB int
 	Tags       map[string]string
+	PVCName    string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -914,6 +916,46 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 	return aws.getInstancesByRegex(filter)
 }
 
+// getAllZones retrieves  a list of all the zones in which nodes are running
+// It currently involves querying all instances
+func (c *AWSCloud) getAllZones() (sets.String, error) {
+	// TODO: Caching, although we currently only use this in volume creation
+	// TODO: We could also query for subnets, I think
+
+	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
+	filters = c.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	instances, err := c.ec2.DescribeInstances(request)
+	if err != nil {
+		return nil, err
+	}
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no instances returned")
+	}
+
+	zones := sets.NewString()
+
+	for _, instance := range instances {
+		// Only return fully-ready instances when listing instances
+		// (vs a query by name, where we will return it if we find it)
+		if orEmpty(instance.State.Name) == "pending" {
+			glog.V(2).Infof("Skipping EC2 instance (pending): %s", *instance.InstanceId)
+			continue
+		}
+
+		if instance.Placement != nil {
+			zone := aws.StringValue(instance.Placement.AvailabilityZone)
+			zones.Insert(zone)
+		}
+	}
+
+	glog.V(2).Infof("Found instances in zones %s", zones)
+	return zones, nil
+}
+
 // GetZone implements Zones.GetZone
 func (c *AWSCloud) GetZone() (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{
@@ -1387,11 +1429,14 @@ func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, e
 	return hostDevicePath, err
 }
 
-// Implements Volumes.CreateVolume
+// CreateDisk implements Volumes.CreateDisk
 func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
-	// Default to creating in the current zone
-	// TODO: Spread across zones?
-	createAZ := s.selfAWSInstance.availabilityZone
+	allZones, err := s.getAllZones()
+	if err != nil {
+		return "", fmt.Errorf("error querying for all zones: %v", err)
+	}
+
+	createAZ := volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
 
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}

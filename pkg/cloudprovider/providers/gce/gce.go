@@ -2066,6 +2066,38 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	return instances, nil
 }
 
+// GetAllZones returns all the zones in which nodes are running
+func (gce *GCECloud) GetAllZones() (sets.String, error) {
+	if len(gce.managedZones) == 1 {
+		return sets.NewString(gce.managedZones...), nil
+	}
+
+	// TODO: Caching, but this is currently only called when we are creating a volume,
+	// which is a relatively infrequent operation, and this is only # zones API calls
+	zones := sets.NewString()
+
+	// TODO: Parallelize, although O(zones) so not too bad (N <= 3 typically)
+	for _, zone := range gce.managedZones {
+		// We only retrieve one page in each zone - we only care about existence
+		listCall := gce.service.Instances.List(gce.projectID, zone)
+
+		// No filter: We assume that a zone is either used or unused
+
+		// Just a minimal set of fields - we only care about existence
+		listCall = listCall.Fields("items(name)")
+
+		res, err := listCall.Do()
+		if err != nil {
+			return nil, err
+		}
+		if len(res.Items) != 0 {
+			zones.Insert(zone)
+		}
+	}
+
+	return zones, nil
+}
+
 func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
 	for _, item := range metadata.Items {
 		if item.Key == key {
