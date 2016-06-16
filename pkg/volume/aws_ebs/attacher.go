@@ -65,12 +65,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 	return devicePath, nil
 }
 
-func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
-	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
-	if err != nil {
-		return "", err
-	}
-
+func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -82,11 +77,8 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
 
-	devicePath := ""
-	if d, err := awsCloud.GetDiskPath(volumeID); err == nil {
-		devicePath = d
-	} else {
-		glog.Errorf("GetDiskPath %q gets error %v", volumeID, err)
+	if devicePath == "" {
+		return "", fmt.Errorf("WaitForAttach failed for AWS Volume %q: devicePath is empty.", volumeID)
 	}
 
 	ticker := time.NewTicker(checkSleepDuration)
@@ -98,13 +90,6 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
-			if devicePath == "" {
-				if d, err := awsCloud.GetDiskPath(volumeID); err == nil {
-					devicePath = d
-				} else {
-					glog.Errorf("GetDiskPath %q gets error %v", volumeID, err)
-				}
-			}
 			if devicePath != "" {
 				devicePaths := getDiskByIdPaths(partition, devicePath)
 				path, err := verifyDevicePath(devicePaths)

@@ -57,7 +57,7 @@ type ActualStateOfWorld interface {
 	// If a volume with the same generated name already exists, this is a noop.
 	// If no volume plugin can support the given volumeSpec or more than one
 	// plugin can support it, an error is returned.
-	AddVolume(volumeSpec *volume.Spec) (api.UniqueVolumeName, error)
+	AddVolume(volumeSpec *volume.Spec, devicePath string) (api.UniqueVolumeName, error)
 
 	// AddPodToVolume adds the given pod to the given volume in the cache
 	// indicating the specified volume has been successfully mounted to the
@@ -108,14 +108,14 @@ type ActualStateOfWorld interface {
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, a volumeNotAttachedError is returned indicating the
 	// given volume is not yet attached.
-	// If a the given volumeName/podName combo exists but the value of
+	// If the given volumeName/podName combo exists but the value of
 	// remountRequired is true, a remountRequiredError is returned indicating
 	// the given volume has been successfully mounted to this pod but should be
 	// remounted to reflect changes in the referencing pod. Atomically updating
 	// volumes, depend on this to update the contents of the volume.
 	// All volume mounting calls should be idempotent so a second mount call for
 	// volumes that do not need to update contents should not fail.
-	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) (bool, error)
+	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) (bool, string, error)
 
 	// GetMountedVolumes generates and returns a list of volumes and the pods
 	// they are successfully attached and mounted for based on the current
@@ -224,9 +224,13 @@ type attachedVolume struct {
 	pluginIsAttachable bool
 
 	// globallyMounted indicates that the volume is mounted to the underlying
-	// device at a global mount point. This global mount point must unmounted
+	// device at a global mount point. This global mount point must be unmounted
 	// prior to detach.
 	globallyMounted bool
+
+	// devicePath contains the path on the node where the volume is attached for
+	// attachable volumes
+	devicePath string
 }
 
 // The mountedPod object represents a pod for which the kubelet volume manager
@@ -260,8 +264,8 @@ type mountedPod struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	volumeSpec *volume.Spec, nodeName string) error {
-	_, err := asw.AddVolume(volumeSpec)
+	volumeSpec *volume.Spec, nodeName string, devicePath string) error {
+	_, err := asw.AddVolume(volumeSpec, devicePath)
 	return err
 }
 
@@ -302,7 +306,7 @@ func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
 }
 
 func (asw *actualStateOfWorld) AddVolume(
-	volumeSpec *volume.Spec) (api.UniqueVolumeName, error) {
+	volumeSpec *volume.Spec, devicePath string) (api.UniqueVolumeName, error) {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -338,6 +342,7 @@ func (asw *actualStateOfWorld) AddVolume(
 			pluginName:         volumePlugin.GetPluginName(),
 			pluginIsAttachable: pluginIsAttachable,
 			globallyMounted:    false,
+			devicePath:         devicePath,
 		}
 		asw.attachedVolumes[volumeName] = volumeObj
 	}
@@ -469,21 +474,22 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName api.UniqueVolumeName) err
 }
 
 func (asw *actualStateOfWorld) PodExistsInVolume(
-	podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) (bool, error) {
+	podName volumetypes.UniquePodName,
+	volumeName api.UniqueVolumeName) (bool, string, error) {
 	asw.RLock()
 	defer asw.RUnlock()
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
-		return false, newVolumeNotAttachedError(volumeName)
+		return false, "", newVolumeNotAttachedError(volumeName)
 	}
 
 	podObj, podExists := volumeObj.mountedPods[podName]
 	if podExists && podObj.remountRequired {
-		return true, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
+		return true, volumeObj.devicePath, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
 	}
 
-	return podExists, nil
+	return podExists, volumeObj.devicePath, nil
 }
 
 func (asw *actualStateOfWorld) GetMountedVolumes() []MountedVolume {

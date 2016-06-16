@@ -24,6 +24,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/statusupdater"
+	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
@@ -55,13 +57,15 @@ func NewReconciler(
 	maxWaitForUnmountDuration time.Duration,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
-	attacherDetacher operationexecutor.OperationExecutor) Reconciler {
+	attacherDetacher operationexecutor.OperationExecutor,
+	nodeStatusUpdater statusupdater.NodeStatusUpdater) Reconciler {
 	return &reconciler{
 		loopPeriod:                loopPeriod,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
 		desiredStateOfWorld:       desiredStateOfWorld,
 		actualStateOfWorld:        actualStateOfWorld,
 		attacherDetacher:          attacherDetacher,
+		nodeStatusUpdater:         nodeStatusUpdater,
 	}
 }
 
@@ -71,6 +75,7 @@ type reconciler struct {
 	desiredStateOfWorld       cache.DesiredStateOfWorld
 	actualStateOfWorld        cache.ActualStateOfWorld
 	attacherDetacher          operationexecutor.OperationExecutor
+	nodeStatusUpdater         statusupdater.NodeStatusUpdater
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -88,10 +93,22 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				attachedVolume.VolumeName, attachedVolume.NodeName) {
 				// Volume exists in actual state of world but not desired
 				if !attachedVolume.MountedByNode {
-					glog.V(5).Infof("Attempting to start DetachVolume for volume %q to node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+					glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 					err := rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, rc.actualStateOfWorld)
 					if err == nil {
-						glog.Infof("Started DetachVolume for volume %q to node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+						glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+					}
+					if err != nil &&
+						!goroutinemap.IsAlreadyExists(err) &&
+						!goroutinemap.IsExponentialBackoff(err) {
+						// Ignore goroutinemap.IsAlreadyExists && goroutinemap.IsExponentialBackoff errors, they are expected.
+						// Log all other errors.
+						glog.Errorf(
+							"operationExecutor.DetachVolume failed to start for volume %q (spec.Name: %q) from node %q with err: %v",
+							attachedVolume.VolumeName,
+							attachedVolume.VolumeSpec.Name(),
+							attachedVolume.NodeName,
+							err)
 					}
 				} else {
 					// If volume is not safe to detach (is mounted) wait a max amount of time before detaching any way.
@@ -100,10 +117,22 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						glog.Errorf("Unexpected error actualStateOfWorld.MarkDesireToDetach(): %v", err)
 					}
 					if timeElapsed > rc.maxWaitForUnmountDuration {
-						glog.V(5).Infof("Attempting to start DetachVolume for volume %q to node %q. Volume is not safe to detach, but maxWaitForUnmountDuration expired.", attachedVolume.VolumeName, attachedVolume.NodeName)
+						glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q. Volume is not safe to detach, but maxWaitForUnmountDuration expired.", attachedVolume.VolumeName, attachedVolume.NodeName)
 						err := rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, rc.actualStateOfWorld)
 						if err == nil {
-							glog.Infof("Started DetachVolume for volume %q to node %q due to maxWaitForUnmountDuration expiry.", attachedVolume.VolumeName, attachedVolume.NodeName)
+							glog.Infof("Started DetachVolume for volume %q from node %q due to maxWaitForUnmountDuration expiry.", attachedVolume.VolumeName, attachedVolume.NodeName)
+						}
+						if err != nil &&
+							!goroutinemap.IsAlreadyExists(err) &&
+							!goroutinemap.IsExponentialBackoff(err) {
+							// Ignore goroutinemap.IsAlreadyExists && goroutinemap.IsExponentialBackoff errors, they are expected.
+							// Log all other errors.
+							glog.Errorf(
+								"operationExecutor.DetachVolume failed to start (maxWaitForUnmountDuration expiry) for volume %q (spec.Name: %q) from node %q with err: %v",
+								attachedVolume.VolumeName,
+								attachedVolume.VolumeSpec.Name(),
+								attachedVolume.NodeName,
+								err)
 						}
 					}
 				}
@@ -117,7 +146,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				// Volume/Node exists, touch it to reset detachRequestedTime
 				glog.V(12).Infof("Volume %q/Node %q is attached--touching.", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				_, err := rc.actualStateOfWorld.AddVolumeNode(
-					volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+					volumeToAttach.VolumeSpec, volumeToAttach.NodeName, "" /* devicePath */)
 				if err != nil {
 					glog.Errorf("Unexpected error on actualStateOfWorld.AddVolumeNode(): %v", err)
 				}
@@ -128,7 +157,25 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				if err == nil {
 					glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
+				if err != nil &&
+					!goroutinemap.IsAlreadyExists(err) &&
+					!goroutinemap.IsExponentialBackoff(err) {
+					// Ignore goroutinemap.IsAlreadyExists && goroutinemap.IsExponentialBackoff errors, they are expected.
+					// Log all other errors.
+					glog.Errorf(
+						"operationExecutor.AttachVolume failed to start for volume %q (spec.Name: %q) to node %q with err: %v",
+						volumeToAttach.VolumeName,
+						volumeToAttach.VolumeSpec.Name(),
+						volumeToAttach.NodeName,
+						err)
+				}
 			}
+		}
+
+		// Update Node Status
+		err := rc.nodeStatusUpdater.UpdateNodeStatuses()
+		if err != nil {
+			glog.Infof("UpdateNodeStatuses failed with: %v", err)
 		}
 	}
 }

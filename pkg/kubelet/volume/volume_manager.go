@@ -126,10 +126,13 @@ func NewVolumeManager(
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr),
 		actualStateOfWorld:  cache.NewActualStateOfWorld(hostName, volumePluginMgr),
-		operationExecutor:   operationexecutor.NewOperationExecutor(volumePluginMgr),
+		operationExecutor: operationexecutor.NewOperationExecutor(
+			kubeClient,
+			volumePluginMgr),
 	}
 
 	vm.reconciler = reconciler.NewReconciler(
+		kubeClient,
 		controllerAttachDetachEnabled,
 		reconcilerLoopSleepPeriod,
 		waitForAttachTimeout,
