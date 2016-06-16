@@ -28,18 +28,23 @@ limitations under the License.
 // Generation is governed by comment tags in the source.  Any package may
 // request DeepCopy generation by including a comment in the file-comments of
 // one file, of the form:
-//   // +k8s:deepcopy-gen=generate
-// or:
-//   // +k8s:deepcopy-gen=register
+//   // +k8s:deepcopy-gen=package
 //
-// Packages which specify `=generate` will have DeepCopy functions generated
-// into them.  Packages which specify `=register` will have DeepCopy functions
-// generated and registered with in `init()` function call to
-// `Scheme.AddGeneratedDeepCopyFuncs()`.
+// Packages can request that the generated DeepCopy functions be registered
+// with an `init()` function call to `Scheme.AddGeneratedDeepCopyFuncs()` by
+// changing the tag to:
+//   // +k8s:deepcopy-gen=package,register
 //
-// Individual types may opt out of DeepCopy generation by specifying a comment
-// of the form:
+// DeepCopy functions can be generated for individual types, rather than the
+// entire package by specifying a comment on the type definion of the form:
+//   // +k8s:deepcopy-gen=true
+//
+// When generating for a whole package, individual types may opt out of
+// DeepCopy generation by specifying a comment on the of the form:
 //   // +k8s:deepcopy-gen=false
+//
+// Note that registration is a whole-package option, and is not available for
+// individual types.
 package main
 
 import (
