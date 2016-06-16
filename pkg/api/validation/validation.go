@@ -2214,7 +2214,7 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fldPath *field.Path
 	return allErrs
 }
 
-// Validates the given template and ensures that it is in accordance with the desrired selector and replicas.
+// Validates the given template and ensures that it is in accordance with the desired selector and replicas.
 func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map[string]string, replicas int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
