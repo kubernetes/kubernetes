@@ -837,6 +837,18 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
+// WaitForFederationApiserverReady waits for the federation apiserver to be ready.
+// It tests the readiness by sending a GET request and expecting a non error response.
+func WaitForFederationApiserverReady(c *federation_internalclientset.Clientset) error {
+	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		_, err := c.Federation().Clusters().List(api.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 // WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
 func WaitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Client, pvName string, Poll, timeout time.Duration) error {
 	Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)

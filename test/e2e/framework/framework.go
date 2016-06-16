@@ -177,6 +177,10 @@ func (f *Framework) BeforeEach() {
 			f.FederationClientset_1_3, err = LoadFederationClientset_1_3()
 			Expect(err).NotTo(HaveOccurred())
 		}
+		By("Waiting for federation-apiserver to be ready")
+		err := WaitForFederationApiserverReady(f.FederationClientset)
+		Expect(err).NotTo(HaveOccurred())
+		By("federation-apiserver is ready")
 	}
 
 	By("Building a namespace api object")
