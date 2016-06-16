@@ -431,6 +431,85 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	deleteAllEtcdKeys()
 }
 
+// TestPersistentVolumeProvisionMultiPVCs tests provisioning of many PVCs.
+// This test is configurable by KUBE_INTEGRATION_PV_* variables.
+func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, binder, watchPV, watchPVC := createClients(t, s)
+	defer watchPV.Stop()
+	defer watchPVC.Stop()
+	binder.Run()
+	defer binder.Stop()
+
+	objCount := getObjectCount()
+	pvcs := make([]*api.PersistentVolumeClaim, objCount)
+	for i := 0; i < objCount; i++ {
+		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+		pvc.Annotations = map[string]string{
+			"volume.alpha.kubernetes.io/storage-class": "",
+		}
+		pvcs[i] = pvc
+	}
+
+	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: start")
+	// Create the claims in a separate goroutine to pop events from watchPVC
+	// early. It gets stuck with >3000 claims.
+	go func() {
+		for i := 0; i < objCount; i++ {
+			_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvcs[i])
+		}
+	}()
+
+	// Wait until the controller provisions and binds all of them
+	for i := 0; i < objCount; i++ {
+		waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
+		glog.V(1).Infof("%d claims bound", i+1)
+	}
+	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
+
+	// check that we have enough bound PVs
+	pvList, err := testClient.PersistentVolumes().List(api.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list volumes: %s", err)
+	}
+	if len(pvList.Items) != objCount {
+		t.Fatalf("Expected to get %d volumes, got %d", objCount, len(pvList.Items))
+	}
+	for i := 0; i < objCount; i++ {
+		pv := &pvList.Items[i]
+		if pv.Status.Phase != api.VolumeBound {
+			t.Fatalf("Expected volume %s to be bound, is %s instead", pv.Name, pv.Status.Phase)
+		}
+		glog.V(2).Infof("PV %q is bound to PVC %q", pv.Name, pv.Spec.ClaimRef.Name)
+	}
+
+	// Delete the claims
+	for i := 0; i < objCount; i++ {
+		_ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvcs[i].Name, nil)
+	}
+
+	// Wait for the PVs to get deleted by listing remaining volumes
+	// (delete events were unreliable)
+	for {
+		volumes, err := testClient.PersistentVolumes().List(api.ListOptions{})
+		if err != nil {
+			t.Fatalf("Failed to list volumes: %v", err)
+		}
+
+		glog.V(1).Infof("%d volumes remaining", len(volumes.Items))
+		if len(volumes.Items) == 0 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: volumes are deleted")
+
+	deleteAllEtcdKeys()
+}
+
 // TestPersistentVolumeMultiPVsDiffAccessModes tests binding of one PVC to two
 // PVs with different access modes.
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
@@ -583,7 +662,7 @@ func createClients(t *testing.T, s *httptest.Server) (*clientset.Clientset, *per
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000000, Burst: 1000000})
 
 	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */)
-	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{
+	plugin := &volumetest.FakeVolumePlugin{
 		PluginName:             "plugin-name",
 		Host:                   host,
 		Config:                 volume.VolumeConfig{},
@@ -594,11 +673,12 @@ func createClients(t *testing.T, s *httptest.Server) (*clientset.Clientset, *per
 		Unmounters:             nil,
 		Attachers:              nil,
 		Detachers:              nil,
-	}}
+	}
+	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fake_cloud.FakeCloud{}
 
 	syncPeriod := getSyncPeriod()
-	ctrl := persistentvolumecontroller.NewPersistentVolumeController(binderClient, syncPeriod, nil, plugins, cloud, "", nil, nil, nil)
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(binderClient, syncPeriod, plugin, plugins, cloud, "", nil, nil, nil)
 
 	watchPV, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
 	if err != nil {
