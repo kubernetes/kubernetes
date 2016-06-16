@@ -18,7 +18,6 @@ package generators
 
 import (
 	"io"
-	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
@@ -74,11 +73,9 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		groupName = ""
 	}
 	// allow user to define a group name that's different from the one parsed from the directory.
-	for _, comment := range c.Universe.Package(g.inputPacakge).DocComments {
-		comment = strings.TrimLeft(comment, "//")
-		if override, ok := types.ExtractCommentTags("+", comment)["groupName"]; ok && override != "" {
-			groupName = override
-		}
+	p := c.Universe.Package(g.inputPacakge)
+	if override, ok := types.ExtractCommentTags("+", p.DocComments)["groupName"]; ok && override != "" {
+		groupName = override
 	}
 
 	m := map[string]interface{}{

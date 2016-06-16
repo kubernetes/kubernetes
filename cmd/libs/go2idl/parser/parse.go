@@ -371,10 +371,7 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 		for _, f := range b.parsed[pkgPath] {
 			if strings.HasSuffix(f.name, "/doc.go") {
 				if f.file.Doc != nil {
-					tp := u.Package(pkgPath)
-					for _, c := range f.file.Doc.List {
-						tp.DocComments = append(tp.DocComments, c.Text)
-					}
+					u.Package(pkgPath).DocComments = splitLines(f.file.Doc.Text())
 				}
 			}
 		}
@@ -386,11 +383,11 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 			if ok {
 				t := b.walkType(u, nil, tn.Type())
 				c1 := b.priorCommentLines(obj.Pos(), 1)
-				t.CommentLines = c1.Text()
+				t.CommentLines = splitLines(c1.Text())
 				if c1 == nil {
-					t.SecondClosestCommentLines = b.priorCommentLines(obj.Pos(), 2).Text()
+					t.SecondClosestCommentLines = splitLines(b.priorCommentLines(obj.Pos(), 2).Text())
 				} else {
-					t.SecondClosestCommentLines = b.priorCommentLines(c1.List[0].Slash, 2).Text()
+					t.SecondClosestCommentLines = splitLines(b.priorCommentLines(c1.List[0].Slash, 2).Text())
 				}
 			}
 			tf, ok := obj.(*tc.Func)
@@ -416,6 +413,10 @@ func (b *Builder) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup 
 	position := b.fset.Position(pos)
 	key := fileLine{position.Filename, position.Line - lines}
 	return b.endLineToCommentGroup[key]
+}
+
+func splitLines(str string) []string {
+	return strings.Split(strings.TrimRight(str, "\n"), "\n")
 }
 
 func tcFuncNameToName(in string) types.Name {
@@ -494,7 +495,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 				Embedded:     f.Anonymous(),
 				Tags:         t.Tag(i),
 				Type:         b.walkType(u, nil, f.Type()),
-				CommentLines: b.priorCommentLines(f.Pos(), 1).Text(),
+				CommentLines: splitLines(b.priorCommentLines(f.Pos(), 1).Text()),
 			}
 			out.Members = append(out.Members, m)
 		}

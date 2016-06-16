@@ -39,8 +39,7 @@ import (
 // TODO: Basically we need to define a standard way of giving instructions to
 // autogenerators in the comments of a type. This is a first iteration of that.
 // TODO: allow multiple values per key?
-func ExtractCommentTags(marker, allLines string) map[string]string {
-	lines := strings.Split(allLines, "\n")
+func ExtractCommentTags(marker string, lines []string) map[string]string {
 	out := map[string]string{}
 	for _, line := range lines {
 		line = strings.Trim(line, " ")

@@ -268,7 +268,7 @@ func (b bodyGen) doAlias(sw *generator.SnippetWriter) error {
 		Members: []types.Member{
 			{
 				Name:         "Items",
-				CommentLines: fmt.Sprintf("items, if empty, will result in an empty %s\n", kind),
+				CommentLines: []string{fmt.Sprintf("items, if empty, will result in an empty %s\n", kind)},
 				Type:         b.t.Underlying,
 			},
 		},
@@ -410,7 +410,7 @@ type protoField struct {
 	Nullable bool
 	Extras   map[string]string
 
-	CommentLines string
+	CommentLines []string
 }
 
 var (
@@ -687,8 +687,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 	return fields, nil
 }
 
-func genComment(out io.Writer, comment, indent string) {
-	lines := strings.Split(comment, "\n")
+func genComment(out io.Writer, lines []string, indent string) {
 	for {
 		l := len(lines)
 		if l == 0 || len(lines[l-1]) != 0 {
