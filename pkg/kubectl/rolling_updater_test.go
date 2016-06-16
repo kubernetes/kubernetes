@@ -1370,7 +1370,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 	}
 }
 
-func TestUpdateWithRetries(t *testing.T) {
+func TestUpdateRcWithRetries(t *testing.T) {
 	codec := testapi.Default.Codec()
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "rc",
@@ -1403,8 +1403,8 @@ func TestUpdateWithRetries(t *testing.T) {
 	header := http.Header{}
 	header.Set("Content-Type", runtime.ContentTypeJSON)
 	updates := []*http.Response{
-		{StatusCode: 500, Header: header, Body: objBody(codec, &api.ReplicationController{})},
-		{StatusCode: 500, Header: header, Body: objBody(codec, &api.ReplicationController{})},
+		{StatusCode: 409, Header: header, Body: objBody(codec, &api.ReplicationController{})}, // conflict
+		{StatusCode: 409, Header: header, Body: objBody(codec, &api.ReplicationController{})}, // conflict
 		{StatusCode: 200, Header: header, Body: objBody(codec, &newRc)},
 	}
 	gets := []*http.Response{
@@ -1442,8 +1442,8 @@ func TestUpdateWithRetries(t *testing.T) {
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
-	if rc, err := updateWithRetries(
-		client.ReplicationControllers("default"), rc, func(c *api.ReplicationController) {
+	if rc, err := updateRcWithRetries(
+		client, "default", rc, func(c *api.ReplicationController) {
 			c.Spec.Selector["baz"] = "foobar"
 		}); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1451,7 +1451,7 @@ func TestUpdateWithRetries(t *testing.T) {
 		t.Errorf("Expected updated rc, got %+v", rc)
 	}
 	if len(updates) != 0 || len(gets) != 0 {
-		t.Errorf("Remaining updates %+v gets %+v", updates, gets)
+		t.Errorf("Remaining updates %#v gets %#v", updates, gets)
 	}
 }
 
