@@ -992,15 +992,22 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 
 	// check for pods that were not deleted
 	remaining := []string{}
+	remainingPods := []api.Pod{}
 	missingTimestamp := false
 	if pods, perr := c.Pods(namespace).List(api.ListOptions{}); perr == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s %s on node %s remains, has deletion timestamp %s", namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-			remaining = append(remaining, pod.Name)
+			remaining = append(remaining, fmt.Sprintf("%s{Reason=%s}", pod.Name, pod.Status.Reason))
+			remainingPods = append(remainingPods, pod)
 			if pod.DeletionTimestamp == nil {
 				missingTimestamp = true
 			}
 		}
+	}
+
+	// log pod status
+	if len(remainingPods) > 0 {
+		logPodStates(remainingPods)
 	}
 
 	// a timeout occurred
