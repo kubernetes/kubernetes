@@ -82,13 +82,15 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 
 	// The disk will be created in the zone in which this code is currently running
 	// TODO: We should support auto-provisioning volumes in multiple/specified zones
-	zone, err := cloud.GetZone()
+	zones, err := cloud.GetAllZones()
 	if err != nil {
 		glog.V(2).Infof("error getting zone information from GCE: %v", err)
 		return "", 0, nil, err
 	}
 
-	err = cloud.CreateDisk(name, zone.FailureDomain, int64(requestGB), *c.options.CloudTags)
+	zone := volume.ChooseZoneForVolume(zones, c.options.PVCName)
+
+	err = cloud.CreateDisk(name, zone, int64(requestGB), *c.options.CloudTags)
 	if err != nil {
 		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
 		return "", 0, nil, err
