@@ -18,16 +18,19 @@ package e2e
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -37,7 +40,10 @@ const (
 )
 
 // TODO support other ports besides 80
-var portForwardRegexp = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
+var (
+	portForwardRegexp        = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
+	portForwardPortToStdOutV = version.MustParse("v1.3.0-alpha.4")
+)
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *api.Pod {
 	return &api.Pod{
@@ -79,7 +85,44 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *a
 	}
 }
 
-func runPortForward(ns, podName string, port int) (*exec.Cmd, int) {
+type portForwardCommand struct {
+	cmd  *exec.Cmd
+	port int
+}
+
+// Stop attempts to gracefully stop `kubectl port-forward`, only killing it if necessary.
+// This helps avoid spdy goroutine leaks in the Kubelet.
+func (c *portForwardCommand) Stop() {
+	// SIGINT signals that kubectl port-forward should gracefully terminate
+	if err := c.cmd.Process.Signal(syscall.SIGINT); err != nil {
+		Logf("error sending SIGINT to kubectl port-forward: %v", err)
+	}
+
+	// try to wait for a clean exit
+	done := make(chan error)
+	go func() {
+		done <- c.cmd.Wait()
+	}()
+
+	expired := time.NewTimer(util.ForeverTestTimeout)
+	defer expired.Stop()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			// success
+			return
+		}
+		Logf("error waiting for kubectl port-forward to exit: %v", err)
+	case <-expired.C:
+		Logf("timed out waiting for kubectl port-forward to exit")
+	}
+
+	Logf("trying to forcibly kill kubectl port-forward")
+	tryKill(c.cmd)
+}
+
+func runPortForward(ns, podName string, port int) *portForwardCommand {
 	cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), podName, fmt.Sprintf(":%d", port))
 	// This is somewhat ugly but is the only way to retrieve the port that was picked
 	// by the port-forward command. We don't want to hard code the port as we have no
@@ -89,13 +132,24 @@ func runPortForward(ns, podName string, port int) (*exec.Cmd, int) {
 	if err != nil {
 		Failf("Failed to start port-forward command: %v", err)
 	}
-	defer stdout.Close()
-	defer stderr.Close()
 
 	buf := make([]byte, 128)
+
+	// After v1.3.0-alpha.4 (#17030), kubectl port-forward outputs port
+	// info to stdout, not stderr, so for version-skewed tests, look there
+	// instead.
+	var portOutput io.ReadCloser
+	if useStdOut, err := kubectlVersionGTE(portForwardPortToStdOutV); err != nil {
+		Failf("Failed to get kubectl version: %v", err)
+	} else if useStdOut {
+		portOutput = stdout
+	} else {
+		portOutput = stderr
+	}
+
 	var n int
 	Logf("reading from `kubectl port-forward` command's stderr")
-	if n, err = stderr.Read(buf); err != nil {
+	if n, err = portOutput.Read(buf); err != nil {
 		Failf("Failed to read from kubectl port-forward stderr: %v", err)
 	}
 	portForwardOutput := string(buf[:n])
@@ -109,7 +163,10 @@ func runPortForward(ns, podName string, port int) (*exec.Cmd, int) {
 		Failf("Error converting %s to an int: %v", match[1], err)
 	}
 
-	return cmd, listenPort
+	return &portForwardCommand{
+		cmd:  cmd,
+		port: listenPort,
+	}
 }
 
 func runKubectlWithTimeout(timeout time.Duration, args ...string) string {
@@ -138,13 +195,13 @@ var _ = Describe("Port forwarding", func() {
 			framework.WaitForPodRunning(pod.Name)
 
 			By("Running 'kubectl port-forward'")
-			cmd, listenPort := runPortForward(framework.Namespace.Name, pod.Name, 80)
-			defer tryKill(cmd)
+			cmd := runPortForward(framework.Namespace.Name, pod.Name, 80)
+			defer cmd.Stop()
 
 			By("Dialing the local port")
-			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", listenPort))
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
 			if err != nil {
-				Failf("Couldn't connect to port %d: %v", listenPort, err)
+				Failf("Couldn't connect to port %d: %v", cmd.port, err)
 			}
 
 			By("Closing the connection to the local port")
@@ -162,17 +219,17 @@ var _ = Describe("Port forwarding", func() {
 			framework.WaitForPodRunning(pod.Name)
 
 			By("Running 'kubectl port-forward'")
-			cmd, listenPort := runPortForward(framework.Namespace.Name, pod.Name, 80)
-			defer tryKill(cmd)
+			cmd := runPortForward(framework.Namespace.Name, pod.Name, 80)
+			defer cmd.Stop()
 
 			By("Dialing the local port")
-			addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%d", listenPort))
+			addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
 			if err != nil {
 				Failf("Error resolving tcp addr: %v", err)
 			}
 			conn, err := net.DialTCP("tcp", nil, addr)
 			if err != nil {
-				Failf("Couldn't connect to port %d: %v", listenPort, err)
+				Failf("Couldn't connect to port %d: %v", cmd.port, err)
 			}
 			defer func() {
 				By("Closing the connection to the local port")
@@ -209,13 +266,13 @@ var _ = Describe("Port forwarding", func() {
 			framework.WaitForPodRunning(pod.Name)
 
 			By("Running 'kubectl port-forward'")
-			cmd, listenPort := runPortForward(framework.Namespace.Name, pod.Name, 80)
-			defer tryKill(cmd)
+			cmd := runPortForward(framework.Namespace.Name, pod.Name, 80)
+			defer cmd.Stop()
 
 			By("Dialing the local port")
-			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", listenPort))
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
 			if err != nil {
-				Failf("Couldn't connect to port %d: %v", listenPort, err)
+				Failf("Couldn't connect to port %d: %v", cmd.port, err)
 			}
 			defer func() {
 				By("Closing the connection to the local port")

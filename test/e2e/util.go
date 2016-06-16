@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -109,6 +110,9 @@ const (
 	// quickly scan through output.
 	podPrintWidth = 55
 )
+
+// For parsing Kubectl version for version-skewed testing.
+var gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
 
 type CloudConfig struct {
 	ProjectID         string
@@ -903,6 +907,29 @@ func serverVersionGTE(v semver.Version, c client.VersionInterface) (bool, error)
 // "default-scheduler", breaking forward-compatibility with tests that rely on
 // finding events from the default scheduler.
 var multiSchedulerVersion = version.MustParse("v1.2.0-alpha.6")
+
+// kubectlVersionGTE returns true if the kubectl version is greater than or
+// equal to v.
+func kubectlVersionGTE(v semver.Version) (bool, error) {
+	kv, err := kubectlVersion()
+	if err != nil {
+		return false, err
+	}
+	return kv.GTE(v), nil
+}
+
+// kubectlVersion gets the version of kubectl that's currently being used (see
+// --kubectl-path in e2e.go to use an alternate kubectl).
+func kubectlVersion() (semver.Version, error) {
+	output := runKubectlOrDie("version", "--client")
+	matches := gitVersionRegexp.FindStringSubmatch(output)
+	if len(matches) != 2 {
+		return semver.Version{}, fmt.Errorf("Could not find kubectl version in output %v", output)
+	}
+	// Don't use the full match, as it contains "GitVersion:\"" and a
+	// trailing "\"".  Just use the submatch.
+	return version.Parse(matches[1])
+}
 
 func getSchedulerName(c client.VersionInterface) string {
 	serverVersionGTEMultiSchedulerVersion, err := serverVersionGTE(multiSchedulerVersion, c)
