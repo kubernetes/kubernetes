@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
@@ -178,7 +179,7 @@ func FindActiveOrLatest(newRS *extensions.ReplicaSet, oldRSs []*extensions.Repli
 		return nil
 	}
 
-	sort.Sort(sort.Reverse(controller.ReplicaSetsByCreationTimestamp(oldRSs)))
+	sort.Sort(sort.Reverse(replicaset.ReplicaSetsByCreationTimestamp(oldRSs)))
 	allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
 
 	switch len(allRSs) {

@@ -20,6 +20,7 @@ package replicaset
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -74,4 +75,76 @@ func (o overlappingReplicaSets) Less(i, j int) bool {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+// ReplicaSetsByCreationTimestamp sorts a list of ReplicationSets by creation timestamp, using their names as a tie breaker.
+type ReplicaSetsByCreationTimestamp []*extensions.ReplicaSet
+
+func (o ReplicaSetsByCreationTimestamp) Len() int      { return len(o) }
+func (o ReplicaSetsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+// ReplicaSetsBySizeOlder sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from old to new replica sets.
+type ReplicaSetsBySizeOlder []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeOlder) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeOlder) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeOlder) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(i, j)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
+}
+
+// ReplicaSetsBySizeNewer sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from new to old replica sets.
+type ReplicaSetsBySizeNewer []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeNewer) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeNewer) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(j, i)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
+}
+
+// ReplicaSetsByActiveness implements sort.Interface for []extensions.ReplicaSet
+// The primary key is whether the spec has active (>0) replicas, while age is
+// the secondary.
+type ReplicaSetsByActiveness []extensions.ReplicaSet
+
+func (list ReplicaSetsByActiveness) Len() int {
+	fmt.Println(len(list))
+	return len(list)
+}
+
+func (list ReplicaSetsByActiveness) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list ReplicaSetsByActiveness) Less(i, j int) bool {
+	iElem := list[i]
+	jElem := list[j]
+	iIsActive := iElem.Spec.Replicas > 0
+	jIsActive := jElem.Spec.Replicas > 0
+	if iIsActive == jIsActive {
+		// break the tie
+		iName := strings.TrimSuffix(iElem.Namespace+"/"+iElem.Name,
+			iElem.Labels["pod-template-hash"])
+		jName := strings.TrimSuffix(jElem.Namespace+"/"+jElem.Name,
+			jElem.Labels["pod-template-hash"])
+		if iName == jName {
+			return jElem.CreationTimestamp.Time.Before(iElem.CreationTimestamp.Time)
+		}
+		return iName < jName
+	}
+	return iIsActive
 }

@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -814,6 +815,14 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 }
 
 func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOptions) error {
+	desiredReplicas := rs.Spec.Replicas
+	currentReplicas := rs.Status.Replicas
+	// Hide empty ReplicaSets unless --show-all was passed
+	// TODO(therc): after #28352 lands, add a warning if any are hidden
+	if desiredReplicas == 0 && currentReplicas == 0 && !options.ShowAll {
+		return nil
+	}
+
 	name := rs.Name
 	namespace := rs.Namespace
 	containers := rs.Spec.Template.Spec.Containers
@@ -829,8 +838,6 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOption
 		}
 	}
 
-	desiredReplicas := rs.Spec.Replicas
-	currentReplicas := rs.Status.Replicas
 	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
 		name,
 		desiredReplicas,
@@ -858,6 +865,7 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOption
 }
 
 func printReplicaSetList(list *extensions.ReplicaSetList, w io.Writer, options PrintOptions) error {
+	sort.Sort(replicaset.ReplicaSetsByActiveness(list.Items))
 	for _, rs := range list.Items {
 		if err := printReplicaSet(&rs, w, options); err != nil {
 			return err

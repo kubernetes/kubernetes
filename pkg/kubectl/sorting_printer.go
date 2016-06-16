@@ -21,6 +21,7 @@ import (
 	"io"
 	"reflect"
 	"sort"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -185,16 +186,37 @@ func isLess(i, j reflect.Value) (bool, error) {
 
 func (r *RuntimeSort) Less(i, j int) bool {
 	iObj := r.objs[i]
+	iElem := reflect.ValueOf(iObj).Elem()
 	jObj := r.objs[j]
+	jElem := reflect.ValueOf(jObj).Elem()
+	if r.field == "" && iElem.Type().Name() == "ReplicaSet" && jElem.Type().Name() == "ReplicaSet" {
+		iIsActive := iElem.FieldByName("Spec").FieldByName("Replicas").Int() > 0
+		jIsActive := jElem.FieldByName("Spec").FieldByName("Replicas").Int() > 0
+		if iIsActive == jIsActive {
+			// break the tie
+			iName := strings.TrimSuffix(iElem.FieldByName("Namespace").String()+"/"+iElem.FieldByName("Name").String(),
+				iElem.FieldByName("Labels").MapIndex(reflect.ValueOf("pod-template-hash")).String())
+			jName := strings.TrimSuffix(jElem.FieldByName("Namespace").String()+"/"+jElem.FieldByName("Name").String(),
+				jElem.FieldByName("Labels").MapIndex(reflect.ValueOf("pod-template-hash")).String())
+			if iName == jName {
+				iTime := iElem.FieldByName("CreationTimestamp").Interface().(unversioned.Time)
+				jTime := jElem.FieldByName("CreationTimestamp").Interface().(unversioned.Time)
+				return jTime.Before(iTime)
+			}
+			return iName < jName
+
+		}
+		return iIsActive
+	}
 
 	parser := jsonpath.New("sorting")
 	parser.Parse(r.field)
 
-	iValues, err := parser.FindResults(reflect.ValueOf(iObj).Elem().Interface())
+	iValues, err := parser.FindResults(iElem.Interface())
 	if err != nil {
 		glog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, r.field, err)
 	}
-	jValues, err := parser.FindResults(reflect.ValueOf(jObj).Elem().Interface())
+	jValues, err := parser.FindResults(jElem.Interface())
 	if err != nil {
 		glog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, r.field, err)
 	}

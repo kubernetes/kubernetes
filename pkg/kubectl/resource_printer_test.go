@@ -1358,6 +1358,138 @@ func TestPrintDeployment(t *testing.T) {
 	}
 }
 
+func TestPrintReplicaSet(t *testing.T) {
+	tests := []struct {
+		replicaSet extensions.ReplicaSet
+		showAll    bool
+		expect     string
+	}{
+		{
+			extensions.ReplicaSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test1-show-all",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.ReplicaSetStatus{
+					Replicas: 10,
+				},
+			},
+			true, // showAll
+			"test1-show-all\t5\t10\t0s\n",
+		},
+		{
+			extensions.ReplicaSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test1-do-not-show-all",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.ReplicaSetStatus{
+					Replicas: 10,
+				},
+			},
+			false, // showAll
+			"test1-do-not-show-all\t5\t10\t0s\n",
+		},
+		{
+			extensions.ReplicaSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test2",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Replicas: 0,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.ReplicaSetStatus{
+					Replicas: 10,
+				},
+			},
+			false, // showAll
+			"test2\t0\t10\t0s\n",
+		},
+		{
+			extensions.ReplicaSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test3",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.ReplicaSetStatus{
+					Replicas: 0,
+				},
+			},
+			false, // showAll
+			"test3\t5\t0\t0s\n",
+		},
+		{
+			extensions.ReplicaSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test4-show-all",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Replicas: 0,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.ReplicaSetStatus{
+					Replicas: 0,
+				},
+			},
+			true, // showAll
+			"test4-show-all\t0\t0\t0s\n",
+		},
+		{
+			extensions.ReplicaSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test4-do-not-show-all",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Replicas: 0,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.ReplicaSetStatus{
+					Replicas: 0,
+				},
+			},
+			false, // showAll
+			"",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printReplicaSet(&test.replicaSet, buf, PrintOptions{false, false, false, false, test.showAll, false, false, "", []string{}})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
 func TestPrintDaemonSet(t *testing.T) {
 	tests := []struct {
 		ds         extensions.DaemonSet

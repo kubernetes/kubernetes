@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -71,6 +72,8 @@ var (
 		# List one or more resources by their type and names.
 		kubectl get rc/web service/frontend pods/web-pod-13je7`)
 )
+
+var rsAliases = map[string]bool{"replicaset": true, "replicasets": true, "rs": true}
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
@@ -304,6 +307,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	var withKind bool = allKinds
 	w := kubectl.GetNewTabWriter(out)
 	defer w.Flush()
+
+	if len(args) > 0 && sorter == nil && rsAliases[args[0]] {
+		sorter = kubectl.NewRuntimeSort("", objs)
+		sort.Sort(sorter)
+	}
 
 	// determine if printing multiple kinds of
 	// objects and enforce "show-kinds" flag if so
