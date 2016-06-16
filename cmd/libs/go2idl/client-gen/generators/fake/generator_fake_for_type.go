@@ -95,11 +95,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	}
 
 	// allow user to define a group name that's different from the one parsed from the directory.
-	for _, comment := range c.Universe.Package(g.inputPackage).DocComments {
-		comment = strings.TrimLeft(comment, "//")
-		if override, ok := types.ExtractCommentTags("+", comment)["groupName"]; ok {
-			groupName = override
-		}
+	p := c.Universe.Package(g.inputPackage)
+	if override, ok := types.ExtractCommentTags("+", p.DocComments)["groupName"]; ok {
+		groupName = override
 	}
 
 	m := map[string]interface{}{

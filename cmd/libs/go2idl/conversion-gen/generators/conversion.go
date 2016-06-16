@@ -232,11 +232,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// Only generate conversions for package which explicitly requested it
 		// byt setting "+genversion=true" in their doc.go file.
 		filtered := false
-		for _, comment := range p.DocComments {
-			comment := strings.Trim(comment, "//")
-			if types.ExtractCommentTags("+", comment)["genconversion"] == "true" {
-				filtered = true
-			}
+		if types.ExtractCommentTags("+", p.DocComments)["genconversion"] == "true" {
+			filtered = true
 		}
 		if !filtered {
 			continue

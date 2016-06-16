@@ -235,7 +235,7 @@ type Type struct {
 
 	// If there are comment lines immediately before the type definition,
 	// they will be recorded here.
-	CommentLines string
+	CommentLines []string
 
 	// If there are comment lines preceding the `CommentLines`, they will be
 	// recorded here. There are two cases:
@@ -252,7 +252,7 @@ type Type struct {
 	// a blank line
 	// type definition
 	// ---
-	SecondClosestCommentLines string
+	SecondClosestCommentLines []string
 
 	// If Kind == Struct
 	Members []Member
@@ -330,7 +330,7 @@ type Member struct {
 
 	// If there are comment lines immediately before the member in the type
 	// definition, they will be recorded here.
-	CommentLines string
+	CommentLines []string
 
 	// If there are tags along with this member, they will be saved here.
 	Tags string
@@ -358,7 +358,7 @@ type Signature struct {
 
 	// If there are comment lines immediately before this
 	// signature/method/function declaration, they will be recorded here.
-	CommentLines string
+	CommentLines []string
 }
 
 // Built in types.
