@@ -247,7 +247,7 @@ function push-federation-images {
 	local dstImageName="${FEDERATION_PUSH_REPO_BASE}/${binary}:${dstImageTag}"
 
 	echo "Tag: ${srcImageName} --> ${dstImageName}"
-	docker tag "$srcImageName" "$dstImageName"
+	docker tag -f "$srcImageName" "$dstImageName"
 
 	echo "Push: $dstImageName"
 	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]];then
