@@ -99,4 +99,5 @@ done
 
 ${KUBE_ROOT}/hack/update-munge-docs.sh
 ${KUBE_ROOT}/hack/update-generated-swagger-docs.sh
+${KUBE_ROOT}/hack/update-swagger-spec.sh
 ./hack/update-api-reference-docs.sh
