@@ -52,7 +52,6 @@ export LOG_LEVEL=4
 cd /go/src/k8s.io/kubernetes
 rm -rf Godeps/_workspace # Temporary until _workspace is fully obliterated
 
-./hack/build-go.sh
 go install ./cmd/...
 ./hack/install-etcd.sh
 
