@@ -17,12 +17,16 @@ limitations under the License.
 package reconciler
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/kubelet/volume/cache"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -38,18 +42,20 @@ const (
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
 	waitForAttachTimeout time.Duration = 1 * time.Second
+	nodeName             string        = "myhostname"
 )
 
 // Calls Run()
 // Verifies there are no calls to attach, detach, mount, unmount, etc.
 func Test_Run_Positive_DoNothing(t *testing.T) {
 	// Arrange
-	nodeName := "myhostname"
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	oex := operationexecutor.NewOperationExecutor(volumePluginMgr)
+	kubeClient := createTestClient()
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
+		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
 		waitForAttachTimeout,
@@ -75,12 +81,13 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 // Verifies there is are attach/mount/etc calls and no detach/unmount calls.
 func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	// Arrange
-	nodeName := "myhostname"
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	oex := operationexecutor.NewOperationExecutor(volumePluginMgr)
+	kubeClient := createTestClient()
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
+		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
 		waitForAttachTimeout,
@@ -141,12 +148,13 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 // Verifies there are no attach/detach calls.
 func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	// Arrange
-	nodeName := "myhostname"
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	oex := operationexecutor.NewOperationExecutor(volumePluginMgr)
+	kubeClient := createTestClient()
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
+		kubeClient,
 		true, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
 		waitForAttachTimeout,
@@ -206,12 +214,13 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 // Verifies detach/unmount calls are issued.
 func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	// Arrange
-	nodeName := "myhostname"
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	oex := operationexecutor.NewOperationExecutor(volumePluginMgr)
+	kubeClient := createTestClient()
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
+		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
 		waitForAttachTimeout,
@@ -284,12 +293,13 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 // Verifies there are no attach/detach calls made.
 func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	// Arrange
-	nodeName := "myhostname"
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	oex := operationexecutor.NewOperationExecutor(volumePluginMgr)
+	kubeClient := createTestClient()
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
+		kubeClient,
 		true, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
 		waitForAttachTimeout,
@@ -401,4 +411,26 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 		Steps:    6,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func createTestClient() *fake.Clientset {
+	fakeClient := &fake.Clientset{}
+	fakeClient.AddReactor("get", "nodes",
+		func(action core.Action) (bool, runtime.Object, error) {
+			return true, &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: nodeName},
+				Status: api.NodeStatus{
+					VolumesAttached: []api.AttachedVolume{
+						{
+							Name:       "fake-plugin/volume-name",
+							DevicePath: "fake/path",
+						},
+					}},
+				Spec: api.NodeSpec{ExternalID: nodeName},
+			}, nil
+		})
+	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
+	return fakeClient
 }

@@ -23,9 +23,24 @@ package goroutinemap
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
+	"time"
 
-	"k8s.io/kubernetes/pkg/util/runtime"
+	"github.com/golang/glog"
+	k8sRuntime "k8s.io/kubernetes/pkg/util/runtime"
+)
+
+const (
+	// initialDurationBeforeRetry is the amount of time after an error occurs
+	// that GoRoutineMap will refuse to allow another operation to start with
+	// the same operationName (if exponentialBackOffOnError is enabled). Each
+	// successive error results in a wait 2x times the previous.
+	initialDurationBeforeRetry time.Duration = 500 * time.Millisecond
+
+	// maxDurationBeforeRetry is the maximum amount of time that
+	// durationBeforeRetry will grow to due to exponential backoff.
+	maxDurationBeforeRetry time.Duration = 2 * time.Minute
 )
 
 // GoRoutineMap defines the supported set of operations.
@@ -36,7 +51,7 @@ type GoRoutineMap interface {
 	// go routine is terminated and the operationName is removed from the list
 	// of executing operations allowing a new operation to be started with the
 	// same name without error.
-	Run(operationName string, operation func() error) error
+	Run(operationName string, operationFunc func() error) error
 
 	// Wait blocks until all operations are completed. This is typically
 	// necessary during tests - the test should wait until all operations finish
@@ -45,50 +60,127 @@ type GoRoutineMap interface {
 }
 
 // NewGoRoutineMap returns a new instance of GoRoutineMap.
-func NewGoRoutineMap() GoRoutineMap {
+func NewGoRoutineMap(exponentialBackOffOnError bool) GoRoutineMap {
 	return &goRoutineMap{
-		operations: make(map[string]bool),
+		operations:                make(map[string]operation),
+		exponentialBackOffOnError: exponentialBackOffOnError,
 	}
 }
 
 type goRoutineMap struct {
-	operations map[string]bool
+	operations                map[string]operation
+	exponentialBackOffOnError bool
+	wg                        sync.WaitGroup
 	sync.Mutex
-	wg sync.WaitGroup
 }
 
-func (grm *goRoutineMap) Run(operationName string, operation func() error) error {
+type operation struct {
+	operationPending    bool
+	lastError           error
+	lastErrorTime       time.Time
+	durationBeforeRetry time.Duration
+}
+
+func (grm *goRoutineMap) Run(operationName string, operationFunc func() error) error {
 	grm.Lock()
 	defer grm.Unlock()
-	if grm.operations[operationName] {
+	existingOp, exists := grm.operations[operationName]
+	if exists {
 		// Operation with name exists
-		return newAlreadyExistsError(operationName)
+		if existingOp.operationPending {
+			return newAlreadyExistsError(operationName)
+		}
+
+		if time.Since(existingOp.lastErrorTime) <= existingOp.durationBeforeRetry {
+			return newExponentialBackoffError(operationName, existingOp)
+		}
 	}
 
-	grm.operations[operationName] = true
+	grm.operations[operationName] = operation{
+		operationPending:    true,
+		lastError:           existingOp.lastError,
+		lastErrorTime:       existingOp.lastErrorTime,
+		durationBeforeRetry: existingOp.durationBeforeRetry,
+	}
 	grm.wg.Add(1)
-	go func() {
-		defer grm.operationComplete(operationName)
-		defer runtime.HandleCrash()
-		operation()
+	go func() (err error) {
+		// Handle unhandled panics (very unlikely)
+		defer k8sRuntime.HandleCrash()
+		// Handle completion of and error, if any, from operationFunc()
+		defer grm.operationComplete(operationName, &err)
+		// Handle panic, if any, from operationFunc()
+		defer recoverFromPanic(operationName, &err)
+		return operationFunc()
 	}()
 
 	return nil
 }
 
-func (grm *goRoutineMap) operationComplete(operationName string) {
+func (grm *goRoutineMap) operationComplete(operationName string, err *error) {
 	defer grm.wg.Done()
 	grm.Lock()
 	defer grm.Unlock()
-	delete(grm.operations, operationName)
+
+	if *err == nil || !grm.exponentialBackOffOnError {
+		// Operation completed without error, or exponentialBackOffOnError disabled
+		delete(grm.operations, operationName)
+		if *err != nil {
+			// Log error
+			glog.Errorf("operation for %q failed with: %v",
+				operationName,
+				*err)
+		}
+	} else {
+		// Operation completed with error and exponentialBackOffOnError Enabled
+		existingOp := grm.operations[operationName]
+		if existingOp.durationBeforeRetry == 0 {
+			existingOp.durationBeforeRetry = initialDurationBeforeRetry
+		} else {
+			existingOp.durationBeforeRetry = 2 * existingOp.durationBeforeRetry
+			if existingOp.durationBeforeRetry > maxDurationBeforeRetry {
+				existingOp.durationBeforeRetry = maxDurationBeforeRetry
+			}
+		}
+		existingOp.lastError = *err
+		existingOp.lastErrorTime = time.Now()
+		existingOp.operationPending = false
+
+		grm.operations[operationName] = existingOp
+
+		// Log error
+		glog.Errorf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). error: %v",
+			operationName,
+			existingOp.lastErrorTime.Add(existingOp.durationBeforeRetry),
+			existingOp.durationBeforeRetry,
+			*err)
+	}
 }
 
 func (grm *goRoutineMap) Wait() {
 	grm.wg.Wait()
 }
 
-// alreadyExistsError is specific error returned when NewGoRoutine()
-// detects that operation with given name is already running.
+func recoverFromPanic(operationName string, err *error) {
+	if r := recover(); r != nil {
+		callers := ""
+		for i := 0; true; i++ {
+			_, file, line, ok := runtime.Caller(i)
+			if !ok {
+				break
+			}
+			callers = callers + fmt.Sprintf("%v:%v\n", file, line)
+		}
+		*err = fmt.Errorf(
+			"operation for %q recovered from panic %q. (err=%v) Call stack:\n%v",
+			operationName,
+			r,
+			*err,
+			callers)
+	}
+}
+
+// alreadyExistsError is the error returned when NewGoRoutine() detects that
+// an operation with the given name is already running.
 type alreadyExistsError struct {
 	operationName string
 }
@@ -96,7 +188,7 @@ type alreadyExistsError struct {
 var _ error = alreadyExistsError{}
 
 func (err alreadyExistsError) Error() string {
-	return fmt.Sprintf("Failed to create operation with name %q. An operation with that name already exists", err.operationName)
+	return fmt.Sprintf("Failed to create operation with name %q. An operation with that name is already executing.", err.operationName)
 }
 
 func newAlreadyExistsError(operationName string) error {
@@ -108,6 +200,46 @@ func newAlreadyExistsError(operationName string) error {
 func IsAlreadyExists(err error) bool {
 	switch err.(type) {
 	case alreadyExistsError:
+		return true
+	default:
+		return false
+	}
+}
+
+// exponentialBackoffError is the error returned when NewGoRoutine() detects
+// that the previous operation for given name failed less then
+// durationBeforeRetry.
+type exponentialBackoffError struct {
+	operationName string
+	failedOp      operation
+}
+
+var _ error = exponentialBackoffError{}
+
+func (err exponentialBackoffError) Error() string {
+	return fmt.Sprintf(
+		"Failed to create operation with name %q. An operation with that name failed at %v. No retries permitted until %v (%v). Last error: %q.",
+		err.operationName,
+		err.failedOp.lastErrorTime,
+		err.failedOp.lastErrorTime.Add(err.failedOp.durationBeforeRetry),
+		err.failedOp.durationBeforeRetry,
+		err.failedOp.lastError)
+}
+
+func newExponentialBackoffError(
+	operationName string, failedOp operation) error {
+	return exponentialBackoffError{
+		operationName: operationName,
+		failedOp:      failedOp,
+	}
+}
+
+// IsExponentialBackoff returns true if an error returned from NewGoRoutine()
+// indicates that the previous operation for given name failed less then
+// durationBeforeRetry.
+func IsExponentialBackoff(err error) bool {
+	switch err.(type) {
+	case exponentialBackoffError:
 		return true
 	default:
 		return false

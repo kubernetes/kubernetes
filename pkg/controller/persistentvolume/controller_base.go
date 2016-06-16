@@ -65,7 +65,7 @@ func NewPersistentVolumeController(
 		claims:                        cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    kubeClient,
 		eventRecorder:                 eventRecorder,
-		runningOperations:             goroutinemap.NewGoRoutineMap(),
+		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
 		cloud:                         cloud,
 		provisioner:                   provisioner,
 		clusterName:                   clusterName,

@@ -89,7 +89,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName st
 	return path.Join(diskByIdPath, diskGooglePrefix+pdName), nil
 }
 
-func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
+func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
