@@ -30,6 +30,20 @@ func IntMin(a, b int) int {
 	return a
 }
 
+func Int32Max(a, b int32) int32 {
+	if b > a {
+		return b
+	}
+	return a
+}
+
+func Int32Min(a, b int32) int32 {
+	if b < a {
+		return b
+	}
+	return a
+}
+
 func Int64Max(a, b int64) int64 {
 	if b > a {
 		return b
