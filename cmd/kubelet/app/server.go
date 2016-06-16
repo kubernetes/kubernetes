@@ -212,7 +212,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		ContainerRuntime:             s.ContainerRuntime,
 		CPUCFSQuota:                  s.CPUCFSQuota,
 		DiskSpacePolicy:              diskSpacePolicy,
-		DockerClient:                 dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		DockerClient:                 dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
 		RuntimeCgroups:               s.RuntimeCgroups,
 		DockerExecHandler:            dockerExecHandler,
 		EnableControllerAttachDetach: s.EnableControllerAttachDetach,
