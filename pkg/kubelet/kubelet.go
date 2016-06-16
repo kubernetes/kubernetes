@@ -1125,7 +1125,11 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 }
 
 func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
-	if kl.cloud == nil || kl.flannelExperimentalOverlay {
+	// TODO: We should have a mechanism to say whether native cloud provider
+	// is used or whether we are using overlay networking. We should return
+	// true for cloud providers if they implement Routes() interface and
+	// we are not using overlay networking.
+	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" || kl.flannelExperimentalOverlay {
 		return false
 	}
 	_, supported := kl.cloud.Routes()
