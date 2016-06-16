@@ -264,6 +264,10 @@ func (f *Framework) AfterEach() {
 		DumpAllNamespaceInfo(f.Client, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
 		LogPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels)
+		if f.federated {
+			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
+			LogPodsWithLabels(f.Client, "federation", map[string]string{"app": "federated-cluster"})
+		}
 	}
 
 	summaries := make([]TestDataSummary, 0)
