@@ -437,6 +437,10 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c *client.Client) 
 		}
 		glog.Infof("Some pods are not ready yet: %v", notready)
 	}
+	glog.Info("Timeout on waiting for pods being ready")
+	glog.Info(framework.RunKubectlOrDie("get", "pods", "-o json", "--all-namespaces"))
+	glog.Info(framework.RunKubectlOrDie("get", "nodes", "-o json"))
+
 	// Some pods are still not running.
 	return fmt.Errorf("Some pods are still not running: %v", notready)
 }
