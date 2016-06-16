@@ -206,10 +206,17 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			"--project="+framework.TestContext.CloudConfig.ProjectID,
 			"--zone="+framework.TestContext.CloudConfig.Zone,
 			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
-		defer exec.Command("gcloud", "alpha", "container", "node-pools", "delete", extraPoolName, "--quiet",
-			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone,
-			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+		defer func() {
+			glog.Infof("Deleting node pool %s", extraPoolName)
+			output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "delete", extraPoolName, "--quiet",
+				"--project="+framework.TestContext.CloudConfig.ProjectID,
+				"--zone="+framework.TestContext.CloudConfig.Zone,
+				"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+			if err != nil {
+				glog.Infof("Error: %v", err)
+			}
+			glog.Infof("Node-pool deletion output: %s", output)
+		}()
 		framework.ExpectNoError(err)
 		glog.Infof("Creating node-pool: %s", output)
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
