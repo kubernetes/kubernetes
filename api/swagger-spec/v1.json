@@ -16768,6 +16768,13 @@
        "$ref": "v1.UniqueVolumeName"
       },
       "description": "List of attachable volumes in use (mounted) by the node."
+     },
+     "volumesAttached": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.AttachedVolume"
+      },
+      "description": "List of volumes that are attached to the node."
      }
     }
    },
@@ -16929,6 +16936,24 @@
    "v1.UniqueVolumeName": {
     "id": "v1.UniqueVolumeName",
     "properties": {}
+   },
+   "v1.AttachedVolume": {
+    "id": "v1.AttachedVolume",
+    "description": "AttachedVolume describes a volume attached to a node",
+    "required": [
+     "name",
+     "devicePath"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the attached volume"
+     },
+     "devicePath": {
+      "type": "string",
+      "description": "DevicePath represents the device path where the volume should be avilable"
+     }
+    }
    },
    "v1.PersistentVolumeClaimList": {
     "id": "v1.PersistentVolumeClaimList",

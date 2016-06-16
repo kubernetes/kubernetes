@@ -2388,9 +2388,20 @@ type NodeStatus struct {
 	Images []ContainerImage `json:"images,omitempty" protobuf:"bytes,8,rep,name=images"`
 	// List of attachable volumes in use (mounted) by the node.
 	VolumesInUse []UniqueVolumeName `json:"volumesInUse,omitempty" protobuf:"bytes,9,rep,name=volumesInUse"`
+	// List of volumes that are attached to the node.
+	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
 }
 
 type UniqueVolumeName string
+
+// AttachedVolume describes a volume attached to a node
+type AttachedVolume struct {
+	// Name of the attached volume
+	Name UniqueVolumeName `json:"name" protobuf:"bytes,1,rep,name=name"`
+
+	// DevicePath represents the device path where the volume should be avilable
+	DevicePath string `json:"devicePath" protobuf:"bytes,2,rep,name=devicePath"`
+}
 
 // Describe a container image
 type ContainerImage struct {

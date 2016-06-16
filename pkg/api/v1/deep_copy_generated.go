@@ -34,6 +34,7 @@ func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		DeepCopy_v1_Affinity,
+		DeepCopy_v1_AttachedVolume,
 		DeepCopy_v1_AzureFileVolumeSource,
 		DeepCopy_v1_Binding,
 		DeepCopy_v1_Capabilities,
@@ -222,6 +223,12 @@ func DeepCopy_v1_Affinity(in Affinity, out *Affinity, c *conversion.Cloner) erro
 	} else {
 		out.PodAntiAffinity = nil
 	}
+	return nil
+}
+
+func DeepCopy_v1_AttachedVolume(in AttachedVolume, out *AttachedVolume, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.DevicePath = in.DevicePath
 	return nil
 }
 
@@ -1556,6 +1563,17 @@ func DeepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 		}
 	} else {
 		out.VolumesInUse = nil
+	}
+	if in.VolumesAttached != nil {
+		in, out := in.VolumesAttached, &out.VolumesAttached
+		*out = make([]AttachedVolume, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_AttachedVolume(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumesAttached = nil
 	}
 	return nil
 }
