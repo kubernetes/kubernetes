@@ -49,12 +49,13 @@ const (
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 100 * time.Millisecond
 
 	// podAttachAndMountTimeout is the maximum amount of time the
-	// GetVolumesForPod call will wait for all volumes in the specified pod to
-	// be attached and mounted. Set to 20 minutes because we've seen cloud
-	// operations take several minutes to complete for some volume plugins in
-	// some cases. While the GetVolumesForPod method is waiting it only blocks
-	// other operations on the same pod, other pods are not affected.
-	podAttachAndMountTimeout time.Duration = 20 * time.Minute
+	// WaitForAttachAndMount call will wait for all volumes in the specified pod
+	// to be attached and mounted. Even though cloud operations can take several
+	// minutes to complete, we set the timeout to 2 minutes because kubelet
+	// will retry in the next sync iteration. This frees the associated
+	// goroutine of the pod to process newer updates if needed (e.g., a delete
+	// request to the pod).
+	podAttachAndMountTimeout time.Duration = 2 * time.Minute
 
 	// podAttachAndMountRetryInterval is the amount of time the GetVolumesForPod
 	// call waits before retrying
