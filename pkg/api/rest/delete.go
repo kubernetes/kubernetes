@@ -72,13 +72,14 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 		// only a shorter grace period may be provided by a user
 		if options.GracePeriodSeconds != nil {
 			period := int64(*options.GracePeriodSeconds)
-			if period > *objectMeta.DeletionGracePeriodSeconds {
+			if period >= *objectMeta.DeletionGracePeriodSeconds {
 				return false, true, nil
 			}
-			now := unversioned.NewTime(unversioned.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
-			objectMeta.DeletionTimestamp = &now
+			newDeletionTimestamp := unversioned.NewTime(
+				objectMeta.DeletionTimestamp.Add(-time.Second * time.Duration(*objectMeta.DeletionGracePeriodSeconds)).
+					Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+			objectMeta.DeletionTimestamp = &newDeletionTimestamp
 			objectMeta.DeletionGracePeriodSeconds = &period
-			options.GracePeriodSeconds = &period
 			return true, false, nil
 		}
 		// graceful deletion is pending, do nothing
