@@ -26,9 +26,10 @@ import (
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
 
-	"github.com/golang/glog"
 	"reflect"
 	"sort"
+
+	"github.com/golang/glog"
 )
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -113,7 +114,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 
 // processServiceDeletion is triggered when a service is delete from underlying k8s cluster
 // the deletion function will wip out the cached ingress info of the service from federation service ingress
-// the function returns a bool to indicate if actual update happend on federation service cache
+// the function returns a bool to indicate if actual update happened on federation service cache
 // and if the federation service cache is updated, the updated info should be post to federation apiserver
 func (cc *clusterClientCache) processServiceDeletion(cachedService *cachedService, clusterName string) bool {
 	cachedService.rwlock.Lock()
@@ -147,7 +148,7 @@ func (cc *clusterClientCache) processServiceDeletion(cachedService *cachedServic
 }
 
 // processServiceUpdate Update ingress info when service updated
-// the function returns a bool to indicate if actual update happend on federation service cache
+// the function returns a bool to indicate if actual update happened on federation service cache
 // and if the federation service cache is updated, the updated info should be post to federation apiserver
 func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService, service *v1.Service, clusterName string) bool {
 	glog.V(4).Infof("Processing service update for %s/%s, cluster %s", service.Namespace, service.Name, clusterName)

@@ -137,7 +137,7 @@ type actualStateOfWorld struct {
 }
 
 // The volume object represents a volume the the attach/detach controller
-// believes to be succesfully attached to a node it is managing.
+// believes to be successfully attached to a node it is managing.
 type attachedVolume struct {
 	// volumeName contains the unique identifier for this volume.
 	volumeName api.UniqueVolumeName

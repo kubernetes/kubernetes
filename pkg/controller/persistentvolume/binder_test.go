@@ -268,7 +268,7 @@ func TestSync(t *testing.T) {
 			[]string{"Warning ClaimLost"}, noerrors, testSyncClaim,
 		},
 		{
-			// syncClaim with claim bound to non-exising volume. Check it's
+			// syncClaim with claim bound to non-existing volume. Check it's
 			// marked as Lost.
 			"3-2 - bound claim with missing volume",
 			novolumes,
