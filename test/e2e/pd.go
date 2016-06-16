@@ -186,14 +186,15 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		diskName, err := createPDWithRetry()
 		framework.ExpectNoError(err, "Error creating PD")
 		numContainers := 4
-
-		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, numContainers)
+		var host0Pod *api.Pod
 
 		defer func() {
 			By("cleaning up PD-RW test environment")
 			// Teardown pods, PD. Ignore errors.
 			// Teardown should do nothing unless test failed.
-			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
+			if host0Pod != nil {
+				podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
+			}
 			detachAndDeletePDs(diskName, []string{host0Name})
 		}()
 
@@ -201,6 +202,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		for i := 0; i < 3; i++ {
 			framework.Logf("PD Read/Writer Iteration #%v", i)
 			By("submitting host0Pod to kubernetes")
+			host0Pod = testPDPod([]string{diskName}, host0Name, false /* readOnly */, numContainers)
 			_, err = podClient.Create(host0Pod)
 			framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
@@ -237,14 +239,15 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		By("creating PD2")
 		disk2Name, err := createPDWithRetry()
 		framework.ExpectNoError(err, "Error creating PD2")
-
-		host0Pod := testPDPod([]string{disk1Name, disk2Name}, host0Name, false /* readOnly */, 1 /* numContainers */)
+		var host0Pod *api.Pod
 
 		defer func() {
 			By("cleaning up PD-RW test environment")
 			// Teardown pods, PD. Ignore errors.
 			// Teardown should do nothing unless test failed.
-			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
+			if host0Pod != nil {
+				podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
+			}
 			detachAndDeletePDs(disk1Name, []string{host0Name})
 			detachAndDeletePDs(disk2Name, []string{host0Name})
 		}()
@@ -254,6 +257,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		for i := 0; i < 3; i++ {
 			framework.Logf("PD Read/Writer Iteration #%v", i)
 			By("submitting host0Pod to kubernetes")
+			host0Pod = testPDPod([]string{disk1Name, disk2Name}, host0Name, false /* readOnly */, 1 /* numContainers */)
 			_, err = podClient.Create(host0Pod)
 			framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
