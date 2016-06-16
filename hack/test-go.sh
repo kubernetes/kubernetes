@@ -323,7 +323,12 @@ for (( i=0, j=0; ; )); do
   etcdPrefix=${etcdPrefixes[j]}
   echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
   # KUBE_TEST_API sets the version of each group to be tested.
-  KUBE_TEST_API="${apiVersion}" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  time {
+   kube::log::status "Starting tests at '$(date)'"
+   KUBE_TEST_API="${apiVersion}" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+   kube::log::status "Finished tests at '$(date)'"
+  }
+
   i=${i}+1
   j=${j}+1
   if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then
