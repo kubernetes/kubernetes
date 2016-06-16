@@ -158,6 +158,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 		networkPlugin,
 		nil,
 		nil,
+		nil,
 		nil)
 
 	return dockerManager, fakeDocker
