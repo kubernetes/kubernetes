@@ -2448,7 +2448,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 
 // Validate resource names that can go in a resource quota
 // Refer to docs/design/resources.md for more details.
-func validateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
+func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 	if len(strings.Split(value, "/")) == 1 {
 		if !api.IsStandardQuotaResourceName(value) {
@@ -2794,24 +2794,24 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 }
 
 // validateResourceQuotaScopes ensures that each enumerated hard resource constraint is valid for set of scopes
-func validateResourceQuotaScopes(resourceQuota *api.ResourceQuota) field.ErrorList {
+func validateResourceQuotaScopes(resourceQuotaSpec *api.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(resourceQuota.Spec.Scopes) == 0 {
+	if len(resourceQuotaSpec.Scopes) == 0 {
 		return allErrs
 	}
 	hardLimits := sets.NewString()
-	for k := range resourceQuota.Spec.Hard {
+	for k := range resourceQuotaSpec.Hard {
 		hardLimits.Insert(string(k))
 	}
-	fldPath := field.NewPath("spec", "scopes")
+	fldPath := fld.Child("scopes")
 	scopeSet := sets.NewString()
-	for _, scope := range resourceQuota.Spec.Scopes {
+	for _, scope := range resourceQuotaSpec.Scopes {
 		if !api.IsStandardResourceQuotaScope(string(scope)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuota.Spec.Scopes, "unsupported scope"))
+			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "unsupported scope"))
 		}
 		for _, k := range hardLimits.List() {
 			if api.IsStandardQuotaResourceName(k) && !api.IsResourceQuotaScopeValidForResource(scope, k) {
-				allErrs = append(allErrs, field.Invalid(fldPath, resourceQuota.Spec.Scopes, "unsupported scope applied to resource"))
+				allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "unsupported scope applied to resource"))
 			}
 		}
 		scopeSet.Insert(string(scope))
@@ -2822,7 +2822,7 @@ func validateResourceQuotaScopes(resourceQuota *api.ResourceQuota) field.ErrorLi
 	}
 	for _, invalidScopePair := range invalidScopePairs {
 		if scopeSet.HasAll(invalidScopePair.List()...) {
-			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuota.Spec.Scopes, "conflicting scopes"))
+			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "conflicting scopes"))
 		}
 	}
 	return allErrs
@@ -2832,32 +2832,47 @@ func validateResourceQuotaScopes(resourceQuota *api.ResourceQuota) field.ErrorLi
 func ValidateResourceQuota(resourceQuota *api.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMeta(&resourceQuota.ObjectMeta, true, ValidateResourceQuotaName, field.NewPath("metadata"))
 
-	fldPath := field.NewPath("spec", "hard")
-	for k, v := range resourceQuota.Spec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
-	}
-	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuota)...)
+	allErrs = append(allErrs, ValidateResourceQuotaSpec(&resourceQuota.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateResourceQuotaStatus(&resourceQuota.Status, field.NewPath("status"))...)
 
-	fldPath = field.NewPath("status", "hard")
-	for k, v := range resourceQuota.Status.Hard {
+	return allErrs
+}
+
+func ValidateResourceQuotaStatus(status *api.ResourceQuotaStatus, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	fldPath := fld.Child("hard")
+	for k, v := range status.Hard {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
-	fldPath = field.NewPath("status", "used")
-	for k, v := range resourceQuota.Status.Used {
+	fldPath = fld.Child("used")
+	for k, v := range status.Used {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 
 	return allErrs
 }
 
-// validateResourceQuantityValue enforces that specified quantity is valid for specified resource
-func validateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
+func ValidateResourceQuotaSpec(resourceQuotaSpec *api.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	fldPath := fld.Child("hard")
+	for k, v := range resourceQuotaSpec.Hard {
+		resPath := fldPath.Key(string(k))
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+	}
+	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
+
+	return allErrs
+}
+
+// ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
+func ValidateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
 	if api.IsIntegerResourceName(resource) {
@@ -2872,15 +2887,10 @@ func validateResourceQuantityValue(resource string, value resource.Quantity, fld
 // newResourceQuota is updated with fields that cannot be changed.
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
-	fldPath := field.NewPath("spec", "hard")
-	for k, v := range newResourceQuota.Spec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
-	}
+	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, field.NewPath("spec"))...)
 
 	// ensure scopes cannot change, and that resources are still valid for scope
-	fldPath = field.NewPath("spec", "scopes")
+	fldPath := field.NewPath("spec", "scopes")
 	oldScopes := sets.NewString()
 	newScopes := sets.NewString()
 	for _, scope := range newResourceQuota.Spec.Scopes {
@@ -2892,7 +2902,6 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.Resourc
 	if !oldScopes.Equal(newScopes) {
 		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, "field is immutable"))
 	}
-	allErrs = append(allErrs, validateResourceQuotaScopes(newResourceQuota)...)
 
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
@@ -2908,14 +2917,14 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 	fldPath := field.NewPath("status", "hard")
 	for k, v := range newResourceQuota.Status.Hard {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 	fldPath = field.NewPath("status", "used")
 	for k, v := range newResourceQuota.Status.Used {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 	newResourceQuota.Spec = oldResourceQuota.Spec
 	return allErrs
