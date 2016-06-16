@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 	It("should be able to discover a federated service", func() {
 		framework.SkipUnlessFederated(f.Client)
 
-		createService(f.FederationClientset, clusterClientSets, f.Namespace.Name)
+		createService(f.FederationClientset_1_3, clusterClientSets, f.Namespace.Name)
 
 		svcDNSNames := []string{
 			FederatedServiceName,
@@ -168,7 +168,7 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 	It("should be able to discover a non-local federated service", func() {
 		framework.SkipUnlessFederated(f.Client)
 
-		createService(f.FederationClientset, clusterClientSets, f.Namespace.Name)
+		createService(f.FederationClientset_1_3, clusterClientSets, f.Namespace.Name)
 
 		// Delete a federated service shard in the default e2e Kubernetes cluster.
 		err := f.Clientset_1_3.Core().Services(f.Namespace.Name).Delete(FederatedServiceName, &api.DeleteOptions{})
@@ -198,7 +198,7 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 // service reaches the expected value, i.e. numSvcs in the given individual Kubernetes
 // cluster. If the shard count, i.e. numSvcs is expected to be at least one, then
 // it also checks if the first shard's name and spec matches that of the given service.
-func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, service *api.Service, numSvcs int) {
+func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, service *v1.Service, numSvcs int) {
 	By("Fetching a federated service shard")
 	var clSvcList *v1.ServiceList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
@@ -225,7 +225,7 @@ func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, s
 	}
 }
 
-func createService(fcs *federation_internalclientset.Clientset, clusterClientSets []*release_1_3.Clientset, namespace string) {
+func createService(fcs *federation_release_1_3.Clientset, clusterClientSets []*release_1_3.Clientset, namespace string) {
 	By("Creating a federated service")
 	labels := map[string]string{
 		"foo": "bar",
@@ -234,13 +234,13 @@ func createService(fcs *federation_internalclientset.Clientset, clusterClientSet
 	svc1port := "svc1"
 	svc2port := "svc2"
 
-	service := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+	service := &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name: FederatedServiceName,
 		},
-		Spec: api.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: labels,
-			Ports: []api.ServicePort{
+			Ports: []v1.ServicePort{
 				{
 					Name:       "portname1",
 					Port:       80,
@@ -254,10 +254,11 @@ func createService(fcs *federation_internalclientset.Clientset, clusterClientSet
 			},
 		},
 	}
-	_, err := fcs.Core().Services(namespace).Create(service)
+	nservice, err := fcs.Core().Services(namespace).Create(service)
+	framework.Logf("Trying to create service %q in namespace %q", service.ObjectMeta.Name, service.ObjectMeta.Namespace)
 	Expect(err).NotTo(HaveOccurred())
 	for _, cs := range clusterClientSets {
-		waitForFederatedServiceShard(cs, namespace, service, 1)
+		waitForFederatedServiceShard(cs, namespace, nservice, 1)
 	}
 }
 
