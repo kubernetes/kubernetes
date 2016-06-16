@@ -334,7 +334,7 @@ func AddValidateFlags(cmd *cobra.Command) {
 }
 
 func AddRecursiveFlag(cmd *cobra.Command, value *bool) {
-	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "If true, process directory recursively.")
+	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
