@@ -265,3 +265,80 @@ func Test_hasDeepCopyMethod(t *testing.T) {
 		}
 	}
 }
+
+func Test_extractTagParams(t *testing.T) {
+	testCases := []struct {
+		comments []string
+		expect   *tagValue
+	}{
+		{
+			comments: []string{
+				"Human comment",
+			},
+			expect: nil,
+		},
+		{
+			comments: []string{
+				"Human comment",
+				"+k8s:deepcopy-gen",
+			},
+			expect: &tagValue{
+				value:    "",
+				register: false,
+			},
+		},
+		{
+			comments: []string{
+				"Human comment",
+				"+k8s:deepcopy-gen=package",
+			},
+			expect: &tagValue{
+				value:    "package",
+				register: false,
+			},
+		},
+		{
+			comments: []string{
+				"Human comment",
+				"+k8s:deepcopy-gen=package,register",
+			},
+			expect: &tagValue{
+				value:    "package",
+				register: true,
+			},
+		},
+		{
+			comments: []string{
+				"Human comment",
+				"+k8s:deepcopy-gen=package,register=true",
+			},
+			expect: &tagValue{
+				value:    "package",
+				register: true,
+			},
+		},
+		{
+			comments: []string{
+				"Human comment",
+				"+k8s:deepcopy-gen=package,register=false",
+			},
+			expect: &tagValue{
+				value:    "package",
+				register: false,
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		r := extractTag(tc.comments)
+		if r == nil && tc.expect != nil {
+			t.Errorf("case[%d]: expected non-nil", i)
+		}
+		if r != nil && tc.expect == nil {
+			t.Errorf("case[%d]: expected nil, got %v", i, *r)
+		}
+		if r != nil && *r != *tc.expect {
+			t.Errorf("case[%d]: expected %v, got %v", i, *tc.expect, *r)
+		}
+	}
+}

@@ -37,6 +37,59 @@ type CustomArgs struct {
 	BoundingDirs []string // Only deal with types rooted under these dirs.
 }
 
+// This is the comment tag that carries parameters for deep-copy generation.
+const tagName = "k8s:deepcopy-gen"
+
+// Known values for the comment tag.
+const tagValuePackage = "package"
+
+// tagValue holds parameters from a tagName tag.
+type tagValue struct {
+	value    string
+	register bool
+}
+
+func extractTag(comments []string) *tagValue {
+	tagVals := types.ExtractCommentTags("+", comments)[tagName]
+	if tagVals == nil {
+		// No match for the tag.
+		return nil
+	}
+	// If there are multiple values, abort.
+	if len(tagVals) > 1 {
+		glog.Fatalf("Found %d %s tags: %q", len(tagVals), tagName, tagVals)
+	}
+
+	// If we got here we are returning something.
+	tag := &tagValue{}
+
+	// Get the primary value.
+	parts := strings.Split(tagVals[0], ",")
+	if len(parts) >= 1 {
+		tag.value = parts[0]
+	}
+
+	// Parse extra arguments.
+	parts = parts[1:]
+	for i := range parts {
+		kv := strings.SplitN(parts[i], "=", 2)
+		k := kv[0]
+		v := ""
+		if len(kv) == 2 {
+			v = kv[1]
+		}
+		switch k {
+		case "register":
+			if v != "false" {
+				tag.register = true
+			}
+		default:
+			glog.Fatalf("Unsupported %s param: %q", tagName, parts[i])
+		}
+	}
+	return tag
+}
+
 // TODO: This is created only to reduce number of changes in a single PR.
 // Remove it and use PublicNamer instead.
 func deepCopyNamer() *namer.NameStrategy {
@@ -86,38 +139,61 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 	}
 
-	for _, p := range context.Universe {
-		// Short-circuit if this package has not opted in.
-		if tagvals := types.ExtractCommentTags("+", p.Comments)["k8s:deepcopy-gen"]; tagvals == nil {
-			// No tag for this package.
-			continue
-		} else if tagvals[0] != "generate" && tagvals[0] != "register" {
-			// Unknown tag.
-			glog.Errorf("Uknown tag value '+k8s:deepcopy-gen=%s'", tagvals[0])
+	for i := range inputs {
+		glog.V(5).Infof("considering pkg %q", i)
+		pkg := context.Universe[i]
+		if pkg == nil {
+			// If the input had no Go files, for example.
 			continue
 		}
-		needsGeneration := false
-		for _, t := range p.Types {
-			if copyableWithinPackage(t, boundingDirs) && inputs.Has(t.Name.Package) {
-				needsGeneration = true
-				break
+
+		ptag := extractTag(pkg.Comments)
+		ptagValue := ""
+		ptagRegister := false
+		if ptag != nil {
+			ptagValue = ptag.value
+			if ptagValue != tagValuePackage {
+				glog.Fatalf("Package %v: unsupported %s value: %q", i, tagName, ptagValue)
+			}
+			ptagRegister = ptag.register
+			glog.V(5).Infof("  tag.value: %q, tag.register: %t", ptagValue, ptagRegister)
+		} else {
+			glog.V(5).Infof("  no tag")
+		}
+
+		// If the pkg-scoped tag says to generate, we can skip scanning types.
+		pkgNeedsGeneration := (ptagValue == tagValuePackage)
+		if !pkgNeedsGeneration {
+			// If the pkg-scoped tag did not exist, scan all types for one that
+			// explicitly wants generation.
+			for _, t := range pkg.Types {
+				glog.V(5).Infof("  considering type %q", t.Name.String())
+				ttag := extractTag(t.CommentLines)
+				if ttag != nil && ttag.value == "true" {
+					glog.V(5).Infof("    tag=true")
+					if !copyableWithinPackage(t, boundingDirs) {
+						glog.Fatalf("Type %v requests deepcopy generation but is not copyable", t)
+					}
+					pkgNeedsGeneration = true
+					break
+				}
 			}
 		}
-		if needsGeneration {
-			path := p.Path
+
+		if pkgNeedsGeneration {
 			packages = append(packages,
 				&generator.DefaultPackage{
-					PackageName: strings.Split(filepath.Base(path), ".")[0],
-					PackagePath: path,
+					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
+					PackagePath: pkg.Path,
 					HeaderText:  header,
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						generators = []generator.Generator{}
 						generators = append(
-							generators, NewGenDeepCopy(arguments.OutputFileBaseName, path, boundingDirs))
+							generators, NewGenDeepCopy(arguments.OutputFileBaseName, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister))
 						return generators
 					},
 					FilterFunc: func(c *generator.Context, t *types.Type) bool {
-						return t.Name.Package == path
+						return t.Name.Package == pkg.Path
 					},
 				})
 		}
@@ -135,19 +211,23 @@ type genDeepCopy struct {
 	generator.DefaultGen
 	targetPackage string
 	boundingDirs  []string
+	allTypes      bool
+	registerTypes bool
 	imports       namer.ImportTracker
 	typesForInit  []*types.Type
 
 	globalVariables map[string]interface{}
 }
 
-func NewGenDeepCopy(sanitizedName, targetPackage string, boundingDirs []string) generator.Generator {
+func NewGenDeepCopy(sanitizedName, targetPackage string, boundingDirs []string, allTypes, registerTypes bool) generator.Generator {
 	return &genDeepCopy{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
 		targetPackage: targetPackage,
 		boundingDirs:  boundingDirs,
+		allTypes:      allTypes,
+		registerTypes: registerTypes,
 		imports:       generator.NewImportTracker(),
 		typesForInit:  make([]*types.Type, 0),
 	}
@@ -159,8 +239,15 @@ func (g *genDeepCopy) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
-	// Filter out all types not copyable within the package.
-	copyable := g.copyableWithinPackage(t)
+	// Filter out types not being processed or not copyable within the package.
+	enabled := g.allTypes
+	if !enabled {
+		ttag := extractTag(t.CommentLines)
+		if ttag != nil && ttag.value == "true" {
+			enabled = true
+		}
+	}
+	copyable := enabled && g.copyableWithinPackage(t)
 	if copyable {
 		g.typesForInit = append(g.typesForInit, t)
 	}
@@ -208,7 +295,8 @@ func isRootedUnder(pkg string, roots []string) bool {
 
 func copyableWithinPackage(t *types.Type, boundingDirs []string) bool {
 	// If the type opts out of copy-generation, stop.
-	if extractBoolTagOrDie("k8s:deepcopy-gen", true, t.CommentLines) == false {
+	ttag := extractTag(t.CommentLines)
+	if ttag != nil && ttag.value == "false" {
 		return false
 	}
 	// Only packages within the restricted range can be processed.
@@ -276,12 +364,14 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	g.globalVariables = map[string]interface{}{
 		"Cloner": cloner,
 	}
-	if tagvals := types.ExtractCommentTags("+", c.Universe[g.targetPackage].Comments)["k8s:deepcopy-gen"]; tagvals != nil && tagvals[0] != "register" {
+	if !g.registerTypes {
 		// TODO: We should come up with a solution to register all generated
 		// deep-copy functions. However, for now, to avoid import cycles
 		// we register only those explicitly requested.
 		return nil
 	}
+	glog.V(5).Infof("registering types in pkg %q", g.targetPackage)
+
 	scheme := c.Universe.Variable(types.Name{Package: apiPackagePath, Name: "Scheme"})
 	g.imports.AddType(scheme)
 	g.globalVariables["scheme"] = scheme
@@ -302,7 +392,34 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	return sw.Error()
 }
 
+func (g *genDeepCopy) needsGeneration(t *types.Type) bool {
+	tag := extractTag(t.CommentLines)
+	tv := ""
+	if tag != nil {
+		tv = tag.value
+		if tv != "true" && tv != "false" {
+			glog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tag.value)
+		}
+	}
+	if g.allTypes && tv == "false" {
+		// The whole package is being generated, but this type has opted out.
+		glog.V(5).Infof("not generating for type %v because type opted out", t)
+		return false
+	}
+	if !g.allTypes && tv != "true" {
+		// The whole package is NOT being generated, and this type has NOT opted in.
+		glog.V(5).Infof("not generating for type %v because type did not opt in", t)
+		return false
+	}
+	return true
+}
+
 func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
+	if !g.needsGeneration(t) {
+		return nil
+	}
+	glog.V(5).Infof("generating for type %v", t)
+
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	funcName := g.funcNameTmpl(t)
 	sw.Do(fmt.Sprintf("func %s(in $.type|raw$, out *$.type|raw$, c *$.Cloner|raw$) error {\n", funcName), g.withGlobals(argsFromType(t)))
