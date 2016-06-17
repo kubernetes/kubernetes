@@ -1392,6 +1392,32 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			},
 		},
 	}
+	deletedPVCPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "deletedPVC",
+						},
+					},
+				},
+			},
+		},
+	}
+	deletedPVPod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					VolumeSource: api.VolumeSource{
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvcWithDeletedPV",
+						},
+					},
+				},
+			},
+		},
+	}
 	emptyPod := &api.Pod{
 		Spec: api.PodSpec{},
 	}
@@ -1466,6 +1492,34 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			fits:         true,
 			test:         "the same EBS volumes are not counted multiple times",
 		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*api.Pod{oneVolPod, deletedPVCPod},
+			maxVols:      2,
+			fits:         false,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*api.Pod{oneVolPod, deletedPVCPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*api.Pod{oneVolPod, deletedPVPod},
+			maxVols:      2,
+			fits:         false,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       ebsPVCPod,
+			existingPods: []*api.Pod{oneVolPod, deletedPVPod},
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
 	}
 
 	pvInfo := FakePersistentVolumeInfo{
@@ -1473,7 +1527,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "someEBSVol"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{},
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "ebsVol"},
 				},
 			},
 		},
@@ -1493,6 +1547,10 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "someNonEBSVol"},
 			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "pvcWithDeletedPV"},
+			Spec:       api.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
 		},
 	}
 
