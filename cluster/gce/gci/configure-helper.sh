@@ -270,7 +270,9 @@ EOF
 function assemble-docker-flags {
   local docker_opts="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --debug"
+    docker_opts+=" --log-level=debug"
+  else
+    docker_opts+=" --log-level=warn"
   fi
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
