@@ -29,12 +29,11 @@ source "$KUBE_ROOT/build/common.sh"
 KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 
 kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command hack/build-cross.sh
 
-if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
-  kube::build::run_build_command hack/test-go.sh
-  kube::build::run_build_command hack/test-integration.sh
+if [[ "${KUBE_FASTBUILD}" == "true" ]]; then
+  make -C "${KUBE_ROOT}" binaries-quick --no-print-directory
+else
+  make -C "${KUBE_ROOT}" binaries-cross --no-print-directory
 fi
 
 if [[ "${FEDERATION:-}" == "true" ]];then
@@ -45,6 +44,5 @@ if [[ "${FEDERATION:-}" == "true" ]];then
     )
 fi
 
-kube::build::copy_output
 kube::release::package_tarballs
 kube::release::package_hyperkube

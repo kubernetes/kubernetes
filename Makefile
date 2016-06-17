@@ -12,38 +12,80 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Old-skool build tools.
-#
-# Targets (see each target for more information):
-#   all: Build code.
-#   check: Run tests.
-#   test: Run tests.
-#   clean: Clean up.
+include build/build.mk
 
-OUT_DIR = _output
+BUILD_IMAGE = gcr.io/google_containers/kube-cross:v1.6.2-experimental
 
-KUBE_GOFLAGS = $(GOFLAGS)
+KUBE_FASTBUILD ?= false
+
+KUBE_GOFLAGS ?= $(GOFLAGS)
 export KUBE_GOFLAGS
 
-KUBE_GOLDFLAGS = $(GOLDFLAGS)
+KUBE_GOLDFLAGS ?= $(GOLDFLAGS)
 export KUBE_GOLDFLAGS
 
-# Build code.
-#
-# Args:
-#   WHAT: Directory names to build.  If any of these directories has a 'main'
-#     package, the build will produce executable files under $(OUT_DIR)/go/bin.
-#     If not specified, "everything" will be built.
-#   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
+# For all kubernetes binaries, we define a short rule shortcut for go install.
+# The rules are defined in build/build.mk. To use these you will need your
+# GOPATH set up properly, see https://golang.org/doc/code.html . Note that
+# kubernetes goes under k8s.io, not github.com. If you don't want to set up
+# your gopath, then use either the quick-release or the release rule to do a
+# containerized build.
 #
 # Example:
-#   make
-#   make all
-#   make all WHAT=cmd/kubelet GOFLAGS=-v
-all:
-	hack/build-go.sh $(WHAT)
-.PHONY: all
+#   make kubectl
+#   make kube-apiserver
+#   make cmd/kubelet
+#   make e2e.test
+#   make kubectl-windows-amd64
+#   make server-binaries
+#   make test-binaries
+#
+# To install a library package, use go install directly.
+#
+# Example:
+#   go install ./pkg/kubelet
+
+# Build a full hermetic release inside a container. The build container needs
+# access to docker in order to build and save kube-system images. We pass in
+# the kubernetes repo (pwd) as a volume so output in _output is owned by root.
+#
+# Example:
+#   make release
+all release:
+	@docker run --rm -it \
+	    -e "KUBE_FASTBUILD=$(KUBE_FASTBUILD)" \
+	    -v $(shell pwd):/go/src/k8s.io/kubernetes \
+	    -v $(shell which docker):/bin/docker:ro \
+	    -v /var/run/docker.sock:/var/run/docker.sock \
+	    -w /go/src/k8s.io/kubernetes \
+	    $(BUILD_IMAGE) bash -c 'make release-local -j4'
+.PHONY: all release
+
+# Build a hermetic release for a limited set of platforms.
+#
+# Example:
+#   make quick-release
+quick-release:
+	@KUBE_FASTBUILD=true $(MAKE) release --no-print-directory
+.PHONY: quick-release
+
+# Build an incremental release without a container. You will need
+# cross-compilers installed. See build/build-image.
+#
+# Example:
+#   make release-local
+release-local:
+	@+./build/release.sh
+.PHONY: release-local
+
+# Build an incremental release for a limited set of platforms without a
+# container. This is the fastest for local development and testing.
+#
+# Example:
+#   make quick-release-local
+quick-release-local:
+	@+KUBE_FASTBUILD=true ./build/release.sh
+.PHONY: quick-release-local
 
 # Runs all the presubmission verifications.
 #
@@ -141,20 +183,3 @@ clean:
 vet:
 	hack/verify-govet.sh $(WHAT) $(TESTS)
 .PHONY: vet
-
-# Build a release
-#
-# Example:
-#   make release
-release:
-	build/release.sh
-.PHONY: release
-
-# Build a release, but skip tests
-#
-# Example:
-#   make release-skip-tests
-release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
-.PHONY: release-skip-tests quick-release
-

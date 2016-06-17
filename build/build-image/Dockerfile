@@ -12,20 +12,65 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file creates a standard build environment for building Kubernetes
-FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
+# This file creates a standard build environment for building cross
+# platform go binary for the architecture kubernetes cares about.
 
-# Mark this as a kube-build container
-RUN touch /kube-build-image
+FROM golang:1.6.2
 
-WORKDIR /go/src/k8s.io/kubernetes
+ENV GOARM 6
+ENV KUBE_DYNAMIC_CROSSPLATFORMS \
+  armel \
+  arm64 \
+  ppc64el
 
-# Propagate the git tree version into the build image
-ADD kube-version-defs /kube-version-defs
-ENV KUBE_GIT_VERSION_FILE /kube-version-defs
+ENV KUBE_CROSSPLATFORMS \
+  linux/386 \
+  linux/arm linux/arm64 \
+  linux/ppc64le \
+  darwin/amd64 darwin/386 \
+  windows/amd64 windows/386
 
-# Make output from the dockerized build go someplace else
-ENV KUBE_OUTPUT_SUBPATH _output/dockerized
+# Pre-compile the standard go library when cross-compiling. This is much easier now when we have go1.5+
+RUN for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} go install std; done
 
-# Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/k8s.io/kubernetes/
+# Install g++, then download and install protoc for generating protobuf output
+RUN apt-get update \
+  && apt-get install -y g++ rsync apt-utils file lxc \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /usr/local/src/protobuf \
+  && cd /usr/local/src/protobuf \
+  && curl -sSL https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protobuf-cpp-3.0.0-beta-2.tar.gz | tar -xzv \
+  && cd protobuf-3.0.0-beta-2 \
+  && ./configure \
+  && make install \
+  && ldconfig \
+  && cd .. \
+  && rm -rf protobuf-3.0.0-beta-2 \
+  && protoc --version
+
+# Use dynamic cgo linking for architectures other than amd64 for the server platforms
+# More info here: https://wiki.debian.org/CrossToolchains
+RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
+  && curl -s http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do dpkg --add-architecture ${platform}; done \
+  && apt-get update \
+  && apt-get install -y build-essential \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# work around 64MB tmpfs size in Docker 1.6
+ENV TMPDIR /tmp.k8s
+
+# Get the code coverage tool and godep
+RUN mkdir $TMPDIR \
+  && chmod a+rwx $TMPDIR \
+  && chmod o+t $TMPDIR \
+  && go get golang.org/x/tools/cmd/cover github.com/tools/godep
+
+# Download and symlink etcd. We need this for our integration tests.
+RUN export ETCD_VERSION=v2.2.1; \
+  mkdir -p /usr/local/src/etcd \
+  && cd /usr/local/src/etcd \
+  && curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz | tar -xz \
+  && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-amd64/etcd /usr/local/bin/
