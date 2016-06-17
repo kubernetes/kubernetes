@@ -329,8 +329,6 @@ func discoverService(f *framework.Framework, name string, exists bool) {
 	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 1; done", name)}
 	By(fmt.Sprintf("Looking up %q", name))
 
-	defer f.Client.Pods(f.Namespace.Name).Delete(FederatedServicePod, api.NewDeleteOptions(0))
-
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   FederatedServicePod,
@@ -349,8 +347,8 @@ func discoverService(f *framework.Framework, name string, exists bool) {
 	}
 
 	_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-	Expect(err).
-		NotTo(HaveOccurred(), "Trying to create pod to run %q", command)
+	Expect(err).NotTo(HaveOccurred(), "Trying to create pod to run %q", command)
+	defer f.Client.Pods(f.Namespace.Name).Delete(FederatedServicePod, api.NewDeleteOptions(0))
 
 	if exists {
 		// TODO(mml): Eventually check the IP address is correct, too.
