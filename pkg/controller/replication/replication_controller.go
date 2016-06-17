@@ -471,12 +471,12 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		// into a performance bottleneck. We should generate a UID for the pod
 		// beforehand and store it via ExpectCreations.
 		rm.expectations.ExpectCreations(rcKey, diff)
-		wait := sync.WaitGroup{}
-		wait.Add(diff)
+		var wg sync.WaitGroup
+		wg.Add(diff)
 		glog.V(2).Infof("Too few %q/%q replicas, need %d, creating %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
 		for i := 0; i < diff; i++ {
 			go func() {
-				defer wait.Done()
+				defer wg.Done()
 				if err := rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc); err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
@@ -486,7 +486,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 				}
 			}()
 		}
-		wait.Wait()
+		wg.Wait()
 	} else if diff > 0 {
 		if diff > rm.burstReplicas {
 			diff = rm.burstReplicas
@@ -513,11 +513,11 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		// labels on a pod/rc change in a way that the pod gets orphaned, the
 		// rc will only wake up after the expectation has expired.
 		rm.expectations.ExpectDeletions(rcKey, deletedPodKeys)
-		wait := sync.WaitGroup{}
-		wait.Add(diff)
+		var wg sync.WaitGroup
+		wg.Add(diff)
 		for i := 0; i < diff; i++ {
 			go func(ix int) {
-				defer wait.Done()
+				defer wg.Done()
 				if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name, rc); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					podKey := controller.PodKey(filteredPods[ix])
@@ -528,7 +528,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 				}
 			}(i)
 		}
-		wait.Wait()
+		wg.Wait()
 	}
 }
 
