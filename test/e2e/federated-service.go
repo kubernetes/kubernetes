@@ -50,6 +50,9 @@ const (
 	FederatedServicePod  = "federated-service-test-pod"
 
 	DefaultFederationName = "federation"
+
+	// We use this to decide how long to wait for our DNS probes to succeed.
+	DNSTTL = 180 * time.Second
 )
 
 var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
@@ -345,6 +348,6 @@ func discoverService(f *framework.Framework, name string) {
 		}
 
 		return logerr(fmt.Errorf("exited %d", status.State.Terminated.ExitCode))
-	}, time.Minute*2, time.Second*2).
+	}, DNSTTL, time.Second*2).
 		Should(BeNil(), "%q should exit 0, but it never did", command)
 }
