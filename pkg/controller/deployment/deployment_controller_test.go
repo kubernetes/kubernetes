@@ -252,6 +252,17 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f.run(getKey(d, t))
 }
 
+func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment(1, nil)
+	now := unversioned.Now()
+	d.DeletionTimestamp = &now
+	f.dStore = append(f.dStore, d)
+
+	f.run(getKey(d, t))
+}
+
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
