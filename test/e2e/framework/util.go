@@ -664,17 +664,20 @@ func RunKubernetesServiceTestContainer(c *client.Client, repoRoot string, ns str
 	}
 }
 
-func kubectlLogPod(c *client.Client, pod api.Pod) {
+func kubectlLogPod(c *client.Client, pod api.Pod, containerNameSubstr string) {
 	for _, container := range pod.Spec.Containers {
-		logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
-		if err != nil {
-			logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+		if strings.Contains(container.Name, containerNameSubstr) {
+			// Contains() matches all strings if substr is empty
+			logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
 			if err != nil {
-				Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+				if err != nil {
+					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				}
 			}
+			By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
+			Logf("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
 		}
-		By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
-		Logf(logs)
 	}
 }
 
@@ -687,7 +690,7 @@ func LogFailedContainers(c *client.Client, ns string) {
 	Logf("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod)
+			kubectlLogPod(c, pod, "")
 		}
 	}
 }
@@ -700,7 +703,18 @@ func LogPodsWithLabels(c *client.Client, ns string, match map[string]string) {
 	}
 	Logf("Running kubectl logs on pods with labels %v in %v", match, ns)
 	for _, pod := range podList.Items {
-		kubectlLogPod(c, pod)
+		kubectlLogPod(c, pod, "")
+	}
+}
+
+func LogContainersInPodsWithLabels(c *client.Client, ns string, match map[string]string, containerSubstr string) {
+	podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(match)})
+	if err != nil {
+		Logf("Error getting pods in namespace %q: %v", ns, err)
+		return
+	}
+	for _, pod := range podList.Items {
+		kubectlLogPod(c, pod, containerSubstr)
 	}
 }
 
