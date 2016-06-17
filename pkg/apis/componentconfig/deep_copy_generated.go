@@ -273,6 +273,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
 	out.ContainerRuntime = in.ContainerRuntime
+	if err := unversioned.DeepCopy_unversioned_Duration(in.RuntimeRequestTimeout, &out.RuntimeRequestTimeout, c); err != nil {
+		return err
+	}
 	out.RktPath = in.RktPath
 	out.RktAPIEndpoint = in.RktAPIEndpoint
 	out.RktStage1Image = in.RktStage1Image
