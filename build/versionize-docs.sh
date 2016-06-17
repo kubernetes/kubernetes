@@ -99,4 +99,6 @@ done
 
 ${KUBE_ROOT}/hack/update-generated-docs.sh
 ${KUBE_ROOT}/hack/update-generated-swagger-docs.sh
+${KUBE_ROOT}/hack/update-swagger-spec.sh
+${KUBE_ROOT}/hack/update-generated-protobuf.sh
 ./hack/update-api-reference-docs.sh
