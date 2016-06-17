@@ -1491,7 +1491,7 @@ function test-build-release {
 # Assumed vars:
 #   Variables from config.sh
 function test-setup {
-  "${KUBE_ROOT}/cluster/kube-up.sh"
+  . "${KUBE_ROOT}/cluster/kube-up.sh"
 
   VPC_ID=$(get_vpc_id)
   detect-security-groups
