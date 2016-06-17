@@ -194,11 +194,9 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 					discoverService(f, name, true)
 				}
 
-				// TODO(mml): Unclear how to make this meaningful and not terribly
-				// slow.  How long (how many minutes?) do we verify that a given DNS
-				// lookup *doesn't* work before we call it a success?  For now,
-				// commenting out.
-				/*
+				// TODO(mml): This currently takes 9 minutes.  Consider reducing the
+				// TTL and/or running the pods in parallel.
+				Context("[Slow]", func() {
 					localSvcDNSNames := []string{
 						FederatedServiceName,
 						fmt.Sprintf("%s.%s", FederatedServiceName, f.Namespace.Name),
@@ -207,7 +205,7 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 					for _, name := range localSvcDNSNames {
 						discoverService(f, name, false)
 					}
-				*/
+				})
 			})
 		})
 	})
