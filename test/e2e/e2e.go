@@ -140,6 +140,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.Logf("WARNING: Image pulling pods failed to enter success in %v: %v", imagePrePullingTimeout, err)
 	}
 
+	// Dump the output of the nethealth containers only once per run
+	if framework.TestContext.DumpLogsOnFailure {
+		framework.Logf("Dumping network health container logs from all nodes")
+		framework.LogContainersInPodsWithLabels(c, api.NamespaceSystem, framework.ImagePullerLabels, "nethealth")
+	}
+
 	return nil
 
 }, func(data []byte) {
