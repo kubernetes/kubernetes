@@ -110,7 +110,7 @@ func TestDeleteSync(t *testing.T) {
 			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				reactor.lock.Lock()
 				defer reactor.lock.Unlock()
-				// Bind the volume to ressurected claim (this should never
+				// Bind the volume to resurrected claim (this should never
 				// happen)
 				claim := newClaim("claim8-7", "uid8-7", "10Gi", "volume8-7", api.ClaimBound)
 				reactor.claims[claim.Name] = claim

@@ -487,7 +487,7 @@ func (NetworkPolicyList) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicyPeer = map[string]string{
 	"podSelector":       "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace.",
-	"namespaceSelector": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omited, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
+	"namespaceSelector": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
 }
 
 func (NetworkPolicyPeer) SwaggerDoc() map[string]string {

@@ -128,7 +128,7 @@ func NewPersistentVolumeController(
 	return controller
 }
 
-// initalizeCaches fills all controller caches with initial data from etcd in
+// initializeCaches fills all controller caches with initial data from etcd in
 // order to have the caches already filled when first addClaim/addVolume to
 // perform initial synchronization of the controller.
 func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSource cache.ListerWatcher) {
