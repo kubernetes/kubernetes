@@ -56,6 +56,9 @@ const (
 	// On average it takes ~6 minutes for a single backend to come online in GCE.
 	lbPollTimeout = 15 * time.Minute
 
+	// General cloud resource poll timeout (eg: create static ip, firewall etc)
+	cloudResourcePollTimeout = 5 * time.Minute
+
 	// Time required by the loadbalancer to cleanup, proportional to numApps/Ing.
 	lbCleanupTimeout = 5 * time.Minute
 	lbPollInterval   = 30 * time.Second
@@ -442,8 +445,8 @@ func ingFromManifest(fileName string) *extensions.Ingress {
 	return &ing
 }
 
-// gcloudUnmarshal unmarshals json output of gcloud into given out interface.
-func gcloudUnmarshal(resource, regex, project string, out interface{}) {
+// gcloudList unmarshals json output of gcloud into given out interface.
+func gcloudList(resource, regex, project string, out interface{}) {
 	// gcloud prints a message to stderr if it has an available update
 	// so we only look at stdout.
 	command := []string{
@@ -471,6 +474,16 @@ func gcloudDelete(resource, name, project string, args ...string) error {
 	output, err := exec.Command("gcloud", argList...).CombinedOutput()
 	if err != nil {
 		framework.Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
+	}
+	return err
+}
+
+func gcloudCreate(resource, name, project string, args ...string) error {
+	framework.Logf("Creating %v in project %v: %v", resource, project, name)
+	argsList := append([]string{"compute", resource, "create", name, fmt.Sprintf("--project=%v", project)}, args...)
+	output, err := exec.Command("gcloud", argsList...).CombinedOutput()
+	if err != nil {
+		framework.Logf("Error creating %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
 	return err
 }
@@ -513,14 +526,20 @@ func (cont *GCEIngressController) init() {
 }
 
 func (cont *GCEIngressController) staticIP(name string) string {
-	output, err := exec.Command("gcloud", "compute", "addresses", "create", name, "--global").CombinedOutput()
-	framework.Logf(string(output))
-	ExpectNoError(err)
+	ExpectNoError(gcloudCreate("addresses", name, cont.Project, "--global"))
 	cont.staticIPName = name
-
 	ipList := []compute.Address{}
-	gcloudUnmarshal("addresses", name, cont.Project, &ipList)
-	if len(ipList) != 1 {
+	if pollErr := wait.PollImmediate(5*time.Second, cloudResourcePollTimeout, func() (bool, error) {
+		gcloudList("addresses", name, cont.Project, &ipList)
+		if len(ipList) != 1 {
+			framework.Logf("Failed to find static ip %v even though create call succeeded, found ips %+v", name, ipList)
+			return false, nil
+		}
+		return true, nil
+	}); pollErr != nil {
+		if err := gcloudDelete("addresses", name, cont.Project, "--global"); err == nil {
+			framework.Logf("Failed to get AND delete address %v even though create call succeeded", name)
+		}
 		framework.Failf("Failed to find static ip %v even though create call succeeded, found ips %+v", name, ipList)
 	}
 	return ipList[0].Address
@@ -536,7 +555,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	// resources hold references to.
 	fwList := []compute.ForwardingRule{}
 	for _, regex := range []string{fmt.Sprintf("k8s-fw-.*--%v", cont.UID), fmt.Sprintf("k8s-fws-.*--%v", cont.UID)} {
-		gcloudUnmarshal("forwarding-rules", regex, cont.Project, &fwList)
+		gcloudList("forwarding-rules", regex, cont.Project, &fwList)
 		if len(fwList) != 0 {
 			msg := ""
 			for _, f := range fwList {
@@ -550,7 +569,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	}
 	// Static IPs are named after forwarding rules.
 	ipList := []compute.Address{}
-	gcloudUnmarshal("addresses", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), cont.Project, &ipList)
+	gcloudList("addresses", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), cont.Project, &ipList)
 	if len(ipList) != 0 {
 		msg := ""
 		for _, ip := range ipList {
@@ -570,7 +589,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	}
 
 	tpList := []compute.TargetHttpProxy{}
-	gcloudUnmarshal("target-http-proxies", fmt.Sprintf("k8s-tp-.*--%v", cont.UID), cont.Project, &tpList)
+	gcloudList("target-http-proxies", fmt.Sprintf("k8s-tp-.*--%v", cont.UID), cont.Project, &tpList)
 	if len(tpList) != 0 {
 		msg := ""
 		for _, t := range tpList {
@@ -582,7 +601,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 		errMsg += fmt.Sprintf("Found target proxies:\n%v", msg)
 	}
 	tpsList := []compute.TargetHttpsProxy{}
-	gcloudUnmarshal("target-https-proxies", fmt.Sprintf("k8s-tps-.*--%v", cont.UID), cont.Project, &tpsList)
+	gcloudList("target-https-proxies", fmt.Sprintf("k8s-tps-.*--%v", cont.UID), cont.Project, &tpsList)
 	if len(tpsList) != 0 {
 		msg := ""
 		for _, t := range tpsList {
@@ -596,7 +615,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	// TODO: Check for leaked ssl certs.
 
 	umList := []compute.UrlMap{}
-	gcloudUnmarshal("url-maps", fmt.Sprintf("k8s-um-.*--%v", cont.UID), cont.Project, &umList)
+	gcloudList("url-maps", fmt.Sprintf("k8s-um-.*--%v", cont.UID), cont.Project, &umList)
 	if len(umList) != 0 {
 		msg := ""
 		for _, u := range umList {
@@ -609,7 +628,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	}
 
 	beList := []compute.BackendService{}
-	gcloudUnmarshal("backend-services", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &beList)
+	gcloudList("backend-services", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &beList)
 	if len(beList) != 0 {
 		msg := ""
 		for _, b := range beList {
@@ -622,7 +641,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	}
 
 	hcList := []compute.HttpHealthCheck{}
-	gcloudUnmarshal("http-health-checks", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &hcList)
+	gcloudList("http-health-checks", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &hcList)
 	if len(hcList) != 0 {
 		msg := ""
 		for _, h := range hcList {
