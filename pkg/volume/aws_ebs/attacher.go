@@ -41,38 +41,28 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 	return &awsElasticBlockStoreAttacher{host: plugin.host}, nil
 }
 
-func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) error {
+func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	volumeID := volumeSource.VolumeID
 
 	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	attached, err := awsCloud.DiskIsAttached(volumeID, hostName)
+	// awsCloud.AttachDisk checks if disk is already attached to node and
+	// succeeds in that case, so no need to do that separately.
+	devicePath, err := awsCloud.AttachDisk(volumeID, hostName, readOnly)
 	if err != nil {
-		// Log error and continue with attach
-		glog.Errorf(
-			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
-			volumeID, hostName, err)
-	}
-
-	if err == nil && attached {
-		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, hostName)
-		return nil
-	}
-
-	if _, err = awsCloud.AttachDisk(volumeID, hostName, readOnly); err != nil {
 		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
-		return err
+		return "", err
 	}
-	return nil
+
+	return devicePath, nil
 }
 
 func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {

@@ -45,25 +45,25 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 	return &cinderDiskAttacher{host: plugin.host}, nil
 }
 
-func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) error {
+func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	volumeID := volumeSource.VolumeID
 
 	cloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
-		return err
+		return "", err
 	}
 	instances, res := cloud.Instances()
 	if !res {
-		return fmt.Errorf("failed to list openstack instances")
+		return "", fmt.Errorf("failed to list openstack instances")
 	}
 	instanceid, err := instances.InstanceID(hostName)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
@@ -79,15 +79,20 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) e
 	if err == nil && attached {
 		// Volume is already attached to node.
 		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, instanceid)
-		return nil
+	} else {
+		_, err = cloud.AttachDisk(instanceid, volumeID)
+		if err != nil {
+			glog.Infof("attach volume %q to instance %q gets %v", volumeID, instanceid, err)
+		}
 	}
 
-	_, err = cloud.AttachDisk(instanceid, volumeID)
-	if err != nil {
-		glog.Infof("attach volume %q to instance %q gets %v", volumeID, instanceid, err)
-	}
 	glog.Infof("attached volume %q to instance %q", volumeID, instanceid)
-	return err
+	devicePath, err := cloud.GetAttachmentDiskPath(instanceid, volumeID)
+	if err != nil {
+		return "", err
+	}
+
+	return devicePath, err
 }
 
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {

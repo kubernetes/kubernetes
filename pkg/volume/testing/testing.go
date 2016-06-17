@@ -358,11 +358,11 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func (fv *FakeVolume) Attach(spec *Spec, hostName string) error {
+func (fv *FakeVolume) Attach(spec *Spec, hostName string) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.AttachCallCount++
-	return nil
+	return "", nil
 }
 
 func (fv *FakeVolume) GetAttachCallCount() int {

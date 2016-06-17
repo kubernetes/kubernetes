@@ -385,7 +385,7 @@ func (oe *operationExecutor) generateAttachVolumeFunc(
 
 	return func() error {
 		// Execute attach
-		attachErr := volumeAttacher.Attach(
+		_, attachErr := volumeAttacher.Attach(
 			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 
 		if attachErr != nil {
