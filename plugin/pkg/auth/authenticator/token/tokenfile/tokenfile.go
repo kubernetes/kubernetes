@@ -22,17 +22,42 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
+	"github.com/fsnotify/fsnotify"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/util/filewatcher"
 )
 
 type TokenAuthenticator struct {
+	path   string
+	mutex  *sync.Mutex
 	tokens map[string]*user.DefaultInfo
 }
 
 // NewCSV returns a TokenAuthenticator, populated from a CSV file.
 // The CSV file must contain records in the format "token,username,useruid"
 func NewCSV(path string) (*TokenAuthenticator, error) {
+	tokens, err := ReadCSV(path)
+	if err != nil {
+		return nil, err
+	}
+	authenticator := &TokenAuthenticator{
+		path:   path,
+		mutex:  &sync.Mutex{},
+		tokens: tokens,
+	}
+	watcher, err := filewatcher.CreateFileWatcher(path)
+	if err != nil {
+		glog.Errorf("failed to add file watcher on %s", path)
+	} else {
+		go filewatcher.StartFileEventLoop(watcher, authenticator.HandleEvent, authenticator.HandleError)
+	}
+	return authenticator, nil
+}
+
+func ReadCSV(path string) (map[string]*user.DefaultInfo, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -51,7 +76,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 			return nil, err
 		}
 		if len(record) < 3 {
-			return nil, fmt.Errorf("token file '%s' must have at least 3 columns (token, user name, user uid), found %d", path, len(record))
+			return nil, fmt.Errorf("token file '%s' must have at least 3 columns (token, user name, user uid), found %d", file.Name(), len(record))
 		}
 		obj := &user.DefaultInfo{
 			Name: record[1],
@@ -63,10 +88,37 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 			obj.Groups = strings.Split(record[3], ",")
 		}
 	}
+	return tokens, nil
+}
 
-	return &TokenAuthenticator{
-		tokens: tokens,
-	}, nil
+func (a *TokenAuthenticator) Update(tokens map[string]*user.DefaultInfo) {
+	a.mutex.Lock()
+	a.tokens = tokens
+	a.mutex.Unlock()
+}
+
+func (a *TokenAuthenticator) HandleEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
+	if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Remove == fsnotify.Remove {
+		glog.Infof("file event caught: %s", event)
+		tokens, err := ReadCSV(a.path)
+		if err != nil {
+			glog.Infof("update token failed, %s", err)
+		} else {
+			glog.Infof("file updated: %s", a.path)
+			a.Update(tokens)
+		}
+	}
+	if event.Op&fsnotify.Remove == fsnotify.Remove {
+		// Some file editor do remove operations on file, eg. Vim
+		// And the file watcher will be invalid, so we add again.
+		watcher.Remove(a.path)
+		watcher.Add(a.path)
+	}
+}
+
+func (a *TokenAuthenticator) HandleError(watcher *fsnotify.Watcher, err error) {
+	glog.Errorf("file watcher of %s got error %s", a.path, err)
+	watcher.Close()
 }
 
 func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {

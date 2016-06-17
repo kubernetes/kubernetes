@@ -17,6 +17,7 @@ limitations under the License.
 package tokenfile
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -138,4 +139,132 @@ func newWithContents(t *testing.T, contents string) (auth *TokenAuthenticator, e
 	}
 
 	return NewCSV(f.Name())
+}
+
+type inner func(*testing.T, *TokenAuthenticator)
+
+func testChangeTokenFileWrapper(t *testing.T, before string, after string, fn1 inner, fn2 inner) {
+	f, err := ioutil.TempFile("", "tokenfile_test")
+	if err != nil {
+		t.Fatalf("unexpected error creating tokenfile: %v", err)
+	}
+	f.Close()
+	defer os.Remove(f.Name())
+
+	ioutil.WriteFile(f.Name(), []byte(before), 0644)
+	auth, err := NewCSV(f.Name())
+	fn1(t, auth)
+	ioutil.WriteFile(f.Name(), []byte(after), 0644)
+	fn2(t, auth)
+}
+
+func innerTestBeforeChangeTokenFile(t *testing.T, auth *TokenAuthenticator) {
+	testCases := []struct {
+		Token string
+		User  *user.DefaultInfo
+		Ok    bool
+		Err   bool
+	}{
+		{
+			Token: "token1",
+			User:  &user.DefaultInfo{Name: "user1", UID: "uid1"},
+			Ok:    true,
+		},
+		{
+			Token: "token2",
+			User:  &user.DefaultInfo{Name: "user2", UID: "uid2"},
+			Ok:    true,
+		},
+		{
+			Token: "token3",
+		},
+		{
+			Token: "token4",
+		},
+	}
+	for i, testCase := range testCases {
+		user, ok, err := auth.AuthenticateToken(testCase.Token)
+		if testCase.User == nil {
+			if user != nil {
+				t.Errorf("%d: unexpected non-nil user %#v", i, user)
+			}
+		} else if !reflect.DeepEqual(testCase.User, user) {
+			t.Errorf("%d: expected user %#v, got %#v", i, testCase.User, user)
+		}
+
+		if testCase.Ok != ok {
+			t.Errorf("%d: expected auth %v, got %v", i, testCase.Ok, ok)
+		}
+		switch {
+		case err == nil && testCase.Err:
+			t.Errorf("%d: unexpected nil error", i)
+		case err != nil && !testCase.Err:
+			t.Errorf("%d: unexpected error: %v", i, err)
+		}
+	}
+}
+
+func innerTestAfterChangeTokenFile(t *testing.T, auth *TokenAuthenticator) {
+	testCases := []struct {
+		Token string
+		User  *user.DefaultInfo
+		Ok    bool
+		Err   bool
+	}{
+		{
+			Token: "token1",
+		},
+		{
+			Token: "token2",
+		},
+		{
+			Token: "token3",
+			User:  &user.DefaultInfo{Name: "user3", UID: "uid3", Groups: []string{"group1", "group2"}},
+			Ok:    true,
+		},
+		{
+			Token: "token4",
+			User:  &user.DefaultInfo{Name: "user4", UID: "uid4", Groups: []string{"group2"}},
+			Ok:    true,
+		},
+	}
+	var flag error
+	for count := 0; count <= 10000; count++ {
+		flag = nil
+		for i, testCase := range testCases {
+			user, ok, err := auth.AuthenticateToken(testCase.Token)
+			if testCase.User == nil {
+				if user != nil {
+					flag = fmt.Errorf("%d: unexpected non-nil user %#v", i, user)
+				}
+			} else if !reflect.DeepEqual(testCase.User, user) {
+				flag = fmt.Errorf("%d: expected user %#v, got %#v", i, testCase.User, user)
+			}
+
+			if testCase.Ok != ok {
+				flag = fmt.Errorf("%d: expected auth %v, got %v", i, testCase.Ok, ok)
+			}
+			switch {
+			case err == nil && testCase.Err:
+				flag = fmt.Errorf("%d: unexpected nil error", i)
+			case err != nil && !testCase.Err:
+				flag = fmt.Errorf("%d: unexpected error: %v", i, err)
+			}
+		}
+		if flag == nil {
+			return
+		}
+	}
+	t.Errorf("Looped 10000 times, got last error %v", flag)
+}
+
+func TestFileChange(t *testing.T) {
+	testChangeTokenFileWrapper(t, `
+token1,user1,uid1
+token2,user2,uid2
+`, `
+token3,user3,uid3,"group1,group2"
+token4,user4,uid4,"group2"
+`, innerTestBeforeChangeTokenFile,
+		innerTestAfterChangeTokenFile)
 }
