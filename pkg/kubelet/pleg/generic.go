@@ -55,7 +55,7 @@ type GenericPLEG struct {
 	// The channel from which the subscriber listens events.
 	eventChannel chan *PodLifecycleEvent
 	// The internal cache for pod/container information.
-	podRecords podRecords
+	podRecords *podRecords
 	// Time of the last relisting.
 	relistTime atomic.Value
 	// Cache for storing the runtime states required for syncing pods.
@@ -105,7 +105,11 @@ type podRecord struct {
 	current *kubecontainer.Pod
 }
 
-type podRecords map[types.UID]*podRecord
+type podRecords struct {
+	// Lock which guards all internal data structures.
+	lock    sync.RWMutex
+	records map[types.UID]*podRecord
+}
 
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
@@ -113,7 +117,7 @@ func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 		relistPeriod: relistPeriod,
 		runtime:      runtime,
 		eventChannel: make(chan *PodLifecycleEvent, channelCapacity),
-		podRecords:   make(podRecords),
+		podRecords:   &podRecords{records: make(map[types.UID]*podRecord)},
 		cache:        cache,
 		clock:        clock,
 	}
@@ -201,11 +205,12 @@ func (g *GenericPLEG) relist() {
 		return
 	}
 	pods := kubecontainer.Pods(podList)
+
 	g.podRecords.setCurrent(pods)
 
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
-	for pid := range g.podRecords {
+	for pid := range g.podRecords.records {
 		oldPod := g.podRecords.getOld(pid)
 		pod := g.podRecords.getCurrent(pid)
 		// Get all containers in the old and the new pod.
@@ -272,8 +277,10 @@ func (g *GenericPLEG) updatePodCacheByWorkers(eventsByPodID map[types.UID][]*Pod
 				delete(g.podsToReinspect, pid)
 			}
 		}
+
 		// Update the internal storage and send out the events.
 		g.podRecords.update(pid)
+
 		for i := range events {
 			// Filter out events that are not reliable and no other components use yet.
 			if events[i].Type == ContainerChanged {
@@ -396,47 +403,55 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 	return state
 }
 
-func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {
-	r, ok := pr[id]
+func (pr *podRecords) getOld(id types.UID) *kubecontainer.Pod {
+	pr.lock.RLock()
+	defer pr.lock.RUnlock()
+	r, ok := pr.records[id]
 	if !ok {
 		return nil
 	}
 	return r.old
 }
 
-func (pr podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
-	r, ok := pr[id]
+func (pr *podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
+	pr.lock.RLock()
+	defer pr.lock.RUnlock()
+	r, ok := pr.records[id]
 	if !ok {
 		return nil
 	}
 	return r.current
 }
 
-func (pr podRecords) setCurrent(pods []*kubecontainer.Pod) {
-	for i := range pr {
-		pr[i].current = nil
+func (pr *podRecords) setCurrent(pods []*kubecontainer.Pod) {
+	pr.lock.Lock()
+	defer pr.lock.Unlock()
+	for i := range pr.records {
+		pr.records[i].current = nil
 	}
 	for _, pod := range pods {
-		if r, ok := pr[pod.ID]; ok {
+		if r, ok := pr.records[pod.ID]; ok {
 			r.current = pod
 		} else {
-			pr[pod.ID] = &podRecord{current: pod}
+			pr.records[pod.ID] = &podRecord{current: pod}
 		}
 	}
 }
 
-func (pr podRecords) update(id types.UID) {
-	r, ok := pr[id]
+func (pr *podRecords) update(id types.UID) {
+	pr.lock.Lock()
+	defer pr.lock.Unlock()
+	r, ok := pr.records[id]
 	if !ok {
 		return
 	}
 	pr.updateInternal(id, r)
 }
 
-func (pr podRecords) updateInternal(id types.UID, r *podRecord) {
+func (pr *podRecords) updateInternal(id types.UID, r *podRecord) {
 	if r.current == nil {
 		// Pod no longer exists; delete the entry.
-		delete(pr, id)
+		delete(pr.records, id)
 		return
 	}
 	r.old = r.current
