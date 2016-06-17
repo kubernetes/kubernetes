@@ -79,7 +79,9 @@ while true; do
   if (( "${found}" == "${EXPECTED_NUM_NODES}" )) && (( "${ready}" == "${EXPECTED_NUM_NODES}")); then
     break
   elif (( "${found}" > "${EXPECTED_NUM_NODES}" )); then
-    echo -e "${color_red}Found ${found} nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
+    if [[ "${KUBE_USE_EXISTING_MASTER:-}" != "true" ]]; then
+      echo -e "${color_red}Found ${found} nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
+    fi
     break
   elif (( "${ready}" > "${EXPECTED_NUM_NODES}")); then
     echo -e "${color_red}Found ${ready} ready nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
