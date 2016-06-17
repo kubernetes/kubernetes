@@ -19,8 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -282,87 +280,12 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	return apiServer.URL, configFilePath
 }
 
-func makeTempDirOrDie(prefix string, baseDir string) string {
-	if baseDir == "" {
-		baseDir = "/tmp"
-	}
-	tempDir, err := ioutil.TempDir(baseDir, prefix)
-	if err != nil {
-		glog.Fatalf("Can't make a temp rootdir: %v", err)
-	}
-	if err = os.MkdirAll(tempDir, 0750); err != nil {
-		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
-	}
-	return tempDir
-}
-
-// podsOnNodes returns true when all of the selected pods exist on a node.
-func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
-	// Wait until all pods are running on the node.
-	return func() (bool, error) {
-		options := api.ListOptions{LabelSelector: labelSelector}
-		pods, err := c.Pods(podNamespace).List(options)
-		if err != nil {
-			glog.Infof("Unable to get pods to list: %v", err)
-			return false, nil
-		}
-		for i := range pods.Items {
-			pod := pods.Items[i]
-			podString := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.NodeName)
-			if len(pod.Spec.NodeName) == 0 {
-				glog.Infof("Pod %q is not bound to a host yet", podString)
-				return false, nil
-			}
-			if pod.Status.Phase != api.PodRunning {
-				glog.Infof("Pod %q is not running, status: %v", podString, pod.Status.Phase)
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-}
-
-func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpointCount int) wait.ConditionFunc {
-	return func() (bool, error) {
-		endpoints, err := c.Endpoints(serviceNamespace).Get(serviceID)
-		if err != nil {
-			glog.Infof("Error getting endpoints: %v", err)
-			return false, nil
-		}
-		count := 0
-		for _, ss := range endpoints.Subsets {
-			for _, addr := range ss.Addresses {
-				for _, port := range ss.Ports {
-					count++
-					glog.Infof("%s/%s endpoint: %s:%d %#v", serviceNamespace, serviceID, addr.IP, port.Port, addr.TargetRef)
-				}
-			}
-		}
-		return count == endpointCount, nil
-	}
-}
-
 func countEndpoints(eps *api.Endpoints) int {
 	count := 0
 	for i := range eps.Subsets {
 		count += len(eps.Subsets[i].Addresses) * len(eps.Subsets[i].Ports)
 	}
 	return count
-}
-
-func podExists(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		_, err := c.Pods(podNamespace).Get(podName)
-		return err == nil, nil
-	}
-}
-
-func podNotFound(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		_, err := c.Pods(podNamespace).Get(podName)
-		return apierrors.IsNotFound(err), nil
-	}
 }
 
 func podRunning(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
