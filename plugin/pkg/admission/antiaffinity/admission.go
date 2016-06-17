@@ -59,7 +59,8 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	}
 	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
 	if err != nil {
-		return err
+		// this is validated later
+		return nil
 	}
 	if affinity.PodAntiAffinity != nil {
 		var podAntiAffinityTerms []api.PodAffinityTerm
