@@ -319,7 +319,7 @@ func (e *EndpointController) syncService(key string) {
 	if !e.podStoreSynced() {
 		// Sleep so we give the pod reflector goroutine a chance to run.
 		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", key)
+		glog.Infof("Waiting for pods controller to sync, requeuing service %v", key)
 		e.queue.Add(key)
 		return
 	}
