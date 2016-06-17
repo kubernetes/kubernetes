@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumemanager
+package volume
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/volume"
+	kubevolume "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -91,19 +91,13 @@ type VolumeManager interface {
 	// volumes.
 	GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
 
-	// GetVolumesForPodAndApplySupplementalGroups, like GetVolumesForPod returns
-	// a VolumeMap containing the volumes referenced by the specified pod that
-	// are successfully attached and mounted. The key in the map is the
-	// OuterVolumeSpecName (i.e. pod.Spec.Volumes[x].Name).
-	// It returns an empty VolumeMap if pod has no volumes.
-	// In addition for every volume that specifies a VolumeGidValue, it appends
-	// the SecurityContext.SupplementalGroups for the specified pod.
-	// XXX: https://github.com/kubernetes/kubernetes/issues/27197 mutating the
-	// pod object is bad, and should be avoided.
-	GetVolumesForPodAndAppendSupplementalGroups(pod *api.Pod) container.VolumeMap
+	// GetExtraSupplementalGroupsForPod returns a list of the extra
+	// supplemental groups for the Pod.  These extra supplemental grops come
+	// from annotations on persistent volumes that the pod depends on.
+	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
 
 	// Returns a list of all volumes that are currently attached according to
-	// the actual state of the world cache and implement the volume.Attacher
+	// the actual state of the world cache and implement the kubevolume.Attacher
 	// interface.
 	GetVolumesInUse() []api.UniqueVolumeName
 }
@@ -120,7 +114,7 @@ func NewVolumeManager(
 	hostName string,
 	podManager pod.Manager,
 	kubeClient internalclientset.Interface,
-	volumePluginMgr *volume.VolumePluginMgr) (VolumeManager, error) {
+	volumePluginMgr *kubevolume.VolumePluginMgr) (VolumeManager, error) {
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
@@ -154,7 +148,7 @@ type volumeManager struct {
 
 	// volumePluginMgr is the volume plugin manager used to access volume
 	// plugins. It must be pre-initialized.
-	volumePluginMgr *volume.VolumePluginMgr
+	volumePluginMgr *kubevolume.VolumePluginMgr
 
 	// desiredStateOfWorld is a data structure containing the desired state of
 	// the world according to the volume manager: i.e. what volumes should be
@@ -197,12 +191,34 @@ func (vm *volumeManager) Run(stopCh <-chan struct{}) {
 
 func (vm *volumeManager) GetMountedVolumesForPod(
 	podName types.UniquePodName) container.VolumeMap {
-	return vm.getVolumesForPodHelper(podName, nil /* pod */)
+	podVolumes := make(container.VolumeMap)
+	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
+		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{Mounter: mountedVolume.Mounter}
+	}
+	return podVolumes
 }
 
-func (vm *volumeManager) GetVolumesForPodAndAppendSupplementalGroups(
-	pod *api.Pod) container.VolumeMap {
-	return vm.getVolumesForPodHelper("" /* podName */, pod)
+func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	podName := volumehelper.GetUniquePodName(pod)
+	supplementalGroups := sets.NewString()
+
+	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
+		if mountedVolume.VolumeGidValue != "" {
+			supplementalGroups.Insert(mountedVolume.VolumeGidValue)
+		}
+	}
+
+	result := make([]int64, supplementalGroups.Len())
+	for _, group := range supplementalGroups.List() {
+		iGroup, extra := getExtraSupplementalGid(group, pod)
+		if !extra {
+			continue
+		}
+
+		result = append(result, int64(iGroup))
+	}
+
+	return result
 }
 
 func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
@@ -216,33 +232,6 @@ func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
 	}
 
 	return volumesInUse
-}
-
-// getVolumesForPodHelper is a helper method implements the common logic for
-// the GetVolumesForPod methods.
-// XXX: https://github.com/kubernetes/kubernetes/issues/27197 mutating the pod
-// object is bad, and should be avoided.
-func (vm *volumeManager) getVolumesForPodHelper(
-	podName types.UniquePodName, pod *api.Pod) container.VolumeMap {
-	if pod != nil {
-		podName = volumehelper.GetUniquePodName(pod)
-	}
-	podVolumes := make(container.VolumeMap)
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] =
-			container.VolumeInfo{Mounter: mountedVolume.Mounter}
-		if pod != nil {
-			err := applyPersistentVolumeAnnotations(
-				mountedVolume.VolumeGidValue, pod)
-			if err != nil {
-				glog.Errorf("applyPersistentVolumeAnnotations failed for pod %q volume %q with: %v",
-					podName,
-					mountedVolume.VolumeName,
-					err)
-			}
-		}
-	}
-	return podVolumes
 }
 
 func (vm *volumeManager) WaitForAttachAndMount(pod *api.Pod) error {
@@ -334,32 +323,27 @@ func getExpectedVolumes(pod *api.Pod) []string {
 	return expectedVolumes
 }
 
-// applyPersistentVolumeAnnotations appends a pod
-// SecurityContext.SupplementalGroups if a GID annotation is provided.
-// XXX: https://github.com/kubernetes/kubernetes/issues/27197 mutating the pod
-// object is bad, and should be avoided.
-func applyPersistentVolumeAnnotations(
-	volumeGidValue string, pod *api.Pod) error {
-	if volumeGidValue != "" {
-		gid, err := strconv.ParseInt(volumeGidValue, 10, 64)
-		if err != nil {
-			return fmt.Errorf(
-				"Invalid value for %s %v",
-				volumehelper.VolumeGidAnnotationKey,
-				err)
-		}
-
-		if pod.Spec.SecurityContext == nil {
-			pod.Spec.SecurityContext = &api.PodSecurityContext{}
-		}
-		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
-			if gid == existingGid {
-				return nil
-			}
-		}
-		pod.Spec.SecurityContext.SupplementalGroups =
-			append(pod.Spec.SecurityContext.SupplementalGroups, gid)
+// getExtraSupplementalGid returns the value of an extra supplemental GID as
+// defined by an annotation on a volume and a boolean indicating whether the
+// volume defined a GID.
+func getExtraSupplementalGid(volumeGidValue string, pod *api.Pod) (int64, bool) {
+	if volumeGidValue == "" {
+		return 0, false
 	}
 
-	return nil
+	gid, err := strconv.ParseInt(volumeGidValue, 10, 64)
+	if err != nil {
+		// TODO: should be unreachable code due to validations
+		return 0, false
+	}
+
+	if pod.Spec.SecurityContext != nil {
+		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
+			if gid == existingGid {
+				return 0, false
+			}
+		}
+	}
+
+	return gid, true
 }

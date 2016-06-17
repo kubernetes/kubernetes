@@ -399,6 +399,19 @@ func NewMainKubelet(
 	klet.podCache = kubecontainer.NewCache()
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
+	klet.volumePluginMgr, err =
+		NewInitializedVolumePluginMgr(klet, volumePlugins)
+	if err != nil {
+		return nil, err
+	}
+
+	klet.volumeManager, err = kubeletvolume.NewVolumeManager(
+		enableControllerAttachDetach,
+		hostname,
+		klet.podManager,
+		klet.kubeClient,
+		klet.volumePluginMgr)
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -416,6 +429,7 @@ func NewMainKubelet(
 			containerLogsDir,
 			osInterface,
 			klet.networkPlugin,
+			klet.volumeManager,
 			klet,
 			klet.httpClient,
 			dockerExecHandler,
@@ -490,19 +504,6 @@ func NewMainKubelet(
 		klet.runner,
 		containerRefManager,
 		recorder)
-
-	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, volumePlugins)
-	if err != nil {
-		return nil, err
-	}
-
-	klet.volumeManager, err = kubeletvolume.NewVolumeManager(
-		enableControllerAttachDetach,
-		hostname,
-		klet.podManager,
-		klet.kubeClient,
-		klet.volumePluginMgr)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -1418,7 +1419,8 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		return nil, err
 	}
 	opts.Hostname = hostname
-	volumes := kl.volumeManager.GetVolumesForPodAndAppendSupplementalGroups(pod)
+	podName := volumehelper.GetUniquePodName(pod)
+	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 
 	opts.PortMappings = makePortMappings(container)
 	// Docker does not relabel volumes if the container is running
