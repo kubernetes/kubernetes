@@ -1298,9 +1298,12 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 	hostDevice := "/dev/xvd" + string(mountDevice)
 	// In the EC2 API, it is sometimes is /dev/sdX and sometimes /dev/xvdX
 	// We are running on the node here, so we check if /dev/xvda exists to determine this
-	ec2Device := "/dev/xvd" + string(mountDevice)
-	if _, err := os.Stat("/dev/xvda"); os.IsNotExist(err) {
-		ec2Device = "/dev/sd" + string(mountDevice)
+	//
+	// TODO: This check fails when running on KCM, as it's only checking the
+	// device name on the kcm and not on the actual instance
+	ec2Device := "/dev/sd" + string(mountDevice)
+	if _, err := os.Stat("/dev/sda"); os.IsNotExist(err) {
+		ec2Device = "/dev/xvd" + string(mountDevice)
 	}
 
 	// attachEnded is set to true if the attach operation completed
