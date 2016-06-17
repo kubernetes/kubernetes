@@ -35,6 +35,17 @@ import (
 	rsutil "k8s.io/kubernetes/pkg/util/replicaset"
 )
 
+// syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
+func (dc *DeploymentController) syncStatusOnly(deployment *extensions.Deployment) error {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
+	if err != nil {
+		return err
+	}
+
+	allRSs := append(oldRSs, newRS)
+	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+}
+
 // sync is responsible for reconciling deployments on scaling events or when they
 // are paused.
 func (dc *DeploymentController) sync(deployment *extensions.Deployment) error {
