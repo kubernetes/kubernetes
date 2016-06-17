@@ -220,6 +220,11 @@ func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, s
 	if numSvcs > 0 && service != nil {
 		// Renaming for clarity/readability
 		clSvc := clSvcList.Items[0]
+
+		// The federation service has no cluster IP.  Clear any cluster IP before
+		// comparison.
+		clSvc.Spec.ClusterIP = ""
+
 		Expect(clSvc.Name).To(Equal(service.Name))
 		Expect(clSvc.Spec).To(Equal(service.Spec))
 	}
