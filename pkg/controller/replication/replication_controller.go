@@ -353,12 +353,9 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		return
 	}
 	curPod := cur.(*api.Pod)
-	rc := rm.getPodController(curPod)
-	if rc == nil {
-		return
-	}
 	oldPod := old.(*api.Pod)
-
+	glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
@@ -366,11 +363,18 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rc never initiates a phase change, and so is never asleep waiting for the same.
 		rm.deletePod(curPod)
+		if labelChanged {
+			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
+			rm.deletePod(oldPod)
+		}
 		return
 	}
-	rm.enqueueController(rc)
+
+	if rc := rm.getPodController(curPod); rc != nil {
+		rm.enqueueController(rc)
+	}
 	// Only need to get the old controller if the labels changed.
-	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
+	if labelChanged {
 		// If the old and new rc are the same, the first one that syncs
 		// will set expectations preventing any damage from the second.
 		if oldRC := rm.getPodController(oldPod); oldRC != nil {
