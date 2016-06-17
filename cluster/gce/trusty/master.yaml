@@ -213,6 +213,7 @@ script
 	set -o errexit
 	set -o nounset
 
+	. /etc/kube-configure-helper.sh
 	. /etc/kube-env
 	export HOME="/root"
 	export KUBECTL_BIN="/usr/bin/kubectl"
