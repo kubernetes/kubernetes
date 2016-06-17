@@ -76,12 +76,12 @@ func (r *Route53APIStub) ChangeResourceRecordSets(input *route53.ChangeResourceR
 		switch *change.Action {
 		case route53.ChangeActionCreate:
 			if _, found := recordSets[*change.ResourceRecordSet.Name]; found {
-				return nil, fmt.Errorf("Attempt to create duplicate rrset %s", change.ResourceRecordSet.Name) // TODO: Return AWS errors with codes etc
+				return nil, fmt.Errorf("Attempt to create duplicate rrset %s", *change.ResourceRecordSet.Name) // TODO: Return AWS errors with codes etc
 			}
 			recordSets[*change.ResourceRecordSet.Name] = append(recordSets[*change.ResourceRecordSet.Name], change.ResourceRecordSet)
 		case route53.ChangeActionDelete:
 			if _, found := recordSets[*change.ResourceRecordSet.Name]; !found {
-				return nil, fmt.Errorf("Attempt to delete non-existant rrset %s", change.ResourceRecordSet.Name) // TODO: Check other fields too
+				return nil, fmt.Errorf("Attempt to delete non-existant rrset %s", *change.ResourceRecordSet.Name) // TODO: Check other fields too
 			}
 			delete(recordSets, *change.ResourceRecordSet.Name)
 		case route53.ChangeActionUpsert:
@@ -102,7 +102,7 @@ func (r *Route53APIStub) ListHostedZones(*route53.ListHostedZonesInput) (*route5
 
 func (r *Route53APIStub) CreateHostedZone(input *route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error) {
 	if _, ok := r.zones[*input.Name]; ok {
-		return nil, fmt.Errorf("Error creating hosted DNS zone: %s already exists", input.Name)
+		return nil, fmt.Errorf("Error creating hosted DNS zone: %s already exists", *input.Name)
 	}
 	r.zones[*input.Name] = &route53.HostedZone{
 		Id:   input.Name,
