@@ -44,6 +44,10 @@ func (s *ServiceController) getHealthyEndpoints(clusterName string, cachedServic
 			return nil, nil, nil, err
 		}
 		for _, ingress := range lbStatus.Ingress {
+			readyEndpoints, ok := cachedService.endpointMap[lbClusterName]
+			if !ok || readyEndpoints == 0 {
+				continue
+			}
 			var address string
 			// We should get either an IP address or a hostname - use whichever one we get
 			if ingress.IP != "" {
