@@ -22,7 +22,6 @@ import (
 	"io"
 	"net"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1296,12 +1295,9 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 
 	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
 	hostDevice := "/dev/xvd" + string(mountDevice)
-	// In the EC2 API, it is sometimes is /dev/sdX and sometimes /dev/xvdX
-	// We are running on the node here, so we check if /dev/xvda exists to determine this
+	// We are using xvd names (so we are HVM only)
+	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
 	ec2Device := "/dev/xvd" + string(mountDevice)
-	if _, err := os.Stat("/dev/xvda"); os.IsNotExist(err) {
-		ec2Device = "/dev/sd" + string(mountDevice)
-	}
 
 	// attachEnded is set to true if the attach operation completed
 	// (successfully or not)
