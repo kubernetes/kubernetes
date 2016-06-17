@@ -24,6 +24,10 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
+# This is required before we run govet for the results to be correct.
+# See https://github.com/golang/go/issues/16086 for details.
+go install ./cmd/...
+
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${KUBE_GOFLAGS:-})"
 
