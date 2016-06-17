@@ -1,7 +1,9 @@
 # Kubernetes
 
-[![GoReportCard Widget]][GoReportCard] [![GoDoc Widget]][GoDoc] [![Coverage Status Widget]][Coverage Status]
+[![Submit Queue Widget]][Submit Queue] [![GoReportCard Widget]][GoReportCard] [![GoDoc Widget]][GoDoc] [![Coverage Status Widget]][Coverage Status]
 
+[Submit Queue]: http://submit-queue.k8s.io/#/e2e
+[Submit Queue Widget]: http://submit-queue.k8s.io/health.svg
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
 [GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
 [GoReportCard]: https://goreportcard.com/report/k8s.io/kubernetes
