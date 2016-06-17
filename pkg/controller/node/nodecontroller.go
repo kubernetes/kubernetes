@@ -61,7 +61,7 @@ const (
 	podCIDRUpdateRetry = 5
 	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
 	nodeEvictionPeriod = 100 * time.Millisecond
-	// controlls how many NodeSpec updates NC can process in any moment.
+	// controls how many NodeSpec updates NC can process in any moment.
 	cidrUpdateWorkers   = 10
 	cidrUpdateQueueSize = 5000
 )
