@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
@@ -70,13 +72,20 @@ func (g *genProtoIDL) Namers(c *generator.Context) namer.NameSystems {
 
 // Filter ignores types that are identified as not exportable.
 func (g *genProtoIDL) Filter(c *generator.Context, t *types.Type) bool {
-	flags := types.ExtractCommentTags("+", t.CommentLines)
-	switch {
-	case flags["protobuf"] == "false":
-		return false
-	case flags["protobuf"] == "true":
-		return true
-	case !g.generateAll:
+	tagVals := types.ExtractCommentTags("+", t.CommentLines)["protobuf"]
+	if tagVals != nil {
+		if tagVals[0] == "false" {
+			// Type specified "false".
+			return false
+		}
+		if tagVals[0] == "true" {
+			// Type specified "true".
+			return true
+		}
+		glog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tagVals[0])
+	}
+	if !g.generateAll {
+		// We're not generating everything.
 		return false
 	}
 	seen := map[*types.Type]bool{}
@@ -125,7 +134,7 @@ func isOptionalAlias(t *types.Type) bool {
 	if t.Underlying == nil || (t.Underlying.Kind != types.Map && t.Underlying.Kind != types.Slice) {
 		return false
 	}
-	if types.ExtractCommentTags("+", t.CommentLines)["protobuf.nullable"] != "true" {
+	if extractBoolTagOrDie("protobuf.nullable", t.CommentLines) == false {
 		return false
 	}
 	return true
@@ -296,7 +305,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 			key := strings.TrimPrefix(k, "protobuf.options.")
 			switch key {
 			case "marshal":
-				if v == "false" {
+				if v[0] == "false" {
 					if !b.omitGogo {
 						options = append(options,
 							"(gogoproto.marshaler) = false",
@@ -307,14 +316,14 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 				}
 			default:
 				if !b.omitGogo || !strings.HasPrefix(key, "(gogoproto.") {
-					options = append(options, fmt.Sprintf("%s = %s", key, v))
+					options = append(options, fmt.Sprintf("%s = %s", key, v[0]))
 				}
 			}
 		// protobuf.as allows a type to have the same message contents as another Go type
 		case k == "protobuf.as":
 			fields = nil
-			if alias = b.locator.GoTypeForName(types.Name{Name: v}); alias == nil {
-				return fmt.Errorf("type %v references alias %q which does not exist", b.t, v)
+			if alias = b.locator.GoTypeForName(types.Name{Name: v[0]}); alias == nil {
+				return fmt.Errorf("type %v references alias %q which does not exist", b.t, v[0])
 			}
 		// protobuf.embed instructs the generator to use the named type in this package
 		// as an embedded message.
@@ -322,10 +331,10 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 			fields = []protoField{
 				{
 					Tag:  1,
-					Name: v,
+					Name: v[0],
 					Type: &types.Type{
 						Name: types.Name{
-							Name:    v,
+							Name:    v[0],
 							Package: b.localPackage.Package,
 							Path:    b.localPackage.Path,
 						},

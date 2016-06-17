@@ -74,8 +74,8 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	}
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(g.inputPacakge)
-	if override, ok := types.ExtractCommentTags("+", p.DocComments)["groupName"]; ok && override != "" {
-		groupName = override
+	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+		groupName = override[0]
 	}
 
 	m := map[string]interface{}{
@@ -101,7 +101,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 			"type":  t,
 			"Group": namer.IC(normalization.BeforeFirstDot(g.group)),
 		}
-		namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {
 			sw.Do(getterImplNamespaced, wrapper)
 		} else {

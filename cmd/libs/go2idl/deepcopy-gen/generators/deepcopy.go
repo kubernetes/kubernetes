@@ -200,7 +200,7 @@ func isRootedUnder(pkg string, roots []string) bool {
 
 func copyableWithinPackage(t *types.Type, boundingDirs []string) bool {
 	// If the type opts out of copy-generation, stop.
-	if types.ExtractCommentTags("+", t.CommentLines)["gencopy"] == "false" {
+	if extractBoolTagOrDie("gencopy", true, t.CommentLines) == false {
 		return false
 	}
 	// Only packages within the restricted range can be processed.

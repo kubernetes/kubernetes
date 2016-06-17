@@ -108,7 +108,7 @@ func Packages(_ *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 				// // +genset
 				// or
 				// // +genset=true
-				return types.ExtractCommentTags("+", t.CommentLines)["genset"] == "true"
+				return extractBoolTagOrDie("genset", t.CommentLines) == true
 			}
 			return false
 		},

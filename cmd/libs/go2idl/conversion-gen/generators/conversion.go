@@ -232,7 +232,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// Only generate conversions for package which explicitly requested it
 		// byt setting "+genversion=true" in their doc.go file.
 		filtered := false
-		if types.ExtractCommentTags("+", p.DocComments)["genconversion"] == "true" {
+		if extractBoolTagOrDie("genconversion", false, p.DocComments) == true {
 			filtered = true
 		}
 		if !filtered {
@@ -342,7 +342,7 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 				// "+ genconversion=false"
 				// comment to ignore this field for conversion.
 				// TODO: Switch to SecondClosestCommentLines.
-				if types.ExtractCommentTags("+", inMember.CommentLines)["genconversion"] == "false" {
+				if extractBoolTagOrDie("genconversion", true, inMember.CommentLines) == false {
 					continue
 				}
 				return false
@@ -428,7 +428,7 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 	if t.Name.Package != g.targetPackage {
 		return false
 	}
-	if types.ExtractCommentTags("+", t.CommentLines)["genconversion"] == "false" {
+	if extractBoolTagOrDie("genconversion", true, t.CommentLines) == false {
 		return false
 	}
 	// TODO: Consider generating functions for other kinds too.
