@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.RunKubectlOrDie("create", "-f", sentinelServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", sentinelControllerYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": sentinelRC}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{sentinelRC: "true"}))
 			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			label = labels.SelectorFromSet(labels.Set(map[string]string{"name": redisRC}))
@@ -106,13 +106,21 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("checking up the services")
 			checkAllLogs := func() {
-				forEachPod("name", "redis", func(pod api.Pod) {
+				selectorKey, selectorValue := "name", redisRC
+				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
 						_, err := framework.LookForStringInLog(ns, pod.Name, "redis", expectedOnServer, serverStartTimeout)
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
-				forEachPod("name", "redis-sentinel", func(pod api.Pod) {
+				selectorKey, selectorValue = sentinelRC, "true"
+				label = labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
 						_, err := framework.LookForStringInLog(ns, pod.Name, "sentinel", expectedOnSentinel, serverStartTimeout)
 						Expect(err).NotTo(HaveOccurred())
