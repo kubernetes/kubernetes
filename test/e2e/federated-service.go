@@ -44,7 +44,7 @@ const (
 	KubeAPIQPS   = 20.0
 	KubeAPIBurst = 30
 
-	FederatedServiceTimeout = 5 * time.Minute
+	FederatedServiceTimeout = 60 * time.Second
 
 	FederatedServiceName = "federated-service"
 	FederatedServicePod  = "federated-service-test-pod"
@@ -52,7 +52,7 @@ const (
 	DefaultFederationName = "federation"
 )
 
-var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
+var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func() {
 	var clusterClientSets []*release_1_3.Clientset
 	var federationName string
 	f := framework.NewDefaultFederatedFramework("service")
@@ -68,28 +68,7 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 		contexts := f.GetUnderlyingFederatedContexts()
 
 		for _, context := range contexts {
-			framework.Logf("Creating cluster object: %s (%s)", context.Name, context.Cluster.Cluster.Server)
-			cluster := federation.Cluster{
-				ObjectMeta: api.ObjectMeta{
-					Name: context.Name,
-				},
-				Spec: federation.ClusterSpec{
-					ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
-						{
-							ClientCIDR:    "0.0.0.0/0",
-							ServerAddress: context.Cluster.Cluster.Server,
-						},
-					},
-					SecretRef: &api.LocalObjectReference{
-						// Note: Name must correlate with federation build script secret name,
-						//       which currently matches the cluster name.
-						//       See federation/cluster/common.sh:132
-						Name: context.Name,
-					},
-				},
-			}
-			_, err := f.FederationClientset.Federation().Clusters().Create(&cluster)
-			framework.ExpectNoError(err, "Creating cluster")
+			createClusterObjectOrFail(f, &context)
 		}
 
 		var clusterList *federation.ClusterList
@@ -108,6 +87,12 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 		}); err != nil {
 			framework.Failf("Failed to list registered clusters: %+v", err)
 		}
+
+		framework.Logf("Checking that %d clusters are Ready", len(contexts))
+		for _, context := range contexts {
+			clusterIsReadyOrFail(f, &context)
+		}
+		framework.Logf("%d clusters are Ready", len(contexts))
 
 		for _, cluster := range clusterList.Items {
 			framework.Logf("Creating a clientset for the cluster %s", cluster.Name)
@@ -240,6 +225,12 @@ func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, s
 		clSvc.Spec.ClusterIP = ""
 
 		Expect(clSvc.Name).To(Equal(service.Name))
+		// Some fields are expected to be different, so make them the same before checking equality.
+		clSvc.Spec.ClusterIP = service.Spec.ClusterIP
+		clSvc.Spec.ExternalIPs = service.Spec.ExternalIPs
+		clSvc.Spec.DeprecatedPublicIPs = service.Spec.DeprecatedPublicIPs
+		clSvc.Spec.LoadBalancerIP = service.Spec.LoadBalancerIP
+		clSvc.Spec.LoadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
 		Expect(clSvc.Spec).To(Equal(service.Spec))
 	}
 }
@@ -275,7 +266,8 @@ func createService(fcs *federation_release_1_3.Clientset, clusterClientSets []*r
 		},
 	}
 	nservice, err := fcs.Core().Services(namespace).Create(service)
-	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Trying to create service %q in namespace %q", service.ObjectMeta.Name, service.ObjectMeta.Namespace)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("creating service %s: %+v", service.Name, err))
 	for _, cs := range clusterClientSets {
 		waitForFederatedServiceShard(cs, namespace, nservice, 1)
 	}
