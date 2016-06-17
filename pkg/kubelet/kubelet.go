@@ -917,7 +917,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
-		if err := kl.containerGC.GarbageCollect(); err != nil {
+		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
 	}, ContainerGCPeriod, wait.NeverStop)

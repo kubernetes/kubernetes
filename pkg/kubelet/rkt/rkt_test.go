@@ -1694,7 +1694,8 @@ func TestGarbageCollect(t *testing.T) {
 			getter.pods[p.UID] = p
 		}
 
-		err := rkt.GarbageCollect(tt.gcPolicy)
+		allSourcesReady := true
+		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady)
 		assert.NoError(t, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.expectedCommands))
