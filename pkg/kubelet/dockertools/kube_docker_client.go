@@ -336,12 +336,8 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 }
 
 func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
-	ctx, cancel := getDefaultContext()
-	defer cancel()
-	resp, err := d.client.ContainerLogs(ctx, id, opts)
-	if ctxErr := contextError(ctx); ctxErr != nil {
-		return ctxErr
-	}
+	// Don't set timeout for log calls
+	resp, err := d.client.ContainerLogs(context.Background(), id, opts)
 	if err != nil {
 		return err
 	}
