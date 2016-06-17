@@ -145,9 +145,6 @@ function create-federation-api-objects {
     FEDERATION_API_TOKEN="$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)"
     export FEDERATION_API_KNOWN_TOKENS="${FEDERATION_API_TOKEN},admin,admin"
 
-    $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
-    $template "${manifests_root}/federation-controller-manager-deployment.yaml" | $host_kubectl create -f -
-
     # Create a kubeconfig with credentails for federation-apiserver. We will
     # then use this kubeconfig to create a secret which the federation
     # controller manager can use to talk to the federation-apiserver.
@@ -168,6 +165,9 @@ function create-federation-api-objects {
       name=$(basename $dir)
       $host_kubectl create secret generic ${name} --from-file="${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
     done
+
+    $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
+    $template "${manifests_root}/federation-controller-manager-deployment.yaml" | $host_kubectl create -f -
 
     # Update the users kubeconfig to include federation-apiserver credentials.
     CONTEXT=federation-cluster \
