@@ -1,13 +1,13 @@
 # Kubernetes
 
-[![GoReportCard Widget]][GoReportCard] [![GoDoc Widget]][GoDoc] [![Travis Widget]][Travis] [![Coverage Status Widget]][Coverage Status]
+[![Submit Queue Widget]][Submit Queue] [![GoReportCard Widget]][GoReportCard] [![GoDoc Widget]][GoDoc] [![Coverage Status Widget]][Coverage Status]
 
+[Submit Queue]: http://submit-queue.k8s.io/#/e2e
+[Submit Queue Widget]: http://submit-queue.k8s.io/health.svg
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
 [GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
 [GoReportCard]: https://goreportcard.com/report/k8s.io/kubernetes
 [GoReportCard Widget]: https://goreportcard.com/badge/k8s.io/kubernetes
-[Travis]: https://travis-ci.org/kubernetes/kubernetes
-[Travis Widget]: https://travis-ci.org/kubernetes/kubernetes.svg?branch=master
 [Coverage Status]: https://coveralls.io/r/kubernetes/kubernetes
 [Coverage Status Widget]: https://coveralls.io/repos/kubernetes/kubernetes/badge.svg
 
