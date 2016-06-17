@@ -176,6 +176,8 @@ var _ = framework.KubeDescribe("Service [Feature:Federation]", func() {
 				framework.SkipUnlessFederated(f.Client)
 
 				// Delete a federated service shard in the default e2e Kubernetes cluster.
+				// TODO(mml): This should not work: #27623.  We should use a load
+				// balancer with actual back-ends, some of which we delete or disable.
 				err := f.Clientset_1_3.Core().Services(f.Namespace.Name).Delete(FederatedServiceName, &api.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				waitForFederatedServiceShard(f.Clientset_1_3, f.Namespace.Name, nil, 0)
