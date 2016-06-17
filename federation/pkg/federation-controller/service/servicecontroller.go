@@ -707,17 +707,22 @@ func (s *ServiceController) updateDNSRecords(services []*cachedService, clusters
 
 // lockedUpdateDNSRecords Updates the DNS records of a service, assuming we hold the mutex
 // associated with the service.
-// TODO: quinton: Still screwed up in the same way as above.  Fix.
 func (s *ServiceController) lockedUpdateDNSRecords(service *cachedService, clusterNames []string) error {
 	if !wantsDNSRecords(service.appliedState) {
 		return nil
 	}
+	ensuredCount := 0
 	for key := range s.clusterCache.clientMap {
 		for _, clusterName := range clusterNames {
 			if key == clusterName {
 				s.ensureDnsRecords(clusterName, service)
+				ensuredCount += 1
 			}
 		}
+	}
+	if ensuredCount < len(clusterNames) {
+		return fmt.Errorf("Failed to update DNS records for %d of %d clusters for service %v due to missing clients for those clusters",
+			len(clusterNames)-ensuredCount, len(clusterNames), service)
 	}
 	return nil
 }
