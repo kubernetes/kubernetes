@@ -945,6 +945,7 @@ func CreateTestingNS(baseName string, c *client.Client, labels map[string]string
 		var err error
 		got, err = c.Namespaces().Create(namespaceObj)
 		if err != nil {
+			Logf("Unexpected error while creating namespace: %v", err)
 			return false, nil
 		}
 		return true, nil
