@@ -35,7 +35,7 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         ExecStartPre=/usr/bin/mkdir -p /opt/cni
-        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-42c4cb842dad606a84e93aad5a4484ded48e3046.tar.gz
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-c864f0e1ea73719b8f4582402b0847064f9883b0.tar.gz
         ExecStart=/usr/bin/tar xf /opt/downloads/cni.tar.gz -C /opt/cni/        
 
     - name: kubernetes-install-rkt.service
@@ -131,10 +131,12 @@ coreos:
         --cluster-dns=${DNS_SERVER_IP} \
         --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
-        --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
+        --container-runtime=rkt \
         --rkt-path=/opt/rkt/rkt \
         --rkt-stage1-image=/opt/rkt/stage1-coreos.aci \
-        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0}
+        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
+        --network-plugin=kubenet \
+        --reconcile-cidr=true
         Restart=always
         RestartSec=10
         KillMode=process
@@ -157,18 +159,7 @@ coreos:
         RestartSec=10
 
     - name: docker.service
-      drop-ins:
-        - name: 50-docker-opts.conf
-          content: |
-            [Service]
-            Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false --ip-masq=false'
-            MountFlags=slave
-            LimitNOFILE=1048576
-            LimitNPROC=1048576
-            LimitCORE=infinity
-            Restart=always
-            RestartSec=2s
-            StartLimitInterval=0
+      command: stop
 
     - name: kubernetes-configure-node.service
       command: start
