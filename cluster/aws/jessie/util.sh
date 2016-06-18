@@ -17,7 +17,7 @@
 
 # A library of helper functions for Jessie.
 
-source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
+source "${KUBE_ROOT}/cluster/aws/common/common.sh"
 
 SSH_USER=admin
 
