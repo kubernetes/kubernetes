@@ -120,9 +120,11 @@ type Disks interface {
 	// DeleteDisk deletes PD.
 	DeleteDisk(diskToDelete string) error
 
-	// GetAutoLabelsForPD returns labels to apply to PeristentVolume
+	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
 	// representing this PD, namely failure domain and zone.
-	GetAutoLabelsForPD(name string) (map[string]string, error)
+	// zone can be provided to specify the zone for the PD,
+	// if empty all managed zones will be searched.
+	GetAutoLabelsForPD(name string, zone string) (map[string]string, error)
 }
 
 type instRefSlice []*compute.InstanceReference
@@ -2250,13 +2252,27 @@ func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 // Builds the labels that should be automatically added to a PersistentVolume backed by a GCE PD
 // Specifically, this builds FailureDomain (zone) and Region labels.
 // The PersistentVolumeLabel admission controller calls this and adds the labels when a PV is created.
-func (gce *GCECloud) GetAutoLabelsForPD(name string) (map[string]string, error) {
-	disk, err := gce.getDiskByNameUnknownZone(name)
-	if err != nil {
-		return nil, err
+// If zone is specified, the volume will only be found in the specified zone,
+// otherwise all managed zones will be searched.
+func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
+	var disk *gceDisk
+	var err error
+	if zone == "" {
+		disk, err = gce.getDiskByNameUnknownZone(name)
+		if err != nil {
+			return nil, err
+		}
+		zone = disk.Zone
+	} else {
+		// We could assume the disks exists; we have all the information we need
+		// However it is more consistent to ensure the disk exists,
+		// and in future we may gather addition information (e.g. disk type, IOPS etc)
+		disk, err = gce.getDiskByName(name, zone)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	zone := disk.Zone
 	region, err := GetGCERegion(zone)
 	if err != nil {
 		return nil, err

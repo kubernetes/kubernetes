@@ -97,7 +97,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 	}
 	glog.V(2).Infof("Successfully created GCE PD volume %s", name)
 
-	labels, err := cloud.GetAutoLabelsForPD(name)
+	labels, err := cloud.GetAutoLabelsForPD(name, zone)
 	if err != nil {
 		// We don't really want to leak the volume here...
 		glog.Errorf("error getting labels for volume %q: %v", name, err)
