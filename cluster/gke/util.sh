@@ -270,8 +270,8 @@ function detect-nodes() {
 
 # Detect minions created in the minion group
 #
-# Note that this will only return the nodes from one of the cluster's instance
-# groups, regardless of how many the cluster has.
+# Note that this will only select nodes in the same zone as the
+# cluster, meaning that it won't include all nodes in a multi-zone cluster.
 #
 # Assumed vars:
 #   none
@@ -280,11 +280,14 @@ function detect-nodes() {
 function detect-node-names {
   echo "... in gke:detect-node-names()" >&2
   detect-project
-  detect-node-instance-group
-  NODE_NAMES=($(gcloud compute instance-groups managed list-instances \
-    "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
-    --format='value(instance)'))
+  detect-node-instance-groups
 
+  NODE_NAMES=()
+  for group in "${NODE_INSTANCE_GROUPS[@]:-}"; do
+    NODE_NAMES+=($(gcloud compute instance-groups managed list-instances \
+      "${group}" --zone "${ZONE}" \
+      --project "${PROJECT}" --format='value(instance)'))
+  done
   echo "NODE_NAMES=${NODE_NAMES[*]:-}"
 }
 
@@ -299,13 +302,17 @@ function detect-node-names {
 #   ZONE
 #   CLUSTER_NAME
 # Vars set:
-#   NODE_INSTANCE_GROUP
-function detect-node-instance-group {
-  echo "... in gke:detect-node-instance-group()" >&2
-  local url=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
+#   NODE_INSTANCE_GROUPS
+function detect-node-instance-groups {
+  echo "... in gke:detect-node-instance-groups()" >&2
+  local urls=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" \
     --format='value(instanceGroupUrls)' "${CLUSTER_NAME}")
-  NODE_INSTANCE_GROUP="${url##*/}"
+  urls=(${urls//;/ })
+  NODE_INSTANCE_GROUPS=()
+  for url in "${urls[@]:-}"; do
+    NODE_INSTANCE_GROUPS+=("${url##*/}")
+  done
 }
 
 # SSH to a node by name ($1) and run a command ($2).
