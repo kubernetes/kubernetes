@@ -21,8 +21,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"reflect"
 	"regexp"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1762,7 +1764,7 @@ func TestUnconfinedSeccompProfileWithDockerV110(t *testing.T) {
 			Name:      "foo4",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "unconfined",
+				api.SeccompPodAnnotationKey: "unconfined",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1804,7 +1806,7 @@ func TestDefaultSeccompProfileWithDockerV110(t *testing.T) {
 			Name:      "foo1",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod": "docker/default",
+				api.SeccompPodAnnotationKey: "docker/default",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1846,8 +1848,8 @@ func TestSeccompContainerAnnotationTrumpsPod(t *testing.T) {
 			Name:      "foo2",
 			Namespace: "new",
 			Annotations: map[string]string{
-				"seccomp.security.alpha.kubernetes.io/pod":            "unconfined",
-				"container.seccomp.security.alpha.kubernetes.io/bar2": "docker/default",
+				api.SeccompPodAnnotationKey:                      "unconfined",
+				api.SeccompContainerAnnotationKeyPrefix + "bar2": "docker/default",
 			},
 		},
 		Spec: api.PodSpec{
@@ -1879,6 +1881,80 @@ func TestSeccompContainerAnnotationTrumpsPod(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	assert.NotContains(t, newContainer.HostConfig.SecurityOpt, "seccomp:unconfined", "Container annotation should trump the pod annotation for seccomp.")
+}
+
+func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
+	tests := []struct {
+		annotations    map[string]string
+		expectedSecOpt string
+		expectedError  string
+	}{
+		{
+			annotations: map[string]string{
+				api.SeccompPodAnnotationKey: "localhost/test",
+			},
+			expectedSecOpt: `seccomp={"foo":"bar"}`,
+		},
+		{
+			annotations: map[string]string{
+				api.SeccompPodAnnotationKey: "localhost/sub/subtest",
+			},
+			expectedSecOpt: `seccomp={"abc":"def"}`,
+		},
+		{
+			annotations: map[string]string{
+				api.SeccompPodAnnotationKey: "localhost/not-existing",
+			},
+			expectedError: "cannot load seccomp profile",
+		},
+	}
+
+	for _, test := range tests {
+		dm, fakeDocker := newTestDockerManagerWithVersion("1.10.1", "1.22")
+		_, filename, _, _ := goruntime.Caller(0)
+		dm.seccompProfileRoot = path.Join(path.Dir(filename), "fixtures", "seccomp")
+
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				UID:         "12345678",
+				Name:        "foo2",
+				Namespace:   "new",
+				Annotations: test.annotations,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar2"},
+				},
+			},
+		}
+
+		result := runSyncPod(t, dm, fakeDocker, pod, nil, test.expectedError != "")
+		if test.expectedError != "" {
+			assert.Contains(t, result.Error().Error(), test.expectedError)
+			continue
+		}
+
+		verifyCalls(t, fakeDocker, []string{
+			// Create pod infra container.
+			"create", "start", "inspect_container", "inspect_container",
+			// Create container.
+			"create", "start", "inspect_container",
+		})
+
+		fakeDocker.Lock()
+		if len(fakeDocker.Created) != 2 ||
+			!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo2_new_", fakeDocker.Created[0]) ||
+			!matchString(t, "/k8s_bar2\\.[a-f0-9]+_foo2_new_", fakeDocker.Created[1]) {
+			t.Errorf("unexpected containers created %v", fakeDocker.Created)
+		}
+		fakeDocker.Unlock()
+
+		newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		assert.Contains(t, newContainer.HostConfig.SecurityOpt, test.expectedSecOpt, "The compacted seccomp json profile should be loaded.")
+	}
 }
 
 func TestSecurityOptsAreNilWithDockerV19(t *testing.T) {

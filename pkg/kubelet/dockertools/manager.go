@@ -991,10 +991,10 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, nil
 	}
 
-	profile, profileOK := pod.ObjectMeta.Annotations["container.seccomp.security.alpha.kubernetes.io/"+ctrName]
+	profile, profileOK := pod.ObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+ctrName]
 	if !profileOK {
 		// try the pod profile
-		profile, profileOK = pod.ObjectMeta.Annotations["seccomp.security.alpha.kubernetes.io/pod"]
+		profile, profileOK = pod.ObjectMeta.Annotations[api.SeccompPodAnnotationKey]
 		if !profileOK {
 			// return early the default
 			return defaultSecurityOpt, nil
@@ -1015,9 +1015,11 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
 	}
 
-	file, err := ioutil.ReadFile(filepath.Join(dm.seccompProfileRoot, strings.TrimPrefix(profile, "localhost/")))
+	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
+	fname := filepath.Join(dm.seccompProfileRoot, filepath.FromSlash(name))
+	file, err := ioutil.ReadFile(fname)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
 	}
 
 	b := bytes.NewBuffer(nil)
@@ -1976,7 +1978,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		podInfraContainerID, err, msg = dm.createPodInfraContainer(pod)
 		if err != nil {
 			startContainerResult.Fail(err, msg)
-			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
+			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q: %s", err, format.Pod(pod), msg)
 			return
 		}
 
