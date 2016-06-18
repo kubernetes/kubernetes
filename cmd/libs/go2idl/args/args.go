@@ -66,6 +66,9 @@ type GeneratorArgs struct {
 	// If true, only verify, don't write anything.
 	VerifyOnly bool
 
+	// If true, use of the "unsafe" package is allowed for better performance
+	Unsafe bool
+
 	// Any custom arguments go here
 	CustomArgs interface{}
 }
@@ -75,6 +78,7 @@ func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to $GOPATH/src/ or ./ if $GOPATH is not set.")
 	fs.StringVarP(&g.OutputPackagePath, "output-package", "p", g.OutputPackagePath, "Base package path.")
 	fs.StringVarP(&g.GoHeaderFilePath, "go-header-file", "h", g.GoHeaderFilePath, "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
+	fs.BoolVar(&g.Unsafe, "unsafe", g.Unsafe, "If true, the unsafe package may be used for better performance.")
 	fs.BoolVar(&g.VerifyOnly, "verify-only", g.VerifyOnly, "If true, only verify existing output, do not write anything.")
 	fs.BoolVar(&g.Recursive, "recursive", g.VerifyOnly, "If true, recurse into all children of input directories.")
 }
