@@ -26,9 +26,10 @@ import (
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
 
-	"github.com/golang/glog"
 	"reflect"
 	"sort"
+
+	"github.com/golang/glog"
 )
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
