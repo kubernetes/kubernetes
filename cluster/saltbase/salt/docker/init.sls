@@ -245,16 +245,6 @@ net.ipv4.ip_forward:
 
 {% elif grains.get('cloud', '') == 'aws'
    and grains.get('os_family', '') == 'Debian'
-   and grains.get('oscodename', '') == 'vivid' -%}
-# TODO: Get from google storage?
-{% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~vivid' %}
-{% set override_deb='docker-engine_1.9.1-0~vivid_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~vivid_amd64.deb' %}
-{% set override_deb_sha1='81741f6f16630632de53762c5554238d57b3b9cb' %}
-
-{% elif grains.get('cloud', '') == 'aws'
-   and grains.get('os_family', '') == 'Debian'
    and grains.get('oscodename', '') == 'wily' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
