@@ -31,6 +31,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -130,6 +132,9 @@ const (
 	// How long claims have to become dynamically provisioned
 	claimProvisionTimeout = 5 * time.Minute
 )
+
+// For parsing Kubectl version for version-skewed testing.
+var gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
 
 // SubResource proxy should have been functional in v1.0.0, but SubResource
 // proxy via tunneling is known to be broken in v1.0.  See
@@ -1289,6 +1294,29 @@ func serverVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (boo
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.GTE(v), nil
+}
+
+// kubectlVersionGTE returns true if the kubectl version is greater than or
+// equal to v.
+func kubectlVersionGTE(v semver.Version) (bool, error) {
+	kv, err := kubectlVersion()
+	if err != nil {
+		return false, err
+	}
+	return kv.GTE(v), nil
+}
+
+// kubectlVersion gets the version of kubectl that's currently being used (see
+// --kubectl-path in e2e.go to use an alternate kubectl).
+func kubectlVersion() (semver.Version, error) {
+	output := runKubectlOrDie("version", "--client")
+	matches := gitVersionRegexp.FindStringSubmatch(output)
+	if len(matches) != 2 {
+		return semver.Version{}, fmt.Errorf("Could not find kubectl version in output %v", output)
+	}
+	// Don't use the full match, as it contains "GitVersion:\"" and a
+	// trailing "\"".  Just use the submatch.
+	return version.Parse(matches[1])
 }
 
 func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
@@ -2532,6 +2560,12 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			return false, nil
 		}
 		allRSs = append(oldRSs, newRS)
+		// The old/new ReplicaSets need to contain the pod-template-hash label
+		for i := range allRSs {
+			if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+				return false, nil
+			}
+		}
 		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 		totalAvailable, err := deploymentutil.GetAvailablePodsForReplicaSets(c, allRSs, minReadySeconds)
 		if err != nil {
@@ -2599,8 +2633,9 @@ func waitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		if err != nil {
 			return false, err
 		}
+		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
 		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
-		if err != nil {
+		if err != nil || newRS == nil || !labelsutil.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 			return false, err
 		}
 		// Check revision of this deployment, and of the new replica set of this deployment
@@ -2613,6 +2648,9 @@ func waitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	})
 	if err == wait.ErrWaitTimeout {
 		logReplicaSetsOfDeployment(deployment, nil, newRS)
+	}
+	if newRS == nil {
+		return fmt.Errorf("deployment %s failed to create new RS: %v", deploymentName, err)
 	}
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %s (got %s / %s) and new RS %s (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
@@ -2676,7 +2714,11 @@ func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 	for i := range allOldRSs {
 		Logf("All old ReplicaSets (%d/%d) of deployment %s: %+v. Selector = %+v", i+1, len(allOldRSs), deployment.Name, allOldRSs[i], allOldRSs[i].Spec.Selector)
 	}
-	Logf("New ReplicaSet of deployment %s: %+v. Selector = %+v", deployment.Name, newRS, newRS.Spec.Selector)
+	if newRS != nil {
+		Logf("New ReplicaSet of deployment %s: %+v. Selector = %+v", deployment.Name, *newRS, newRS.Spec.Selector)
+	} else {
+		Logf("New ReplicaSet of deployment %s is nil.", deployment.Name)
+	}
 }
 
 func waitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string, desiredGeneration int64) error {

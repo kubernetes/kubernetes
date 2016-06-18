@@ -80,7 +80,7 @@ The `BashCompletionFunction` option is really only valid/useful on the root comm
 In the above example "pod" was assumed to already be typed. But if you want `kubectl get [tab][tab]` to show a list of valid "nouns" you have to set them. Simplified code from `kubectl get` looks like:
 
 ```go
-validArgs []string = { "pods", "nodes", "services", "replicationControllers" }
+validArgs []string = { "pod", "node", "service", "replicationcontroller" }
 
 cmd := &cobra.Command{
 	Use:     "get [(-o|--output=)json|yaml|template|...] (RESOURCE [NAME] | RESOURCE/NAME ...)",
@@ -99,8 +99,33 @@ Notice we put the "ValidArgs" on the "get" subcommand. Doing so will give result
 
 ```bash
 # kubectl get [tab][tab]
-nodes                 pods                    replicationControllers  services
+node                 pod                    replicationcontroller  service
 ```
+
+## Plural form and shortcuts for nouns
+
+If your nouns have a number of aliases, you can define them alongside `ValidArgs` using `ArgAliases`:
+
+```go`
+argAliases []string = { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
+
+cmd := &cobra.Command{
+    ...
+	ValidArgs:  validArgs,
+	ArgAliases: argAliases
+}
+```
+
+The aliases are not shown to the user on tab completion, but they are accepted as valid nouns by
+the completion aglorithm if entered manually, e.g. in:
+
+```bash
+# kubectl get rc [tab][tab]
+backend        frontend       database 
+```
+
+Note that without declaring `rc` as an alias, the completion algorithm would show the list of nouns
+in this example again instead of the replication controllers.
 
 ## Mark flags as required
 
@@ -147,3 +172,35 @@ hello.yml                     test.json
 ```
 
 So while there are many other files in the CWD it only shows me subdirs and those with valid extensions.
+
+# Specifiy custom flag completion
+
+Similar to the filename completion and filtering usingn cobra.BashCompFilenameExt, you can specifiy
+a custom flag completion function with cobra.BashCompCustom:
+
+```go
+	annotation := make(map[string][]string)
+	annotation[cobra.BashCompFilenameExt] = []string{"__kubectl_get_namespaces"}
+
+	flag := &pflag.Flag{
+		Name:        "namespace",
+		Usage:       usage,
+		Annotations: annotation,
+	}
+	cmd.Flags().AddFlag(flag)
+```
+
+In addition add the `__handle_namespace_flag` implementation in the `BashCompletionFunction`
+value, e.g.:
+
+```bash
+__kubectl_get_namespaces()
+{
+    local template
+    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
+    local kubectl_out
+    if kubectl_out=$(kubectl get -o template --template="${template}" namespace 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out}[*]" -- "$cur" ) )
+    fi
+}
+```

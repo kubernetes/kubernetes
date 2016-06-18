@@ -29,16 +29,18 @@ config_hostname() {
 config_ip_firewall() {
   # We have seen that GCE image may have strict host firewall rules which drop
   # most inbound/forwarded packets. In such a case, add rules to accept all
-  # TCP/UDP packets.
+  # TCP/UDP/ICMP packets.
   if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    echo "Add rules to accpet all inbound TCP/UDP packets"
+    echo "Add rules to accpet all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
+    iptables -A INPUT -w -p ICMP -j ACCEPT
   fi
   if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accpet all forwarded TCP/UDP packets"
+    echo "Add rules to accpet all forwarded TCP/UDP/ICMP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
+    iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 }
 
@@ -184,6 +186,16 @@ assemble_kubelet_flags() {
   echo "KUBELET_OPTS=\"${KUBELET_CMD_FLAGS}\"" > /etc/default/kubelet
 }
 
+start_kubelet(){
+  echo "Start kubelet"
+  # Delete docker0 to avoid interference
+  iptables -t nat -F || true
+  ip link set docker0 down || true
+  brctl delbr docker0 || true
+  . /etc/default/kubelet
+  /usr/bin/kubelet ${KUBELET_OPTS} 1>>/var/log/kubelet.log 2>&1
+}
+
 restart_docker_daemon() {
   DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
   if [ "${TEST_CLUSTER:-}" = "true" ]; then
@@ -195,9 +207,6 @@ restart_docker_daemon() {
     echo "Sleep 1 second to wait for cbr0"
     sleep 1
   done
-  # Remove docker0
-  ifconfig docker0 down
-  brctl delbr docker0
   # Ensure docker daemon is really functional before exiting. Operations afterwards may
   # assume it is running.
   while ! docker version > /dev/null; do
@@ -323,19 +332,32 @@ create_master_auth() {
     add_token_entry "system:dns" "${known_tokens_csv}"
   fi
 
-  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
-    cat <<EOF >/etc/gce.conf
+  use_cloud_config="false"
+  cat <<EOF >/etc/gce.conf
 [global]
+EOF
+  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
+  use_cloud_config="true"
+  cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
   fi
+  if [ -n "${NODE_INSTANCE_PREFIX:-}" ]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+node-tags = ${NODE_INSTANCE_PREFIX}
+EOF
+  fi
   if [ -n "${MULTIZONE:-}" ]; then
     cat <<EOF >>/etc/gce.conf
 multizone = ${MULTIZONE}
 EOF
+  fi
+  if [ "${use_cloud_config}" != "true" ]; then
+    rm -f /etc/gce.conf
   fi
 }
 
@@ -689,4 +711,33 @@ prepare_kube_addons() {
   # In case that some GCE customized trusty may have a read-only /root.
   mount -t tmpfs tmpfs /root
   mount --bind -o remount,rw,noexec /root
+}
+
+reset_motd() {
+  # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
+  readonly version="$(/usr/bin/kubelet --version=true | cut -f2 -d " ")"
+  # This logic grabs either a release tag (v1.2.1 or v1.2.1-alpha.1),
+  # or the git hash that's in the build info.
+  gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
+  devel=""
+  if [ "${gitref}" != "${version}" ]; then
+    devel="
+Note: This looks like a development version, which might not be present on GitHub.
+If it isn't, the closest tag is at:
+  https://github.com/kubernetes/kubernetes/tree/${gitref}
+"
+    gitref="${version//*+/}"
+  fi
+  cat > /etc/motd <<EOF
+Welcome to Kubernetes ${version}!
+You can find documentation for Kubernetes at:
+  http://docs.kubernetes.io/
+You can download the build image for this release at:
+  https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
+It is based on the Kubernetes source at:
+  https://github.com/kubernetes/kubernetes/tree/${gitref}
+${devel}
+For Kubernetes copyright and licensing information, see:
+  /home/kubernetes/LICENSES
+EOF
 }
