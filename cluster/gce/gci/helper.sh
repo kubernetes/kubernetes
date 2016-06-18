@@ -25,9 +25,14 @@ function ensure-gci-metadata-files {
 update_disabled
 EOF
   fi
-  if [[ ! -f "${KUBE_TEMP}/gci-docker.txt" ]]; then
-    cat >"${KUBE_TEMP}/gci-docker.txt" << EOF
+  if [[ ! -f "${KUBE_TEMP}/gci-ensure-gke-docker.txt" ]]; then
+    cat >"${KUBE_TEMP}/gci-ensure-gke-docker.txt" << EOF
 true
+EOF
+  fi
+  if [[ ! -f "${KUBE_TEMP}/gci-docker-version.txt" ]]; then
+    cat >"${KUBE_TEMP}/gci-docker-version.txt" << EOF
+${GCI_DOCKER_VERSION}
 EOF
   fi
 }
@@ -42,7 +47,8 @@ function create-node-instance-template {
     "configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh" \
     "cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     "gci-update-strategy=${KUBE_TEMP}/gci-update.txt" \
-    "gci-ensure-gke-docker=${KUBE_TEMP}/gci-docker.txt"
+    "gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt" \
+    "gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
 }
 
 # create-master-instance creates the master instance. If called with
@@ -76,7 +82,7 @@ function create-master-instance {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-docker.txt" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}"
 }
