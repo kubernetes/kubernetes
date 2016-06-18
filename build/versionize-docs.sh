@@ -97,7 +97,7 @@ for file in "${go_files[@]}"; do
       "${file}"
 done
 
-${KUBE_ROOT}/hack/update-generated-docs.sh
+${KUBE_ROOT}/hack/update-munge-docs.sh
 ${KUBE_ROOT}/hack/update-generated-swagger-docs.sh
 ${KUBE_ROOT}/hack/update-swagger-spec.sh
 ${KUBE_ROOT}/hack/update-generated-protobuf.sh
