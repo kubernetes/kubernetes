@@ -1270,7 +1270,7 @@ func (x *RoleBinding) CodecEncodeSelf(e *codec1978.Encoder) {
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("subject"))
+				r.EncodeString(codecSelferC_UTF81234, string("subjects"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				if x.Subjects == nil {
 					r.EncodeNil()
@@ -1412,7 +1412,7 @@ func (x *RoleBinding) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				yyv4 := &x.ObjectMeta
 				yyv4.CodecDecodeSelf(d)
 			}
-		case "subject":
+		case "subjects":
 			if r.TryDecodeAsNil() {
 				x.Subjects = nil
 			} else {
@@ -2633,7 +2633,7 @@ func (x *ClusterRoleBinding) CodecEncodeSelf(e *codec1978.Encoder) {
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("subject"))
+				r.EncodeString(codecSelferC_UTF81234, string("subjects"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				if x.Subjects == nil {
 					r.EncodeNil()
@@ -2775,7 +2775,7 @@ func (x *ClusterRoleBinding) codecDecodeSelfFromMap(l int, d *codec1978.Decoder)
 				yyv4 := &x.ObjectMeta
 				yyv4.CodecDecodeSelf(d)
 			}
-		case "subject":
+		case "subjects":
 			if r.TryDecodeAsNil() {
 				x.Subjects = nil
 			} else {
