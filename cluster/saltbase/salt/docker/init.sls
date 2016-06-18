@@ -227,10 +227,10 @@ net.ipv4.ip_forward:
    and grains.get('oscodename', '') == 'jessie' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~jessie' %}
-{% set override_deb='docker-engine_1.9.1-0~jessie_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~jessie_amd64.deb' %}
-{% set override_deb_sha1='c58c39008fd6399177f6b2491222e4438f518d78' %}
+{% set override_docker_ver='1.11.2-0~jessie' %}
+{% set override_deb='docker-engine_1.11.2-0~jessie_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~jessie_amd64.deb' %}
+{% set override_deb_sha1='c312f1f6fa0b34df4589bb812e4f7af8e28fd51d' %}
 
 # Ubuntu presents as os_family=Debian, osfullname=Ubuntu
 {% elif grains.get('cloud', '') == 'aws'
@@ -238,10 +238,10 @@ net.ipv4.ip_forward:
    and grains.get('oscodename', '') == 'trusty' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~trusty' %}
-{% set override_deb='docker-engine_1.9.1-0~trusty_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~trusty_amd64.deb' %}
-{% set override_deb_sha1='ce728172ab29f9fdacfffffe2e2f88a144f23875' %}
+{% set override_docker_ver='1.11.2-0~trusty' %}
+{% set override_deb='docker-engine_1.11.2-0~trusty_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~trusty_amd64.deb' %}
+{% set override_deb_sha1='022dee31e68c6d572eaac750915786e4a6729d2a' %}
 
 {% elif grains.get('cloud', '') == 'aws'
    and grains.get('os_family', '') == 'Debian'
@@ -258,10 +258,10 @@ net.ipv4.ip_forward:
    and grains.get('oscodename', '') == 'wily' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~wily' %}
-{% set override_deb='docker-engine_1.9.1-0~wily_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~wily_amd64.deb' %}
-{% set override_deb_sha1='a505fd49372cf836f5b9ed953053c50b3381dbfd' %}
+{% set override_docker_ver='1.11.2-0~wily' %}
+{% set override_deb='docker-engine_1.11.2-0~wily_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~wily_amd64.deb' %}
+{% set override_deb_sha1='3e02f51fe18aa777eeb1676c3d9a75e5ea6d96c9' %}
 
 {% else %}
 {% set docker_pkg_name='lxc-docker-1.7.1' %}
