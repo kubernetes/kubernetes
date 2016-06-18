@@ -1121,6 +1121,7 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	if err := kl.setNodeStatus(node); err != nil {
 		return nil, err
 	}
+
 	return node, nil
 }
 
@@ -1156,6 +1157,7 @@ func (kl *Kubelet) registerWithApiserver() {
 			glog.Errorf("Unable to construct api.Node object for kubelet: %v", err)
 			continue
 		}
+
 		glog.V(2).Infof("Attempting to register node %s", node.Name)
 		if _, err := kl.kubeClient.Core().Nodes().Create(node); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
@@ -1564,7 +1566,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 					return result, err
 				}
 			case envVar.ValueFrom.ResourceFieldRef != nil:
-				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, pod, container)
+				defaultedPod, defaultedContainer, err := kl.defaultPodLimitsForDownwardApi(pod, container)
+				if err != nil {
+					return result, err
+				}
+				runtimeVal, err = containerResourceRuntimeValue(envVar.ValueFrom.ResourceFieldRef, defaultedPod, defaultedContainer)
 				if err != nil {
 					return result, err
 				}
@@ -1904,7 +1910,11 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Wait for volumes to attach/mount
-	if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
+	defaultedPod, _, err := kl.defaultPodLimitsForDownwardApi(pod, nil)
+	if err != nil {
+		return err
+	}
+	if err := kl.volumeManager.WaitForAttachAndMount(defaultedPod); err != nil {
 		ref, errGetRef := api.GetReference(pod)
 		if errGetRef == nil && ref != nil {
 			kl.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
