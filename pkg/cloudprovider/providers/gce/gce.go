@@ -978,10 +978,16 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))
 	}
-	hostTags, err := gce.computeHostTags(hosts)
-	if err != nil {
-		return nil, err
+	// If the node tags to be used for this cluster have been predefined in the
+	// provider config, just use them. Otherwise, invoke computeHostTags method to get the tags.
+	hostTags := gce.nodeTags
+	if len(hostTags) == 0 {
+		var err error
+		if hostTags, err = gce.computeHostTags(hosts); err != nil {
+			return nil, fmt.Errorf("No node tags supplied and also failed to parse the given lists of hosts for tags. Abort creating firewall rule.")
+		}
 	}
+
 	firewall := &compute.Firewall{
 		Name:         makeFirewallName(name),
 		Description:  desc,
@@ -1003,17 +1009,13 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	return firewall, nil
 }
 
-// If the node tags to be used for this cluster have been predefined in the
-// provider config, just use them. Otherwise, grab all tags from all relevant
-// instances:
+// ComputeHostTags grabs all tags from all instances being added to the pool.
 // * The longest tag that is a prefix of the instance name is used
-// * If any instance has a prefix tag, all instances must
-// * If no instances have a prefix tag, no tags are used
+// * If any instance has no matching prefix tag, return error
+// Invoking this method to get host tags is risky since it depends on the format
+// of the host names in the cluster. Only use it as a fallback if gce.nodeTags
+// is unspecified
 func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
-	if len(gce.nodeTags) > 0 {
-		return gce.nodeTags, nil
-	}
-
 	// TODO: We could store the tags in gceInstance, so we could have already fetched it
 	hostNamesByZone := make(map[string][]string)
 	for _, host := range hosts {
@@ -1052,8 +1054,8 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 				}
 				if len(longest_tag) > 0 {
 					tags.Insert(longest_tag)
-				} else if len(tags) > 0 {
-					return nil, fmt.Errorf("Some, but not all, instances have prefix tags (%s is missing)", instance.Name)
+				} else {
+					return nil, fmt.Errorf("Could not find any tag that is a prefix of instance name for instance %s", instance.Name)
 				}
 			}
 		}
@@ -1061,11 +1063,9 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 			glog.Errorf("computeHostTags exceeded maxPages=%d for Instances.List: truncating.", maxPages)
 		}
 	}
-
 	if len(tags) == 0 {
-		glog.V(2).Info("No instances had tags, creating rule without target tags")
+		return nil, fmt.Errorf("No instances found")
 	}
-
 	return tags.List(), nil
 }
 
