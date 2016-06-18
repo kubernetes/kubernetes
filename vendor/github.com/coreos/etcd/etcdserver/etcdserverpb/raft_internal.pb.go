@@ -19,41 +19,112 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+type RequestHeader struct {
+	ID uint64 `protobuf:"varint,1,opt,name=ID,json=iD,proto3" json:"ID,omitempty"`
+	// username is a username that is associated with an auth token of gRPC connection
+	Username string `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+}
+
+func (m *RequestHeader) Reset()                    { *m = RequestHeader{} }
+func (m *RequestHeader) String() string            { return proto.CompactTextString(m) }
+func (*RequestHeader) ProtoMessage()               {}
+func (*RequestHeader) Descriptor() ([]byte, []int) { return fileDescriptorRaftInternal, []int{0} }
+
 // An InternalRaftRequest is the union of all requests which can be
 // sent via raft.
 type InternalRaftRequest struct {
-	ID                     uint64                         `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	V2                     *Request                       `protobuf:"bytes,2,opt,name=v2" json:"v2,omitempty"`
-	Range                  *RangeRequest                  `protobuf:"bytes,3,opt,name=range" json:"range,omitempty"`
-	Put                    *PutRequest                    `protobuf:"bytes,4,opt,name=put" json:"put,omitempty"`
-	DeleteRange            *DeleteRangeRequest            `protobuf:"bytes,5,opt,name=delete_range" json:"delete_range,omitempty"`
-	Txn                    *TxnRequest                    `protobuf:"bytes,6,opt,name=txn" json:"txn,omitempty"`
-	Compaction             *CompactionRequest             `protobuf:"bytes,7,opt,name=compaction" json:"compaction,omitempty"`
-	LeaseGrant             *LeaseGrantRequest             `protobuf:"bytes,8,opt,name=lease_grant" json:"lease_grant,omitempty"`
-	LeaseRevoke            *LeaseRevokeRequest            `protobuf:"bytes,9,opt,name=lease_revoke" json:"lease_revoke,omitempty"`
-	AuthEnable             *AuthEnableRequest             `protobuf:"bytes,10,opt,name=auth_enable" json:"auth_enable,omitempty"`
-	AuthUserAdd            *AuthUserAddRequest            `protobuf:"bytes,11,opt,name=auth_user_add" json:"auth_user_add,omitempty"`
-	AuthUserDelete         *AuthUserDeleteRequest         `protobuf:"bytes,12,opt,name=auth_user_delete" json:"auth_user_delete,omitempty"`
-	AuthUserChangePassword *AuthUserChangePasswordRequest `protobuf:"bytes,13,opt,name=auth_user_change_password" json:"auth_user_change_password,omitempty"`
-	AuthRoleAdd            *AuthRoleAddRequest            `protobuf:"bytes,14,opt,name=auth_role_add" json:"auth_role_add,omitempty"`
-	Alarm                  *AlarmRequest                  `protobuf:"bytes,15,opt,name=alarm" json:"alarm,omitempty"`
+	Header                   *RequestHeader                   `protobuf:"bytes,100,opt,name=header" json:"header,omitempty"`
+	ID                       uint64                           `protobuf:"varint,1,opt,name=ID,json=iD,proto3" json:"ID,omitempty"`
+	V2                       *Request                         `protobuf:"bytes,2,opt,name=v2" json:"v2,omitempty"`
+	Range                    *RangeRequest                    `protobuf:"bytes,3,opt,name=range" json:"range,omitempty"`
+	Put                      *PutRequest                      `protobuf:"bytes,4,opt,name=put" json:"put,omitempty"`
+	DeleteRange              *DeleteRangeRequest              `protobuf:"bytes,5,opt,name=delete_range,json=deleteRange" json:"delete_range,omitempty"`
+	Txn                      *TxnRequest                      `protobuf:"bytes,6,opt,name=txn" json:"txn,omitempty"`
+	Compaction               *CompactionRequest               `protobuf:"bytes,7,opt,name=compaction" json:"compaction,omitempty"`
+	LeaseGrant               *LeaseGrantRequest               `protobuf:"bytes,8,opt,name=lease_grant,json=leaseGrant" json:"lease_grant,omitempty"`
+	LeaseRevoke              *LeaseRevokeRequest              `protobuf:"bytes,9,opt,name=lease_revoke,json=leaseRevoke" json:"lease_revoke,omitempty"`
+	Alarm                    *AlarmRequest                    `protobuf:"bytes,10,opt,name=alarm" json:"alarm,omitempty"`
+	AuthEnable               *AuthEnableRequest               `protobuf:"bytes,1000,opt,name=auth_enable,json=authEnable" json:"auth_enable,omitempty"`
+	AuthDisable              *AuthDisableRequest              `protobuf:"bytes,1011,opt,name=auth_disable,json=authDisable" json:"auth_disable,omitempty"`
+	Authenticate             *InternalAuthenticateRequest     `protobuf:"bytes,1012,opt,name=authenticate" json:"authenticate,omitempty"`
+	AuthUserAdd              *AuthUserAddRequest              `protobuf:"bytes,1100,opt,name=auth_user_add,json=authUserAdd" json:"auth_user_add,omitempty"`
+	AuthUserDelete           *AuthUserDeleteRequest           `protobuf:"bytes,1101,opt,name=auth_user_delete,json=authUserDelete" json:"auth_user_delete,omitempty"`
+	AuthUserGet              *AuthUserGetRequest              `protobuf:"bytes,1102,opt,name=auth_user_get,json=authUserGet" json:"auth_user_get,omitempty"`
+	AuthUserChangePassword   *AuthUserChangePasswordRequest   `protobuf:"bytes,1103,opt,name=auth_user_change_password,json=authUserChangePassword" json:"auth_user_change_password,omitempty"`
+	AuthUserGrantRole        *AuthUserGrantRoleRequest        `protobuf:"bytes,1104,opt,name=auth_user_grant_role,json=authUserGrantRole" json:"auth_user_grant_role,omitempty"`
+	AuthUserRevokeRole       *AuthUserRevokeRoleRequest       `protobuf:"bytes,1105,opt,name=auth_user_revoke_role,json=authUserRevokeRole" json:"auth_user_revoke_role,omitempty"`
+	AuthRoleAdd              *AuthRoleAddRequest              `protobuf:"bytes,1200,opt,name=auth_role_add,json=authRoleAdd" json:"auth_role_add,omitempty"`
+	AuthRoleDelete           *AuthRoleDeleteRequest           `protobuf:"bytes,1201,opt,name=auth_role_delete,json=authRoleDelete" json:"auth_role_delete,omitempty"`
+	AuthRoleGet              *AuthRoleGetRequest              `protobuf:"bytes,1202,opt,name=auth_role_get,json=authRoleGet" json:"auth_role_get,omitempty"`
+	AuthRoleGrantPermission  *AuthRoleGrantPermissionRequest  `protobuf:"bytes,1203,opt,name=auth_role_grant_permission,json=authRoleGrantPermission" json:"auth_role_grant_permission,omitempty"`
+	AuthRoleRevokePermission *AuthRoleRevokePermissionRequest `protobuf:"bytes,1204,opt,name=auth_role_revoke_permission,json=authRoleRevokePermission" json:"auth_role_revoke_permission,omitempty"`
 }
 
-func (m *InternalRaftRequest) Reset()         { *m = InternalRaftRequest{} }
-func (m *InternalRaftRequest) String() string { return proto.CompactTextString(m) }
-func (*InternalRaftRequest) ProtoMessage()    {}
+func (m *InternalRaftRequest) Reset()                    { *m = InternalRaftRequest{} }
+func (m *InternalRaftRequest) String() string            { return proto.CompactTextString(m) }
+func (*InternalRaftRequest) ProtoMessage()               {}
+func (*InternalRaftRequest) Descriptor() ([]byte, []int) { return fileDescriptorRaftInternal, []int{1} }
 
 type EmptyResponse struct {
 }
 
-func (m *EmptyResponse) Reset()         { *m = EmptyResponse{} }
-func (m *EmptyResponse) String() string { return proto.CompactTextString(m) }
-func (*EmptyResponse) ProtoMessage()    {}
+func (m *EmptyResponse) Reset()                    { *m = EmptyResponse{} }
+func (m *EmptyResponse) String() string            { return proto.CompactTextString(m) }
+func (*EmptyResponse) ProtoMessage()               {}
+func (*EmptyResponse) Descriptor() ([]byte, []int) { return fileDescriptorRaftInternal, []int{2} }
+
+// What is the difference between AuthenticateRequest (defined in rpc.proto) and InternalAuthenticateRequest?
+// InternalAuthenticateRequest has a member that is filled by etcdserver and shouldn't be user-facing.
+// For avoiding misusage the field, we have an internal version of AuthenticateRequest.
+type InternalAuthenticateRequest struct {
+	Name     string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Password string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	// simple_token is generated in API layer (etcdserver/v3_server.go)
+	SimpleToken string `protobuf:"bytes,3,opt,name=simple_token,json=simpleToken,proto3" json:"simple_token,omitempty"`
+}
+
+func (m *InternalAuthenticateRequest) Reset()         { *m = InternalAuthenticateRequest{} }
+func (m *InternalAuthenticateRequest) String() string { return proto.CompactTextString(m) }
+func (*InternalAuthenticateRequest) ProtoMessage()    {}
+func (*InternalAuthenticateRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptorRaftInternal, []int{3}
+}
 
 func init() {
+	proto.RegisterType((*RequestHeader)(nil), "etcdserverpb.RequestHeader")
 	proto.RegisterType((*InternalRaftRequest)(nil), "etcdserverpb.InternalRaftRequest")
 	proto.RegisterType((*EmptyResponse)(nil), "etcdserverpb.EmptyResponse")
+	proto.RegisterType((*InternalAuthenticateRequest)(nil), "etcdserverpb.InternalAuthenticateRequest")
 }
+func (m *RequestHeader) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RequestHeader) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.ID != 0 {
+		data[i] = 0x8
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.ID))
+	}
+	if len(m.Username) > 0 {
+		data[i] = 0x12
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(len(m.Username)))
+		i += copy(data[i:], m.Username)
+	}
+	return i, nil
+}
+
 func (m *InternalRaftRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -154,65 +225,195 @@ func (m *InternalRaftRequest) MarshalTo(data []byte) (int, error) {
 		}
 		i += n8
 	}
-	if m.AuthEnable != nil {
+	if m.Alarm != nil {
 		data[i] = 0x52
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthEnable.Size()))
-		n9, err := m.AuthEnable.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(data, i, uint64(m.Alarm.Size()))
+		n9, err := m.Alarm.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n9
 	}
-	if m.AuthUserAdd != nil {
-		data[i] = 0x5a
+	if m.Header != nil {
+		data[i] = 0xa2
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserAdd.Size()))
-		n10, err := m.AuthUserAdd.MarshalTo(data[i:])
+		data[i] = 0x6
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.Header.Size()))
+		n10, err := m.Header.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n10
 	}
-	if m.AuthUserDelete != nil {
-		data[i] = 0x62
+	if m.AuthEnable != nil {
+		data[i] = 0xc2
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserDelete.Size()))
-		n11, err := m.AuthUserDelete.MarshalTo(data[i:])
+		data[i] = 0x3e
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthEnable.Size()))
+		n11, err := m.AuthEnable.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n11
 	}
-	if m.AuthUserChangePassword != nil {
-		data[i] = 0x6a
+	if m.AuthDisable != nil {
+		data[i] = 0x9a
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserChangePassword.Size()))
-		n12, err := m.AuthUserChangePassword.MarshalTo(data[i:])
+		data[i] = 0x3f
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthDisable.Size()))
+		n12, err := m.AuthDisable.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n12
 	}
-	if m.AuthRoleAdd != nil {
-		data[i] = 0x72
+	if m.Authenticate != nil {
+		data[i] = 0xa2
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleAdd.Size()))
-		n13, err := m.AuthRoleAdd.MarshalTo(data[i:])
+		data[i] = 0x3f
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.Authenticate.Size()))
+		n13, err := m.Authenticate.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n13
 	}
-	if m.Alarm != nil {
-		data[i] = 0x7a
+	if m.AuthUserAdd != nil {
+		data[i] = 0xe2
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Alarm.Size()))
-		n14, err := m.Alarm.MarshalTo(data[i:])
+		data[i] = 0x44
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserAdd.Size()))
+		n14, err := m.AuthUserAdd.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n14
+	}
+	if m.AuthUserDelete != nil {
+		data[i] = 0xea
+		i++
+		data[i] = 0x44
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserDelete.Size()))
+		n15, err := m.AuthUserDelete.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n15
+	}
+	if m.AuthUserGet != nil {
+		data[i] = 0xf2
+		i++
+		data[i] = 0x44
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserGet.Size()))
+		n16, err := m.AuthUserGet.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n16
+	}
+	if m.AuthUserChangePassword != nil {
+		data[i] = 0xfa
+		i++
+		data[i] = 0x44
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserChangePassword.Size()))
+		n17, err := m.AuthUserChangePassword.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n17
+	}
+	if m.AuthUserGrantRole != nil {
+		data[i] = 0x82
+		i++
+		data[i] = 0x45
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserGrantRole.Size()))
+		n18, err := m.AuthUserGrantRole.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n18
+	}
+	if m.AuthUserRevokeRole != nil {
+		data[i] = 0x8a
+		i++
+		data[i] = 0x45
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserRevokeRole.Size()))
+		n19, err := m.AuthUserRevokeRole.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n19
+	}
+	if m.AuthRoleAdd != nil {
+		data[i] = 0x82
+		i++
+		data[i] = 0x4b
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleAdd.Size()))
+		n20, err := m.AuthRoleAdd.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n20
+	}
+	if m.AuthRoleDelete != nil {
+		data[i] = 0x8a
+		i++
+		data[i] = 0x4b
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleDelete.Size()))
+		n21, err := m.AuthRoleDelete.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n21
+	}
+	if m.AuthRoleGet != nil {
+		data[i] = 0x92
+		i++
+		data[i] = 0x4b
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleGet.Size()))
+		n22, err := m.AuthRoleGet.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n22
+	}
+	if m.AuthRoleGrantPermission != nil {
+		data[i] = 0x9a
+		i++
+		data[i] = 0x4b
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleGrantPermission.Size()))
+		n23, err := m.AuthRoleGrantPermission.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n23
+	}
+	if m.AuthRoleRevokePermission != nil {
+		data[i] = 0xa2
+		i++
+		data[i] = 0x4b
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleRevokePermission.Size()))
+		n24, err := m.AuthRoleRevokePermission.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n24
 	}
 	return i, nil
 }
@@ -232,6 +433,42 @@ func (m *EmptyResponse) MarshalTo(data []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	return i, nil
+}
+
+func (m *InternalAuthenticateRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *InternalAuthenticateRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Name) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(len(m.Name)))
+		i += copy(data[i:], m.Name)
+	}
+	if len(m.Password) > 0 {
+		data[i] = 0x12
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(len(m.Password)))
+		i += copy(data[i:], m.Password)
+	}
+	if len(m.SimpleToken) > 0 {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(len(m.SimpleToken)))
+		i += copy(data[i:], m.SimpleToken)
+	}
 	return i, nil
 }
 
@@ -262,6 +499,19 @@ func encodeVarintRaftInternal(data []byte, offset int, v uint64) int {
 	data[offset] = uint8(v)
 	return offset + 1
 }
+func (m *RequestHeader) Size() (n int) {
+	var l int
+	_ = l
+	if m.ID != 0 {
+		n += 1 + sovRaftInternal(uint64(m.ID))
+	}
+	l = len(m.Username)
+	if l > 0 {
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	return n
+}
+
 func (m *InternalRaftRequest) Size() (n int) {
 	var l int
 	_ = l
@@ -300,29 +550,69 @@ func (m *InternalRaftRequest) Size() (n int) {
 		l = m.LeaseRevoke.Size()
 		n += 1 + l + sovRaftInternal(uint64(l))
 	}
-	if m.AuthEnable != nil {
-		l = m.AuthEnable.Size()
-		n += 1 + l + sovRaftInternal(uint64(l))
-	}
-	if m.AuthUserAdd != nil {
-		l = m.AuthUserAdd.Size()
-		n += 1 + l + sovRaftInternal(uint64(l))
-	}
-	if m.AuthUserDelete != nil {
-		l = m.AuthUserDelete.Size()
-		n += 1 + l + sovRaftInternal(uint64(l))
-	}
-	if m.AuthUserChangePassword != nil {
-		l = m.AuthUserChangePassword.Size()
-		n += 1 + l + sovRaftInternal(uint64(l))
-	}
-	if m.AuthRoleAdd != nil {
-		l = m.AuthRoleAdd.Size()
-		n += 1 + l + sovRaftInternal(uint64(l))
-	}
 	if m.Alarm != nil {
 		l = m.Alarm.Size()
 		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	if m.Header != nil {
+		l = m.Header.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthEnable != nil {
+		l = m.AuthEnable.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthDisable != nil {
+		l = m.AuthDisable.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.Authenticate != nil {
+		l = m.Authenticate.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserAdd != nil {
+		l = m.AuthUserAdd.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserDelete != nil {
+		l = m.AuthUserDelete.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserGet != nil {
+		l = m.AuthUserGet.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserChangePassword != nil {
+		l = m.AuthUserChangePassword.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserGrantRole != nil {
+		l = m.AuthUserGrantRole.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserRevokeRole != nil {
+		l = m.AuthUserRevokeRole.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthRoleAdd != nil {
+		l = m.AuthRoleAdd.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthRoleDelete != nil {
+		l = m.AuthRoleDelete.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthRoleGet != nil {
+		l = m.AuthRoleGet.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthRoleGrantPermission != nil {
+		l = m.AuthRoleGrantPermission.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthRoleRevokePermission != nil {
+		l = m.AuthRoleRevokePermission.Size()
+		n += 2 + l + sovRaftInternal(uint64(l))
 	}
 	return n
 }
@@ -330,6 +620,24 @@ func (m *InternalRaftRequest) Size() (n int) {
 func (m *EmptyResponse) Size() (n int) {
 	var l int
 	_ = l
+	return n
+}
+
+func (m *InternalAuthenticateRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	l = len(m.Password)
+	if l > 0 {
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	l = len(m.SimpleToken)
+	if l > 0 {
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
 	return n
 }
 
@@ -345,6 +653,104 @@ func sovRaftInternal(x uint64) (n int) {
 }
 func sozRaftInternal(x uint64) (n int) {
 	return sovRaftInternal(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *RequestHeader) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRaftInternal
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RequestHeader: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RequestHeader: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			m.ID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.ID |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Username", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Username = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRaftInternal(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 	l := len(data)
@@ -660,6 +1066,72 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			iNdEx = postIndex
 		case 10:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Alarm", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Alarm == nil {
+				m.Alarm = &AlarmRequest{}
+			}
+			if err := m.Alarm.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 100:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Header == nil {
+				m.Header = &RequestHeader{}
+			}
+			if err := m.Header.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1000:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field AuthEnable", wireType)
 			}
 			var msglen int
@@ -691,7 +1163,73 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 11:
+		case 1011:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthDisable", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthDisable == nil {
+				m.AuthDisable = &AuthDisableRequest{}
+			}
+			if err := m.AuthDisable.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1012:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Authenticate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Authenticate == nil {
+				m.Authenticate = &InternalAuthenticateRequest{}
+			}
+			if err := m.Authenticate.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1100:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserAdd", wireType)
 			}
@@ -724,7 +1262,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 12:
+		case 1101:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserDelete", wireType)
 			}
@@ -757,7 +1295,40 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 13:
+		case 1102:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserGet", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthUserGet == nil {
+				m.AuthUserGet = &AuthUserGetRequest{}
+			}
+			if err := m.AuthUserGet.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1103:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserChangePassword", wireType)
 			}
@@ -790,7 +1361,73 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 14:
+		case 1104:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserGrantRole", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthUserGrantRole == nil {
+				m.AuthUserGrantRole = &AuthUserGrantRoleRequest{}
+			}
+			if err := m.AuthUserGrantRole.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1105:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserRevokeRole", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthUserRevokeRole == nil {
+				m.AuthUserRevokeRole = &AuthUserRevokeRoleRequest{}
+			}
+			if err := m.AuthUserRevokeRole.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1200:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field AuthRoleAdd", wireType)
 			}
@@ -823,9 +1460,9 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 15:
+		case 1201:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Alarm", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthRoleDelete", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -849,10 +1486,109 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Alarm == nil {
-				m.Alarm = &AlarmRequest{}
+			if m.AuthRoleDelete == nil {
+				m.AuthRoleDelete = &AuthRoleDeleteRequest{}
 			}
-			if err := m.Alarm.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthRoleDelete.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1202:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthRoleGet", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthRoleGet == nil {
+				m.AuthRoleGet = &AuthRoleGetRequest{}
+			}
+			if err := m.AuthRoleGet.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1203:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthRoleGrantPermission", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthRoleGrantPermission == nil {
+				m.AuthRoleGrantPermission = &AuthRoleGrantPermissionRequest{}
+			}
+			if err := m.AuthRoleGrantPermission.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 1204:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthRoleRevokePermission", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthRoleRevokePermission == nil {
+				m.AuthRoleRevokePermission = &AuthRoleRevokePermissionRequest{}
+			}
+			if err := m.AuthRoleRevokePermission.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -906,6 +1642,143 @@ func (m *EmptyResponse) Unmarshal(data []byte) error {
 			return fmt.Errorf("proto: EmptyResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRaftInternal(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRaftInternal
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: InternalAuthenticateRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: InternalAuthenticateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Password", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Password = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SimpleToken", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SimpleToken = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipRaftInternal(data[iNdEx:])
@@ -1031,3 +1904,56 @@ var (
 	ErrInvalidLengthRaftInternal = fmt.Errorf("proto: negative length found during unmarshaling")
 	ErrIntOverflowRaftInternal   = fmt.Errorf("proto: integer overflow")
 )
+
+var fileDescriptorRaftInternal = []byte{
+	// 770 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x7c, 0x95, 0x4b, 0x6f, 0x13, 0x3b,
+	0x14, 0xc7, 0x6f, 0xd2, 0x67, 0x9c, 0xa4, 0xb7, 0xd7, 0x6d, 0x2f, 0x26, 0x95, 0x4a, 0x09, 0xe2,
+	0x0d, 0x05, 0xb5, 0x4b, 0x16, 0x10, 0x9a, 0xaa, 0x54, 0x42, 0xa8, 0x1a, 0x15, 0x09, 0x89, 0xc5,
+	0xc8, 0xcd, 0x98, 0x74, 0x60, 0x5e, 0x78, 0x9c, 0x52, 0xbe, 0x15, 0xaf, 0x0f, 0xd1, 0x05, 0x8f,
+	0xb2, 0x65, 0x05, 0xac, 0xd8, 0xc3, 0x07, 0xc0, 0xaf, 0xf1, 0xcc, 0x24, 0x4e, 0x17, 0x91, 0x66,
+	0xce, 0xf9, 0x9f, 0xdf, 0x39, 0x9e, 0xbf, 0x1d, 0x83, 0x05, 0x8a, 0x9f, 0x31, 0xd7, 0x8f, 0x18,
+	0xa1, 0x11, 0x0e, 0xd6, 0x12, 0x1a, 0xb3, 0x18, 0x36, 0x08, 0xeb, 0x79, 0x29, 0xa1, 0x87, 0x84,
+	0x26, 0xfb, 0xad, 0xc5, 0x7e, 0xdc, 0x8f, 0x65, 0xe2, 0x96, 0x78, 0x52, 0x9a, 0xd6, 0x7c, 0xae,
+	0xd1, 0x91, 0x1a, 0x4d, 0x7a, 0xea, 0xb1, 0x7d, 0x07, 0x34, 0x1d, 0xf2, 0x72, 0x40, 0x52, 0xf6,
+	0x80, 0x60, 0x8f, 0x50, 0x38, 0x07, 0xaa, 0x3b, 0x5d, 0x54, 0x59, 0xad, 0x5c, 0x99, 0x74, 0xaa,
+	0x7e, 0x17, 0xb6, 0xc0, 0xec, 0x20, 0x15, 0x2d, 0x43, 0x82, 0xaa, 0x3c, 0x5a, 0x73, 0xcc, 0x7b,
+	0xfb, 0x5b, 0x13, 0x2c, 0xec, 0xe8, 0x81, 0x1c, 0x3e, 0x9d, 0x26, 0x8d, 0x30, 0x2e, 0x82, 0xea,
+	0xe1, 0xba, 0xac, 0xae, 0xaf, 0x2f, 0xad, 0x15, 0x47, 0x5e, 0xd3, 0x25, 0x0e, 0x17, 0xc0, 0xdb,
+	0x60, 0x8a, 0xe2, 0xa8, 0x4f, 0xd0, 0x84, 0x54, 0xb6, 0x86, 0x94, 0x22, 0x95, 0xc9, 0x95, 0x10,
+	0x5e, 0x03, 0x13, 0xc9, 0x80, 0xa1, 0x49, 0xa9, 0x47, 0x65, 0xfd, 0xee, 0x20, 0x9b, 0xc7, 0x11,
+	0x22, 0xb8, 0x09, 0x1a, 0x1e, 0x09, 0x08, 0x23, 0xae, 0x6a, 0x32, 0x25, 0x8b, 0x56, 0xcb, 0x45,
+	0x5d, 0xa9, 0x28, 0xb5, 0xaa, 0x7b, 0x79, 0x4c, 0x34, 0x64, 0x47, 0x11, 0x9a, 0xb6, 0x35, 0xdc,
+	0x3b, 0x8a, 0x4c, 0x43, 0x2e, 0x82, 0x77, 0x01, 0xe8, 0xc5, 0x61, 0x82, 0x7b, 0xcc, 0x8f, 0x23,
+	0x34, 0x23, 0x4b, 0xce, 0x95, 0x4b, 0x36, 0x4d, 0x3e, 0xab, 0x2c, 0x94, 0xc0, 0x7b, 0xa0, 0x1e,
+	0x10, 0x9c, 0x12, 0xb7, 0xcf, 0x27, 0x66, 0x68, 0xd6, 0x46, 0x78, 0x28, 0x04, 0xdb, 0x22, 0x6f,
+	0x08, 0x81, 0x09, 0x89, 0x35, 0x2b, 0x02, 0x25, 0x87, 0xf1, 0x0b, 0x82, 0x6a, 0xb6, 0x35, 0x4b,
+	0x84, 0x23, 0x05, 0x66, 0xcd, 0x41, 0x1e, 0x13, 0xb6, 0xe0, 0x00, 0xd3, 0x10, 0x01, 0x9b, 0x2d,
+	0x1d, 0x91, 0x32, 0xb6, 0x48, 0x21, 0xdc, 0x00, 0xd3, 0x07, 0x72, 0x37, 0x21, 0x4f, 0x96, 0x2c,
+	0x5b, 0x3d, 0x57, 0x1b, 0xce, 0xd1, 0x52, 0xd8, 0x01, 0x75, 0x3c, 0x60, 0x07, 0x2e, 0x89, 0xf0,
+	0x7e, 0x40, 0xd0, 0x2f, 0xeb, 0x07, 0xeb, 0x70, 0xc5, 0x96, 0x14, 0x98, 0xe5, 0x62, 0x13, 0x82,
+	0x5d, 0xd0, 0x90, 0x08, 0xcf, 0x4f, 0x25, 0xe3, 0xf7, 0x8c, 0x6d, 0xbd, 0x82, 0xd1, 0x55, 0x0a,
+	0xb3, 0x5e, 0x9c, 0xc7, 0xe0, 0x23, 0x45, 0x21, 0x11, 0xf3, 0x7b, 0x98, 0x11, 0xf4, 0x47, 0x51,
+	0xae, 0x96, 0x29, 0xd9, 0xbe, 0xef, 0x14, 0xa4, 0x19, 0xae, 0x54, 0x0f, 0xb7, 0x40, 0x53, 0x4e,
+	0x25, 0x8e, 0x8d, 0x8b, 0x3d, 0x0f, 0x7d, 0x9c, 0x1d, 0x37, 0xd6, 0x63, 0xfe, 0xd6, 0xf1, 0xbc,
+	0xd2, 0x58, 0x3a, 0xc6, 0xc7, 0x9a, 0xcf, 0x31, 0x6a, 0x4f, 0xa2, 0x4f, 0x8a, 0x74, 0xc1, 0x4e,
+	0xd2, 0x9b, 0x59, 0xc3, 0xe6, 0x70, 0x29, 0x5c, 0x1e, 0xab, 0x4f, 0x18, 0xfa, 0x7c, 0xea, 0x58,
+	0xdb, 0x84, 0x8d, 0x8c, 0xc5, 0x63, 0xb0, 0x0f, 0xce, 0xe6, 0x98, 0xde, 0x81, 0x38, 0x25, 0x6e,
+	0x82, 0xd3, 0xf4, 0x55, 0x4c, 0x3d, 0xf4, 0x45, 0x21, 0xaf, 0xdb, 0x91, 0x9b, 0x52, 0xbd, 0xab,
+	0xc5, 0x19, 0xfd, 0x7f, 0x6c, 0x4d, 0xc3, 0x27, 0x60, 0xb1, 0x30, 0xaf, 0xd8, 0xde, 0x2e, 0x8d,
+	0xb9, 0xc9, 0x27, 0xaa, 0xc7, 0xa5, 0x31, 0x63, 0xcb, 0xa3, 0x11, 0xe7, 0x56, 0xff, 0x87, 0x87,
+	0x33, 0xf0, 0x29, 0x58, 0xca, 0xc9, 0xea, 0xa4, 0x28, 0xf4, 0x57, 0x85, 0xbe, 0x6c, 0x47, 0xeb,
+	0x23, 0x53, 0x60, 0x43, 0x3c, 0x92, 0x32, 0x9f, 0x59, 0x00, 0xa5, 0xfb, 0x6f, 0x6a, 0xe3, 0x3e,
+	0xb3, 0xd0, 0x0f, 0xbb, 0xaf, 0x63, 0xc6, 0x7d, 0x89, 0xd1, 0xee, 0xbf, 0xad, 0x8d, 0x73, 0x5f,
+	0x54, 0x59, 0xdc, 0xcf, 0xc3, 0xe5, 0xb1, 0x84, 0xfb, 0xef, 0x4e, 0x1d, 0x6b, 0xd8, 0x7d, 0x1d,
+	0x83, 0xcf, 0x41, 0xab, 0x80, 0x91, 0xa6, 0x24, 0x84, 0x86, 0x7e, 0x9a, 0x8a, 0xff, 0xbc, 0xf7,
+	0x8a, 0x79, 0x63, 0x0c, 0x53, 0xc8, 0x77, 0x8d, 0x3a, 0xe3, 0x9f, 0xc1, 0xf6, 0x3c, 0x0c, 0xc1,
+	0x72, 0xde, 0x4b, 0xdb, 0x54, 0x68, 0xf6, 0x41, 0x35, 0xbb, 0x69, 0x6f, 0xa6, 0x1c, 0x19, 0xed,
+	0x86, 0xf0, 0x18, 0x41, 0xfb, 0x5f, 0xd0, 0xdc, 0x0a, 0x13, 0xf6, 0xda, 0x21, 0x69, 0x12, 0x47,
+	0x29, 0x69, 0x27, 0x60, 0xf9, 0x94, 0x43, 0x0f, 0x21, 0x98, 0x94, 0x97, 0x64, 0x45, 0x5e, 0x92,
+	0xf2, 0x59, 0x5c, 0x9e, 0xe6, 0x2c, 0xe8, 0xcb, 0x33, 0x7b, 0x87, 0xe7, 0x41, 0x23, 0xf5, 0xc3,
+	0x84, 0xaf, 0x85, 0xf1, 0xc6, 0x91, 0xbc, 0xf4, 0x6a, 0x4e, 0x5d, 0xc5, 0xf6, 0x44, 0xe8, 0xfe,
+	0xfc, 0xf1, 0x8f, 0x95, 0x7f, 0x8e, 0x7f, 0xae, 0x54, 0x4e, 0xf8, 0xef, 0x3b, 0xff, 0xed, 0x4f,
+	0xcb, 0x5b, 0x7b, 0xe3, 0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xa6, 0x96, 0x31, 0x96, 0x0d, 0x08,
+	0x00, 0x00,
+}

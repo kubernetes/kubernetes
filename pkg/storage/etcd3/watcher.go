@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/coreos/etcd/clientv3"
-	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -263,7 +263,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 func parseError(err error) *watch.Event {
 	var status *unversioned.Status
 	switch {
-	case err == etcdrpc.ErrCompacted:
+	case err == rpctypes.ErrCompacted:
 		status = &unversioned.Status{
 			Status:  unversioned.StatusFailure,
 			Message: err.Error(),

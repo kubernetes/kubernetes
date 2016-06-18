@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,4 +40,7 @@ func (h *header) fill(rh *pb.ResponseHeader) {
 	rh.ClusterId = uint64(h.clusterID)
 	rh.MemberId = uint64(h.memberID)
 	rh.RaftTerm = h.raftTimer.Term()
+	if rh.Revision == 0 {
+		rh.Revision = h.rev()
+	}
 }

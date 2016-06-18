@@ -107,29 +107,7 @@ type protoDecoder struct {
 // Decode implements the Decoder interface.
 func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
 	_, err := pbutil.ReadDelimited(d.r, v)
-	if err != nil {
-		return err
-	}
-	if !model.IsValidMetricName(model.LabelValue(v.GetName())) {
-		return fmt.Errorf("invalid metric name %q", v.GetName())
-	}
-	for _, m := range v.GetMetric() {
-		if m == nil {
-			continue
-		}
-		for _, l := range m.GetLabel() {
-			if l == nil {
-				continue
-			}
-			if !model.LabelValue(l.GetValue()).IsValid() {
-				return fmt.Errorf("invalid label value %q", l.GetValue())
-			}
-			if !model.LabelName(l.GetName()).IsValid() {
-				return fmt.Errorf("invalid label name %q", l.GetName())
-			}
-		}
-	}
-	return nil
+	return err
 }
 
 // textDecoder implements the Decoder interface for the text protcol.

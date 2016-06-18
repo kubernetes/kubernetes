@@ -64,11 +64,11 @@ func PathBusEscape(path string) string {
 type Conn struct {
 	// sysconn/sysobj are only used to call dbus methods
 	sysconn *dbus.Conn
-	sysobj  dbus.BusObject
+	sysobj  *dbus.Object
 
 	// sigconn/sigobj are only used to receive dbus signals
 	sigconn *dbus.Conn
-	sigobj  dbus.BusObject
+	sigobj  *dbus.Object
 
 	jobListener struct {
 		jobs map[dbus.ObjectPath]chan<- string
@@ -86,7 +86,7 @@ type Conn struct {
 // New establishes a connection to the system bus and authenticates.
 // Callers should call Close() when done with the connection.
 func New() (*Conn, error) {
-	return NewConnection(func() (*dbus.Conn, error) {
+	return newConnection(func() (*dbus.Conn, error) {
 		return dbusAuthHelloConnection(dbus.SystemBusPrivate)
 	})
 }
@@ -95,7 +95,7 @@ func New() (*Conn, error) {
 // authenticates. This can be used to connect to systemd user instances.
 // Callers should call Close() when done with the connection.
 func NewUserConnection() (*Conn, error) {
-	return NewConnection(func() (*dbus.Conn, error) {
+	return newConnection(func() (*dbus.Conn, error) {
 		return dbusAuthHelloConnection(dbus.SessionBusPrivate)
 	})
 }
@@ -104,7 +104,7 @@ func NewUserConnection() (*Conn, error) {
 // This can be used for communicating with systemd without a dbus daemon.
 // Callers should call Close() when done with the connection.
 func NewSystemdConnection() (*Conn, error) {
-	return NewConnection(func() (*dbus.Conn, error) {
+	return newConnection(func() (*dbus.Conn, error) {
 		// We skip Hello when talking directly to systemd.
 		return dbusAuthConnection(func() (*dbus.Conn, error) {
 			return dbus.Dial("unix:path=/run/systemd/private")
@@ -118,18 +118,13 @@ func (c *Conn) Close() {
 	c.sigconn.Close()
 }
 
-// NewConnection establishes a connection to a bus using a caller-supplied function.
-// This allows connecting to remote buses through a user-supplied mechanism.
-// The supplied function may be called multiple times, and should return independent connections.
-// The returned connection must be fully initialised: the org.freedesktop.DBus.Hello call must have succeeded,
-// and any authentication should be handled by the function.
-func NewConnection(dialBus func() (*dbus.Conn, error)) (*Conn, error) {
-	sysconn, err := dialBus()
+func newConnection(createBus func() (*dbus.Conn, error)) (*Conn, error) {
+	sysconn, err := createBus()
 	if err != nil {
 		return nil, err
 	}
 
-	sigconn, err := dialBus()
+	sigconn, err := createBus()
 	if err != nil {
 		sysconn.Close()
 		return nil, err
@@ -151,17 +146,6 @@ func NewConnection(dialBus func() (*dbus.Conn, error)) (*Conn, error) {
 
 	c.dispatch()
 	return c, nil
-}
-
-// GetManagerProperty returns the value of a property on the org.freedesktop.systemd1.Manager
-// interface. The value is returned in its string representation, as defined at
-// https://developer.gnome.org/glib/unstable/gvariant-text.html
-func (c *Conn) GetManagerProperty(prop string) (string, error) {
-	variant, err := c.sysobj.GetProperty("org.freedesktop.systemd1.Manager." + prop)
-	if err != nil {
-		return "", err
-	}
-	return variant.String(), nil
 }
 
 func dbusAuthConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error) {
@@ -198,6 +182,6 @@ func dbusAuthHelloConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, 
 	return conn, nil
 }
 
-func systemdObject(conn *dbus.Conn) dbus.BusObject {
+func systemdObject(conn *dbus.Conn) *dbus.Object {
 	return conn.Object("org.freedesktop.systemd1", dbus.ObjectPath("/org/freedesktop/systemd1"))
 }

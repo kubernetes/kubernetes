@@ -46,7 +46,7 @@ type counter002 struct {
 	Value  float64        `json:"value"`
 }
 
-func protoLabelSet(base, ext model.LabelSet) ([]*dto.LabelPair, error) {
+func protoLabelSet(base, ext model.LabelSet) []*dto.LabelPair {
 	labels := base.Clone().Merge(ext)
 	delete(labels, model.MetricNameLabel)
 
@@ -59,9 +59,6 @@ func protoLabelSet(base, ext model.LabelSet) ([]*dto.LabelPair, error) {
 	pairs := make([]*dto.LabelPair, 0, len(labels))
 
 	for _, ln := range names {
-		if !model.LabelNameRE.MatchString(ln) {
-			return nil, fmt.Errorf("invalid label name %q", ln)
-		}
 		lv := labels[model.LabelName(ln)]
 
 		pairs = append(pairs, &dto.LabelPair{
@@ -70,7 +67,7 @@ func protoLabelSet(base, ext model.LabelSet) ([]*dto.LabelPair, error) {
 		})
 	}
 
-	return pairs, nil
+	return pairs
 }
 
 func (d *json2Decoder) more() error {
@@ -105,12 +102,8 @@ func (d *json2Decoder) more() error {
 			}
 
 			for _, ctr := range values {
-				labels, err := protoLabelSet(e.BaseLabels, ctr.Labels)
-				if err != nil {
-					return err
-				}
 				f.Metric = append(f.Metric, &dto.Metric{
-					Label: labels,
+					Label: protoLabelSet(e.BaseLabels, ctr.Labels),
 					Untyped: &dto.Untyped{
 						Value: proto.Float64(ctr.Value),
 					},
@@ -138,13 +131,8 @@ func (d *json2Decoder) more() error {
 					// this remains "percentile"
 					hist.Labels["percentile"] = model.LabelValue(q)
 
-					labels, err := protoLabelSet(e.BaseLabels, hist.Labels)
-					if err != nil {
-						return err
-					}
-
 					f.Metric = append(f.Metric, &dto.Metric{
-						Label: labels,
+						Label: protoLabelSet(e.BaseLabels, hist.Labels),
 						Untyped: &dto.Untyped{
 							Value: proto.Float64(value),
 						},

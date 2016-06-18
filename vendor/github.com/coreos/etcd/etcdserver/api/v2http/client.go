@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -62,8 +62,6 @@ const (
 
 // NewClientHandler generates a muxed http.Handler with the given parameters to serve etcd client requests.
 func NewClientHandler(server *etcdserver.EtcdServer, timeout time.Duration) http.Handler {
-	go capabilityLoop(server)
-
 	sec := auth.NewStore(server, timeout)
 
 	kh := &keysHandler{
@@ -129,6 +127,7 @@ func NewClientHandler(server *etcdserver.EtcdServer, timeout time.Duration) http
 		mux.Handle(pprofPrefix+"/block", pprof.Handler("block"))
 	}
 
+	api.RunCapabilityLoop(server)
 	return requestLogger(mux)
 }
 
@@ -720,20 +719,19 @@ func trimEventPrefix(ev *store.Event, prefix string) *store.Event {
 	// Since the *Event may reference one in the store history
 	// history, we must copy it before modifying
 	e := ev.Clone()
-	e.Node = trimNodeExternPrefix(e.Node, prefix)
-	e.PrevNode = trimNodeExternPrefix(e.PrevNode, prefix)
+	trimNodeExternPrefix(e.Node, prefix)
+	trimNodeExternPrefix(e.PrevNode, prefix)
 	return e
 }
 
-func trimNodeExternPrefix(n *store.NodeExtern, prefix string) *store.NodeExtern {
+func trimNodeExternPrefix(n *store.NodeExtern, prefix string) {
 	if n == nil {
-		return nil
+		return
 	}
 	n.Key = strings.TrimPrefix(n.Key, prefix)
 	for _, nn := range n.Nodes {
-		nn = trimNodeExternPrefix(nn, prefix)
+		trimNodeExternPrefix(nn, prefix)
 	}
-	return n
 }
 
 func trimErrorPrefix(err error, prefix string) error {

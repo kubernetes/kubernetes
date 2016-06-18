@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/coreos/etcd/clientv3"
-	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
 )
@@ -41,8 +41,8 @@ func TestCompact(t *testing.T) {
 		t.Fatalf("compact failed: %v", err)
 	}
 
-	_, err = client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision))
-	if err != etcdrpc.ErrCompacted {
+	_, err = client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision-1))
+	if err != rpctypes.ErrCompacted {
 		t.Errorf("Expecting ErrCompacted, but get=%v", err)
 	}
 }

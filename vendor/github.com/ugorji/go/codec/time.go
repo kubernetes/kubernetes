@@ -5,22 +5,11 @@ package codec
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 )
 
 var (
-	timeDigits   = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-	timeExtEncFn = func(rv reflect.Value) (bs []byte, err error) {
-		defer panicToErr(&err)
-		bs = timeExt{}.WriteExt(rv.Interface())
-		return
-	}
-	timeExtDecFn = func(rv reflect.Value, bs []byte) (err error) {
-		defer panicToErr(&err)
-		timeExt{}.ReadExt(rv.Interface(), bs)
-		return
-	}
+	timeDigits = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 )
 
 type timeExt struct{}

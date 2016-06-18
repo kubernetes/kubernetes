@@ -573,12 +573,12 @@ func writeUnknownStruct(w *textWriter, data []byte) (err error) {
 			return ferr
 		}
 		if wire != WireStartGroup {
-			if err := w.WriteByte(':'); err != nil {
+			if err = w.WriteByte(':'); err != nil {
 				return err
 			}
 		}
 		if !w.compact || wire == WireStartGroup {
-			if err := w.WriteByte(' '); err != nil {
+			if err = w.WriteByte(' '); err != nil {
 				return err
 			}
 		}

@@ -185,6 +185,17 @@ func NewExtension(e []byte) Extension {
 	return ee
 }
 
+func AppendExtension(e extendableProto, tag int32, buf []byte) {
+	if ee, eok := e.(extensionsMap); eok {
+		ext := ee.ExtensionMap()[int32(tag)] // may be missing
+		ext.enc = append(ext.enc, buf...)
+		ee.ExtensionMap()[int32(tag)] = ext
+	} else if ee, eok := e.(extensionsBytes); eok {
+		ext := ee.GetExtensions()
+		*ext = append(*ext, buf...)
+	}
+}
+
 func (this Extension) GoString() string {
 	if this.enc == nil {
 		if err := encodeExtension(&this); err != nil {

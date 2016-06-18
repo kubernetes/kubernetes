@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ not empty. Note that when writing an Entry with Index i, any
 previously-persisted entries with Index >= i must be discarded.
 
 2. Send all Messages to the nodes named in the To field. It is important that
-no messages be sent until after the latest HardState has been persisted to disk,
+no messages be sent until the latest HardState has been persisted to disk,
 and all Entries written by any previous Ready batch (Messages may be sent while
 entries from the same batch are being persisted). To reduce the I/O latency, an
 optimization can be applied to make leader write to disk in parallel with its
@@ -137,6 +137,7 @@ The total state machine handling loop will look something like this:
           cc.Unmarshal(entry.Data)
           s.Node.ApplyConfChange(cc)
         }
+      }
       s.Node.Advance()
     case <-s.done:
       return
@@ -209,10 +210,10 @@ stale log entries:
 	passes 'MsgHup' to its Step method and becomes (or remains) a candidate to
 	start a new election.
 
-	'MsgBeat' is an internal type that signals leaders to send a heartbeat of
+	'MsgBeat' is an internal type that signals the leader to send a heartbeat of
 	the 'MsgHeartbeat' type. If a node is a leader, the 'tick' function in
-	the 'raft' struct is set as 'tickHeartbeat', and sends periodic heartbeat
-	messages of the 'MsgBeat' type to its followers.
+	the 'raft' struct is set as 'tickHeartbeat', and triggers the leader to
+	send periodic 'MsgHeartbeat' messages to its followers.
 
 	'MsgProp' proposes to append data to its log entries. This is a special
 	type to redirect proposals to leader. Therefore, send method overwrites
