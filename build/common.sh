@@ -126,7 +126,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v3
           federation-apiserver,ppc64le/busybox
-          federation-controller-manager,ppc64lebusybox
+          federation-controller-manager,ppc64le/busybox
         );;
   esac
 
@@ -690,8 +690,11 @@ function kube::release::package_hyperkube() {
   if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
     for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
 
-      kube::log::status "Building hyperkube image for arch: ${arch}"
-      REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
+      # TODO(IBM): Enable hyperkube builds for ppc64le again
+      if [[ ${arch} != "ppc64le" ]]; then
+        kube::log::status "Building hyperkube image for arch: ${arch}"
+        REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
+      fi
     done
   fi
 }
@@ -1528,18 +1531,22 @@ function kube::release::docker::release() {
   for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
     for binary in "${binaries[@]}"; do
 
-      local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-      kube::log::status "Pushing ${binary} to ${docker_target}"
-      "${docker_push_cmd[@]}" push "${docker_target}"
+      # TODO(IBM): Enable hyperkube builds for ppc64le again
+      if [[ ${binary} != "hyperkube" || ${arch} != "ppc64le" ]]; then
 
-      # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
-      if [[ ${arch} == "amd64" ]]; then
-        local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
+        local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+        kube::log::status "Pushing ${binary} to ${docker_target}"
+        "${docker_push_cmd[@]}" push "${docker_target}"
 
-        "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
+        # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
+        if [[ ${arch} == "amd64" ]]; then
+          local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
 
-        kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
-        "${docker_push_cmd[@]}" push "${legacy_docker_target}"
+          "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
+
+          kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
+          "${docker_push_cmd[@]}" push "${legacy_docker_target}"
+        fi
       fi
     done
   done
