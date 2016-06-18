@@ -28,9 +28,13 @@ FIREWALL_SSH="${FIREWALL_SSH:-${NETWORK}-allow-ssh}"
 GCLOUD="${GCLOUD:-gcloud}"
 CMD_GROUP="${CMD_GROUP:-}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
-NODE_SCOPES="${NODE_SCOPES:-"compute-rw,storage-ro"}"
 MACHINE_TYPE="${MACHINE_TYPE:-n1-standard-2}"
 IMAGE_TYPE="${IMAGE_TYPE:-}"
+if [[ "${FEDERATION:-}" == true ]]; then
+    NODE_SCOPES="${NODE_SCOPES:-compute-rw,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
+else
+    NODE_SCOPES="${NODE_SCOPES:-compute-rw,storage-ro}"
+fi
 
 # WARNING: any new vars added here must correspond to options that can be
 # passed to `gcloud {CMD_GROUP} container clusters create`, or they will
