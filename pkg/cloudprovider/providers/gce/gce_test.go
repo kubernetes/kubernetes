@@ -152,6 +152,16 @@ func TestScrubDNS(t *testing.T) {
 	}
 }
 
+func TestCreateFirewallFails(t *testing.T) {
+	name := "loadbalancer"
+	region := "us-central1"
+	desc := "description"
+	gce := &GCECloud{}
+	if err := gce.createFirewall(name, region, desc, nil, nil, nil); err == nil {
+		t.Errorf("error expected when creating firewall without any tags found")
+	}
+}
+
 func TestRestrictTargetPool(t *testing.T) {
 	const maxInstances = 5
 	tests := []struct {
