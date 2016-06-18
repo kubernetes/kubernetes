@@ -370,8 +370,12 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 
 		for _, f := range b.parsed[pkgPath] {
 			if strings.HasSuffix(f.name, "/doc.go") {
+				tp := u.Package(pkgPath)
+				for i := range f.file.Comments {
+					tp.Comments = append(tp.Comments, splitLines(f.file.Comments[i].Text())...)
+				}
 				if f.file.Doc != nil {
-					u.Package(pkgPath).DocComments = splitLines(f.file.Doc.Text())
+					tp.DocComments = splitLines(f.file.Doc.Text())
 				}
 			}
 		}
