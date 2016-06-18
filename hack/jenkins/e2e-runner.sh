@@ -103,20 +103,24 @@ function get_latest_gci_image() {
     local image_type="$2"
     local image_index=""
     if [[ "${image_type}" == head ]]; then
-      image_index="gci-head"
+      image_index="latest-base-image-gci-head"
     elif [[ "${image_type}" == dev ]]; then
-      image_index="gci-dev"
+      image_index="latest-base-image-gci-dev"
     elif [[ "${image_type}" == beta ]]; then
-      image_index="gci-beta"
+      image_index="latest-base-image-gci-beta"
     elif [[ "${image_type}" == stable ]]; then
-      image_index="gci-stable"
+      image_index="latest-base-image-gci-stable"
+    elif [[ "${image_type}" == preview-test ]]; then
+      # A GCI preview image that is able to override its Docker installation on
+      # boot.
+      image_index="latest-test-image-gci-preview"
     fi
 
     local image=""
     # Retry the gsutil command a couple times to mitigate the effect of
     # transient server errors.
     for n in $(seq 3); do
-      image="$(gsutil cat "gs://${image_project}/image-indices/latest-base-image-${image_index}")" && break || sleep 1
+      image="$(gsutil cat "gs://${image_project}/image-indices/${image_index}")" && break || sleep 1
     done
     if [[ -z "${image}" ]]; then
       echo "Failed to find GCI image for ${image_type}"
@@ -126,6 +130,18 @@ function get_latest_gci_image() {
     # Clean up gsutil artifacts otherwise the later test stage will complain.
     rm -rf .config &> /dev/null
     rm -rf .gsutil &> /dev/null
+}
+
+function get_latest_docker_release() {
+  # Typical Docker release versions are like v1.11.2-rc1, v1.11.2, and etc.
+  local -r version_re='.*\"tag_name\":[[:space:]]+\"v([0-9\.r|c-]+)\",.*'
+  local -r latest_release="$(curl -fsSL --retry 3 https://api.github.com/repos/docker/docker/releases/latest)"
+  if [[ "${latest_release}" =~ ${version_re} ]]; then
+    echo "${BASH_REMATCH[1]}"
+  else
+    echo "Malformed Docker API response for latest release: ${latest_release}"
+    exit 1
+  fi
 }
 
 function install_google_cloud_sdk_tarball() {
@@ -196,6 +212,9 @@ if [[ -n "${JENKINS_GCI_IMAGE_TYPE:-}" ]]; then
   export KUBE_GCE_MASTER_PROJECT="${gci_image_project}"
   export KUBE_GCE_MASTER_IMAGE="${gci_image}"
   export KUBE_OS_DISTRIBUTION="gci"
+  if [[ "${JENKINS_GCI_IMAGE_TYPE}" == preview-test ]]; then
+    export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
+  fi
 fi
 
 function e2e_test() {
