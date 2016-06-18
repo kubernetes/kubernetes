@@ -29,7 +29,7 @@ type Zones struct {
 func (zones Zones) List() ([]dnsprovider.Zone, error) {
 	response, err := zones.impl.List(zones.project()).Do()
 	if err != nil {
-		return []dnsprovider.Zone{}, nil
+		return nil, err
 	}
 	managedZones := response.ManagedZones()
 	zoneList := make([]dnsprovider.Zone, len(managedZones))
