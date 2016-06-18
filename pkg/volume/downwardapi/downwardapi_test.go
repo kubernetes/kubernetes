@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -34,14 +35,6 @@ import (
 )
 
 const downwardAPIDir = "..data"
-
-func formatMap(m map[string]string) (fmtstr string) {
-	for key, value := range m {
-		fmtstr += fmt.Sprintf("%v=%q\n", key, value)
-	}
-
-	return
-}
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := utiltesting.MkTmpdir("downwardApi_volume_test.")
@@ -155,8 +148,8 @@ func TestLabels(t *testing.T) {
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	if sortLines(string(data)) != sortLines(formatMap(labels)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(labels))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(labels)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(labels))
 	}
 
 	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
@@ -222,8 +215,8 @@ func TestAnnotations(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	if sortLines(string(data)) != sortLines(formatMap(annotations)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(annotations))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(annotations)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(annotations))
 	}
 	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 
@@ -433,8 +426,8 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	if sortLines(string(data)) != sortLines(formatMap(labels)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(labels))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(labels)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(labels))
 	}
 	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 
@@ -503,8 +496,8 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	if sortLines(string(data)) != sortLines(formatMap(labels)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(labels))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(labels)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(labels))
 	}
 
 	newLabels := map[string]string{
@@ -534,8 +527,8 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	if sortLines(string(data)) != sortLines(formatMap(newLabels)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(newLabels))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(newLabels)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(newLabels))
 	}
 	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 }
@@ -606,16 +599,16 @@ func TestWriteWithUnixPath(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 
-	if sortLines(string(data)) != sortLines(formatMap(labels)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(labels))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(labels)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(labels))
 	}
 
 	data, err = ioutil.ReadFile(path.Join(volumePath, "this/is/yours/annotations"))
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	if sortLines(string(data)) != sortLines(formatMap(annotations)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(annotations))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(annotations)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(annotations))
 	}
 	CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 }
@@ -687,7 +680,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if sortLines(string(data)) != sortLines(formatMap(labels)) {
-		t.Errorf("Found `%s` expected %s", data, formatMap(labels))
+	if sortLines(string(data)) != sortLines(fieldpath.FormatMap(labels)) {
+		t.Errorf("Found `%s` expected %s", data, fieldpath.FormatMap(labels))
 	}
 }
