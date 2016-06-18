@@ -65,7 +65,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 					Labels: map[string]string{"key": "value"},
 				},
 			},
-			expectedValue: "key=\"value\"\n",
+			expectedValue: "key=\"value\"",
 		},
 		{
 			name:      "ok - labels bslash n",
@@ -75,7 +75,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 					Labels: map[string]string{"key": "value\n"},
 				},
 			},
-			expectedValue: "key=\"value\\n\"\n",
+			expectedValue: "key=\"value\\n\"",
 		},
 		{
 			name:      "ok - annotations",
@@ -85,7 +85,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 					Annotations: map[string]string{"builder": "john-doe"},
 				},
 			},
-			expectedValue: "builder=\"john-doe\"\n",
+			expectedValue: "builder=\"john-doe\"",
 		},
 
 		{
