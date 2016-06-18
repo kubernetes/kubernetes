@@ -58,10 +58,8 @@ KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Lists of API Versions of each groups that should be tested, groups are
 # separated by comma, lists are separated by semicolon. e.g.,
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1,federation/v1alpha1;v1,autoscaling/v1,batch/v1,batch/v2alpha1,extensions/v1beta1,apps/v1alpha1,federation/v1alpha1,policy/v1alpha1,rbac.authorization.k8s.io/v1alpha1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,autoscaling/v1,batch/v1,batch/v2alpha1,extensions/v1beta1,apps/v1alpha1,federation/v1alpha1,policy/v1alpha1,rbac.authorization.k8s.io/v1alpha1"}
 # once we have multiple group supports
-# Run tests with the standard (registry) etcd prefix.
-KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry"}
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
@@ -315,29 +313,12 @@ checkFDs
 
 # Convert the CSVs to arrays.
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
 apiVersionsCount=${#apiVersions[@]}
-etcdPrefixesCount=${#etcdPrefixes[@]}
-for (( i=0, j=0; ; )); do
+for (( i=0; i<${apiVersionsCount}; i++ )); do
   apiVersion=${apiVersions[i]}
-  etcdPrefix=${etcdPrefixes[j]}
-  echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
+  echo "Running tests for APIVersion: $apiVersion"
   # KUBE_TEST_API sets the version of each group to be tested.
-  KUBE_TEST_API="${apiVersion}" ETCD_PREFIX=${etcdPrefix} runTests "$@"
-  i=${i}+1
-  j=${j}+1
-  if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then
-    # All api versions and etcd prefixes tested.
-    break
-  fi
-  if [[ i -eq ${apiVersionsCount} ]]; then
-    # Use the last api version for remaining etcd prefixes.
-    i=${i}-1
-  fi
-   if [[ j -eq ${etcdPrefixesCount} ]]; then
-     # Use the last etcd prefix for remaining api versions.
-    j=${j}-1
-  fi
+  KUBE_TEST_API="${apiVersion}" runTests "$@"
 done
 
 # We might run the tests for multiple versions, but we want to report only

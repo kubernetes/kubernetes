@@ -664,17 +664,20 @@ func RunKubernetesServiceTestContainer(c *client.Client, repoRoot string, ns str
 	}
 }
 
-func kubectlLogPod(c *client.Client, pod api.Pod) {
+func kubectlLogPod(c *client.Client, pod api.Pod, containerNameSubstr string) {
 	for _, container := range pod.Spec.Containers {
-		logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
-		if err != nil {
-			logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+		if strings.Contains(container.Name, containerNameSubstr) {
+			// Contains() matches all strings if substr is empty
+			logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
 			if err != nil {
-				Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+				if err != nil {
+					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				}
 			}
+			By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
+			Logf("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
 		}
-		By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
-		Logf(logs)
 	}
 }
 
@@ -687,7 +690,7 @@ func LogFailedContainers(c *client.Client, ns string) {
 	Logf("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod)
+			kubectlLogPod(c, pod, "")
 		}
 	}
 }
@@ -700,7 +703,18 @@ func LogPodsWithLabels(c *client.Client, ns string, match map[string]string) {
 	}
 	Logf("Running kubectl logs on pods with labels %v in %v", match, ns)
 	for _, pod := range podList.Items {
-		kubectlLogPod(c, pod)
+		kubectlLogPod(c, pod, "")
+	}
+}
+
+func LogContainersInPodsWithLabels(c *client.Client, ns string, match map[string]string, containerSubstr string) {
+	podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(match)})
+	if err != nil {
+		Logf("Error getting pods in namespace %q: %v", ns, err)
+		return
+	}
+	for _, pod := range podList.Items {
+		kubectlLogPod(c, pod, containerSubstr)
 	}
 }
 
@@ -837,6 +851,18 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
+// WaitForFederationApiserverReady waits for the federation apiserver to be ready.
+// It tests the readiness by sending a GET request and expecting a non error response.
+func WaitForFederationApiserverReady(c *federation_internalclientset.Clientset) error {
+	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		_, err := c.Federation().Clusters().List(api.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 // WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
 func WaitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Client, pvName string, Poll, timeout time.Duration) error {
 	Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
@@ -919,6 +945,7 @@ func CreateTestingNS(baseName string, c *client.Client, labels map[string]string
 		var err error
 		got, err = c.Namespaces().Create(namespaceObj)
 		if err != nil {
+			Logf("Unexpected error while creating namespace: %v", err)
 			return false, nil
 		}
 		return true, nil

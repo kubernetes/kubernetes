@@ -177,6 +177,10 @@ func (f *Framework) BeforeEach() {
 			f.FederationClientset_1_3, err = LoadFederationClientset_1_3()
 			Expect(err).NotTo(HaveOccurred())
 		}
+		By("Waiting for federation-apiserver to be ready")
+		err := WaitForFederationApiserverReady(f.FederationClientset)
+		Expect(err).NotTo(HaveOccurred())
+		By("federation-apiserver is ready")
 	}
 
 	By("Building a namespace api object")
@@ -272,7 +276,7 @@ func (f *Framework) AfterEach() {
 	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		DumpAllNamespaceInfo(f.Client, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
-		LogPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels)
+		LogContainersInPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels, "image-puller")
 		if f.federated {
 			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
 			LogPodsWithLabels(f.Client, "federation", map[string]string{"app": "federated-cluster"})
@@ -299,7 +303,7 @@ func (f *Framework) AfterEach() {
 		if err != nil {
 			Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 		} else {
-			received, err := grabber.Grab(nil)
+			received, err := grabber.Grab()
 			if err != nil {
 				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 			} else {

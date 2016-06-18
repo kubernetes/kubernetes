@@ -917,7 +917,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
-		if err := kl.containerGC.GarbageCollect(); err != nil {
+		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
@@ -1125,7 +1125,11 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 }
 
 func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
-	if kl.cloud == nil || kl.flannelExperimentalOverlay {
+	// TODO: We should have a mechanism to say whether native cloud provider
+	// is used or whether we are using overlay networking. We should return
+	// true for cloud providers if they implement Routes() interface and
+	// we are not using overlay networking.
+	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" || kl.flannelExperimentalOverlay {
 		return false
 	}
 	_, supported := kl.cloud.Routes()
@@ -2720,6 +2724,10 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *api.Pod
 	var cID string
 
 	cStatus, found := api.GetContainerStatus(podStatus.ContainerStatuses, containerName)
+	// if not found, check the init containers
+	if !found {
+		cStatus, found = api.GetContainerStatus(podStatus.InitContainerStatuses, containerName)
+	}
 	if !found {
 		return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is not available", containerName, podName)
 	}

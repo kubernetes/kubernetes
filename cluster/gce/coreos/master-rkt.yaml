@@ -35,9 +35,23 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         ExecStartPre=/usr/bin/mkdir -p /opt/cni
-        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-42c4cb842dad606a84e93aad5a4484ded48e3046.tar.gz
-        ExecStart=/usr/bin/tar xf /opt/downloads/cni.tar.gz -C /opt/cni/        
-        
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-c864f0e1ea73719b8f4582402b0847064f9883b0.tar.gz
+        ExecStart=/usr/bin/tar xf /opt/downloads/cni.tar.gz -C /opt/cni/
+
+    - name: kubernetes-install-docker2aci.service
+      command: start
+      content: |
+        [Unit]
+        Description=Download docker2aci
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/usr/bin/mkdir -p /opt/docker2aci
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/docker2aci.tar.gz https://github.com/appc/docker2aci/releases/download/v0.11.1/docker2aci-v0.11.1.tar.gz
+        ExecStart=/usr/bin/tar --strip-components=1 -xf /opt/downloads/docker2aci.tar.gz -C /opt/docker2aci/ --overwrite
+
     - name: kubernetes-install-rkt.service
       command: start
       content: |
@@ -114,6 +128,18 @@ coreos:
         # TODO(yifan): Check hash.
         ExecStart=/usr/bin/tar xf /opt/downloads/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
 
+    - name: rkt-api-service.service
+      command: start
+      content: |
+        [Unit]
+        Description=Start rkt API service as Daemon
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        ExecStart=/opt/rkt/rkt api-service
+        Restart=always
+        RestartSec=10
+
     - name: kubelet.service
       command: start
       content: |
@@ -139,7 +165,7 @@ coreos:
         --cluster-dns=${DNS_SERVER_IP} \
         --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
-        --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
+        --container-runtime=rkt \
         --rkt-path=/opt/rkt/rkt \
         --rkt-stage1-image=/opt/rkt/stage1-coreos.aci \
         --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
@@ -149,20 +175,9 @@ coreos:
         Restart=always
         RestartSec=10
         KillMode=process
-        
+
     - name: docker.service
-      drop-ins:
-        - name: 50-docker-opts.conf
-          content: |
-            [Service]
-            Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false --ip-masq=false'
-            MountFlags=slave
-            LimitNOFILE=1048576
-            LimitNPROC=1048576
-            LimitCORE=infinity
-            Restart=always
-            RestartSec=2s
-            StartLimitInterval=0
+      command: stop
 
     - name: kubernetes-configure-node.service
       command: start
@@ -177,6 +192,8 @@ coreos:
         After=kubernetes-download-salt.service
         Requires=kubernetes-download-manifests.service
         After=kubernetes-download-manifests.service
+        Requires=kubernetes-install-docker2aci.service
+        After=kubernetes-install-docker2aci.service
         # Need the kubelet/docker running because we will use docker load for docker images.
         Requires=kubelet.service
         After=kubelet.service

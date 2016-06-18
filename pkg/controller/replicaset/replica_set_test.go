@@ -547,16 +547,32 @@ func TestUpdatePods(t *testing.T) {
 	testRSSpec2.Name = "barfoo"
 	manager.rsStore.Store.Add(&testRSSpec2)
 
-	// Put one pod in the podStore
+	// case 1: We put in the podStore a pod with labels matching testRSSpec1,
+	// then update its labels to match testRSSpec2.  We expect to receive a sync
+	// request for both replica sets.
 	pod1 := newPodList(manager.podStore.Indexer, 1, api.PodRunning, labelMap1, testRSSpec1, "pod").Items[0]
 	pod2 := pod1
 	pod2.Labels = labelMap2
-
-	// Send an update of the same pod with modified labels, and confirm we get a sync request for
-	// both controllers
 	manager.updatePod(&pod1, &pod2)
-
 	expected := sets.NewString(testRSSpec1.Name, testRSSpec2.Name)
+	for _, name := range expected.List() {
+		t.Logf("Expecting update for %+v", name)
+		select {
+		case got := <-received:
+			if !expected.Has(got) {
+				t.Errorf("Expected keys %#v got %v", expected, got)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("Expected update notifications for replica sets within 100ms each")
+		}
+	}
+
+	// case 2: pod1 in the podStore has labels matching testRSSpec1. We update
+	// its labels to match no replica set. We expect to receive a sync request
+	// for testRSSpec1.
+	pod2.Labels = make(map[string]string)
+	manager.updatePod(&pod1, &pod2)
+	expected = sets.NewString(testRSSpec1.Name)
 	for _, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
 		select {

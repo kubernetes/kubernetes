@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -153,22 +154,17 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 
-		removeLabels := func(nodesToClean []string) {
+		removeLabels := func(nodesToClean sets.String) {
 			By("Removing labels from nodes")
-			for _, node := range nodesToClean {
-				updateLabelsForNode(f, node, map[string]string{}, []string{"cluster-autoscaling-test.special-node"})
-			}
+			updateNodeLabels(c, nodesToClean, nil, labels)
 		}
 
 		nodes, err := GetGroupNodes(minMig)
-		defer removeLabels(nodes)
-		nodesMap := map[string]struct{}{}
 		ExpectNoError(err)
+		nodesSet := sets.NewString(nodes...)
+		defer removeLabels(nodesSet)
 		By(fmt.Sprintf("Annotating nodes of the smallest MIG(%s): %v", minMig, nodes))
-		for _, node := range nodes {
-			updateLabelsForNode(f, node, labels, nil)
-			nodesMap[node] = struct{}{}
-		}
+		updateNodeLabels(c, nodesSet, labels, nil)
 
 		CreateNodeSelectorPods(f, "node-selector", minSize+1, labels, false)
 
@@ -179,14 +175,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
 		newNodes, err := GetGroupNodes(minMig)
-		defer removeLabels(newNodes)
 		ExpectNoError(err)
-		By(fmt.Sprintf("Setting labels for new nodes: %v", newNodes))
-		for _, node := range newNodes {
-			if _, old := nodesMap[node]; !old {
-				updateLabelsForNode(f, node, labels, nil)
-			}
-		}
+		newNodesSet := sets.NewString(newNodes...)
+		newNodesSet.Delete(nodes...)
+		defer removeLabels(newNodesSet)
+		By(fmt.Sprintf("Setting labels for new nodes: %v", newNodesSet.List()))
+		updateNodeLabels(c, newNodesSet, labels, nil)
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
@@ -462,18 +456,4 @@ func setMigSizes(sizes map[string]int) {
 			framework.ExpectNoError(err)
 		}
 	}
-}
-
-func updateLabelsForNode(f *framework.Framework, node string, addLabels map[string]string, rmLabels []string) {
-	n, err := f.Client.Nodes().Get(node)
-	ExpectNoError(err)
-	for _, label := range rmLabels {
-		delete(n.Labels, label)
-	}
-	for label, value := range addLabels {
-		n.Labels[label] = value
-	}
-	_, err = f.Client.Nodes().Update(n)
-	ExpectNoError(err)
-	By(fmt.Sprintf("Labels successfully updated for node %s", node))
 }

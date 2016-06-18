@@ -1813,7 +1813,7 @@ func podDetailsFromServiceFile(serviceFilePath string) (string, string, string, 
 // - If the number of containers exceeds gcPolicy.MaxContainers,
 //   then containers whose ages are older than gcPolicy.minAge will
 //   be removed.
-func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
+func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	var errlist []error
 	var totalInactiveContainers int
 	var inactivePods []*rktapi.Pod
@@ -1846,7 +1846,7 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 				continue
 			}
 			_, found := r.podGetter.GetPodByUID(uid)
-			if !found {
+			if !found && allSourcesReady {
 				removeCandidates = append(removeCandidates, pod)
 				continue
 			}

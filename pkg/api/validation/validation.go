@@ -1167,7 +1167,7 @@ func validateContainerResourceFieldSelector(fs *api.ResourceFieldSelector, expre
 }
 
 var validContainerResourceDivisorForCPU = sets.NewString("1m", "1")
-var validContainerResourceDivisorForMemory = sets.NewString("1m", "1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
+var validContainerResourceDivisorForMemory = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
 
 func validateContainerResourceDivisor(rName string, divisor resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1182,7 +1182,7 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 		}
 	case "limits.memory", "requests.memory":
 		if !validContainerResourceDivisorForMemory.Has(divisor.String()) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, fmt.Sprintf("only divisor's values 1m, 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource")))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, fmt.Sprintf("only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource")))
 		}
 	}
 	return allErrs

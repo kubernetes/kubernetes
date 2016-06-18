@@ -126,8 +126,13 @@ function kubectl-with-retry()
 }
 
 kube::util::trap_add cleanup EXIT SIGINT
-
 kube::util::ensure-temp-dir
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubectl \
+    cmd/kube-apiserver \
+    cmd/kube-controller-manager
+
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -163,6 +168,9 @@ kube::log::status "Running kubectl with no options"
 
 # Only run kubelet on platforms it supports
 if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubelet
 
 kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \

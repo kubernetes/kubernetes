@@ -1511,6 +1511,8 @@ function kube::release::docker::release() {
     "kube-scheduler"
     "kube-proxy"
     "hyperkube"
+    "federation-apiserver"
+    "federation-controller-manager"
   )
 
   local docker_push_cmd=("${DOCKER[@]}")

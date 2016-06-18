@@ -24,49 +24,79 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
-// Pod manager stores and manages access to the pods.
+// Manager stores and manages access to pods, maintaining the mappings
+// between static pods and mirror pods.
 //
-// Kubelet discovers pod updates from 3 sources: file, http, and apiserver.
-// Pods from non-apiserver sources are called static pods, and API server is
-// not aware of the existence of static pods. In order to monitor the status of
-// such pods, kubelet creates a mirror pod for each static pod via the API
-// server.
+// The kubelet discovers pod updates from 3 sources: file, http, and
+// apiserver. Pods from non-apiserver sources are called static pods, and API
+// server is not aware of the existence of static pods. In order to monitor
+// the status of such pods, the kubelet creates a mirror pod for each static
+// pod via the API server.
 //
 // A mirror pod has the same pod full name (name and namespace) as its static
 // counterpart (albeit different metadata such as UID, etc). By leveraging the
-// fact that kubelet reports the pod status using the pod full name, the status
-// of the mirror pod always reflects the actual status of the static pod.
-// When a static pod gets deleted, the associated orphaned mirror pod will
-// also be removed.
-
+// fact that the kubelet reports the pod status using the pod full name, the
+// status of the mirror pod always reflects the actual status of the static
+// pod. When a static pod gets deleted, the associated orphaned mirror pod
+// will also be removed.
 type Manager interface {
+	// GetPods returns the regular pods bound to the kubelet and their spec.
 	GetPods() []*api.Pod
+	// GetPodByName returns the (non-mirror) pod that matches full name, as well as
+	// whether the pod was found.
 	GetPodByFullName(podFullName string) (*api.Pod, bool)
+	// GetPodByName provides the (non-mirror) pod that matches namespace and
+	// name, as well as whether the pod was found.
 	GetPodByName(namespace, name string) (*api.Pod, bool)
+	// GetPodByUID provides the (non-mirror) pod that matches pod UID, as well as
+	// whether the pod is found.
 	GetPodByUID(types.UID) (*api.Pod, bool)
+	// GetPodByMirrorPod returns the static pod for the given mirror pod and
+	// whether it was known to the pod manger.
 	GetPodByMirrorPod(*api.Pod) (*api.Pod, bool)
+	// GetMirrorPodByPod returns the mirror pod for the given static pod and
+	// whether it was known to the pod manager.
 	GetMirrorPodByPod(*api.Pod) (*api.Pod, bool)
+	// GetPodsAndMirrorPods returns the both regular and mirror pods.
 	GetPodsAndMirrorPods() ([]*api.Pod, []*api.Pod)
-
 	// SetPods replaces the internal pods with the new pods.
 	// It is currently only used for testing.
 	SetPods(pods []*api.Pod)
-
-	// Methods that modify a single pod.
+	// AddPod adds the given pod to the manager.
 	AddPod(pod *api.Pod)
+	// UpdatePod updates the given pod in the manager.
 	UpdatePod(pod *api.Pod)
+	// DeletePod deletes the given pod from the manager.  For mirror pods,
+	// this means deleting the mappings related to mirror pods.  For non-
+	// mirror pods, this means deleting from indexes for all non-mirror pods.
 	DeletePod(pod *api.Pod)
-
+	// DeleteOrphanedMirrorPods deletes all mirror pods which do not have
+	// associated static pods. This method sends deletion requests to the API
+	// server, but does NOT modify the internal pod storage in basicManager.
 	DeleteOrphanedMirrorPods()
+	// TranslatePodUID returns the UID which is the mirror pod or static pod
+	// of the pod with the given UID.  If the UID belongs to a mirror pod,
+	// returns the UID of its static pod.  If the UID belongs to a static pod,
+	// returns the UID of its mirror pod.  Otherwise, returns the original UID.
+	//
+	// All public-facing functions should perform this translation for UIDs
+	// because user may provide a mirror pod UID, which is not recognized by
+	// internal Kubelet functions.
 	TranslatePodUID(uid types.UID) types.UID
+	// GetUIDTranslations returns the mappings of static pod UIDs to mirror pod
+	// UIDs and mirror pod UIDs to static pod UIDs.
 	GetUIDTranslations() (podToMirror, mirrorToPod map[types.UID]types.UID)
+	// IsMirrorPodOf returns true if mirrorPod is a correct representation of
+	// pod; false otherwise.
 	IsMirrorPodOf(mirrorPod, pod *api.Pod) bool
+
 	MirrorClient
 }
 
-// All maps in basicManager should be set by calling UpdatePods();
-// individual arrays/maps are not immutable and no other methods should attempt
-// to modify them.
+// basicManager is a functional Manger.
+//
+// All fields in basicManager are read-only and are updated calling SetPods,
+// AddPod, UpdatePod, or DeletePod.
 type basicManager struct {
 	// Protects all internal maps.
 	lock sync.RWMutex
@@ -87,6 +117,7 @@ type basicManager struct {
 	MirrorClient
 }
 
+// NewBasicPodManager returns a functional Manager.
 func NewBasicPodManager(client MirrorClient) Manager {
 	pm := &basicManager{}
 	pm.MirrorClient = client
@@ -118,6 +149,9 @@ func (pm *basicManager) UpdatePod(pod *api.Pod) {
 	pm.updatePodsInternal(pod)
 }
 
+// updatePodsInternal replaces the given pods in the current state of the
+// manager, updating the various indices.  The caller is assumed to hold the
+// lock.
 func (pm *basicManager) updatePodsInternal(pods ...*api.Pod) {
 	for _, pod := range pods {
 		podFullName := kubecontainer.GetPodFullName(pod)
@@ -151,14 +185,12 @@ func (pm *basicManager) DeletePod(pod *api.Pod) {
 	}
 }
 
-// GetPods returns the regular pods bound to the kubelet and their spec.
 func (pm *basicManager) GetPods() []*api.Pod {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	return podsMapToPods(pm.podByUID)
 }
 
-// GetPodsAndMirrorPods returns the both regular and mirror pods.
 func (pm *basicManager) GetPodsAndMirrorPods() ([]*api.Pod, []*api.Pod) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
@@ -172,8 +204,6 @@ func (pm *basicManager) getAllPods() []*api.Pod {
 	return append(podsMapToPods(pm.podByUID), podsMapToPods(pm.mirrorPodByUID)...)
 }
 
-// GetPodByUID provides the (non-mirror) pod that matches pod UID, as well as
-// whether the pod is found.
 func (pm *basicManager) GetPodByUID(uid types.UID) (*api.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
@@ -181,15 +211,11 @@ func (pm *basicManager) GetPodByUID(uid types.UID) (*api.Pod, bool) {
 	return pod, ok
 }
 
-// GetPodByName provides the (non-mirror) pod that matches namespace and name,
-// as well as whether the pod was found.
 func (pm *basicManager) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	podFullName := kubecontainer.BuildPodFullName(name, namespace)
 	return pm.GetPodByFullName(podFullName)
 }
 
-// GetPodByName returns the (non-mirror) pod that matches full name, as well as
-// whether the pod was found.
 func (pm *basicManager) GetPodByFullName(podFullName string) (*api.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
@@ -197,10 +223,6 @@ func (pm *basicManager) GetPodByFullName(podFullName string) (*api.Pod, bool) {
 	return pod, ok
 }
 
-// If the UID belongs to a mirror pod, maps it to the UID of its static pod.
-// Otherwise, return the original UID. All public-facing functions should
-// perform this translation for UIDs because user may provide a mirror pod UID,
-// which is not recognized by internal Kubelet functions.
 func (pm *basicManager) TranslatePodUID(uid types.UID) types.UID {
 	if uid == "" {
 		return uid
@@ -239,9 +261,6 @@ func (pm *basicManager) getOrphanedMirrorPodNames() []string {
 	return podFullNames
 }
 
-// Delete all mirror pods which do not have associated static pods. This method
-// sends deletion requets to the API server, but does NOT modify the internal
-// pod storage in basicManager.
 func (pm *basicManager) DeleteOrphanedMirrorPods() {
 	podFullNames := pm.getOrphanedMirrorPodNames()
 	for _, podFullName := range podFullNames {
@@ -249,7 +268,6 @@ func (pm *basicManager) DeleteOrphanedMirrorPods() {
 	}
 }
 
-// Returns true if mirrorPod is a correct representation of pod; false otherwise.
 func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *api.Pod) bool {
 	// Check name and namespace first.
 	if pod.Name != mirrorPod.Name || pod.Namespace != mirrorPod.Namespace {

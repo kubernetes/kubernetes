@@ -250,7 +250,7 @@ func TestCascadingDeletion(t *testing.T) {
 
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
-func TestCreateWithNonExisitentOwner(t *testing.T) {
+func TestCreateWithNonExistentOwner(t *testing.T) {
 	gc, clientSet := setup(t)
 	oldEnableGarbageCollector := registry.EnableGarbageCollector
 	registry.EnableGarbageCollector = true

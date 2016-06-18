@@ -35,6 +35,18 @@ spec:
       name: socket
     - mountPath: /usr/bin/docker
       name: docker
+  # Add a container that runs a health-check
+  - name: nethealth-check
+    resources:
+      requests:
+        cpu: 100m
+      limits:
+        cpu: 100m
+    image:  gcr.io/google_containers/kube-nethealth-amd64:1.0
+    command:
+    - /bin/sh
+    - -c
+    - "/usr/bin/nethealth || true"
   volumes:
   - hostPath:
       path: /var/run/docker.sock
@@ -44,3 +56,6 @@ spec:
     name: docker
   # This pod is really fire-and-forget.
   restartPolicy: Never
+  # This pod needs hostNetworking for true VM perf measurement as well as avoiding cbr0 issues
+  hostNetwork: true
+
