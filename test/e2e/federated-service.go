@@ -50,6 +50,9 @@ const (
 	FederatedServicePod  = "federated-service-test-pod"
 
 	DefaultFederationName = "federation"
+
+	// We use this to decide how long to wait for our DNS probes to succeed.
+	DNSTTL = 180 * time.Second
 )
 
 var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func() {
@@ -149,7 +152,7 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 			// pods, perhaps in the BeforeEach, and then just poll until we get
 			// successes/failures from them all.
 			for _, name := range svcDNSNames {
-				discoverService(f, name)
+				discoverService(f, name, true)
 			}
 		})
 
@@ -158,6 +161,8 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 				framework.SkipUnlessFederated(f.Client)
 
 				// Delete a federated service shard in the default e2e Kubernetes cluster.
+				// TODO(mml): This should not work: #27623.  We should use a load
+				// balancer with actual back-ends, some of which we delete or disable.
 				err := f.Clientset_1_3.Core().Services(f.Namespace.Name).Delete(FederatedServiceName, &api.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				waitForFederatedServiceShard(f.Clientset_1_3, f.Namespace.Name, nil, 0)
@@ -171,14 +176,12 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 					fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name, federationName),
 				}
 				for _, name := range svcDNSNames {
-					discoverService(f, name)
+					discoverService(f, name, true)
 				}
 
-				// TODO(mml): Unclear how to make this meaningful and not terribly
-				// slow.  How long (how many minutes?) do we verify that a given DNS
-				// lookup *doesn't* work before we call it a success?  For now,
-				// commenting out.
-				/*
+				// TODO(mml): This currently takes 9 minutes.  Consider reducing the
+				// TTL and/or running the pods in parallel.
+				Context("[Slow]", func() {
 					localSvcDNSNames := []string{
 						FederatedServiceName,
 						fmt.Sprintf("%s.%s", FederatedServiceName, f.Namespace.Name),
@@ -187,7 +190,7 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 					for _, name := range localSvcDNSNames {
 						discoverService(f, name, false)
 					}
-				*/
+				})
 			})
 		})
 	})
@@ -273,10 +276,50 @@ func createService(fcs *federation_release_1_3.Clientset, clusterClientSets []*r
 	}
 }
 
-func discoverService(f *framework.Framework, name string) {
-	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 1; done", name)}
+func podExitCodeDetector(f *framework.Framework, name string, code int32) func() error {
+	// If we ever get any container logs, stash them here.
+	logs := ""
 
-	defer f.Client.Pods(f.Namespace.Name).Delete(FederatedServicePod, api.NewDeleteOptions(0))
+	logerr := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		if logs == "" {
+			return err
+		}
+		return fmt.Errorf("%s (%v)", logs, err)
+	}
+
+	return func() error {
+		pod, err := f.Client.Pods(f.Namespace.Name).Get(name)
+		if err != nil {
+			return logerr(err)
+		}
+		if len(pod.Status.ContainerStatuses) < 1 {
+			return logerr(fmt.Errorf("no container statuses"))
+		}
+
+		// Best effort attempt to grab pod logs for debugging
+		logs, err = framework.GetPodLogs(f.Client, f.Namespace.Name, name, pod.Spec.Containers[0].Name)
+		if err != nil {
+			framework.Logf("Cannot fetch pod logs: %v", err)
+		}
+
+		status := pod.Status.ContainerStatuses[0]
+		if status.State.Terminated == nil {
+			return logerr(fmt.Errorf("container is not in terminated state"))
+		}
+		if status.State.Terminated.ExitCode == code {
+			return nil
+		}
+
+		return logerr(fmt.Errorf("exited %d", status.State.Terminated.ExitCode))
+	}
+}
+
+func discoverService(f *framework.Framework, name string, exists bool) {
+	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 1; done", name)}
+	By(fmt.Sprintf("Looking up %q", name))
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -296,47 +339,15 @@ func discoverService(f *framework.Framework, name string) {
 	}
 
 	_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-	Expect(err).
-		NotTo(HaveOccurred(), "Trying to create pod to run %q", command)
+	Expect(err).NotTo(HaveOccurred(), "Trying to create pod to run %q", command)
+	defer f.Client.Pods(f.Namespace.Name).Delete(FederatedServicePod, api.NewDeleteOptions(0))
 
-	// If we ever get any container logs, stash them here.
-	logs := ""
-
-	logerr := func(err error) error {
-		if err == nil {
-			return nil
-		}
-		if logs == "" {
-			return err
-		}
-		return fmt.Errorf("%s (%v)", logs, err)
+	if exists {
+		// TODO(mml): Eventually check the IP address is correct, too.
+		Eventually(podExitCodeDetector(f, FederatedServicePod, 0), DNSTTL, time.Second*2).
+			Should(BeNil(), "%q should exit 0, but it never did", command)
+	} else {
+		Consistently(podExitCodeDetector(f, FederatedServicePod, 0), DNSTTL, time.Second*2).
+			ShouldNot(BeNil(), "%q should never exit 0, but it did", command)
 	}
-
-	// TODO(mml): Eventually check the IP address is correct, too.
-	Eventually(func() error {
-		pod, err := f.Client.Pods(f.Namespace.Name).Get(FederatedServicePod)
-		if err != nil {
-			return logerr(err)
-		}
-		if len(pod.Status.ContainerStatuses) < 1 {
-			return logerr(fmt.Errorf("no container statuses"))
-		}
-
-		// Best effort attempt to grab pod logs for debugging
-		logs, err = framework.GetPodLogs(f.Client, f.Namespace.Name, FederatedServicePod, "federated-service-discovery-container")
-		if err != nil {
-			framework.Logf("Cannot fetch pod logs: %v", err)
-		}
-
-		status := pod.Status.ContainerStatuses[0]
-		if status.State.Terminated == nil {
-			return logerr(fmt.Errorf("container is not in terminated state"))
-		}
-		if status.State.Terminated.ExitCode == 0 {
-			return nil
-		}
-
-		return logerr(fmt.Errorf("exited %d", status.State.Terminated.ExitCode))
-	}, time.Minute*2, time.Second*2).
-		Should(BeNil(), "%q should exit 0, but it never did", command)
 }
