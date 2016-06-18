@@ -19,9 +19,6 @@ limitations under the License.
 package kubenet
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/base32"
 	"fmt"
 	"net"
 	"strings"
@@ -39,13 +36,15 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 )
 
 const (
@@ -54,11 +53,6 @@ const (
 	DefaultCNIDir     = "/opt/cni/bin"
 
 	sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
-
-	// the hostport chain
-	kubenetHostportsChain utiliptables.Chain = "KUBENET-HOSTPORTS"
-	// prefix for kubenet hostport chains
-	kubenetHostportChainPrefix string = "KUBENET-HP-"
 )
 
 type kubenetNetworkPlugin struct {
@@ -75,7 +69,7 @@ type kubenetNetworkPlugin struct {
 	execer          utilexec.Interface
 	nsenterPath     string
 	hairpinMode     componentconfig.HairpinMode
-	hostPortMap     map[hostport]closeable
+	hostportHandler hostport.HostportHandler
 	iptables        utiliptables.Interface
 	// vendorDir is passed by kubelet network-plugin-dir parameter.
 	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
@@ -90,11 +84,11 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	iptInterface := utiliptables.New(execer, dbus, protocol)
 	return &kubenetNetworkPlugin{
 		podIPs:            make(map[kubecontainer.ContainerID]string),
-		hostPortMap:       make(map[hostport]closeable),
 		MTU:               1460, //TODO: don't hardcode this
 		execer:            utilexec.New(),
 		iptables:          iptInterface,
 		vendorDir:         networkPluginDir,
+		hostportHandler:   hostport.NewHostportHandler(),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
@@ -297,38 +291,7 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt(network.NET_PLUGIN_CAPABILITY_SHAPING)
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
-	plugin.mu.Lock()
-	defer plugin.mu.Unlock()
-
-	start := time.Now()
-	defer func() {
-		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
-	}()
-
-	pod, ok := plugin.host.GetPodByName(namespace, name)
-	if !ok {
-		return fmt.Errorf("pod %q cannot be found", name)
-	}
-	// try to open pod host port if specified
-	hostportMap, err := plugin.openPodHostports(pod)
-	if err != nil {
-		return err
-	}
-	if len(hostportMap) > 0 {
-		// defer to decide whether to keep the host port open based on the result of SetUpPod
-		defer plugin.syncHostportMap(id, hostportMap)
-	}
-
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
-	if err != nil {
-		return fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
-	}
-
-	if err := plugin.Status(); err != nil {
-		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
-	}
-
+func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, pod *api.Pod) error {
 	// Bring up container loopback interface
 	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		return err
@@ -346,7 +309,6 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	if ip4 == nil {
 		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
 	}
-	plugin.podIPs[id] = ip4.String()
 
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
@@ -365,20 +327,100 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	// initialization
 	shaper := plugin.shaper()
 
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
+	if err != nil {
+		return fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
+	}
 	if egress != nil || ingress != nil {
-		ipAddr := plugin.podIPs[id]
-		if err := shaper.ReconcileCIDR(fmt.Sprintf("%s/32", ipAddr), egress, ingress); err != nil {
+		if err := shaper.ReconcileCIDR(fmt.Sprintf("%s/32", ip4.String()), egress, ingress); err != nil {
 			return fmt.Errorf("Failed to add pod to shaper: %v", err)
 		}
 	}
 
-	plugin.syncHostportsRules()
+	plugin.podIPs[id] = ip4.String()
+
+	// Open any hostports the pod's containers want
+	runningPods, err := plugin.getRunningPods()
+	if err != nil {
+		return err
+	}
+	if err := plugin.hostportHandler.OpenPodHostportsAndSync(pod, BridgeName, runningPods); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+
+	start := time.Now()
+	defer func() {
+		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
+	}()
+
+	pod, ok := plugin.host.GetPodByName(namespace, name)
+	if !ok {
+		return fmt.Errorf("pod %q cannot be found", name)
+	}
+
+	if err := plugin.Status(); err != nil {
+		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
+	}
+
+	if err := plugin.setup(namespace, name, id, pod); err != nil {
+		// Make sure everything gets cleaned up on errors
+		podIP, _ := plugin.podIPs[id]
+		if err := plugin.teardown(namespace, name, id, podIP); err != nil {
+			// Not a hard error or warning
+			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
+		}
+		return err
+	}
 
 	// Need to SNAT outbound traffic from cluster
-	if err = plugin.ensureMasqRule(); err != nil {
+	if err := plugin.ensureMasqRule(); err != nil {
 		glog.Errorf("Failed to ensure MASQ rule: %v", err)
 	}
+
 	return nil
+}
+
+// Tears down as much of a pod's network as it can even if errors occur.  Returns
+// an aggregate error composed of all errors encountered during the teardown.
+func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id kubecontainer.ContainerID, podIP string) error {
+	errList := []error{}
+
+	if podIP != "" {
+		glog.V(5).Infof("Removing pod IP %s from shaper", podIP)
+		// shaper wants /32
+		if err := plugin.shaper().Reset(fmt.Sprintf("%s/32", podIP)); err != nil {
+			// Possible bandwidth shaping wasn't enabled for this pod anyways
+			glog.V(4).Infof("Failed to remove pod IP %s from shaper: %v", podIP, err)
+		}
+
+		delete(plugin.podIPs, id)
+	}
+
+	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
+		// This is to prevent returning error when TearDownPod is called twice on the same pod. This helps to reduce event pollution.
+		if podIP != "" {
+			glog.Warningf("Failed to delete container from kubenet: %v", err)
+		} else {
+			errList = append(errList, err)
+		}
+	}
+
+	runningPods, err := plugin.getRunningPods()
+	if err == nil {
+		err = plugin.hostportHandler.SyncHostports(BridgeName, runningPods)
+	}
+	if err != nil {
+		errList = append(errList, err)
+	}
+
+	return utilerrors.NewAggregate(errList)
 }
 
 func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
@@ -395,31 +437,16 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	}
 
 	// no cached IP is Ok during teardown
-	podIP, hasIP := plugin.podIPs[id]
-	if hasIP {
-		glog.V(5).Infof("Removing pod IP %s from shaper", podIP)
-		// shaper wants /32
-		if err := plugin.shaper().Reset(fmt.Sprintf("%s/32", podIP)); err != nil {
-			// Possible bandwidth shaping wasn't enabled for this pod anyways
-			glog.V(4).Infof("Failed to remove pod IP %s from shaper: %v", podIP, err)
-		}
-	}
-	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
-		// This is to prevent returning error when TearDownPod is called twice on the same pod. This helps to reduce event pollution.
-		if !hasIP {
-			glog.Warningf("Failed to delete container from kubenet: %v", err)
-			return nil
-		}
+	podIP, _ := plugin.podIPs[id]
+	if err := plugin.teardown(namespace, name, id, podIP); err != nil {
 		return err
 	}
-	delete(plugin.podIPs, id)
-
-	plugin.syncHostportsRules()
 
 	// Need to SNAT outbound traffic from cluster
 	if err := plugin.ensureMasqRule(); err != nil {
 		glog.Errorf("Failed to ensure MASQ rule: %v", err)
 	}
+
 	return nil
 }
 
@@ -465,6 +492,39 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 		return fmt.Errorf("Kubenet does not have netConfig. This is most likely due to lack of PodCIDR")
 	}
 	return nil
+}
+
+// Returns a list of pods running on this node and each pod's IP address.  Assumes
+// PodSpecs retrieved from the runtime include the name and ID of containers in
+// each pod.
+func (plugin *kubenetNetworkPlugin) getRunningPods() ([]*hostport.RunningPod, error) {
+	pods, err := plugin.host.GetRuntime().GetPods(false)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to retrieve pods from runtime: %v", err)
+	}
+	runningPods := make([]*hostport.RunningPod, 0)
+	for _, p := range pods {
+		for _, c := range p.Containers {
+			if c.Name != dockertools.PodInfraContainerName {
+				continue
+			}
+			ipString, ok := plugin.podIPs[c.ID]
+			if !ok {
+				continue
+			}
+			podIP := net.ParseIP(ipString)
+			if podIP == nil {
+				continue
+			}
+			if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
+				runningPods = append(runningPods, &hostport.RunningPod{
+					Pod: pod,
+					IP:  podIP,
+				})
+			}
+		}
+	}
+	return runningPods, nil
 }
 
 func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID) (*libcni.RuntimeConf, error) {
@@ -516,332 +576,6 @@ func (plugin *kubenetNetworkPlugin) getNsenterPath() (string, error) {
 		plugin.nsenterPath = nsenterPath
 	}
 	return plugin.nsenterPath, nil
-}
-
-type closeable interface {
-	Close() error
-}
-
-type hostport struct {
-	port     int32
-	protocol string
-}
-
-type targetPod struct {
-	podFullName string
-	podIP       string
-}
-
-func (hp *hostport) String() string {
-	return fmt.Sprintf("%s:%d", hp.protocol, hp.port)
-}
-
-//openPodHostports opens all hostport for pod and returns the map of hostport and socket
-func (plugin *kubenetNetworkPlugin) openPodHostports(pod *api.Pod) (map[hostport]closeable, error) {
-	var retErr error
-	hostportMap := make(map[hostport]closeable)
-	for _, container := range pod.Spec.Containers {
-		for _, port := range container.Ports {
-			if port.HostPort <= 0 {
-				// Ignore
-				continue
-			}
-			hp := hostport{
-				port:     port.HostPort,
-				protocol: strings.ToLower(string(port.Protocol)),
-			}
-			socket, err := openLocalPort(&hp)
-			if err != nil {
-				retErr = fmt.Errorf("Cannot open hostport %d for pod %s: %v", port.HostPort, kubecontainer.GetPodFullName(pod), err)
-				break
-			}
-			hostportMap[hp] = socket
-		}
-		if retErr != nil {
-			break
-		}
-	}
-	// If encounter any error, close all hostports that just got opened.
-	if retErr != nil {
-		for hp, socket := range hostportMap {
-			if err := socket.Close(); err != nil {
-				glog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, kubecontainer.GetPodFullName(pod), err)
-			}
-		}
-	}
-	return hostportMap, retErr
-}
-
-//syncHostportMap syncs newly opened hostports to kubenet on successful pod setup. If pod setup failed, then clean up.
-func (plugin *kubenetNetworkPlugin) syncHostportMap(id kubecontainer.ContainerID, hostportMap map[hostport]closeable) {
-	// if pod ip cannot be retrieved from podCIDR, then assume pod setup failed.
-	if _, ok := plugin.podIPs[id]; !ok {
-		for hp, socket := range hostportMap {
-			err := socket.Close()
-			if err != nil {
-				glog.Errorf("Failed to close socket for hostport %v", hp)
-			}
-		}
-		return
-	}
-	// add newly opened hostports
-	for hp, socket := range hostportMap {
-		plugin.hostPortMap[hp] = socket
-	}
-}
-
-// gatherAllHostports returns all hostports that should be presented on node
-func (plugin *kubenetNetworkPlugin) gatherAllHostports() (map[api.ContainerPort]targetPod, error) {
-	podHostportMap := make(map[api.ContainerPort]targetPod)
-	pods, err := plugin.host.GetRuntime().GetPods(false)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve pods from runtime: %v", err)
-	}
-	for _, p := range pods {
-		var podInfraContainerId kubecontainer.ContainerID
-		for _, c := range p.Containers {
-			if c.Name == dockertools.PodInfraContainerName {
-				podInfraContainerId = c.ID
-				break
-			}
-		}
-		// Assuming if kubenet has the pod's ip, the pod is alive and its host port should be presented.
-		podIP, ok := plugin.podIPs[podInfraContainerId]
-		if !ok {
-			// The POD has been delete. Ignore
-			continue
-		}
-		// Need the complete api.Pod object
-		pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name)
-		// kubenet should not handle hostports for hostnetwork pods
-		if ok && !pod.Spec.SecurityContext.HostNetwork {
-			for _, container := range pod.Spec.Containers {
-				for _, port := range container.Ports {
-					if port.HostPort != 0 {
-						podHostportMap[port] = targetPod{podFullName: kubecontainer.GetPodFullName(pod), podIP: podIP}
-					}
-				}
-			}
-		}
-	}
-	return podHostportMap, nil
-}
-
-// Join all words with spaces, terminate with newline and write to buf.
-func writeLine(buf *bytes.Buffer, words ...string) {
-	buf.WriteString(strings.Join(words, " ") + "\n")
-}
-
-//hostportChainName takes containerPort for a pod and returns associated iptables chain.
-// This is computed by hashing (sha256)
-// then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
-// this because Iptables Chain Names must be <= 28 chars long, and the longer
-// they are the harder they are to read.
-func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(string(cp.HostPort) + string(cp.Protocol) + podFullName))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return utiliptables.Chain(kubenetHostportChainPrefix + encoded[:16])
-}
-
-// syncHostportsRules gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
-func (plugin *kubenetNetworkPlugin) syncHostportsRules() {
-	start := time.Now()
-	defer func() {
-		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
-	}()
-
-	containerPortMap, err := plugin.gatherAllHostports()
-	if err != nil {
-		glog.Errorf("Fail to get hostports: %v", err)
-		return
-	}
-
-	glog.V(4).Info("Ensuring kubenet hostport chains")
-	// Ensure kubenetHostportChain
-	if _, err := plugin.iptables.EnsureChain(utiliptables.TableNAT, kubenetHostportsChain); err != nil {
-		glog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubenetHostportsChain, err)
-		return
-	}
-	tableChainsNeedJumpServices := []struct {
-		table utiliptables.Table
-		chain utiliptables.Chain
-	}{
-		{utiliptables.TableNAT, utiliptables.ChainOutput},
-		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
-	}
-	args := []string{"-m", "comment", "--comment", "kubenet hostport portals",
-		"-m", "addrtype", "--dst-type", "LOCAL",
-		"-j", string(kubenetHostportsChain)}
-	for _, tc := range tableChainsNeedJumpServices {
-		if _, err := plugin.iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubenetHostportsChain, err)
-			return
-		}
-	}
-	// Need to SNAT traffic from localhost
-	args = []string{"-m", "comment", "--comment", "SNAT for localhost access to hostports", "-o", BridgeName, "-s", "127.0.0.0/8", "-j", "MASQUERADE"}
-	if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-		glog.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
-		return
-	}
-
-	// Get iptables-save output so we can check for existing chains and rules.
-	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	existingNATChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err := plugin.iptables.Save(utiliptables.TableNAT)
-	if err != nil { // if we failed to get any rules
-		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
-	} else { // otherwise parse the output
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
-	}
-
-	natChains := bytes.NewBuffer(nil)
-	natRules := bytes.NewBuffer(nil)
-	writeLine(natChains, "*nat")
-	// Make sure we keep stats for the top-level chains, if they existed
-	// (which most should have because we created them above).
-	if chain, ok := existingNATChains[kubenetHostportsChain]; ok {
-		writeLine(natChains, chain)
-	} else {
-		writeLine(natChains, utiliptables.MakeChainLine(kubenetHostportsChain))
-	}
-	// Assuming the node is running kube-proxy in iptables mode
-	// Reusing kube-proxy's KubeMarkMasqChain for SNAT
-	// TODO: let kubelet manage KubeMarkMasqChain. Other components should just be able to use it
-	if chain, ok := existingNATChains[iptablesproxy.KubeMarkMasqChain]; ok {
-		writeLine(natChains, chain)
-	} else {
-		writeLine(natChains, utiliptables.MakeChainLine(iptablesproxy.KubeMarkMasqChain))
-	}
-
-	// Accumulate NAT chains to keep.
-	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
-
-	for containerPort, target := range containerPortMap {
-		protocol := strings.ToLower(string(containerPort.Protocol))
-		hostportChain := hostportChainName(containerPort, target.podFullName)
-		if chain, ok := existingNATChains[hostportChain]; ok {
-			writeLine(natChains, chain)
-		} else {
-			writeLine(natChains, utiliptables.MakeChainLine(hostportChain))
-		}
-
-		activeNATChains[hostportChain] = true
-
-		// Redirect to hostport chain
-		args := []string{
-			"-A", string(kubenetHostportsChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),
-			"-m", protocol, "-p", protocol,
-			"--dport", fmt.Sprintf("%d", containerPort.HostPort),
-			"-j", string(hostportChain),
-		}
-		writeLine(natRules, args...)
-
-		// If the request comes from the pod that is serving the hostport, then SNAT
-		args = []string{
-			"-A", string(hostportChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),
-			"-s", target.podIP, "-j", string(iptablesproxy.KubeMarkMasqChain),
-		}
-		writeLine(natRules, args...)
-
-		// Create hostport chain to DNAT traffic to final destination
-		// Iptables will maintained the stats for this chain
-		args = []string{
-			"-A", string(hostportChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),
-			"-m", protocol, "-p", protocol,
-			"-j", "DNAT", fmt.Sprintf("--to-destination=%s:%d", target.podIP, containerPort.ContainerPort),
-		}
-		writeLine(natRules, args...)
-	}
-
-	// Delete chains no longer in use.
-	for chain := range existingNATChains {
-		if !activeNATChains[chain] {
-			chainString := string(chain)
-			if !strings.HasPrefix(chainString, kubenetHostportChainPrefix) {
-				// Ignore chains that aren't ours.
-				continue
-			}
-			// We must (as per iptables) write a chain-line for it, which has
-			// the nice effect of flushing the chain.  Then we can remove the
-			// chain.
-			writeLine(natChains, existingNATChains[chain])
-			writeLine(natRules, "-X", chainString)
-		}
-	}
-	writeLine(natRules, "COMMIT")
-
-	natLines := append(natChains.Bytes(), natRules.Bytes()...)
-	glog.V(3).Infof("Restoring iptables rules: %s", natLines)
-	err = plugin.iptables.RestoreAll(natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
-	if err != nil {
-		glog.Errorf("Failed to execute iptables-restore: %v", err)
-		return
-	}
-
-	plugin.cleanupHostportMap(containerPortMap)
-}
-
-func openLocalPort(hp *hostport) (closeable, error) {
-	// For ports on node IPs, open the actual port and hold it, even though we
-	// use iptables to redirect traffic.
-	// This ensures a) that it's safe to use that port and b) that (a) stays
-	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
-	// is using a port and we give that same port out to a Service.  That would
-	// be bad because iptables would silently claim the traffic but the process
-	// would never know.
-	// NOTE: We should not need to have a real listen()ing socket - bind()
-	// should be enough, but I can't figure out a way to e2e test without
-	// it.  Tools like 'ss' and 'netstat' do not show sockets that are
-	// bind()ed but not listen()ed, and at least the default debian netcat
-	// has no way to avoid about 10 seconds of retries.
-	var socket closeable
-	switch hp.protocol {
-	case "tcp":
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", hp.port))
-		if err != nil {
-			return nil, err
-		}
-		socket = listener
-	case "udp":
-		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", hp.port))
-		if err != nil {
-			return nil, err
-		}
-		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
-		socket = conn
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", hp.protocol)
-	}
-	glog.V(2).Infof("Opened local port %s", hp.String())
-	return socket, nil
-}
-
-// cleanupHostportMap closes obsolete hostports
-func (plugin *kubenetNetworkPlugin) cleanupHostportMap(containerPortMap map[api.ContainerPort]targetPod) {
-	// compute hostports that are supposed to be open
-	currentHostports := make(map[hostport]bool)
-	for containerPort := range containerPortMap {
-		hp := hostport{
-			port:     containerPort.HostPort,
-			protocol: string(containerPort.Protocol),
-		}
-		currentHostports[hp] = true
-	}
-
-	// close and delete obsolete hostports
-	for hp, socket := range plugin.hostPortMap {
-		if _, ok := currentHostports[hp]; !ok {
-			socket.Close()
-			delete(plugin.hostPortMap, hp)
-		}
-	}
 }
 
 // shaper retrieves the bandwidth shaper and, if it hasn't been fetched before,
