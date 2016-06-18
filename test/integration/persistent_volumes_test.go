@@ -48,7 +48,7 @@ func init() {
 	requireEtcd()
 }
 
-// Several tests in this file are configurable by enviroment variables:
+// Several tests in this file are configurable by environment variables:
 // KUBE_INTEGRATION_PV_OBJECTS - nr. of PVs/PVCs to be created
 //      (100 by default)
 // KUBE_INTEGRATION_PV_SYNC_PERIOD - volume controller sync period
