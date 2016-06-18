@@ -271,7 +271,9 @@ function assemble-docker-flags {
   echo "Assemble docker command line flags"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --debug"
+    docker_opts+=" --log-level=debug"
+  else
+    docker_opts+=" --log-level=warn"
   fi
   local use_net_plugin="true"
   if [[ "${NETWORK_PROVIDER:-}" != "kubenet" && "${NETWORK_PROVIDER:-}" != "cni" ]]; then
