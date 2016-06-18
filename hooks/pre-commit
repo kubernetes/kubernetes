@@ -29,7 +29,7 @@ if [[ "${#files[@]}" -ne 0 ]]; then
   fi
   echo "${reset}"
 
-  echo -ne "Check if Godep licesnses are up to date..."
+  echo -ne "Check if Godep licenses are up to date..."
   if ! OUT=$("hack/verify-godep-licenses.sh" 2>&1); then
     echo
     echo "${red}${OUT}"
@@ -53,8 +53,8 @@ done
 
 if [[ "${#files_need_gofmt[@]}" -ne 0 ]]; then
   echo "${red}ERROR!"
-  echo "Some files have not been gofmt'd.  To fix these errors, "
-  echo "cut and paste the following:"
+  echo "Some files have not been gofmt'd. To fix these errors, "
+  echo "copy and paste the following:"
   echo "  gofmt -s -w ${files_need_gofmt[@]}"
   exit_code=1
 else
@@ -88,7 +88,7 @@ echo -ne "Checking for problems with flag names... "
 invalid_flag_lines=$(hack/verify-flags-underscore.py "${files[@]}")
 if [[ "${invalid_flag_lines:-}" != "" ]]; then
   echo "${red}ERROR!"
-  echo "There appear to be problems with the following"
+  echo "There appear to be problems with the following:"
   for line in "${invalid_flag_lines[@]}"; do
     echo "  ${line}"
   done
