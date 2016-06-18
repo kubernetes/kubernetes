@@ -24,6 +24,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -136,7 +137,7 @@ func Convert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out *Pe
 }
 
 func autoConvert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, out *apps.PetSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
 	out.Replicas = int(in.Replicas)
 	return nil
 }
@@ -146,7 +147,7 @@ func Convert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, out *a
 }
 
 func autoConvert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(in *apps.PetSetStatus, out *PetSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
 	out.Replicas = int32(in.Replicas)
 	return nil
 }

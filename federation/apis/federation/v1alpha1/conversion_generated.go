@@ -23,9 +23,10 @@ package v1alpha1
 import (
 	federation "k8s.io/kubernetes/federation/apis/federation"
 	api "k8s.io/kubernetes/pkg/api"
-	resource "k8s.io/kubernetes/pkg/api/resource"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -135,16 +136,10 @@ func autoConvert_v1alpha1_ClusterList_To_federation_ClusterList(in *ClusterList,
 	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
 		return err
 	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]federation.Cluster, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_Cluster_To_federation_Cluster(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
 	return nil
 }
@@ -160,16 +155,10 @@ func autoConvert_federation_ClusterList_To_v1alpha1_ClusterList(in *federation.C
 	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
 		return err
 	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]Cluster, len(*in))
-		for i := range *in {
-			if err := Convert_federation_Cluster_To_v1alpha1_Cluster(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
 	return nil
 }
@@ -197,27 +186,12 @@ func Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(in *federation.Clust
 }
 
 func autoConvert_v1alpha1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out *federation.ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]federation.ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_ServerAddressByClientCIDR_To_federation_ServerAddressByClientCIDR(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.ServerAddressByClientCIDRs))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
-	if in.SecretRef != nil {
-		in, out := &in.SecretRef, &out.SecretRef
-		*out = new(api.LocalObjectReference)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.SecretRef = nil
-	}
+	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -226,27 +200,12 @@ func Convert_v1alpha1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out
 }
 
 func autoConvert_federation_ClusterSpec_To_v1alpha1_ClusterSpec(in *federation.ClusterSpec, out *ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			if err := Convert_federation_ServerAddressByClientCIDR_To_v1alpha1_ServerAddressByClientCIDR(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.ServerAddressByClientCIDRs))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
-	if in.SecretRef != nil {
-		in, out := &in.SecretRef, &out.SecretRef
-		*out = new(v1.LocalObjectReference)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.SecretRef = nil
-	}
+	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -255,16 +214,10 @@ func Convert_federation_ClusterSpec_To_v1alpha1_ClusterSpec(in *federation.Clust
 }
 
 func autoConvert_v1alpha1_ClusterStatus_To_federation_ClusterStatus(in *ClusterStatus, out *federation.ClusterStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]federation.ClusterCondition, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_ClusterCondition_To_federation_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
 	if err := v1.Convert_v1_ResourceList_To_api_ResourceList(&in.Capacity, &out.Capacity, s); err != nil {
 		return err
@@ -275,7 +228,11 @@ func autoConvert_v1alpha1_ClusterStatus_To_federation_ClusterStatus(in *ClusterS
 	if err := Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta(&in.ClusterMeta, &out.ClusterMeta, s); err != nil {
 		return err
 	}
-	out.Zones = in.Zones
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Zones))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Zones))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
+	}
 	out.Region = in.Region
 	return nil
 }
@@ -285,47 +242,27 @@ func Convert_v1alpha1_ClusterStatus_To_federation_ClusterStatus(in *ClusterStatu
 }
 
 func autoConvert_federation_ClusterStatus_To_v1alpha1_ClusterStatus(in *federation.ClusterStatus, out *ClusterStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]ClusterCondition, len(*in))
-		for i := range *in {
-			if err := Convert_federation_ClusterCondition_To_v1alpha1_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
-	if in.Capacity != nil {
-		in, out := &in.Capacity, &out.Capacity
-		*out = make(v1.ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[v1.ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Capacity = nil
+	{
+		m := (*v1.ResourceList)(unsafe.Pointer(&in.Capacity))
+		out.Capacity = *m
 	}
-	if in.Allocatable != nil {
-		in, out := &in.Allocatable, &out.Allocatable
-		*out = make(v1.ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[v1.ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Allocatable = nil
+	{
+		m := (*v1.ResourceList)(unsafe.Pointer(&in.Allocatable))
+		out.Allocatable = *m
 	}
 	if err := Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(&in.ClusterMeta, &out.ClusterMeta, s); err != nil {
 		return err
 	}
-	out.Zones = in.Zones
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Zones))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Zones))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
+	}
 	out.Region = in.Region
 	return nil
 }

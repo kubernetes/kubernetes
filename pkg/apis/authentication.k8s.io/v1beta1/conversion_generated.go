@@ -24,6 +24,8 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	authentication_k8s_io "k8s.io/kubernetes/pkg/apis/authentication.k8s.io"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -121,8 +123,15 @@ func Convert_authenticationk8sio_TokenReviewStatus_To_v1beta1_TokenReviewStatus(
 func autoConvert_v1beta1_UserInfo_To_authenticationk8sio_UserInfo(in *UserInfo, out *authentication_k8s_io.UserInfo, s conversion.Scope) error {
 	out.Username = in.Username
 	out.UID = in.UID
-	out.Groups = in.Groups
-	out.Extra = in.Extra
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Groups))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Groups))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
+	}
+	{
+		m := (*map[string][]string)(unsafe.Pointer(&in.Extra))
+		out.Extra = *m
+	}
 	return nil
 }
 
@@ -133,8 +142,15 @@ func Convert_v1beta1_UserInfo_To_authenticationk8sio_UserInfo(in *UserInfo, out 
 func autoConvert_authenticationk8sio_UserInfo_To_v1beta1_UserInfo(in *authentication_k8s_io.UserInfo, out *UserInfo, s conversion.Scope) error {
 	out.Username = in.Username
 	out.UID = in.UID
-	out.Groups = in.Groups
-	out.Extra = in.Extra
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Groups))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Groups))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
+	}
+	{
+		m := (*map[string][]string)(unsafe.Pointer(&in.Extra))
+		out.Extra = *m
+	}
 	return nil
 }
 

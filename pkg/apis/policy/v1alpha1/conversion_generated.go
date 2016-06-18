@@ -22,8 +22,11 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -91,16 +94,10 @@ func autoConvert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetL
 	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
 		return err
 	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]policy.PodDisruptionBudget, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
 	return nil
 }
@@ -116,16 +113,10 @@ func autoConvert_policy_PodDisruptionBudgetList_To_v1alpha1_PodDisruptionBudgetL
 	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
 		return err
 	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]PodDisruptionBudget, len(*in))
-		for i := range *in {
-			if err := Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
 	return nil
 }
@@ -138,7 +129,7 @@ func autoConvert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetS
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
 		return err
 	}
-	out.Selector = in.Selector
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
@@ -150,7 +141,7 @@ func autoConvert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetS
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
 		return err
 	}
-	out.Selector = in.Selector
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
