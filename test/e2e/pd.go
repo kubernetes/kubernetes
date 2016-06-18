@@ -178,8 +178,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.ExpectNoError(podClient.Delete(host1ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host1ROPod")
 	})
 
-	// Flaky issue: #26076
-	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession [Slow] [Flaky]", func() {
+	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession [Slow]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
@@ -229,8 +228,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		}
 	})
 
-	// Flaky issue: #26076
-	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow] [Flaky]", func() {
+	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD1")
