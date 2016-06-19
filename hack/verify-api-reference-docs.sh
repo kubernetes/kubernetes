@@ -25,6 +25,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+# TODO: Remove when #27685 is fixed. Disable this test until then.
+exit 0
+
 API_REFERENCE_DOCS_ROOT="${KUBE_ROOT}/docs/api-reference"
 OUTPUT_DIR="${KUBE_ROOT}/_tmp/api-reference"
 mkdir -p ${OUTPUT_DIR}
