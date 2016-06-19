@@ -185,7 +185,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			obj := event.Object
 			s.fixup(obj)
-			if err := s.embeddedEncoder.EncodeToStream(obj, buf); err != nil {
+			if err := s.embeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
 				return
@@ -235,7 +235,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			}
 			obj := event.Object
 			s.fixup(obj)
-			if err := s.embeddedEncoder.EncodeToStream(obj, buf); err != nil {
+			if err := s.embeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
 				return
@@ -248,7 +248,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 
 			// the internal event will be versioned by the encoder
 			*internalEvent = versioned.InternalEvent(event)
-			if err := s.encoder.EncodeToStream(internalEvent, streamBuf); err != nil {
+			if err := s.encoder.Encode(internalEvent, streamBuf); err != nil {
 				// encoding error
 				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))
 				s.watching.Stop()

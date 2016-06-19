@@ -250,31 +250,28 @@ func TestTypes(t *testing.T) {
 }
 
 func TestVersionedEncoding(t *testing.T) {
-	s, codec := GetTestScheme()
-	out, err := runtime.Encode(codec, &TestType1{}, unversioned.GroupVersion{Version: "v2"})
+	s, _ := GetTestScheme()
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	encoder, _ := cf.SerializerForFileExtension("json")
+
+	codec := cf.CodecForVersions(encoder, nil, []unversioned.GroupVersion{{Version: "v2"}}, nil)
+	out, err := runtime.Encode(codec, &TestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(out) != `{"myVersionKey":"v2","myKindKey":"TestType1"}`+"\n" {
 		t.Fatal(string(out))
 	}
-	_, err = runtime.Encode(codec, &TestType1{}, unversioned.GroupVersion{Version: "v3"})
+
+	codec = cf.CodecForVersions(encoder, nil, []unversioned.GroupVersion{{Version: "v3"}}, nil)
+	_, err = runtime.Encode(codec, &TestType1{})
 	if err == nil {
 		t.Fatal(err)
 	}
 
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
-	encoder, _ := cf.SerializerForFileExtension("json")
-
-	// codec that is unversioned uses the target version
-	unversionedCodec := cf.CodecForVersions(encoder, nil, nil, nil)
-	_, err = runtime.Encode(unversionedCodec, &TestType1{}, unversioned.GroupVersion{Version: "v3"})
-	if err == nil || !runtime.IsNotRegisteredError(err) {
-		t.Fatal(err)
-	}
-
 	// unversioned encode with no versions is written directly to wire
-	out, err = runtime.Encode(unversionedCodec, &TestType1{})
+	codec = cf.CodecForVersions(encoder, nil, nil, nil)
+	out, err = runtime.Encode(codec, &TestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +423,7 @@ func TestDirectCodec(t *testing.T) {
 	}
 	directEncoder := df.EncoderForVersion(serializer, ignoredGV)
 	directDecoder := df.DecoderToVersion(serializer, ignoredGV)
-	out, err := runtime.Encode(directEncoder, &ExternalTestType1{}, ignoredGV)
+	out, err := runtime.Encode(directEncoder, &ExternalTestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
