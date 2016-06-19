@@ -62,12 +62,9 @@ type LimitOptions struct {
 }
 
 const (
-	limit_resources = `
-  pod (po), replicationcontroller (rc), deployment, daemonset (ds), job, replicaset (rs)`
-
 	limit_long = `Update existing container resource limits/requests.
 
-Possible resources include (case insensitive):` + limit_resources
+Possible resources include (case insensitive):`
 
 	limit_example = `
 # Set a deployments nginx container cpu limits to "200m and memory to "512Mi"
@@ -88,11 +85,17 @@ func NewCmdLimit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LimitOptions{
 		Out: out,
 	}
+	var limit_resources1 string
+	RESTMappings := f.ResourcesWithPodTemplates()
+	for _, Map := range RESTMappings {
+		limit_resources1 = limit_resources1 + ", " + Map.Resource
+
+	}
 
 	cmd := &cobra.Command{
 		Use:     "limit (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS] ^ --remove)",
 		Short:   "update resource limits/requests on running pod template ",
-		Long:    limit_long,
+		Long:    limit_long + "\n" + limit_resources1[2:],
 		Example: limit_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
