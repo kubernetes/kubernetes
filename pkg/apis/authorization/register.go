@@ -48,7 +48,3 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&LocalSubjectAccessReview{},
 	)
 }
-
-func (obj *LocalSubjectAccessReview) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *SubjectAccessReview) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
-func (obj *SelfSubjectAccessReview) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }

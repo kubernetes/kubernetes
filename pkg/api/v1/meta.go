@@ -14,60 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 )
 
-// FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
-func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
-	meta.CreationTimestamp = unversioned.Now()
-	meta.UID = util.NewUUID()
-	meta.SelfLink = ""
-}
-
-// HasObjectMetaSystemFieldValues returns true if fields that are managed by the system on ObjectMeta have values.
-func HasObjectMetaSystemFieldValues(meta *ObjectMeta) bool {
-	return !meta.CreationTimestamp.Time.IsZero() ||
-		len(meta.UID) != 0
-}
-
-// ObjectMetaFor returns a pointer to a provided object's ObjectMeta.
-// TODO: allow runtime.Unknown to extract this object
-// TODO: Remove this function and use meta.Accessor() instead.
-func ObjectMetaFor(obj runtime.Object) (*ObjectMeta, error) {
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	var meta *ObjectMeta
-	err = runtime.FieldPtr(v, "ObjectMeta", &meta)
-	return meta, err
-}
-
-// ListMetaFor returns a pointer to a provided object's ListMeta,
-// or an error if the object does not have that pointer.
-// TODO: allow runtime.Unknown to extract this object
-func ListMetaFor(obj runtime.Object) (*unversioned.ListMeta, error) {
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	var meta *unversioned.ListMeta
-	err = runtime.FieldPtr(v, "ListMeta", &meta)
-	return meta, err
-}
-
 func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
-
-func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind { return obj }
 
 // Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.

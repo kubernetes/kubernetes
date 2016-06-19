@@ -73,20 +73,10 @@ type ListMetaAccessor interface {
 // List lets you work with list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field will be a no-op and return a default value.
-type List interface {
-	GetResourceVersion() string
-	SetResourceVersion(version string)
-	GetSelfLink() string
-	SetSelfLink(selfLink string)
-}
+type List unversioned.List
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
-type Type interface {
-	GetAPIVersion() string
-	SetAPIVersion(version string)
-	GetKind() string
-	SetKind(kind string)
-}
+type Type unversioned.Type
 
 // MetadataAccessor lets you work with object and list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does

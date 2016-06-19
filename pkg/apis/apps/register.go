@@ -52,6 +52,3 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&api.ListOptions{},
 	)
 }
-
-func (obj *PetSet) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *PetSetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

@@ -62,13 +62,3 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	)
 	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
-
-func (obj *ClusterRole) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
-func (obj *ClusterRoleBinding) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *ClusterRoleBindingList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *ClusterRoleList) GetObjectKind() unversioned.ObjectKind        { return &obj.TypeMeta }
-
-func (obj *Role) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
-func (obj *RoleBinding) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *RoleBindingList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *RoleList) GetObjectKind() unversioned.ObjectKind        { return &obj.TypeMeta }
