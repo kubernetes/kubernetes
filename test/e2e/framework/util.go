@@ -548,9 +548,10 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 // that it requires the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
 // waiting.
-// If ignoreSuccessPods is true, pods in the "Success" state are ignored and
-// this function waits for minPods to enter Running/Ready. Otherwise an error is
-// returned even if there are minPods pods, some of which are in Running/Ready
+// If ignoreLabels is not empty, pods matching this selector are ignored and
+// this function waits for minPods to enter Running/Ready and for all pods
+// matching ignoreLabels to enter Success phase. Otherwise an error is returned
+// even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
 func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
@@ -558,6 +559,14 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var waitForSuccessError error
+	go func() {
+		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
+		wg.Done()
+	}()
+
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		// We get the new list of pods and replication controllers in every
 		// iteration because more pods come online during startup and we want to
@@ -611,6 +620,10 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		return false, nil
 	}) != nil {
 		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
+	}
+	wg.Wait()
+	if waitForSuccessError != nil {
+		return waitForSuccessError
 	}
 	return nil
 }
