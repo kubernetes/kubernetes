@@ -50,6 +50,3 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&PodDisruptionBudgetList{},
 	)
 }
-
-func (obj *PodDisruptionBudget) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *PodDisruptionBudgetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
