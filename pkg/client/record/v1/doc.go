@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package record has all client logic for recording and reporting events.
+// Package v1 has all client logic for recording and reporting events.
 
-// This package is a temporary duplication of the record/v1 package, the only
-// difference is that this package operates on the unversioned Event. We will
-// remove this package when we convert components to use a versioned client set.
-package record
+// Packaage record is a temporary duplication of this package, the only
+// difference is that the record package operates on the unversioned Event. We
+// will remove the record package when we convert components to use a versioned
+// client set.
+package v1
