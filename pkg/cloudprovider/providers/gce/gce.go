@@ -120,7 +120,7 @@ type Disks interface {
 	// DeleteDisk deletes PD.
 	DeleteDisk(diskToDelete string) error
 
-	// GetAutoLabelsForPD returns labels to apply to PeristentVolume
+	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
 	// representing this PD, namely failure domain and zone.
 	GetAutoLabelsForPD(name string) (map[string]string, error)
 }

@@ -224,7 +224,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 
 		// Special case for runtime.RawExtension and runtime.Objects because they always fail to validate
 		// This is because the actual values will be of some sub-type (e.g. Deployment) not the expected
-		// super-type (RawExtention)
+		// super-type (RawExtension)
 		if s.isGenericArray(details) {
 			errs := s.validateItems(value)
 			if len(errs) > 0 {

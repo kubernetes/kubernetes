@@ -218,7 +218,7 @@ func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadB
 				// NOTE The documentation for the AWS API indicates we could get an HTTP 400
 				// back if a policy of the same name already exists. However, the aws-sdk does not
 				// seem to return an error to us in these cases. Therefore this will issue an API
-				// request everytime.
+				// request every time.
 				err := s.createProxyProtocolPolicy(loadBalancerName)
 				if err != nil {
 					return nil, err
