@@ -2317,6 +2317,19 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 
 			permissions.Insert(permission)
 		}
+
+		// Allow ICMP fragmentation packets, important for MTU discovery
+		{
+			permission := &ec2.IpPermission{
+				IpProtocol: aws.String("icmp"),
+				FromPort:   aws.Int64(3),
+				ToPort:     aws.Int64(4),
+				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+			}
+
+			permissions.Insert(permission)
+		}
+
 		_, err = s.setSecurityGroupIngress(securityGroupID, permissions)
 		if err != nil {
 			return nil, err
