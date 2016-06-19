@@ -53,6 +53,8 @@ type VolumeOptions struct {
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
+	// Zone hint for multizone deployments
+	ZoneHint string
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
