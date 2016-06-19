@@ -39,7 +39,7 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 	return volumesToReturn, len(volumesToReturn) > 0
 }
 
-// podVolumesExist checks wiht the volume manager and returns true any of the
+// podVolumesExist checks with the volume manager and returns true any of the
 // pods for the specified volume are mounted.
 func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {
 	if mountedVolumes :=

@@ -530,7 +530,7 @@ func (ctrl *PersistentVolumeController) updateClaimPhaseWithEvent(claim *api.Per
 		return nil, err
 	}
 
-	// Emit the event only when the status change happens, not everytime
+	// Emit the event only when the status change happens, not every time
 	// syncClaim is called.
 	glog.V(3).Infof("claim %q changed status to %q: %s", claimToClaimKey(claim), phase, message)
 	ctrl.eventRecorder.Event(newClaim, eventtype, reason, message)
@@ -587,7 +587,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *api.P
 		return nil, err
 	}
 
-	// Emit the event only when the status change happens, not everytime
+	// Emit the event only when the status change happens, not every time
 	// syncClaim is called.
 	glog.V(3).Infof("volume %q changed status to %q: %s", volume.Name, phase, message)
 	ctrl.eventRecorder.Event(newVol, eventtype, reason, message)
@@ -774,7 +774,7 @@ func (ctrl *PersistentVolumeController) bind(volume *api.PersistentVolume, claim
 func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolume) error {
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
 
-	// Save the PV only when any modification is neccesary.
+	// Save the PV only when any modification is neccessary.
 	clone, err := conversion.NewCloner().DeepCopy(volume)
 	if err != nil {
 		return fmt.Errorf("Error cloning pv: %v", err)
