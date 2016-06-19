@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 )
 
+// Compile time check for interface adeherence
 var _ interfaces.ManagedZonesDeleteCall = ManagedZonesDeleteCall{}
 
 type ManagedZonesDeleteCall struct {
