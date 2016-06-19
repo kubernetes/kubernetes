@@ -25,12 +25,18 @@ import (
 func TestExtractCommentTags(t *testing.T) {
 	commentLines := []string{
 		"Human comment that is ignored.",
-		"+foo=value1,bar",
-		"+foo=value2,baz=qux",
+		"+foo=value1",
+		"+bar",
+		"+foo=value2",
+		"+baz=qux,zrb=true",
 	}
 
 	a := ExtractCommentTags("+", commentLines)
-	e := map[string][]string{"foo": {"value1", "value2"}, "bar": {""}, "baz": {"qux"}}
+	e := map[string][]string{
+		"foo": {"value1", "value2"},
+		"bar": {""},
+		"baz": {"qux,zrb=true"},
+	}
 	if !reflect.DeepEqual(e, a) {
 		t.Errorf("Wanted %q, got %q", e, a)
 	}

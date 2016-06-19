@@ -25,16 +25,18 @@ import (
 
 // ExtractCommentTags parses comments for lines of the form:
 //
-//   'marker' + "key1=value1,key2=value2".
+//   'marker' + "key=value".
 //
 // Values are optional; "" is the default.  A tag can be specified more than
 // one time and all values are returned.  If the resulting map has an entry for
 // a key, the value (a slice) is guaranteed to have at least 1 element.
 //
-// Example: if you pass "+" for 'marker', and the following two lines are in
+// Example: if you pass "+" for 'marker', and the following lines are in
 // the comments:
-//   +foo=value1,bar
-//   +foo=value2,baz="qux"
+//   +foo=value1
+//   +bar
+//   +foo=value2
+//   +baz="qux"
 // Then this function will return:
 //   map[string][]string{"foo":{"value1, "value2"}, "bar": {""}, "baz": {"qux"}}
 func ExtractCommentTags(marker string, lines []string) map[string][]string {
@@ -47,14 +49,12 @@ func ExtractCommentTags(marker string, lines []string) map[string][]string {
 		if !strings.HasPrefix(line, marker) {
 			continue
 		}
-		pairs := strings.Split(line[len(marker):], ",")
-		for _, p := range pairs {
-			kv := strings.Split(p, "=")
-			if len(kv) == 2 {
-				out[kv[0]] = append(out[kv[0]], kv[1])
-			} else if len(kv) == 1 {
-				out[kv[0]] = append(out[kv[0]], "")
-			}
+		// TODO: we could support multiple values per key if we split on spaces
+		kv := strings.SplitN(line[len(marker):], "=", 2)
+		if len(kv) == 2 {
+			out[kv[0]] = append(out[kv[0]], kv[1])
+		} else if len(kv) == 1 {
+			out[kv[0]] = append(out[kv[0]], "")
 		}
 	}
 	return out
