@@ -62,7 +62,13 @@ type LimitOptions struct {
 }
 
 const (
-	limit_long = `Update existing container resource limits/requests.
+	limit_long = `Update existing container resource limits/requests. Setting limits/requests restricts cpu/memory usage on 
+running containers, which is normally unbound. A container with limits/requests set changes the QoS tiers
+of the container above those without limits/requests, this can be most important for infrastructure pods. 
+Pods with set limits/requests will fail to  deploy if a node that can handle the limits/requests cannot 
+be found.  
+
+*NOTE* if limits are set without requests the requests are set to the limits.
 
 Possible resources include (case insensitive):`
 
@@ -95,7 +101,7 @@ func NewCmdLimit(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Com
 
 	cmd := &cobra.Command{
 		Use:     "limit (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS] ^ --remove)",
-		Short:   "update resource limits/requests on running pod template ",
+		Short:   "update resource limits/requests on objects with pod templates",
 		Long:    limit_long + "\n" + limit_resources1[2:],
 		Example: limit_example,
 		Run: func(cmd *cobra.Command, args []string) {
