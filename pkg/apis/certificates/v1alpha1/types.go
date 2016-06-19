@@ -21,7 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // Describes a certificate signing request
 type CertificateSigningRequest struct {

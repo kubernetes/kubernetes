@@ -50,7 +50,8 @@ type PodDisruptionBudgetStatus struct {
 	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,4,opt,name=expectedPods"`
 }
 
-// +genclient=true,noMethods=true
+// +genclient=true
+// +noMethods=true
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
