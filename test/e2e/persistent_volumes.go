@@ -17,10 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/json"
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -38,23 +38,32 @@ func persistentVolumeTestCleanup(client *client.Client, config VolumeTestConfig)
 	if config.serverImage != "" {
 		err := podClient.Delete(config.prefix+"-server", nil)
 		if err != nil {
-			framework.ExpectNoError(err, "Failed to delete server pod: %v", err)
+			framework.Failf("Failed to delete the server pod: %v", err)
 		}
 	}
+}
+
+func deletePersistentVolume(c *client.Client, pv *api.PersistentVolume) {
+	// Delete the PersistentVolume
+	framework.Logf("Deleting PersistentVolume")
+	err := c.PersistentVolumes().Delete(pv.Name)
+	if err != nil {
+		framework.Failf("Delete PersistentVolume failed: %v", err)
+	}
+	// Wait for PersistentVolume to Delete
+	framework.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, 30*time.Second)
 }
 
 var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	f := framework.NewDefaultFramework("pv")
 	var c *client.Client
 	var ns string
-
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
 	})
 
-	// Flaky issue: #25294
-	It("NFS volume can be created, bound, retrieved, unbound, and used by a pod [Flaky]", func() {
+	It("should create a PersistentVolume, Claim, and a client Pod that will test the read/write access of the volume[Flaky]", func() {
 		config := VolumeTestConfig{
 			namespace:   ns,
 			prefix:      "nfs",
@@ -66,58 +75,102 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			persistentVolumeTestCleanup(c, config)
 		}()
 
+		// Create the nfs server pod
 		pod := startVolumeServer(c, config)
 		serverIP := pod.Status.PodIP
 		framework.Logf("NFS server IP address: %v", serverIP)
 
+		// Define the PersistentVolume and PersistentVolumeClaim
 		pv := makePersistentVolume(serverIP)
 		pvc := makePersistentVolumeClaim(ns)
 
-		framework.Logf("Creating PersistentVolume using NFS")
+		// Create the PersistentVolume and wait for PersistentVolume.Status.Phase to be Available
+		// defer deletion to clean up the PV should the test fail post-creation.
+		framework.Logf("Creating PersistentVolume")
 		pv, err := c.PersistentVolumes().Create(pv)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			framework.Failf("Create PersistentVolume failed: %v", err)
+		}
+		defer deletePersistentVolume(c, pv)
+		framework.WaitForPersistentVolumePhase(api.VolumeAvailable, c, pv.Name, 1*time.Second, 20*time.Second)
 
+		// Create the PersistentVolumeClaim and wait for Bound phase
 		framework.Logf("Creating PersistentVolumeClaim")
 		pvc, err = c.PersistentVolumeClaims(ns).Create(pvc)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			framework.Failf("Create PersistentVolumeClaim failed: %v", err)
+		}
+		framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, c, ns, pvc.Name, 3*time.Second, 300*time.Second)
 
-		// allow the binder a chance to catch up.  should not be more than 20s.
-		framework.WaitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 1*time.Second, 30*time.Second)
-
+		// Wait for PersistentVolume.Status.Phase to be Bound. Can take several minutes.
+		err = framework.WaitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 3*time.Second, 300*time.Second)
+		if err != nil {
+			framework.Failf("PersistentVolume failed to enter a bound state: %+v", err)
+		}
+		// Check the PersistentVolume.ClaimRef.UID for non-nil value as confirmation of the bound state.
+		framework.Logf("Checking PersistentVolume ClaimRef is non-nil")
 		pv, err = c.PersistentVolumes().Get(pv.Name)
-		Expect(err).NotTo(HaveOccurred())
-		if pv.Spec.ClaimRef == nil {
-			framework.Failf("Expected PersistentVolume to be bound, but got nil ClaimRef: %+v", pv)
+		if pv.Spec.ClaimRef == nil || len(pv.Spec.ClaimRef.UID) == 0 {
+			pvJson, _ := json.MarshalIndent(pv, "", "  ")
+			framework.Failf("Expected PersistentVolume to be bound, but got nil ClaimRef or UID: %+v", string(pvJson))
 		}
 
+		// Check the PersistentVolumeClaim.Status.Phase for Bound state
+		framework.Logf("Checking PersistentVolumeClaim status is Bound")
+		pvc, err = c.PersistentVolumeClaims(ns).Get(pvc.Name)
+		if pvcPhase := pvc.Status.Phase; pvcPhase != "Bound" {
+			framework.Failf("Expected PersistentVolumeClaim status Bound. Actual:  %+v.  Error: %+v", pvcPhase, err)
+		}
+
+		// Check that the PersistentVolume's ClaimRef contains the UID of the PersistendVolumeClaim
+		if pvc.ObjectMeta.UID != pv.Spec.ClaimRef.UID {
+			framework.Failf("Binding failed: PersistentVolumeClaim UID does not match PersistentVolume's ClaimRef UID. ")
+		}
+
+		// writePod writes to the nfs volume
+		framework.Logf("Creating writePod")
+		pvc, _ = c.PersistentVolumeClaims(ns).Get(pvc.Name)
+		writePod := makeWritePod(ns, pvc.Name)
+		writePod, err = c.Pods(ns).Create(writePod)
+		if err != nil {
+			framework.Failf("Create writePod failed: %+v", err)
+		}
+
+		// Wait for the writePod to complete it's lifecycle
+		err = framework.WaitForPodSuccessInNamespace(c, writePod.Name, writePod.Spec.Containers[0].Name, writePod.Namespace)
+		if err != nil {
+			framework.Failf("WritePod exited with error: %+v", err)
+		} else {
+			framework.Logf("WritePod exited without error.")
+		}
+
+		// Delete the PersistentVolumeClaim
 		framework.Logf("Deleting PersistentVolumeClaim to trigger PV Recycling")
 		err = c.PersistentVolumeClaims(ns).Delete(pvc.Name)
-		Expect(err).NotTo(HaveOccurred())
-
-		// allow the recycler a chance to catch up.  it has to perform NFS scrub, which can be slow in e2e.
-		framework.WaitForPersistentVolumePhase(api.VolumeAvailable, c, pv.Name, 5*time.Second, 300*time.Second)
-
-		pv, err = c.PersistentVolumes().Get(pv.Name)
-		Expect(err).NotTo(HaveOccurred())
-		if pv.Spec.ClaimRef != nil {
-			framework.Failf("Expected PersistentVolume to be unbound, but found non-nil ClaimRef: %+v", pv)
+		if err != nil {
+			framework.Failf("Delete PersistentVolumeClaim failed: %v", err)
 		}
 
-		// The NFS Server pod we're using contains an index.html file
-		// Verify the file was really scrubbed from the volume
-		podTemplate := makeCheckPod(ns, serverIP)
-		checkpod, err := c.Pods(ns).Create(podTemplate)
-		framework.ExpectNoError(err, "Failed to create checker pod: %v", err)
-		err = framework.WaitForPodSuccessInNamespace(c, checkpod.Name, checkpod.Spec.Containers[0].Name, checkpod.Namespace)
-		Expect(err).NotTo(HaveOccurred())
-		// must delete PV, otherwise the PV is available and next time a PVC may bind to it and cause new PV fails to bind
-		framework.Logf("Deleting PersistentVolume")
-		err = c.PersistentVolumes().Delete(pv.Name)
-		Expect(err).NotTo(HaveOccurred())
+		// Wait for the PersistentVolume phase to return to Available
+		framework.Logf("Waiting for recycling process to complete.")
+		err = framework.WaitForPersistentVolumePhase(api.VolumeAvailable, c, pv.Name, 3*time.Second, 300*time.Second)
+		if err != nil {
+			framework.Failf("Recycling failed: %v", err)
+		}
+
+		// Examine the PersistentVolume.ClaimRef and UID.  Expect nil values.
+		pv, err = c.PersistentVolumes().Get(pv.Name)
+		if pv.Spec.ClaimRef != nil && len(pv.Spec.ClaimRef.UID) > 0 {
+			crjson, _ := json.MarshalIndent(pv.Spec.ClaimRef, "", "  ")
+			framework.Failf("Expected a nil ClaimRef or UID. Found: ", string(crjson))
+		}
+
 	})
 })
 
 func makePersistentVolume(serverIP string) *api.PersistentVolume {
+	// Takes an NFS server IP address and returns a PersistentVolume object for instantiation.
+	// Specs are expected to match this test's PersistentVolumeClaim
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "nfs-",
@@ -130,7 +183,7 @@ func makePersistentVolume(serverIP string) *api.PersistentVolume {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				NFS: &api.NFSVolumeSource{
 					Server:   serverIP,
-					Path:     "/",
+					Path:     "/exports",
 					ReadOnly: false,
 				},
 			},
@@ -144,6 +197,8 @@ func makePersistentVolume(serverIP string) *api.PersistentVolume {
 }
 
 func makePersistentVolumeClaim(ns string) *api.PersistentVolumeClaim {
+	// Takes a namespace and returns a PersistentVolumeClaim object for instantiation.
+	// Specs are expected to match this test's PersistentVolume
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "pvc-",
@@ -164,45 +219,48 @@ func makePersistentVolumeClaim(ns string) *api.PersistentVolumeClaim {
 	}
 }
 
-func makeCheckPod(ns string, nfsserver string) *api.Pod {
+func makeWritePod(ns string, pvcName string) *api.Pod {
 	// Prepare pod that mounts the NFS volume again and
 	// checks that /mnt/index.html was scrubbed there
+
+	var isPrivileged bool = true
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "checker-",
+			GenerateName: "write-pod-",
 			Namespace:    ns,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:    "scrub-checker",
+					Name:    "write-pod",
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "test ! -e /mnt/index.html || exit 1"},
+					Args:    []string{"-c", "touch /mnt/SUCCESS && exit 0 || exit 1"},
 					VolumeMounts: []api.VolumeMount{
 						{
-							Name:      "nfs-volume",
+							Name:      "nfs-pvc",
 							MountPath: "/mnt",
 						},
+					},
+					SecurityContext: &api.SecurityContext{
+						Privileged: &isPrivileged,
 					},
 				},
 			},
 			Volumes: []api.Volume{
 				{
-					Name: "nfs-volume",
+					Name: "nfs-pvc",
 					VolumeSource: api.VolumeSource{
-						NFS: &api.NFSVolumeSource{
-							Server: nfsserver,
-							Path:   "/",
+						PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvcName,
 						},
 					},
 				},
 			},
 		},
 	}
-
 }
