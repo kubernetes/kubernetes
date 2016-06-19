@@ -3721,7 +3721,7 @@ func RestartApiserver(c *client.Client) error {
 	if ProviderIs("gce", "aws") {
 		return sshRestartMaster()
 	}
-	// GKE doesn't allow ssh accesss, so use a same-version master
+	// GKE doesn't allow ssh access, so use a same-version master
 	// upgrade to teardown/recreate master.
 	v, err := c.ServerVersion()
 	if err != nil {

@@ -1213,7 +1213,7 @@ func netnsPathFromName(netnsName string) string {
 // setupPodNetwork creates a network namespace for the given pod and calls
 // configured NetworkPlugin's setup function on it.
 // It returns the namespace name, configured IP (if available), and an error if
-// one occured.
+// one occurred.
 //
 // If the pod is running in host network or is running using the no-op plugin, then nothing will be done.
 func (r *Runtime) setupPodNetwork(pod *api.Pod) (string, string, error) {
