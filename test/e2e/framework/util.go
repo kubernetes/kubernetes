@@ -1369,7 +1369,7 @@ func WaitForService(c *client.Client, namespace, name string, exist bool, interv
 //WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
-		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
+		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
 		list, err := c.Endpoints(namespace).List(api.ListOptions{})
 		if err != nil {
 			return false, err
@@ -1422,7 +1422,7 @@ func WaitForEndpoint(c *client.Client, ns, name string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Failed to get entpoints for %s/%s", ns, name)
+	return fmt.Errorf("Failed to get endpoints for %s/%s", ns, name)
 }
 
 // Context for checking pods responses by issuing GETs to them (via the API
