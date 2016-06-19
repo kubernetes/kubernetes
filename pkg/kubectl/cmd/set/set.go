@@ -30,7 +30,7 @@ These commands help you make changes to existing application resources.`
 	set_example = ``
 )
 
-func NewCmdSet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdSet(f *cmdutil.Factory, out io.Writer, err io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "set SUBCOMMAND",
@@ -44,7 +44,7 @@ func NewCmdSet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// add subcommands
 	cmd.AddCommand(NewCmdImage(f, out))
-	cmd.AddCommand(NewCmdLimit(f, out))
+	cmd.AddCommand(NewCmdLimit(f, out, err))
 
 	return cmd
 }

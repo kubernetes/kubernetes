@@ -39,8 +39,8 @@ type LimitOptions struct {
 	Infos             []*resource.Info
 	Encoder           runtime.Encoder
 	Out               io.Writer
-	Selector          string
 	Err               io.Writer
+	Selector          string
 	Filenames         []string
 	ContainerSelector string
 	Recursive         bool
@@ -81,9 +81,10 @@ kubectl set limit -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --local -o
 `
 )
 
-func NewCmdLimit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLimit(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &LimitOptions{
 		Out: out,
+		Err: errOut,
 	}
 	var limit_resources1 string
 	RESTMappings := f.ResourcesWithPodTemplates()
@@ -191,15 +192,17 @@ func (o *LimitOptions) Run() error {
 		info := patch.Info
 		if patch.Err != nil {
 			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			continue
 		}
 
 		//no changes
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
+			allErrs = append(allErrs, fmt.Errorf("info: %s %q was not changed\n", info.Mapping.Resource, info.Name))
 			continue
 		}
 
 		if o.Local {
-			fmt.Fprintln(o.Out, "running in local mode...")
+			fmt.Fprintln(o.Err, "info: running in local mode...")
 			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
 		}
 

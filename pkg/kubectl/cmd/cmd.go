@@ -197,7 +197,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdGet(f, out))
-	cmds.AddCommand(set.NewCmdSet(f, out))
+	cmds.AddCommand(set.NewCmdSet(f, out, err))
 	cmds.AddCommand(NewCmdDescribe(f, out))
 	cmds.AddCommand(NewCmdCreate(f, out))
 	cmds.AddCommand(NewCmdReplace(f, out))
