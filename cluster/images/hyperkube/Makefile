@@ -17,7 +17,7 @@
 # Usage:
 #   [ARCH=amd64] [REGISTRY="gcr.io/google_containers"] make (build|push) VERSION={some_version_number e.g. v1.2.0}
 
-REGISTRY?="gcr.io/google_containers"
+REGISTRY?=gcr.io/google_containers
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 CNI_RELEASE=c864f0e1ea73719b8f4582402b0847064f9883b0
@@ -54,9 +54,14 @@ ifndef VERSION
     $(error VERSION is undefined)
 endif
 	cp -r ./* ${TEMP_DIR}
-	mkdir -p ${TEMP_DIR}/cni
+	mkdir -p ${TEMP_DIR}/cni ${TEMP_DIR}/addons
 	cp ../../saltbase/salt/helpers/safe_format_and_mount ${TEMP_DIR}
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
+	cp ../../saltbase/salt/kube-dns/skydns-rc.yaml.base ${TEMP_DIR}/addons/skydns-rc.yaml
+	cp ../../saltbase/salt/kube-dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/skydns-svc.yaml
+	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons
+	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons
+	cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/kube-proxy.yaml
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 
 	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/*.yaml static-pods/*.json
@@ -64,6 +69,8 @@ endif
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" addons/*.yaml static-pods/*.json
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;s|__PILLAR__DNS__DOMAIN__|cluster.local|g" addons/skydns*.yaml
 	rm ${TEMP_DIR}/addons/*.back
 
 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer

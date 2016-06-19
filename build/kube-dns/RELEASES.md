@@ -6,9 +6,11 @@ are ready, not on every PR.
 
 1. Build the container for testing: 
 
-`make release`
-`cd build/kube-dns`
-`make container PREFIX=<your-docker-hub> TAG=rc`
+```
+make release
+cd build/kube-dns
+make container PREFIX=<your-docker-hub> TAG=rc
+```
 
 2. Manually deploy this to your own cluster by updating the replication
    controller and deleting the running pod(s).
@@ -18,13 +20,12 @@ are ready, not on every PR.
 4. Update the TAG version in `Makefile` and update the `Changelog`. Update the
    `*.yaml.in` to point to the new tag. Send a PR but mark it as "DO NOT MERGE".
 
-5. Once the PR is approved, build and push the container for real for all architectures:
+5. Once the PR is approved, build and push the container for real **for all architectures**:
 
 	```console
 	# Build for linux/amd64 (default)
 	$ make push ARCH=amd64
 	# ---> gcr.io/google_containers/kube-dns-amd64:TAG
-	# ---> gcr.io/google_containers/kube-dns:TAG (image with backwards-compatible naming)
 
 	$ make push ARCH=arm
 	# ---> gcr.io/google_containers/kube-dns-arm:TAG
