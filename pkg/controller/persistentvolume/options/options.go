@@ -35,6 +35,7 @@ type VolumeConfigFlags struct {
 	PersistentVolumeRecyclerMinimumTimeoutHostPath      int
 	PersistentVolumeRecyclerIncrementTimeoutHostPath    int
 	EnableHostPathProvisioning                          bool
+	EnableDynamicProvisioning                           bool
 }
 
 type PersistentVolumeControllerOptions struct {
@@ -53,6 +54,7 @@ func NewPersistentVolumeControllerOptions() PersistentVolumeControllerOptions {
 			PersistentVolumeRecyclerMinimumTimeoutHostPath:   60,
 			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
 			EnableHostPathProvisioning:                       false,
+			EnableDynamicProvisioning:                        true,
 		},
 	}
 }
@@ -84,4 +86,6 @@ func (o *PersistentVolumeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.VolumeConfigFlags.EnableHostPathProvisioning, "enable-hostpath-provisioner", o.VolumeConfigFlags.EnableHostPathProvisioning,
 		"Enable HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features. "+
 			"HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.")
+	fs.BoolVar(&o.VolumeConfigFlags.EnableDynamicProvisioning, "enable-dynamic-provisioning", o.VolumeConfigFlags.EnableDynamicProvisioning,
+		"Enable dynamic provisioning for environments that support it.")
 }
