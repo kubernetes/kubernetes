@@ -53,7 +53,10 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 	}
 	ks.healthzPort = config.HealthzPort
 	ks.dnsPort = config.DNSPort
-	ks.kd = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
+	ks.kd, err = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
+	if err != nil {
+		glog.Fatalf("Failed to start kubeDNS: %v", err)
+	}
 	return &ks
 }
 
