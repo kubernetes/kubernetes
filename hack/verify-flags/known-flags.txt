@@ -119,6 +119,7 @@ enable-controller-attach-detach
 enable-custom-metrics
 enable-debugging-handlers
 enable-garbage-collector
+enable-dynamic-provisioning
 enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
