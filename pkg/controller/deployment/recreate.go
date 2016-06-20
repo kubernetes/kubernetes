@@ -18,7 +18,10 @@ package deployment
 
 import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	unversionedclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
+	rsutil "k8s.io/kubernetes/pkg/util/replicaset"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
@@ -29,15 +32,21 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 		return err
 	}
 	allRSs := append(oldRSs, newRS)
+	activeOldRSs := controller.FilterActiveReplicaSets(oldRSs)
 
 	// scale down old replica sets
-	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(controller.FilterActiveReplicaSets(oldRSs), deployment)
+	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(activeOldRSs, deployment)
 	if err != nil {
 		return err
 	}
 	if scaledDown {
 		// Update DeploymentStatus
 		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+	}
+
+	// Wait for all old replica set to scale down to zero.
+	if err := dc.waitForInactiveReplicaSets(activeOldRSs); err != nil {
+		return err
 	}
 
 	// If we need to create a new RS, create it now
@@ -83,6 +92,20 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*ext
 		}
 	}
 	return scaled, nil
+}
+
+// waitForInactiveReplicaSets will wait until all passed replica sets are inactive and have been noticed
+// by the replica set controller.
+func (dc *DeploymentController) waitForInactiveReplicaSets(oldRSs []*extensions.ReplicaSet) error {
+	for i := range oldRSs {
+		rs := oldRSs[i]
+
+		condition := rsutil.ReplicaSetIsInactive(dc.client.Extensions(), rs)
+		if err := wait.ExponentialBackoff(unversionedclient.DefaultRetry, condition); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate"
