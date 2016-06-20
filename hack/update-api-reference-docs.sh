@@ -60,11 +60,11 @@ fi
 
 for ver in $VERSIONS; do
   TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/${ver}"
-  REGISTER_FILE_URL="https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg"
+  TYPES_FILE_URL="https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg"
   if [[ ${ver} == "v1" ]]; then
-    REGISTER_FILE_URL="${REGISTER_FILE_URL}/api/${ver}/register.go"
+    TYPES_FILE_URL="${TYPES_FILE_URL}/api/${ver}/types.go"
   else
-    REGISTER_FILE_URL="${REGISTER_FILE_URL}/apis/${ver}/register.go"
+    TYPES_FILE_URL="${TYPES_FILE_URL}/apis/${ver}/types.go"
   fi
   SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name "${ver}")"
 
@@ -73,7 +73,7 @@ for ver in $VERSIONS; do
     -v "${SWAGGER_PATH}":/swagger-source:z \
     gcr.io/google_containers/gen-swagger-docs:v5 \
     "${SWAGGER_JSON_NAME}" \
-    "${REGISTER_FILE_URL}"
+    "${TYPES_FILE_URL}"
 done
 
 # Check if we actually changed anything
