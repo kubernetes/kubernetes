@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -208,7 +209,7 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volPath)
 	if err := b.manager.AttachDisk(b, globalPDPath); err != nil {
-		glog.V(4).Infof("AttachDisk failed: %v", err)
+		glog.V(3).Infof("AttachDisk failed: %v", err)
 		return err
 	}
 	glog.V(3).Infof("vSphere volume %s attached", b.volPath)
@@ -291,7 +292,11 @@ func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
 		return fmt.Errorf("directory %s is not mounted", dir)
 	}
 
-	v.volPath = path.Base(refs[0])
+	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().
+	// volumePath eg: "[local] xxx.vmdk" provided to attach/mount
+	// replacing \040 with space to match the actual volumePath
+	mountPath := strings.Replace(path.Base(refs[0]), "\\040", " ", -1)
+	v.volPath = mountPath
 	glog.V(4).Infof("Found volume %s mounted to %s", v.volPath, dir)
 
 	// Reload list of references, there might be SetUpAt finished in the meantime

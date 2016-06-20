@@ -224,19 +224,19 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Cannot create a new VMDK volume: %v", err)
 	}
 
-	diskID, _, err := vs.AttachDisk(volPath, "")
+	_, _, err = vs.AttachDisk(volPath, "")
 	if err != nil {
 		t.Fatalf("Cannot attach volume(%s) to VM(%s): %v", volPath, srvs[0], err)
 	}
 
-	err = vs.DetachDisk(diskID, "")
+	err = vs.DetachDisk(volPath, "")
 	if err != nil {
-		t.Fatalf("Cannot detach disk(%s) from VM(%s): %v", diskID, srvs[0], err)
+		t.Fatalf("Cannot detach disk(%s) from VM(%s): %v", volPath, srvs[0], err)
 	}
 
 	// todo: Deleting a volume after detach currently not working through API or UI (vSphere)
 	// err = vs.DeleteVolume(volPath)
 	// if err != nil {
-	//  	t.Fatalf("Cannot delete VMDK volume %s: %v", volPath, err)
+	// 	t.Fatalf("Cannot delete VMDK volume %s: %v", volPath, err)
 	// }
 }

@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -33,6 +32,8 @@ import (
 const (
 	maxRetries = 10
 )
+
+var ErrProbeVolume = errors.New("Error scanning attached volumes")
 
 // Singleton key mutex for keeping attach/detach operations for the same PD atomic
 var attachDetachMutex = keymutex.NewKeyMutex()
@@ -55,7 +56,7 @@ func (util *VsphereDiskUtil) AttachDisk(vm *vsphereVolumeMounter, globalPDPath s
 
 	diskID, diskUUID, attachError := cloud.AttachDisk(vm.volPath, "")
 	if attachError != nil {
-		return err
+		return attachError
 	} else if diskUUID == "" {
 		return errors.New("Disk UUID has no value")
 	}
@@ -68,7 +69,7 @@ func (util *VsphereDiskUtil) AttachDisk(vm *vsphereVolumeMounter, globalPDPath s
 	for {
 		devicePath = verifyDevicePath(diskUUID)
 		// probe the attached vol so that symlink in /dev/disk/by-id is created
-		probeAttachedVolume()
+		scsiHostRescan()
 
 		_, err := os.Stat(devicePath)
 		if err == nil {
@@ -106,13 +107,25 @@ func (util *VsphereDiskUtil) AttachDisk(vm *vsphereVolumeMounter, globalPDPath s
 	return nil
 }
 
+// rescan scsi bus
+func scsiHostRescan() {
+	scsi_path := "/sys/class/scsi_host/"
+	if dirs, err := ioutil.ReadDir(scsi_path); err == nil {
+		for _, f := range dirs {
+			name := scsi_path + f.Name() + "/scan"
+			data := []byte("- - -")
+			ioutil.WriteFile(name, data, 0666)
+		}
+	}
+}
+
 func verifyDevicePath(diskUUID string) string {
 	files, _ := ioutil.ReadDir("/dev/disk/by-id/")
 	for _, f := range files {
 		// TODO: should support other controllers
 		if strings.Contains(f.Name(), "scsi-") {
 			devID := f.Name()[len("scsi-"):len(f.Name())]
-			if strings.Contains(diskUUID, devID) {
+			if strings.Contains(devID, diskUUID) {
 				glog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
 				return path.Join("/dev/disk/by-id/", f.Name())
 			}
@@ -120,19 +133,6 @@ func verifyDevicePath(diskUUID string) string {
 	}
 	glog.Warningf("Failed to find device for the diskid: %q\n", diskUUID)
 	return ""
-}
-
-func probeAttachedVolume() error {
-	executor := exec.New()
-	args := []string{"trigger"}
-	cmd := executor.Command("/usr/bin/udevadm", args...)
-	_, err := cmd.CombinedOutput()
-	if err != nil {
-		glog.Errorf("error running udevadm trigger %v\n", err)
-		return err
-	}
-	glog.V(4).Infof("Successfully probed all attachments")
-	return nil
 }
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
@@ -156,7 +156,7 @@ func (util *VsphereDiskUtil) DetachDisk(vu *vsphereVolumeUnmounter) error {
 		return err
 	}
 
-	if err = cloud.DetachDisk(vu.diskID, ""); err != nil {
+	if err = cloud.DetachDisk(vu.volPath, ""); err != nil {
 		return err
 	}
 	glog.V(2).Infof("Successfully detached vSphere volume %s", vu.volPath)
