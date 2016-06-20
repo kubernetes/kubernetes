@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting rabbitmq")
 			framework.RunKubectlOrDie("create", "-f", rabbitmqServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", rabbitmqControllerYaml, nsFlag)
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "rabbitmq"}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "rabbitmq"}))
 			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod("component", "rabbitmq", func(pod api.Pod) {
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("starting celery")
 			framework.RunKubectlOrDie("create", "-f", celeryControllerYaml, nsFlag)
-			label = labels.SelectorFromSet(labels.Set(map[string]string{"name": "celery"}))
+			label = labels.SelectorFromSet(labels.Set(map[string]string{"component": "celery"}))
 			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod("component", "celery", func(pod api.Pod) {
@@ -163,7 +163,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting flower")
 			framework.RunKubectlOrDie("create", "-f", flowerServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", flowerControllerYaml, nsFlag)
-			label = labels.SelectorFromSet(labels.Set(map[string]string{"name": "flower"}))
+			label = labels.SelectorFromSet(labels.Set(map[string]string{"component": "flower"}))
 			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod("component", "flower", func(pod api.Pod) {
