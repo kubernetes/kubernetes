@@ -20,26 +20,26 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: heapster-v1.1.0.beta2
+  name: heapster-v1.1.0
   namespace: kube-system
   labels:
     k8s-app: heapster
     kubernetes.io/cluster-service: "true"
-    version: v1.1.0.beta2
+    version: v1.1.0
 spec:
   replicas: 1
   selector:
     matchLabels:
       k8s-app: heapster
-      version: v1.1.0.beta2
+      version: v1.1.0
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v1.1.0.beta2
+        version: v1.1.0
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v1.1.0-beta2
+        - image: gcr.io/google_containers/heapster:v1.1.0
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -57,7 +57,7 @@ spec:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
-        - image: gcr.io/google_containers/heapster:v1.1.0-beta2
+        - image: gcr.io/google_containers/heapster:v1.1.0
           name: eventer
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -100,7 +100,7 @@ spec:
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{metrics_memory_per_node}}Mi
             - --threshold=5
-            - --deployment=heapster-v1.1.0.beta2
+            - --deployment=heapster-v1.1.0
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
@@ -129,7 +129,7 @@ spec:
             - --memory={{base_eventer_memory}}
             - --extra-memory={{eventer_memory_per_node}}Ki
             - --threshold=5
-            - --deployment=heapster-v1.1.0.beta2
+            - --deployment=heapster-v1.1.0
             - --container=eventer
             - --poll-period=300000
             - --estimator=exponential
