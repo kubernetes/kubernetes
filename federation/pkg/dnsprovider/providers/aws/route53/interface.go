@@ -18,19 +18,19 @@ package route53
 
 import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53/testing"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53/stubs"
 )
 
 // Compile time check for interface adeherence
 var _ dnsprovider.Interface = Interface{}
 
 type Interface struct {
-	service testing.Route53API
+	service stubs.Route53API
 }
 
 // newInterfaceWithStub facilitates stubbing out the underlying AWS Route53
 // library for testing purposes.  It returns an provider-independent interface.
-func newInterfaceWithStub(service testing.Route53API) *Interface {
+func newInterfaceWithStub(service stubs.Route53API) *Interface {
 	return &Interface{service}
 }
 
