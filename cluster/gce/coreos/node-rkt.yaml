@@ -56,6 +56,20 @@ coreos:
         ExecStartPre=/usr/bin/curl --fail --silent --location --create-dirs --output /opt/downloads/rkt.tar.gz https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
         ExecStart=/usr/bin/tar --strip-components=1 -xf /opt/downloads/rkt.tar.gz -C /opt/rkt/ --overwrite
 
+    - name: kubernetes-load-rkt-stage1.service
+      command: start
+      content: |
+        [Unit]
+        Description=Load rkt stage1 images
+        Documentation=http://github.com/coreos/rkt
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        Type=oneshot
+        ExecStart=/opt/rkt/rkt fetch /opt/rkt/stage1-coreos.aci /opt/rkt/stage1-kvm.aci /opt/rkt/stage1-fly.aci  --insecure-options=image
+
     - name: kubernetes-download-manifests.service
       command: start
       content: |
@@ -111,8 +125,8 @@ coreos:
       content: |
         [Unit]
         Description=Run Kubelet service
-        Requires=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service
-        After=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service
+        Requires=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service kubernetes-load-rkt-stage1.service
+        After=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service kubernetes-load-rkt-stage1.service
         [Service]
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/curl --fail --silent --show-error \
@@ -133,7 +147,7 @@ coreos:
         --logtostderr=true \
         --container-runtime=rkt \
         --rkt-path=/opt/rkt/rkt \
-        --rkt-stage1-image=/opt/rkt/stage1-coreos.aci \
+        --rkt-stage1-image=${RKT_STAGE1_IMAGE} \
         --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
         --network-plugin=kubenet \
         --reconcile-cidr=true

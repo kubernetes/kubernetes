@@ -1832,15 +1832,15 @@ func TestPreparePodArgs(t *testing.T) {
 					},
 				},
 			},
-			"stage1-path",
+			"stage1-image0",
 			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-name=stage1-image"},
 		},
 		{
 			appcschema.PodManifest{
 				Annotations: appctypes.Annotations{},
 			},
-			"stage1-path",
-			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-path=stage1-path"},
+			"stage1-image0",
+			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-name=stage1-image0"},
 		},
 		{
 			appcschema.PodManifest{
