@@ -152,6 +152,19 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
+# Creates a kubeconfig file with the credentials for only the current-context
+# cluster. This is used by federation to create secrets in test setup.
+function create-kubeconfig-for-federation() {
+  if [[ "${FEDERATION:-}" == "true" ]]; then
+    echo "creating kubeconfig for federation secret"
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
+    KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
+    KUBECONFIG_PATH="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${cc}"
+    mkdir -p "${KUBECONFIG_PATH}"
+    "${kubectl}" config view --minify --flatten > "${KUBECONFIG_PATH}/kubeconfig"
+  fi
+}
 
 function tear_down_alive_resources() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"

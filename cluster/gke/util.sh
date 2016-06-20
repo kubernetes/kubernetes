@@ -23,6 +23,7 @@ KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
+source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 # Perform preparations required to run e2e tests
@@ -193,25 +194,7 @@ function kube-up() {
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
 
-  if [[ "${FEDERATION:-}" == "true" ]]; then
-    # Create a kubeconfig with credentials for this apiserver. We will later use
-    # this kubeconfig to create a secret which the federation control plane can
-    # use to talk to this apiserver.
-    KUBECONFIG=${KUBECONFIG:-${HOME}/.kube/config}
-    KUBECONFIG_DIR=$(dirname $KUBECONFIG)
-    CONTEXT=$($KUBECTL config current-context)
-    DEST_KUBECONFIG="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${CONTEXT}/kubeconfig"
-    mkdir -p $(dirname $DEST_KUBECONFIG) >&2
-    # TODO: Original kubeconfig can contain credential information about
-    # other clusters as well. Extract the information about only this cluster
-    # and then create a file with that.
-    # For now, we use the whole kubeconfig file.
-    # Note: This is not as dangerous as it sounds because this code path is
-    # only expected to run during tests. Users are not expected to set
-    # FEDERATION=true while bringing up their kubernetes clusters.
-    # But there is nothing stopping them from doing so.
-    cp $KUBECONFIG $DEST_KUBECONFIG >&2
-  fi
+  create-kubeconfig-for-federation
 
   if [[ ! -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
     "${GCLOUD}" ${CMD_GROUP:-} container node-pools create "heapster-pool" --cluster "${CLUSTER_NAME}" --num-nodes=1 --machine-type="${HEAPSTER_MACHINE_TYPE}" "${shared_args[@]}"

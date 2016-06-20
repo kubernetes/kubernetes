@@ -298,14 +298,7 @@ function kube-up {
    # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
 
-   if [[ "${FEDERATION:-}" == "true" ]]; then
-       # Create a kubeconfig with credentials for this apiserver. We will later use
-       # this kubeconfig to create a secret which the federation control plane can
-       # use to talk to this apiserver.
-       KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
-       KUBECONFIG="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${CONTEXT}/kubeconfig" \
-         create-kubeconfig
-   fi
+   create-kubeconfig-for-federation
   )
 
   verify-cluster
