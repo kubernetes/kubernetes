@@ -54,9 +54,8 @@ type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example "rbac/v1alpha1".
-	APIVersion string `json:"apiVersion" protobuf:"bytes,2,opt.name=apiVersion"`
+	// APIVersion holds the API group and version of the referenced object.
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt.name=apiVersion"`
 	// Name of the object being referenced.
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
@@ -87,7 +86,7 @@ type RoleBinding struct {
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
-	Subjects []Subject `json:"subject" protobuf:"bytes,2,rep,name=subjects"`
+	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
 
 	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
@@ -136,7 +135,7 @@ type ClusterRoleBinding struct {
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
-	Subjects []Subject `json:"subject" protobuf:"bytes,2,rep,name=subjects"`
+	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
 
 	// RoleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.

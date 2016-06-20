@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This file is not intended to be run automatically. It is meant to be run
+# immediately before exporting docs. We do not want to check these documents in
+# by default.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -28,7 +32,6 @@ kube::golang::setup_env
     cmd/genkubedocs \
     cmd/genman \
     cmd/genyaml \
-    cmd/mungedocs \
     federation/cmd/genfeddocs
 
 kube::util::ensure-temp-dir
@@ -36,46 +39,17 @@ kube::util::ensure-temp-dir
 kube::util::gen-docs "${KUBE_TEMP}"
 
 # remove all of the old docs
-while read file; do
-  rm "${KUBE_ROOT}/${file}" 2>/dev/null || true
-done <"${KUBE_ROOT}/.generated_docs"
+kube::util::remove-gen-docs
 
+# Copy fresh docs into the repo.
 # the shopt is so that we get .generated_docs from the glob.
 shopt -s dotglob
 cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
 shopt -u dotglob
 
-kube::util::gen-analytics "${KUBE_ROOT}"
+# Replace with placeholder docs
+kube::util::set-placeholder-gen-docs
 
-mungedocs=$(kube::util::find-binary "mungedocs")
-"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${KUBE_ROOT}/docs/" && ret=0 || ret=$?
-if [[ $ret -eq 1 ]]; then
-  echo "${KUBE_ROOT}/docs/ requires manual changes.  See preceding errors."
-  exit 1
-elif [[ $ret -gt 1 ]]; then
-  echo "Error running mungedocs."
-  exit 1
-fi
+echo "Generated docs have been placed in the repository tree. Running hack/update-munge-docs.sh."
 
-"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${KUBE_ROOT}/examples/" && ret=0 || ret=$?
-if [[ $ret -eq 1 ]]; then
-  echo "${KUBE_ROOT}/examples/ requires manual changes.  See preceding errors."
-  exit 1
-elif [[ $ret -gt 1 ]]; then
-  echo "Error running mungedocs."
-  exit 1
-fi
-
-"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" \
-               "--skip-munges=unversioned-warning,analytics" \
-               "--norecurse" \
-               "--root-dir=${KUBE_ROOT}/" && ret=0 || ret=$?
-if [[ $ret -eq 1 ]]; then
-  echo "${KUBE_ROOT}/ requires manual changes.  See preceding errors."
-  exit 1
-elif [[ $ret -gt 1 ]]; then
-  echo "Error running mungedocs."
-  exit 1
-fi
-
-# ex: ts=2 sw=2 et filetype=sh
+"${KUBE_ROOT}/hack/update-munge-docs.sh"

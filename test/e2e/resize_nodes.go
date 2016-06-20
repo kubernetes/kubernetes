@@ -87,7 +87,7 @@ func GetGroupNodes(group string) ([]string, error) {
 			return nil, err
 		}
 		re := regexp.MustCompile(".*RUNNING")
-		lines := re.FindStringSubmatch(string(output))
+		lines := re.FindAllString(string(output), -1)
 		for i, line := range lines {
 			lines[i] = line[:strings.Index(line, " ")]
 		}

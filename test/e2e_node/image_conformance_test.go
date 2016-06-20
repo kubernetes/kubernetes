@@ -19,9 +19,6 @@ package e2e_node
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -34,20 +31,13 @@ const (
 )
 
 var _ = Describe("Image Container Conformance Test", func() {
-	var cl *client.Client
-
-	BeforeEach(func() {
-		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
-	})
-
-	Describe("image conformance blackbox test", func() {
+	Describe("[FLAKY] image conformance blackbox test", func() {
 		Context("when testing images that exist", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {
 				existImageTags := []string{
-					NoPullImagRegistry[pullTestExecHealthz],
-					NoPullImagRegistry[pullTestAlpineWithBash],
+					NoPullImageRegistry[pullTestExecHealthz],
+					NoPullImageRegistry[pullTestAlpineWithBash],
 				}
 				for _, existImageTag := range existImageTags {
 					conformImage, _ := NewConformanceImage("docker", existImageTag)
@@ -59,7 +49,7 @@ var _ = Describe("Image Container Conformance Test", func() {
 				}
 			})
 
-			It("It should present successfully [Conformance]", func() {
+			It("It should present successfully", func() {
 				for _, conformImage := range conformImages {
 					present, err := conformImage.Present()
 					Expect(err).ShouldNot(HaveOccurred())
@@ -67,7 +57,7 @@ var _ = Describe("Image Container Conformance Test", func() {
 				}
 			})
 
-			It("should list pulled images [Conformance]", func() {
+			It("should list pulled images", func() {
 				image, _ := NewConformanceImage("docker", "")
 				tags, err := image.List()
 				Expect(err).ShouldNot(HaveOccurred())
@@ -101,7 +91,7 @@ var _ = Describe("Image Container Conformance Test", func() {
 					conformImages = append(conformImages, conformImage)
 				}
 
-				By("not presenting images [Conformance]", func() {
+				By("not presenting images", func() {
 					for _, conformImage := range conformImages {
 						present, err := conformImage.Present()
 						Expect(err).ShouldNot(HaveOccurred())
@@ -109,7 +99,7 @@ var _ = Describe("Image Container Conformance Test", func() {
 					}
 				})
 
-				By("not listing pulled images [Conformance]", func() {
+				By("not listing pulled images", func() {
 					image, _ := NewConformanceImage("docker", "")
 					tags, err := image.List()
 					Expect(err).ShouldNot(HaveOccurred())
@@ -118,7 +108,7 @@ var _ = Describe("Image Container Conformance Test", func() {
 					}
 				})
 
-				By("not removing non-exist images [Conformance]", func() {
+				By("not removing non-exist images", func() {
 					for _, conformImage := range conformImages {
 						err := conformImage.Remove()
 						Expect(err).Should(HaveOccurred())

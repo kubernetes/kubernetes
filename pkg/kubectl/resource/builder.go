@@ -71,6 +71,8 @@ type Builder struct {
 	singleResourceType bool
 	continueOnError    bool
 
+	singular bool
+
 	export bool
 
 	schema validation.Schema
@@ -113,6 +115,9 @@ func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...strin
 			}
 			b.URL(defaultHttpGetAttempts, url)
 		default:
+			if !recursive {
+				b.singular = true
+			}
 			b.Path(recursive, s)
 		}
 	}
@@ -546,7 +551,12 @@ func (b *Builder) visitorResult() *Result {
 
 	// visit items specified by resource and name
 	if len(b.resourceTuples) != 0 {
-		isSingular := len(b.resourceTuples) == 1
+		// if b.singular is false, this could be by default, so double-check length
+		// of resourceTuples to determine if in fact it is singular or not
+		isSingular := b.singular
+		if !isSingular {
+			isSingular = len(b.resourceTuples) == 1
+		}
 
 		if len(b.paths) != 0 {
 			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}

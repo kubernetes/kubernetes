@@ -346,6 +346,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		// save the scheduled pod
+		if pod, err = podClient.Get(pod.Name); err != nil {
+			Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
+		}
+		framework.Logf("scheduled pod: %#v", pod)
 
 		By("deleting the pod gracefully")
 		if err := podClient.Delete(pod.Name, api.NewDeleteOptions(30)); err != nil {
@@ -353,7 +358,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 
 		By("verifying the kubelet observed the termination notice")
-		pod, err = podClient.Get(pod.Name)
 		Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
 			podList, err := framework.GetKubeletPods(f.Client, pod.Spec.NodeName)
 			if err != nil {

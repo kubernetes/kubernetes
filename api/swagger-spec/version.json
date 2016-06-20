@@ -9,7 +9,7 @@
     "description": "git code version from which this is built",
     "operations": [
      {
-      "type": "void",
+      "type": "version.Info",
       "method": "GET",
       "summary": "get the code version",
       "nickname": "getCodeVersion",
@@ -24,5 +24,49 @@
     ]
    }
   ],
-  "models": {}
+  "models": {
+   "version.Info": {
+    "id": "version.Info",
+    "required": [
+     "major",
+     "minor",
+     "gitVersion",
+     "gitCommit",
+     "gitTreeState",
+     "buildDate",
+     "goVersion",
+     "compiler",
+     "platform"
+    ],
+    "properties": {
+     "major": {
+      "type": "string"
+     },
+     "minor": {
+      "type": "string"
+     },
+     "gitVersion": {
+      "type": "string"
+     },
+     "gitCommit": {
+      "type": "string"
+     },
+     "gitTreeState": {
+      "type": "string"
+     },
+     "buildDate": {
+      "type": "string"
+     },
+     "goVersion": {
+      "type": "string"
+     },
+     "compiler": {
+      "type": "string"
+     },
+     "platform": {
+      "type": "string"
+     }
+    }
+   }
+  }
  }

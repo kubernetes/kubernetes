@@ -29,16 +29,18 @@ config_hostname() {
 config_ip_firewall() {
   # We have seen that GCE image may have strict host firewall rules which drop
   # most inbound/forwarded packets. In such a case, add rules to accept all
-  # TCP/UDP packets.
+  # TCP/UDP/ICMP packets.
   if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    echo "Add rules to accpet all inbound TCP/UDP packets"
+    echo "Add rules to accpet all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
+    iptables -A INPUT -w -p ICMP -j ACCEPT
   fi
   if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accpet all forwarded TCP/UDP packets"
+    echo "Add rules to accpet all forwarded TCP/UDP/ICMP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
+    iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 }
 
@@ -182,6 +184,16 @@ assemble_kubelet_flags() {
   echo "KUBELET_OPTS=\"${KUBELET_CMD_FLAGS}\"" > /etc/default/kubelet
 }
 
+start_kubelet(){
+  echo "Start kubelet"
+  # Delete docker0 to avoid interference
+  iptables -t nat -F || true
+  ip link set docker0 down || true
+  brctl delbr docker0 || true
+  . /etc/default/kubelet
+  /usr/bin/kubelet ${KUBELET_OPTS} 1>>/var/log/kubelet.log 2>&1
+}
+
 restart_docker_daemon() {
   DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
   if [ "${TEST_CLUSTER:-}" = "true" ]; then
@@ -200,9 +212,6 @@ restart_docker_daemon() {
     echo "Sleep 1 second to wait for cbr0"
     sleep 1
   done
-  # Remove docker0
-  ifconfig docker0 down
-  brctl delbr docker0
   # Ensure docker daemon is really functional before exiting. Operations afterwards may
   # assume it is running.
   while ! docker version > /dev/null; do
@@ -430,13 +439,16 @@ start_etcd_servers() {
 
 # Calculates the following variables based on env variables, which will be used
 # by the manifests of several kube-master components.
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 compute_master_manifest_variables() {
+  CLOUD_CONFIG_OPT=""
   CLOUD_CONFIG_VOLUME=""
   CLOUD_CONFIG_MOUNT=""
-  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
+  if [ -f /etc/gce.conf ]; then
+    CLOUD_CONFIG_OPT="--cloud-config=/etc/gce.conf"
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
@@ -461,6 +473,7 @@ remove_salt_config_comments() {
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
 # Assumed vars (which are calculated in function compute_master_manifest_variables)
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
@@ -471,7 +484,7 @@ start_kube_apiserver() {
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-apiserver.tar
 
   # Calculate variables and assemble the command line.
-  params="${APISERVER_TEST_ARGS:-} ${API_SERVER_TEST_LOG_LEVEL:-"--v=2"}"
+  params="${APISERVER_TEST_ARGS:-} ${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${CLOUD_CONFIG_OPT}"
   params="${params} --cloud-provider=gce"
   params="${params} --address=127.0.0.1"
   params="${params} --etcd-servers=http://127.0.0.1:4001"
@@ -499,7 +512,6 @@ start_kube_apiserver() {
   fi
   if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
     readonly vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-    params="${params} --cloud-config=/etc/gce.conf"
     params="${params} --advertise-address=${vm_external_ip}"
     params="${params} --ssh-user=${PROXY_SSH_USER}"
     params="${params} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
@@ -553,6 +565,7 @@ start_kube_apiserver() {
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
 # Assumed vars (which are calculated in function compute_master_manifest_variables)
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
@@ -563,10 +576,7 @@ start_kube_controller_manager() {
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-controller-manager.tar
 
   # Calculate variables and assemble the command line.
-  params="--master=127.0.0.1:8080 --cloud-provider=gce --root-ca-file=/etc/srv/kubernetes/ca.crt --service-account-private-key-file=/etc/srv/kubernetes/server.key ${CONTROLLER_MANAGER_TEST_ARGS:-}"
-  if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
-    params="${params} --cloud-config=/etc/gce.conf"
-  fi
+  params="--master=127.0.0.1:8080 --cloud-provider=gce --root-ca-file=/etc/srv/kubernetes/ca.crt --service-account-private-key-file=/etc/srv/kubernetes/server.key ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   if [ -n "${INSTANCE_PREFIX:-}" ]; then
     params="${params} --cluster-name=${INSTANCE_PREFIX}"
   fi
@@ -634,19 +644,19 @@ start_kube_scheduler() {
 }
 
 # Starts k8s cluster autoscaler.
+# Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
+#   CLOUD_CONFIG_VOLUME
+#   CLOUD_CONFIG_MOUNT
 start_cluster_autoscaler() {
-  if [ "${ENABLE_NODE_AUTOSCALER:-}" = "true" ]; then
+  if [ "${ENABLE_CLUSTER_AUTOSCALER:-}" = "true" ]; then
     prepare-log-file /var/log/cluster-autoscaler.log
 
      # Remove salt comments and replace variables with values
     src_file="${kube_home}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove_salt_config_comments "${src_file}"
 
-    params="${AUTOSCALER_MIG_CONFIG}"
-    if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
-      params="${params} --cloud-config=/etc/gce.conf"
-    fi
-
+    params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT}"
     sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -704,16 +714,23 @@ start_kube_addons() {
     file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup_addon_manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    base_metrics_memory="200Mi"
+    base_metrics_memory="140Mi"
     metrics_memory="${base_metrics_memory}"
-    base_eventer_memory="200Mi"
+    base_eventer_memory="190Mi"
+    base_metrics_cpu="80m"
+    metrics_cpu="${base_metrics_cpu}"
     eventer_memory="${base_eventer_memory}"
+    nanny_memory="90Mi"
     readonly metrics_memory_per_node="4"
+    readonly metrics_cpu_per_node="0.5"
     readonly eventer_memory_per_node="500"
+    readonly nanny_memory_per_node="200"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -ge 1 ]; then
-      num_kube_nodes="$((${NUM_NODES}-1))"
+      num_kube_nodes="$((${NUM_NODES}+1))"
       metrics_memory="$((${num_kube_nodes} * ${metrics_memory_per_node} + 200))Mi"
       eventer_memory="$((${num_kube_nodes} * ${eventer_memory_per_node} + 200 * 1024))Ki"
+      nanny_memory="$((${num_kube_nodes} * ${nanny_memory_per_node} + 90 * 1024))Ki"
+      metrics_cpu=$(echo - | awk "{print ${num_kube_nodes} * ${metrics_cpu_per_node} + 80}")m
     fi
     controller_yaml="${addon_dst_dir}/${file_dir}"
     if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
@@ -724,10 +741,14 @@ start_kube_addons() {
     remove_salt_config_comments "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu *}}@${metrics_cpu}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
   fi
   if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
     setup_addon_manifests "addons" "cluster-loadbalancing/glbc"

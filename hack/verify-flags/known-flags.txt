@@ -88,6 +88,8 @@ default-container-cpu-limit
 default-container-mem-limit
 delay-shutdown
 delete-collection-workers
+delete-instances
+delete-local-data
 delete-namespace
 deleting-pods-burst
 deleting-pods-qps
@@ -97,6 +99,8 @@ deserialization-cache-size
 dest-file
 disable-filter
 dns-port
+dns-provider
+dns-provider-config
 docker-email
 docker-endpoint
 docker-exec-handler
@@ -154,6 +158,7 @@ fake-clientset
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-name
 file-check-frequency
 file-suffix
 file_content_in_loop
@@ -441,6 +446,7 @@ suicide-timeout
 sync-frequency
 system-cgroups
 system-container
+system-pods-startup-timeout
 system-reserved
 target-port
 tcp-services
@@ -469,3 +475,4 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
+zone-name

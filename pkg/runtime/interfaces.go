@@ -31,10 +31,9 @@ const (
 )
 
 type Encoder interface {
-	// EncodeToStream writes an object to a stream. Override versions may be provided for each group
-	// that enforce a certain versioning. Implementations may return errors if the versions are incompatible,
-	// or if no conversion is defined.
-	EncodeToStream(obj Object, stream io.Writer, overrides ...unversioned.GroupVersion) error
+	// Encode writes an object to a stream. Implementations may return errors if the versions are
+	// incompatible, or if no conversion is defined.
+	Encode(obj Object, w io.Writer) error
 }
 
 type Decoder interface {

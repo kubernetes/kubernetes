@@ -34,7 +34,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	return &kubenetNetworkPlugin{}
 }
 
-func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode) error {
+func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
 	return fmt.Errorf("Kubenet is not supported in this build")
 }
 

@@ -161,7 +161,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 		if t, ok := in.(unversioned.Time); ok {
 			return t.Before(j.Interface().(unversioned.Time)), nil
 		}
-		// fallback to the fields comparision
+		// fallback to the fields comparison
 		for idx := 0; idx < i.NumField(); idx++ {
 			less, err := isLess(i.Field(idx), j.Field(idx))
 			if err != nil || !less {

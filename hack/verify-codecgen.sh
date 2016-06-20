@@ -35,6 +35,13 @@ generated_files=($(
       \) -prune \
     \) -name '*.generated.go'))
 
+function cleanup {
+  for generated_file in ${generated_files[@]}; do
+    rm -f "${generated_file}.original"
+  done
+}
+trap cleanup EXIT SIGINT
+
 for generated_file in ${generated_files[@]}; do
   cat "${generated_file}" > "${generated_file}.original"
 done
@@ -53,7 +60,6 @@ for generated_file in ${generated_files[@]}; do
     ret=1
   fi
 
-  rm -f "${generated_file}.original"
 done
 
 exit $ret

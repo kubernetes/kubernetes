@@ -133,8 +133,8 @@ func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
 	return "", args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy) error {
-	args := r.Called(gcPolicy)
+func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
+	args := r.Called(gcPolicy, ready)
 	return args.Error(0)
 }
 

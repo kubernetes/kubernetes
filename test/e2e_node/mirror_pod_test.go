@@ -24,25 +24,21 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("MirrorPod", func() {
-	var cl *client.Client
-	BeforeEach(func() {
-		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
-	})
-	ns := "mirror-pod"
+var _ = framework.KubeDescribe("MirrorPod", func() {
+	f := NewDefaultFramework("mirror-pod")
 	Context("when create a mirror pod ", func() {
 		var staticPodName, mirrorPodName string
 		BeforeEach(func() {
+			ns := f.Namespace.Name
 			staticPodName = "static-pod-" + string(util.NewUUID())
 			mirrorPodName = staticPodName + "-" + e2es.nodeName
 
@@ -52,12 +48,13 @@ var _ = Describe("MirrorPod", func() {
 
 			By("wait for the mirror pod to be running")
 			Eventually(func() error {
-				return checkMirrorPodRunning(cl, mirrorPodName, ns)
+				return checkMirrorPodRunning(f.Client, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		It("should be updated when static pod updated", func() {
+			ns := f.Namespace.Name
 			By("get mirror pod uid")
-			pod, err := cl.Pods(ns).Get(mirrorPodName)
+			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
@@ -68,53 +65,56 @@ var _ = Describe("MirrorPod", func() {
 
 			By("wait for the mirror pod to be updated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(cl, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunnig(f.Client, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 
 			By("check the mirror pod container image is updated")
-			pod, err = cl.Pods(ns).Get(mirrorPodName)
+			pod, err = f.Client.Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(len(pod.Spec.Containers)).Should(Equal(1))
 			Expect(pod.Spec.Containers[0].Image).Should(Equal(image))
 		})
 		It("should be recreated when mirror pod gracefully deleted", func() {
+			ns := f.Namespace.Name
 			By("get mirror pod uid")
-			pod, err := cl.Pods(ns).Get(mirrorPodName)
+			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 30s")
-			err = cl.Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(30))
+			err = f.Client.Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(30))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(cl, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunnig(f.Client, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		It("should be recreated when mirror pod forcibly deleted", func() {
+			ns := f.Namespace.Name
 			By("get mirror pod uid")
-			pod, err := cl.Pods(ns).Get(mirrorPodName)
+			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 0s")
-			err = cl.Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(0))
+			err = f.Client.Pods(ns).Delete(mirrorPodName, api.NewDeleteOptions(0))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(cl, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunnig(f.Client, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		AfterEach(func() {
+			ns := f.Namespace.Name
 			By("delete the static pod")
 			err := deleteStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to disappear")
 			Eventually(func() error {
-				return checkMirrorPodDisappear(cl, mirrorPodName, ns)
+				return checkMirrorPodDisappear(f.Client, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 	})

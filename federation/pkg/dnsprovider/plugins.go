@@ -62,6 +62,17 @@ func GetDnsProvider(name string, config io.Reader) (Interface, error) {
 	return f(config)
 }
 
+// Returns a list of registered dns providers.
+func RegisteredDnsProviders() []string {
+	registeredProviders := make([]string, len(providers))
+	i := 0
+	for provider := range providers {
+		registeredProviders[i] = provider
+		i = i + 1
+	}
+	return registeredProviders
+}
+
 // InitDnsProvider creates an instance of the named DNS provider.
 func InitDnsProvider(name string, configFilePath string) (Interface, error) {
 	var dns Interface

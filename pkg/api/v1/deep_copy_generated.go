@@ -1550,7 +1550,7 @@ func DeepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 	}
 	if in.VolumesInUse != nil {
 		in, out := in.VolumesInUse, &out.VolumesInUse
-		*out = make([]UniqueDeviceName, len(in))
+		*out = make([]UniqueVolumeName, len(in))
 		for i := range in {
 			(*out)[i] = in[i]
 		}
@@ -2428,11 +2428,7 @@ func DeepCopy_v1_Preconditions(in Preconditions, out *Preconditions, c *conversi
 	if in.UID != nil {
 		in, out := in.UID, &out.UID
 		*out = new(types.UID)
-		if newVal, err := c.DeepCopy(*in); err != nil {
-			return err
-		} else {
-			**out = newVal.(types.UID)
-		}
+		**out = *in
 	} else {
 		out.UID = nil
 	}

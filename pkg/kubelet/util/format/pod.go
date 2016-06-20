@@ -19,6 +19,7 @@ package format
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -33,10 +34,26 @@ func Pod(pod *api.Pod) string {
 	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.UID)
 }
 
+// PodWithDeletionTimestamp is the same as Pod. In addition, it prints the
+// deletion timestamp of the pod if it's not nil.
+func PodWithDeletionTimestamp(pod *api.Pod) string {
+	var deletionTimestamp string
+	if pod.DeletionTimestamp != nil {
+		deletionTimestamp = ":DeletionTimestamp=" + pod.DeletionTimestamp.UTC().Format(time.RFC3339)
+	}
+	return Pod(pod) + deletionTimestamp
+}
+
 // Pods returns a string representating a list of pods in a human
 // readable format.
 func Pods(pods []*api.Pod) string {
 	return aggregatePods(pods, Pod)
+}
+
+// PodsWithDeletiontimestamps is the same as Pods. In addition, it prints the
+// deletion timestamps of the pods if they are not nil.
+func PodsWithDeletiontimestamps(pods []*api.Pod) string {
+	return aggregatePods(pods, PodWithDeletionTimestamp)
 }
 
 func aggregatePods(pods []*api.Pod, handler podHandler) string {

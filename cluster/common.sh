@@ -59,6 +59,7 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(be
 #   KUBE_KEY
 #   CA_CERT
 function create-kubeconfig() {
+  KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   SECONDARY_KUBECONFIG=${SECONDARY_KUBECONFIG:-}
   OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
@@ -67,7 +68,6 @@ function create-kubeconfig() {
       CONTEXT=$OVERRIDE_CONTEXT
   fi
 
-  export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   # KUBECONFIG determines the file we write to, but it may not exist yet
   if [[ ! -e "${KUBECONFIG}" ]]; then
     mkdir -p $(dirname "${KUBECONFIG}")
@@ -104,21 +104,21 @@ function create-kubeconfig() {
     )
   fi
 
-  "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
+  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
   if [[ -n "${user_args[@]:-}" ]]; then
-    "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
+    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
   fi
-  "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
+  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
 
   if [[ "${SECONDARY_KUBECONFIG}" != "true" ]];then
-      "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
+      KUBECONFIG="${KUBECONFIG}" "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
   fi
 
   # If we have a bearer token, also create a credential entry with basic auth
   # so that it is easy to discover the basic auth password for your cluster
   # to use in a web browser.
   if [[ ! -z "${KUBE_BEARER_TOKEN:-}" && ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
-    "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
+    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 
    echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
@@ -128,8 +128,16 @@ function create-kubeconfig() {
 # Assumed vars:
 #   KUBECONFIG
 #   CONTEXT
+#
+# To explicitly name the context being removed, use OVERRIDE_CONTEXT
 function clear-kubeconfig() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+  OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
+
+  if [[ "$OVERRIDE_CONTEXT" != "" ]];then
+      CONTEXT=$OVERRIDE_CONTEXT
+  fi
+
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   "${kubectl}" config unset "clusters.${CONTEXT}"
   "${kubectl}" config unset "users.${CONTEXT}"
@@ -496,6 +504,7 @@ SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
+DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote ${DOCKER_REGISTRY_MIRROR_URL:-})
 ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
 ENABLE_CLUSTER_UI: $(yaml-quote ${ENABLE_CLUSTER_UI:-false})
@@ -594,7 +603,6 @@ ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
-MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
@@ -649,6 +657,11 @@ EOF
 NODE_LABELS: $(yaml-quote ${NODE_LABELS})
 EOF
     fi
+  if [ -n "${EVICTION_HARD:-}" ]; then
+      cat >>$file <<EOF
+EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
+EOF
+    fi
   if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
     # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF
@@ -660,9 +673,9 @@ RKT_PATH: $(yaml-quote ${RKT_PATH:-})
 KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
-  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
       cat >>$file <<EOF
-ENABLE_NODE_AUTOSCALER: $(yaml-quote ${ENABLE_NODE_AUTOSCALER})
+ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 EOF
   fi

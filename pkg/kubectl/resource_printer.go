@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -53,6 +54,7 @@ const (
 	tabwriterPadding  = 3
 	tabwriterPadChar  = ' '
 	tabwriterFlags    = 0
+	loadBalancerWidth = 16
 )
 
 // GetPrinter takes a format type, an optional format argument. It will return true
@@ -433,6 +435,10 @@ var persistentVolumeColumns = []string{"NAME", "CAPACITY", "ACCESSMODES", "STATU
 var persistentVolumeClaimColumns = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
+var roleColumns = []string{"NAME", "AGE"}
+var roleBindingColumns = []string{"NAME", "AGE"}
+var clusterRoleColumns = []string{"NAME", "AGE"}
+var clusterRoleBindingColumns = []string{"NAME", "AGE"}
 
 // TODO: consider having 'KIND' for third party resource data
 var thirdPartyResourceDataColumns = []string{"NAME", "LABELS", "DATA"}
@@ -502,6 +508,14 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(clusterColumns, printClusterList)
 	h.Handler(networkPolicyColumns, printNetworkPolicy)
 	h.Handler(networkPolicyColumns, printNetworkPolicyList)
+	h.Handler(roleColumns, printRole)
+	h.Handler(roleColumns, printRoleList)
+	h.Handler(roleBindingColumns, printRoleBinding)
+	h.Handler(roleBindingColumns, printRoleBindingList)
+	h.Handler(clusterRoleColumns, printClusterRole)
+	h.Handler(clusterRoleColumns, printClusterRoleList)
+	h.Handler(clusterRoleBindingColumns, printClusterRoleBinding)
+	h.Handler(clusterRoleBindingColumns, printClusterRoleBindingList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -930,19 +944,26 @@ func printJobList(list *batch.JobList, w io.Writer, options PrintOptions) error 
 	return nil
 }
 
-// loadBalancerStatusStringer behaves just like a string interface and converts the given status to a string.
-func loadBalancerStatusStringer(s api.LoadBalancerStatus) string {
+// loadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.
+// `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
+func loadBalancerStatusStringer(s api.LoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
 	result := []string{}
 	for i := range ingress {
 		if ingress[i].IP != "" {
 			result = append(result, ingress[i].IP)
+		} else if ingress[i].Hostname != "" {
+			result = append(result, ingress[i].Hostname)
 		}
 	}
-	return strings.Join(result, ",")
+	r := strings.Join(result, ",")
+	if !wide && len(r) > loadBalancerWidth {
+		r = r[0:(loadBalancerWidth-3)] + "..."
+	}
+	return r
 }
 
-func getServiceExternalIP(svc *api.Service) string {
+func getServiceExternalIP(svc *api.Service, wide bool) string {
 	switch svc.Spec.Type {
 	case api.ServiceTypeClusterIP:
 		if len(svc.Spec.ExternalIPs) > 0 {
@@ -955,7 +976,7 @@ func getServiceExternalIP(svc *api.Service) string {
 		}
 		return "<nodes>"
 	case api.ServiceTypeLoadBalancer:
-		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer)
+		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer, wide)
 		if len(svc.Spec.ExternalIPs) > 0 {
 			result := append(strings.Split(lbIps, ","), svc.Spec.ExternalIPs...)
 			return strings.Join(result, ",")
@@ -982,7 +1003,7 @@ func printService(svc *api.Service, w io.Writer, options PrintOptions) error {
 	namespace := svc.Namespace
 
 	internalIP := svc.Spec.ClusterIP
-	externalIP := getServiceExternalIP(svc)
+	externalIP := getServiceExternalIP(svc, options.Wide)
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1069,7 +1090,7 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%s",
 		name,
 		formatHosts(ingress.Spec.Rules),
-		loadBalancerStatusStringer(ingress.Status.LoadBalancer),
+		loadBalancerStatusStringer(ingress.Status.LoadBalancer, options.Wide),
 		formatPorts(ingress.Spec.TLS),
 		translateTimestamp(ingress.CreationTimestamp),
 	); err != nil {
@@ -1488,27 +1509,7 @@ func printEventList(list *api.EventList, w io.Writer, options PrintOptions) erro
 }
 
 func printLimitRange(limitRange *api.LimitRange, w io.Writer, options PrintOptions) error {
-	name := limitRange.Name
-	namespace := limitRange.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
-	}
-
-	if _, err := fmt.Fprintf(
-		w, "%s\t%s",
-		name,
-		translateTimestamp(limitRange.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, AppendLabels(limitRange.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, limitRange.Labels))
-	return err
+	return printObjectMeta(limitRange.ObjectMeta, w, options, true)
 }
 
 // Prints the LimitRangeList in a human-friendly format.
@@ -1521,34 +1522,92 @@ func printLimitRangeList(list *api.LimitRangeList, w io.Writer, options PrintOpt
 	return nil
 }
 
-func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, options PrintOptions) error {
-	name := resourceQuota.Name
-	namespace := resourceQuota.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+// printObjectMeta prints the object metadata of a given resource.
+func printObjectMeta(meta api.ObjectMeta, w io.Writer, options PrintOptions, namespaced bool) error {
+	if namespaced && options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", meta.Namespace); err != nil {
 			return err
 		}
 	}
 
 	if _, err := fmt.Fprintf(
 		w, "%s\t%s",
-		name,
-		translateTimestamp(resourceQuota.CreationTimestamp),
+		meta.Name,
+		translateTimestamp(meta.CreationTimestamp),
 	); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprint(w, AppendLabels(resourceQuota.Labels, options.ColumnLabels)); err != nil {
+	if _, err := fmt.Fprint(w, AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
 		return err
 	}
-	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, resourceQuota.Labels))
+	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, meta.Labels))
 	return err
+}
+
+func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, options PrintOptions) error {
+	return printObjectMeta(resourceQuota.ObjectMeta, w, options, true)
 }
 
 // Prints the ResourceQuotaList in a human-friendly format.
 func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, options PrintOptions) error {
 	for i := range list.Items {
 		if err := printResourceQuota(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printRole(role *rbac.Role, w io.Writer, options PrintOptions) error {
+	return printObjectMeta(role.ObjectMeta, w, options, true)
+}
+
+// Prints the Role in a human-friendly format.
+func printRoleList(list *rbac.RoleList, w io.Writer, options PrintOptions) error {
+	for i := range list.Items {
+		if err := printRole(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printRoleBinding(roleBinding *rbac.RoleBinding, w io.Writer, options PrintOptions) error {
+	return printObjectMeta(roleBinding.ObjectMeta, w, options, true)
+}
+
+// Prints the RoleBinding in a human-friendly format.
+func printRoleBindingList(list *rbac.RoleBindingList, w io.Writer, options PrintOptions) error {
+	for i := range list.Items {
+		if err := printRoleBinding(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printClusterRole(clusterRole *rbac.ClusterRole, w io.Writer, options PrintOptions) error {
+	return printObjectMeta(clusterRole.ObjectMeta, w, options, false)
+}
+
+// Prints the ClusterRole in a human-friendly format.
+func printClusterRoleList(list *rbac.ClusterRoleList, w io.Writer, options PrintOptions) error {
+	for i := range list.Items {
+		if err := printClusterRole(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printClusterRoleBinding(clusterRoleBinding *rbac.ClusterRoleBinding, w io.Writer, options PrintOptions) error {
+	return printObjectMeta(clusterRoleBinding.ObjectMeta, w, options, false)
+}
+
+// Prints the ClusterRoleBinding in a human-friendly format.
+func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, w io.Writer, options PrintOptions) error {
+	for i := range list.Items {
+		if err := printClusterRoleBinding(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}

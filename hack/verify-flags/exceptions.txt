@@ -8,15 +8,15 @@ cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
 cluster/aws/templates/configure-vm-aws.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/centos/util.sh:  local node_ip=${node#*@}
-cluster/gce/config-default.sh:# reloads <os_distro>/helper.sh in the gap between when the master is created
-cluster/gce/config-test.sh:# reloads <os_distro>/helper.sh in the gap between when the master is created
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
+cluster/gce/gci/configure-helper.sh:      reconcile_cidr="false"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/gci/configure-helper.sh:  local reconcile_cidr="true"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
@@ -31,8 +31,9 @@ cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
 cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
 cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
+cluster/photon-controller/templates/salt-master.sh:  api_servers: $MASTER_NAME
 cluster/photon-controller/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
-cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -v "^-" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
+cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
 cluster/photon-controller/util.sh:  local cert_dir="/srv/kubernetes"
 cluster/photon-controller/util.sh:  node_name=${1}
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
@@ -46,6 +47,7 @@ cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --c
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
+cluster/saltbase/salt/kubelet/default:  {% set eviction_hard="--eviction-hard=" + pillar['eviction_hard'] %}
 cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
 cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
 cluster/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}

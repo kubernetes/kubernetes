@@ -576,11 +576,7 @@ func DeepCopy_extensions_NetworkPolicyPort(in NetworkPolicyPort, out *NetworkPol
 	if in.Protocol != nil {
 		in, out := in.Protocol, &out.Protocol
 		*out = new(api.Protocol)
-		if newVal, err := c.DeepCopy(*in); err != nil {
-			return err
-		} else {
-			**out = newVal.(api.Protocol)
-		}
+		**out = *in
 	} else {
 		out.Protocol = nil
 	}

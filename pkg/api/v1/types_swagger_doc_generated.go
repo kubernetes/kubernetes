@@ -880,7 +880,7 @@ var map_NodeStatus = map[string]string{
 	"daemonEndpoints": "Endpoints of daemons running on the Node.",
 	"nodeInfo":        "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
 	"images":          "List of container images on this node",
-	"volumesInUse":    "List of volumes in use (mounted) by the node.",
+	"volumesInUse":    "List of attachable volumes in use (mounted) by the node.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
@@ -1337,7 +1337,7 @@ var map_RBDVolumeSource = map[string]string{
 	"pool":      "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it.",
 	"user":      "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"keyring":   "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
-	"secretRef": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is empty. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
+	"secretRef": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it",
 }
 

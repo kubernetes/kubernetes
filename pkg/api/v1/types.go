@@ -573,20 +573,20 @@ type RBDVolumeSource struct {
 	// The rados pool name.
 	// Default is rbd.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it.
-	RBDPool string `json:"pool" protobuf:"bytes,4,opt,name=pool"`
+	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
 	// The rados user name.
 	// Default is admin.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
-	RadosUser string `json:"user" protobuf:"bytes,5,opt,name=user"`
+	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
 	// Keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
-	Keyring string `json:"keyring" protobuf:"bytes,6,opt,name=keyring"`
+	Keyring string `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
 	// SecretRef is name of the authentication secret for RBDUser. If provided
 	// overrides keyring.
-	// Default is empty.
+	// Default is nil.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
-	SecretRef *LocalObjectReference `json:"secretRef" protobuf:"bytes,7,opt,name=secretRef"`
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,7,opt,name=secretRef"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
@@ -2386,11 +2386,11 @@ type NodeStatus struct {
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty" protobuf:"bytes,7,opt,name=nodeInfo"`
 	// List of container images on this node
 	Images []ContainerImage `json:"images,omitempty" protobuf:"bytes,8,rep,name=images"`
-	// List of volumes in use (mounted) by the node.
-	VolumesInUse []UniqueDeviceName `json:"volumesInUse,omitempty" protobuf:"bytes,9,rep,name=volumesInUse"`
+	// List of attachable volumes in use (mounted) by the node.
+	VolumesInUse []UniqueVolumeName `json:"volumesInUse,omitempty" protobuf:"bytes,9,rep,name=volumesInUse"`
 }
 
-type UniqueDeviceName string
+type UniqueVolumeName string
 
 // Describe a container image
 type ContainerImage struct {

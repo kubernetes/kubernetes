@@ -35,7 +35,7 @@ if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
   # Otherwise, we respect whatever is set by the user.
   gci_images=( $(gcloud compute images list --project google-containers \
       --show-deprecated --no-standard-images --sort-by='~creationTimestamp' \
-      --regexp='gci-[a-z]+-52-.*' --format='table[no-heading](name)') )
+      --regexp='gci-[a-z]+-53-.*' --format='table[no-heading](name)') )
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-"${gci_images[0]}"}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
   # The default node image when using GCI is still the Debian based ContainerVM
@@ -45,7 +45,7 @@ if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
 fi
 
 # Verfiy cluster autoscaler configuration.
-if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   if [ -z $AUTOSCALER_MIN_NODES ]; then
     echo "AUTOSCALER_MIN_NODES not set."
     exit 1
@@ -190,6 +190,10 @@ function set-preferred-region() {
     KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google_containers"
   else
     KUBE_ADDON_REGISTRY="gcr.io/google_containers"
+  fi
+
+  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
+    DOCKER_REGISTRY_MIRROR_URL="https://${preferred}-mirror.gcr.io"
   fi
 }
 
@@ -836,7 +840,7 @@ function create-cluster-autoscaler-mig-config() {
     AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --nodes=${this_mig_min}:${this_mig_max}:${mig_url}"
   done
 
-  AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --experimental-scale-down-enabled=${AUTOSCALER_ENABLE_SCALE_DOWN}"
+  AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --scale-down-enabled=${AUTOSCALER_ENABLE_SCALE_DOWN}"
 }
 
 # Assumes:
@@ -844,12 +848,12 @@ function create-cluster-autoscaler-mig-config() {
 # - NODE_INSTANCE_PREFIX
 # - PROJECT
 # - ZONE
-# - ENABLE_NODE_AUTOSCALER
+# - ENABLE_CLUSTER_AUTOSCALER
 # - AUTOSCALER_MAX_NODES
 # - AUTOSCALER_MIN_NODES
 function create-autoscaler-config() {
   # Create autoscaler for nodes configuration if requested
-  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
     create-cluster-autoscaler-mig-config
     echo "Using autoscaler config: ${AUTOSCALER_MIG_CONFIG}"
   fi
@@ -896,7 +900,18 @@ function check-cluster() {
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   (
    umask 077
+
+   # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
+
+   if [[ "${FEDERATION:-}" == "true" ]]; then
+       # Create a kubeconfig with credentials for this apiserver. We will later use
+       # this kubeconfig to create a secret which the federation control plane can
+       # use to talk to this apiserver.
+       KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
+       KUBECONFIG="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${CONTEXT}/kubeconfig" \
+         create-kubeconfig
+   fi
   )
 
   # ensures KUBECONFIG is set
@@ -921,6 +936,8 @@ function check-cluster() {
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
 # down the firewall rules and routes.
 function kube-down {
+  local -r batch=200
+
   detect-project
   detect-node-names # For INSTANCE_GROUPS
 
@@ -949,9 +966,14 @@ function kube-down {
         --project "${PROJECT}" \
         --quiet \
         --zone "${ZONE}" \
-        "${group}"
+        "${group}" &
     fi
   done
+
+  # Wait for last batch of jobs
+  kube::util::wait-for-jobs || {
+    echo -e "Failed to delete instance group(s)." >&2
+  }
 
   if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
     gcloud compute instance-templates delete \
@@ -998,14 +1020,14 @@ function kube-down {
                 --format='value(name)') )
   # If any minions are running, delete them in batches.
   while (( "${#minions[@]}" > 0 )); do
-    echo Deleting nodes "${minions[*]::10}"
+    echo Deleting nodes "${minions[*]::${batch}}"
     gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
       --delete-disks boot \
       --zone "${ZONE}" \
-      "${minions[@]::10}"
-    minions=( "${minions[@]:10}" )
+      "${minions[@]::${batch}}"
+    minions=( "${minions[@]:${batch}}" )
   done
 
   # Delete firewall rule for the master.
@@ -1036,12 +1058,12 @@ function kube-down {
     --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}"  \
     --format='value(name)') )
   while (( "${#routes[@]}" > 0 )); do
-    echo Deleting routes "${routes[*]::10}"
+    echo Deleting routes "${routes[*]::${batch}}"
     gcloud compute routes delete \
       --project "${PROJECT}" \
       --quiet \
-      "${routes[@]::10}"
-    routes=( "${routes[@]:10}" )
+      "${routes[@]::${batch}}"
+    routes=( "${routes[@]:${batch}}" )
   done
 
   # Delete the master's reserved IP

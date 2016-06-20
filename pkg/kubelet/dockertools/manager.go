@@ -69,7 +69,9 @@ const (
 
 	minimumDockerAPIVersion = "1.20"
 
-	dockerv110APIVersion = "1.21"
+	// Remote API version for docker daemon version v1.10
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	dockerV110APIVersion = "1.22"
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
@@ -88,10 +90,6 @@ const (
 	// networking). Must match the value returned by docker inspect -f
 	// '{{.HostConfig.NetworkMode}}'.
 	namespaceModeHost = "host"
-
-	// Remote API version for docker daemon version v1.10
-	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	dockerV110APIVersion = "1.22"
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
@@ -645,7 +643,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// If current api version is newer than docker 1.10 requested, set OomScoreAdj to HostConfig
-	result, err := dm.checkDockerAPIVersion(dockerv110APIVersion)
+	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
 	if err != nil {
 		glog.Errorf("Failed to check docker api version: %v", err)
 	} else if result >= 0 {
@@ -993,10 +991,10 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, nil
 	}
 
-	profile, profileOK := pod.ObjectMeta.Annotations["security.alpha.kubernetes.io/seccomp/container/"+ctrName]
+	profile, profileOK := pod.ObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+ctrName]
 	if !profileOK {
 		// try the pod profile
-		profile, profileOK = pod.ObjectMeta.Annotations["security.alpha.kubernetes.io/seccomp/pod"]
+		profile, profileOK = pod.ObjectMeta.Annotations[api.SeccompPodAnnotationKey]
 		if !profileOK {
 			// return early the default
 			return defaultSecurityOpt, nil
@@ -1013,13 +1011,15 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, nil
 	}
 
-	if !strings.HasPrefix(profile, "localhost") {
+	if !strings.HasPrefix(profile, "localhost/") {
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
 	}
 
-	file, err := ioutil.ReadFile(filepath.Join(dm.seccompProfileRoot, strings.TrimPrefix(profile, "localhost/")))
+	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
+	fname := filepath.Join(dm.seccompProfileRoot, filepath.FromSlash(name))
+	file, err := ioutil.ReadFile(fname)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
 	}
 
 	b := bytes.NewBuffer(nil)
@@ -1504,8 +1504,9 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Can't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	} else {
+		glog.V(5).Infof("Generating ref for container %s: %#v", container.Name, ref)
 	}
-	glog.Infof("Generating ref for container %s: %#v", container.Name, ref)
 
 	opts, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
@@ -1577,7 +1578,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 
 func (dm *DockerManager) applyOOMScoreAdjIfNeeded(pod *api.Pod, container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
 	// Compare current API version with expected api version.
-	result, err := dm.checkDockerAPIVersion(dockerv110APIVersion)
+	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
 	if err != nil {
 		return fmt.Errorf("Failed to check docker api version: %v", err)
 	}
@@ -1977,7 +1978,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		podInfraContainerID, err, msg = dm.createPodInfraContainer(pod)
 		if err != nil {
 			startContainerResult.Fail(err, msg)
-			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
+			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q: %s", err, format.Pod(pod), msg)
 			return
 		}
 
@@ -2353,8 +2354,8 @@ func (dm *DockerManager) GetNetNS(containerID kubecontainer.ContainerID) (string
 }
 
 // Garbage collection of dead containers
-func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
-	return dm.containerGC.GarbageCollect(gcPolicy)
+func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+	return dm.containerGC.GarbageCollect(gcPolicy, allSourcesReady)
 }
 
 func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {

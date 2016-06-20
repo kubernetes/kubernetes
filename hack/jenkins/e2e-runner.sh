@@ -34,9 +34,12 @@ function fetch_output_tars() {
 }
 
 function fetch_server_version_tars() {
-    local -r build_version="v$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE}  --format='value(defaultClusterVersion)')"
-    fetch_tars_from_gcs "release" "${build_version}"
-    unpack_binaries
+    local -r server_version="$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE}  --format='value(defaultClusterVersion)')"
+    # Use latest build of the server version's branch for test files.
+    fetch_published_version_tars "ci/latest-${server_version:0:3}"
+    # Unset cluster api version; we want to use server default for the cluster
+    # version.
+    unset CLUSTER_API_VERSION
 }
 
 # Use a published version like "ci/latest" (default), "release/latest",
@@ -100,20 +103,24 @@ function get_latest_gci_image() {
     local image_type="$2"
     local image_index=""
     if [[ "${image_type}" == head ]]; then
-      image_index="gci-head"
+      image_index="latest-base-image-gci-head"
     elif [[ "${image_type}" == dev ]]; then
-      image_index="gci-dev"
+      image_index="latest-base-image-gci-dev"
     elif [[ "${image_type}" == beta ]]; then
-      image_index="gci-beta"
+      image_index="latest-base-image-gci-beta"
     elif [[ "${image_type}" == stable ]]; then
-      image_index="gci-stable"
+      image_index="latest-base-image-gci-stable"
+    elif [[ "${image_type}" == preview-test ]]; then
+      # A GCI preview image that is able to override its Docker installation on
+      # boot.
+      image_index="latest-test-image-gci-preview"
     fi
 
     local image=""
     # Retry the gsutil command a couple times to mitigate the effect of
     # transient server errors.
     for n in $(seq 3); do
-      image="$(gsutil cat "gs://${image_project}/image-indices/latest-base-image-${image_index}")" && break || sleep 1
+      image="$(gsutil cat "gs://${image_project}/image-indices/${image_index}")" && break || sleep 1
     done
     if [[ -z "${image}" ]]; then
       echo "Failed to find GCI image for ${image_type}"
@@ -123,6 +130,18 @@ function get_latest_gci_image() {
     # Clean up gsutil artifacts otherwise the later test stage will complain.
     rm -rf .config &> /dev/null
     rm -rf .gsutil &> /dev/null
+}
+
+function get_latest_docker_release() {
+  # Typical Docker release versions are like v1.11.2-rc1, v1.11.2, and etc.
+  local -r version_re='.*\"tag_name\":[[:space:]]+\"v([0-9\.r|c-]+)\",.*'
+  local -r latest_release="$(curl -fsSL --retry 3 https://api.github.com/repos/docker/docker/releases/latest)"
+  if [[ "${latest_release}" =~ ${version_re} ]]; then
+    echo "${BASH_REMATCH[1]}"
+  else
+    echo "Malformed Docker API response for latest release: ${latest_release}"
+    exit 1
+  fi
 }
 
 function install_google_cloud_sdk_tarball() {
@@ -193,6 +212,9 @@ if [[ -n "${JENKINS_GCI_IMAGE_TYPE:-}" ]]; then
   export KUBE_GCE_MASTER_PROJECT="${gci_image_project}"
   export KUBE_GCE_MASTER_IMAGE="${gci_image}"
   export KUBE_OS_DISTRIBUTION="gci"
+  if [[ "${JENKINS_GCI_IMAGE_TYPE}" == preview-test ]]; then
+    export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
+  fi
 fi
 
 function e2e_test() {
@@ -336,11 +358,7 @@ fi
 # GINKGO_UPGRADE_TESTS_ARGS for the test run.
 #
 # JENKINS_USE_SKEW_TESTS=true will run tests from the skewed version rather
-# than the original version; it is mutuall exclusive with
-# JENKINS_USE_SKEW_KUBECTL.
-#
-# JENKINS_USE_SKEW_KUBECTL=true will use the skewed version of Kubectl; it is
-# mutually exclusive with JENKINS_USE_SKEW_TESTS.
+# than the original version.
 if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
     cd ..
     mv kubernetes kubernetes_old
@@ -355,10 +373,12 @@ if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
     if [[ "${JENKINS_USE_SKEW_TESTS:-}" != "true" ]]; then
         # Back out into the old tests now that we've downloaded & maybe upgraded.
         cd ../kubernetes_old
-        if [[ "${JENKINS_USE_SKEW_KUBECTL:-}" == "true" ]]; then
-            # Append kubectl-path of skewed kubectl to test args
-            GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-} --kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
-        fi
+	# Append kubectl-path of skewed kubectl to test args, since we always
+	# want that to use the skewed kubectl version:
+	#
+	# - for upgrade jobs, we want kubectl to be at the same version as master.
+	# - for client skew tests, we want to use the skewed kubectl (that's what we're testing).
+        GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-} --kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
     fi
 fi
 

@@ -18,11 +18,13 @@ package testing
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -40,16 +42,17 @@ import (
 
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
-	rootDir    string
-	kubeClient clientset.Interface
-	pluginMgr  VolumePluginMgr
-	cloud      cloudprovider.Interface
-	mounter    mount.Interface
-	writer     io.Writer
+	rootDir     string
+	kubeClient  clientset.Interface
+	pluginMgr   VolumePluginMgr
+	cloud       cloudprovider.Interface
+	mounter     mount.Interface
+	writer      io.Writer
+	rootContext string
 }
 
-func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: nil}
+func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, rootContext string) *fakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: nil, rootContext: rootContext}
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
 	host.pluginMgr.InitPlugins(plugins, host)
@@ -115,6 +118,15 @@ func (f *fakeVolumeHost) GetHostName() string {
 	return "fakeHostName"
 }
 
+// Returns host IP or nil in the case of error.
+func (f *fakeVolumeHost) GetHostIP() (net.IP, error) {
+	return nil, fmt.Errorf("GetHostIP() not implemented")
+}
+
+func (f *fakeVolumeHost) GetRootContext() string {
+	return f.rootContext
+}
+
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{
@@ -166,15 +178,23 @@ func (plugin *FakeVolumePlugin) Init(host VolumeHost) error {
 	return nil
 }
 
-func (plugin *FakeVolumePlugin) Name() string {
+func (plugin *FakeVolumePlugin) GetPluginName() string {
 	plugin.RLock()
 	defer plugin.RUnlock()
 	return plugin.PluginName
 }
 
+func (plugin *FakeVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
+	return spec.Name(), nil
+}
+
 func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	// TODO: maybe pattern-match on spec.Name() to decide?
 	return true
+}
+
+func (plugin *FakeVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *api.Pod, opts VolumeOptions) (Mounter, error) {
@@ -188,6 +208,12 @@ func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *api.Pod, opts Volume
 	return volume, nil
 }
 
+func (plugin *FakeVolumePlugin) GetMounters() (Mounters []*FakeVolume) {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.Mounters
+}
+
 func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (Unmounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
@@ -197,6 +223,12 @@ func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	volume.Plugin = plugin
 	volume.MetricsNil = MetricsNil{}
 	return volume, nil
+}
+
+func (plugin *FakeVolumePlugin) GetUnmounters() (Unmounters []*FakeVolume) {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.Unmounters
 }
 
 func (plugin *FakeVolumePlugin) NewAttacher() (Attacher, error) {
@@ -235,10 +267,6 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	plugin.RLock()
 	defer plugin.RUnlock()
 	return plugin.NewDetacherCallCount
-}
-
-func (plugin *FakeVolumePlugin) GetDeviceName(spec *Spec) (string, error) {
-	return spec.Name(), nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler, error) {
@@ -293,6 +321,12 @@ func (fv *FakeVolume) SetUp(fsGroup *int64) error {
 	return fv.SetUpAt(fv.getPath(), fsGroup)
 }
 
+func (fv *FakeVolume) GetSetUpCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.SetUpCallCount
+}
+
 func (fv *FakeVolume) SetUpAt(dir string, fsGroup *int64) error {
 	return os.MkdirAll(dir, 0750)
 }
@@ -312,6 +346,12 @@ func (fv *FakeVolume) TearDown() error {
 	defer fv.Unlock()
 	fv.TearDownCallCount++
 	return fv.TearDownAt(fv.getPath())
+}
+
+func (fv *FakeVolume) GetTearDownCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.TearDownCallCount
 }
 
 func (fv *FakeVolume) TearDownAt(dir string) error {
@@ -338,18 +378,30 @@ func (fv *FakeVolume) WaitForAttach(spec *Spec, spectimeout time.Duration) (stri
 	return "", nil
 }
 
-func (fv *FakeVolume) GetDeviceMountPath(spec *Spec) string {
+func (fv *FakeVolume) GetWaitForAttachCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.WaitForAttachCallCount
+}
+
+func (fv *FakeVolume) GetDeviceMountPath(spec *Spec) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.GetDeviceMountPathCallCount++
-	return ""
+	return "", nil
 }
 
-func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
+func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.MountDeviceCallCount++
 	return nil
+}
+
+func (fv *FakeVolume) GetMountDeviceCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.MountDeviceCallCount
 }
 
 func (fv *FakeVolume) Detach(deviceMountPath string, hostName string) error {
@@ -372,7 +424,7 @@ func (fv *FakeVolume) WaitForDetach(devicePath string, timeout time.Duration) er
 	return nil
 }
 
-func (fv *FakeVolume) UnmountDevice(globalMountPath string, mounter mount.Interface) error {
+func (fv *FakeVolume) UnmountDevice(globalMountPath string) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.UnmountDeviceCallCount++
@@ -465,4 +517,213 @@ func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
 	}
 	used.Format = resource.BinarySI
 	return &used, nil
+}
+
+// VerifyAttachCallCount ensures that at least one of the Attachers for this
+// plugin has the expectedAttachCallCount number of calls. Otherwise it returns
+// an error.
+func VerifyAttachCallCount(
+	expectedAttachCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, attacher := range fakeVolumePlugin.GetAttachers() {
+		actualCallCount := attacher.GetAttachCallCount()
+		if actualCallCount == expectedAttachCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No attachers have expected AttachCallCount. Expected: <%v>.",
+		expectedAttachCallCount)
+}
+
+// VerifyZeroAttachCalls ensures that all of the Attachers for this plugin have
+// a zero AttachCallCount. Otherwise it returns an error.
+func VerifyZeroAttachCalls(fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, attacher := range fakeVolumePlugin.GetAttachers() {
+		actualCallCount := attacher.GetAttachCallCount()
+		if actualCallCount != 0 {
+			return fmt.Errorf(
+				"At least one attacher has non-zero AttachCallCount: <%v>.",
+				actualCallCount)
+		}
+	}
+
+	return nil
+}
+
+// VerifyWaitForAttachCallCount ensures that at least one of the Mounters for
+// this plugin has the expectedWaitForAttachCallCount number of calls. Otherwise
+// it returns an error.
+func VerifyWaitForAttachCallCount(
+	expectedWaitForAttachCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, attacher := range fakeVolumePlugin.GetAttachers() {
+		actualCallCount := attacher.GetWaitForAttachCallCount()
+		if actualCallCount == expectedWaitForAttachCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Attachers have expected WaitForAttachCallCount. Expected: <%v>.",
+		expectedWaitForAttachCallCount)
+}
+
+// VerifyZeroWaitForAttachCallCount ensures that all Attachers for this plugin
+// have a zero WaitForAttachCallCount. Otherwise it returns an error.
+func VerifyZeroWaitForAttachCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, attacher := range fakeVolumePlugin.GetAttachers() {
+		actualCallCount := attacher.GetWaitForAttachCallCount()
+		if actualCallCount != 0 {
+			return fmt.Errorf(
+				"At least one attacher has non-zero WaitForAttachCallCount: <%v>.",
+				actualCallCount)
+		}
+	}
+
+	return nil
+}
+
+// VerifyMountDeviceCallCount ensures that at least one of the Mounters for
+// this plugin has the expectedMountDeviceCallCount number of calls. Otherwise
+// it returns an error.
+func VerifyMountDeviceCallCount(
+	expectedMountDeviceCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, attacher := range fakeVolumePlugin.GetAttachers() {
+		actualCallCount := attacher.GetMountDeviceCallCount()
+		if actualCallCount == expectedMountDeviceCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Attachers have expected MountDeviceCallCount. Expected: <%v>.",
+		expectedMountDeviceCallCount)
+}
+
+// VerifyZeroMountDeviceCallCount ensures that all Attachers for this plugin
+// have a zero MountDeviceCallCount. Otherwise it returns an error.
+func VerifyZeroMountDeviceCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, attacher := range fakeVolumePlugin.GetAttachers() {
+		actualCallCount := attacher.GetMountDeviceCallCount()
+		if actualCallCount != 0 {
+			return fmt.Errorf(
+				"At least one attacher has non-zero MountDeviceCallCount: <%v>.",
+				actualCallCount)
+		}
+	}
+
+	return nil
+}
+
+// VerifySetUpCallCount ensures that at least one of the Mounters for this
+// plugin has the expectedSetUpCallCount number of calls. Otherwise it returns
+// an error.
+func VerifySetUpCallCount(
+	expectedSetUpCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, mounter := range fakeVolumePlugin.GetMounters() {
+		actualCallCount := mounter.GetSetUpCallCount()
+		if actualCallCount >= expectedSetUpCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Mounters have expected SetUpCallCount. Expected: <%v>.",
+		expectedSetUpCallCount)
+}
+
+// VerifyZeroSetUpCallCount ensures that all Mounters for this plugin have a
+// zero SetUpCallCount. Otherwise it returns an error.
+func VerifyZeroSetUpCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, mounter := range fakeVolumePlugin.GetMounters() {
+		actualCallCount := mounter.GetSetUpCallCount()
+		if actualCallCount != 0 {
+			return fmt.Errorf(
+				"At least one mounter has non-zero SetUpCallCount: <%v>.",
+				actualCallCount)
+		}
+	}
+
+	return nil
+}
+
+// VerifyTearDownCallCount ensures that at least one of the Unounters for this
+// plugin has the expectedTearDownCallCount number of calls. Otherwise it
+// returns an error.
+func VerifyTearDownCallCount(
+	expectedTearDownCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, unmounter := range fakeVolumePlugin.GetUnmounters() {
+		actualCallCount := unmounter.GetTearDownCallCount()
+		if actualCallCount >= expectedTearDownCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Unmounters have expected SetUpCallCount. Expected: <%v>.",
+		expectedTearDownCallCount)
+}
+
+// VerifyZeroTearDownCallCount ensures that all Mounters for this plugin have a
+// zero TearDownCallCount. Otherwise it returns an error.
+func VerifyZeroTearDownCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, mounter := range fakeVolumePlugin.GetMounters() {
+		actualCallCount := mounter.GetTearDownCallCount()
+		if actualCallCount != 0 {
+			return fmt.Errorf(
+				"At least one mounter has non-zero TearDownCallCount: <%v>.",
+				actualCallCount)
+		}
+	}
+
+	return nil
+}
+
+// VerifyDetachCallCount ensures that at least one of the Attachers for this
+// plugin has the expectedDetachCallCount number of calls. Otherwise it returns
+// an error.
+func VerifyDetachCallCount(
+	expectedDetachCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, detacher := range fakeVolumePlugin.GetDetachers() {
+		actualCallCount := detacher.GetDetachCallCount()
+		if actualCallCount == expectedDetachCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Detachers have expected DetachCallCount. Expected: <%v>.",
+		expectedDetachCallCount)
+}
+
+// VerifyZeroDetachCallCount ensures that all Detachers for this plugin have a
+// zero DetachCallCount. Otherwise it returns an error.
+func VerifyZeroDetachCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, detacher := range fakeVolumePlugin.GetDetachers() {
+		actualCallCount := detacher.GetDetachCallCount()
+		if actualCallCount != 0 {
+			return fmt.Errorf(
+				"At least one detacher has non-zero DetachCallCount: <%v>.",
+				actualCallCount)
+		}
+	}
+
+	return nil
+}
+
+// GetTestVolumePluginMgr creates, initializes, and returns a test volume plugin
+// manager and fake volume plugin using a fake volume host.
+func GetTestVolumePluginMgr(
+	t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
+	plugins := ProbeVolumePlugins(VolumeConfig{})
+	volumePluginMgr := NewFakeVolumeHost(
+		"" /* rootDir */, nil /* kubeClient */, plugins, "" /* rootContext */).pluginMgr
+
+	return &volumePluginMgr, plugins[0].(*FakeVolumePlugin)
 }

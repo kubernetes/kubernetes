@@ -87,3 +87,14 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 	// if the error is nil and podUpdated is true, the returned pod contains the applied update.
 	return pod, podUpdated, err
 }
+
+// Filter uses the input function f to filter the given pod list, and return the filtered pods
+func Filter(podList *api.PodList, f func(api.Pod) bool) []api.Pod {
+	pods := make([]api.Pod, 0)
+	for _, p := range podList.Items {
+		if f(p) {
+			pods = append(pods, p)
+		}
+	}
+	return pods
+}

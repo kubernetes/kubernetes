@@ -51,8 +51,18 @@ func (plugin *fcPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *fcPlugin) Name() string {
+func (plugin *fcPlugin) GetPluginName() string {
 	return fcPluginName
+}
+
+func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	//  TargetWWNs are the FibreChannel target world wide names
+	return fmt.Sprintf("%v", volumeSource.TargetWWNs), nil
 }
 
 func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
@@ -61,6 +71,10 @@ func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	return true
+}
+
+func (plugin *fcPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *fcPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -78,14 +92,9 @@ func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vol
 func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Mounter, error) {
 	// fc volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// fc volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	var readOnly bool
-	var fc *api.FCVolumeSource
-	if spec.Volume != nil && spec.Volume.FC != nil {
-		fc = spec.Volume.FC
-		readOnly = fc.ReadOnly
-	} else {
-		fc = spec.PersistentVolume.Spec.FC
-		readOnly = spec.ReadOnly
+	fc, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	if fc.Lun == nil {
@@ -196,4 +205,15 @@ func (c *fcDiskUnmounter) TearDown() error {
 
 func (c *fcDiskUnmounter) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.FCVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.FC != nil {
+		return spec.Volume.FC, spec.Volume.FC.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.FC != nil {
+		return spec.PersistentVolume.Spec.FC, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a FibreChannel volume type")
 }

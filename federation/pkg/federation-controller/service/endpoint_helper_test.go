@@ -19,9 +19,9 @@ package service
 import (
 	"testing"
 
-	"k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
-	"k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -29,63 +29,75 @@ var fakeDns, _ = clouddns.NewFakeInterface() // No need to check for unsupported
 var fakeDnsZones, _ = fakeDns.Zones()
 
 var fakeServiceController = ServiceController{
-	dns:          fakeDns,
-	dnsZones:     fakeDnsZones,
-	serviceCache: &serviceCache{fedServiceMap: make(map[string]*cachedService)},
+	dns:            fakeDns,
+	dnsZones:       fakeDnsZones,
+	federationName: "fed1",
+	zoneName:       "example.com",
+	serviceCache:   &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 	clusterCache: &clusterClientCache{
 		clientMap: make(map[string]*clusterCache),
 	},
 	knownClusterSet: make(sets.String),
 }
 
-func buildEndpoint(subsets [][]string) *api.Endpoints {
-	endpoint := &api.Endpoints{
-		Subsets: []api.EndpointSubset{
-			{Addresses: []api.EndpointAddress{}},
+func buildEndpoint(subsets [][]string) *v1.Endpoints {
+	endpoint := &v1.Endpoints{
+		Subsets: []v1.EndpointSubset{
+			{Addresses: []v1.EndpointAddress{}},
 		},
 	}
 	for _, element := range subsets {
-		address := api.EndpointAddress{IP: element[0], Hostname: element[1], TargetRef: nil}
+		address := v1.EndpointAddress{IP: element[0], Hostname: element[1], TargetRef: nil}
 		endpoint.Subsets[0].Addresses = append(endpoint.Subsets[0].Addresses, address)
 	}
 	return endpoint
 }
 
 func TestProcessEndpointUpdate(t *testing.T) {
+	clusterName := "foo"
 	cc := clusterClientCache{
-		clientMap: make(map[string]*clusterCache),
+		clientMap: map[string]*clusterCache{
+			clusterName: {
+				cluster: &v1alpha1.Cluster{
+					Status: v1alpha1.ClusterStatus{
+						Zones:  []string{"foozone"},
+						Region: "fooregion",
+					},
+				},
+			},
+		},
 	}
 	tests := []struct {
 		name          string
 		cachedService *cachedService
-		endpoint      *api.Endpoints
+		endpoint      *v1.Endpoints
 		clusterName   string
 		expectResult  int
 	}{
 		{
 			"no-cache",
 			&cachedService{
-				lastState:   &api.Service{},
+				lastState:   &v1.Service{},
 				endpointMap: make(map[string]int),
 			},
 			buildEndpoint([][]string{{"ip1", ""}}),
-			"foo",
+			clusterName,
 			1,
 		},
 		{
 			"has-cache",
 			&cachedService{
-				lastState: &api.Service{},
+				lastState: &v1.Service{},
 				endpointMap: map[string]int{
 					"foo": 1,
 				},
 			},
 			buildEndpoint([][]string{{"ip1", ""}}),
-			"foo",
+			clusterName,
 			1,
 		},
 	}
-
+	fakeServiceController.clusterCache = &cc
 	for _, test := range tests {
 		cc.processEndpointUpdate(test.cachedService, test.endpoint, test.clusterName, &fakeServiceController)
 		if test.expectResult != test.cachedService.endpointMap[test.clusterName] {
@@ -99,8 +111,8 @@ func TestProcessEndpointDeletion(t *testing.T) {
 	cc := clusterClientCache{
 		clientMap: map[string]*clusterCache{
 			clusterName: {
-				cluster: &federation.Cluster{
-					Status: federation.ClusterStatus{
+				cluster: &v1alpha1.Cluster{
+					Status: v1alpha1.ClusterStatus{
 						Zones:  []string{"foozone"},
 						Region: "fooregion",
 					},
@@ -111,14 +123,14 @@ func TestProcessEndpointDeletion(t *testing.T) {
 	tests := []struct {
 		name          string
 		cachedService *cachedService
-		endpoint      *api.Endpoints
+		endpoint      *v1.Endpoints
 		clusterName   string
 		expectResult  int
 	}{
 		{
 			"no-cache",
 			&cachedService{
-				lastState:   &api.Service{},
+				lastState:   &v1.Service{},
 				endpointMap: make(map[string]int),
 			},
 			buildEndpoint([][]string{{"ip1", ""}}),
@@ -128,7 +140,7 @@ func TestProcessEndpointDeletion(t *testing.T) {
 		{
 			"has-cache",
 			&cachedService{
-				lastState: &api.Service{},
+				lastState: &v1.Service{},
 				endpointMap: map[string]int{
 					clusterName: 1,
 				},

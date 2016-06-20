@@ -40,7 +40,7 @@ func (ClusterRole) SwaggerDoc() map[string]string {
 var map_ClusterRoleBinding = map[string]string{
 	"":         "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
 	"metadata": "Standard object's metadata.",
-	"subject":  "Subjects holds references to the objects the role applies to.",
+	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
 }
 
@@ -95,7 +95,7 @@ func (Role) SwaggerDoc() map[string]string {
 var map_RoleBinding = map[string]string{
 	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
 	"metadata": "Standard object's metadata.",
-	"subject":  "Subjects holds references to the objects the role applies to.",
+	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
 }
 
@@ -126,7 +126,7 @@ func (RoleList) SwaggerDoc() map[string]string {
 var map_Subject = map[string]string{
 	"":           "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
 	"kind":       "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
-	"apiVersion": "APIVersion holds the API group and version of the referenced object. For non-object references such as \"Group\" and \"User\" this is expected to be API version of this API group. For example \"rbac/v1alpha1\".",
+	"apiVersion": "APIVersion holds the API group and version of the referenced object.",
 	"name":       "Name of the object being referenced.",
 	"namespace":  "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
 }

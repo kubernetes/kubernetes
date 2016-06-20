@@ -104,7 +104,7 @@ fi
 
 # Should NOT be called within the global scope, unless setting the desired global zone vars
 # This function is currently NOT USED in the global scope
-function set-federated-zone-vars {
+function set-federation-zone-vars {
     zone="$1"
     export OVERRIDE_CONTEXT="federation-e2e-${KUBERNETES_PROVIDER}-$zone"
     echo "Setting zone vars to: $OVERRIDE_CONTEXT"

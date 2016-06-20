@@ -306,7 +306,7 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, force
 		status.StartTime = &now
 	}
 
-	normalizeStatus(&status)
+	normalizeStatus(pod, &status)
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
 	if isCached && isStatusEqual(&cachedStatus.status, &status) && !forceUpdate {
@@ -484,7 +484,7 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 	if err != nil {
 		return false
 	}
-	normalizeStatus(&podStatus)
+	normalizeStatus(pod, &podStatus)
 
 	if isStatusEqual(&podStatus, &status) {
 		// If the status from the source is the same with the cached status,
@@ -504,7 +504,7 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 // In fact, the best way to solve this is to do it on api side. However for now, we normalize the status locally in
 // kubelet temporarily.
 // TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
-func normalizeStatus(status *api.PodStatus) *api.PodStatus {
+func normalizeStatus(pod *api.Pod, status *api.PodStatus) *api.PodStatus {
 	normalizeTimeStamp := func(t *unversioned.Time) {
 		*t = t.Rfc3339Copy()
 	}
@@ -543,7 +543,7 @@ func normalizeStatus(status *api.PodStatus) *api.PodStatus {
 		normalizeContainerState(&cstatus.LastTerminationState)
 	}
 	// Sort the container statuses, so that the order won't affect the result of comparison
-	sort.Sort(kubetypes.SortedContainerStatuses(status.InitContainerStatuses))
+	kubetypes.SortInitContainerStatuses(pod, status.InitContainerStatuses)
 	return status
 }
 

@@ -94,7 +94,7 @@ func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, er
 	return nil, fmt.Errorf("No valid networks found in %s", pluginDir)
 }
 
-func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode) error {
+func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
 	plugin.host = host
 	return nil
 }
@@ -197,6 +197,7 @@ func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubec
 		NetNS:       podNetnsPath,
 		IfName:      network.DefaultInterfaceName,
 		Args: [][2]string{
+			{"IgnoreUnknown", "1"},
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},
 			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID.ID},

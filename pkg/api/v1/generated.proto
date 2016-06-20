@@ -1304,7 +1304,7 @@ message NodeStatus {
   // List of container images on this node
   repeated ContainerImage images = 8;
 
-  // List of volumes in use (mounted) by the node.
+  // List of attachable volumes in use (mounted) by the node.
   repeated string volumesInUse = 9;
 }
 
@@ -2276,7 +2276,7 @@ message RBDVolumeSource {
 
   // SecretRef is name of the authentication secret for RBDUser. If provided
   // overrides keyring.
-  // Default is empty.
+  // Default is nil.
   // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
   optional LocalObjectReference secretRef = 7;
 

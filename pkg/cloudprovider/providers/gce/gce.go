@@ -100,6 +100,31 @@ type Config struct {
 	}
 }
 
+// Disks is interface for manipulation with GCE PDs.
+type Disks interface {
+	// AttachDisk attaches given disk to given instance. Current instance
+	// is used when instanceID is empty string.
+	AttachDisk(diskName, instanceID string, readOnly bool) error
+
+	// DetachDisk detaches given disk to given instance. Current instance
+	// is used when instanceID is empty string.
+	DetachDisk(devicePath, instanceID string) error
+
+	// DiskIsAttached checks if a disk is attached to the given node.
+	DiskIsAttached(diskName, instanceID string) (bool, error)
+
+	// CreateDisk creates a new PD with given properties. Tags are serialized
+	// as JSON into Description field.
+	CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error
+
+	// DeleteDisk deletes PD.
+	DeleteDisk(diskToDelete string) error
+
+	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
+	// representing this PD, namely failure domain and zone.
+	GetAutoLabelsForPD(name string) (map[string]string, error)
+}
+
 type instRefSlice []*compute.InstanceReference
 
 func (p instRefSlice) Len() int      { return len(p) }
@@ -402,19 +427,33 @@ func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operatio
 		return getErrorFromOp(op)
 	}
 
+	opStart := time.Now()
 	opName := op.Name
 	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
 		start := time.Now()
 		gce.operationPollRateLimiter.Accept()
 		duration := time.Now().Sub(start)
 		if duration > 5*time.Second {
-			glog.Infof("pollOperation: waited %v for %v", duration, opName)
+			glog.Infof("pollOperation: throttled %v for %v", duration, opName)
 		}
 		pollOp, err := getOperation(opName)
 		if err != nil {
 			glog.Warningf("GCE poll operation %s failed: pollOp: [%v] err: [%v] getErrorFromOp: [%v]", opName, pollOp, err, getErrorFromOp(pollOp))
 		}
-		return opIsDone(pollOp), getErrorFromOp(pollOp)
+		done := opIsDone(pollOp)
+		if done {
+			duration := time.Now().Sub(opStart)
+			if duration > 1*time.Minute {
+				// Log the JSON. It's cleaner than the %v structure.
+				enc, err := pollOp.MarshalJSON()
+				if err != nil {
+					glog.Warningf("waitForOperation: long operation (%v): %v (failed to encode to JSON: %v)", duration, pollOp, err)
+				} else {
+					glog.Infof("waitForOperation: long operation (%v): %v", duration, string(enc))
+				}
+			}
+		}
+		return done, getErrorFromOp(pollOp)
 	})
 }
 
@@ -939,10 +978,16 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))
 	}
-	hostTags, err := gce.computeHostTags(hosts)
-	if err != nil {
-		return nil, err
+	// If the node tags to be used for this cluster have been predefined in the
+	// provider config, just use them. Otherwise, invoke computeHostTags method to get the tags.
+	hostTags := gce.nodeTags
+	if len(hostTags) == 0 {
+		var err error
+		if hostTags, err = gce.computeHostTags(hosts); err != nil {
+			return nil, fmt.Errorf("No node tags supplied and also failed to parse the given lists of hosts for tags. Abort creating firewall rule.")
+		}
 	}
+
 	firewall := &compute.Firewall{
 		Name:         makeFirewallName(name),
 		Description:  desc,
@@ -964,17 +1009,13 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	return firewall, nil
 }
 
-// If the node tags to be used for this cluster have been predefined in the
-// provider config, just use them. Otherwise, grab all tags from all relevant
-// instances:
+// ComputeHostTags grabs all tags from all instances being added to the pool.
 // * The longest tag that is a prefix of the instance name is used
-// * If any instance has a prefix tag, all instances must
-// * If no instances have a prefix tag, no tags are used
+// * If any instance has no matching prefix tag, return error
+// Invoking this method to get host tags is risky since it depends on the format
+// of the host names in the cluster. Only use it as a fallback if gce.nodeTags
+// is unspecified
 func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
-	if len(gce.nodeTags) > 0 {
-		return gce.nodeTags, nil
-	}
-
 	// TODO: We could store the tags in gceInstance, so we could have already fetched it
 	hostNamesByZone := make(map[string][]string)
 	for _, host := range hosts {
@@ -1013,8 +1054,8 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 				}
 				if len(longest_tag) > 0 {
 					tags.Insert(longest_tag)
-				} else if len(tags) > 0 {
-					return nil, fmt.Errorf("Some, but not all, instances have prefix tags (%s is missing)", instance.Name)
+				} else {
+					return nil, fmt.Errorf("Could not find any tag that is a prefix of instance name for instance %s", instance.Name)
 				}
 			}
 		}
@@ -1022,11 +1063,9 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 			glog.Errorf("computeHostTags exceeded maxPages=%d for Instances.List: truncating.", maxPages)
 		}
 	}
-
 	if len(tags) == 0 {
-		glog.V(2).Info("No instances had tags, creating rule without target tags")
+		return nil, fmt.Errorf("No instances found")
 	}
-
 	return tags.List(), nil
 }
 

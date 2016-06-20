@@ -1501,6 +1501,16 @@ function kube-down {
 
     echo "Deleting VPC: ${vpc_id}"
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
+  else
+    echo "" >&2
+    echo -e "${color_red}Cluster NOT deleted!${color_norm}" >&2
+    echo "" >&2
+    echo "No VPC was found with tag KubernetesCluster=${CLUSTER_ID}" >&2
+    echo "" >&2
+    echo "If you are trying to delete a cluster in a shared VPC," >&2
+    echo "please consider using one of the methods in the kube-deploy repo." >&2
+    echo "See: https://github.com/kubernetes/kube-deploy/blob/master/docs/delete_cluster.md" >&2
+    exit 1
   fi
 }
 

@@ -24,16 +24,18 @@ set -o pipefail
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
   # The GCI image has host firewall which drop most inbound/forwarded packets.
-  # We need to add rules to accept all TCP/UDP packets.
+  # We need to add rules to accept all TCP/UDP/ICMP packets.
   if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all inbound TCP/UDP packets"
+    echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
+    iptables -A INPUT -w -p ICMP -j ACCEPT
   fi
   if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all forwarded TCP/UDP packets"
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
+    iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
 }
 
@@ -44,6 +46,23 @@ function create-dirs {
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
     mkdir -p /var/lib/kube-proxy
   fi
+}
+
+# Local ssds, if present, are mounted at /mnt/disks/ssdN.
+function ensure-local-ssds() {
+  for ssd in /dev/disk/by-id/google-local-ssd-*; do
+    if [ -e "${ssd}" ]; then
+      ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
+      ssdmount="/mnt/disks/ssd${ssdnum}/"
+      echo "Formatting and mounting local SSD $ssd to ${ssdmount}"
+      mkdir -p ${ssdmount}
+      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" ${ssdmount} || \
+      { echo "Local SSD $ssdnum mount failed"; return 1; }
+      chmod a+w ${ssdmount}
+    else
+      echo "No local SSD disks found."
+    fi
+  done
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
@@ -249,10 +268,19 @@ EOF
 }
 
 function assemble-docker-flags {
-  local docker_opts="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
+  echo "Assemble docker command line flags"
+  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --debug"
+    docker_opts+=" --log-level=debug"
+  else
+    docker_opts+=" --log-level=warn"
   fi
+  local use_net_plugin="true"
+  if [[ "${NETWORK_PROVIDER:-}" != "kubenet" && "${NETWORK_PROVIDER:-}" != "cni" ]]; then
+    use_net_plugin="false"
+    docker_opts+=" --bridge=cbr0"
+  fi
+
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
@@ -261,6 +289,12 @@ function assemble-docker-flags {
   fi
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  # If using a network plugin, we need to explicitly restart docker daemon, because
+  # kubelet will not do it. 
+  if [[ "${use_net_plugin}" == "true" ]]; then
+    echo "Docker command line is updated. Restart docker to pick it up"
+    systemctl restart docker
+  fi
 }
 
 # A helper function for loading a docker image. It keeps trying up to 5 times.
@@ -321,14 +355,15 @@ function start-kubelet {
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
+  local reconcile_cidr="true"
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ ! -z "${KUBELET_APISERVER:-}" && ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
-      flags+=" --reconcile-cidr=false"
       flags+=" --pod-cidr=10.123.45.0/30"
+      reconcile_cidr="false"
     else
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
@@ -341,6 +376,15 @@ function start-kubelet {
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
   fi
+  # Network plugin
+  if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
+    flags+=" --network-plugin-dir=/home/kubernetes/bin"
+    flags+=" --network-plugin=${NETWORK_PROVIDER}"
+  fi
+  flags+=" --reconcile-cidr=${reconcile_cidr}"
+  if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
+    flag+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
+  fi
   if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
     flags+=" --manifest-url=${MANIFEST_URL}"
     flags+=" --manifest-url-header=${MANIFEST_URL_HEADER}"
@@ -351,10 +395,18 @@ function start-kubelet {
   if [[ -n "${NODE_LABELS:-}" ]]; then
     flags+=" --node-labels=${NODE_LABELS}"
   fi
+  if [[ -n "${EVICTION_HARD:-}" ]]; then
+    flags+=" --eviction-hard=${EVICTION_HARD}"
+  fi
   if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
      flags+=" --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
   fi
   echo "KUBELET_OPTS=\"${flags}\"" > /etc/default/kubelet
+
+  # Delete docker0 to avoid interference
+  iptables -t nat -F || true
+  ip link set docker0 down || true
+  brctl delbr docker0 || true
 
   systemctl start kubelet.service
 }
@@ -440,13 +492,16 @@ function start-etcd-servers {
 
 # Calculates the following variables based on env variables, which will be used
 # by the manifests of several kube-master components.
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 function compute-master-manifest-variables {
+  CLOUD_CONFIG_OPT=""
   CLOUD_CONFIG_VOLUME=""
   CLOUD_CONFIG_MOUNT=""
-  if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
+  if [[ -f /etc/gce.conf ]]; then
+    CLOUD_CONFIG_OPT="--cloud-config=/etc/gce.conf"
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
@@ -472,6 +527,7 @@ function remove-salt-config-comments {
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
 # Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
@@ -480,7 +536,7 @@ function start-kube-apiserver {
   prepare-log-file /var/log/kube-apiserver.log
 
   # Calculate variables and assemble the command line.
-  local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-}"
+  local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
   params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
@@ -508,7 +564,6 @@ function start-kube-apiserver {
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     params+=" --advertise-address=${vm_external_ip}"
-    params+=" --cloud-config=/etc/gce.conf"
     params+=" --ssh-user=${PROXY_SSH_USER}"
     params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
   fi
@@ -559,6 +614,7 @@ function start-kube-apiserver {
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
 # Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
@@ -566,14 +622,11 @@ function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
-  local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-}"
+  local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --cloud-provider=gce"
   params+=" --master=127.0.0.1:8080"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
-  if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
-    params+=" --cloud-config=/etc/gce.conf"
-  fi
   if [[ -n "${INSTANCE_PREFIX:-}" ]]; then
     params+=" --cluster-name=${INSTANCE_PREFIX}"
   fi
@@ -583,7 +636,9 @@ function start-kube-controller-manager {
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
-  if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
+    params+=" --allocate-node-cidrs=true"
+  elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
     params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
@@ -630,8 +685,12 @@ function start-kube-scheduler {
 }
 
 # Starts cluster autoscaler.
+# Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
+#   CLOUD_CONFIG_VOLUME
+#   CLOUD_CONFIG_MOUNT
 function start-cluster-autoscaler {
-  if [[ "${ENABLE_NODE_AUTOSCALER:-}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
     prepare-log-file /var/log/cluster-autoscaler.log
 
@@ -639,11 +698,7 @@ function start-cluster-autoscaler {
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove-salt-config-comments "${src_file}"
 
-    local params="${AUTOSCALER_MIG_CONFIG}"
-    if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
-      params+=" --cloud-config=/etc/gce.conf"
-    fi
-
+    local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT}"
     sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -694,16 +749,23 @@ function start-kube-addons {
     local -r file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup-addon-manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    base_metrics_memory="200Mi"
+    base_metrics_memory="140Mi"
     metrics_memory="${base_metrics_memory}"
-    base_eventer_memory="200Mi"
+    base_eventer_memory="190Mi"
+    base_metrics_cpu="80m"
+    metrics_cpu="${base_metrics_cpu}"
     eventer_memory="${base_eventer_memory}"
+    nanny_memory="90Mi"
     local -r metrics_memory_per_node="4"
+    local -r metrics_cpu_per_node="0.5"
     local -r eventer_memory_per_node="500"
+    local -r nanny_memory_per_node="200"
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then
-      num_kube_nodes="$((${NUM_NODES}-1))"
+      num_kube_nodes="$((${NUM_NODES}+1))"
       metrics_memory="$((${num_kube_nodes} * ${metrics_memory_per_node} + 200))Mi"
       eventer_memory="$((${num_kube_nodes} * ${eventer_memory_per_node} + 200 * 1024))Ki"
+      nanny_memory="$((${num_kube_nodes} * ${nanny_memory_per_node} + 90 * 1024))Ki"
+      metrics_cpu=$(echo - | awk "{print ${num_kube_nodes} * ${metrics_cpu_per_node} + 80}")m
     fi
     controller_yaml="${dst_dir}/${file_dir}"
     if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
@@ -714,10 +776,14 @@ function start-kube-addons {
     remove-salt-config-comments "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu *}}@${metrics_cpu}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
@@ -752,10 +818,6 @@ function start-kube-addons {
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "true" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
-    local -r node_problem_detector_file="${dst_dir}/node-problem-detector/node-problem-detector.yaml"
-    mv "${dst_dir}/node-problem-detector/node-problem-detector.yaml.in" "${node_problem_detector_file}"
-    # Replace the salt configurations with variable values.
-    sed -i -e "s@{{ *pillar\['master_node'\] *}}@${MASTER_NAME}@g" "${node_problem_detector_file}"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"
@@ -789,7 +851,6 @@ function start-lb-controller {
        /etc/kubernetes/manifests/
   fi
 }
-
 
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
@@ -838,6 +899,7 @@ fi
 source "${KUBE_HOME}/kube-env"
 config-ip-firewall
 create-dirs
+ensure-local-ssds
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-master-auth

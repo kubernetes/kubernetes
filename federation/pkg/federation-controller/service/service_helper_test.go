@@ -20,15 +20,15 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-func buildServiceStatus(ingresses [][]string) api.LoadBalancerStatus {
-	status := api.LoadBalancerStatus{
-		Ingress: []api.LoadBalancerIngress{},
+func buildServiceStatus(ingresses [][]string) v1.LoadBalancerStatus {
+	status := v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{},
 	}
 	for _, element := range ingresses {
-		ingress := api.LoadBalancerIngress{IP: element[0], Hostname: element[1]}
+		ingress := v1.LoadBalancerIngress{IP: element[0], Hostname: element[1]}
 		status.Ingress = append(status.Ingress, ingress)
 	}
 	return status
@@ -41,18 +41,18 @@ func TestProcessServiceUpdate(t *testing.T) {
 	tests := []struct {
 		name             string
 		cachedService    *cachedService
-		service          *api.Service
+		service          *v1.Service
 		clusterName      string
 		expectNeedUpdate bool
-		expectStatus     api.LoadBalancerStatus
+		expectStatus     v1.LoadBalancerStatus
 	}{
 		{
 			"no-cache",
 			&cachedService{
-				lastState:        &api.Service{},
-				serviceStatusMap: make(map[string]api.LoadBalancerStatus),
+				lastState:        &v1.Service{},
+				serviceStatusMap: make(map[string]v1.LoadBalancerStatus),
 			},
-			&api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
+			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
 			"foo",
 			true,
 			buildServiceStatus([][]string{{"ip1", ""}}),
@@ -60,12 +60,12 @@ func TestProcessServiceUpdate(t *testing.T) {
 		{
 			"same-ingress",
 			&cachedService{
-				lastState: &api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
-				serviceStatusMap: map[string]api.LoadBalancerStatus{
-					"foo1": {Ingress: []api.LoadBalancerIngress{{"ip1", ""}}},
+				lastState: &v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
+				serviceStatusMap: map[string]v1.LoadBalancerStatus{
+					"foo1": {Ingress: []v1.LoadBalancerIngress{{"ip1", ""}}},
 				},
 			},
-			&api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
+			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
 			"foo1",
 			false,
 			buildServiceStatus([][]string{{"ip1", ""}}),
@@ -73,14 +73,14 @@ func TestProcessServiceUpdate(t *testing.T) {
 		{
 			"diff-cluster",
 			&cachedService{
-				lastState: &api.Service{
-					ObjectMeta: api.ObjectMeta{Name: "bar1"},
+				lastState: &v1.Service{
+					ObjectMeta: v1.ObjectMeta{Name: "bar1"},
 				},
-				serviceStatusMap: map[string]api.LoadBalancerStatus{
-					"foo2": {Ingress: []api.LoadBalancerIngress{{"ip1", ""}}},
+				serviceStatusMap: map[string]v1.LoadBalancerStatus{
+					"foo2": {Ingress: []v1.LoadBalancerIngress{{"ip1", ""}}},
 				},
 			},
-			&api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
+			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
 			"foo1",
 			true,
 			buildServiceStatus([][]string{{"ip1", ""}}),
@@ -88,12 +88,12 @@ func TestProcessServiceUpdate(t *testing.T) {
 		{
 			"diff-ingress",
 			&cachedService{
-				lastState: &api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip4", ""}, {"ip1", ""}, {"ip2", ""}})}},
-				serviceStatusMap: map[string]api.LoadBalancerStatus{
+				lastState: &v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip4", ""}, {"ip1", ""}, {"ip2", ""}})}},
+				serviceStatusMap: map[string]v1.LoadBalancerStatus{
 					"foo1": buildServiceStatus([][]string{{"ip4", ""}, {"ip1", ""}, {"ip2", ""}}),
 				},
 			},
-			&api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip2", ""}, {"ip3", ""}, {"ip5", ""}})}},
+			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip2", ""}, {"ip3", ""}, {"ip5", ""}})}},
 			"foo1",
 			true,
 			buildServiceStatus([][]string{{"ip2", ""}, {"ip3", ""}, {"ip5", ""}}),
@@ -117,20 +117,20 @@ func TestProcessServiceDeletion(t *testing.T) {
 	tests := []struct {
 		name             string
 		cachedService    *cachedService
-		service          *api.Service
+		service          *v1.Service
 		clusterName      string
 		expectNeedUpdate bool
-		expectStatus     api.LoadBalancerStatus
+		expectStatus     v1.LoadBalancerStatus
 	}{
 		{
 			"same-ingress",
 			&cachedService{
-				lastState: &api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
-				serviceStatusMap: map[string]api.LoadBalancerStatus{
-					"foo1": {Ingress: []api.LoadBalancerIngress{{"ip1", ""}}},
+				lastState: &v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
+				serviceStatusMap: map[string]v1.LoadBalancerStatus{
+					"foo1": {Ingress: []v1.LoadBalancerIngress{{"ip1", ""}}},
 				},
 			},
-			&api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
+			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
 			"foo1",
 			true,
 			buildServiceStatus([][]string{}),
@@ -138,13 +138,13 @@ func TestProcessServiceDeletion(t *testing.T) {
 		{
 			"diff-ingress",
 			&cachedService{
-				lastState: &api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip4", ""}, {"ip1", ""}, {"ip2", ""}, {"ip3", ""}, {"ip5", ""}, {"ip6", ""}, {"ip8", ""}})}},
-				serviceStatusMap: map[string]api.LoadBalancerStatus{
+				lastState: &v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip4", ""}, {"ip1", ""}, {"ip2", ""}, {"ip3", ""}, {"ip5", ""}, {"ip6", ""}, {"ip8", ""}})}},
+				serviceStatusMap: map[string]v1.LoadBalancerStatus{
 					"foo1": buildServiceStatus([][]string{{"ip1", ""}, {"ip2", ""}, {"ip3", ""}}),
 					"foo2": buildServiceStatus([][]string{{"ip5", ""}, {"ip6", ""}, {"ip8", ""}}),
 				},
 			},
-			&api.Service{Status: api.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}, {"ip2", ""}, {"ip3", ""}})}},
+			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}, {"ip2", ""}, {"ip3", ""}})}},
 			"foo1",
 			true,
 			buildServiceStatus([][]string{{"ip4", ""}, {"ip5", ""}, {"ip6", ""}, {"ip8", ""}}),

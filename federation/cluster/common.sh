@@ -24,14 +24,36 @@
 
 : "${KUBE_ROOT?Must set KUBE_ROOT env var}"
 
+# Provides the $KUBERNETES_PROVIDER variable and detect-project function
+source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+# If $FEDERATION_PUSH_REPO_BASE isn't set, then set the GCR registry name
+# based on the detected project name for gce and gke providers.
+FEDERATION_PUSH_REPO_BASE=${FEDERATION_PUSH_REPO_BASE:-}
+if [[ -z "${FEDERATION_PUSH_REPO_BASE}" ]]; then
+    if [[ "${KUBERNETES_PROVIDER}" == "gke" || "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+        # Populates $PROJECT
+        detect-project
+        if [[ ${PROJECT} == *':'* ]]; then
+            echo "${PROJECT} contains ':' and can not be used as FEDERATION_PUSH_REPO_BASE. Please set FEDERATION_PUSH_REPO_BASE explicitly."
+            exit 1
+        fi
+        FEDERATION_PUSH_REPO_BASE=gcr.io/${PROJECT}
+    else
+        echo "Must set FEDERATION_PUSH_REPO_BASE env var"
+        exit 1
+    fi
+fi
+
 FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}
-FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-e2e}
+FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation}
 
 KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 KUBE_ARCH=${KUBE_ARCH:-amd64}
 KUBE_BUILD_STAGE=${KUBE_BUILD_STAGE:-release-stage}
 
 source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 
@@ -40,7 +62,7 @@ host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE
 
 # Optional
 # FEDERATION_IMAGE_TAG: reference and pull all federated images with this tag. Used for ci testing
-function create-federated-api-objects {
+function create-federation-api-objects {
 (
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
     export FEDERATION_APISERVER_DEPLOYMENT_NAME="federation-apiserver"
@@ -51,24 +73,40 @@ function create-federated-api-objects {
     export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager"
     export FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-controller-manager.docker_tag)}"
 
+    if [[ -z "${FEDERATION_DNS_PROVIDER:-}" ]]; then
+      # Set the appropriate value based on cloud provider.
+      if [[ "$KUBERNETES_PROVIDER" == "gce" || "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+        echo "setting dns provider to google-clouddns"
+        export FEDERATION_DNS_PROVIDER="google-clouddns"
+      elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+        echo "setting dns provider to aws-route53"
+        export FEDERATION_DNS_PROVIDER="aws-route53"
+      else
+        echo "Must set FEDERATION_DNS_PROVIDER env var"
+        exit 1
+      fi
+    fi
+
     export FEDERATION_SERVICE_CIDR=${FEDERATION_SERVICE_CIDR:-"10.10.0.0/24"}
 
     #Only used for providers that require a nodeport service (vagrant for now)
     #We will use loadbalancer services where we can
     export FEDERATION_API_NODEPORT=32111
     export FEDERATION_NAMESPACE
+    export FEDERATION_NAME="${FEDERATION_NAME:-federation}"
+    export DNS_ZONE_NAME="${DNS_ZONE_NAME:-federation.example}"  # See https://tools.ietf.org/html/rfc2606
 
     template="go run ${KUBE_ROOT}/federation/cluster/template.go"
 
     FEDERATION_KUBECONFIG_PATH="${KUBE_ROOT}/federation/cluster/kubeconfig"
 
-    federation_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --context=federated-cluster --namespace=default"
+    federation_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --context=federation-cluster --namespace=default"
 
     manifests_root="${KUBE_ROOT}/federation/manifests/"
 
     $template "${manifests_root}/federation-ns.yaml" | $host_kubectl apply -f -
 
-    cleanup-federated-api-objects
+    cleanup-federation-api-objects
 
     export FEDERATION_API_HOST=""
     export KUBE_MASTER_IP=""
@@ -107,8 +145,35 @@ function create-federated-api-objects {
     FEDERATION_API_TOKEN="$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)"
     export FEDERATION_API_KNOWN_TOKENS="${FEDERATION_API_TOKEN},admin,admin"
 
+    # Create a kubeconfig with credentails for federation-apiserver. We will
+    # then use this kubeconfig to create a secret which the federation
+    # controller manager can use to talk to the federation-apiserver.
+    # Note that the file name should be "kubeconfig" so that the secret key gets the same name.
+    KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
+    CONTEXT=federation-cluster \
+	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
+           KUBECONFIG="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" \
+	   create-kubeconfig
+
+    # Create secret with federation-apiserver's kubeconfig
+    $host_kubectl create secret generic federation-apiserver-secret --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+
+    # Create secrets with all the kubernetes-apiserver's kubeconfigs.
+    for dir in ${KUBECONFIG_DIR}/federation/kubernetes-apiserver/*; do
+      # We create a secret with the same name as the directory name (which is
+      # same as cluster name in kubeconfig)
+      name=$(basename $dir)
+      $host_kubectl create secret generic ${name} --from-file="${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+    done
+
     $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
     $template "${manifests_root}/federation-controller-manager-deployment.yaml" | $host_kubectl create -f -
+
+    # Update the users kubeconfig to include federation-apiserver credentials.
+    CONTEXT=federation-cluster \
+	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
+	   SECONDARY_KUBECONFIG=true \
+	   create-kubeconfig
 
     # Don't finish provisioning until federation-apiserver pod is running
     for i in {1..30};do
@@ -145,11 +210,6 @@ function create-federated-api-objects {
 
 	sleep 4
     done
-    
-    CONTEXT=federated-cluster \
-	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
-	   SECONDARY_KUBECONFIG=true \
-	   create-kubeconfig
 )
 }
 
@@ -158,7 +218,7 @@ function create-federated-api-objects {
 
 # Optional
 # FEDERATION_IMAGE_TAG: push all federated images with this tag. Used for ci testing
-function push-federated-images {
+function push-federation-images {
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
     local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"federation-apiserver federation-controller-manager"}
 
@@ -187,7 +247,7 @@ function push-federated-images {
 	local dstImageName="${FEDERATION_PUSH_REPO_BASE}/${binary}:${dstImageTag}"
 
 	echo "Tag: ${srcImageName} --> ${dstImageName}"
-	docker tag "$srcImageName" "$dstImageName"
+	docker tag -f "$srcImageName" "$dstImageName"
 
 	echo "Push: $dstImageName"
 	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]];then
@@ -207,6 +267,9 @@ function push-federated-images {
 
     done
 }
-function cleanup-federated-api-objects {
-    $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
+function cleanup-federation-api-objects {
+  # Delete all resources with the federated-cluster label.
+  $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
+  # Delete all resources in FEDERATION_NAMESPACE.
+  $host_kubectl delete pods,svc,rc,deployment,secret --namespace=${FEDERATION_NAMESPACE} --all
 }

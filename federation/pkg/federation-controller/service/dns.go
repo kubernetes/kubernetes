@@ -44,6 +44,10 @@ func (s *ServiceController) getHealthyEndpoints(clusterName string, cachedServic
 			return nil, nil, nil, err
 		}
 		for _, ingress := range lbStatus.Ingress {
+			readyEndpoints, ok := cachedService.endpointMap[lbClusterName]
+			if !ok || readyEndpoints == 0 {
+				continue
+			}
 			var address string
 			// We should get either an IP address or a hostname - use whichever one we get
 			if ingress.IP != "" {
@@ -85,8 +89,7 @@ func (s *ServiceController) getClusterZoneNames(clusterName string) (zones []str
 
 // getFederationDNSZoneName returns the name of the managed DNS Zone configured for this federation
 func (s *ServiceController) getFederationDNSZoneName() (string, error) {
-	return "example.com", nil // TODO: quinton: Get this from the federation configuration.
-	// Note: For unit testing this must match the domain populated in the test/stub dnsprovider.
+	return s.zoneName, nil
 }
 
 // getDnsZone is a hack around the fact that dnsprovider does not yet support a Get() method, only a List() method.  TODO:  Fix that.
@@ -147,7 +150,7 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 /* ensureDnsRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
    if endpoints is nil or empty, a CNAME record to uplevelCname is ensured.
 */
-func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoints []string, uplevelCname string) error {
+func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoints []string, uplevelCname string, endpointReachable bool) error {
 	dnsZone, err := getDnsZone(dnsZoneName, s.dnsZones)
 	if err != nil {
 		return err
@@ -161,29 +164,31 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 		return err
 	}
 	if rrset == nil {
-		// It doesn't exist yet, so create it, if we indeed have healthy endpoints
-		if len(endpoints) < 1 {
-			// There are no endpoint addresses at this level, so CNAME to uplevel, if provided
-			if uplevelCname != "" {
-				newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
+		if endpointReachable {
+			// It doesn't exist yet, so create it, if we indeed have healthy endpoints
+			if len(endpoints) < 1 {
+				// There are no endpoint addresses at this level, so CNAME to uplevel, if provided
+				if uplevelCname != "" {
+					newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
+					rrset, err = rrsets.Add(newRrset)
+					if err != nil {
+						return err
+					}
+				}
+				// else we want no record, and we have no record, so we're all good.
+			} else {
+				// We have valid endpoint addresses, so just add them as A records.
+				// But first resolve DNS names, as some cloud providers (like AWS) expose
+				// load balancers behind DNS names, not IP addresses.
+				resolvedEndpoints, err := getResolvedEndpoints(endpoints)
+				if err != nil {
+					return err // TODO: We could potentially add the ones we did get back, even if some of them failed to resolve.
+				}
+				newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
 				rrset, err = rrsets.Add(newRrset)
 				if err != nil {
 					return err
 				}
-			}
-			// else we want no record, and we have no record, so we're all good.
-		} else {
-			// We have valid endpoint addresses, so just add them as A records.
-			// But first resolve DNS names, as some cloud providers (like AWS) expose
-			// load balancers behind DNS names, not IP addresses.
-			resolvedEndpoints, err := getResolvedEndpoints(endpoints)
-			if err != nil {
-				return err // TODO: We could potentially add the ones we did get back, even if some of them failed to resolve.
-			}
-			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
-			rrset, err = rrsets.Add(newRrset)
-			if err != nil {
-				return err
 			}
 		}
 	} else {
@@ -192,6 +197,11 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			// Need an appropriate CNAME record.  Check that we have it.
 			newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
 			if rrset == newRrset {
+				if !endpointReachable {
+					if err = rrsets.Remove(rrset); err != nil {
+						return err
+					}
+				}
 				// The existing rrset is equal to the required one - our work is done here
 				return nil
 			} else {
@@ -200,7 +210,7 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 				if err = rrsets.Remove(rrset); err != nil {
 					return err
 				}
-				if uplevelCname != "" {
+				if uplevelCname != "" && endpointReachable {
 					if _, err = rrsets.Add(newRrset); err != nil {
 						return err
 					}
@@ -215,6 +225,11 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			}
 			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
 			if rrset == newRrset {
+				if !endpointReachable {
+					if err = rrsets.Remove(rrset); err != nil {
+						return err
+					}
+				}
 				// The existing rrset is equal to the required one - our work is done here
 				// TODO: We could be more thorough about checking for equivalence to avoid unnecessary updates, but in the
 				//       worst case we'll just replace what's there with an equivalent, if not exactly identical record set.
@@ -225,8 +240,10 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 				if err = rrsets.Remove(rrset); err != nil {
 					return err
 				}
-				if _, err = rrsets.Add(newRrset); err != nil {
-					return err
+				if endpointReachable {
+					if _, err = rrsets.Add(newRrset); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -257,12 +274,18 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	if s == nil {
 		return fmt.Errorf("nil ServiceController passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
 	}
+	if s.dns == nil {
+		return nil
+	}
 	if cachedService == nil {
 		return fmt.Errorf("nil cachedService passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
 	}
 	serviceName := cachedService.lastState.Name
 	namespaceName := cachedService.lastState.Namespace
 	zoneNames, regionName, err := s.getClusterZoneNames(clusterName)
+	if zoneNames == nil {
+		return fmt.Errorf("fail to get cluster zone names")
+	}
 	if err != nil {
 		return err
 	}
@@ -274,7 +297,7 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	if err != nil {
 		return err
 	}
-
+	_, endpointReachable := cachedService.endpointMap[clusterName]
 	commonPrefix := serviceName + "." + namespaceName + "." + s.federationName + ".svc"
 	// dnsNames is the path up the DNS search tree, starting at the leaf
 	dnsNames := []string{
@@ -287,7 +310,7 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	endpoints := [][]string{zoneEndpoints, regionEndpoints, globalEndpoints}
 
 	for i, endpoint := range endpoints {
-		if err = s.ensureDnsRrsets(dnsZoneName, dnsNames[i], endpoint, dnsNames[i+1]); err != nil {
+		if err = s.ensureDnsRrsets(dnsZoneName, dnsNames[i], endpoint, dnsNames[i+1], endpointReachable); err != nil {
 			return err
 		}
 	}

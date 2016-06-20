@@ -57,13 +57,26 @@ func (plugin *vsphereVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *vsphereVolumePlugin) Name() string {
+func (plugin *vsphereVolumePlugin) GetPluginName() string {
 	return vsphereVolumePluginName
+}
+
+func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.VolumePath, nil
 }
 
 func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.VsphereVolume != nil) ||
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
+}
+
+func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *vsphereVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
@@ -75,11 +88,9 @@ func (plugin *vsphereVolumePlugin) NewUnmounter(volName string, podUID types.UID
 }
 
 func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager vdManager, mounter mount.Interface) (volume.Mounter, error) {
-	var vvol *api.VsphereVirtualDiskVolumeSource
-	if spec.Volume != nil && spec.Volume.VsphereVolume != nil {
-		vvol = spec.Volume.VsphereVolume
-	} else {
-		vvol = spec.PersistentVolume.Spec.VsphereVolume
+	vvol, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	volPath := vvol.VolumePath
@@ -416,4 +427,16 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 	}
 	return pv, nil
+}
+
+func getVolumeSource(
+	spec *volume.Spec) (*api.VsphereVirtualDiskVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.VsphereVolume != nil {
+		return spec.Volume.VsphereVolume, spec.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.VsphereVolume != nil {
+		return spec.PersistentVolume.Spec.VsphereVolume, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
 }

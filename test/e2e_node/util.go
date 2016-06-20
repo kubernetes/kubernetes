@@ -19,8 +19,8 @@ package e2e_node
 import (
 	"flag"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -32,9 +32,17 @@ var startServices = flag.Bool("start-services", true, "If true, start local node
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 
 func NewDefaultFramework(baseName string) *framework.Framework {
-	client := client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
-	return framework.NewFramework(baseName, framework.FrameworkOptions{
-		ClientQPS:   100,
-		ClientBurst: 100,
-	}, client)
+	// Provides a client config for the framework to create a client.
+	f := func() (*restclient.Config, error) {
+		return &restclient.Config{Host: *apiServerAddress}, nil
+	}
+	return framework.NewFrameworkWithConfigGetter(baseName,
+		framework.FrameworkOptions{
+			ClientQPS:   100,
+			ClientBurst: 100,
+		}, nil, f)
+}
+
+func assignPodToNode(pod *api.Pod) {
+	pod.Spec.NodeName = *nodeName
 }

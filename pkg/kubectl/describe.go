@@ -724,6 +724,11 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 
 	storage := pv.Spec.Capacity[api.ResourceStorage]
 
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Events(namespace).Search(pv)
+	}
+
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(out, "Labels", pv.Labels)
@@ -754,6 +759,10 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printGlusterfsVolumeSource(pv.Spec.Glusterfs, out)
 		case pv.Spec.RBD != nil:
 			printRBDVolumeSource(pv.Spec.RBD, out)
+		}
+
+		if events != nil {
+			DescribeEvents(events, out)
 		}
 
 		return nil
@@ -1294,7 +1303,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%v\n", ing.Name)
 		fmt.Fprintf(out, "Namespace:\t%v\n", ing.Namespace)
-		fmt.Fprintf(out, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer))
+		fmt.Fprintf(out, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
 		def := ing.Spec.Backend
 		ns := ing.Namespace
 		if def == nil {

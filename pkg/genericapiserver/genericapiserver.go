@@ -696,7 +696,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if shouldGenSelfSignedCerts(options.TLSCertFile, options.TLSPrivateKeyFile) {
+			if crypto.ShouldGenSelfSignedCerts(options.TLSCertFile, options.TLSPrivateKeyFile) {
 				if err := crypto.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 					glog.Errorf("Unable to generate self signed cert: %v", err)
 				} else {
@@ -733,28 +733,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	glog.Fatal(http.ListenAndServe())
-}
-
-// If the file represented by path exists and
-// readable, return true otherwise return false.
-func canReadFile(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-
-	defer f.Close()
-
-	return true
-}
-
-func shouldGenSelfSignedCerts(certPath, keyPath string) bool {
-	if canReadFile(certPath) || canReadFile(keyPath) {
-		glog.Infof("using existing apiserver.crt and apiserver.key files")
-		return false
-	}
-
-	return true
 }
 
 // Exposes the given group version in API.

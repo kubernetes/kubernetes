@@ -69,6 +69,7 @@ option go_package = "runtime";
 // in the Object. (TODO: In the case where the object is of an unknown type, a
 // runtime.Unknown object will be created and stored.)
 // 
+// +gencopy=true
 // +protobuf=true
 message RawExtension {
   // Raw is the underlying serialization of this object.
@@ -88,6 +89,7 @@ message RawExtension {
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 // 
+// +gencopy=true
 // +protobuf=true
 message TypeMeta {
   optional string apiVersion = 1;
@@ -101,6 +103,7 @@ message TypeMeta {
 // TODO: Make this object have easy access to field based accessors and settors for
 // metadata and field mutatation.
 // 
+// +gencopy=true
 // +protobuf=true
 message Unknown {
   optional TypeMeta typeMeta = 1;

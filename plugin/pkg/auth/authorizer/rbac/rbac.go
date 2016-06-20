@@ -65,7 +65,7 @@ func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) error {
 	return validation.ConfirmNoEscalation(ctx, r.authorizationRuleResolver, []rbac.PolicyRule{requestedRule})
 }
 
-func New(roleRegistry role.Registry, roleBindingRegistry rolebinding.Registry, clusterRoleRegistry clusterrole.Registry, clusterRoleBindingRegistry clusterrolebinding.Registry, superUser string) (*RBACAuthorizer, error) {
+func New(roleRegistry role.Registry, roleBindingRegistry rolebinding.Registry, clusterRoleRegistry clusterrole.Registry, clusterRoleBindingRegistry clusterrolebinding.Registry, superUser string) *RBACAuthorizer {
 	authorizer := &RBACAuthorizer{
 		superUser: superUser,
 		authorizationRuleResolver: validation.NewDefaultRuleResolver(
@@ -75,5 +75,5 @@ func New(roleRegistry role.Registry, roleBindingRegistry rolebinding.Registry, c
 			clusterRoleBindingRegistry,
 		),
 	}
-	return authorizer, nil
+	return authorizer
 }

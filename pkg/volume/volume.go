@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -147,11 +146,11 @@ type Attacher interface {
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
 	// point which should be bind mounted for individual volumes.
-	GetDeviceMountPath(spec *Spec) string
+	GetDeviceMountPath(spec *Spec) (string, error)
 
 	// MountDevice mounts the disk to a global path which
 	// individual pods can then bind mount
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error
+	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
 }
 
 // Detacher can detach a volume from a node.
@@ -167,7 +166,7 @@ type Detacher interface {
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
 	// unmounted.
-	UnmountDevice(deviceMountPath string, mounter mount.Interface) error
+	UnmountDevice(deviceMountPath string) error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {

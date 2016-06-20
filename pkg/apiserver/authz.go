@@ -143,16 +143,13 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
 		case ModeRBAC:
-			rbacAuthorizer, err := rbac.New(
+			rbacAuthorizer := rbac.New(
 				config.RBACRoleRegistry,
 				config.RBACRoleBindingRegistry,
 				config.RBACClusterRoleRegistry,
 				config.RBACClusterRoleBindingRegistry,
 				config.RBACSuperUser,
 			)
-			if err != nil {
-				return nil, err
-			}
 			authorizers = append(authorizers, rbacAuthorizer)
 		default:
 			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)

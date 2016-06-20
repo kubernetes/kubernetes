@@ -126,8 +126,13 @@ function kubectl-with-retry()
 }
 
 kube::util::trap_add cleanup EXIT SIGINT
-
 kube::util::ensure-temp-dir
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubectl \
+    cmd/kube-apiserver \
+    cmd/kube-controller-manager
+
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -163,6 +168,9 @@ kube::log::status "Running kubectl with no options"
 
 # Only run kubelet on platforms it supports
 if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubelet
 
 kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
@@ -298,7 +306,7 @@ runTests() {
   image_field="(index .spec.containers 0).image"
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
-  hpa_cpu_field=".spec.cpuUtilization.targetPercentage"
+  hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
   secret_data=".data"
@@ -884,7 +892,7 @@ __EOF__
   [[ "$(kubectl get hpa.v1beta1.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
+  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
   output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
@@ -932,6 +940,77 @@ __EOF__
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
+  ###############
+  # Kubectl get #
+  ###############
+
+  ### Test retrieval of non-existing pods
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}")
+  # Post-condition: POD abc should error since it doesn't exist
+  kube::test::if_has_string "${output_message}" 'pods "abc" not found'
+
+  ### Test retrieval of non-existing POD with output flag specified
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}" -o name)
+  # Post-condition: POD abc should error since it doesn't exist
+  kube::test::if_has_string "${output_message}" 'pods "abc" not found'
+
+  #####################################
+  # Third Party Resources             #
+  #####################################
+  create_and_use_new_namespace
+  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "ThirdPartyResource",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "foo.company.com"
+  },
+  "versions": [
+    {
+      "name": "v1"
+    }
+  ]
+}
+__EOF__
+
+  # Post-Condition: assertion object exist
+  kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'foo.company.com:'
+
+  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/apis/company.com/v1" "third party api"
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create a new resource of type Foo
+ kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+ {
+  "kind": "Foo",
+  "apiVersion": "company.com/v1",
+  "metadata": {
+    "name": "test"
+  },
+  "some-field": "field1",
+  "other-field": "field2"
+}
+__EOF__
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete foos test
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # teardown
+  kubectl delete thirdpartyresources foo.company.com "${kube_flags[@]}"
 
   #####################################
   # Recursive Resources via directory #
@@ -997,11 +1076,10 @@ __EOF__
   # Pre-condition: busybox0 & busybox1 PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
-  output_message1=$(kubectl get -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}" -o go-template="{{range.items}}{{$id_field}}:{{end}}")
-  output_message2=$(! kubectl get -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}")
+  output_message=$(! kubectl get -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}" -o go-template="{{range.items}}{{$id_field}}:{{end}}")
   # Post-condition: busybox0 & busybox1 PODs are retrieved, but because busybox2 is malformed, it should not show up
-  kube::test::if_has_string "${output_message1}" "busybox0:busybox1:"
-  kube::test::if_has_string "${output_message2}" "Object 'Kind' is missing"
+  kube::test::if_has_string "${output_message}" "busybox0:busybox1:"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
 
   ## Label multiple busybox PODs recursively from directory of YAML files
   # Pre-condition: busybox0 & busybox1 PODs exist
@@ -1050,8 +1128,8 @@ __EOF__
   output_message=$(! kubectl autoscale --min=1 --max=2 -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox replication controllers are autoscaled
   # with min. of 1 replica & max of 2 replicas, and since busybox2 is malformed, it should error
-  kube::test::get_object_assert 'hpa busybox0' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 80'
-  kube::test::get_object_assert 'hpa busybox1' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 80'
+  kube::test::get_object_assert 'hpa busybox0' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 <no value>'
+  kube::test::get_object_assert 'hpa busybox1' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 <no value>'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   kubectl delete hpa busybox0 "${kube_flags[@]}"
   kubectl delete hpa busybox1 "${kube_flags[@]}"
@@ -1652,9 +1730,17 @@ __EOF__
   kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
   kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 2~3 pods, default CPU utilization (80%), rc specified by name
+  # autoscale 1~2 pods, CPU utilization 70%, rc specified by file, using old generator
+  kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70 --generator=horizontalpodautoscaler/v1beta1
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
+  kubectl delete hpa frontend "${kube_flags[@]}"
+  # autoscale 2~3 pods, no CPU utilization specified, rc specified by name
   kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
+  kubectl delete hpa frontend "${kube_flags[@]}"
+  # autoscale 2~3 pods, no CPU utilization specified, rc specified by name, using old generator
+  kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3 --generator=horizontalpodautoscaler/v1beta1
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale without specifying --max should fail
   ! kubectl autoscale rc frontend "${kube_flags[@]}"
@@ -1672,9 +1758,9 @@ __EOF__
   # Command
   kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
-  # autoscale 2~3 pods, default CPU utilization (80%)
+  # autoscale 2~3 pods, no CPU utilization specified
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa.extensions nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the deployment reaper.
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
@@ -1849,9 +1935,9 @@ __EOF__
   kubectl autoscale -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
   kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 2~3 pods, default CPU utilization (80%), replica set specified by name
+  # autoscale 2~3 pods, no CPU utilization specified, replica set specified by name
   kubectl autoscale rs frontend "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale without specifying --max should fail
   ! kubectl autoscale rs frontend "${kube_flags[@]}"

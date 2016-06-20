@@ -25,7 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
@@ -51,10 +53,15 @@ const (
 type Framework struct {
 	BaseName string
 
-	Client        *client.Client
-	Clientset_1_2 *release_1_2.Clientset
-	Clientset_1_3 *release_1_3.Clientset
+	ClientConfigGetter ClientConfigGetter
+	Client             *client.Client
+	Clientset_1_2      *release_1_2.Clientset
+	Clientset_1_3      *release_1_3.Clientset
 
+	// TODO(mml): Remove this.  We should generally use the versioned clientset.
+	FederationClientset     *federation_internalclientset.Clientset
+	FederationClientset_1_3 *federation_release_1_3.Clientset
+	// TODO: remove FederationClient, all the client access must be through FederationClientset
 	FederationClient *unversionedfederation.FederationClient
 
 	Namespace                *api.Namespace   // Every test has at least one namespace
@@ -110,11 +117,16 @@ func NewDefaultFederatedFramework(baseName string) *Framework {
 }
 
 func NewFramework(baseName string, options FrameworkOptions, client *client.Client) *Framework {
+	return NewFrameworkWithConfigGetter(baseName, options, client, LoadConfig)
+}
+
+func NewFrameworkWithConfigGetter(baseName string, options FrameworkOptions, client *client.Client, configGetter ClientConfigGetter) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
 		options:                  options,
 		Client:                   client,
+		ClientConfigGetter:       configGetter,
 	}
 
 	BeforeEach(f.BeforeEach)
@@ -130,7 +142,7 @@ func (f *Framework) BeforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.Client == nil {
 		By("Creating a kubernetes client")
-		config, err := LoadConfig()
+		config, err := f.ClientConfigGetter()
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = f.options.ClientQPS
 		config.Burst = f.options.ClientBurst
@@ -146,11 +158,29 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	if f.federated && f.FederationClient == nil {
-		By("Creating a federated kubernetes client")
-		var err error
-		f.FederationClient, err = LoadFederationClient()
+	if f.federated {
+		if f.FederationClient == nil {
+			By("Creating a federated kubernetes client")
+			var err error
+			f.FederationClient, err = LoadFederationClient()
+			Expect(err).NotTo(HaveOccurred())
+		}
+		if f.FederationClientset == nil {
+			By("Creating an unversioned federation Clientset")
+			var err error
+			f.FederationClientset, err = LoadFederationClientset()
+			Expect(err).NotTo(HaveOccurred())
+		}
+		if f.FederationClientset_1_3 == nil {
+			By("Creating a release 1.3 federation Clientset")
+			var err error
+			f.FederationClientset_1_3, err = LoadFederationClientset_1_3()
+			Expect(err).NotTo(HaveOccurred())
+		}
+		By("Waiting for federation-apiserver to be ready")
+		err := WaitForFederationApiserverReady(f.FederationClientset)
 		Expect(err).NotTo(HaveOccurred())
+		By("federation-apiserver is ready")
 	}
 
 	By("Building a namespace api object")
@@ -229,7 +259,11 @@ func (f *Framework) AfterEach() {
 	if f.federated {
 		defer func() {
 			if f.FederationClient == nil {
-				Logf("Warning: framework is marked federated, but has no FederationClient")
+				Logf("Warning: framework is marked federated, but has no federation client")
+				return
+			}
+			if f.FederationClientset == nil {
+				Logf("Warning: framework is marked federated, but has no federation clientset")
 				return
 			}
 			if err := f.FederationClient.Clusters().DeleteCollection(nil, api.ListOptions{}); err != nil {
@@ -242,7 +276,11 @@ func (f *Framework) AfterEach() {
 	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		DumpAllNamespaceInfo(f.Client, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
-		LogPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels)
+		LogContainersInPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels, "image-puller")
+		if f.federated {
+			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
+			LogPodsWithLabels(f.Client, "federation", map[string]string{"app": "federated-cluster"})
+		}
 	}
 
 	summaries := make([]TestDataSummary, 0)
@@ -265,7 +303,7 @@ func (f *Framework) AfterEach() {
 		if err != nil {
 			Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 		} else {
-			received, err := grabber.Grab(nil)
+			received, err := grabber.Grab()
 			if err != nil {
 				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 			} else {
@@ -565,7 +603,7 @@ func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 
 	e2eContexts := []E2EContext{}
 	for _, context := range kubeconfig.Contexts {
-		if strings.HasPrefix(context.Name, "federation-e2e") {
+		if strings.HasPrefix(context.Name, "federation") && context.Name != "federation-cluster" {
 
 			user := kubeconfig.findUser(context.Context.User)
 			if user == nil {

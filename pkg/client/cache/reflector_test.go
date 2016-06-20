@@ -252,7 +252,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 
 	// Verify we received the right ids with the right resource versions.
 	for i, id := range ids {
-		pod := s.Pop().(*api.Pod)
+		pod := Pop(s).(*api.Pod)
 		if e, a := id, pod.Name; e != a {
 			t.Errorf("%v: Expected %v, got %v", i, e, a)
 		}

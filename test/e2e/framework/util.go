@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	goRuntime "runtime"
 	"sort"
 	"strconv"
@@ -37,7 +38,9 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -62,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -152,9 +156,14 @@ const (
 	RestartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-// Label allocated to the image puller static pod that runs on each node
-// before e2es.
-var ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+var (
+	// Label allocated to the image puller static pod that runs on each node
+	// before e2es.
+	ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+
+	// For parsing Kubectl version for version-skewed testing.
+	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
+)
 
 // GetServerArchitecture fetches the architecture of the cluster's apiserver.
 func GetServerArchitecture(c *client.Client) string {
@@ -381,7 +390,7 @@ func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInter
 func SkipUnlessFederated(c *client.Client) {
 	federationNS := os.Getenv("FEDERATION_NAMESPACE")
 	if federationNS == "" {
-		federationNS = "federation-e2e"
+		federationNS = "federation"
 	}
 
 	_, err := c.Namespaces().Get(federationNS)
@@ -539,9 +548,10 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 // that it requires the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
 // waiting.
-// If ignoreSuccessPods is true, pods in the "Success" state are ignored and
-// this function waits for minPods to enter Running/Ready. Otherwise an error is
-// returned even if there are minPods pods, some of which are in Running/Ready
+// If ignoreLabels is not empty, pods matching this selector are ignored and
+// this function waits for minPods to enter Running/Ready and for all pods
+// matching ignoreLabels to enter Success phase. Otherwise an error is returned
+// even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
 func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
@@ -549,6 +559,14 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var waitForSuccessError error
+	go func() {
+		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
+		wg.Done()
+	}()
+
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		// We get the new list of pods and replication controllers in every
 		// iteration because more pods come online during startup and we want to
@@ -603,6 +621,10 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	}) != nil {
 		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 	}
+	wg.Wait()
+	if waitForSuccessError != nil {
+		return waitForSuccessError
+	}
 	return nil
 }
 
@@ -655,17 +677,20 @@ func RunKubernetesServiceTestContainer(c *client.Client, repoRoot string, ns str
 	}
 }
 
-func kubectlLogPod(c *client.Client, pod api.Pod) {
+func kubectlLogPod(c *client.Client, pod api.Pod, containerNameSubstr string) {
 	for _, container := range pod.Spec.Containers {
-		logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
-		if err != nil {
-			logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+		if strings.Contains(container.Name, containerNameSubstr) {
+			// Contains() matches all strings if substr is empty
+			logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
 			if err != nil {
-				Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+				if err != nil {
+					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				}
 			}
+			By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
+			Logf("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
 		}
-		By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
-		Logf(logs)
 	}
 }
 
@@ -678,7 +703,7 @@ func LogFailedContainers(c *client.Client, ns string) {
 	Logf("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod)
+			kubectlLogPod(c, pod, "")
 		}
 	}
 }
@@ -691,7 +716,18 @@ func LogPodsWithLabels(c *client.Client, ns string, match map[string]string) {
 	}
 	Logf("Running kubectl logs on pods with labels %v in %v", match, ns)
 	for _, pod := range podList.Items {
-		kubectlLogPod(c, pod)
+		kubectlLogPod(c, pod, "")
+	}
+}
+
+func LogContainersInPodsWithLabels(c *client.Client, ns string, match map[string]string, containerSubstr string) {
+	podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(match)})
+	if err != nil {
+		Logf("Error getting pods in namespace %q: %v", ns, err)
+		return
+	}
+	for _, pod := range podList.Items {
+		kubectlLogPod(c, pod, containerSubstr)
 	}
 }
 
@@ -828,6 +864,18 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
+// WaitForFederationApiserverReady waits for the federation apiserver to be ready.
+// It tests the readiness by sending a GET request and expecting a non error response.
+func WaitForFederationApiserverReady(c *federation_internalclientset.Clientset) error {
+	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		_, err := c.Federation().Clusters().List(api.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 // WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
 func WaitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Client, pvName string, Poll, timeout time.Duration) error {
 	Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
@@ -910,6 +958,7 @@ func CreateTestingNS(baseName string, c *client.Client, labels map[string]string
 		var err error
 		got, err = c.Namespaces().Create(namespaceObj)
 		if err != nil {
+			Logf("Unexpected error while creating namespace: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -1333,7 +1382,7 @@ func WaitForService(c *client.Client, namespace, name string, exist bool, interv
 //WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
-		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
+		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
 		list, err := c.Endpoints(namespace).List(api.ListOptions{})
 		if err != nil {
 			return false, err
@@ -1386,7 +1435,7 @@ func WaitForEndpoint(c *client.Client, ns, name string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Failed to get entpoints for %s/%s", ns, name)
+	return fmt.Errorf("Failed to get endpoints for %s/%s", ns, name)
 }
 
 // Context for checking pods responses by issuing GETs to them (via the API
@@ -1486,6 +1535,29 @@ func ServerVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (boo
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.GTE(v), nil
+}
+
+// KubectlVersionGTE returns true if the kubectl version is greater than or
+// equal to v.
+func KubectlVersionGTE(v semver.Version) (bool, error) {
+	kv, err := KubectlVersion()
+	if err != nil {
+		return false, err
+	}
+	return kv.GTE(v), nil
+}
+
+// KubectlVersion gets the version of kubectl that's currently being used (see
+// --kubectl-path in e2e.go to use an alternate kubectl).
+func KubectlVersion() (semver.Version, error) {
+	output := RunKubectlOrDie("version", "--client")
+	matches := gitVersionRegexp.FindStringSubmatch(output)
+	if len(matches) != 2 {
+		return semver.Version{}, fmt.Errorf("Could not find kubectl version in output %v", output)
+	}
+	// Don't use the full match, as it contains "GitVersion:\"" and a
+	// trailing "\"".  Just use the submatch.
+	return version.Parse(matches[1])
 }
 
 func PodsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
@@ -1596,6 +1668,8 @@ func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	return c, nil
 }
 
+type ClientConfigGetter func() (*restclient.Config, error)
+
 func LoadConfig() (*restclient.Config, error) {
 	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
@@ -1608,14 +1682,17 @@ func LoadConfig() (*restclient.Config, error) {
 func LoadFederatedConfig() (*restclient.Config, error) {
 	c, err := restclientConfig(federatedKubeContext)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating federation client config: %v", err.Error())
 	}
 	cfg, err := clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if cfg != nil {
 		//TODO(colhom): this is only here because https://github.com/kubernetes/kubernetes/issues/25422
 		cfg.NegotiatedSerializer = api.Codecs
 	}
-	return cfg, err
+	if err != nil {
+		return cfg, fmt.Errorf("error creating federation client config: %v", err.Error())
+	}
+	return cfg, nil
 }
 
 func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
@@ -1626,6 +1703,44 @@ func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
 	if c.Client.Timeout == 0 {
 		c.Client.Timeout = SingleCallTimeout
 	}
+	return c, nil
+}
+
+func setTimeouts(cs ...*http.Client) {
+	for _, client := range cs {
+		if client.Timeout == 0 {
+			client.Timeout = SingleCallTimeout
+		}
+	}
+}
+
+func LoadFederationClientset() (*federation_internalclientset.Clientset, error) {
+	config, err := LoadFederatedConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := federation_internalclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
+	}
+	// Set timeout for each client in the set.
+	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
+	return c, nil
+}
+
+func LoadFederationClientset_1_3() (*federation_release_1_3.Clientset, error) {
+	config, err := LoadFederatedConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := federation_release_1_3.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
+	}
+	// Set timeout for each client in the set.
+	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
 	return c, nil
 }
 
@@ -1643,7 +1758,7 @@ func loadFederationClientFromConfig(config *restclient.Config) (*unversionedfede
 func LoadFederationClient() (*unversionedfederation.FederationClient, error) {
 	config, err := LoadFederatedConfig()
 	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
+		return nil, err
 	}
 	return loadFederationClientFromConfig(config)
 }
@@ -1838,8 +1953,31 @@ func (b kubectlBuilder) WithStdinReader(reader io.Reader) *kubectlBuilder {
 func (b kubectlBuilder) ExecOrDie() string {
 	str, err := b.Exec()
 	Logf("stdout: %q", str)
+	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
+	// Note that we're still dying after retrying so that we can get visibility to triage it further.
+	if isTimeout(err) {
+		Logf("Hit i/o timeout error, talking to the server 2s later to see if it's temporary.")
+		time.Sleep(2 * time.Second)
+		retryStr, retryErr := RunKubectl("version")
+		Logf("stdout: %q", retryStr)
+		Logf("err: %v", retryErr)
+	}
 	Expect(err).NotTo(HaveOccurred())
 	return str
+}
+
+func isTimeout(err error) bool {
+	switch err := err.(type) {
+	case net.Error:
+		if err.Timeout() {
+			return true
+		}
+	case *url.Error:
+		if err, ok := err.Err.(net.Error); ok && err.Timeout() {
+			return true
+		}
+	}
+	return false
 }
 
 func (b kubectlBuilder) Exec() (string, error) {
@@ -2604,7 +2742,7 @@ func waitListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
 func isNodeSchedulable(node *api.Node) bool {
 	nodeReady := IsNodeConditionSetAsExpected(node, api.NodeReady, true)
 	networkReady := IsNodeConditionUnset(node, api.NodeNetworkUnavailable) ||
-		IsNodeConditionSetAsExpected(node, api.NodeNetworkUnavailable, false)
+		IsNodeConditionSetAsExpectedSilent(node, api.NodeNetworkUnavailable, false)
 	return !node.Spec.Unschedulable && nodeReady && networkReady
 }
 
@@ -2623,7 +2761,7 @@ func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
 }
 
 func WaitForAllNodesSchedulable(c *client.Client) error {
-	return wait.PollImmediate(30*time.Second, 2*time.Hour, func() (bool, error) {
+	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
 		opts := api.ListOptions{
 			ResourceVersion: "0",
 			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector(),
@@ -2634,10 +2772,15 @@ func WaitForAllNodesSchedulable(c *client.Client) error {
 			// Ignore the error here - it will be retried.
 			return false, nil
 		}
+		schedulable := 0
 		for _, node := range nodes.Items {
-			if !isNodeSchedulable(&node) {
-				return false, nil
+			if isNodeSchedulable(&node) {
+				schedulable++
 			}
+		}
+		if schedulable != len(nodes.Items) {
+			Logf("%d/%d nodes schedulable (polling after 30s)", schedulable, len(nodes.Items))
+			return false, nil
 		}
 		return true, nil
 	})
@@ -2873,19 +3016,25 @@ func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			return false, nil
 		}
 		allRSs = append(oldRSs, newRS)
+		// The old/new ReplicaSets need to contain the pod-template-hash label
+		for i := range allRSs {
+			if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+				return false, nil
+			}
+		}
 		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-		totalAvailable, err := deploymentutil.GetAvailablePodsForReplicaSets(c, allRSs, minReadySeconds)
+		totalAvailable, err := deploymentutil.GetAvailablePodsForDeployment(c, deployment, minReadySeconds)
 		if err != nil {
 			return false, err
 		}
 		if totalCreated > maxCreated {
 			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
+			logPodsOfDeployment(c, deployment, minReadySeconds)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
 			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfReplicaSets(c, allRSs, minReadySeconds)
+			logPodsOfDeployment(c, deployment, minReadySeconds)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
@@ -2901,7 +3050,7 @@ func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 
 	if err == wait.ErrWaitTimeout {
 		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-		logPodsOfReplicaSets(c, allRSs, minReadySeconds)
+		logPodsOfDeployment(c, deployment, minReadySeconds)
 	}
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %s status to match expectation: %v", deploymentName, err)
@@ -2958,8 +3107,9 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		if err != nil {
 			return false, err
 		}
+		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
 		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
-		if err != nil {
+		if err != nil || newRS == nil || !labelsutil.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 			return false, err
 		}
 		// Check revision of this deployment, and of the new replica set of this deployment
@@ -2972,6 +3122,9 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	})
 	if err == wait.ErrWaitTimeout {
 		logReplicaSetsOfDeployment(deployment, nil, newRS)
+	}
+	if newRS == nil {
+		return fmt.Errorf("deployment %s failed to create new RS: %v", deploymentName, err)
 	}
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %s (got %s / %s) and new RS %s (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
@@ -3035,17 +3188,28 @@ func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 	for i := range allOldRSs {
 		Logf("All old ReplicaSets (%d/%d) of deployment %s: %+v. Selector = %+v", i+1, len(allOldRSs), deployment.Name, *allOldRSs[i], allOldRSs[i].Spec.Selector)
 	}
-	Logf("New ReplicaSet of deployment %s: %+v. Selector = %+v", deployment.Name, *newRS, newRS.Spec.Selector)
+	if newRS != nil {
+		Logf("New ReplicaSet of deployment %s: %+v. Selector = %+v", deployment.Name, *newRS, newRS.Spec.Selector)
+	} else {
+		Logf("New ReplicaSet of deployment %s is nil.", deployment.Name)
+	}
 }
 
 func WaitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string, desiredGeneration int64) error {
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
 }
 
-func logPodsOfReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int32) {
-	allPods, err := deploymentutil.GetPodsForReplicaSets(c, rss)
+func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment, minReadySeconds int32) {
+	podList, err := deploymentutil.ListPods(deployment,
+		func(namespace string, options api.ListOptions) (*api.PodList, error) {
+			return c.Core().Pods(namespace).List(options)
+		})
+	if err != nil {
+		Logf("Failed to list pods of deployment %s: %v", deployment.Name, err)
+		return
+	}
 	if err == nil {
-		for _, pod := range allPods {
+		for _, pod := range podList.Items {
 			availability := "not available"
 			if deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
 				availability = "available"
@@ -3407,7 +3571,7 @@ func WaitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 	return WaitForNodeToBe(c, name, api.NodeReady, false, timeout)
 }
 
-func IsNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
+func isNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue, silent bool) bool {
 	// Check the node readiness condition (logging all).
 	for _, cond := range node.Status.Conditions {
 		// Ensure that the condition type and the status matches as desired.
@@ -3415,14 +3579,26 @@ func IsNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditio
 			if (cond.Status == api.ConditionTrue) == wantTrue {
 				return true
 			} else {
-				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-					conditionType, node.Name, cond.Status == api.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				if !silent {
+					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+						conditionType, node.Name, cond.Status == api.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				}
 				return false
 			}
 		}
 	}
-	Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
+	if !silent {
+		Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
+	}
 	return false
+}
+
+func IsNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+}
+
+func IsNodeConditionSetAsExpectedSilent(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
 
 func IsNodeConditionUnset(node *api.Node, conditionType api.NodeConditionType) bool {

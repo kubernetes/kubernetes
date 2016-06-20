@@ -33,6 +33,10 @@ var _ = framework.KubeDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 
 	f := framework.NewDefaultFramework("localssd")
 
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gke")
+	})
+
 	It("should write and read from node local SSD [Feature:GKELocalSSD]", func() {
 		framework.Logf("Start local SSD test")
 		createNodePoolWithLocalSsds("np-ssd")
@@ -46,15 +50,15 @@ func createNodePoolWithLocalSsds(nodePoolName string) {
 	out, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create",
 		nodePoolName,
 		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
-		"--local-ssd-count=1").Output()
+		"--local-ssd-count=1").CombinedOutput()
 	if err != nil {
-		framework.Failf("Failed to create node pool %s: %v", nodePoolName, err)
+		framework.Failf("Failed to create node pool %s: Err: %v\n%v", nodePoolName, err, string(out))
 	}
-	framework.Logf("Successfully created node pool %s: %v", nodePoolName, out)
+	framework.Logf("Successfully created node pool %s:\n%v", nodePoolName, string(out))
 }
 
 func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
-	var pod = testPodWithSsd("echo 'hello world' > /mnt/ssd0/data  && sleep 1 && cat /mnt/ssd0/data")
+	var pod = testPodWithSsd("echo 'hello world' > /mnt/disks/ssd0/data  && sleep 1 && cat /mnt/disks/ssd0/data")
 	var msg string
 	var out = []string{"hello world"}
 
@@ -64,7 +68,7 @@ func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
 func testPodWithSsd(command string) *api.Pod {
 	containerName := "test-container"
 	volumeName := "test-ssd-volume"
-	path := "/mnt/ssd0"
+	path := "/mnt/disks/ssd0"
 	podName := "pod-" + string(util.NewUUID())
 	image := "ubuntu:14.04"
 	return &api.Pod{

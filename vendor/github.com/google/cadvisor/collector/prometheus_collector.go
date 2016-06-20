@@ -120,12 +120,18 @@ func (collector *PrometheusCollector) GetSpec() []v1.MetricSpec {
 	}
 
 	lines := strings.Split(string(pageContent), "\n")
+	lineCount := len(lines)
 	for i, line := range lines {
 		if strings.HasPrefix(line, "# HELP") {
-			stopIndex := strings.Index(lines[i+2], "{")
-			if stopIndex == -1 {
-				stopIndex = strings.Index(lines[i+2], " ")
+			if i+2 >= lineCount {
+				break
 			}
+
+			stopIndex := strings.IndexAny(lines[i+2], "{ ")
+			if stopIndex == -1 {
+				continue
+			}
+
 			name := strings.TrimSpace(lines[i+2][0:stopIndex])
 			if _, ok := collector.metricsSet[name]; collector.metricsSet != nil && !ok {
 				continue
