@@ -961,6 +961,58 @@ __EOF__
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
 
   #####################################
+  # Third Party Resources             #
+  #####################################
+  create_and_use_new_namespace
+  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "ThirdPartyResource",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "foo.company.com"
+  },
+  "versions": [
+    {
+      "name": "v1"
+    }
+  ]
+}
+__EOF__
+
+  # Post-Condition: assertion object exist
+  kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'foo.company.com:'
+
+  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/apis/company.com/v1" "third party api"
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create a new resource of type Foo
+ kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+ {
+  "kind": "Foo",
+  "apiVersion": "company.com/v1",
+  "metadata": {
+    "name": "test"
+  },
+  "some-field": "field1",
+  "other-field": "field2"
+}
+__EOF__
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete foos test
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # teardown
+  kubectl delete thirdpartyresources foo.company.com "${kube_flags[@]}"
+
+  #####################################
   # Recursive Resources via directory #
   #####################################
 
