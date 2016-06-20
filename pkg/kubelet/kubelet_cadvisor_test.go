@@ -22,6 +22,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 func TestGetContainerInfo(t *testing.T) {
@@ -39,8 +40,8 @@ func TestGetContainerInfo(t *testing.T) {
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
 	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "qux",
 			Namespace: "ns",
@@ -50,7 +51,7 @@ func TestGetContainerInfo(t *testing.T) {
 					ID:   kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
-		},
+		}},
 	}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
 	if err != nil {
@@ -122,8 +123,8 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerInfo := cadvisorapi.ContainerInfo{}
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, cadvisorApiFailure)
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "uuid",
 			Name:      "qux",
 			Namespace: "ns",
@@ -132,7 +133,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 					ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
-		},
+		}},
 	}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
 	if stats != nil {
@@ -153,7 +154,7 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{}
 
 	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if stats != nil {
@@ -206,8 +207,8 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "qux",
 			Namespace: "ns",
@@ -216,6 +217,7 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 					ID: kubecontainer.ContainerID{Type: "test", ID: "fakeID"},
 				},
 			}},
+		},
 	}
 
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)

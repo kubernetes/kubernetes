@@ -408,15 +408,15 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
 
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "foo",
 			Namespace: "new",
 			Containers: []*kubecontainer.Container{
 				{Name: "bar"},
 			},
-		},
+		}},
 	}
 	kubelet.HandlePodCleanups()
 	// Sources are not ready yet. Don't remove any pods.
@@ -1087,7 +1087,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	fakeRuntime.PodList = []*containertest.FakePod{}
 
 	podName := "podFoo"
 	podNamespace := "nsFoo"
@@ -1113,8 +1113,8 @@ func TestRunInContainer(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "podFoo",
 			Namespace: "nsFoo",
@@ -1123,7 +1123,7 @@ func TestRunInContainer(t *testing.T) {
 					ID: containerID,
 				},
 			},
-		},
+		}},
 	}
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
@@ -2069,7 +2069,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	fakeRuntime.PodList = []*containertest.FakePod{}
 
 	podName := "podFoo"
 	podNamespace := "nsFoo"
@@ -2102,8 +2102,8 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 	podName := "podFoo"
 	podNamespace := "nsFoo"
 	containerID := "containerFoo"
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2111,7 +2111,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 				{Name: "bar",
 					ID: kubecontainer.ContainerID{Type: "test", ID: "barID"}},
 			},
-		},
+		}},
 	}
 
 	err := kubelet.ExecInContainer(
@@ -2165,8 +2165,8 @@ func TestExecInContainer(t *testing.T) {
 	stdout := &fakeReadWriteCloser{}
 	stderr := &fakeReadWriteCloser{}
 	tty := true
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2175,7 +2175,7 @@ func TestExecInContainer(t *testing.T) {
 					ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
-		},
+		}},
 	}
 
 	err := kubelet.ExecInContainer(
@@ -2215,7 +2215,7 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	fakeRuntime.PodList = []*containertest.FakePod{}
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
@@ -2245,8 +2245,8 @@ func TestPortForward(t *testing.T) {
 	podName := "podFoo"
 	podNamespace := "nsFoo"
 	podID := types.UID("12345678")
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        podID,
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2256,7 +2256,7 @@ func TestPortForward(t *testing.T) {
 					ID:   kubecontainer.ContainerID{Type: "test", ID: "containerFoo"},
 				},
 			},
-		},
+		}},
 	}
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
@@ -3594,8 +3594,8 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
 	kubelet := testKubelet.kubelet
 
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "1234",
 			Name:      "qux",
 			Namespace: "ns",
@@ -3605,7 +3605,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 					ID:   kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
-		},
+		}},
 	}
 
 	kubelet.podManager.SetPods(pods)
@@ -3930,15 +3930,15 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 		},
 	}
 
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "bar",
 			Namespace: "new",
 			Containers: []*kubecontainer.Container{
 				{Name: "foo"},
 			},
-		},
+		}},
 	}
 
 	// Let the pod worker sets the status to fail after this sync.
@@ -3986,15 +3986,15 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 		},
 	}
 
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "bar",
 			Namespace: "new",
 			Containers: []*kubecontainer.Container{
 				{Name: "foo"},
 			},
-		},
+		}},
 	}
 
 	kubelet.podManager.SetPods(pods)
@@ -4118,13 +4118,13 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	// Pretend the pod is deleted from apiserver, but is still active on the node.
 	// The pod directory should not be removed.
 	pods = []*api.Pod{}
-	testKubelet.fakeRuntime.PodList = []*kubecontainer.Pod{runningPod}
+	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{runningPod, ""}}
 	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, true)
 
 	// The pod is deleted and also not active on the node. The pod directory
 	// should be removed.
 	pods = []*api.Pod{}
-	testKubelet.fakeRuntime.PodList = []*kubecontainer.Pod{}
+	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{}
 	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, false)
 }
 
