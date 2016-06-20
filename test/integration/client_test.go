@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -107,6 +108,29 @@ func TestClient(t *testing.T) {
 	if actual.Spec.NodeName != "" {
 		t.Errorf("expected pod to be unscheduled, got %#v", actual)
 	}
+}
+
+func TestAPIVersions(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	clientVersion := c.APIVersion().String()
+	g, err := c.ServerGroups()
+	if err != nil {
+		t.Fatalf("Failed to get api versions: %v", err)
+	}
+	versions := unversioned.ExtractGroupVersions(g)
+
+	// Verify that the server supports the API version used by the client.
+	for _, version := range versions {
+		if version == clientVersion {
+			return
+		}
+	}
+	t.Errorf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", versions, clientVersion)
 }
 
 func TestSingleWatch(t *testing.T) {
@@ -396,4 +420,65 @@ func TestMultiWatch(t *testing.T) {
 	}
 	log.Printf("all watches ended")
 	t.Errorf("durations: %v", dur)
+}
+
+func runSelfLinkTestOnNamespace(t *testing.T, c *client.Client, namespace string) {
+	podBody := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "selflinktest",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"name": "selflinktest",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "name", Image: "image"},
+			},
+		},
+	}
+	pod, err := c.Pods(namespace).Create(&podBody)
+	if err != nil {
+		t.Fatalf("Failed creating selflinktest pod: %v", err)
+	}
+	if err = c.Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
+		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
+	}
+
+	podList, err := c.Pods(namespace).List(api.ListOptions{})
+	if err != nil {
+		t.Errorf("Failed listing pods: %v", err)
+	}
+
+	if err = c.Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
+		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
+	}
+
+	found := false
+	for i := range podList.Items {
+		item := &podList.Items[i]
+		if item.Name != "selflinktest" {
+			continue
+		}
+		found = true
+		err = c.Get().RequestURI(item.SelfLink).Do().Into(pod)
+		if err != nil {
+			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
+		}
+		break
+	}
+	if !found {
+		t.Errorf("never found selflinktest pod in namespace %s", namespace)
+	}
+}
+
+func TestSelfLinkOnNamespace(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	runSelfLinkTestOnNamespace(t, c, api.NamespaceDefault)
+	runSelfLinkTestOnNamespace(t, c, "other-namespace")
 }
