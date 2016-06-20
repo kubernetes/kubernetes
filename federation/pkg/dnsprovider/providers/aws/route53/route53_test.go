@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	route53testing "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53/testing"
+	route53testing "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53/stubs"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 
 	"github.com/aws/aws-sdk-go/aws"
