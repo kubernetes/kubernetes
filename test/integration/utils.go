@@ -27,11 +27,12 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func newEtcdClient() etcd.Client {
 	cfg := etcd.Config{
-		Endpoints: []string{"http://127.0.0.1:4001"},
+		Endpoints: []string{framework.GetEtcdURLFromEnv()},
 	}
 	client, err := etcd.New(cfg)
 	if err != nil {
