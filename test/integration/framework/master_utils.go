@@ -154,7 +154,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
 	config := storagebackend.Config{
-		ServerList: []string{"http://127.0.0.1:4001"},
+		ServerList: []string{GetEtcdURLFromEnv()},
 		// This causes the integration tests to exercise the etcd
 		// prefix code, so please don't change without ensuring
 		// sufficient coverage in other ways.
