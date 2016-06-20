@@ -17,43 +17,129 @@ limitations under the License.
 package rbac
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/registry/clusterrole"
-	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
-	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
-	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/clusterrolebinding/etcd"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/role"
-	roleetcd "k8s.io/kubernetes/pkg/registry/role/etcd"
-	"k8s.io/kubernetes/pkg/registry/rolebinding"
-	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
-func TestNew(t *testing.T) {
-	// NOTE(ericchiang): Can't get this strategy to do reads. Get cryptic "client: etcd cluster is unavailable or misconfigured"
-	// Writes work fine, so use to test storing initial data.
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	defer server.Terminate(t)
+func newRule(verbs, apiGroups, resources string) rbac.PolicyRule {
+	return rbac.PolicyRule{
+		Verbs:     strings.Split(verbs, ","),
+		APIGroups: strings.Split(apiGroups, ","),
+		Resources: strings.Split(resources, ","),
+	}
+}
 
-	codec := testapi.Groups[rbac.GroupName].StorageCodec()
-	getRESTOptions := func(resource string) generic.RESTOptions {
-		cacheSize := etcdtest.DeserializationCacheSize
-		storage := etcd.NewEtcdStorage(server.Client, codec, resource, false, cacheSize)
-		return generic.RESTOptions{Storage: storage, Decorator: generic.UndecoratedStorage}
+func newRole(name, namespace string, rules ...rbac.PolicyRule) rbac.Role {
+	return rbac.Role{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: name}, Rules: rules}
+}
+
+func newClusterRole(name string, rules ...rbac.PolicyRule) rbac.ClusterRole {
+	return rbac.ClusterRole{ObjectMeta: api.ObjectMeta{Name: name}, Rules: rules}
+}
+
+const (
+	bindToRole        uint16 = 0x0
+	bindToClusterRole uint16 = 0x1
+)
+
+func newRoleBinding(namespace, roleName string, bindType uint16, subjects ...string) rbac.RoleBinding {
+	r := rbac.RoleBinding{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
+
+	switch bindType {
+	case bindToRole:
+		r.RoleRef = api.ObjectReference{Kind: "Role", Namespace: namespace, Name: roleName}
+	case bindToClusterRole:
+		r.RoleRef = api.ObjectReference{Kind: "ClusterRole", Name: roleName}
 	}
 
-	roleRegistry := role.NewRegistry(roleetcd.NewREST(getRESTOptions("roles")))
-	roleBindingRegistry := rolebinding.NewRegistry(rolebindingetcd.NewREST(getRESTOptions("rolebindings")))
-	clusterRoleRegistry := clusterrole.NewRegistry(clusterroleetcd.NewREST(getRESTOptions("clusterroles")))
-	clusterRoleBindingRegistry := clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(getRESTOptions("clusterrolebindings")))
-	_, err := New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry, "")
-	if err != nil {
-		t.Fatalf("failed to create authorizer: %v", err)
+	r.Subjects = make([]rbac.Subject, len(subjects))
+	for i, subject := range subjects {
+		split := strings.SplitN(subject, ":", 2)
+		r.Subjects[i].Kind, r.Subjects[i].Name = split[0], split[1]
+	}
+	return r
+}
+
+type defaultAttributes struct {
+	user      string
+	groups    string
+	verb      string
+	resource  string
+	namespace string
+	apiGroup  string
+}
+
+func (d *defaultAttributes) String() string {
+	return fmt.Sprintf("user=(%s), groups=(%s), verb=(%s), resource=(%s), namespace=(%s), apiGroup=(%s)",
+		d.user, strings.Split(d.groups, ","), d.verb, d.resource, d.namespace, d.apiGroup)
+}
+
+func (d *defaultAttributes) GetUserName() string     { return d.user }
+func (d *defaultAttributes) GetGroups() []string     { return strings.Split(d.groups, ",") }
+func (d *defaultAttributes) GetVerb() string         { return d.verb }
+func (d *defaultAttributes) IsReadOnly() bool        { return d.verb == "get" || d.verb == "watch" }
+func (d *defaultAttributes) GetNamespace() string    { return d.namespace }
+func (d *defaultAttributes) GetResource() string     { return d.resource }
+func (d *defaultAttributes) GetSubresource() string  { return "" }
+func (d *defaultAttributes) GetName() string         { return "" }
+func (d *defaultAttributes) GetAPIGroup() string     { return d.apiGroup }
+func (d *defaultAttributes) GetAPIVersion() string   { return "" }
+func (d *defaultAttributes) IsResourceRequest() bool { return true }
+func (d *defaultAttributes) GetPath() string         { return "" }
+
+func TestAuthorizer(t *testing.T) {
+	tests := []struct {
+		roles               []rbac.Role
+		roleBindings        []rbac.RoleBinding
+		clusterRoles        []rbac.ClusterRole
+		clusterRoleBindings []rbac.ClusterRoleBinding
+
+		superUser string
+
+		shouldPass []authorizer.Attributes
+		shouldFail []authorizer.Attributes
+	}{
+		{
+			clusterRoles: []rbac.ClusterRole{
+				newClusterRole("admin", newRule("*", "*", "*")),
+			},
+			roleBindings: []rbac.RoleBinding{
+				newRoleBinding("ns1", "admin", bindToClusterRole, "User:admin", "Group:admins"),
+			},
+			shouldPass: []authorizer.Attributes{
+				&defaultAttributes{"admin", "", "get", "Pods", "ns1", ""},
+				&defaultAttributes{"admin", "", "watch", "Pods", "ns1", ""},
+				&defaultAttributes{"admin", "group1", "watch", "Foobar", "ns1", ""},
+				&defaultAttributes{"joe", "admins", "watch", "Foobar", "ns1", ""},
+				&defaultAttributes{"joe", "group1,admins", "watch", "Foobar", "ns1", ""},
+			},
+			shouldFail: []authorizer.Attributes{
+				&defaultAttributes{"admin", "", "GET", "Pods", "ns2", ""},
+				&defaultAttributes{"admin", "", "GET", "Nodes", "", ""},
+				&defaultAttributes{"admin", "admins", "GET", "Pods", "ns2", ""},
+				&defaultAttributes{"admin", "admins", "GET", "Nodes", "", ""},
+			},
+		},
+	}
+	for i, tt := range tests {
+		ruleResolver := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
+		a := RBACAuthorizer{tt.superUser, ruleResolver}
+		for _, attr := range tt.shouldPass {
+			if err := a.Authorize(attr); err != nil {
+				t.Errorf("case %d: incorrectly restricted %s: %T %v", i, attr, err, err)
+			}
+		}
+
+		for _, attr := range tt.shouldFail {
+			if err := a.Authorize(attr); err == nil {
+				t.Errorf("case %d: incorrectly passed %s", i, attr)
+			}
+		}
 	}
 }
