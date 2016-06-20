@@ -18,9 +18,7 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 
 	etcd "github.com/coreos/etcd/client"
@@ -65,20 +63,6 @@ func deleteAllEtcdKeys() {
 		}
 	}
 
-}
-
-func MakeTempDirOrDie(prefix string, baseDir string) string {
-	if baseDir == "" {
-		baseDir = "/tmp"
-	}
-	tempDir, err := ioutil.TempDir(baseDir, prefix)
-	if err != nil {
-		glog.Fatalf("Can't make a temp rootdir: %v", err)
-	}
-	if err = os.MkdirAll(tempDir, 0750); err != nil {
-		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
-	}
-	return tempDir
 }
 
 func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {

@@ -64,8 +64,8 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
@@ -210,8 +210,8 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	cadvisorInterface := new(cadvisortest.Fake)
 
 	// Kubelet (localhost)
-	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
-	configFilePath := integration.MakeTempDirOrDie("config", testRootDir)
+	testRootDir := testutils.MakeTempDirOrDie("kubelet_integ_1.", "")
+	configFilePath := testutils.MakeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
@@ -245,7 +245,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	testRootDir = integration.MakeTempDirOrDie("kubelet_integ_2.", "")
+	testRootDir = testutils.MakeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
 
 	kcfg = kubeletapp.SimpleKubelet(
