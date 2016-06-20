@@ -726,7 +726,7 @@ Note: This looks like a development version, which might not be present on GitHu
 If it isn't, the closest tag is at:
   https://github.com/kubernetes/kubernetes/tree/${gitref}
 "
-    gitref="${version//*+/}"
+    gitref=$(echo ${version} | sed -e 's/.*+//')
   fi
   cat > /etc/motd <<EOF
 Welcome to Kubernetes ${version}!
