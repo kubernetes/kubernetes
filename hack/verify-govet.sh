@@ -46,34 +46,4 @@ if [[ ${#targets[@]} -eq 0 ]]; then
   targets=$(go list ./... | egrep -v "/(third_party|vendor)/")
 fi
 
-# Do this in parallel; results in 5-10x speedup.
-pids=""
-for i in $targets
-  do
-  (
-    # Run go vet using goflags for each target specified.
-    #
-    # Remove any lines go vet or godep outputs with the exit status.
-    # Remove any lines godep outputs about the vendor experiment.
-    #
-    # If go vet fails (produces output), grep will succeed, but if go vet
-    # succeeds (produces no output) grep will fail. Then we just use
-    # PIPESTATUS[0] which is go's exit code.
-    #
-    # The intended result is that each incantation of this line returns
-    # either 0 (pass) or 1 (fail).
-    go vet "${goflags[@]:+${goflags[@]}}" "$i" 2>&1 \
-      | grep -v -E "exit status|GO15VENDOREXPERIMENT=" \
-      || fail=${PIPESTATUS[0]}
-    exit $fail
-  ) &
-  pids+=" $!"
-done
-
-# Count and return the number of failed files (non-zero is a failed vet run).
-failedfiles=0
-for p in $pids; do
-  wait $p || let "failedfiles+=1"
-done
-
-exit $failedfiles
+go vet "${goflags[@]:+${goflags[@]}}" ${targets[@]}
