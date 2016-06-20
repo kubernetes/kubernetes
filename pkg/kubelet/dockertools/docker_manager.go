@@ -406,10 +406,13 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 
 	if container.NetworkSettings != nil {
 		result = container.NetworkSettings.IPAddress
-
-		// Fall back to IPv6 address if no IPv4 address is present
-		if result == "" {
-			result = container.NetworkSettings.GlobalIPv6Address
+		if len(result) == 0 {
+			for _, network := range container.NetworkSettings.Networks {
+				if len(network.IPAddress) > 0 {
+					result = network.IPAddress
+					break
+				}
+			}
 		}
 	}
 
