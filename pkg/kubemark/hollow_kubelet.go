@@ -27,7 +27,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
-	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
 )
@@ -45,8 +45,8 @@ func NewHollowKubelet(
 	containerManager cm.ContainerManager,
 	maxPods int, podsPerCore int,
 ) *HollowKubelet {
-	testRootDir := integration.MakeTempDirOrDie("hollow-kubelet.", "")
-	manifestFilePath := integration.MakeTempDirOrDie("manifest", testRootDir)
+	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
+	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	return &HollowKubelet{
