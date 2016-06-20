@@ -24,7 +24,7 @@ cd /build
 
 # wget doesn't retry on 503, so adding a loop to make it more resilient.
 for i in {1..3}; do
-  if wget "$2" -O register.go; then
+  if wget "$2" -O types.go; then
     break
   fi
   if [ $i -eq 3 ]; then
@@ -40,8 +40,7 @@ cp /swagger-source/"$1".json input.json
 
 #insert a TOC for top level API objects
 buf="== Top Level API Objects\n\n"
-top_level_models=$(grep GetObjectKind ./register.go | sed 's/func (obj \*\(.*\)) GetObjectKind(\(.*\)) .*/\1/g' \
-    | tr -d '()' | tr -d '{}' | tr -d ' ')
+top_level_models=$(grep -B 1 "unversioned\.TypeMeta" ./types.go | awk '/type/{print $2;}' | sort)
 
 # check if the top level models exist in the definitions.adoc. If they exist,
 # their name will be <version>.<model_name>
