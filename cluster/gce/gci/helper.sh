@@ -32,7 +32,7 @@ EOF
   fi
   if [[ ! -f "${KUBE_TEMP}/gci-docker-version.txt" ]]; then
     cat >"${KUBE_TEMP}/gci-docker-version.txt" << EOF
-${GCI_DOCKER_VERSION}
+${GCI_DOCKER_VERSION:-}
 EOF
   fi
 }
