@@ -130,6 +130,45 @@ while true; do sleep 1; done
 					Eventually(terminateContainer.Present, retryTimeout, pollInterval).Should(BeFalse())
 				}
 			})
+
+			It("should report termination message if TerminationMessagePath is set [Conformance]", func() {
+				name := "termination-message-container"
+				terminationMessage := "DONE"
+				terminationMessagePath := "/dev/termination-log"
+				c := ConformanceContainer{
+					Container: api.Container{
+						Image:   ImageRegistry[busyBoxImage],
+						Name:    name,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
+						TerminationMessagePath: terminationMessagePath,
+					},
+					Client:        f.Client,
+					RestartPolicy: api.RestartPolicyNever,
+					NodeName:      *nodeName,
+					Namespace:     f.Namespace.Name,
+				}
+
+				By("create the container")
+				Expect(c.Create()).To(Succeed())
+				defer c.Delete()
+
+				By("wait for the container to succeed")
+				Eventually(c.GetPhase, retryTimeout, pollInterval).Should(Equal(api.PodSucceeded))
+
+				By("get the container status")
+				status, err := c.GetStatus()
+				Expect(err).NotTo(HaveOccurred())
+
+				By("the container should be terminated")
+				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
+
+				By("the termination message should be set")
+				Expect(status.State.Terminated.Message).Should(Equal(terminationMessage))
+
+				By("delete the container")
+				Expect(c.Delete()).To(Succeed())
+			})
 		})
 
 		Context("when running a container with a new image", func() {
