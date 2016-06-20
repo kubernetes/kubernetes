@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -176,9 +177,63 @@ func RenameDirectory(oldPath, newName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = os.Rename(oldPath, newPath)
+	// os.Rename call fails on windows (https://github.com/golang/go/issues/14527)
+	// Replacing with copyFolder to the newPath and deleting the oldPath directory
+	// err = os.Rename(oldPath, newPath)
+	err = copyFolder(oldPath, newPath)
+
 	if err != nil {
 		return "", err
 	}
+	os.RemoveAll(oldPath)
 	return newPath, nil
+}
+
+func copyFolder(source string, dest string) (err error) {
+	directory, _ := os.Open(source)
+	objects, err := directory.Readdir(-1)
+
+	for _, obj := range objects {
+		sourcefilepointer := source + "/" + obj.Name()
+		destinationfilepointer := dest + "/" + obj.Name()
+		if obj.IsDir() {
+			err = copyFolder(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = copyFile(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return
+}
+
+func copyFile(source string, dest string) (err error) {
+	sourcefile, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+
+	defer sourcefile.Close()
+
+	destfile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+
+	defer destfile.Close()
+
+	_, err = io.Copy(destfile, sourcefile)
+	if err == nil {
+		sourceinfo, err := os.Stat(source)
+		if err != nil {
+			err = os.Chmod(dest, sourceinfo.Mode())
+		}
+
+	}
+	return
 }
