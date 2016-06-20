@@ -274,7 +274,7 @@ spec:
   securityContext:
     sysctls:
     - name: net.ipv4.ip_forward
-      value: 2
+      value: "2"
 ```
 
 ### Allowing only certain sysctls
