@@ -30,13 +30,29 @@ else
   exit 1
 fi
 
-if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
-  # If the master image is not set, we use the latest GCI dev image.
-  # Otherwise, we respect whatever is set by the user.
+function get_latest_gci_image() {
+  # GCI milestone to use
+  GCI_MILESTONE="53"
+
+  # First try to find an active (non-deprecated) image on this milestone.
   gci_images=( $(gcloud compute images list --project google-containers \
-      --show-deprecated --no-standard-images --sort-by='~creationTimestamp' \
-      --regexp='gci-[a-z]+-53-.*' --format='table[no-heading](name)') )
-  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-"${gci_images[0]}"}
+      --no-standard-images --sort-by="~creationTimestamp" \
+      --regexp="gci-[a-z]+-${GCI_MILESTONE}-.*" --format="table[no-heading](name)") )
+
+  # If no active image is available, search across all deprecated images.
+  if [[ ${#gci_images[@]} == 0 ]] ; then
+    gci_images=( $(gcloud compute images list --project google-containers \
+        --no-standard-images --show-deprecated --sort-by="~creationTimestamp" \
+        --regexp="gci-[a-z]+-${GCI_MILESTONE}-.*" --format="table[no-heading](name)") )
+  fi
+
+  echo "${gci_images[0]}"
+}
+
+if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
+  # If the master image is not set, we use the pinned GCI image.
+  # Otherwise, we respect whatever is set by the user.
+  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-"$(get_latest_gci_image)"}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
   # The default node image when using GCI is still the Debian based ContainerVM
   # until GCI gets validated for node usage.
