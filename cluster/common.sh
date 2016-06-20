@@ -21,6 +21,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBECTL_PATH=${KUBECTL_PATH:-${KUBE_ROOT}/cluster/kubectl.sh}
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
@@ -60,7 +61,6 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(be
 #   CA_CERT
 function create-kubeconfig() {
   KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   SECONDARY_KUBECONFIG=${SECONDARY_KUBECONFIG:-}
   OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
 
@@ -104,21 +104,21 @@ function create-kubeconfig() {
     )
   fi
 
-  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
+  KUBECONFIG="${KUBECONFIG}" "${KUBECTL_PATH}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
   if [[ -n "${user_args[@]:-}" ]]; then
-    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
+    KUBECONFIG="${KUBECONFIG}" "${KUBECTL_PATH}" config set-credentials "${CONTEXT}" "${user_args[@]}"
   fi
-  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
+  KUBECONFIG="${KUBECONFIG}" "${KUBECTL_PATH}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
 
   if [[ "${SECONDARY_KUBECONFIG}" != "true" ]];then
-      KUBECONFIG="${KUBECONFIG}" "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
+      KUBECONFIG="${KUBECONFIG}" "${KUBECTL_PATH}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
   fi
 
   # If we have a bearer token, also create a credential entry with basic auth
   # so that it is easy to discover the basic auth password for your cluster
   # to use in a web browser.
   if [[ ! -z "${KUBE_BEARER_TOKEN:-}" && ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
-    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
+    KUBECONFIG="${KUBECONFIG}" "${KUBECTL_PATH}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 
    echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
@@ -138,15 +138,14 @@ function clear-kubeconfig() {
       CONTEXT=$OVERRIDE_CONTEXT
   fi
 
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" config unset "clusters.${CONTEXT}"
-  "${kubectl}" config unset "users.${CONTEXT}"
-  "${kubectl}" config unset "users.${CONTEXT}-basic-auth"
-  "${kubectl}" config unset "contexts.${CONTEXT}"
+  "${KUBECTL_PATH}" config unset "clusters.${CONTEXT}"
+  "${KUBECTL_PATH}" config unset "users.${CONTEXT}"
+  "${KUBECTL_PATH}" config unset "users.${CONTEXT}-basic-auth"
+  "${KUBECTL_PATH}" config unset "contexts.${CONTEXT}"
 
-  local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
+  local cc=$("${KUBECTL_PATH}" config view -o jsonpath='{.current-context}')
   if [[ "${cc}" == "${CONTEXT}" ]]; then
-    "${kubectl}" config unset current-context
+    "${KUBECTL_PATH}" config unset current-context
   fi
 
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
@@ -154,11 +153,10 @@ function clear-kubeconfig() {
 
 
 function tear_down_alive_resources() {
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" delete rc --all || true
-  "${kubectl}" delete pods --all || true
-  "${kubectl}" delete svc --all || true
-  "${kubectl}" delete pvc --all || true
+  "${KUBECTL_PATH}" delete rc --all || true
+  "${KUBECTL_PATH}" delete pods --all || true
+  "${KUBECTL_PATH}" delete svc --all || true
+  "${KUBECTL_PATH}" delete pvc --all || true
 }
 
 # Gets username, password for the current-context in kubeconfig, if they exist.
@@ -175,13 +173,13 @@ function tear_down_alive_resources() {
 function get-kubeconfig-basicauth() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
-  local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+  local cc=$("${KUBECTL_PATH}" config view -o jsonpath="{.current-context}")
   if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
-  local user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
-  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.username}")
-  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.password}")
+  local user=$("${KUBECTL_PATH}" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  KUBE_USER=$("${KUBECTL_PATH}" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.username}")
+  KUBE_PASSWORD=$("${KUBECTL_PATH}" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.password}")
 }
 
 # Generate basic auth user and password.
@@ -207,12 +205,12 @@ function gen-kube-basicauth() {
 function get-kubeconfig-bearertoken() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
-  local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+  local cc=$("${KUBECTL_PATH}" config view -o jsonpath="{.current-context}")
   if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
-  local user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
-  KUBE_BEARER_TOKEN=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.token}")
+  local user=$("${KUBECTL_PATH}" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  KUBE_BEARER_TOKEN=$("${KUBECTL_PATH}" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.token}")
 }
 
 # Generate bearer token.
@@ -266,14 +264,13 @@ function load-or-gen-kube-bearertoken() {
 # current-context user does not exist or contain a server entry.
 function detect-master-from-kubeconfig() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  export KUBECTL_PATH=${KUBECTL_PATH:-${KUBE_ROOT}/cluster/kubectl.sh}
 
-  local cc=$(${KUBECTL_PATH} config view -o jsonpath="{.current-context}")
+  local cc=$("${KUBECTL_PATH}" config view -o jsonpath="{.current-context}")
   if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
-  local cluster=$(${KUBECTL_PATH} config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
-  KUBE_MASTER_URL=$(${KUBECTL_PATH} config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
+  local cluster=$("${KUBECTL_PATH}" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
+  KUBE_MASTER_URL=$("${KUBECTL_PATH}" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
 }
 
 # Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
