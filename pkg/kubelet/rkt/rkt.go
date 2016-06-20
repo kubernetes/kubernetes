@@ -1028,7 +1028,7 @@ func (r *Runtime) preparePodArgs(manifest *appcschema.PodManifest, manifestFileN
 	// 3) empty; whatever rkt's compiled to default to
 	stage1ImageCmd := ""
 	if r.config.Stage1Image != "" {
-		stage1ImageCmd = "--stage1-path=" + r.config.Stage1Image
+		stage1ImageCmd = "--stage1-name=" + r.config.Stage1Image
 	}
 	if stage1Name, ok := manifest.Annotations.Get(k8sRktStage1NameAnno); ok {
 		stage1ImageCmd = "--stage1-name=" + stage1Name
