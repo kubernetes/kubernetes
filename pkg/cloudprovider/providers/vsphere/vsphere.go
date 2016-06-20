@@ -44,7 +44,8 @@ const ActivePowerState = "poweredOn"
 const DefaultDiskController = "scsi"
 const DefaultSCSIControllerType = "lsilogic"
 
-var ErrNoDiskUUIDFound = errors.New("no disk UUID found")
+var ErrNoDiskUUIDFound = errors.New("No disk UUID found")
+var ErrNoDiskIDFound = errors.New("No vSphere disk ID found")
 var ErrNoDevicesFound = errors.New("No devices found")
 
 // VSphere is an implementation of cloud provider Interface for VSphere.
@@ -273,7 +274,7 @@ func (i *Instances) List(filter string) ([]string, error) {
 		return nil, err
 	}
 
-	glog.V(3).Infof("Found %s instances matching %s: %s",
+	glog.V(3).Infof("found %s instances matching %s: %s",
 		len(vmList), filter, vmList)
 
 	return vmList, nil
@@ -435,9 +436,9 @@ func (vs *VSphere) GetZone() (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{Region: vs.cfg.Global.Datacenter}, nil
 }
 
-// Routes returns an implementation of Routes for vSphere.
+// Routes returns a false since the interface is not supported for vSphere.
 func (vs *VSphere) Routes() (cloudprovider.Routes, bool) {
-	return nil, true
+	return nil, false
 }
 
 // ScrubDNS filters DNS settings for pods.
@@ -525,7 +526,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 		// create a scsi controller if there is not one
 		newSCSIController, err := vmDevices.CreateSCSIController(vs.cfg.Disk.SCSIControllerType)
 		if err != nil {
-			glog.V(3).Infof("Cannot create new SCSI controller - %v", err)
+			glog.V(3).Infof("cannot create new SCSI controller - %v", err)
 			return "", "", err
 		}
 		configNewSCSIController := newSCSIController.(types.BaseVirtualSCSIController).GetVirtualSCSIController()
@@ -536,7 +537,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 		// add the scsi controller to virtual machine
 		err = vm.AddDevice(context.TODO(), newSCSIController)
 		if err != nil {
-			glog.V(3).Infof("Cannot add SCSI controller to vm - %v", err)
+			glog.V(3).Infof("cannot add SCSI controller to vm - %v", err)
 			// attempt clean up of scsi controller
 			if vmDevices, err := vm.Device(ctx); err == nil {
 				cleanUpController(newSCSIController, vmDevices, vm, ctx)
@@ -551,7 +552,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 			return "", "", err
 		}
 		if diskController, err = vmDevices.FindDiskController(vs.cfg.Disk.DiskController); err != nil {
-			glog.V(3).Infof("Cannot find disk controller - %v", err)
+			glog.V(3).Infof("cannot find disk controller - %v", err)
 			// attempt clean up of scsi controller
 			cleanUpController(newSCSIController, vmDevices, vm, ctx)
 			return "", "", err
@@ -562,12 +563,11 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 	disk := vmDevices.CreateDisk(diskController, ds.Reference(), vmDiskPath)
 	backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
 	backing.DiskMode = string(types.VirtualDiskModeIndependent_persistent)
-	disk = vmDevices.ChildDisk(disk)
 
 	// Attach disk to the VM
 	err = vm.AddDevice(ctx, disk)
 	if err != nil {
-		glog.V(3).Infof("Cannot add disk to the vm - %v", err)
+		glog.V(3).Infof("cannot attach disk to the vm - %v", err)
 		if newSCSICreated {
 			cleanUpController(newSCSIController, vmDevices, vm, ctx)
 		}
@@ -611,13 +611,29 @@ func getVirtualDiskUUID(newDevice types.BaseVirtualDevice) (string, error) {
 
 	if b, ok := vd.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
 		uuidWithNoHypens := strings.Replace(b.Uuid, "-", "", -1)
-		return uuidWithNoHypens, nil
+		return strings.ToLower(uuidWithNoHypens), nil
 	}
 	return "", ErrNoDiskUUIDFound
 }
 
+func getVirtualDiskID(volPath string, vmDevices object.VirtualDeviceList) (string, error) {
+	// filter vm devices to retrieve disk ID for the given vmdk file
+	for _, device := range vmDevices {
+		if vmDevices.TypeName(device) == "VirtualDisk" {
+			d := device.GetVirtualDevice()
+			if b, ok := d.Backing.(types.BaseVirtualDeviceFileBackingInfo); ok {
+				fileName := b.GetVirtualDeviceFileBackingInfo().FileName
+				if fileName == volPath {
+					return vmDevices.Name(device), nil
+				}
+			}
+		}
+	}
+	return "", ErrNoDiskIDFound
+}
+
 // Detaches given virtual disk volume from the compute running kubelet.
-func (vs *VSphere) DetachDisk(diskID string, nodeName string) error {
+func (vs *VSphere) DetachDisk(volPath string, nodeName string) error {
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -642,13 +658,19 @@ func (vs *VSphere) DetachDisk(diskID string, nodeName string) error {
 		return err
 	}
 
+	diskID, err := getVirtualDiskID(volPath, vmDevices)
+	if err != nil {
+		glog.Warningf("disk ID not found for %v ", volPath)
+		return err
+	}
+
 	// Remove disk from VM
 	device := vmDevices.Find(diskID)
 	if device == nil {
 		return fmt.Errorf("device '%s' not found", diskID)
 	}
 
-	err = vm.RemoveDevice(ctx, false, device)
+	err = vm.RemoveDevice(ctx, true, device)
 	if err != nil {
 		return err
 	}
