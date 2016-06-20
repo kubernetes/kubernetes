@@ -25,15 +25,16 @@ import (
 // ValidateEvent makes sure that the event makes sense.
 func ValidateEvent(event *api.Event) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// There is no namespace required for node.
+	// There is no namespace required for node or persistent volume.
 	// However, older client code accidentally sets event.Namespace
 	// to api.NamespaceDefault, so we accept that too, but "" is preferred.
-	if event.InvolvedObject.Kind == "Node" &&
+	if (event.InvolvedObject.Kind == "Node" || event.InvolvedObject.Kind == "PersistentVolume") &&
 		event.Namespace != api.NamespaceDefault &&
 		event.Namespace != "" {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "not allowed for node"))
 	}
 	if event.InvolvedObject.Kind != "Node" &&
+		event.InvolvedObject.Kind != "PersistentVolume" &&
 		event.Namespace != event.InvolvedObject.Namespace {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match involvedObject"))
 	}
