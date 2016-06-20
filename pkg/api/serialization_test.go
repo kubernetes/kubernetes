@@ -174,6 +174,20 @@ var nonRoundTrippableTypes = sets.NewString(
 	"WatchEvent",
 )
 
+var commonKinds = []string{"ListOptions", "DeleteOptions"}
+
+// verify all external group/versions have the common kinds like the ListOptions, DeleteOptions are registered.
+func TestCommonKindsRegistered(t *testing.T) {
+	for _, kind := range commonKinds {
+		for _, group := range testapi.Groups {
+			gv := group.GroupVersion()
+			if _, err := api.Scheme.New(gv.WithKind(kind)); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+}
+
 var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "ExportOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
 

@@ -443,11 +443,9 @@ func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionReso
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := unversioned.APIResource{Name: resource.Resource}
-			// The default parameter codec used by the dynamic client cannot
-			// encode api.ListOptions.
-			// TODO: api.ParameterCodec doesn't support thirdparty objects.
-			// We need a generic parameter codec.
-			return client.ParameterCodec(api.ParameterCodec).Resource(&apiResource, api.NamespaceAll).List(&options)
+			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
+				Resource(&apiResource, api.NamespaceAll).
+				List(&options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			// APIResource.Kind is not used by the dynamic client, so
@@ -455,9 +453,9 @@ func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionReso
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := unversioned.APIResource{Name: resource.Resource}
-			// The default parameter codec used by the dynamic client cannot
-			// encode api.ListOptions.
-			return client.ParameterCodec(api.ParameterCodec).Resource(&apiResource, api.NamespaceAll).Watch(&options)
+			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
+				Resource(&apiResource, api.NamespaceAll).
+				Watch(&options)
 		},
 	}
 }
