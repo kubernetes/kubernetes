@@ -14,13 +14,31 @@ import (
 
 func makeAttributes(kind, resource string, obj runtime.Object, ops []admission.Operation) []admission.Attributes {
 	if ops == nil {
-		ops = []admission.Operation{admission.Update, admission.Delete, admission.Connect}
+		ops = []admission.Operation{admission.Create, admission.Update}
 	}
 	result := []admission.Attributes{}
 	for _, op := range ops {
 		result = append(result, admission.NewAttributesRecord(obj, nil, api.Kind(kind).WithVersion("version"), "myns", "myname", api.Resource(resource).WithVersion("version"), "", op, nil))
 	}
 	return result
+}
+
+func TestHandles(t *testing.T) {
+	j := &jsonPath{}
+
+	handles := []admission.Operation{admission.Create, admission.Update}
+	for _, op := range handles {
+		if !j.Handles(op) {
+			t.Errorf("expected to handle: %s but didn't", op)
+		}
+	}
+
+	doesntHandle := []admission.Operation{admission.Connect, admission.Delete}
+	for _, op := range doesntHandle {
+		if j.Handles(op) {
+			t.Errorf("expected not to handle: %s, but did", op)
+		}
+	}
 }
 
 func TestJSONPathMultiRule(t *testing.T) {
@@ -71,6 +89,7 @@ func TestJSONPathMultiRule(t *testing.T) {
 		rsrc  string
 		obj   runtime.Object
 		admit bool
+		ops   []admission.Operation
 	}{
 		{
 			name:  "empty",
@@ -128,7 +147,7 @@ func TestJSONPathMultiRule(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		attrs := makeAttributes(test.kind, test.rsrc, test.obj, nil)
+		attrs := makeAttributes(test.kind, test.rsrc, test.obj, test.ops)
 		for _, attr := range attrs {
 			err := a.Admit(attr)
 			if test.admit && err != nil {

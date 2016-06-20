@@ -168,7 +168,7 @@ func (j *jsonPath) Admit(a admission.Attributes) (err error) {
 }
 
 func (j *jsonPath) Handles(operation admission.Operation) bool {
-	return true
+	return operation == admission.Create || operation == admission.Update
 }
 
 func makeRule(rule *JSONPathAdmissionRule) (*jsonPathRule, error) {
