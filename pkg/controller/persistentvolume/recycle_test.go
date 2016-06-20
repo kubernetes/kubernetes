@@ -57,7 +57,7 @@ func TestRecycleSync(t *testing.T) {
 			// recycle failure - plugin not found
 			"6-3 - plugin not found",
 			newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", api.VolumeBound, api.PersistentVolumeReclaimRecycle),
-			newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", api.VolumeFailed, api.PersistentVolumeReclaimRecycle),
+			withMessage("No recycler plugin found for the volume!", newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", api.VolumeFailed, api.PersistentVolumeReclaimRecycle)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors, testSyncVolume,
@@ -66,7 +66,7 @@ func TestRecycleSync(t *testing.T) {
 			// recycle failure - newRecycler returns error
 			"6-4 - newRecycler returns error",
 			newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", api.VolumeBound, api.PersistentVolumeReclaimRecycle),
-			newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", api.VolumeFailed, api.PersistentVolumeReclaimRecycle),
+			withMessage("Failed to create recycler: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", api.VolumeFailed, api.PersistentVolumeReclaimRecycle)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
@@ -76,7 +76,7 @@ func TestRecycleSync(t *testing.T) {
 			// recycle failure - recycle returns error
 			"6-5 - recycle returns error",
 			newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", api.VolumeBound, api.PersistentVolumeReclaimRecycle),
-			newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", api.VolumeFailed, api.PersistentVolumeReclaimRecycle),
+			withMessage("Recycler failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", api.VolumeFailed, api.PersistentVolumeReclaimRecycle)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
@@ -154,7 +154,7 @@ func TestRecycleSync(t *testing.T) {
 			// volume has unknown reclaim policy - failure expected
 			"6-10 - unknown reclaim policy",
 			newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", api.VolumeBound, "Unknown"),
-			newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", api.VolumeFailed, "Unknown"),
+			withMessage("Volume has unrecognized PersistentVolumeReclaimPolicy", newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", api.VolumeFailed, "Unknown")),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeUnknownReclaimPolicy"}, noerrors, testSyncVolume,
