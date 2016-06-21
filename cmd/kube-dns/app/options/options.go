@@ -112,13 +112,13 @@ func (fv federationsVar) Set(keyVal string) error {
 		splits := strings.SplitN(strings.TrimSpace(val), "=", 2)
 		name := strings.TrimSpace(splits[0])
 		domain := strings.TrimSpace(splits[1])
-		if len(validation.IsDNS1123Label(name)) != 0 {
-			return fmt.Errorf("%s not a valid federation name", name)
+		if errs := validation.IsDNS1123Label(name); len(errs) != 0 {
+			return fmt.Errorf("%q not a valid federation name: %q", name, errs)
 		}
 		// The federation domain name need not strictly be domain names, we
 		// accept valid dns names with subdomain components.
-		if len(validation.IsDNS1123Subdomain(domain)) != 0 {
-			return fmt.Errorf("%s not a valid federation name", name)
+		if errs := validation.IsDNS1123Subdomain(domain); len(errs) != 0 {
+			return fmt.Errorf("%q not a valid domain name: %q", domain, errs)
 		}
 		fv.nameDomainMap[name] = domain
 	}
