@@ -19,8 +19,10 @@ package internal
 import (
 	dns "google.golang.org/api/dns/v1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
+	"k8s.io/kubernetes/pkg/util"
 )
 
+// Compile time check for interface adeherence
 var _ interfaces.ManagedZonesService = &ManagedZonesService{}
 
 type ManagedZonesService struct{ impl *dns.ManagedZonesService }
@@ -39,4 +41,8 @@ func (m *ManagedZonesService) Get(project, managedZone string) interfaces.Manage
 
 func (m *ManagedZonesService) List(project string) interfaces.ManagedZonesListCall {
 	return &ManagedZonesListCall{m.impl.List(project)}
+}
+
+func (m *ManagedZonesService) NewManagedZone(dnsName string) interfaces.ManagedZone {
+	return &ManagedZone{impl: &dns.ManagedZone{Name: string(util.NewUUID()), DnsName: dnsName}}
 }
