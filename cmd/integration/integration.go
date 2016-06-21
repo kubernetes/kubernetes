@@ -19,13 +19,10 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"reflect"
 	gruntime "runtime"
 	"strconv"
 	"strings"
@@ -36,8 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -51,9 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -66,8 +59,8 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
@@ -212,8 +205,8 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	cadvisorInterface := new(cadvisortest.Fake)
 
 	// Kubelet (localhost)
-	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
-	configFilePath := integration.MakeTempDirOrDie("config", testRootDir)
+	testRootDir := testutils.MakeTempDirOrDie("kubelet_integ_1.", "")
+	configFilePath := testutils.MakeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	cm := cm.NewStubContainerManager()
 	kcfg := kubeletapp.SimpleKubelet(
@@ -247,7 +240,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	testRootDir = integration.MakeTempDirOrDie("kubelet_integ_2.", "")
+	testRootDir = testutils.MakeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
 
 	kcfg = kubeletapp.SimpleKubelet(
@@ -282,89 +275,6 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	return apiServer.URL, configFilePath
 }
 
-func makeTempDirOrDie(prefix string, baseDir string) string {
-	if baseDir == "" {
-		baseDir = "/tmp"
-	}
-	tempDir, err := ioutil.TempDir(baseDir, prefix)
-	if err != nil {
-		glog.Fatalf("Can't make a temp rootdir: %v", err)
-	}
-	if err = os.MkdirAll(tempDir, 0750); err != nil {
-		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
-	}
-	return tempDir
-}
-
-// podsOnNodes returns true when all of the selected pods exist on a node.
-func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
-	// Wait until all pods are running on the node.
-	return func() (bool, error) {
-		options := api.ListOptions{LabelSelector: labelSelector}
-		pods, err := c.Pods(podNamespace).List(options)
-		if err != nil {
-			glog.Infof("Unable to get pods to list: %v", err)
-			return false, nil
-		}
-		for i := range pods.Items {
-			pod := pods.Items[i]
-			podString := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.NodeName)
-			if len(pod.Spec.NodeName) == 0 {
-				glog.Infof("Pod %q is not bound to a host yet", podString)
-				return false, nil
-			}
-			if pod.Status.Phase != api.PodRunning {
-				glog.Infof("Pod %q is not running, status: %v", podString, pod.Status.Phase)
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-}
-
-func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpointCount int) wait.ConditionFunc {
-	return func() (bool, error) {
-		endpoints, err := c.Endpoints(serviceNamespace).Get(serviceID)
-		if err != nil {
-			glog.Infof("Error getting endpoints: %v", err)
-			return false, nil
-		}
-		count := 0
-		for _, ss := range endpoints.Subsets {
-			for _, addr := range ss.Addresses {
-				for _, port := range ss.Ports {
-					count++
-					glog.Infof("%s/%s endpoint: %s:%d %#v", serviceNamespace, serviceID, addr.IP, port.Port, addr.TargetRef)
-				}
-			}
-		}
-		return count == endpointCount, nil
-	}
-}
-
-func countEndpoints(eps *api.Endpoints) int {
-	count := 0
-	for i := range eps.Subsets {
-		count += len(eps.Subsets[i].Addresses) * len(eps.Subsets[i].Ports)
-	}
-	return count
-}
-
-func podExists(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		_, err := c.Pods(podNamespace).Get(podName)
-		return err == nil, nil
-	}
-}
-
-func podNotFound(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		_, err := c.Pods(podNamespace).Get(podName)
-		return apierrors.IsNotFound(err), nil
-	}
-}
-
 func podRunning(c *client.Client, podNamespace string, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.Pods(podNamespace).Get(podName)
@@ -383,402 +293,6 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 		}
 		return true, nil
 	}
-}
-
-func runAPIVersionsTest(c *client.Client) {
-	g, err := c.ServerGroups()
-	clientVersion := c.APIVersion().String()
-	if err != nil {
-		glog.Fatalf("Failed to get api versions: %v", err)
-	}
-	versions := unversioned.ExtractGroupVersions(g)
-
-	// Verify that the server supports the API version used by the client.
-	for _, version := range versions {
-		if version == clientVersion {
-			glog.Infof("Version test passed")
-			return
-		}
-	}
-	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", versions, clientVersion)
-}
-
-func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
-	svcBody := api.Service{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "selflinktest",
-			Namespace: namespace,
-			Labels: map[string]string{
-				"name": "selflinktest",
-			},
-		},
-		Spec: api.ServiceSpec{
-			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
-			},
-			Ports: []api.ServicePort{{
-				Port:     12345,
-				Protocol: "TCP",
-			}},
-			SessionAffinity: "None",
-		},
-	}
-	services := c.Services(namespace)
-	svc, err := services.Create(&svcBody)
-	if err != nil {
-		glog.Fatalf("Failed creating selflinktest service: %v", err)
-	}
-	err = c.Get().RequestURI(svc.SelfLink).Do().Into(svc)
-	if err != nil {
-		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
-	}
-
-	svcList, err := services.List(api.ListOptions{})
-	if err != nil {
-		glog.Fatalf("Failed listing services: %v", err)
-	}
-
-	err = c.Get().RequestURI(svcList.SelfLink).Do().Into(svcList)
-	if err != nil {
-		glog.Fatalf("Failed listing services with supplied self link '%v': %v", svcList.SelfLink, err)
-	}
-
-	found := false
-	for i := range svcList.Items {
-		item := &svcList.Items[i]
-		if item.Name != "selflinktest" {
-			continue
-		}
-		found = true
-		err = c.Get().RequestURI(item.SelfLink).Do().Into(svc)
-		if err != nil {
-			glog.Fatalf("Failed listing service with supplied self link '%v': %v", item.SelfLink, err)
-		}
-		break
-	}
-	if !found {
-		glog.Fatalf("never found selflinktest service in namespace %s", namespace)
-	}
-	glog.Infof("Self link test passed in namespace %s", namespace)
-
-	// TODO: Should test PUT at some point, too.
-}
-
-func runAtomicPutTest(c *client.Client) {
-	svcBody := api.Service{
-		TypeMeta: unversioned.TypeMeta{
-			APIVersion: c.APIVersion().String(),
-		},
-		ObjectMeta: api.ObjectMeta{
-			Name: "atomicservice",
-			Labels: map[string]string{
-				"name": "atomicService",
-			},
-		},
-		Spec: api.ServiceSpec{
-			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
-			},
-			Ports: []api.ServicePort{{
-				Port:     12345,
-				Protocol: "TCP",
-			}},
-			SessionAffinity: "None",
-		},
-	}
-	services := c.Services(api.NamespaceDefault)
-	svc, err := services.Create(&svcBody)
-	if err != nil {
-		glog.Fatalf("Failed creating atomicService: %v", err)
-	}
-	glog.Info("Created atomicService")
-	testLabels := labels.Set{
-		"foo": "bar",
-	}
-	for i := 0; i < 5; i++ {
-		// a: z, b: y, etc...
-		testLabels[string([]byte{byte('a' + i)})] = string([]byte{byte('z' - i)})
-	}
-	var wg sync.WaitGroup
-	wg.Add(len(testLabels))
-	for label, value := range testLabels {
-		go func(l, v string) {
-			for {
-				glog.Infof("Starting to update (%s, %s)", l, v)
-				tmpSvc, err := services.Get(svc.Name)
-				if err != nil {
-					glog.Errorf("Error getting atomicService: %v", err)
-					continue
-				}
-				if tmpSvc.Spec.Selector == nil {
-					tmpSvc.Spec.Selector = map[string]string{l: v}
-				} else {
-					tmpSvc.Spec.Selector[l] = v
-				}
-				glog.Infof("Posting update (%s, %s)", l, v)
-				tmpSvc, err = services.Update(tmpSvc)
-				if err != nil {
-					if apierrors.IsConflict(err) {
-						glog.Infof("Conflict: (%s, %s)", l, v)
-						// This is what we expect.
-						continue
-					}
-					glog.Errorf("Unexpected error putting atomicService: %v", err)
-					continue
-				}
-				break
-			}
-			glog.Infof("Done update (%s, %s)", l, v)
-			wg.Done()
-		}(label, value)
-	}
-	wg.Wait()
-	svc, err = services.Get(svc.Name)
-	if err != nil {
-		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
-	}
-	if !reflect.DeepEqual(testLabels, labels.Set(svc.Spec.Selector)) {
-		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Spec.Selector)
-	}
-	glog.Info("Atomic PUTs work.")
-}
-
-func runPatchTest(c *client.Client) {
-	name := "patchservice"
-	resource := "services"
-	svcBody := api.Service{
-		TypeMeta: unversioned.TypeMeta{
-			APIVersion: c.APIVersion().String(),
-		},
-		ObjectMeta: api.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{},
-		},
-		Spec: api.ServiceSpec{
-			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
-			},
-			Ports: []api.ServicePort{{
-				Port:     12345,
-				Protocol: "TCP",
-			}},
-			SessionAffinity: "None",
-		},
-	}
-	services := c.Services(api.NamespaceDefault)
-	svc, err := services.Create(&svcBody)
-	if err != nil {
-		glog.Fatalf("Failed creating patchservice: %v", err)
-	}
-
-	patchBodies := map[unversioned.GroupVersion]map[api.PatchType]struct {
-		AddLabelBody        []byte
-		RemoveLabelBody     []byte
-		RemoveAllLabelsBody []byte
-	}{
-		v1.SchemeGroupVersion: {
-			api.JSONPatchType: {
-				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
-			},
-			api.MergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":null}}`),
-			},
-			api.StrategicMergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
-			},
-		},
-	}
-
-	pb := patchBodies[c.APIVersion()]
-
-	execPatch := func(pt api.PatchType, body []byte) error {
-		return c.Patch(pt).
-			Resource(resource).
-			Namespace(api.NamespaceDefault).
-			Name(name).
-			Body(body).
-			Do().
-			Error()
-	}
-	for k, v := range pb {
-		// add label
-		err := execPatch(k, v.AddLabelBody)
-		if err != nil {
-			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
-		}
-		svc, err = services.Get(name)
-		if err != nil {
-			glog.Fatalf("Failed getting patchservice: %v", err)
-		}
-		if len(svc.Labels) != 2 || svc.Labels["foo"] != "bar" || svc.Labels["baz"] != "qux" {
-			glog.Fatalf("Failed updating patchservice with patch type %s: labels are: %v", k, svc.Labels)
-		}
-
-		// remove one label
-		err = execPatch(k, v.RemoveLabelBody)
-		if err != nil {
-			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
-		}
-		svc, err = services.Get(name)
-		if err != nil {
-			glog.Fatalf("Failed getting patchservice: %v", err)
-		}
-		if len(svc.Labels) != 1 || svc.Labels["baz"] != "qux" {
-			glog.Fatalf("Failed updating patchservice with patch type %s: labels are: %v", k, svc.Labels)
-		}
-
-		// remove all labels
-		err = execPatch(k, v.RemoveAllLabelsBody)
-		if err != nil {
-			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
-		}
-		svc, err = services.Get(name)
-		if err != nil {
-			glog.Fatalf("Failed getting patchservice: %v", err)
-		}
-		if svc.Labels != nil {
-			glog.Fatalf("Failed remove all labels from patchservice with patch type %s: %v", k, svc.Labels)
-		}
-	}
-
-	// Test patch with a resource that allows create on update
-	endpointTemplate := &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Name: "patchendpoint"},
-		Subsets: []api.EndpointSubset{
-			{
-				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
-				Ports:     []api.EndpointPort{{Port: 80, Protocol: api.ProtocolTCP}},
-			},
-		},
-	}
-
-	patchEndpoint := func(json []byte) (runtime.Object, error) {
-		return c.Patch(api.MergePatchType).Resource("endpoints").Namespace(api.NamespaceDefault).Name("patchendpoint").Body(json).Do().Get()
-	}
-
-	// Make sure patch doesn't get to CreateOnUpdate
-	{
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
-		if err != nil {
-			glog.Fatalf("Failed creating endpoint JSON: %v", err)
-		}
-		if obj, err := patchEndpoint(endpointJSON); !apierrors.IsNotFound(err) {
-			glog.Fatalf("Expected notfound creating from patch, got error=%v and object: %#v", err, obj)
-		}
-	}
-
-	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
-	createdEndpoint, err := c.Endpoints(api.NamespaceDefault).Update(endpointTemplate)
-	if err != nil {
-		glog.Fatalf("Failed creating endpoint: %v", err)
-	}
-
-	// Make sure identity patch is accepted
-	{
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), createdEndpoint)
-		if err != nil {
-			glog.Fatalf("Failed creating endpoint JSON: %v", err)
-		}
-		if _, err := patchEndpoint(endpointJSON); err != nil {
-			glog.Fatalf("Failed patching endpoint: %v", err)
-		}
-	}
-
-	// Make sure patch complains about a mismatched resourceVersion
-	{
-		endpointTemplate.Name = ""
-		endpointTemplate.UID = ""
-		endpointTemplate.ResourceVersion = "1"
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
-		if err != nil {
-			glog.Fatalf("Failed creating endpoint JSON: %v", err)
-		}
-		if _, err := patchEndpoint(endpointJSON); !apierrors.IsConflict(err) {
-			glog.Fatalf("Expected error, got %#v", err)
-		}
-	}
-
-	// Make sure patch complains about mutating the UID
-	{
-		endpointTemplate.Name = ""
-		endpointTemplate.UID = "abc"
-		endpointTemplate.ResourceVersion = ""
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
-		if err != nil {
-			glog.Fatalf("Failed creating endpoint JSON: %v", err)
-		}
-		if _, err := patchEndpoint(endpointJSON); !apierrors.IsInvalid(err) {
-			glog.Fatalf("Expected error, got %#v", err)
-		}
-	}
-
-	// Make sure patch complains about a mismatched name
-	{
-		endpointTemplate.Name = "changedname"
-		endpointTemplate.UID = ""
-		endpointTemplate.ResourceVersion = ""
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
-		if err != nil {
-			glog.Fatalf("Failed creating endpoint JSON: %v", err)
-		}
-		if _, err := patchEndpoint(endpointJSON); !apierrors.IsBadRequest(err) {
-			glog.Fatalf("Expected error, got %#v", err)
-		}
-	}
-
-	// Make sure patch containing originally submitted JSON is accepted
-	{
-		endpointTemplate.Name = ""
-		endpointTemplate.UID = ""
-		endpointTemplate.ResourceVersion = ""
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
-		if err != nil {
-			glog.Fatalf("Failed creating endpoint JSON: %v", err)
-		}
-		if _, err := patchEndpoint(endpointJSON); err != nil {
-			glog.Fatalf("Failed patching endpoint: %v", err)
-		}
-	}
-
-	glog.Info("PATCHs work.")
-}
-
-func runMasterServiceTest(client *client.Client) {
-	time.Sleep(12 * time.Second)
-	svcList, err := client.Services(api.NamespaceDefault).List(api.ListOptions{})
-	if err != nil {
-		glog.Fatalf("Unexpected error listing services: %v", err)
-	}
-	var foundRW bool
-	found := sets.String{}
-	for i := range svcList.Items {
-		found.Insert(svcList.Items[i].Name)
-		if svcList.Items[i].Name == "kubernetes" {
-			foundRW = true
-		}
-	}
-	if foundRW {
-		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes")
-		if err != nil {
-			glog.Fatalf("Unexpected error listing endpoints for kubernetes service: %v", err)
-		}
-		if countEndpoints(ep) == 0 {
-			glog.Fatalf("No endpoints for kubernetes service: %v", ep)
-		}
-	} else {
-		glog.Errorf("No RW service found: %v", found)
-		glog.Fatal("Kubernetes service test failed")
-	}
-	glog.Infof("Master service test passed.")
 }
 
 func runSchedulerNoPhantomPodsTest(client *client.Client) {
@@ -894,16 +408,7 @@ func main() {
 		})
 
 	// Run tests in parallel
-	testFuncs := []testFunc{
-		runAtomicPutTest,
-		runPatchTest,
-		runAPIVersionsTest,
-		runMasterServiceTest,
-		func(c *client.Client) {
-			runSelfLinkTestOnNamespace(c, api.NamespaceDefault)
-			runSelfLinkTestOnNamespace(c, "other")
-		},
-	}
+	testFuncs := []testFunc{}
 
 	// Only run at most maxConcurrency tests in parallel.
 	if maxConcurrency <= 0 {

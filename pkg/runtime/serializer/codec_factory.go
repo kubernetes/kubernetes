@@ -339,7 +339,7 @@ type DirectCodec struct {
 }
 
 // EncodeToStream does not do conversion. It sets the gvk during serialization. overrides are ignored.
-func (c DirectCodec) EncodeToStream(obj runtime.Object, stream io.Writer, overrides ...unversioned.GroupVersion) error {
+func (c DirectCodec) Encode(obj runtime.Object, stream io.Writer) error {
 	gvks, _, err := c.ObjectTyper.ObjectKinds(obj)
 	if err != nil {
 		return err
@@ -347,7 +347,7 @@ func (c DirectCodec) EncodeToStream(obj runtime.Object, stream io.Writer, overri
 	kind := obj.GetObjectKind()
 	oldGVK := kind.GroupVersionKind()
 	kind.SetGroupVersionKind(gvks[0])
-	err = c.Serializer.EncodeToStream(obj, stream, overrides...)
+	err = c.Serializer.Encode(obj, stream)
 	kind.SetGroupVersionKind(oldGVK)
 	return err
 }

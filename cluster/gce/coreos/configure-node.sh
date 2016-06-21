@@ -119,7 +119,7 @@ function wait-url-up() {
   done
 }
 
-# Configure addon yamls, and run salt/kube-addons/kube-addon.sh
+# Configure addon yamls, and run salt/kube-addons/kube-addons.sh
 function configure-master-addons() {
   echo "Configuring master addons"
 
@@ -160,6 +160,10 @@ function configure-master-addons() {
     CLUSTER_REGISTRY_DISK_SIZE=$(convert-bytes-gce-kube "${CLUSTER_REGISTRY_DISK_SIZE}")
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/registry  ${addon_dir}/registry
   fi
+
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR}" == "true" ]]; then
+    evaluate-manifests-dir ${MANIFESTS_DIR}/addons/node-problem-detector  ${addon_dir}/node-problem-detector
+  fi
 }
 
 function configure-master-components() {
@@ -169,8 +173,8 @@ function configure-master-components() {
   configure-kube-apiserver
   configure-kube-scheduler
   configure-kube-controller-manager
-  configure-addon-manager
   configure-master-addons
+  configure-addon-manager
 }
 
 # TODO(yifan): Merge this with mount-master-pd() in configure-vm.sh
@@ -296,10 +300,10 @@ function load-docker-images() {
   done
 }
 
-
-# TODO(yifan): Making this function more generic for other runtimes.
 function load-master-components-images() {
-  echo "Loading docker images for master components"
+  echo "Loading images for master components"
+  export RKT_BIN=/opt/rkt/rkt
+  export DOCKER2ACI_BIN=/opt/docker2aci/docker2aci
   ${SALT_DIR}/install.sh ${KUBE_BIN_TAR}
   ${SALT_DIR}/salt/kube-master-addons/kube-master-addons.sh
 
@@ -308,7 +312,6 @@ function load-master-components-images() {
   KUBE_CONTROLLER_MANAGER_DOCKER_TAG=$(cat ${KUBE_BIN_DIR}/kube-controller-manager.docker_tag)
   KUBE_SCHEDULER_DOCKER_TAG=$(cat ${KUBE_BIN_DIR}/kube-scheduler.docker_tag)
 }
-
 
 ##########
 #  main  #

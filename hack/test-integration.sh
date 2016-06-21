@@ -29,7 +29,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 # TODO: It's going to be:
 # KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1"}
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1;v1,autoscaling/v1,batch/v1,apps/v1alpha1,policy/v1alpha1,extensions/v1beta1,rbac.authorization.k8s.io/v1alpha1"}
+# FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
+# ONLY the last version is tested in each group.
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,autoscaling/v1,batch/v1,apps/v1alpha1,policy/v1alpha1,extensions/v1beta1,rbac.authorization.k8s.io/v1alpha1"}
 
 # Give integration tests longer to run
 # TODO: allow a larger value to be passed in
@@ -37,28 +39,34 @@ KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1;v1,autos
 KUBE_TIMEOUT="-timeout 600s"
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
+KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 
 cleanup() {
+  kube::log::status "Cleaning up etcd"
   kube::etcd::cleanup
   kube::log::status "Integration test cleanup complete"
 }
 
 runTests() {
+  kube::log::status "Starting etcd instance"
   kube::etcd::start
-
   kube::log::status "Running integration test cases"
 
   # TODO: Re-enable race detection when we switch to a thread-safe etcd client
   # KUBE_RACE="-race"
-  KUBE_GOFLAGS="-tags 'integration no-docker' " \
+  KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -tags 'integration no-docker'" \
     KUBE_RACE="" \
     KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
-  kube::log::status "Running integration test scenario with watch cache on"
-  KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
-    --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}" --watch-cache=true
+  # Run the watch cache tests
+  # KUBE_TEST_ARGS doesn't mean anything to the watch cache test.
+  if [[ -z "${KUBE_TEST_ARGS}" ]]; then
+    kube::log::status "Running integration test scenario with watch cache on"
+    KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
+      --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}" --watch-cache=true
+  fi
 
   cleanup
 }
@@ -73,11 +81,15 @@ checkEtcdOnPath() {
 
 checkEtcdOnPath
 
-
 "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
+
+# If a test case is specified, just run once with v1 API version and exit
+if [[ -n "${KUBE_TEST_ARGS}" ]]; then
+  runTests v1
+fi
 
 # Convert the CSV to an array of API versions to test
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -57,13 +58,26 @@ func (plugin *vsphereVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *vsphereVolumePlugin) Name() string {
+func (plugin *vsphereVolumePlugin) GetPluginName() string {
 	return vsphereVolumePluginName
+}
+
+func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.VolumePath, nil
 }
 
 func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.VsphereVolume != nil) ||
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
+}
+
+func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *vsphereVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
@@ -75,11 +89,9 @@ func (plugin *vsphereVolumePlugin) NewUnmounter(volName string, podUID types.UID
 }
 
 func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager vdManager, mounter mount.Interface) (volume.Mounter, error) {
-	var vvol *api.VsphereVirtualDiskVolumeSource
-	if spec.Volume != nil && spec.Volume.VsphereVolume != nil {
-		vvol = spec.Volume.VsphereVolume
-	} else {
-		vvol = spec.PersistentVolume.Spec.VsphereVolume
+	vvol, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	volPath := vvol.VolumePath
@@ -197,7 +209,7 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volPath)
 	if err := b.manager.AttachDisk(b, globalPDPath); err != nil {
-		glog.V(4).Infof("AttachDisk failed: %v", err)
+		glog.V(3).Infof("AttachDisk failed: %v", err)
 		return err
 	}
 	glog.V(3).Infof("vSphere volume %s attached", b.volPath)
@@ -280,7 +292,11 @@ func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
 		return fmt.Errorf("directory %s is not mounted", dir)
 	}
 
-	v.volPath = path.Base(refs[0])
+	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().
+	// volumePath eg: "[local] xxx.vmdk" provided to attach/mount
+	// replacing \040 with space to match the actual volumePath
+	mountPath := strings.Replace(path.Base(refs[0]), "\\040", " ", -1)
+	v.volPath = mountPath
 	glog.V(4).Infof("Found volume %s mounted to %s", v.volPath, dir)
 
 	// Reload list of references, there might be SetUpAt finished in the meantime
@@ -416,4 +432,16 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 	}
 	return pv, nil
+}
+
+func getVolumeSource(
+	spec *volume.Spec) (*api.VsphereVirtualDiskVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.VsphereVolume != nil {
+		return spec.Volume.VsphereVolume, spec.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.VsphereVolume != nil {
+		return spec.PersistentVolume.Spec.VsphereVolume, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
 }

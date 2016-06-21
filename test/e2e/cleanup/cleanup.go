@@ -40,7 +40,7 @@ func main() {
 		log.Fatalf("Please specify a resource and project to cleanup.")
 	}
 	if strings.ToLower(*resource) == "ingress" {
-		ingController := e2e.IngressController{UID: ".*", Project: *project}
+		ingController := e2e.GCEIngressController{UID: ".*", Project: *project}
 		log.Printf("%v", ingController.Cleanup(true))
 		return
 	}

@@ -197,24 +197,38 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 	)
 
 	if dockerStorageDriver == devicemapperStorageDriver {
-		// If the storage drive is devicemapper, create and start a
-		// ThinPoolWatcher to monitor the size of container CoW layers with
-		// thin_ls.
-		dockerThinPoolName, err := dockerutil.DockerThinPoolName(*dockerInfo)
-		if err != nil {
-			return fmt.Errorf("couldn't find device mapper thin pool name: %v", err)
-		}
+		_, err := devicemapper.ThinLsBinaryPresent()
+		if err == nil {
+			// If the storage driver is devicemapper, create and start a
+			// ThinPoolWatcher to monitor the size of container CoW layers
+			// with thin_ls.
+			dockerThinPoolName, err := dockerutil.DockerThinPoolName(*dockerInfo)
+			if err != nil {
+				return fmt.Errorf("couldn't find device mapper thin pool name: %v", err)
+			}
 
-		dockerMetadataDevice, err := dockerutil.DockerMetadataDevice(*dockerInfo)
-		if err != nil {
-			return fmt.Errorf("couldn't determine devicemapper metadata device")
-		}
+			dockerMetadataDevice, err := dockerutil.DockerMetadataDevice(*dockerInfo)
+			if err != nil {
+				return fmt.Errorf("couldn't determine devicemapper metadata device: %v", err)
+			}
 
-		thinPoolWatcher = devicemapper.NewThinPoolWatcher(dockerThinPoolName, dockerMetadataDevice)
-		go thinPoolWatcher.Start()
+			thinPoolWatcher, err = devicemapper.NewThinPoolWatcher(dockerThinPoolName, dockerMetadataDevice)
+			if err != nil {
+				return fmt.Errorf("couldn't create thin pool watcher: %v", err)
+			}
+
+			go thinPoolWatcher.Start()
+		} else {
+			msg := []string{
+				"Couldn't locate thin_ls binary; not starting thin pool watcher.",
+				"Containers backed by thin pools will not show accurate usage.",
+				"err: %v",
+			}
+			glog.Errorf(strings.Join(msg, " "), err)
+		}
 	}
 
-	glog.Infof("registering Docker factory")
+	glog.Infof("Registering Docker factory")
 	f := &dockerFactory{
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,

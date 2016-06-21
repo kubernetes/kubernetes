@@ -555,7 +555,7 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 	return reactor
 }
 
-func newTestController(kubeClient clientset.Interface, volumeSource, claimSource cache.ListerWatcher) *PersistentVolumeController {
+func newTestController(kubeClient clientset.Interface, volumeSource, claimSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
 	if volumeSource == nil {
 		volumeSource = framework.NewFakeControllerSource()
 	}
@@ -572,6 +572,7 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 		volumeSource,
 		claimSource,
 		record.NewFakeRecorder(1000), // event recorder
+		enableDynamicProvisioning,
 	)
 
 	// Speed up the test
@@ -663,6 +664,14 @@ func withLabelSelector(labels map[string]string, claims []*api.PersistentVolumeC
 	}
 
 	return claims
+}
+
+// withMessage saves given message into volume.Status.Message of the first
+// volume in the array and returns the array.  Meant to be used to compose
+// volumes specified inline in a test.
+func withMessage(message string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+	volumes[0].Status.Message = message
+	return volumes
 }
 
 // newVolumeArray returns array with a single volume that would be returned by
@@ -822,7 +831,7 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil)
+		ctrl := newTestController(client, nil, nil, true)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -866,7 +875,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil)
+		ctrl := newTestController(client, nil, nil, true)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -980,12 +989,20 @@ func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
 	return nil
 }
 
-func (plugin *mockVolumePlugin) Name() string {
+func (plugin *mockVolumePlugin) GetPluginName() string {
 	return mockPluginName
+}
+
+func (plugin *mockVolumePlugin) GetVolumeName(spec *vol.Spec) (string, error) {
+	return spec.Name(), nil
 }
 
 func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
 	return true
+}
+
+func (plugin *mockVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *api.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {

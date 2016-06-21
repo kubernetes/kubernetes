@@ -273,6 +273,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
 	out.ContainerRuntime = in.ContainerRuntime
+	if err := unversioned.DeepCopy_unversioned_Duration(in.RuntimeRequestTimeout, &out.RuntimeRequestTimeout, c); err != nil {
+		return err
+	}
 	out.RktPath = in.RktPath
 	out.RktAPIEndpoint = in.RktAPIEndpoint
 	out.RktStage1Image = in.RktStage1Image
@@ -361,6 +364,7 @@ func DeepCopy_componentconfig_PortRangeVar(in PortRangeVar, out *PortRangeVar, c
 
 func DeepCopy_componentconfig_VolumeConfiguration(in VolumeConfiguration, out *VolumeConfiguration, c *conversion.Cloner) error {
 	out.EnableHostPathProvisioning = in.EnableHostPathProvisioning
+	out.EnableDynamicProvisioning = in.EnableDynamicProvisioning
 	if err := DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in.PersistentVolumeRecyclerConfiguration, &out.PersistentVolumeRecyclerConfiguration, c); err != nil {
 		return err
 	}

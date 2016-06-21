@@ -122,6 +122,8 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 		}
 	}
 
+	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
+
 	return allErrs
 }
 
@@ -1167,7 +1169,7 @@ func validateContainerResourceFieldSelector(fs *api.ResourceFieldSelector, expre
 }
 
 var validContainerResourceDivisorForCPU = sets.NewString("1m", "1")
-var validContainerResourceDivisorForMemory = sets.NewString("1m", "1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
+var validContainerResourceDivisorForMemory = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
 
 func validateContainerResourceDivisor(rName string, divisor resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1182,7 +1184,7 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 		}
 	case "limits.memory", "requests.memory":
 		if !validContainerResourceDivisorForMemory.Has(divisor.String()) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, fmt.Sprintf("only divisor's values 1m, 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource")))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, fmt.Sprintf("only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource")))
 		}
 	}
 	return allErrs
@@ -1841,6 +1843,33 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	}
 	if len(tolerations) > 0 {
 		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
+	}
+
+	return allErrs
+}
+
+func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
+	if p == "docker/default" {
+		return nil
+	}
+	if p == "unconfined" {
+		return nil
+	}
+	if strings.HasPrefix(p, "localhost/") {
+		return validateSubPath(strings.TrimPrefix(p, "localhost/"), fldPath)
+	}
+	return field.ErrorList{field.Invalid(fldPath, p, "must be a valid seccomp profile")}
+}
+
+func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if p, exists := annotations[api.SeccompPodAnnotationKey]; exists {
+		allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
+	}
+	for k, p := range annotations {
+		if strings.HasPrefix(k, api.SeccompContainerAnnotationKeyPrefix) {
+			allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(k))...)
+		}
 	}
 
 	return allErrs

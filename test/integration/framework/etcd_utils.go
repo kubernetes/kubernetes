@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	"k8s.io/kubernetes/pkg/util/env"
 )
 
 // If you need to start an etcd instance by hand, you also need to insert a key
@@ -37,9 +38,15 @@ func init() {
 	RequireEtcd()
 }
 
+func GetEtcdURLFromEnv() string {
+	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:4001")
+	glog.V(4).Infof("Using KUBE_INTEGRATION_ETCD_URL=%q", url)
+	return url
+}
+
 func NewEtcdClient() etcd.Client {
 	cfg := etcd.Config{
-		Endpoints: []string{"http://127.0.0.1:4001"},
+		Endpoints: []string{GetEtcdURLFromEnv()},
 	}
 	client, err := etcd.New(cfg)
 	if err != nil {
@@ -74,6 +81,13 @@ func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
 		client = NewEtcdClient()
 	}
 	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
+}
+
+func NewRbacEtcdStorage(client etcd.Client) storage.Interface {
+	if client == nil {
+		client = NewEtcdClient()
+	}
+	return etcdstorage.NewEtcdStorage(client, testapi.Rbac.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 }
 
 func RequireEtcd() {

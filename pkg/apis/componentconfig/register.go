@@ -48,6 +48,3 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&KubeSchedulerConfiguration{},
 	)
 }
-
-func (obj *KubeProxyConfiguration) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *KubeSchedulerConfiguration) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

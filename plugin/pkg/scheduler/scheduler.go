@@ -135,7 +135,7 @@ func (s *Scheduler) scheduleOne() {
 		}
 
 		bindingStart := time.Now()
-		// If binding succeded then PodScheduled condition will be updated in apiserver so that
+		// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 		// it's atomic with setting host.
 		err := s.config.Binder.Bind(b)
 		if err != nil {

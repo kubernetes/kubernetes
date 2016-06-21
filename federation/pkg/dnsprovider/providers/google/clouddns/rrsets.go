@@ -24,6 +24,9 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
 
+// Compile time check for interface adeherence
+var _ dnsprovider.ResourceRecordSets = ResourceRecordSets{}
+
 type ResourceRecordSets struct {
 	zone *Zone
 	impl interfaces.ResourceRecordSetsService

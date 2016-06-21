@@ -54,7 +54,7 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionK
 	return obj, &gvk, nil
 }
 
-func (unstructuredJSONScheme) EncodeToStream(obj Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+func (unstructuredJSONScheme) Encode(obj Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case *Unstructured:
 		return json.NewEncoder(w).Encode(t.Object)

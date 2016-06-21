@@ -596,10 +596,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
-<h3 id="_v1_uniquedevicename">v1.UniqueDeviceName</h3>
-
-</div>
-<div class="sect2">
 <h3 id="_v1_preconditions">v1.Preconditions</h3>
 <div class="paragraph">
 <p>Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.</p>
@@ -2271,9 +2267,9 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 </div>
 <div class="sect2">
-<h3 id="_v1_persistentvolumeclaim">v1.PersistentVolumeClaim</h3>
+<h3 id="_v1_namespacelist">v1.NamespaceList</h3>
 <div class="paragraph">
-<p>PersistentVolumeClaim is a user&#8217;s request for and claim to a persistent volume</p>
+<p>NamespaceList is a list of Namespaces.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2318,7 +2314,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Spec defines the desired characteristics of a volume requested by a pod author. More info: <a href="http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumeclaimspec">v1.PersistentVolumeClaimSpec</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -2333,9 +2329,9 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
-<h3 id="_v1_namespacelist">v1.NamespaceList</h3>
+<h3 id="_v1_persistentvolumeclaim">v1.PersistentVolumeClaim</h3>
 <div class="paragraph">
-<p>NamespaceList is a list of Namespaces.</p>
+<p>PersistentVolumeClaim is a user&#8217;s request for and claim to a persistent volume</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2373,7 +2369,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -2769,6 +2765,10 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 </tbody>
 </table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_uniquevolumename">v1.UniqueVolumeName</h3>
 
 </div>
 <div class="sect2">
@@ -4757,9 +4757,16 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">volumesInUse</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">List of volumes in use (mounted) by the node.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of attachable volumes in use (mounted) by the node.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_uniquedevicename">v1.UniqueDeviceName</a> array</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_uniquevolumename">v1.UniqueVolumeName</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">volumesAttached</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of volumes that are attached to the node.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_attachedvolume">v1.AttachedVolume</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -4809,6 +4816,47 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_attachedvolume">v1.AttachedVolume</h3>
+<div class="paragraph">
+<p>AttachedVolume describes a volume attached to a node</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the attached volume</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">devicePath</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">DevicePath represents the device path where the volume should be avilable</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>

@@ -17,7 +17,7 @@
 # If you update this image please bump the tag value before pushing.
 #
 # Usage:
-#   [ARCH=amd64] [TAG=1.0] [REGISTRY=gcr.io/google_containers] [BASEIMAGE=busybox] make container
+#   [ARCH=amd64] [TAG=1.3] [REGISTRY=gcr.io/google_containers] [BASEIMAGE=busybox] make (container|push)
 
 # Default registry, arch and tag. This can be overwritten by arguments to make
 PLATFORM?=linux
@@ -26,7 +26,6 @@ TAG?=1.3
 REGISTRY?=gcr.io/google_containers
 
 GOLANG_VERSION=1.6
-GOARM=6
 KUBE_ROOT=$(shell pwd)/../..
 TEMP_DIR:=$(shell mktemp -d)
 

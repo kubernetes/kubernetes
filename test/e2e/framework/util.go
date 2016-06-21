@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	goRuntime "runtime"
 	"sort"
 	"strconv"
@@ -39,6 +40,7 @@ import (
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -154,9 +156,14 @@ const (
 	RestartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-// Label allocated to the image puller static pod that runs on each node
-// before e2es.
-var ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+var (
+	// Label allocated to the image puller static pod that runs on each node
+	// before e2es.
+	ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
+
+	// For parsing Kubectl version for version-skewed testing.
+	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
+)
 
 // GetServerArchitecture fetches the architecture of the cluster's apiserver.
 func GetServerArchitecture(c *client.Client) string {
@@ -541,9 +548,10 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 // that it requires the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
 // waiting.
-// If ignoreSuccessPods is true, pods in the "Success" state are ignored and
-// this function waits for minPods to enter Running/Ready. Otherwise an error is
-// returned even if there are minPods pods, some of which are in Running/Ready
+// If ignoreLabels is not empty, pods matching this selector are ignored and
+// this function waits for minPods to enter Running/Ready and for all pods
+// matching ignoreLabels to enter Success phase. Otherwise an error is returned
+// even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
 func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
@@ -551,6 +559,14 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var waitForSuccessError error
+	go func() {
+		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
+		wg.Done()
+	}()
+
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		// We get the new list of pods and replication controllers in every
 		// iteration because more pods come online during startup and we want to
@@ -605,6 +621,10 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	}) != nil {
 		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 	}
+	wg.Wait()
+	if waitForSuccessError != nil {
+		return waitForSuccessError
+	}
 	return nil
 }
 
@@ -657,17 +677,20 @@ func RunKubernetesServiceTestContainer(c *client.Client, repoRoot string, ns str
 	}
 }
 
-func kubectlLogPod(c *client.Client, pod api.Pod) {
+func kubectlLogPod(c *client.Client, pod api.Pod, containerNameSubstr string) {
 	for _, container := range pod.Spec.Containers {
-		logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
-		if err != nil {
-			logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+		if strings.Contains(container.Name, containerNameSubstr) {
+			// Contains() matches all strings if substr is empty
+			logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
 			if err != nil {
-				Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+				if err != nil {
+					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				}
 			}
+			By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
+			Logf("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
 		}
-		By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
-		Logf(logs)
 	}
 }
 
@@ -680,7 +703,7 @@ func LogFailedContainers(c *client.Client, ns string) {
 	Logf("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod)
+			kubectlLogPod(c, pod, "")
 		}
 	}
 }
@@ -693,7 +716,18 @@ func LogPodsWithLabels(c *client.Client, ns string, match map[string]string) {
 	}
 	Logf("Running kubectl logs on pods with labels %v in %v", match, ns)
 	for _, pod := range podList.Items {
-		kubectlLogPod(c, pod)
+		kubectlLogPod(c, pod, "")
+	}
+}
+
+func LogContainersInPodsWithLabels(c *client.Client, ns string, match map[string]string, containerSubstr string) {
+	podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(match)})
+	if err != nil {
+		Logf("Error getting pods in namespace %q: %v", ns, err)
+		return
+	}
+	for _, pod := range podList.Items {
+		kubectlLogPod(c, pod, containerSubstr)
 	}
 }
 
@@ -830,6 +864,18 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
+// WaitForFederationApiserverReady waits for the federation apiserver to be ready.
+// It tests the readiness by sending a GET request and expecting a non error response.
+func WaitForFederationApiserverReady(c *federation_internalclientset.Clientset) error {
+	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		_, err := c.Federation().Clusters().List(api.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 // WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
 func WaitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Client, pvName string, Poll, timeout time.Duration) error {
 	Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
@@ -912,6 +958,7 @@ func CreateTestingNS(baseName string, c *client.Client, labels map[string]string
 		var err error
 		got, err = c.Namespaces().Create(namespaceObj)
 		if err != nil {
+			Logf("Unexpected error while creating namespace: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -1335,7 +1382,7 @@ func WaitForService(c *client.Client, namespace, name string, exist bool, interv
 //WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
-		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
+		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
 		list, err := c.Endpoints(namespace).List(api.ListOptions{})
 		if err != nil {
 			return false, err
@@ -1388,7 +1435,7 @@ func WaitForEndpoint(c *client.Client, ns, name string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Failed to get entpoints for %s/%s", ns, name)
+	return fmt.Errorf("Failed to get endpoints for %s/%s", ns, name)
 }
 
 // Context for checking pods responses by issuing GETs to them (via the API
@@ -1488,6 +1535,29 @@ func ServerVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (boo
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.GTE(v), nil
+}
+
+// KubectlVersionGTE returns true if the kubectl version is greater than or
+// equal to v.
+func KubectlVersionGTE(v semver.Version) (bool, error) {
+	kv, err := KubectlVersion()
+	if err != nil {
+		return false, err
+	}
+	return kv.GTE(v), nil
+}
+
+// KubectlVersion gets the version of kubectl that's currently being used (see
+// --kubectl-path in e2e.go to use an alternate kubectl).
+func KubectlVersion() (semver.Version, error) {
+	output := RunKubectlOrDie("version", "--client")
+	matches := gitVersionRegexp.FindStringSubmatch(output)
+	if len(matches) != 2 {
+		return semver.Version{}, fmt.Errorf("Could not find kubectl version in output %v", output)
+	}
+	// Don't use the full match, as it contains "GitVersion:\"" and a
+	// trailing "\"".  Just use the submatch.
+	return version.Parse(matches[1])
 }
 
 func PodsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
@@ -1612,14 +1682,17 @@ func LoadConfig() (*restclient.Config, error) {
 func LoadFederatedConfig() (*restclient.Config, error) {
 	c, err := restclientConfig(federatedKubeContext)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating federation client config: %v", err.Error())
 	}
 	cfg, err := clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if cfg != nil {
 		//TODO(colhom): this is only here because https://github.com/kubernetes/kubernetes/issues/25422
 		cfg.NegotiatedSerializer = api.Codecs
 	}
-	return cfg, err
+	if err != nil {
+		return cfg, fmt.Errorf("error creating federation client config: %v", err.Error())
+	}
+	return cfg, nil
 }
 
 func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
@@ -1633,30 +1706,42 @@ func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
 	return c, nil
 }
 
-func loadFederationClientsetFromConfig(config *restclient.Config) (*federation_internalclientset.Clientset, error) {
-	c, err := federation_internalclientset.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
+func setTimeouts(cs ...*http.Client) {
+	for _, client := range cs {
+		if client.Timeout == 0 {
+			client.Timeout = SingleCallTimeout
+		}
 	}
-	// Set timeout for each client in the set.
-	if c.DiscoveryClient.Client.Timeout == 0 {
-		c.DiscoveryClient.Client.Timeout = SingleCallTimeout
-	}
-	if c.FederationClient.Client.Timeout == 0 {
-		c.FederationClient.Client.Timeout = SingleCallTimeout
-	}
-	if c.CoreClient.Client.Timeout == 0 {
-		c.CoreClient.Client.Timeout = SingleCallTimeout
-	}
-	return c, nil
 }
 
 func LoadFederationClientset() (*federation_internalclientset.Clientset, error) {
 	config, err := LoadFederatedConfig()
 	if err != nil {
-		return nil, fmt.Errorf("error creating federated client config: %v", err.Error())
+		return nil, err
 	}
-	return loadFederationClientsetFromConfig(config)
+
+	c, err := federation_internalclientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
+	}
+	// Set timeout for each client in the set.
+	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
+	return c, nil
+}
+
+func LoadFederationClientset_1_3() (*federation_release_1_3.Clientset, error) {
+	config, err := LoadFederatedConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := federation_release_1_3.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
+	}
+	// Set timeout for each client in the set.
+	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
+	return c, nil
 }
 
 func loadFederationClientFromConfig(config *restclient.Config) (*unversionedfederation.FederationClient, error) {
@@ -1673,7 +1758,7 @@ func loadFederationClientFromConfig(config *restclient.Config) (*unversionedfede
 func LoadFederationClient() (*unversionedfederation.FederationClient, error) {
 	config, err := LoadFederatedConfig()
 	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
+		return nil, err
 	}
 	return loadFederationClientFromConfig(config)
 }
@@ -1714,7 +1799,7 @@ func Cleanup(filePath, ns string, selectors ...string) {
 	AssertCleanup(ns, selectors...)
 }
 
-// Asserts that cleanup of a namespace wrt selectors occured.
+// Asserts that cleanup of a namespace wrt selectors occurred.
 func AssertCleanup(ns string, selectors ...string) {
 	var nsArg string
 	if ns != "" {
@@ -3649,7 +3734,7 @@ func RestartApiserver(c *client.Client) error {
 	if ProviderIs("gce", "aws") {
 		return sshRestartMaster()
 	}
-	// GKE doesn't allow ssh accesss, so use a same-version master
+	// GKE doesn't allow ssh access, so use a same-version master
 	// upgrade to teardown/recreate master.
 	v, err := c.ServerVersion()
 	if err != nil {

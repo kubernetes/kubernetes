@@ -107,7 +107,7 @@ func (s *KubeletExecutorServer) runExecutor(
 	exec := executor.New(executor.Config{
 		Registry:        registry,
 		APIClient:       apiclient,
-		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint, 0),
 		SuicideTimeout:  s.SuicideTimeout,
 		KubeletFinished: kubeletFinished,
 		ExitFunc:        os.Exit,

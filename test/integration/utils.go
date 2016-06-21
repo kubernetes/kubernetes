@@ -18,20 +18,19 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func newEtcdClient() etcd.Client {
 	cfg := etcd.Config{
-		Endpoints: []string{"http://127.0.0.1:4001"},
+		Endpoints: []string{framework.GetEtcdURLFromEnv()},
 	}
 	client, err := etcd.New(cfg)
 	if err != nil {
@@ -64,20 +63,6 @@ func deleteAllEtcdKeys() {
 		}
 	}
 
-}
-
-func MakeTempDirOrDie(prefix string, baseDir string) string {
-	if baseDir == "" {
-		baseDir = "/tmp"
-	}
-	tempDir, err := ioutil.TempDir(baseDir, prefix)
-	if err != nil {
-		glog.Fatalf("Can't make a temp rootdir: %v", err)
-	}
-	if err = os.MkdirAll(tempDir, 0750); err != nil {
-		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
-	}
-	return tempDir
 }
 
 func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {

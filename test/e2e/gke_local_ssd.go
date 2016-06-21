@@ -33,6 +33,10 @@ var _ = framework.KubeDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 
 	f := framework.NewDefaultFramework("localssd")
 
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gke")
+	})
+
 	It("should write and read from node local SSD [Feature:GKELocalSSD]", func() {
 		framework.Logf("Start local SSD test")
 		createNodePoolWithLocalSsds("np-ssd")
@@ -46,11 +50,11 @@ func createNodePoolWithLocalSsds(nodePoolName string) {
 	out, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create",
 		nodePoolName,
 		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
-		"--local-ssd-count=1").Output()
+		"--local-ssd-count=1").CombinedOutput()
 	if err != nil {
-		framework.Failf("Failed to create node pool %s: %v", nodePoolName, err)
+		framework.Failf("Failed to create node pool %s: Err: %v\n%v", nodePoolName, err, string(out))
 	}
-	framework.Logf("Successfully created node pool %s: %v", nodePoolName, out)
+	framework.Logf("Successfully created node pool %s:\n%v", nodePoolName, string(out))
 }
 
 func doTestWriteAndReadToLocalSsd(f *framework.Framework) {

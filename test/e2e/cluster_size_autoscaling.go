@@ -22,12 +22,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -77,10 +79,10 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		Expect(nodeCount).Should(Equal(sum))
 
 		if framework.ProviderIs("gke") {
-			val, err := isAutoscalerEnabled()
+			val, err := isAutoscalerEnabled(3)
 			framework.ExpectNoError(err)
 			if !val {
-				err = enableAutoscaler()
+				err = enableAutoscaler("default-pool", 3, 5)
 				framework.ExpectNoError(err)
 			}
 		}
@@ -152,22 +154,17 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 
-		removeLabels := func(nodesToClean []string) {
+		removeLabels := func(nodesToClean sets.String) {
 			By("Removing labels from nodes")
-			for _, node := range nodesToClean {
-				updateLabelsForNode(f, node, map[string]string{}, []string{"cluster-autoscaling-test.special-node"})
-			}
+			updateNodeLabels(c, nodesToClean, nil, labels)
 		}
 
 		nodes, err := GetGroupNodes(minMig)
-		defer removeLabels(nodes)
-		nodesMap := map[string]struct{}{}
 		ExpectNoError(err)
+		nodesSet := sets.NewString(nodes...)
+		defer removeLabels(nodesSet)
 		By(fmt.Sprintf("Annotating nodes of the smallest MIG(%s): %v", minMig, nodes))
-		for _, node := range nodes {
-			updateLabelsForNode(f, node, labels, nil)
-			nodesMap[node] = struct{}{}
-		}
+		updateNodeLabels(c, nodesSet, labels, nil)
 
 		CreateNodeSelectorPods(f, "node-selector", minSize+1, labels, false)
 
@@ -178,14 +175,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
 		newNodes, err := GetGroupNodes(minMig)
-		defer removeLabels(newNodes)
 		ExpectNoError(err)
-		By(fmt.Sprintf("Setting labels for new nodes: %v", newNodes))
-		for _, node := range newNodes {
-			if _, old := nodesMap[node]; !old {
-				updateLabelsForNode(f, node, labels, nil)
-			}
-		}
+		newNodesSet := sets.NewString(newNodes...)
+		newNodesSet.Delete(nodes...)
+		defer removeLabels(newNodesSet)
+		By(fmt.Sprintf("Setting labels for new nodes: %v", newNodesSet.List()))
+		updateNodeLabels(c, newNodesSet, labels, nil)
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
@@ -198,19 +193,28 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.SkipUnlessProviderIs("gke")
 
 		By("Creating new node-pool with one n1-standard-4 machine")
-		output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", "extra-pool", "--quiet",
+		const extraPoolName = "extra-pool"
+		output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", extraPoolName, "--quiet",
 			"--machine-type=n1-standard-4",
 			"--num-nodes=1",
 			"--project="+framework.TestContext.CloudConfig.ProjectID,
 			"--zone="+framework.TestContext.CloudConfig.Zone,
 			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
-		defer exec.Command("gcloud", "alpha", "container", "node-pools", "delete", "extra-pool", "--quiet",
-			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone,
-			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+		defer func() {
+			glog.Infof("Deleting node pool %s", extraPoolName)
+			output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "delete", extraPoolName, "--quiet",
+				"--project="+framework.TestContext.CloudConfig.ProjectID,
+				"--zone="+framework.TestContext.CloudConfig.Zone,
+				"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+			if err != nil {
+				glog.Infof("Error: %v", err)
+			}
+			glog.Infof("Node-pool deletion output: %s", output)
+		}()
 		framework.ExpectNoError(err)
 		glog.Infof("Creating node-pool: %s", output)
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 
 		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
 		ReserveMemory(f, "memory-reservation", 2, 2*memCapacityMb, false)
@@ -249,7 +253,7 @@ func getGKEClusterUrl() string {
 		token)
 }
 
-func isAutoscalerEnabled() (bool, error) {
+func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
 	resp, err := http.Get(getGKEClusterUrl())
 	if err != nil {
 		return false, err
@@ -262,20 +266,20 @@ func isAutoscalerEnabled() (bool, error) {
 	strBody := string(body)
 	glog.Infof("Cluster config %s", strBody)
 
-	if strings.Contains(strBody, "minNodeCount") {
+	if strings.Contains(strBody, "\"minNodeCount\": "+strconv.Itoa(expectedMinNodeCountInTargetPool)) {
 		return true, nil
 	}
 	return false, nil
 }
 
-func enableAutoscaler() error {
+func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 	updateRequest := "{" +
 		" \"update\": {" +
-		"  \"desiredNodePoolId\": \"default-pool\"," +
+		"  \"desiredNodePoolId\": \"" + nodePool + "\"," +
 		"  \"desiredNodePoolAutoscaling\": {" +
 		"   \"enabled\": \"true\"," +
-		"   \"minNodeCount\": \"3\"," +
-		"   \"maxNodeCount\": \"5\"" +
+		"   \"minNodeCount\": \"" + strconv.Itoa(minCount) + "\"," +
+		"   \"maxNodeCount\": \"" + strconv.Itoa(maxCount) + "\"" +
 		"  }" +
 		" }" +
 		"}"
@@ -289,7 +293,7 @@ func enableAutoscaler() error {
 	glog.Infof("Config update result: %s", putResult)
 
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
-		if val, err := isAutoscalerEnabled(); err == nil && val {
+		if val, err := isAutoscalerEnabled(minCount); err == nil && val {
 			return nil
 		}
 	}
@@ -434,6 +438,10 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c *client.Client) 
 		}
 		glog.Infof("Some pods are not ready yet: %v", notready)
 	}
+	glog.Info("Timeout on waiting for pods being ready")
+	glog.Info(framework.RunKubectlOrDie("get", "pods", "-o json", "--all-namespaces"))
+	glog.Info(framework.RunKubectlOrDie("get", "nodes", "-o json"))
+
 	// Some pods are still not running.
 	return fmt.Errorf("Some pods are still not running: %v", notready)
 }
@@ -448,18 +456,4 @@ func setMigSizes(sizes map[string]int) {
 			framework.ExpectNoError(err)
 		}
 	}
-}
-
-func updateLabelsForNode(f *framework.Framework, node string, addLabels map[string]string, rmLabels []string) {
-	n, err := f.Client.Nodes().Get(node)
-	ExpectNoError(err)
-	for _, label := range rmLabels {
-		delete(n.Labels, label)
-	}
-	for label, value := range addLabels {
-		n.Labels[label] = value
-	}
-	_, err = f.Client.Nodes().Update(n)
-	ExpectNoError(err)
-	By(fmt.Sprintf("Labels successfully updated for node %s", node))
 }

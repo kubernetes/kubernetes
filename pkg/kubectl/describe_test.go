@@ -626,6 +626,15 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
+		"PersistentVolumeDescriber": &PersistentVolumeDescriber{
+			testclient.NewSimpleFake(&api.PersistentVolume{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+					SelfLink:  "url/url/url",
+				},
+			}, events),
+		},
 		"PodDescriber": &PodDescriber{
 			testclient.NewSimpleFake(&api.Pod{
 				ObjectMeta: api.ObjectMeta{

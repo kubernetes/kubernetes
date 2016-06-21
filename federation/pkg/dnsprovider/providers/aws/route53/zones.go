@@ -18,7 +18,9 @@ package route53
 
 import (
 	"github.com/aws/aws-sdk-go/service/route53"
+
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Compile time check for interface adeherence
@@ -42,4 +44,20 @@ func (zones Zones) List() ([]dnsprovider.Zone, error) {
 		zoneList[i] = &Zone{zone, &zones}
 	}
 	return zoneList, nil
+}
+
+func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {
+	dnsName := zone.Name()
+	input := route53.CreateHostedZoneInput{Name: &dnsName}
+	output, err := zones.interface_.service.CreateHostedZone(&input)
+	if err != nil {
+		return nil, err
+	}
+	return &Zone{output.HostedZone, &zones}, nil
+}
+
+func (zones Zones) New(name string) (dnsprovider.Zone, error) {
+	id := string(util.NewUUID())
+	managedZone := route53.HostedZone{Id: &id, Name: &name}
+	return &Zone{&managedZone, &zones}, nil
 }

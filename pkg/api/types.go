@@ -306,6 +306,8 @@ type PersistentVolumeSpec struct {
 	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// ClaimRef is expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
+	// When set to non-nil value, PVC.Spec.Selector of the referenced PVC is
+	// ignored, i.e. labels of this PV do not need to match PVC selector.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 	// Optional: what happens to a persistent volume when released from its claim.
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
@@ -366,11 +368,13 @@ type PersistentVolumeClaimList struct {
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
-	// A label query over volumes to consider for binding
+	// A label query over volumes to consider for binding. This selector is
+	// ignored when VolumeName is set
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty"`
-	// VolumeName is the binding reference to the PersistentVolume backing this claim
+	// VolumeName is the binding reference to the PersistentVolume backing this
+	// claim. When set to non-empty value Selector is not evaluated
 	VolumeName string `json:"volumeName,omitempty"`
 }
 
@@ -1983,11 +1987,22 @@ type NodeStatus struct {
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 	// List of container images on this node
 	Images []ContainerImage `json:"images,omitempty"`
-	// List of attachable volume devices in use (mounted) by the node.
-	VolumesInUse []UniqueDeviceName `json:"volumesInUse,omitempty"`
+	// List of attachable volumes in use (mounted) by the node.
+	VolumesInUse []UniqueVolumeName `json:"volumesInUse,omitempty"`
+	// List of volumes that are attached to the node.
+	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty"`
 }
 
-type UniqueDeviceName string
+type UniqueVolumeName string
+
+// AttachedVolume describes a volume attached to a node
+type AttachedVolume struct {
+	// Name of the attached volume
+	Name UniqueVolumeName `json:"name"`
+
+	// DevicePath represents the device path where the volume should be avilable
+	DevicePath string `json:"devicePath"`
+}
 
 // Describe a container image
 type ContainerImage struct {

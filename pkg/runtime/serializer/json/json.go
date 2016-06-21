@@ -159,8 +159,8 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 	return obj, actual, nil
 }
 
-// EncodeToStream serializes the provided object to the given writer. Overrides is ignored.
-func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+// Encode serializes the provided object to the given writer.
+func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	if s.yaml {
 		json, err := json.Marshal(obj)
 		if err != nil {

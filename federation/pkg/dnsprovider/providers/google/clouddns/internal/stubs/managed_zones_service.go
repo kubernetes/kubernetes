@@ -18,6 +18,7 @@ package stubs
 
 import "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 
+// Compile time check for interface adeherence
 var _ interfaces.ManagedZonesService = &ManagedZonesService{}
 
 type ManagedZonesService struct {
@@ -38,4 +39,8 @@ func (m *ManagedZonesService) Get(project string, managedZone string) interfaces
 
 func (m *ManagedZonesService) List(project string) interfaces.ManagedZonesListCall {
 	return &ManagedZonesListCall{m, project, nil, nil, ""}
+}
+
+func (m *ManagedZonesService) NewManagedZone(dnsName string) interfaces.ManagedZone {
+	return &ManagedZone{Service: m, Name_: dnsName}
 }

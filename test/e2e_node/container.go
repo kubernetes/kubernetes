@@ -17,58 +17,33 @@ limitations under the License.
 package e2e_node
 
 import (
-	"errors"
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/onsi/gomega/format"
-	"github.com/onsi/gomega/types"
 )
 
 // One pod one container
 type ConformanceContainer struct {
-	Container     api.Container
-	Client        *client.Client
-	RestartPolicy api.RestartPolicy
-	Volumes       []api.Volume
-	NodeName      string
-	Namespace     string
+	Container        api.Container
+	Client           *client.Client
+	RestartPolicy    api.RestartPolicy
+	Volumes          []api.Volume
+	ImagePullSecrets []string
+	NodeName         string
+	Namespace        string
 
 	podName string
 }
 
-type ConformanceContainerEqualMatcher struct {
-	Expected interface{}
-}
-
-func CContainerEqual(expected interface{}) types.GomegaMatcher {
-	return &ConformanceContainerEqualMatcher{
-		Expected: expected,
-	}
-}
-
-func (matcher *ConformanceContainerEqualMatcher) Match(actual interface{}) (bool, error) {
-	if actual == nil && matcher.Expected == nil {
-		return false, fmt.Errorf("Refusing to compare <nil> to <nil>.\nBe explicit and use BeNil() instead.  This is to avoid mistakes where both sides of an assertion are erroneously uninitialized.")
-	}
-	val := api.Semantic.DeepDerivative(matcher.Expected, actual)
-	return val, nil
-}
-
-func (matcher *ConformanceContainerEqualMatcher) FailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "to equal", matcher.Expected)
-}
-
-func (matcher *ConformanceContainerEqualMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "not to equal", matcher.Expected)
-}
-
 func (cc *ConformanceContainer) Create() error {
 	cc.podName = cc.Container.Name + string(util.NewUUID())
+	imagePullSecrets := []api.LocalObjectReference{}
+	for _, s := range cc.ImagePullSecrets {
+		imagePullSecrets = append(imagePullSecrets, api.LocalObjectReference{Name: s})
+	}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      cc.podName,
@@ -80,7 +55,8 @@ func (cc *ConformanceContainer) Create() error {
 			Containers: []api.Container{
 				cc.Container,
 			},
-			Volumes: cc.Volumes,
+			Volumes:          cc.Volumes,
+			ImagePullSecrets: imagePullSecrets,
 		},
 	}
 
@@ -88,26 +64,8 @@ func (cc *ConformanceContainer) Create() error {
 	return err
 }
 
-//Same with 'delete'
-func (cc *ConformanceContainer) Stop() error {
-	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, &api.DeleteOptions{})
-}
-
 func (cc *ConformanceContainer) Delete() error {
-	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, &api.DeleteOptions{})
-}
-
-func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
-	if err != nil {
-		return ConformanceContainer{}, err
-	}
-
-	containers := pod.Spec.Containers
-	if containers == nil || len(containers) != 1 {
-		return ConformanceContainer{}, errors.New("Failed to get container")
-	}
-	return ConformanceContainer{containers[0], cc.Client, pod.Spec.RestartPolicy, pod.Spec.Volumes, pod.Spec.NodeName, cc.Namespace, cc.podName}, nil
+	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, api.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
@@ -143,7 +101,7 @@ func (cc *ConformanceContainer) Present() (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	if apierrs.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		return false, nil
 	}
 	return false, err

@@ -943,12 +943,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		svcName := fmt.Sprintf("%v.%v", serviceName, f.Namespace.Name)
 		By("waiting for endpoints of Service with DNS name " + svcName)
 
-		createExecPodOrFail(f.Client, f.Namespace.Name, "exec")
+		execPodName := createExecPodOrFail(f.Client, f.Namespace.Name, "execpod-")
 		cmd := fmt.Sprintf("wget -qO- %v", svcName)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, "exec", cmd)
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.name, stdout, err)
 				return false, nil
@@ -1094,13 +1094,14 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 
 // createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
 // vessel for kubectl exec commands.
-func createExecPodOrFail(c *client.Client, ns, name string) {
+// Returns the name of the created pod.
+func createExecPodOrFail(c *client.Client, ns, generateName string) string {
 	framework.Logf("Creating new exec pod")
 	immediate := int64(0)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			GenerateName: generateName,
+			Namespace:    ns,
 		},
 		Spec: api.PodSpec{
 			TerminationGracePeriodSeconds: &immediate,
@@ -1113,16 +1114,17 @@ func createExecPodOrFail(c *client.Client, ns, name string) {
 			},
 		},
 	}
-	_, err := c.Pods(ns).Create(pod)
+	created, err := c.Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := c.Pods(pod.Namespace).Get(pod.Name)
+		retrievedPod, err := c.Pods(pod.Namespace).Get(created.Name)
 		if err != nil {
 			return false, nil
 		}
 		return retrievedPod.Status.Phase == api.PodRunning, nil
 	})
 	Expect(err).NotTo(HaveOccurred())
+	return created.Name
 }
 
 func createPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {
@@ -1406,8 +1408,7 @@ func stopServeHostnameService(c *client.Client, ns, name string) error {
 // in the cluster. Each pod in the service is expected to echo its name. These
 // names are compared with the given expectedPods list after a sort | uniq.
 func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPods []string, serviceIP string, servicePort int) error {
-	execPodName := "execpod"
-	createExecPodOrFail(c, ns, execPodName)
+	execPodName := createExecPodOrFail(c, ns, "execpod-")
 	defer func() {
 		deletePodOrFail(c, ns, execPodName)
 	}()

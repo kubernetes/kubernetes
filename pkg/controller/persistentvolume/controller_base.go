@@ -52,6 +52,7 @@ func NewPersistentVolumeController(
 	clusterName string,
 	volumeSource, claimSource cache.ListerWatcher,
 	eventRecorder record.EventRecorder,
+	enableDynamicProvisioning bool,
 ) *PersistentVolumeController {
 
 	if eventRecorder == nil {
@@ -65,9 +66,10 @@ func NewPersistentVolumeController(
 		claims:                        cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    kubeClient,
 		eventRecorder:                 eventRecorder,
-		runningOperations:             goroutinemap.NewGoRoutineMap(),
+		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
 		cloud:                         cloud,
 		provisioner:                   provisioner,
+		enableDynamicProvisioning:     enableDynamicProvisioning,
 		clusterName:                   clusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
@@ -128,7 +130,7 @@ func NewPersistentVolumeController(
 	return controller
 }
 
-// initalizeCaches fills all controller caches with initial data from etcd in
+// initializeCaches fills all controller caches with initial data from etcd in
 // order to have the caches already filled when first addClaim/addVolume to
 // perform initial synchronization of the controller.
 func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSource cache.ListerWatcher) {

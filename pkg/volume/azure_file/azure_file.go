@@ -54,14 +54,27 @@ func (plugin *azureFilePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *azureFilePlugin) Name() string {
+func (plugin *azureFilePlugin) GetPluginName() string {
 	return azureFilePluginName
+}
+
+func (plugin *azureFilePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.ShareName, nil
 }
 
 func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 	//TODO: check if mount.cifs is there
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureFile != nil) ||
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
+}
+
+func (plugin *azureFilePlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *azureFilePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -77,15 +90,11 @@ func (plugin *azureFilePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ vol
 }
 
 func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, util azureUtil, mounter mount.Interface) (volume.Mounter, error) {
-	var source *api.AzureFileVolumeSource
-	var readOnly bool
-	if spec.Volume != nil && spec.Volume.AzureFile != nil {
-		source = spec.Volume.AzureFile
-		readOnly = spec.Volume.AzureFile.ReadOnly
-	} else {
-		source = spec.PersistentVolume.Spec.AzureFile
-		readOnly = spec.ReadOnly
+	source, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
+
 	return &azureFileMounter{
 		azureFile: &azureFile{
 			volName:         spec.Name(),
@@ -236,4 +245,16 @@ func (c *azureFileUnmounter) TearDownAt(dir string) error {
 	}
 
 	return nil
+}
+
+func getVolumeSource(
+	spec *volume.Spec) (*api.AzureFileVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.AzureFile != nil {
+		return spec.Volume.AzureFile, spec.Volume.AzureFile.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.AzureFile != nil {
+		return spec.PersistentVolume.Spec.AzureFile, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference an AzureFile volume type")
 }

@@ -126,8 +126,13 @@ function kubectl-with-retry()
 }
 
 kube::util::trap_add cleanup EXIT SIGINT
-
 kube::util::ensure-temp-dir
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubectl \
+    cmd/kube-apiserver \
+    cmd/kube-controller-manager
+
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -163,6 +168,9 @@ kube::log::status "Running kubectl with no options"
 
 # Only run kubelet on platforms it supports
 if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubelet
 
 kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
@@ -951,6 +959,58 @@ __EOF__
   output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}" -o name)
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
+
+  #####################################
+  # Third Party Resources             #
+  #####################################
+  create_and_use_new_namespace
+  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "ThirdPartyResource",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "foo.company.com"
+  },
+  "versions": [
+    {
+      "name": "v1"
+    }
+  ]
+}
+__EOF__
+
+  # Post-Condition: assertion object exist
+  kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'foo.company.com:'
+
+  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/apis/company.com/v1" "third party api"
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create a new resource of type Foo
+ kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+ {
+  "kind": "Foo",
+  "apiVersion": "company.com/v1",
+  "metadata": {
+    "name": "test"
+  },
+  "some-field": "field1",
+  "other-field": "field2"
+}
+__EOF__
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete foos test
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # teardown
+  kubectl delete thirdpartyresources foo.company.com "${kube_flags[@]}"
 
   #####################################
   # Recursive Resources via directory #

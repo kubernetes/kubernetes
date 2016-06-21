@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -27,10 +28,11 @@ import (
 )
 
 // formatMap formats map[string]string to a string.
-func formatMap(m map[string]string) (fmtStr string) {
+func FormatMap(m map[string]string) (fmtStr string) {
 	for key, value := range m {
 		fmtStr += fmt.Sprintf("%v=%q\n", key, value)
 	}
+	fmtStr = strings.TrimSuffix(fmtStr, "\n")
 
 	return
 }
@@ -51,9 +53,9 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 
 	switch fieldPath {
 	case "metadata.annotations":
-		return formatMap(accessor.GetAnnotations()), nil
+		return FormatMap(accessor.GetAnnotations()), nil
 	case "metadata.labels":
-		return formatMap(accessor.GetLabels()), nil
+		return FormatMap(accessor.GetLabels()), nil
 	case "metadata.name":
 		return accessor.GetName(), nil
 	case "metadata.namespace":

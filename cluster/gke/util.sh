@@ -23,6 +23,7 @@ KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
+source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 # Perform preparations required to run e2e tests
@@ -128,6 +129,7 @@ function validate-cluster {
 #   ADDITIONAL_ZONES (optional)
 #   NODE_SCOPES
 #   MACHINE_TYPE
+#   HEAPSTER_MACHINE_TYPE (optional)
 #   CLUSTER_IP_RANGE (optional)
 #   GKE_CREATE_FLAGS (optional, space delineated)
 function kube-up() {
@@ -155,12 +157,26 @@ function kube-up() {
     echo "... Using firewall-rule: ${FIREWALL_SSH}" >&2
   fi
 
-  local create_args=(
+  local shared_args=(
     "--zone=${ZONE}"
     "--project=${PROJECT}"
-    "--num-nodes=${NUM_NODES}"
-    "--network=${NETWORK}"
     "--scopes=${NODE_SCOPES}"
+  )
+
+  if [[ ! -z "${IMAGE_TYPE:-}" ]]; then
+    shared_args+=("--image-type=${IMAGE_TYPE}")
+  fi
+
+  if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    local -r nodes="${NUM_NODES}"
+  else
+    local -r nodes=$(( NUM_NODES - 1 ))
+  fi
+
+  local create_args=(
+    ${shared_args[@]}
+    "--num-nodes=${nodes}"
+    "--network=${NETWORK}"
     "--cluster-version=${CLUSTER_API_VERSION}"
     "--machine-type=${MACHINE_TYPE}"
   )
@@ -173,14 +189,16 @@ function kube-up() {
     create_args+=("--cluster-ipv4-cidr=${CLUSTER_IP_RANGE}")
   fi
 
-  if [[ ! -z "${IMAGE_TYPE:-}" ]]; then
-    create_args+=("--image-type=${IMAGE_TYPE}")
-  fi
-
   create_args+=( ${GKE_CREATE_FLAGS:-} )
 
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
+
+  create-kubeconfig-for-federation
+
+  if [[ ! -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    "${GCLOUD}" ${CMD_GROUP:-} container node-pools create "heapster-pool" --cluster "${CLUSTER_NAME}" --num-nodes=1 --machine-type="${HEAPSTER_MACHINE_TYPE}" "${shared_args[@]}"
+  fi
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -255,8 +273,8 @@ function detect-nodes() {
 
 # Detect minions created in the minion group
 #
-# Note that this will only return the nodes from one of the cluster's instance
-# groups, regardless of how many the cluster has.
+# Note that this will only select nodes in the same zone as the
+# cluster, meaning that it won't include all nodes in a multi-zone cluster.
 #
 # Assumed vars:
 #   none
@@ -265,11 +283,14 @@ function detect-nodes() {
 function detect-node-names {
   echo "... in gke:detect-node-names()" >&2
   detect-project
-  detect-node-instance-group
-  NODE_NAMES=($(gcloud compute instance-groups managed list-instances \
-    "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
-    --format='value(instance)'))
+  detect-node-instance-groups
 
+  NODE_NAMES=()
+  for group in "${NODE_INSTANCE_GROUPS[@]:-}"; do
+    NODE_NAMES+=($(gcloud compute instance-groups managed list-instances \
+      "${group}" --zone "${ZONE}" \
+      --project "${PROJECT}" --format='value(instance)'))
+  done
   echo "NODE_NAMES=${NODE_NAMES[*]:-}"
 }
 
@@ -284,13 +305,17 @@ function detect-node-names {
 #   ZONE
 #   CLUSTER_NAME
 # Vars set:
-#   NODE_INSTANCE_GROUP
-function detect-node-instance-group {
-  echo "... in gke:detect-node-instance-group()" >&2
-  local url=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
+#   NODE_INSTANCE_GROUPS
+function detect-node-instance-groups {
+  echo "... in gke:detect-node-instance-groups()" >&2
+  local urls=$("${GCLOUD}" ${CMD_GROUP:-} container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" \
     --format='value(instanceGroupUrls)' "${CLUSTER_NAME}")
-  NODE_INSTANCE_GROUP="${url##*/}"
+  urls=(${urls//;/ })
+  NODE_INSTANCE_GROUPS=()
+  for url in "${urls[@]:-}"; do
+    NODE_INSTANCE_GROUPS+=("${url##*/}")
+  done
 }
 
 # SSH to a node by name ($1) and run a command ($2).

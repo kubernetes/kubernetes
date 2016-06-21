@@ -128,6 +128,9 @@ const (
 	// under the CNI directory directly.
 	// See https://github.com/coreos/rkt/pull/2312#issuecomment-200068370.
 	defaultNetworkName = "rkt.kubernetes.io"
+
+	// defaultRequestTimeout is the default timeout of rkt requests.
+	defaultRequestTimeout = 2 * time.Minute
 )
 
 // Runtime implements the Containerruntime for rkt. The implementation
@@ -166,6 +169,9 @@ type Runtime struct {
 	nsenterPath string
 
 	versions versions
+
+	// requestTimeout is the timeout of rkt requests.
+	requestTimeout time.Duration
 }
 
 var _ kubecontainer.Runtime = &Runtime{}
@@ -200,6 +206,7 @@ func New(
 	os kubecontainer.OSInterface,
 	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
+	requestTimeout time.Duration,
 ) (*Runtime, error) {
 	// Create dbus connection.
 	systemd, err := newSystemd()
@@ -233,6 +240,10 @@ func New(
 		return nil, fmt.Errorf("cannot find nsenter binary: %v", err)
 	}
 
+	if requestTimeout == 0 {
+		requestTimeout = defaultRequestTimeout
+	}
+
 	rkt := &Runtime{
 		os:                  kubecontainer.RealOS{},
 		systemd:             systemd,
@@ -249,6 +260,7 @@ func New(
 		execer:              execer,
 		touchPath:           touchPath,
 		nsenterPath:         nsenterPath,
+		requestTimeout:      requestTimeout,
 	}
 
 	rkt.config, err = rkt.getConfig(rkt.config)
@@ -585,7 +597,9 @@ func setApp(imgManifest *appcschema.ImageManifest, c *api.Container, opts *kubec
 func (r *Runtime) makePodManifest(pod *api.Pod, podIP string, pullSecrets []api.Secret) (*appcschema.PodManifest, error) {
 	manifest := appcschema.BlankPodManifest()
 
-	listResp, err := r.apisvc.ListPods(context.Background(), &rktapi.ListPodsRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
+	listResp, err := r.apisvc.ListPods(ctx, &rktapi.ListPodsRequest{
 		Detail:  true,
 		Filters: kubernetesPodFilters(pod.UID),
 	})
@@ -1028,7 +1042,7 @@ func (r *Runtime) preparePodArgs(manifest *appcschema.PodManifest, manifestFileN
 	// 3) empty; whatever rkt's compiled to default to
 	stage1ImageCmd := ""
 	if r.config.Stage1Image != "" {
-		stage1ImageCmd = "--stage1-path=" + r.config.Stage1Image
+		stage1ImageCmd = "--stage1-name=" + r.config.Stage1Image
 	}
 	if stage1Name, ok := manifest.Annotations.Get(k8sRktStage1NameAnno); ok {
 		stage1ImageCmd = "--stage1-name=" + stage1Name
@@ -1213,7 +1227,7 @@ func netnsPathFromName(netnsName string) string {
 // setupPodNetwork creates a network namespace for the given pod and calls
 // configured NetworkPlugin's setup function on it.
 // It returns the namespace name, configured IP (if available), and an error if
-// one occured.
+// one occurred.
 //
 // If the pod is running in host network or is running using the no-op plugin, then nothing will be done.
 func (r *Runtime) setupPodNetwork(pod *api.Pod) (string, string, error) {
@@ -1349,7 +1363,9 @@ func (r *Runtime) runPostStartHook(containerID kubecontainer.ContainerID, pod *a
 	}
 
 	isContainerRunning := func() (done bool, err error) {
-		resp, err := r.apisvc.InspectPod(context.Background(), &rktapi.InspectPodRequest{Id: cid.uuid})
+		ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+		defer cancel()
+		resp, err := r.apisvc.InspectPod(ctx, &rktapi.InspectPodRequest{Id: cid.uuid})
 		if err != nil {
 			return false, fmt.Errorf("failed to inspect rkt pod %q for pod %q", cid.uuid, format.Pod(pod))
 		}
@@ -1520,7 +1536,9 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	if !all {
 		listReq.Filters[0].States = []rktapi.PodState{rktapi.PodState_POD_STATE_RUNNING}
 	}
-	listResp, err := r.apisvc.ListPods(context.Background(), listReq)
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
+	listResp, err := r.apisvc.ListPods(ctx, listReq)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't list pods: %v", err)
 	}
@@ -1813,7 +1831,7 @@ func podDetailsFromServiceFile(serviceFilePath string) (string, string, string, 
 // - If the number of containers exceeds gcPolicy.MaxContainers,
 //   then containers whose ages are older than gcPolicy.minAge will
 //   be removed.
-func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
+func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	var errlist []error
 	var totalInactiveContainers int
 	var inactivePods []*rktapi.Pod
@@ -1829,7 +1847,9 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 		return err
 	}
 
-	resp, err := r.apisvc.ListPods(context.Background(), &rktapi.ListPodsRequest{Filters: kubernetesPodsFilters()})
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
+	resp, err := r.apisvc.ListPods(ctx, &rktapi.ListPodsRequest{Filters: kubernetesPodsFilters()})
 	if err != nil {
 		glog.Errorf("rkt: Failed to list pods: %v", err)
 		return err
@@ -1846,7 +1866,7 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 				continue
 			}
 			_, found := r.podGetter.GetPodByUID(uid)
-			if !found {
+			if !found && allSourcesReady {
 				removeCandidates = append(removeCandidates, pod)
 				continue
 			}
@@ -2047,7 +2067,9 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	glog.V(4).Infof("Rkt port forwarding in container.")
 
-	listResp, err := r.apisvc.ListPods(context.Background(), &rktapi.ListPodsRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
+	listResp, err := r.apisvc.ListPods(ctx, &rktapi.ListPodsRequest{
 		Detail:  true,
 		Filters: runningKubernetesPodFilters(pod.ID),
 	})
@@ -2197,7 +2219,9 @@ func (r *Runtime) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kube
 		Namespace: namespace,
 	}
 
-	listResp, err := r.apisvc.ListPods(context.Background(), &rktapi.ListPodsRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
+	listResp, err := r.apisvc.ListPods(ctx, &rktapi.ListPodsRequest{
 		Detail:  true,
 		Filters: kubernetesPodFilters(uid),
 	})

@@ -17,9 +17,13 @@ limitations under the License.
 package clouddns
 
 import (
+	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
+
+// Compile time check for interface adeherence
+var _ dnsprovider.ResourceRecordSet = ResourceRecordSet{}
 
 type ResourceRecordSet struct {
 	impl   interfaces.ResourceRecordSet

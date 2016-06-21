@@ -15,7 +15,7 @@
 IMAGE=gcr.io/google-containers/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v2
+VERSION=v3
 
 # amd64 and arm has "stable" binaries pushed for v1.2, arm64 and ppc64le hasn't so they have to fetch the latest alpha
 # however, arm64 and ppc64le are very experimental right now, so it's okay
@@ -29,12 +29,12 @@ ifeq ($(ARCH),arm)
 	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
-	KUBECTL_VERSION?=v1.3.0-alpha.3
+	KUBECTL_VERSION?=v1.3.0-beta.0
 	BASEIMAGE?=aarch64/python:2.7-slim
 	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)
-	KUBECTL_VERSION?=v1.3.0-alpha.3
+	KUBECTL_VERSION?=v1.3.0-alpha.4
 	BASEIMAGE?=ppc64le/python:2.7-slim
 	QEMUARCH=ppc64le
 endif

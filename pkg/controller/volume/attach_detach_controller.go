@@ -20,6 +20,7 @@ package volume
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/golang/glog"
@@ -27,19 +28,20 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/volume/attacherdetacher"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/reconciler"
+	"k8s.io/kubernetes/pkg/controller/volume/statusupdater"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/attachdetach"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
-	// loopPeriod is the ammount of time the reconciler loop waits between
+	// loopPeriod is the amount of time the reconciler loop waits between
 	// successive executions
 	reconcilerLoopPeriod time.Duration = 100 * time.Millisecond
 
@@ -103,13 +105,19 @@ func NewAttachDetachController(
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
-	adc.attacherDetacher = attacherdetacher.NewAttacherDetacher(&adc.volumePluginMgr)
+	adc.attacherDetacher =
+		operationexecutor.NewOperationExecutor(
+			kubeClient,
+			&adc.volumePluginMgr)
+	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
+		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
-		adc.attacherDetacher)
+		adc.attacherDetacher,
+		adc.nodeStatusUpdater)
 
 	return adc, nil
 }
@@ -152,12 +160,16 @@ type attachDetachController struct {
 	actualStateOfWorld cache.ActualStateOfWorld
 
 	// attacherDetacher is used to start asynchronous attach and operations
-	attacherDetacher attacherdetacher.AttacherDetacher
+	attacherDetacher operationexecutor.OperationExecutor
 
 	// reconciler is used to run an asynchronous periodic loop to reconcile the
 	// desiredStateOfWorld with the actualStateOfWorld by triggering attach
 	// detach operations using the attacherDetacher.
 	reconciler reconciler.Reconciler
+
+	// nodeStatusUpdater is used to update node status with the list of attached
+	// volumes
+	nodeStatusUpdater statusupdater.NodeStatusUpdater
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -205,7 +217,7 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	}
 
 	nodeName := node.Name
-	if _, exists := node.Annotations[attachdetach.ControllerManagedAnnotation]; exists {
+	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
@@ -284,10 +296,11 @@ func (adc *attachDetachController) processPodVolumes(
 			continue
 		}
 
+		uniquePodName := volumehelper.GetUniquePodName(pod)
 		if addVolumes {
 			// Add volume to desired state of world
 			_, err := adc.desiredStateOfWorld.AddPod(
-				getUniquePodName(pod), volumeSpec, pod.Spec.NodeName)
+				uniquePodName, volumeSpec, pod.Spec.NodeName)
 			if err != nil {
 				glog.V(10).Infof(
 					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
@@ -299,11 +312,11 @@ func (adc *attachDetachController) processPodVolumes(
 
 		} else {
 			// Remove volume from desired state of world
-			uniqueVolumeName, err := attachdetach.GetUniqueDeviceNameFromSpec(
+			uniqueVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
 				attachableVolumePlugin, volumeSpec)
 			if err != nil {
 				glog.V(10).Infof(
-					"Failed to delete volume %q for pod %q/%q from desiredStateOfWorld. GenerateUniqueDeviceName failed with %v",
+					"Failed to delete volume %q for pod %q/%q from desiredStateOfWorld. GetUniqueVolumeNameFromSpec failed with %v",
 					podVolume.Name,
 					pod.Namespace,
 					pod.Name,
@@ -311,7 +324,7 @@ func (adc *attachDetachController) processPodVolumes(
 				continue
 			}
 			adc.desiredStateOfWorld.DeletePod(
-				getUniquePodName(pod), uniqueVolumeName, pod.Spec.NodeName)
+				uniquePodName, uniqueVolumeName, pod.Spec.NodeName)
 		}
 	}
 
@@ -482,7 +495,7 @@ func (adc *attachDetachController) getPVSpecFromCache(
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName string, volumesInUse []api.UniqueDeviceName) {
+	nodeName string, volumesInUse []api.UniqueVolumeName) {
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false
 		for _, volumeInUse := range volumesInUse {
@@ -499,11 +512,6 @@ func (adc *attachDetachController) processVolumesInUse(
 				attachedVolume.VolumeName, nodeName, mounted, err)
 		}
 	}
-}
-
-// getUniquePodName returns a unique name to reference pod by in memory caches
-func getUniquePodName(pod *api.Pod) string {
-	return types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}.String()
 }
 
 // VolumeHost implementation
@@ -549,5 +557,13 @@ func (adc *attachDetachController) GetWriter() io.Writer {
 }
 
 func (adc *attachDetachController) GetHostName() string {
+	return ""
+}
+
+func (adc *attachDetachController) GetHostIP() (net.IP, error) {
+	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
+}
+
+func (adc *attachDetachController) GetRootContext() string {
 	return ""
 }

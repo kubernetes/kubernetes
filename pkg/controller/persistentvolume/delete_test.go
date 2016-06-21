@@ -57,7 +57,7 @@ func TestDeleteSync(t *testing.T) {
 			// delete failure - plugin not found
 			"8-3 - plugin not found",
 			newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", api.VolumeBound, api.PersistentVolumeReclaimDelete),
-			newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", api.VolumeFailed, api.PersistentVolumeReclaimDelete),
+			withMessage("Error getting deleter volume plugin for volume \"volume8-3\": no volume plugin matched", newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", api.VolumeFailed, api.PersistentVolumeReclaimDelete)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors, testSyncVolume,
@@ -66,7 +66,7 @@ func TestDeleteSync(t *testing.T) {
 			// delete failure - newDeleter returns error
 			"8-4 - newDeleter returns error",
 			newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", api.VolumeBound, api.PersistentVolumeReclaimDelete),
-			newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", api.VolumeFailed, api.PersistentVolumeReclaimDelete),
+			withMessage("Failed to create deleter for volume \"volume8-4\": Mock plugin error: no deleteCalls configured", newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", api.VolumeFailed, api.PersistentVolumeReclaimDelete)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,
@@ -76,7 +76,7 @@ func TestDeleteSync(t *testing.T) {
 			// delete failure - delete() returns error
 			"8-5 - delete returns error",
 			newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeBound, api.PersistentVolumeReclaimDelete),
-			newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeFailed, api.PersistentVolumeReclaimDelete),
+			withMessage("Delete of volume \"volume8-5\" failed: Mock delete error", newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeFailed, api.PersistentVolumeReclaimDelete)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,
@@ -110,7 +110,7 @@ func TestDeleteSync(t *testing.T) {
 			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				reactor.lock.Lock()
 				defer reactor.lock.Unlock()
-				// Bind the volume to ressurected claim (this should never
+				// Bind the volume to resurrected claim (this should never
 				// happen)
 				claim := newClaim("claim8-7", "uid8-7", "10Gi", "volume8-7", api.ClaimBound)
 				reactor.claims[claim.Name] = claim

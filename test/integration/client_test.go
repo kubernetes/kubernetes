@@ -22,16 +22,20 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"runtime"
+	rt "runtime"
 	"sync"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
@@ -107,6 +111,330 @@ func TestClient(t *testing.T) {
 	if actual.Spec.NodeName != "" {
 		t.Errorf("expected pod to be unscheduled, got %#v", actual)
 	}
+}
+
+func TestAtomicPut(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	rcBody := api.ReplicationController{
+		TypeMeta: unversioned.TypeMeta{
+			APIVersion: c.APIVersion().String(),
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "atomicrc",
+			Labels: map[string]string{
+				"name": "atomicrc",
+			},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 0,
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "name", Image: "image"},
+					},
+				},
+			},
+		},
+	}
+	rcs := c.ReplicationControllers(api.NamespaceDefault)
+	rc, err := rcs.Create(&rcBody)
+	if err != nil {
+		t.Fatalf("Failed creating atomicRC: %v", err)
+	}
+	testLabels := labels.Set{
+		"foo": "bar",
+	}
+	for i := 0; i < 5; i++ {
+		// a: z, b: y, etc...
+		testLabels[string([]byte{byte('a' + i)})] = string([]byte{byte('z' - i)})
+	}
+	var wg sync.WaitGroup
+	wg.Add(len(testLabels))
+	for label, value := range testLabels {
+		go func(l, v string) {
+			defer wg.Done()
+			for {
+				tmpRC, err := rcs.Get(rc.Name)
+				if err != nil {
+					t.Errorf("Error getting atomicRC: %v", err)
+					continue
+				}
+				if tmpRC.Spec.Selector == nil {
+					tmpRC.Spec.Selector = map[string]string{l: v}
+					tmpRC.Spec.Template.Labels = map[string]string{l: v}
+				} else {
+					tmpRC.Spec.Selector[l] = v
+					tmpRC.Spec.Template.Labels[l] = v
+				}
+				tmpRC, err = rcs.Update(tmpRC)
+				if err != nil {
+					if apierrors.IsConflict(err) {
+						// This is what we expect.
+						continue
+					}
+					t.Errorf("Unexpected error putting atomicRC: %v", err)
+					continue
+				}
+				return
+			}
+		}(label, value)
+	}
+	wg.Wait()
+	rc, err = rcs.Get(rc.Name)
+	if err != nil {
+		t.Fatalf("Failed getting atomicRC after writers are complete: %v", err)
+	}
+	if !reflect.DeepEqual(testLabels, labels.Set(rc.Spec.Selector)) {
+		t.Errorf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, rc.Spec.Selector)
+	}
+}
+
+func TestPatch(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	name := "patchpod"
+	resource := "pods"
+	podBody := api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			APIVersion: c.APIVersion().String(),
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "name", Image: "image"},
+			},
+		},
+	}
+	pods := c.Pods(api.NamespaceDefault)
+	pod, err := pods.Create(&podBody)
+	if err != nil {
+		t.Fatalf("Failed creating patchpods: %v", err)
+	}
+
+	patchBodies := map[unversioned.GroupVersion]map[api.PatchType]struct {
+		AddLabelBody        []byte
+		RemoveLabelBody     []byte
+		RemoveAllLabelsBody []byte
+	}{
+		v1.SchemeGroupVersion: {
+			api.JSONPatchType: {
+				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
+				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
+				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
+			},
+			api.MergePatchType: {
+				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
+				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
+				[]byte(`{"metadata":{"labels":null}}`),
+			},
+			api.StrategicMergePatchType: {
+				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
+				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
+				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
+			},
+		},
+	}
+
+	pb := patchBodies[c.APIVersion()]
+
+	execPatch := func(pt api.PatchType, body []byte) error {
+		return c.Patch(pt).
+			Resource(resource).
+			Namespace(api.NamespaceDefault).
+			Name(name).
+			Body(body).
+			Do().
+			Error()
+	}
+	for k, v := range pb {
+		// add label
+		err := execPatch(k, v.AddLabelBody)
+		if err != nil {
+			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
+		}
+		pod, err = pods.Get(name)
+		if err != nil {
+			t.Fatalf("Failed getting patchpod: %v", err)
+		}
+		if len(pod.Labels) != 2 || pod.Labels["foo"] != "bar" || pod.Labels["baz"] != "qux" {
+			t.Errorf("Failed updating patchpod with patch type %s: labels are: %v", k, pod.Labels)
+		}
+
+		// remove one label
+		err = execPatch(k, v.RemoveLabelBody)
+		if err != nil {
+			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
+		}
+		pod, err = pods.Get(name)
+		if err != nil {
+			t.Fatalf("Failed getting patchpod: %v", err)
+		}
+		if len(pod.Labels) != 1 || pod.Labels["baz"] != "qux" {
+			t.Errorf("Failed updating patchpod with patch type %s: labels are: %v", k, pod.Labels)
+		}
+
+		// remove all labels
+		err = execPatch(k, v.RemoveAllLabelsBody)
+		if err != nil {
+			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
+		}
+		pod, err = pods.Get(name)
+		if err != nil {
+			t.Fatalf("Failed getting patchpod: %v", err)
+		}
+		if pod.Labels != nil {
+			t.Errorf("Failed remove all labels from patchpod with patch type %s: %v", k, pod.Labels)
+		}
+	}
+}
+
+func TestPatchWithCreateOnUpdate(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	endpointTemplate := &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: "patchendpoint"},
+		Subsets: []api.EndpointSubset{
+			{
+				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+				Ports:     []api.EndpointPort{{Port: 80, Protocol: api.ProtocolTCP}},
+			},
+		},
+	}
+
+	patchEndpoint := func(json []byte) (runtime.Object, error) {
+		return c.Patch(api.MergePatchType).Resource("endpoints").Namespace(api.NamespaceDefault).Name("patchendpoint").Body(json).Do().Get()
+	}
+
+	// Make sure patch doesn't get to CreateOnUpdate
+	{
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			t.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if obj, err := patchEndpoint(endpointJSON); !apierrors.IsNotFound(err) {
+			t.Errorf("Expected notfound creating from patch, got error=%v and object: %#v", err, obj)
+		}
+	}
+
+	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
+	createdEndpoint, err := c.Endpoints(api.NamespaceDefault).Update(endpointTemplate)
+	if err != nil {
+		t.Fatalf("Failed creating endpoint: %v", err)
+	}
+
+	// Make sure identity patch is accepted
+	{
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), createdEndpoint)
+		if err != nil {
+			t.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); err != nil {
+			t.Errorf("Failed patching endpoint: %v", err)
+		}
+	}
+
+	// Make sure patch complains about a mismatched resourceVersion
+	{
+		endpointTemplate.Name = ""
+		endpointTemplate.UID = ""
+		endpointTemplate.ResourceVersion = "1"
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			t.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); !apierrors.IsConflict(err) {
+			t.Errorf("Expected error, got %#v", err)
+		}
+	}
+
+	// Make sure patch complains about mutating the UID
+	{
+		endpointTemplate.Name = ""
+		endpointTemplate.UID = "abc"
+		endpointTemplate.ResourceVersion = ""
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			t.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); !apierrors.IsInvalid(err) {
+			t.Errorf("Expected error, got %#v", err)
+		}
+	}
+
+	// Make sure patch complains about a mismatched name
+	{
+		endpointTemplate.Name = "changedname"
+		endpointTemplate.UID = ""
+		endpointTemplate.ResourceVersion = ""
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			t.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); !apierrors.IsBadRequest(err) {
+			t.Errorf("Expected error, got %#v", err)
+		}
+	}
+
+	// Make sure patch containing originally submitted JSON is accepted
+	{
+		endpointTemplate.Name = ""
+		endpointTemplate.UID = ""
+		endpointTemplate.ResourceVersion = ""
+		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		if err != nil {
+			t.Fatalf("Failed creating endpoint JSON: %v", err)
+		}
+		if _, err := patchEndpoint(endpointJSON); err != nil {
+			t.Errorf("Failed patching endpoint: %v", err)
+		}
+	}
+}
+
+func TestAPIVersions(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	clientVersion := c.APIVersion().String()
+	g, err := c.ServerGroups()
+	if err != nil {
+		t.Fatalf("Failed to get api versions: %v", err)
+	}
+	versions := unversioned.ExtractGroupVersions(g)
+
+	// Verify that the server supports the API version used by the client.
+	for _, version := range versions {
+		if version == clientVersion {
+			return
+		}
+	}
+	t.Errorf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", versions, clientVersion)
 }
 
 func TestSingleWatch(t *testing.T) {
@@ -191,7 +519,7 @@ func TestMultiWatch(t *testing.T) {
 	// TODO: Reenable this test when we get #6059 resolved.
 	return
 	const watcherCount = 50
-	runtime.GOMAXPROCS(watcherCount)
+	rt.GOMAXPROCS(watcherCount)
 
 	framework.DeleteAllEtcdKeys()
 	defer framework.DeleteAllEtcdKeys()
@@ -396,4 +724,65 @@ func TestMultiWatch(t *testing.T) {
 	}
 	log.Printf("all watches ended")
 	t.Errorf("durations: %v", dur)
+}
+
+func runSelfLinkTestOnNamespace(t *testing.T, c *client.Client, namespace string) {
+	podBody := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "selflinktest",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"name": "selflinktest",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "name", Image: "image"},
+			},
+		},
+	}
+	pod, err := c.Pods(namespace).Create(&podBody)
+	if err != nil {
+		t.Fatalf("Failed creating selflinktest pod: %v", err)
+	}
+	if err = c.Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
+		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
+	}
+
+	podList, err := c.Pods(namespace).List(api.ListOptions{})
+	if err != nil {
+		t.Errorf("Failed listing pods: %v", err)
+	}
+
+	if err = c.Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
+		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
+	}
+
+	found := false
+	for i := range podList.Items {
+		item := &podList.Items[i]
+		if item.Name != "selflinktest" {
+			continue
+		}
+		found = true
+		err = c.Get().RequestURI(item.SelfLink).Do().Into(pod)
+		if err != nil {
+			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
+		}
+		break
+	}
+	if !found {
+		t.Errorf("never found selflinktest pod in namespace %s", namespace)
+	}
+}
+
+func TestSelfLinkOnNamespace(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	runSelfLinkTestOnNamespace(t, c, api.NamespaceDefault)
+	runSelfLinkTestOnNamespace(t, c, "other-namespace")
 }

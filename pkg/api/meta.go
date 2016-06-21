@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -63,6 +64,10 @@ func ListMetaFor(obj runtime.Object) (*unversioned.ListMeta, error) {
 	err = runtime.FieldPtr(v, "ListMeta", &meta)
 	return meta, err
 }
+
+func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
+
+func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind { return obj }
 
 // Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.

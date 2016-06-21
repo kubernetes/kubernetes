@@ -71,9 +71,9 @@ function detect-master {
   fi
 
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-      # Make sure to ignore lines where it's not attached to a portgroup
+      # Pick out the NICs that have a MAC address owned VMware (with OUI 00:0C:29)
       # Make sure to ignore lines that have a network interface but no address
-    KUBE_MASTER_IP=$(${PHOTON} vm networks "${KUBE_MASTER_ID}" | grep -v "^-" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
+    KUBE_MASTER_IP=$(${PHOTON} vm networks "${KUBE_MASTER_ID}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
   fi
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     kube::log::error "Could not find Kubernetes master node IP. Make sure you've launched a cluster with 'kube-up.sh'" >&2
@@ -114,9 +114,9 @@ function detect-nodes {
     fi
     KUBE_NODE_IDS+=("${node_id}")
 
-    # Make sure to ignore lines where it's not attached to a portgroup
+    # Pick out the NICs that have a MAC address owned VMware (with OUI 00:0C:29)
     # Make sure to ignore lines that have a network interface but no address
-    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -v "^-" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
+    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
     KUBE_NODE_IP_ADDRESSES+=("${node_ip}")
 
     if [[ -z ${silent} ]]; then
@@ -323,7 +323,11 @@ function pc-delete-vm {
   local rc=0
 
   kube::log::status "Deleting VM ${vm_name}"
+  # In some cases, head exits before photon, so the pipline exits with
+  # SIGPIPE. We disable the pipefile option to hide that failure.
+  set +o pipefail
   ${PHOTON} vm show "${vm_id}" | head -1 | grep STARTED > /dev/null 2>&1 || rc=$?
+  set +o pipefail
   if [[ ${rc} -eq 0 ]]; then
     ${PHOTON} vm stop "${vm_id}" > /dev/null 2>&1 || rc=$?
     if [[ ${rc} -ne 0 ]]; then
@@ -537,6 +541,28 @@ function gen-salt {
 }
 
 #
+# Generate a script to add a route to a host (master or node)
+# The script will do two things:
+# 1. Add the route immediately with the route command
+# 2. Persist the route by saving it in /etc/network/interfaces
+# This was done with a script because it was easier to get the quoting right
+# and make it clear.
+#
+function gen-add-route {
+  route=${1}
+  gateway=${2}
+  (
+      echo '#!/bin/bash'
+      echo ''
+      echo '# Immediately add route'
+      echo "sudo route add -net ${route} gw ${gateway}"
+      echo ''
+      echo '# Persist route so it lasts over restarts'
+      echo 'sed -in "s|^iface eth0.*|&\n    post-up route add -net' "${route} gw ${gateway}|"'" /etc/network/interfaces'
+  ) > "${KUBE_TEMP}/add-route.sh"
+}
+
+#
 # Create the Kubernetes master VM
 # Sets global variables: 
 # - KUBE_MASTER    (Name)
@@ -721,10 +747,13 @@ function setup-pod-routes {
   local j
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     kube::log::status "Configuring pod routes on ${NODE_NAMES[${i}]}..."
-    run-ssh-cmd "${KUBE_MASTER_IP}" "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[${i}]} gw ${KUBE_NODE_IP_ADDRESSES[${i}]}"
+    gen-add-route "${KUBE_NODE_BRIDGE_NETWORK[${i}]}" "${KUBE_NODE_IP_ADDRESSES[${i}]}"
+    run-script-remotely "${KUBE_MASTER_IP}" "${KUBE_TEMP}/add-route.sh"
+
     for (( j=0; j<${#NODE_NAMES[@]}; j++)); do
       if [[ "${i}" != "${j}" ]]; then
-        run-ssh-cmd "${KUBE_NODE_IP_ADDRESSES[${i}]}" "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[${j}]} gw ${KUBE_NODE_IP_ADDRESSES[${j}]}"
+        gen-add-route "${KUBE_NODE_BRIDGE_NETWORK[${j}]}" "${KUBE_NODE_IP_ADDRESSES[${j}]}"
+        run-script-remotely "${KUBE_NODE_IP_ADDRESSES[${i}]}" "${KUBE_TEMP}/add-route.sh"
       fi
     done
   done

@@ -44,6 +44,10 @@ func (s *ServiceController) getHealthyEndpoints(clusterName string, cachedServic
 			return nil, nil, nil, err
 		}
 		for _, ingress := range lbStatus.Ingress {
+			readyEndpoints, ok := cachedService.endpointMap[lbClusterName]
+			if !ok || readyEndpoints == 0 {
+				continue
+			}
 			var address string
 			// We should get either an IP address or a hostname - use whichever one we get
 			if ingress.IP != "" {
@@ -279,11 +283,11 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	serviceName := cachedService.lastState.Name
 	namespaceName := cachedService.lastState.Namespace
 	zoneNames, regionName, err := s.getClusterZoneNames(clusterName)
-	if zoneNames == nil {
-		return fmt.Errorf("fail to get cluster zone names")
-	}
 	if err != nil {
 		return err
+	}
+	if zoneNames == nil {
+		return fmt.Errorf("failed to get cluster zone names")
 	}
 	dnsZoneName, err := s.getFederationDNSZoneName()
 	if err != nil {

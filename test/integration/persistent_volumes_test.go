@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -47,7 +48,7 @@ func init() {
 	requireEtcd()
 }
 
-// Several tests in this file are configurable by enviroment variables:
+// Several tests in this file are configurable by environment variables:
 // KUBE_INTEGRATION_PV_OBJECTS - nr. of PVs/PVCs to be created
 //      (100 by default)
 // KUBE_INTEGRATION_PV_SYNC_PERIOD - volume controller sync period
@@ -267,6 +268,78 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	}
 }
 
+// TestPersistentVolumeClaimLabelSelector test binding using label selectors
+func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	defer watchPV.Stop()
+	defer watchPVC.Stop()
+
+	controller.Run()
+	defer controller.Stop()
+
+	var (
+		err     error
+		modes   = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+		reclaim = api.PersistentVolumeReclaimRetain
+
+		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
+		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
+		pvc      = createPVC("pvc-ls-1", "1G", modes)
+	)
+
+	pv_true.ObjectMeta.SetLabels(map[string]string{"foo": "true"})
+	pv_false.ObjectMeta.SetLabels(map[string]string{"foo": "false"})
+
+	_, err = testClient.PersistentVolumes().Create(pv_true)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolume: %v", err)
+	}
+	_, err = testClient.PersistentVolumes().Create(pv_false)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolume: %v", err)
+	}
+	t.Log("volumes created")
+
+	pvc.Spec.Selector = &unversioned.LabelSelector{
+		MatchLabels: map[string]string{
+			"foo": "true",
+		},
+	}
+
+	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolumeClaim: %v", err)
+	}
+	t.Log("claim created")
+
+	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+	t.Log("volume bound")
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	t.Log("claim bound")
+
+	pv, err := testClient.PersistentVolumes().Get("pv-false")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef != nil {
+		t.Fatalf("False PV shouldn't be bound")
+	}
+	pv, err = testClient.PersistentVolumes().Get("pv-true")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef == nil {
+		t.Fatalf("True PV should be bound")
+	}
+	if pv.Spec.ClaimRef.Namespace != pvc.Namespace || pv.Spec.ClaimRef.Name != pvc.Name {
+		t.Fatalf("Bind mismatch! Expected %s/%s but got %s/%s", pvc.Namespace, pvc.Name, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	}
+}
+
 // TestPersistentVolumeMultiPVs tests binding of one PVC to 100 PVs with
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
@@ -431,6 +504,85 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	deleteAllEtcdKeys()
 }
 
+// TestPersistentVolumeProvisionMultiPVCs tests provisioning of many PVCs.
+// This test is configurable by KUBE_INTEGRATION_PV_* variables.
+func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, binder, watchPV, watchPVC := createClients(t, s)
+	defer watchPV.Stop()
+	defer watchPVC.Stop()
+	binder.Run()
+	defer binder.Stop()
+
+	objCount := getObjectCount()
+	pvcs := make([]*api.PersistentVolumeClaim, objCount)
+	for i := 0; i < objCount; i++ {
+		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+		pvc.Annotations = map[string]string{
+			"volume.alpha.kubernetes.io/storage-class": "",
+		}
+		pvcs[i] = pvc
+	}
+
+	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: start")
+	// Create the claims in a separate goroutine to pop events from watchPVC
+	// early. It gets stuck with >3000 claims.
+	go func() {
+		for i := 0; i < objCount; i++ {
+			_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvcs[i])
+		}
+	}()
+
+	// Wait until the controller provisions and binds all of them
+	for i := 0; i < objCount; i++ {
+		waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
+		glog.V(1).Infof("%d claims bound", i+1)
+	}
+	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
+
+	// check that we have enough bound PVs
+	pvList, err := testClient.PersistentVolumes().List(api.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list volumes: %s", err)
+	}
+	if len(pvList.Items) != objCount {
+		t.Fatalf("Expected to get %d volumes, got %d", objCount, len(pvList.Items))
+	}
+	for i := 0; i < objCount; i++ {
+		pv := &pvList.Items[i]
+		if pv.Status.Phase != api.VolumeBound {
+			t.Fatalf("Expected volume %s to be bound, is %s instead", pv.Name, pv.Status.Phase)
+		}
+		glog.V(2).Infof("PV %q is bound to PVC %q", pv.Name, pv.Spec.ClaimRef.Name)
+	}
+
+	// Delete the claims
+	for i := 0; i < objCount; i++ {
+		_ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvcs[i].Name, nil)
+	}
+
+	// Wait for the PVs to get deleted by listing remaining volumes
+	// (delete events were unreliable)
+	for {
+		volumes, err := testClient.PersistentVolumes().List(api.ListOptions{})
+		if err != nil {
+			t.Fatalf("Failed to list volumes: %v", err)
+		}
+
+		glog.V(1).Infof("%d volumes remaining", len(volumes.Items))
+		if len(volumes.Items) == 0 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: volumes are deleted")
+
+	deleteAllEtcdKeys()
+}
+
 // TestPersistentVolumeMultiPVsDiffAccessModes tests binding of one PVC to two
 // PVs with different access modes.
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
@@ -582,8 +734,8 @@ func createClients(t *testing.T, s *httptest.Server) (*clientset.Clientset, *per
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000000, Burst: 1000000})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000000, Burst: 1000000})
 
-	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
-	plugins := []volume.VolumePlugin{&volumetest.FakeVolumePlugin{
+	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */)
+	plugin := &volumetest.FakeVolumePlugin{
 		PluginName:             "plugin-name",
 		Host:                   host,
 		Config:                 volume.VolumeConfig{},
@@ -594,11 +746,12 @@ func createClients(t *testing.T, s *httptest.Server) (*clientset.Clientset, *per
 		Unmounters:             nil,
 		Attachers:              nil,
 		Detachers:              nil,
-	}}
+	}
+	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fake_cloud.FakeCloud{}
 
 	syncPeriod := getSyncPeriod()
-	ctrl := persistentvolumecontroller.NewPersistentVolumeController(binderClient, syncPeriod, nil, plugins, cloud, "", nil, nil, nil)
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(binderClient, syncPeriod, plugin, plugins, cloud, "", nil, nil, nil, true)
 
 	watchPV, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
 	if err != nil {

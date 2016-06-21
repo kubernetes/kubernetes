@@ -253,8 +253,8 @@ func (dynamicCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj r
 	return obj, gvk, nil
 }
 
-func (dynamicCodec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
-	return runtime.UnstructuredJSONScheme.EncodeToStream(obj, w, overrides...)
+func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
+	return runtime.UnstructuredJSONScheme.Encode(obj, w)
 }
 
 // paramaterCodec is a codec converts an API object to query

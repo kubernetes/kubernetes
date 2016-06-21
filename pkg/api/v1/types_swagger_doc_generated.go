@@ -50,6 +50,16 @@ func (Affinity) SwaggerDoc() map[string]string {
 	return map_Affinity
 }
 
+var map_AttachedVolume = map[string]string{
+	"":           "AttachedVolume describes a volume attached to a node",
+	"name":       "Name of the attached volume",
+	"devicePath": "DevicePath represents the device path where the volume should be avilable",
+}
+
+func (AttachedVolume) SwaggerDoc() map[string]string {
+	return map_AttachedVolume
+}
+
 var map_AzureFileVolumeSource = map[string]string{
 	"":           "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
@@ -880,7 +890,8 @@ var map_NodeStatus = map[string]string{
 	"daemonEndpoints": "Endpoints of daemons running on the Node.",
 	"nodeInfo":        "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/release-1.3/docs/admin/node.md#node-info",
 	"images":          "List of container images on this node",
-	"volumesInUse":    "List of volumes in use (mounted) by the node.",
+	"volumesInUse":    "List of attachable volumes in use (mounted) by the node.",
+	"volumesAttached": "List of volumes that are attached to the node.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {

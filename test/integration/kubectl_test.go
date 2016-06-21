@@ -37,7 +37,7 @@ func TestKubectlValidation(t *testing.T) {
 		{`{"apiVersion": "v1", "kind": "Pod"}`, false},
 
 		// The following test the experimental api.
-		// TOOD: Replace with something more robust. These may move.
+		// TODO: Replace with something more robust. These may move.
 		{`{"apiVersion": "extensions/v1beta1", "kind": "Ingress"}`, false},
 		{`{"apiVersion": "extensions/v1beta1", "kind": "Job"}`, false},
 		{`{"apiVersion": "vNotAVersion", "kind": "Job"}`, true},

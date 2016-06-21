@@ -287,6 +287,7 @@ func (s *CMServer) Run(_ []string) error {
 		nil,
 		nil,
 		nil,
+		s.VolumeConfiguration.EnableDynamicProvisioning,
 	)
 	volumeController.Run()
 

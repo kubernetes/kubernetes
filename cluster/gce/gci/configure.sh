@@ -139,13 +139,24 @@ function install-kube-binary-config {
   if [[ "${TEST_CLUSTER:-}" == "true" ]] || \
      [[ "${builtin_version}" != "${required_version}" ]]; then
     cp "${src_dir}/kubectl" "${kube_bin}"
-    chmod 544 "${kube_bin}/kubelet"
-    chmod 544 "${kube_bin}/kubectl"
+    chmod 755 "${kube_bin}/kubelet"
+    chmod 755 "${kube_bin}/kubectl"
     mount --bind "${kube_bin}/kubelet" /usr/bin/kubelet
     mount --bind "${kube_bin}/kubectl" /usr/bin/kubectl
   else
     rm -f "${kube_bin}/kubelet"
   fi
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
+     [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+    #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
+    local -r cni_tar="cni-26b61728ac940c3faf827927782326e921be17b0.tar.gz"
+    download-or-bust "" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+    tar xzf "${KUBE_HOME}/${cni_tar}" -C "${kube_bin}" --overwrite
+    mv "${kube_bin}/bin"/* "${kube_bin}"
+    rmdir "${kube_bin}/bin"
+    rm -f "${KUBE_HOME}/${cni_tar}"
+  fi
+
   cp "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.

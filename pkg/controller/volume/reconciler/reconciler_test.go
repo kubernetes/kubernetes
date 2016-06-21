@@ -21,28 +21,38 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/controller/volume/attacherdetacher"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/statusupdater"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/testing"
 	"k8s.io/kubernetes/pkg/util/wait"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
 	reconcilerLoopPeriod      time.Duration = 0 * time.Millisecond
 	maxWaitForUnmountDuration time.Duration = 50 * time.Millisecond
+	resyncPeriod              time.Duration = 5 * time.Minute
 )
 
 // Calls Run()
 // Verifies there are no calls to attach or detach.
 func Test_Run_Positive_DoNothing(t *testing.T) {
 	// Arrange
-	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	ad := operationexecutor.NewOperationExecutor(
+		fakeKubeClient, volumePluginMgr)
+	nodeInformer := informers.CreateSharedNodeIndexInformer(
+		fakeKubeClient, resyncPeriod)
+	nsu := statusupdater.NewNodeStatusUpdater(
+		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
@@ -60,14 +70,19 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 // Verifies there is one attach call and no detach calls.
 func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	// Arrange
-	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	nodeInformer := informers.CreateSharedNodeIndexInformer(
+		fakeKubeClient, resyncPeriod)
+	nsu := statusupdater.NewNodeStatusUpdater(
+		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
-	podName := "pod-name"
-	volumeName := api.UniqueDeviceName("volume-name")
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
+	podName := types.UniquePodName("pod-uid")
+	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
@@ -101,14 +116,19 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *testing.T) {
 	// Arrange
-	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	nodeInformer := informers.CreateSharedNodeIndexInformer(
+		fakeKubeClient, resyncPeriod)
+	nsu := statusupdater.NewNodeStatusUpdater(
+		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
-	podName := "pod-name"
-	volumeName := api.UniqueDeviceName("volume-name")
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
+	podName := types.UniquePodName("pod-uid")
+	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
@@ -163,14 +183,19 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *testing.T) {
 	// Arrange
-	volumePluginMgr, fakePlugin := controllervolumetesting.GetTestVolumePluginMgr((t))
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	ad := attacherdetacher.NewAttacherDetacher(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	nodeInformer := informers.CreateSharedNodeIndexInformer(
+		fakeKubeClient, resyncPeriod)
+	nsu := statusupdater.NewNodeStatusUpdater(
+		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad)
-	podName := "pod-name"
-	volumeName := api.UniqueDeviceName("volume-name")
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
+	podName := types.UniquePodName("pod-uid")
+	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
 	dsw.AddNode(nodeName)
@@ -378,6 +403,3 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 	}
 	return wait.ExponentialBackoff(backoff, fn)
 }
-
-// t.Logf("asw: %v", asw.GetAttachedVolumes())
-// t.Logf("dsw: %v", dsw.GetVolumesToAttach())

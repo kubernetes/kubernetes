@@ -85,18 +85,20 @@ type GCECloud struct {
 	managedZones             []string // List of zones we are spanning (for Ubernetes-Lite, primarily when running on master)
 	networkURL               string
 	nodeTags                 []string // List of tags to use on firewall rules for load balancers
+	nodeInstancePrefix       string   // If non-"", an advisory prefix for all nodes in the cluster
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 }
 
 type Config struct {
 	Global struct {
-		TokenURL    string   `gcfg:"token-url"`
-		TokenBody   string   `gcfg:"token-body"`
-		ProjectID   string   `gcfg:"project-id"`
-		NetworkName string   `gcfg:"network-name"`
-		NodeTags    []string `gcfg:"node-tags"`
-		Multizone   bool     `gcfg:"multizone"`
+		TokenURL           string   `gcfg:"token-url"`
+		TokenBody          string   `gcfg:"token-body"`
+		ProjectID          string   `gcfg:"project-id"`
+		NetworkName        string   `gcfg:"network-name"`
+		NodeTags           []string `gcfg:"node-tags"`
+		NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
+		Multizone          bool     `gcfg:"multizone"`
 	}
 }
 
@@ -120,7 +122,7 @@ type Disks interface {
 	// DeleteDisk deletes PD.
 	DeleteDisk(diskToDelete string) error
 
-	// GetAutoLabelsForPD returns labels to apply to PeristentVolume
+	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
 	// representing this PD, namely failure domain and zone.
 	GetAutoLabelsForPD(name string) (map[string]string, error)
 }
@@ -260,6 +262,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 
 	tokenSource := google.ComputeTokenSource("")
 	var nodeTags []string
+	var nodeInstancePrefix string
 	if config != nil {
 		var cfg Config
 		if err := gcfg.ReadInto(&cfg, config); err != nil {
@@ -281,19 +284,20 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			tokenSource = NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
 		nodeTags = cfg.Global.NodeTags
+		nodeInstancePrefix = cfg.Global.NodeInstancePrefix
 		if cfg.Global.Multizone {
 			managedZones = nil // Use all zones in region
 		}
 	}
 
-	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, nodeTags, tokenSource, true /* useMetadataServer */)
+	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, nodeTags, nodeInstancePrefix, tokenSource, true /* useMetadataServer */)
 }
 
 // Creates a GCECloud object using the specified parameters.
 // If no networkUrl is specified, loads networkName via rest call.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
-func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, nodeTags []string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
+func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, nodeTags []string, nodeInstancePrefix string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
 	if tokenSource == nil {
 		var err error
 		tokenSource, err = google.DefaultTokenSource(
@@ -348,6 +352,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		managedZones:             managedZones,
 		networkURL:               networkURL,
 		nodeTags:                 nodeTags,
+		nodeInstancePrefix:       nodeInstancePrefix,
 		useMetadataServer:        useMetadataServer,
 		operationPollRateLimiter: operationPollRateLimiter,
 	}, nil
@@ -978,10 +983,16 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))
 	}
-	hostTags, err := gce.computeHostTags(hosts)
-	if err != nil {
-		return nil, err
+	// If the node tags to be used for this cluster have been predefined in the
+	// provider config, just use them. Otherwise, invoke computeHostTags method to get the tags.
+	hostTags := gce.nodeTags
+	if len(hostTags) == 0 {
+		var err error
+		if hostTags, err = gce.computeHostTags(hosts); err != nil {
+			return nil, fmt.Errorf("No node tags supplied and also failed to parse the given lists of hosts for tags. Abort creating firewall rule.")
+		}
 	}
+
 	firewall := &compute.Firewall{
 		Name:         makeFirewallName(name),
 		Description:  desc,
@@ -1003,21 +1014,28 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	return firewall, nil
 }
 
-// If the node tags to be used for this cluster have been predefined in the
-// provider config, just use them. Otherwise, grab all tags from all relevant
-// instances:
+// ComputeHostTags grabs all tags from all instances being added to the pool.
 // * The longest tag that is a prefix of the instance name is used
-// * If any instance has a prefix tag, all instances must
-// * If no instances have a prefix tag, no tags are used
+// * If any instance has no matching prefix tag, return error
+// Invoking this method to get host tags is risky since it depends on the format
+// of the host names in the cluster. Only use it as a fallback if gce.nodeTags
+// is unspecified
 func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
-	if len(gce.nodeTags) > 0 {
-		return gce.nodeTags, nil
-	}
-
 	// TODO: We could store the tags in gceInstance, so we could have already fetched it
-	hostNamesByZone := make(map[string][]string)
+	hostNamesByZone := make(map[string]map[string]bool) // map of zones -> map of names -> bool (for easy lookup)
+	nodeInstancePrefix := gce.nodeInstancePrefix
 	for _, host := range hosts {
-		hostNamesByZone[host.Zone] = append(hostNamesByZone[host.Zone], host.Name)
+		if !strings.HasPrefix(host.Name, gce.nodeInstancePrefix) {
+			glog.Warningf("instance '%s' does not conform to prefix '%s', ignoring filter", host, gce.nodeInstancePrefix)
+			nodeInstancePrefix = ""
+		}
+
+		z, ok := hostNamesByZone[host.Zone]
+		if !ok {
+			z = make(map[string]bool)
+			hostNamesByZone[host.Zone] = z
+		}
+		z[host.Name] = true
 	}
 
 	tags := sets.NewString()
@@ -1028,11 +1046,14 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
 			listCall := gce.service.Instances.List(gce.projectID, zone)
 
-			// Add the filter for hosts
-			listCall = listCall.Filter("name eq (" + strings.Join(hostNames, "|") + ")")
+			if nodeInstancePrefix != "" {
+				// Add the filter for hosts
+				listCall = listCall.Filter("name eq " + nodeInstancePrefix + ".*")
+			}
 
 			// Add the fields we want
-			listCall = listCall.Fields("items(name,tags)")
+			// TODO(zmerlynn): Internal bug 29524655
+			// listCall = listCall.Fields("items(name,tags)")
 
 			if pageToken != "" {
 				listCall = listCall.PageToken(pageToken)
@@ -1044,6 +1065,10 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 			}
 			pageToken = res.NextPageToken
 			for _, instance := range res.Items {
+				if !hostNames[instance.Name] {
+					continue
+				}
+
 				longest_tag := ""
 				for _, tag := range instance.Tags.Items {
 					if strings.HasPrefix(instance.Name, tag) && len(tag) > len(longest_tag) {
@@ -1052,8 +1077,8 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 				}
 				if len(longest_tag) > 0 {
 					tags.Insert(longest_tag)
-				} else if len(tags) > 0 {
-					return nil, fmt.Errorf("Some, but not all, instances have prefix tags (%s is missing)", instance.Name)
+				} else {
+					return nil, fmt.Errorf("Could not find any tag that is a prefix of instance name for instance %s", instance.Name)
 				}
 			}
 		}
@@ -1061,11 +1086,9 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 			glog.Errorf("computeHostTags exceeded maxPages=%d for Instances.List: truncating.", maxPages)
 		}
 	}
-
 	if len(tags) == 0 {
-		glog.V(2).Info("No instances had tags, creating rule without target tags")
+		return nil, fmt.Errorf("No instances found")
 	}
-
 	return tags.List(), nil
 }
 
@@ -2429,21 +2452,20 @@ type gceDisk struct {
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
 func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 	instances := make(map[string]*gceInstance)
+	remaining := len(names)
 
+	nodeInstancePrefix := gce.nodeInstancePrefix
 	for _, name := range names {
 		name = canonicalizeInstanceName(name)
+		if !strings.HasPrefix(name, gce.nodeInstancePrefix) {
+			glog.Warningf("instance '%s' does not conform to prefix '%s', removing filter", name, gce.nodeInstancePrefix)
+			nodeInstancePrefix = ""
+		}
 		instances[name] = nil
 	}
 
 	for _, zone := range gce.managedZones {
-		var remaining []string
-		for name, instance := range instances {
-			if instance == nil {
-				remaining = append(remaining, name)
-			}
-		}
-
-		if len(remaining) == 0 {
+		if remaining == 0 {
 			break
 		}
 
@@ -2452,10 +2474,13 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
 			listCall := gce.service.Instances.List(gce.projectID, zone)
 
-			// Add the filter for hosts
-			listCall = listCall.Filter("name eq (" + strings.Join(remaining, "|") + ")")
+			if nodeInstancePrefix != "" {
+				// Add the filter for hosts
+				listCall = listCall.Filter("name eq " + nodeInstancePrefix + ".*")
+			}
 
-			listCall = listCall.Fields("items(name,id,disks,machineType)")
+			// TODO(zmerlynn): Internal bug 29524655
+			// listCall = listCall.Fields("items(name,id,disks,machineType)")
 			if pageToken != "" {
 				listCall.PageToken(pageToken)
 			}
@@ -2467,6 +2492,10 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 			pageToken = res.NextPageToken
 			for _, i := range res.Items {
 				name := i.Name
+				if _, ok := instances[name]; !ok {
+					continue
+				}
+
 				instance := &gceInstance{
 					Zone:  zone,
 					Name:  name,
@@ -2475,6 +2504,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 					Type:  lastComponent(i.MachineType),
 				}
 				instances[name] = instance
+				remaining--
 			}
 		}
 		if page >= maxPages {
