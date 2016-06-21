@@ -176,7 +176,7 @@ func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count i
 		createPod(f, podName, []api.Container{
 			{
 				Image:   ImageRegistry[busyBoxImage],
-				Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee ~/file | tee /test-empty-dir-mnt ; sleep 1; done"},
+				Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee /test-empty-dir-mnt/file ; sleep 1; done"},
 				Name:    podName + containerSuffix,
 				VolumeMounts: []api.VolumeMount{
 					{MountPath: "/test-empty-dir-mnt", Name: volumeNamePrefix},
