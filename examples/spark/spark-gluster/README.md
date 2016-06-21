@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 
 # Spark on GlusterFS example
 
-This guide is an extension of the standard [Spark on Kubernetes Guide](../../../examples/spark/) and describes how to run Spark on GlusterFS using the [Kubernetes Volume Plugin for GlusterFS](../../../examples/glusterfs/)
+This guide is an extension of the standard [Spark on Kubernetes Guide](../../../examples/spark/) and describes how to run Spark on GlusterFS using the [Kubernetes Volume Plugin for GlusterFS](../../../examples/volumes/glusterfs/)
 
 The setup is the same in that you will setup a Spark Master Service in the same way you do with the standard Spark guide but you will deploy a modified Spark Master and a Modified Spark Worker ReplicationController, as they will be modified to use the GlusterFS volume plugin to mount a GlusterFS volume into the Spark Master and Spark Workers containers. Note that this example can be used as a guide for implementing any of the Kubernetes Volume Plugins with the Spark Example.
 

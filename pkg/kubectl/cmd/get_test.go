@@ -339,7 +339,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 
 	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/storage/cassandra/cassandra-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods.Items[0]}
@@ -807,7 +807,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/storage/cassandra/cassandra-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods[0], events[0].Object, events[1].Object}
