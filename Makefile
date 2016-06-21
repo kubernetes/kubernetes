@@ -52,7 +52,7 @@ export KUBE_GOLDFLAGS
 # Example:
 #   make release
 all release:
-	@docker run --rm -it \
+	@docker run --rm -i \
 	    -e "KUBE_FASTBUILD=$(KUBE_FASTBUILD)" \
 	    -v $(shell pwd):/go/src/k8s.io/kubernetes \
 	    -v $(shell which docker):/bin/docker:ro \
