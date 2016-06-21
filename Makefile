@@ -75,7 +75,7 @@ quick-release:
 # Example:
 #   make release-local
 release-local:
-	@+./build/release.sh
+	@+./build/build.sh
 .PHONY: release-local
 
 # Build an incremental release for a limited set of platforms without a
@@ -84,7 +84,7 @@ release-local:
 # Example:
 #   make quick-release-local
 quick-release-local:
-	@+KUBE_FASTBUILD=true ./build/release.sh
+	@+KUBE_FASTBUILD=true ./build/build.sh
 .PHONY: quick-release-local
 
 # Runs all the presubmission verifications.
