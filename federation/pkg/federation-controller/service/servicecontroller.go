@@ -263,6 +263,19 @@ func (s *ServiceController) init() error {
 		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
 	}
 	s.dnsZones = zones
+	if _, err := getDnsZone(s.zoneName, s.dnsZones); err != nil {
+		glog.Infof("DNS zone %q not found.  Creating DNS zone %q.", s.zoneName, s.zoneName)
+		managedZone, err := s.dnsZones.New(s.zoneName)
+		if err != nil {
+			return err
+		}
+		zone, err := s.dnsZones.Add(managedZone)
+		if err != nil {
+			return err
+		}
+		glog.Infof("DNS zone %q successfully created.  Note that DNS resolution will not work until you have registered this name with "+
+			"a DNS registrar and they have changed the authoritative name servers for your domain to point to your DNS provider.", zone.Name())
+	}
 	return nil
 }
 
