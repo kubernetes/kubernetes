@@ -39,8 +39,6 @@ source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
 
-KUBE_GIT_UPSTREAM="${KUBE_GIT_UPSTREAM:-upstream}"
-
 KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
 
 # This emulates "readlink -f" which is not available on MacOS X.
