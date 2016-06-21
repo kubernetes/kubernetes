@@ -45,7 +45,7 @@ var masterNodes sets.String
 func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
 	for _, pod := range pods.Items {
 		if !masterNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "asdf" {
+			if pod.Spec.NodeName != "" {
 				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
 				Expect(scheduledCondition != nil).To(Equal(true))
 				Expect(scheduledCondition.Status).To(Equal(api.ConditionTrue))
