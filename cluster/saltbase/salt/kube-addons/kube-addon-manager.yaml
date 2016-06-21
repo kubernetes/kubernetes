@@ -10,7 +10,7 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-addon-manager
-    image: gcr.io/google-containers/kube-addon-manager:v4
+    image: gcr.io/google-containers/kube-addon-manager:v5
     resources:
       requests:
         cpu: 5m
