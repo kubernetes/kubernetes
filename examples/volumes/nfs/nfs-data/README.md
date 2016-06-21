@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/nfs/nfs-data/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/nfs/nfs-data/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -43,5 +43,5 @@ Available as `gcr.io/google-samples/nfs-server`
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/nfs-data/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/nfs/nfs-data/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

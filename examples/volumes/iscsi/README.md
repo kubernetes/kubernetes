@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/iscsi/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/iscsi/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -70,7 +70,7 @@ kubectl create -f ./your_new_pod.yaml
 Here is the example pod created and expected output:
 
 ```console
-# kubectl create -f examples/iscsi/iscsi.yaml
+# kubectl create -f examples/volumes/iscsi/iscsi.yaml
 # kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 iscsipd   2/2       RUNNING   0           2m
@@ -120,5 +120,5 @@ Run *docker inspect* and verify the container mounted the host directory into th
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/iscsi/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/iscsi/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

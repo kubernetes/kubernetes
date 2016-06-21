@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/aws_ebs/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/aws_ebs/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -48,7 +48,7 @@ Create a volume in the same region as your node.
 Add your volume information in the pod description file aws-ebs-web.yaml then create the pod:
 
 ```shell
-  $ kubectl create -f examples/aws_ebs/aws-ebs-web.yaml
+  $ kubectl create -f examples/volumes/aws_ebs/aws-ebs-web.yaml
 ```
 
 Add some data to the volume if is empty:
@@ -66,5 +66,5 @@ You should now be able to query your web server:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/aws_ebs/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/aws_ebs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

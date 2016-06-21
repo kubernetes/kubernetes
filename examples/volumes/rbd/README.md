@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/rbd/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/rbd/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -65,7 +65,7 @@ QVFBTWdYaFZ3QkNlRGhBQTlubFBhRnlmVVNhdEdENGRyRldEdlE9PQ==
 An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secret through ```kubectl``` in the following command.
 
 ```console
-    # kubectl create -f examples/rbd/secret/ceph-secret.yaml
+    # kubectl create -f examples/volumes/rbd/secret/ceph-secret.yaml
 ```
 
 # Get started
@@ -73,7 +73,7 @@ An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secre
 Here are my commands:
 
 ```console
-    # kubectl create -f examples/rbd/rbd.json
+    # kubectl create -f examples/volumes/rbd/rbd.json
     # kubectl get pods
 ```
 
@@ -89,5 +89,5 @@ On the Kubernetes host, I got these in mount output
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/rbd/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/rbd/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

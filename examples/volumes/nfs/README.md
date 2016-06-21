@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/examples/nfs/README.md).
+[here](http://releases.k8s.io/release-1.2/examples/volumes/nfs/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -58,16 +58,16 @@ Note, this example uses an NFS container that doesn't support NFSv4.
 ## tl;dr Quickstart
 
 ```console
-$ kubectl create -f examples/nfs/provisioner/nfs-server-gce-pv.yaml
-$ kubectl create -f examples/nfs/nfs-server-rc.yaml
-$ kubectl create -f examples/nfs/nfs-server-service.yaml
+$ kubectl create -f examples/volumes/nfs/provisioner/nfs-server-gce-pv.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-server-rc.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-server-service.yaml
 # get the cluster IP of the server using the following command
 $ kubectl describe services nfs-server
 # use the NFS server IP to update nfs-pv.yaml and execute the following
-$ kubectl create -f examples/nfs/nfs-pv.yaml
-$ kubectl create -f examples/nfs/nfs-pvc.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-pv.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-pvc.yaml
 # run a fake backend
-$ kubectl create -f examples/nfs/nfs-busybox-rc.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-busybox-rc.yaml
 # get pod name from this command
 $ kubectl get pod -l name=nfs-busybox
 # use the pod name to check the test file
@@ -94,12 +94,12 @@ Define [the NFS Service and Replication Controller](nfs-server-rc.yaml) and
 The NFS server exports an an auto-provisioned persistent volume backed by GCE PD:
 
 ```console
-$ kubectl create -f examples/nfs/provisioner/nfs-server-gce-pv.yaml
+$ kubectl create -f examples/volumes/nfs/provisioner/nfs-server-gce-pv.yaml
 ```
 
 ```console
-$ kubectl create -f examples/nfs/nfs-server-rc.yaml
-$ kubectl create -f examples/nfs/nfs-server-service.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-server-rc.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-server-service.yaml
 ```
 
 The directory contains dummy `index.html`. Wait until the pod is running
@@ -125,8 +125,8 @@ claim gives us an indirection that allow multiple pods to refer to the NFS
 server using a symbolic name rather than the hardcoded server address.
 
 ```console
-$ kubectl create -f examples/nfs/nfs-pv.yaml
-$ kubectl create -f examples/nfs/nfs-pvc.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-pv.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-pvc.yaml
 ```
 
 ## Setup the fake backend
@@ -135,7 +135,7 @@ The [NFS busybox controller](nfs-busybox-rc.yaml) updates `index.html` on the
 NFS server every 10 seconds. Let's start that now:
 
 ```console
-$ kubectl create -f examples/nfs/nfs-busybox-rc.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-busybox-rc.yaml
 ```
 
 Conveniently, it's also a `busybox` pod, so we can get an early check
@@ -165,14 +165,14 @@ volume and runs a simple web server on it.
 Define the pod:
 
 ```console
-$ kubectl create -f examples/nfs/nfs-web-rc.yaml
+$ kubectl create -f examples/volumes/nfs/nfs-web-rc.yaml
 ```
 
 This creates two pods, each of which serve the `index.html` from above. We can
 then use a simple service to front it:
 
 ```console
-kubectl create -f examples/nfs/nfs-web-service.yaml
+kubectl create -f examples/volumes/nfs/nfs-web-service.yaml
 ```
 
 We can then use the busybox container we launched before to check that `nginx`
@@ -200,5 +200,5 @@ nfs-busybox-w3s4t
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/nfs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

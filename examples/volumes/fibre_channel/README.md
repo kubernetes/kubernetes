@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/fibre_channel/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/fibre_channel/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -49,7 +49,7 @@ kubectl create -f ./your_new_pod.json
 Here is my command and output:
 
 ```console
-# kubectl create -f examples/fibre_channel/fc.yaml
+# kubectl create -f examples/volumes/fibre_channel/fc.yaml
 # kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 fcpd      2/2       Running   0          10m
@@ -74,5 +74,5 @@ CONTAINER ID        IMAGE                                  COMMAND             C
 ```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/fibre_channel/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/fibre_channel/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

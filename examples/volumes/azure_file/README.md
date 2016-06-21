@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/azure_file/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/azure_file/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -53,7 +53,7 @@ In the pod, you need to provide the following information:
 Create the secret:
 
 ```console
-    # kubectl create -f examples/azure_file/secret/azure-secret.yaml
+    # kubectl create -f examples/volumes/azure_file/secret/azure-secret.yaml
 ```
 
 You should see the account name and key from `kubectl get secret`
@@ -61,9 +61,9 @@ You should see the account name and key from `kubectl get secret`
 Then create the Pod:
 
 ```console
-    # kubectl create -f examples/azure_file/azure.yaml
+    # kubectl create -f examples/volumes/azure_file/azure.yaml
 ```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/azure_file/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/azure_file/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

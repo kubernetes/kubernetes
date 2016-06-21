@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/cephfs/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/cephfs/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -55,12 +55,12 @@ Once you have installed Ceph and a Kubernetes cluster, you can create a pod base
 Here are the commands:
 
 ```console
-    # kubectl create -f examples/cephfs/cephfs.yaml
+    # kubectl create -f examples/volumes/cephfs/cephfs.yaml
 
     # create a secret if you want to use Ceph secret instead of secret file
-    # kubectl create -f examples/cephfs/secret/ceph-secret.yaml
+    # kubectl create -f examples/volumes/cephfs/secret/ceph-secret.yaml
 	
-    # kubectl create -f examples/cephfs/cephfs-with-secret.yaml
+    # kubectl create -f examples/volumes/cephfs/cephfs-with-secret.yaml
     # kubectl get pods
 ```
 
@@ -68,5 +68,5 @@ Here are the commands:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cephfs/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/cephfs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

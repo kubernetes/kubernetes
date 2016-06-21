@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/flocker/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/volumes/flocker/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -101,7 +101,7 @@ The following *volume* spec from the [example pod](flocker-pod.yml) illustrates 
 Use `kubetctl` to create the pod.
 
 ```sh
-$ kubectl create -f examples/flocker/flocker-pod.yml
+$ kubectl create -f examples/volumes/flocker/flocker-pod.yml
 ```
 
 You should now verify that the pod is running and determine it's IP address:
@@ -145,5 +145,5 @@ Read more about the [Flocker Cluster Architecture](https://docs.clusterhq.com/en
 To see a demo example of using Kubernetes and Flocker, visit [Flocker's blog post on High Availability with Kubernetes and Flocker](https://clusterhq.com/2015/12/22/ha-demo-kubernetes-flocker/)
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/flocker/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/flocker/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
