@@ -159,10 +159,18 @@ function create-federation-api-objects {
     $host_kubectl create secret generic federation-apiserver-secret --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
 
     # Create secrets with all the kubernetes-apiserver's kubeconfigs.
+    # Note: This is used only by the test setup (where kubernetes clusters are
+    # brought up with FEDERATION=true). Users are expected to create this secret
+    # themselves.
     for dir in ${KUBECONFIG_DIR}/federation/kubernetes-apiserver/*; do
       # We create a secret with the same name as the directory name (which is
-      # same as cluster name in kubeconfig)
+      # same as cluster name in kubeconfig).
+      # Massage the name so that it is valid (should not contain "_" and max 253
+      # chars)
       name=$(basename $dir)
+      name=$(echo "$name" | sed -e "s/_/-/g")  # Replace "_" by "-"
+      name=${name:0:252}
+      echo "Creating secret with name: $name"
       $host_kubectl create secret generic ${name} --from-file="${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
     done
 

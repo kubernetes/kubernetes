@@ -1304,7 +1304,11 @@ function build-config() {
   export CONTEXT="aws_${INSTANCE_PREFIX}"
   (
    umask 077
+
+   # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
+
+   create-kubeconfig-for-federation
   )
 }
 
