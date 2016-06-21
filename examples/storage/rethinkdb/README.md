@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/rethinkdb/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/storage/rethinkdb/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -50,7 +50,7 @@ Rethinkdb will discover its peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
 ```sh
-$kubectl create -f examples/rethinkdb/driver-service.yaml
+$kubectl create -f examples/storage/rethinkdb/driver-service.yaml
 ```
 
 check out:
@@ -67,7 +67,7 @@ rethinkdb-driver  10.0.27.114      <none>            28015/TCP     db=rethinkdb 
 start the first server in the cluster
 
 ```sh
-$kubectl create -f examples/rethinkdb/rc.yaml
+$kubectl create -f examples/storage/rethinkdb/rc.yaml
 ```
 
 Actually, you can start servers as many as you want at one time, just modify the `replicas` in `rc.ymal`
@@ -110,8 +110,8 @@ Admin
 You need a separate pod (labeled as role:admin) to access Web Admin UI
 
 ```sh
-kubectl create -f examples/rethinkdb/admin-pod.yaml
-kubectl create -f examples/rethinkdb/admin-service.yaml
+kubectl create -f examples/storage/rethinkdb/admin-pod.yaml
+kubectl create -f examples/storage/rethinkdb/admin-service.yaml
 ```
 
 find the service
@@ -159,5 +159,5 @@ the generated pods which is using `nodeSelector` to force k8s to schedule contai
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/rethinkdb/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storage/rethinkdb/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

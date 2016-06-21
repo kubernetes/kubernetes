@@ -220,10 +220,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod":       &api.Pod{},
 			"service":   &api.Service{},
 		},
-		"../examples/iscsi": {
+		"../examples/storage/iscsi": {
 			"iscsi": &api.Pod{},
 		},
-		"../examples/glusterfs": {
+		"../examples/storage/glusterfs": {
 			"glusterfs-pod":       &api.Pod{},
 			"glusterfs-endpoints": &api.Endpoints{},
 			"glusterfs-service":   &api.Service{},
@@ -249,14 +249,14 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"scheduler-policy-config":               &schedulerapi.Policy{},
 			"scheduler-policy-config-with-extender": &schedulerapi.Policy{},
 		},
-		"../examples/rbd/secret": {
+		"../examples/storage/rbd/secret": {
 			"ceph-secret": &api.Secret{},
 		},
-		"../examples/rbd": {
+		"../examples/storage/rbd": {
 			"rbd":             &api.Pod{},
 			"rbd-with-secret": &api.Pod{},
 		},
-		"../examples/cassandra": {
+		"../examples/storage/cassandra": {
 			"cassandra-daemonset":  &extensions.DaemonSet{},
 			"cassandra-controller": &api.ReplicationController{},
 			"cassandra-service":    &api.Service{},
@@ -289,7 +289,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/explorer": {
 			"pod": &api.Pod{},
 		},
-		"../examples/hazelcast": {
+		"../examples/storage/hazelcast": {
 			"hazelcast-controller": &api.ReplicationController{},
 			"hazelcast-service":    &api.Service{},
 		},
@@ -319,7 +319,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"mysql-deployment":     &api.Service{},
 			"wordpress-deployment": &api.Service{},
 		},
-		"../examples/nfs": {
+		"../examples/storage/nfs": {
 			"nfs-busybox-rc":     &api.ReplicationController{},
 			"nfs-server-rc":      &api.ReplicationController{},
 			"nfs-server-service": &api.Service{},
@@ -345,7 +345,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"phabricator-controller": &api.ReplicationController{},
 			"phabricator-service":    &api.Service{},
 		},
-		"../examples/redis": {
+		"../examples/storage/redis": {
 			"redis-controller":          &api.ReplicationController{},
 			"redis-master":              &api.Pod{},
 			"redis-proxy":               &api.Pod{},
@@ -357,7 +357,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"limits":    &api.LimitRange{},
 			"quota":     &api.ResourceQuota{},
 		},
-		"../examples/rethinkdb": {
+		"../examples/storage/rethinkdb": {
 			"admin-pod":      &api.Pod{},
 			"admin-service":  &api.Service{},
 			"driver-service": &api.Service{},
@@ -390,7 +390,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"zookeeper-service":       &api.Service{},
 			"zookeeper":               &api.Pod{},
 		},
-		"../examples/cephfs/": {
+		"../examples/storage/cephfs/": {
 			"cephfs":             &api.Pod{},
 			"cephfs-with-secret": &api.Pod{},
 		},
@@ -486,7 +486,7 @@ func TestReadme(t *testing.T) {
 	}{
 		{"../README.md", []runtime.Object{&api.Pod{}}},
 		{"../docs/user-guide/walkthrough/README.md", []runtime.Object{&api.Pod{}}},
-		{"../examples/iscsi/README.md", []runtime.Object{&api.Pod{}}},
+		{"../examples/storage/iscsi/README.md", []runtime.Object{&api.Pod{}}},
 	}
 
 	for _, path := range paths {

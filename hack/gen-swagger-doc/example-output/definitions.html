@@ -2586,14 +2586,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">iscsi</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">iSCSI disk attached to host machine on demand; see <a href="http://releases.k8s.io/HEAD/examples/iscsi/README.md">http://releases.k8s.io/HEAD/examples/iscsi/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">iSCSI disk attached to host machine on demand; see <a href="http://releases.k8s.io/HEAD/examples/storage/iscsi/README.md">http://releases.k8s.io/HEAD/examples/storage/iscsi/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_iscsivolumesource">v1.ISCSIVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">glusterfs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs volume that will be mounted on the host machine; see <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/glusterfs/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs volume that will be mounted on the host machine; see <a href="http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_glusterfsvolumesource">v1.GlusterfsVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2607,7 +2607,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rbd</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">rados block volume that will be mounted on the host machine; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md">http://releases.k8s.io/HEAD/examples/rbd/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rados block volume that will be mounted on the host machine; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_rbdvolumesource">v1.RBDVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3260,21 +3260,21 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">endpoints</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">gluster hosts endpoints name; see <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">gluster hosts endpoints name; see <a href="http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">path to gluster volume; see <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">path to gluster volume; see <a href="http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">glusterfs volume to be mounted with read-only permissions; see <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">glusterfs volume to be mounted with read-only permissions; see <a href="http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -3516,56 +3516,56 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">monitors</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">a collection of Ceph monitors; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">a collection of Ceph monitors; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">image</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">rados image name; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rados image name; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">file system type to mount, such as ext4, xfs, ntfs; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">file system type to mount, such as ext4, xfs, ntfs; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">pool</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">rados pool name; default is rbd; optional; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rados pool name; default is rbd; optional; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">rados user name; default is admin; optional; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rados user name; default is admin; optional; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">keyring</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">keyring is the path to key ring for rados user; default is /etc/ceph/keyring; optional; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">keyring is the path to key ring for rados user; default is /etc/ceph/keyring; optional; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of a secret to authenticate the RBD user; if provided overrides keyring; optional; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of a secret to authenticate the RBD user; if provided overrides keyring; optional; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">rbd volume to be mounted with read-only permissions; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rbd volume to be mounted with read-only permissions; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -4224,7 +4224,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">glusterfs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs volume resource provisioned by an admin; see <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/glusterfs/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs volume resource provisioned by an admin; see <a href="http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/storage/glusterfs/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_glusterfsvolumesource">v1.GlusterfsVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4238,7 +4238,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rbd</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">rados block volume that will be mounted on the host machine; see <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md">http://releases.k8s.io/HEAD/examples/rbd/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rados block volume that will be mounted on the host machine; see <a href="http://releases.k8s.io/HEAD/examples/storage/rbd/README.md">http://releases.k8s.io/HEAD/examples/storage/rbd/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_rbdvolumesource">v1.RBDVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>

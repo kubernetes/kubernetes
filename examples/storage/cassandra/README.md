@@ -22,7 +22,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/cassandra/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/storage/cassandra/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -121,10 +121,10 @@ here are the steps:
 
 ```sh
 # create a service to track all cassandra nodes
-kubectl create -f examples/cassandra/cassandra-service.yaml
+kubectl create -f examples/storage/cassandra/cassandra-service.yaml
 
 # create a replication controller to replicate cassandra nodes
-kubectl create -f examples/cassandra/cassandra-controller.yaml
+kubectl create -f examples/storage/cassandra/cassandra-controller.yaml
 
 # validate the Cassandra cluster. Substitute the name of one of your pods.
 kubectl exec -ti cassandra-xxxxx -- nodetool status
@@ -136,7 +136,7 @@ kubectl scale rc cassandra --replicas=4
 kubectl delete rc cassandra
 
 # then, create a daemonset to place a cassandra node on each kubernetes node
-kubectl create -f examples/cassandra/cassandra-daemonset.yaml --validate=false
+kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml --validate=false
 
 # resource cleanup
 kubectl delete service -l app=cassandra
@@ -184,7 +184,7 @@ selected for membership in this service. We'll see that in action shortly.
 Create the Cassandra service as follows:
 
 ```console
-$ kubectl create -f examples/cassandra/cassandra-service.yaml
+$ kubectl create -f examples/storage/cassandra/cassandra-service.yaml
 ```
 
 
@@ -294,7 +294,7 @@ Create the Replication Controller:
 
 ```console
 
-$ kubectl create -f examples/cassandra/cassandra-controller.yaml
+$ kubectl create -f examples/storage/cassandra/cassandra-controller.yaml
 
 ```
 
@@ -520,7 +520,7 @@ Create this daemonset:
 
 ```console
 
-$ kubectl create -f examples/cassandra/cassandra-daemonset.yaml
+$ kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml
 
 ```
 
@@ -528,7 +528,7 @@ You may need to disable config file validation, like so:
 
 ```console
 
-$ kubectl create -f examples/cassandra/cassandra-daemonset.yaml --validate=false
+$ kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml --validate=false
 
 ```
 
@@ -596,5 +596,5 @@ $ kubectl delete daemonset cassandra
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cassandra/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storage/cassandra/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
