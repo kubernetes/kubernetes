@@ -21,15 +21,22 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ghodss/yaml"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -369,5 +376,55 @@ func TestAccept(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusNotAcceptable {
 		t.Errorf("unexpected error from the server")
+	}
+}
+
+func countEndpoints(eps *api.Endpoints) int {
+	count := 0
+	for i := range eps.Subsets {
+		count += len(eps.Subsets[i].Addresses) * len(eps.Subsets[i].Ports)
+	}
+	return count
+}
+
+func TestMasterService(t *testing.T) {
+	m, err := master.New(framework.NewIntegrationTestMasterConfig())
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	framework.DeleteAllEtcdKeys()
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	err = wait.Poll(time.Second, time.Minute, func() (bool, error) {
+		svcList, err := client.Services(api.NamespaceDefault).List(api.ListOptions{})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return false, nil
+		}
+		found := false
+		for i := range svcList.Items {
+			if svcList.Items[i].Name == "kubernetes" {
+				found = true
+			}
+		}
+		if found {
+			ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes")
+			if err != nil {
+				return false, nil
+			}
+			if countEndpoints(ep) == 0 {
+				return false, fmt.Errorf("no endpoints for kubernetes service: %v", ep)
+			}
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
