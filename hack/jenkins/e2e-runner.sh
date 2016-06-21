@@ -89,13 +89,19 @@ function get_latest_gci_image() {
 function get_latest_docker_release() {
   # Typical Docker release versions are like v1.11.2-rc1, v1.11.2, and etc.
   local -r version_re='.*\"tag_name\":[[:space:]]+\"v([0-9\.r|c-]+)\",.*'
-  local -r latest_release="$(curl -fsSL --retry 3 https://api.github.com/repos/docker/docker/releases/latest)"
-  if [[ "${latest_release}" =~ ${version_re} ]]; then
-    echo "${BASH_REMATCH[1]}"
-  else
-    echo "Malformed Docker API response for latest release: ${latest_release}"
-    exit 1
-  fi
+  local -r releases="$(curl -fsSL --retry 3 https://api.github.com/repos/docker/docker/releases)"
+  # The GitHub API returns releases in descending order of creation time so the
+  # first one is always the latest.
+  # TODO: if we can install `jq` on the Jenkins nodes, we won't have to craft
+  # regular expressions here.
+  while read -r line; do
+    if [[ "${line}" =~ ${version_re} ]]; then
+      echo "${BASH_REMATCH[1]}"
+      return
+    fi
+  done <<< "${releases}"
+  echo "Failed to determine the latest Docker release."
+  exit 1
 }
 
 function install_google_cloud_sdk_tarball() {
@@ -165,7 +171,9 @@ if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
   export KUBE_GCE_MASTER_PROJECT="${GCI_STAGING_PROJECT}"
   export KUBE_GCE_MASTER_IMAGE="$(get_latest_gci_image "${GCI_STAGING_PROJECT}" "${JENKINS_GCI_IMAGE_FAMILY}")"
   export KUBE_OS_DISTRIBUTION="gci"
-  if [[ "${JENKINS_GCI_IMAGE_TYPE}" == preview-test ]]; then
+  if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-preview-test" ]]; then
+    # The family "gci-preview-test" is reserved for a special type of GCI images
+    # that are used to continuously validate Docker releases.
     export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
   fi
 fi
