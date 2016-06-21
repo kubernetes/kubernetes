@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 /* internal implements a stub for the AWS Route53 API, used primarily for unit testing purposes */
-package testing
+package stubs
 
 import (
 	"fmt"
