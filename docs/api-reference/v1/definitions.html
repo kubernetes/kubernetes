@@ -2305,23 +2305,16 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object&#8217;s metadata. More info: <a href="http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Spec defines the desired characteristics of a volume requested by a pod author. More info: <a href="http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Status represents the current information/status of a persistent volume claim. Read-only. More info: <a href="http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumeclaimstatus">v1.PersistentVolumeClaimStatus</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Items is the list of Namespace objects in the list. More info: <a href="http://releases.k8s.io/release-1.3/docs/user-guide/namespaces.md">http://releases.k8s.io/release-1.3/docs/user-guide/namespaces.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_namespace">v1.Namespace</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -2367,16 +2360,23 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object&#8217;s metadata. More info: <a href="http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Items is the list of Namespace objects in the list. More info: <a href="http://releases.k8s.io/release-1.3/docs/user-guide/namespaces.md">http://releases.k8s.io/release-1.3/docs/user-guide/namespaces.md</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_namespace">v1.Namespace</a> array</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Spec defines the desired characteristics of a volume requested by a pod author. More info: <a href="http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumeclaimspec">v1.PersistentVolumeClaimSpec</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Status represents the current information/status of a persistent volume claim. Read-only. More info: <a href="http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/release-1.3/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumeclaimstatus">v1.PersistentVolumeClaimStatus</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -8153,7 +8153,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-06-16 01:05:44 UTC
+Last updated 2016-06-21 18:58:24 UTC
 </div>
 </div>
 </body>
