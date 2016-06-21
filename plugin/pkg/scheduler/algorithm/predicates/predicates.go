@@ -59,7 +59,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	}
 
 	if !exists {
-		return nil, fmt.Errorf("node '%v' is not in cache", id)
+		return nil, fmt.Errorf("node '%v' not found", id)
 	}
 
 	return node.(*api.Node), nil
