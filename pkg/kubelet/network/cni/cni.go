@@ -18,17 +18,16 @@ package cni
 
 import (
 	"fmt"
-	"net"
+	"os/exec"
 	"sort"
-	"strings"
 
 	"github.com/appc/cni/libcni"
 	cnitypes "github.com/appc/cni/pkg/types"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 const (
@@ -104,11 +103,7 @@ func (plugin *cniNetworkPlugin) Name() string {
 }
 
 func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
-	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
-	if !ok {
-		return fmt.Errorf("CNI execution called on non-docker runtime")
-	}
-	netns, err := runtime.GetNetNS(id)
+	netns, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return err
 	}
@@ -123,11 +118,7 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
-	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
-	if !ok {
-		return fmt.Errorf("CNI execution called on non-docker runtime")
-	}
-	netns, err := runtime.GetNetNS(id)
+	netns, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return err
 	}
@@ -138,18 +129,21 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
-	if !ok {
-		return nil, fmt.Errorf("CNI execution called on non-docker runtime")
-	}
-	ipStr, err := runtime.GetContainerIP(id.ID, network.DefaultInterfaceName)
+	netns, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return nil, err
 	}
-	ip, _, err := net.ParseCIDR(strings.Trim(ipStr, "\n"))
+
+	nsenterPath, lookupErr := exec.LookPath("nsenter")
+	if lookupErr != nil {
+		return nil, fmt.Errorf("Unable to obtain IP address of container: missing nsenter.")
+	}
+
+	ip, err := network.GetPodIP(utilexec.New(), id, nsenterPath, netns, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
+
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
