@@ -93,7 +93,7 @@ func NewCmdLimit(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Com
 		Err: errOut,
 	}
 	var limit_resources1 string
-	RESTMappings := f.ResourcesWithPodTemplates()
+	RESTMappings := f.ResourcesWithPodSpecs()
 	for _, Map := range RESTMappings {
 		limit_resources1 = limit_resources1 + ", " + Map.Resource
 
