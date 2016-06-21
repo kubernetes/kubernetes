@@ -191,6 +191,7 @@ EOF
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 node-tags = ${NODE_INSTANCE_PREFIX}
+node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
   fi
   if [[ -n "${MULTIZONE:-}" ]]; then
