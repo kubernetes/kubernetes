@@ -29,6 +29,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 # TODO: It's going to be:
 # KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1"}
+# FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
+# ONLY the last version is tested in each group.
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,autoscaling/v1,batch/v1,apps/v1alpha1,policy/v1alpha1,extensions/v1beta1,rbac.authorization.k8s.io/v1alpha1"}
 
 # Give integration tests longer to run
