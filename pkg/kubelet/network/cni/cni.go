@@ -18,8 +18,8 @@ package cni
 
 import (
 	"fmt"
-	"os/exec"
 	"sort"
+	"sync"
 
 	"github.com/appc/cni/libcni"
 	cnitypes "github.com/appc/cni/pkg/types"
@@ -42,6 +42,9 @@ type cniNetworkPlugin struct {
 
 	defaultNetwork *cniNetwork
 	host           network.Host
+	execer         utilexec.Interface
+	nsenterPath    string
+	mu             sync.Mutex
 }
 
 type cniNetwork struct {
@@ -56,7 +59,7 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix str
 	if err != nil {
 		return configList
 	}
-	return append(configList, &cniNetworkPlugin{defaultNetwork: network})
+	return append(configList, &cniNetworkPlugin{defaultNetwork: network, execer: utilexec.New()})
 }
 
 func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
@@ -103,6 +106,9 @@ func (plugin *cniNetworkPlugin) Name() string {
 }
 
 func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+
 	netns, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return err
@@ -118,6 +124,9 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+
 	netns, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return err
@@ -129,22 +138,36 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	netns, err := plugin.host.GetRuntime().GetNetNS(id)
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+
+	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return nil, err
 	}
 
-	nsenterPath, lookupErr := exec.LookPath("nsenter")
-	if lookupErr != nil {
-		return nil, fmt.Errorf("Unable to obtain IP address of container: missing nsenter.")
+	nsenterPath, err := plugin.getNsenterPath()
+	if err != nil {
+		return nil, err
 	}
-
-	ip, err := network.GetPodIP(utilexec.New(), id, nsenterPath, netns, network.DefaultInterfaceName)
+	// Try to retrieve ip inside container network namespace.
+	ip, err := network.GetPodIP(plugin.execer, id, nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
 
 	return &network.PodNetworkStatus{IP: ip}, nil
+}
+
+func (plugin *cniNetworkPlugin) getNsenterPath() (string, error) {
+	if plugin.nsenterPath == "" {
+		nsenterPath, err := plugin.execer.LookPath("nsenter")
+		if err != nil {
+			return "", err
+		}
+		plugin.nsenterPath = nsenterPath
+	}
+	return plugin.nsenterPath, nil
 }
 
 func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {

@@ -468,8 +468,8 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if err != nil {
 		return nil, err
 	}
-	// Try to retrieve ip inside container network namespace
-	ip, err := network.GetPodIP(plugin.execer, id, netnsPath, nsenterPath, network.DefaultInterfaceName)
+	// Try to retrieve ip inside container network namespace.
+	ip, err := network.GetPodIP(plugin.execer, id, nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
