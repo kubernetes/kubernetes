@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This command checks that the built commands can function together for
-# simple scenarios.  It does not require Docker so it can run in travis.
+# simple scenarios.  It does not require Docker.
 
 set -o errexit
 set -o nounset
