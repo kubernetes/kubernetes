@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master"
@@ -257,6 +258,9 @@ var deleteResp string = `
 // Job share storage.  This test can be deleted when Jobs is removed from ext/v1beta1,
 // (expected to happen in 1.4).
 func TestBatchGroupBackwardCompatibility(t *testing.T) {
+	if *testapi.Batch.GroupVersion() == v2alpha1.SchemeGroupVersion {
+		t.Skip("Shared job storage is not required for batch/v2alpha1.")
+	}
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 	transport := http.DefaultTransport
