@@ -40,13 +40,18 @@ const (
 
 var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	f := framework.NewDefaultFramework("examples")
-	// Customized ForEach wrapper for this test.
-	forEachPod := func(selectorKey string, selectorValue string, fn func(api.Pod)) {
-		f.NewClusterVerification(
+
+	// Reusable cluster state function.  This won't be adversly affected by lazy initialization of framework.
+	clusterState := func(selectorKey string, selectorValue string) *framework.ClusterVerification {
+		return f.NewClusterVerification(
 			framework.PodStateVerification{
 				Selectors:   map[string]string{selectorKey: selectorValue},
 				ValidPhases: []api.PodPhase{api.PodRunning},
-			}).ForEach(fn)
+			})
+	}
+	// Customized ForEach wrapper for this test.
+	forEachPod := func(selectorKey string, selectorValue string, fn func(api.Pod)) {
+		clusterState(selectorKey, selectorValue).ForEach(fn)
 	}
 	var c *client.Client
 	var ns string
@@ -86,7 +91,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.RunKubectlOrDie("create", "-f", sentinelServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", sentinelControllerYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": sentinelRC}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{sentinelRC: "true"}))
 			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			label = labels.SelectorFromSet(labels.Set(map[string]string{"name": redisRC}))
@@ -101,13 +106,21 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("checking up the services")
 			checkAllLogs := func() {
-				forEachPod("name", "redis", func(pod api.Pod) {
+				selectorKey, selectorValue := "name", redisRC
+				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
 						_, err := framework.LookForStringInLog(ns, pod.Name, "redis", expectedOnServer, serverStartTimeout)
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
-				forEachPod("name", "redis-sentinel", func(pod api.Pod) {
+				selectorKey, selectorValue = sentinelRC, "true"
+				label = labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
 						_, err := framework.LookForStringInLog(ns, pod.Name, "sentinel", expectedOnSentinel, serverStartTimeout)
 						Expect(err).NotTo(HaveOccurred())
@@ -182,11 +195,6 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples", "spark", file)
 			}
 
-			// Override test-generated namespace to be as specified in Spark example
-			ns = "spark-cluster"
-			namespaceYaml := mkpath("namespace-spark-cluster.yaml")
-			framework.RunKubectlOrDie("create", "-f", namespaceYaml)
-
 			// TODO: Add Zepplin and Web UI to this example.
 			serviceYaml := mkpath("spark-master-service.yaml")
 			masterYaml := mkpath("spark-master-controller.yaml")
@@ -197,14 +205,14 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				By("starting master")
 				framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
 				framework.RunKubectlOrDie("create", "-f", masterYaml, nsFlag)
-				label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "spark-master"}))
+				selectorKey, selectorValue := "component", "spark-master"
+				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
 				err := framework.WaitForPodsWithLabelRunning(c, ns, label)
 				Expect(err).NotTo(HaveOccurred())
 
 				framework.Logf("Now polling for Master startup...")
-
 				// Only one master pod: But its a natural way to look up pod names.
-				forEachPod("component", "spark-master", func(pod api.Pod) {
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					framework.Logf("Now waiting for master to startup in %v", pod.Name)
 					_, err := framework.LookForStringInLog(ns, pod.Name, "spark-master", "Starting Spark master at", serverStartTimeout)
 					Expect(err).NotTo(HaveOccurred())
@@ -213,7 +221,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				By("waiting for master endpoint")
 				err = framework.WaitForEndpoint(c, ns, "spark-master")
 				Expect(err).NotTo(HaveOccurred())
-				forEachPod("component", "spark-master", func(pod api.Pod) {
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					_, maErr := framework.LookForStringInLog(f.Namespace.Name, pod.Name, "spark-master", "Starting Spark master at", serverStartTimeout)
 					if maErr != nil {
 						framework.Failf("Didn't find target string. error:", maErr)
@@ -224,7 +232,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				By("starting workers")
 				framework.Logf("Now starting Workers")
 				framework.RunKubectlOrDie("create", "-f", workerControllerYaml, nsFlag)
-				label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "spark-worker"}))
+				selectorKey, selectorValue := "component", "spark-worker"
+				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
 				err := framework.WaitForPodsWithLabelRunning(c, ns, label)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -232,9 +241,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				// framework.ScaleRC(c, ns, "spark-worker-controller", 2, true)
 
 				framework.Logf("Now polling for worker startup...")
-				// ScaleRC(c, ns, "spark-worker-controller", 2, true)
-				framework.Logf("Now polling for worker startup...")
-				forEachPod("component", "spark-worker",
+				forEachPod(selectorKey, selectorValue,
 					func(pod api.Pod) {
 						_, slaveErr := framework.LookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
 						Expect(slaveErr).NotTo(HaveOccurred())
