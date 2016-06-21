@@ -919,7 +919,10 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 // getAllZones retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
 func (c *AWSCloud) getAllZones() (sets.String, error) {
-	// TODO: Caching, although we currently only use this in volume creation
+	// We don't currently cache this; it is currently used only in volume
+	// creation which is expected to be a comparatively rare occurence.
+
+	// TODO: Caching / expose api.Nodes to the cloud provider?
 	// TODO: We could also query for subnets, I think
 
 	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}

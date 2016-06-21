@@ -2070,6 +2070,7 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 
 // GetAllZones returns all the zones in which nodes are running
 func (gce *GCECloud) GetAllZones() (sets.String, error) {
+	// Fast-path for non-multizone
 	if len(gce.managedZones) == 1 {
 		return sets.NewString(gce.managedZones...), nil
 	}
@@ -2084,6 +2085,15 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 		listCall := gce.service.Instances.List(gce.projectID, zone)
 
 		// No filter: We assume that a zone is either used or unused
+		// We could only consider running nodes (like we do in List above),
+		// but probably if instances are starting we still want to consider them.
+		// I think we should wait until we have a reason to make the
+		// call one way or the other; we generally can't guarantee correct
+		// volume spreading if the set of zones is changing
+		// (and volume spreading is currently only a heuristic).
+		// Long term we want to replace GetAllZones (which primarily supports volume
+		// spreading) with a scheduler policy that is able to see the global state of
+		// volumes and the health of zones.
 
 		// Just a minimal set of fields - we only care about existence
 		listCall = listCall.Fields("items(name)")
@@ -2258,6 +2268,12 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 	var disk *gceDisk
 	var err error
 	if zone == "" {
+		// We would like as far as possible to avoid this case,
+		// because GCE doesn't guarantee that volumes are uniquely named per region,
+		// just per zone.  However, creation of GCE PDs was originally done only
+		// by name, so we have to continue to support that.
+		// However, wherever possible the zone should be passed (and it is passed
+		// for most cases that we can control, e.g. dynamic volume provisioning)
 		disk, err = gce.getDiskByNameUnknownZone(name)
 		if err != nil {
 			return nil, err
