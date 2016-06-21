@@ -269,6 +269,7 @@ func printDebugInfo(c *client.Client) {
 		return
 	}
 	for _, pod := range podList.Items {
-		framework.Logf("Kubectl output:\n%v", framework.RunKubectlOrDie("log", pod.Name, "--namespace=kube-system"))
+		framework.Logf("Kubectl output:\n%v",
+			framework.RunKubectlOrDie("log", pod.Name, "--namespace=kube-system", "--container=heapster"))
 	}
 }
