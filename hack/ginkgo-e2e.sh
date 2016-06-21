@@ -106,7 +106,7 @@ fi
 # file and the one provided with --host is ignored.
 # Add path for things like running kubectl binary.
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
-"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+KUBE_CACHE_MUTATION_DETECTOR=true "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \

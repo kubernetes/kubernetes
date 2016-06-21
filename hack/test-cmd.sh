@@ -209,7 +209,7 @@ kube::log::status "Starting kube-apiserver"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
 
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_CACHE_MUTATION_DETECTOR=true "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -227,7 +227,7 @@ kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
 
 # Start controller manager
 kube::log::status "Starting controller-manager"
-"${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
+KUBE_CACHE_MUTATION_DETECTOR=true "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
   --port="${CTLRMGR_PORT}" \
   --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
   --master="127.0.0.1:${API_PORT}" 1>&2 &

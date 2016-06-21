@@ -176,7 +176,7 @@ function e2e_test() {
     go run ./hack/e2e.go ${E2E_OPT:-} -v --isup
     # Jenkins will look at the junit*.xml files for test failures, so don't exit with a nonzero
     # error code if it was only tests that failed.
-    go run ./hack/e2e.go ${E2E_OPT:-} -v --test \
+    KUBE_CACHE_MUTATION_DETECTOR=true go run ./hack/e2e.go ${E2E_OPT:-} -v --test \
       ${ginkgo_test_args:+--test_args="${ginkgo_test_args}"} \
       && exitcode=0 || exitcode=$?
     if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 ]]; then

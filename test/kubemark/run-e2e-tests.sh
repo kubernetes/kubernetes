@@ -32,6 +32,7 @@ detect-master
 export KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
 export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/resources/kubeconfig.loc"
 export E2E_MIN_STARTUP_PODS=0
+export KUBE_CACHE_MUTATION_DETECTOR=true 
 
 if [[ -z "$@" ]]; then
 	ARGS='--ginkgo.focus=should\sallow\sstarting\s30\spods\sper\snode'
