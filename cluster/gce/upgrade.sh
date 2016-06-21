@@ -116,6 +116,7 @@ function wait-for-master() {
 function prepare-upgrade() {
   ensure-temp-dir
   detect-project
+  write-cluster-name
   tars_from_version
 }
 
