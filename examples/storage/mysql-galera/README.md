@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/mysql-galera/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/storage/msql-galera/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -56,11 +56,11 @@ Note: Kubernetes best-practices is to pre-create the services for each controlle
 
 First, create the overall cluster service that will be used to connect to the cluster:
 
-```kubectl create -f examples/mysql-galera/pxc-cluster-service.yaml```
+```kubectl create -f examples/storage/msql-galera/pxc-cluster-service.yaml```
 
 Create the service and replication controller for the first node:
 
-```kubectl create -f examples/mysql-galera/pxc-node1.yaml```
+```kubectl create -f examples/storage/msql-galera/pxc-node1.yaml```
 
 ### Create services and controllers for the remaining nodes
 
@@ -71,21 +71,21 @@ When complete, you should be able connect with a mysql client to the IP address
 
 ### An example of creating a cluster
 
-Shown below are examples of Using ```kubectl``` from within the ```./examples/mysql-galera``` directory, the status of the lauched replication controllers and services can be confirmed
+Shown below are examples of Using ```kubectl``` from within the ```./examples/storage/msql-galera``` directory, the status of the lauched replication controllers and services can be confirmed
 
 ```
-$ kubectl create -f examples/mysql-galera/pxc-cluster-service.yaml 
+$ kubectl create -f examples/storage/msql-galera/pxc-cluster-service.yaml 
 services/pxc-cluster
 
-$ kubectl create -f examples/mysql-galera/pxc-node1.yaml 
+$ kubectl create -f examples/storage/msql-galera/pxc-node1.yaml 
 services/pxc-node1
 replicationcontrollers/pxc-node1
 
-$ kubectl create -f examples/mysql-galera/pxc-node2.yaml 
+$ kubectl create -f examples/storage/msql-galera/pxc-node2.yaml 
 services/pxc-node2
 replicationcontrollers/pxc-node2
 
-$ kubectl create -f examples/mysql-galera/pxc-node3.yaml 
+$ kubectl create -f examples/storage/msql-galera/pxc-node3.yaml 
 services/pxc-node3
 replicationcontrollers/pxc-node3
 
@@ -167,5 +167,5 @@ This setup certainly can become more fluid and dynamic. One idea is to perhaps u
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/mysql-galera/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storage/msql-galera/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

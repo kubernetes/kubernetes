@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/redis/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/storage/redis/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -56,7 +56,7 @@ Here is the config for the initial master and sentinel pod: [redis-master.yaml](
 Create this master as follows:
 
 ```sh
-kubectl create -f examples/redis/redis-master.yaml
+kubectl create -f examples/storage/redis/redis-master.yaml
 ```
 
 ### Turning up a sentinel service
@@ -70,7 +70,7 @@ Here is the definition of the sentinel service: [redis-sentinel-service.yaml](re
 Create this service:
 
 ```sh
-kubectl create -f examples/redis/redis-sentinel-service.yaml
+kubectl create -f examples/storage/redis/redis-sentinel-service.yaml
 ```
 
 ### Turning up replicated redis servers
@@ -86,7 +86,7 @@ The bulk of this controller config is actually identical to the redis-master pod
 Create this controller:
 
 ```sh
-kubectl create -f examples/redis/redis-controller.yaml
+kubectl create -f examples/storage/redis/redis-controller.yaml
 ```
 
 We'll do the same thing for the sentinel.  Here is the controller config: [redis-sentinel-controller.yaml](redis-sentinel-controller.yaml)
@@ -94,7 +94,7 @@ We'll do the same thing for the sentinel.  Here is the controller config: [redis
 We create it as follows:
 
 ```sh
-kubectl create -f examples/redis/redis-sentinel-controller.yaml
+kubectl create -f examples/storage/redis/redis-sentinel-controller.yaml
 ```
 
 ### Scale our replicated pods
@@ -142,16 +142,16 @@ For those of you who are impatient, here is the summary of commands we ran in th
 
 ```
 # Create a bootstrap master
-kubectl create -f examples/redis/redis-master.yaml
+kubectl create -f examples/storage/redis/redis-master.yaml
 
 # Create a service to track the sentinels
-kubectl create -f examples/redis/redis-sentinel-service.yaml
+kubectl create -f examples/storage/redis/redis-sentinel-service.yaml
 
 # Create a replication controller for redis servers
-kubectl create -f examples/redis/redis-controller.yaml
+kubectl create -f examples/storage/redis/redis-controller.yaml
 
 # Create a replication controller for redis sentinels
-kubectl create -f examples/redis/redis-sentinel-controller.yaml
+kubectl create -f examples/storage/redis/redis-sentinel-controller.yaml
 
 # Scale both replication controllers
 kubectl scale rc redis --replicas=3
@@ -163,5 +163,5 @@ kubectl delete pods redis-master
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/redis/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storage/redis/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

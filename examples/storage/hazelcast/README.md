@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/hazelcast/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/storage/hazelcast/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -92,7 +92,7 @@ The important thing to note here is the `selector`. It is a query over labels, t
 Create this service as follows:
 
 ```sh
-$ kubectl create -f examples/hazelcast/hazelcast-service.yaml
+$ kubectl create -f examples/storage/hazelcast/hazelcast-service.yaml
 ```
 
 ### Adding replicated nodes
@@ -153,7 +153,7 @@ Last but not least, we set `DNS_DOMAIN` environment variable according to your K
 Create this controller:
 
 ```sh
-$ kubectl create -f examples/hazelcast/hazelcast-controller.yaml
+$ kubectl create -f examples/storage/hazelcast/hazelcast-controller.yaml
 ```
 
 After the controller provisions successfully the pod, you can query the service endpoints:
@@ -264,10 +264,10 @@ For those of you who are impatient, here is the summary of the commands we ran i
 
 ```sh
 # create a service to track all hazelcast nodes
-kubectl create -f examples/hazelcast/hazelcast-service.yaml
+kubectl create -f examples/storage/hazelcast/hazelcast-service.yaml
 
 # create a replication controller to replicate hazelcast nodes
-kubectl create -f examples/hazelcast/hazelcast-controller.yaml
+kubectl create -f examples/storage/hazelcast/hazelcast-controller.yaml
 
 # scale up to 2 nodes
 kubectl scale rc hazelcast --replicas=2
@@ -282,5 +282,5 @@ See [here](https://github.com/pires/hazelcast-kubernetes-bootstrapper/blob/maste
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/hazelcast/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storage/hazelcast/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/glusterfs/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/storage/glusterfs/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -65,7 +65,7 @@ The "IP" field should be filled with the address of a node in the Glusterfs serv
 Create the endpoints,
 
 ```sh
-$ kubectl create -f examples/glusterfs/glusterfs-endpoints.json
+$ kubectl create -f examples/storage/glusterfs/glusterfs-endpoints.json
 ```
 
 You can verify that the endpoints are successfully created by running
@@ -81,7 +81,7 @@ We need also create a service for this endpoints, so that the endpoints will be 
 Use this command to create the service:
 
 ```sh
-$ kubectl create -f examples/glusterfs/glusterfs-service.json
+$ kubectl create -f examples/storage/glusterfs/glusterfs-service.json
 ```
 
 
@@ -109,7 +109,7 @@ The parameters are explained as the followings.
 Create a pod that has a container using Glusterfs volume,
 
 ```sh
-$ kubectl create -f examples/glusterfs/glusterfs-pod.json
+$ kubectl create -f examples/storage/glusterfs/glusterfs-pod.json
 ```
 
 You can verify that the pod is running:
@@ -134,5 +134,5 @@ You may also run `docker ps` on the host to see the actual container.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/glusterfs/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storage/glusterfs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
