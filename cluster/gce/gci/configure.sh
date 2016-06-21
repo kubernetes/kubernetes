@@ -139,8 +139,8 @@ function install-kube-binary-config {
   if [[ "${TEST_CLUSTER:-}" == "true" ]] || \
      [[ "${builtin_version}" != "${required_version}" ]]; then
     cp "${src_dir}/kubectl" "${kube_bin}"
-    chmod 544 "${kube_bin}/kubelet"
-    chmod 544 "${kube_bin}/kubectl"
+    chmod 755 "${kube_bin}/kubelet"
+    chmod 755 "${kube_bin}/kubectl"
     mount --bind "${kube_bin}/kubelet" /usr/bin/kubelet
     mount --bind "${kube_bin}/kubectl" /usr/bin/kubectl
   else
