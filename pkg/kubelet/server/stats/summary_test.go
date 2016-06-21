@@ -110,8 +110,8 @@ func TestBuildSummary(t *testing.T) {
 		"/pod2-c0": summaryTestContainerInfo(seedPod2Container, pName2, namespace2, cName20),
 	}
 
-	rootfs := v2.FsInfo{}
-	imagefs := v2.FsInfo{}
+	rootfs := v2.FsInfo{Device: "device-1"}
+	imagefs := v2.FsInfo{Device: "device-1"}
 
 	// memory limit overrides for each container (used to test available bytes if a memory limit is known)
 	memoryLimitOverrides := map[string]uint64{
@@ -138,6 +138,7 @@ func TestBuildSummary(t *testing.T) {
 	checkCPUStats(t, "Node", seedRoot, nodeStats.CPU)
 	checkMemoryStats(t, "Node", seedRoot, infos["/"], nodeStats.Memory)
 	checkNetworkStats(t, "Node", seedRoot, nodeStats.Network)
+	assert.Equal(t, nodeStats.Runtime.PrimaryFs, true)
 
 	systemSeeds := map[string]int{
 		kubestats.SystemContainerRuntime: seedRuntime,
