@@ -468,6 +468,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if err != nil {
 		return nil, err
 	}
+	// Try to retrieve ip inside container network namespace
 	ip, err := network.GetPodIP(plugin.execer, id, netnsPath, nsenterPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
@@ -484,11 +485,12 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 	return nil
 }
 
-// getContainerID returns the containerID that will be used to retrieve the pod IP.
+// getNetworkContainerID returns the containerID that will be used to retrieve the pod IP.
 // For Docker, the container ID is the pod infra container's ID.
 // For rkt, the container ID is the API pod's UID.
-// TODO(yifan): Rename to getPodID.
-func (plugin *kubenetNetworkPlugin) getContainerID(pod *kubecontainer.Pod) kubecontainer.ContainerID {
+// TODO(yifan): The ID we return here is actually binded to each pod, we need to rename this
+// function to reflect that.
+func (plugin *kubenetNetworkPlugin) getNetworkContainerID(pod *kubecontainer.Pod) kubecontainer.ContainerID {
 	switch plugin.host.GetRuntime().Type() {
 	case "rkt": // TODO(yifan): Use rkt.RktType after we fixed the circular import.
 		if apiPod, ok := plugin.host.GetPodByName(pod.Namespace, pod.Name); ok {
@@ -514,7 +516,7 @@ func (plugin *kubenetNetworkPlugin) getRunningPods() ([]*hostport.RunningPod, er
 	}
 	runningPods := make([]*hostport.RunningPod, 0)
 	for _, p := range pods {
-		containerID := plugin.getContainerID(p)
+		containerID := plugin.getNetworkContainerID(p)
 		ipString, ok := plugin.podIPs[containerID]
 		if !ok {
 			continue
