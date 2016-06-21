@@ -2,7 +2,6 @@ kind: ReplicationController
 apiVersion: v1
 metadata:
   name: spark-worker-controller
-  namespace: spark-cluster
 spec:
   replicas: 2
   selector:

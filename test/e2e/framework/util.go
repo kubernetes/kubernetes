@@ -3913,7 +3913,7 @@ func WaitForIngressAddress(c *client.Client, ns, ingName string, timeout time.Du
 // Looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie("log", podName, container, fmt.Sprintf("--namespace=%v", ns))
+		return RunKubectlOrDie("logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
 	})
 }
 
