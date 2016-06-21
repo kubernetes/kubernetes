@@ -49,14 +49,22 @@ import (
 // TODO(random-liu): Swith to new docker interface by refactoring the functions in the old DockerInterface
 // one by one.
 type kubeDockerClient struct {
-	client *dockerapi.Client
+	// timeout is the timeout of short running docker operations.
+	timeout time.Duration
+	client  *dockerapi.Client
 }
 
 // Make sure that kubeDockerClient implemented the DockerInterface.
 var _ DockerInterface = &kubeDockerClient{}
 
+// There are 2 kinds of docker operations categorized by running time:
+// * Long running operation: The long running operation could run for arbitrary long time, and the running time
+// usually depends on some uncontrollable factors. These operations include: PullImage, Logs, StartExec, AttachToContainer.
+// * Non-long running operation: Given the maximum load of the system, the non-long running operation should finish
+// in expected and usually short time. These include all other operations.
+// kubeDockerClient only applies timeout on non-long running operations.
 const (
-	// defaultTimeout is the default timeout of all docker operations.
+	// defaultTimeout is the default timeout of short running docker operations.
 	defaultTimeout = 2 * time.Minute
 
 	// defaultShmSize is the default ShmSize to use (in bytes) if not specified.
@@ -69,20 +77,26 @@ const (
 	// is made for defaultImagePullingStuckTimeout, the image pulling will be cancelled.
 	// Docker reports image progress for every 512kB block, so normally there shouldn't be too long interval
 	// between progress updates.
+	// TODO(random-liu): Make this configurable
 	defaultImagePullingStuckTimeout = 1 * time.Minute
 )
 
-// newKubeDockerClient creates an kubeDockerClient from an existing docker client.
-func newKubeDockerClient(dockerClient *dockerapi.Client) DockerInterface {
+// newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
+// defaultTimeout will be applied.
+func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout time.Duration) DockerInterface {
+	if requestTimeout == 0 {
+		requestTimeout = defaultTimeout
+	}
 	return &kubeDockerClient{
-		client: dockerClient,
+		client:  dockerClient,
+		timeout: requestTimeout,
 	}
 }
 
-func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
-	ctx, cancel := getDefaultContext()
+func (d *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-	containers, err := k.client.ContainerList(ctx, options)
+	containers, err := d.client.ContainerList(ctx, options)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
@@ -93,7 +107,7 @@ func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 }
 
 func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	containerJSON, err := d.client.ContainerInspect(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -109,7 +123,7 @@ func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 }
 
 func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	// we provide an explicit default shm size as to not depend on docker daemon.
 	// TODO: evaluate exposing this as a knob in the API
@@ -127,7 +141,7 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 }
 
 func (d *kubeDockerClient) StartContainer(id string) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	err := d.client.ContainerStart(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -138,7 +152,7 @@ func (d *kubeDockerClient) StartContainer(id string) error {
 
 // Stopping an already stopped container will not cause an error in engine-api.
 func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	err := d.client.ContainerStop(ctx, id, timeout)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -148,7 +162,7 @@ func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
 }
 
 func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	err := d.client.ContainerRemove(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -158,7 +172,7 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 }
 
 func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, _, err := d.client.ImageInspectWithRaw(ctx, image, true)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -174,7 +188,7 @@ func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect
 }
 
 func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ImageHistory(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -184,7 +198,7 @@ func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, 
 }
 
 func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	images, err := d.client.ImageList(ctx, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -297,7 +311,7 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 		return err
 	}
 	opts.RegistryAuth = base64Auth
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	resp, err := d.client.ImagePull(ctx, image, opts)
 	if err != nil {
@@ -326,7 +340,7 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 }
 
 func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ImageRemove(ctx, image, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -336,8 +350,12 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 }
 
 func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
-	// Don't set timeout for log calls
-	resp, err := d.client.ContainerLogs(context.Background(), id, opts)
+	ctx, cancel := d.getCancelableContext()
+	defer cancel()
+	resp, err := d.client.ContainerLogs(ctx, id, opts)
+	if ctxErr := contextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
 	if err != nil {
 		return err
 	}
@@ -346,7 +364,7 @@ func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 }
 
 func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ServerVersion(ctx)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -359,7 +377,7 @@ func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
 }
 
 func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.Info(ctx)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -373,7 +391,7 @@ func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
 
 // TODO(random-liu): Add unit test for exec and attach functions, just like what go-dockerclient did.
 func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ContainerExecCreate(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -386,7 +404,7 @@ func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*
 }
 
 func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	if opts.Detach {
 		err := d.client.ContainerExecStart(ctx, startExec, opts)
@@ -410,7 +428,7 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 }
 
 func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ContainerExecInspect(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -423,7 +441,7 @@ func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 }
 
 func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	resp, err := d.client.ContainerAttach(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -484,14 +502,21 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 	return nil
 }
 
+// getCancelableContext returns a new cancelable context. For long running requests without timeout, we use cancelable
+// context to avoid potential resource leak, although the current implementation shouldn't leak resource.
+func (d *kubeDockerClient) getCancelableContext() (context.Context, context.CancelFunc) {
+	return context.WithCancel(context.Background())
+}
+
+// getTimeoutContext returns a new context with default request timeout
+func (d *kubeDockerClient) getTimeoutContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), d.timeout)
+}
+
 // parseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
 func parseDockerTimestamp(s string) (time.Time, error) {
 	// Timestamp returned by Docker is in time.RFC3339Nano format.
 	return time.Parse(time.RFC3339Nano, s)
-}
-
-func getDefaultContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), defaultTimeout)
 }
 
 // contextError checks the context, and returns error if the context is timeout.

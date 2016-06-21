@@ -73,9 +73,11 @@ func (r *Runtime) getVersions() error {
 		return err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
 	// Example for the version strings returned by GetInfo():
 	// RktVersion:"0.10.0+gitb7349b1" AppcVersion:"0.7.1" ApiVersion:"1.0.0-alpha"
-	resp, err := r.apisvc.GetInfo(context.Background(), &rktapi.GetInfoRequest{})
+	resp, err := r.apisvc.GetInfo(ctx, &rktapi.GetInfoRequest{})
 	if err != nil {
 		return err
 	}

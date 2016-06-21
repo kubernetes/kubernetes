@@ -206,6 +206,7 @@ func NewMainKubelet(
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
 	containerRuntime string,
+	runtimeRequestTimeout time.Duration,
 	rktPath string,
 	rktAPIEndpoint string,
 	rktStage1Image string,
@@ -451,6 +452,7 @@ func NewMainKubelet(
 			kubecontainer.RealOS{},
 			imageBackOff,
 			serializeImagePulls,
+			runtimeRequestTimeout,
 		)
 		if err != nil {
 			return nil, err
