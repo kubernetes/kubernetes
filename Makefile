@@ -158,3 +158,26 @@ release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
 
+# Build a quick individual release
+#
+# Example:
+#   make scheduler
+apiserver:
+	build/make-individuals.sh cmd/kube-apiserver
+.PHONY: apiserver
+
+controller-manager:
+	build/make-individuals.sh cmd/kube-controller-manager
+.PHONY: controller-manager
+
+scheduler:
+	build/make-individuals.sh plugin/cmd/kube-scheduler
+.PHONY: scheduler
+
+kubelet:
+	build/make-individuals.sh cmd/kubelet
+.PHONY: kubelet
+
+proxy:
+	build/make-individuals.sh cmd/kube-proxy
+.PHONY: proxy
