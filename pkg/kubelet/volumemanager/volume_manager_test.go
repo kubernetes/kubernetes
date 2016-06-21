@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/record"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -180,6 +181,7 @@ func newTestVolumeManager(
 	podManager pod.Manager,
 	kubeClient internalclientset.Interface) (VolumeManager, error) {
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, volumetest.NewFakeVolumeHost(tmpDir, kubeClient, nil, "" /* rootContext */))
 
@@ -190,7 +192,8 @@ func newTestVolumeManager(
 		kubeClient,
 		plugMgr,
 		&containertest.FakeRuntime{},
-		&mount.FakeMounter{})
+		&mount.FakeMounter{},
+		fakeRecorder)
 	return vm, err
 }
 
