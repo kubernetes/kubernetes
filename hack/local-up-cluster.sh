@@ -43,6 +43,11 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 
+# start the cache mutation detector by default so that cache mutators will be found
+KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
+export KUBE_CACHE_MUTATION_DETECTOR
+
+
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
