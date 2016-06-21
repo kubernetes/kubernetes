@@ -69,9 +69,9 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  re
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
-examples/cassandra/image/run.sh:	cluster_name \
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
-examples/vitess/env.sh:    node_ip=$(get_node_ip)
+examples/storage/cassandra/image/run.sh:	cluster_name \
+examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
 hack/jenkins/e2e-runner.sh:    local -r image_project="$1"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
