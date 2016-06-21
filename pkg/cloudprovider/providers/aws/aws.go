@@ -1483,6 +1483,9 @@ func (c *AWSCloud) GetDiskPath(volumeName string) (string, error) {
 // Implement Volumes.DiskIsAttached
 func (c *AWSCloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	awsInstance, err := c.getAwsInstance(instanceID)
+	if err != nil {
+		return false, err
+	}
 
 	info, err := awsInstance.describeInstance()
 	if err != nil {
