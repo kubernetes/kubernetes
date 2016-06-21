@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/reconciler"
+	"k8s.io/kubernetes/pkg/controller/volume/statusupdater"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -105,13 +106,18 @@ func NewAttachDetachController(
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
 	adc.attacherDetacher =
-		operationexecutor.NewOperationExecutor(&adc.volumePluginMgr)
+		operationexecutor.NewOperationExecutor(
+			kubeClient,
+			&adc.volumePluginMgr)
+	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
+		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
-		adc.attacherDetacher)
+		adc.attacherDetacher,
+		adc.nodeStatusUpdater)
 
 	return adc, nil
 }
@@ -160,6 +166,10 @@ type attachDetachController struct {
 	// desiredStateOfWorld with the actualStateOfWorld by triggering attach
 	// detach operations using the attacherDetacher.
 	reconciler reconciler.Reconciler
+
+	// nodeStatusUpdater is used to update node status with the list of attached
+	// volumes
+	nodeStatusUpdater statusupdater.NodeStatusUpdater
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {

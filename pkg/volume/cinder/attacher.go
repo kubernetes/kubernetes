@@ -45,25 +45,25 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 	return &cinderDiskAttacher{host: plugin.host}, nil
 }
 
-func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) error {
+func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	volumeID := volumeSource.VolumeID
 
 	cloud, err := getCloudProvider(attacher.host.GetCloudProvider())
 	if err != nil {
-		return err
+		return "", err
 	}
 	instances, res := cloud.Instances()
 	if !res {
-		return fmt.Errorf("failed to list openstack instances")
+		return "", fmt.Errorf("failed to list openstack instances")
 	}
 	instanceid, err := instances.InstanceID(hostName)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
@@ -71,7 +71,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) e
 	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
 		// Log error and continue with attach
-		glog.Errorf(
+		glog.Warningf(
 			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
 			volumeID, instanceid, err)
 	}
@@ -79,38 +79,35 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) e
 	if err == nil && attached {
 		// Volume is already attached to node.
 		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, instanceid)
-		return nil
+	} else {
+		_, err = cloud.AttachDisk(instanceid, volumeID)
+		if err == nil {
+			glog.Infof("Attach operation successful: volume %q attached to node %q.", volumeID, instanceid)
+		} else {
+			glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
+			return "", err
+		}
 	}
 
-	_, err = cloud.AttachDisk(instanceid, volumeID)
+	devicePath, err := cloud.GetAttachmentDiskPath(instanceid, volumeID)
 	if err != nil {
-		glog.Infof("attach volume %q to instance %q gets %v", volumeID, instanceid, err)
-	}
-	glog.Infof("attached volume %q to instance %q", volumeID, instanceid)
-	return err
-}
-
-func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
-	cloud, err := getCloudProvider(attacher.host.GetCloudProvider())
-	if err != nil {
+		glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
 		return "", err
 	}
 
+	return devicePath, err
+}
+
+func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
 	volumeID := volumeSource.VolumeID
-	instanceid, err := cloud.InstanceID()
-	if err != nil {
-		return "", err
-	}
-	devicePath := ""
-	if d, err := cloud.GetAttachmentDiskPath(instanceid, volumeID); err == nil {
-		devicePath = d
-	} else {
-		glog.Errorf("%q GetAttachmentDiskPath (%q) gets error %v", instanceid, volumeID, err)
+
+	if devicePath == "" {
+		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
 	}
 
 	ticker := time.NewTicker(checkSleepDuration)
@@ -123,25 +120,14 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, timeout tim
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
-			if devicePath == "" {
-				if d, err := cloud.GetAttachmentDiskPath(instanceid, volumeID); err == nil {
-					devicePath = d
-				} else {
-					glog.Errorf("%q GetAttachmentDiskPath (%q) gets error %v", instanceid, volumeID, err)
-				}
-			}
-			if devicePath == "" {
-				glog.V(5).Infof("Cinder disk (%q) is not attached yet", volumeID)
+			probeAttachedVolume()
+			exists, err := pathExists(devicePath)
+			if exists && err == nil {
+				glog.Infof("Successfully found attached Cinder disk %q.", volumeID)
+				return devicePath, nil
 			} else {
-				probeAttachedVolume()
-				exists, err := pathExists(devicePath)
-				if exists && err == nil {
-					glog.Infof("Successfully found attached Cinder disk %q.", volumeID)
-					return devicePath, nil
-				} else {
-					//Log error, if any, and continue checking periodically
-					glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", volumeID, err)
-				}
+				//Log error, if any, and continue checking periodically
+				glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", volumeID, err)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)

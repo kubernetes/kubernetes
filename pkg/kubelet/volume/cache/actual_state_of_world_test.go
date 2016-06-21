@@ -51,9 +51,10 @@ func Test_AddVolume_Positive_NewVolume(t *testing.T) {
 		},
 	}
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	devicePath := "fake/device/path"
 
 	// Act
-	generatedVolumeName, err := asw.AddVolume(volumeSpec)
+	generatedVolumeName, err := asw.AddVolume(volumeSpec, devicePath)
 
 	// Assert
 	if err != nil {
@@ -69,6 +70,7 @@ func Test_AddVolume_Positive_NewVolume(t *testing.T) {
 func Test_AddVolume_Positive_ExistingVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	devicePath := "fake/device/path"
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -90,13 +92,13 @@ func Test_AddVolume_Positive_ExistingVolume(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	generatedVolumeName, err := asw.AddVolume(volumeSpec)
+	generatedVolumeName, err := asw.AddVolume(volumeSpec, devicePath)
 	if err != nil {
 		t.Fatalf("AddVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act
-	generatedVolumeName, err = asw.AddVolume(volumeSpec)
+	generatedVolumeName, err = asw.AddVolume(volumeSpec, devicePath)
 
 	// Assert
 	if err != nil {
@@ -113,6 +115,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	devicePath := "fake/device/path"
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -137,7 +140,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec)
 
-	generatedVolumeName, err := asw.AddVolume(volumeSpec)
+	generatedVolumeName, err := asw.AddVolume(volumeSpec, devicePath)
 	if err != nil {
 		t.Fatalf("AddVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -158,7 +161,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	}
 
 	verifyVolumeExistsInAttachedVolumes(t, generatedVolumeName, asw)
-	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, asw)
+	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 }
 
 // Populates data struct with a volume
@@ -169,6 +172,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	devicePath := "fake/device/path"
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -193,7 +197,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec)
 
-	generatedVolumeName, err := asw.AddVolume(volumeSpec)
+	generatedVolumeName, err := asw.AddVolume(volumeSpec, devicePath)
 	if err != nil {
 		t.Fatalf("AddVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -220,7 +224,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	}
 
 	verifyVolumeExistsInAttachedVolumes(t, generatedVolumeName, asw)
-	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, asw)
+	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 }
 
 // Calls AddPodToVolume() to add pod to empty data stuct
@@ -316,8 +320,9 @@ func verifyPodExistsInVolumeAsw(
 	t *testing.T,
 	expectedPodName volumetypes.UniquePodName,
 	expectedVolumeName api.UniqueVolumeName,
+	expectedDevicePath string,
 	asw ActualStateOfWorld) {
-	podExistsInVolume, err :=
+	podExistsInVolume, devicePath, err :=
 		asw.PodExistsInVolume(expectedPodName, expectedVolumeName)
 	if err != nil {
 		t.Fatalf(
@@ -329,6 +334,13 @@ func verifyPodExistsInVolumeAsw(
 			"ASW PodExistsInVolume result invalid. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
 	}
+
+	if devicePath != expectedDevicePath {
+		t.Fatalf(
+			"Invalid devicePath. Expected: <%q> Actual: <%q> ",
+			expectedDevicePath,
+			devicePath)
+	}
 }
 
 func verifyPodDoesntExistInVolumeAsw(
@@ -337,7 +349,7 @@ func verifyPodDoesntExistInVolumeAsw(
 	volumeToCheck api.UniqueVolumeName,
 	expectVolumeToExist bool,
 	asw ActualStateOfWorld) {
-	podExistsInVolume, err :=
+	podExistsInVolume, devicePath, err :=
 		asw.PodExistsInVolume(podToCheck, volumeToCheck)
 	if !expectVolumeToExist && err == nil {
 		t.Fatalf(
@@ -353,5 +365,11 @@ func verifyPodDoesntExistInVolumeAsw(
 		t.Fatalf(
 			"ASW PodExistsInVolume result invalid. Expected: <false> Actual: <%v>",
 			podExistsInVolume)
+	}
+
+	if devicePath != "" {
+		t.Fatalf(
+			"Invalid devicePath. Expected: <\"\"> Actual: <%q> ",
+			devicePath)
 	}
 }
