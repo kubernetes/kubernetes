@@ -23,6 +23,7 @@ KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
+source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 # Perform preparations required to run e2e tests
@@ -192,6 +193,8 @@ function kube-up() {
 
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
+
+  create-kubeconfig-for-federation
 
   if [[ ! -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
     "${GCLOUD}" ${CMD_GROUP:-} container node-pools create "heapster-pool" --cluster "${CLUSTER_NAME}" --num-nodes=1 --machine-type="${HEAPSTER_MACHINE_TYPE}" "${shared_args[@]}"
