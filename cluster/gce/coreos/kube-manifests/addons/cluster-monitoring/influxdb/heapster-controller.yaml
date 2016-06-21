@@ -20,7 +20,7 @@ spec:
         version: v1.1.0.beta2
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v1.1.0-beta2
+        - image: gcr.io/google_containers/heapster:v1.1.0
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
