@@ -17,8 +17,14 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // GetTestVolumeSpec returns a test volume spec
@@ -35,4 +41,63 @@ func GetTestVolumeSpec(volumeName string, diskName api.UniqueVolumeName) *volume
 			},
 		},
 	}
+}
+
+func CreateTestClient() *fake.Clientset {
+	fakeClient := &fake.Clientset{}
+
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &api.PodList{}
+		podNamePrefix := "mypod"
+		namespace := "mynamespace"
+		for i := 0; i < 5; i++ {
+			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+			pod := api.Pod{
+				Status: api.PodStatus{
+					Phase: api.PodRunning,
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:      podName,
+					Namespace: namespace,
+					Labels: map[string]string{
+						"name": podName,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "containerName",
+							Image: "containerImage",
+							VolumeMounts: []api.VolumeMount{
+								{
+									Name:      "volumeMountName",
+									ReadOnly:  false,
+									MountPath: "/mnt",
+								},
+							},
+						},
+					},
+					Volumes: []api.Volume{
+						{
+							Name: "volumeName",
+							VolumeSource: api.VolumeSource{
+								GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+									PDName:   "pdName",
+									FSType:   "ext4",
+									ReadOnly: false,
+								},
+							},
+						},
+					},
+				},
+			}
+			obj.Items = append(obj.Items, pod)
+		}
+		return true, obj, nil
+	})
+
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+
+	return fakeClient
 }

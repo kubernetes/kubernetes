@@ -1989,9 +1989,20 @@ type NodeStatus struct {
 	Images []ContainerImage `json:"images,omitempty"`
 	// List of attachable volumes in use (mounted) by the node.
 	VolumesInUse []UniqueVolumeName `json:"volumesInUse,omitempty"`
+	// List of volumes that are attached to the node.
+	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty"`
 }
 
 type UniqueVolumeName string
+
+// AttachedVolume describes a volume attached to a node
+type AttachedVolume struct {
+	// Name of the attached volume
+	Name UniqueVolumeName `json:"name"`
+
+	// DevicePath represents the device path where the volume should be avilable
+	DevicePath string `json:"devicePath"`
+}
 
 // Describe a container image
 type ContainerImage struct {

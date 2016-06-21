@@ -297,7 +297,7 @@ func newTestKubeletWithImageList(
 		controllerAttachDetachEnabled,
 		kubelet.hostname,
 		kubelet.podManager,
-		kubelet.kubeClient,
+		fakeKubeClient,
 		kubelet.volumePluginMgr)
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
@@ -617,6 +617,24 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	kubelet.mounter = &mount.FakeMounter{}
+	kubeClient := testKubelet.fakeKubeClient
+	kubeClient.AddReactor("get", "nodes",
+		func(action core.Action) (bool, runtime.Object, error) {
+			return true, &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+				Status: api.NodeStatus{
+					VolumesAttached: []api.AttachedVolume{
+						{
+							Name:       "fake/vol1",
+							DevicePath: "fake/path",
+						},
+					}},
+				Spec: api.NodeSpec{ExternalID: testKubeletHostname},
+			}, nil
+		})
+	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", api.PodSpec{
 		Volumes: []api.Volume{
@@ -687,6 +705,24 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	kubelet.mounter = &mount.FakeMounter{}
+	kubeClient := testKubelet.fakeKubeClient
+	kubeClient.AddReactor("get", "nodes",
+		func(action core.Action) (bool, runtime.Object, error) {
+			return true, &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+				Status: api.NodeStatus{
+					VolumesAttached: []api.AttachedVolume{
+						{
+							Name:       "fake/vol1",
+							DevicePath: "fake/path",
+						},
+					}},
+				Spec: api.NodeSpec{ExternalID: testKubeletHostname},
+			}, nil
+		})
+	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", api.PodSpec{
 		Volumes: []api.Volume{

@@ -84,8 +84,8 @@ type DesiredStateOfWorld interface {
 	GetVolumesToMount() []VolumeToMount
 }
 
-// VolumeToMount represents a volume that should be attached to this node and
-// mounted to the PodName.
+// VolumeToMount represents a volume that is attached to this node and needs to
+// be mounted to PodName.
 type VolumeToMount struct {
 	operationexecutor.VolumeToMount
 }

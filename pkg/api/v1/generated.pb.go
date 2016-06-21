@@ -27,6 +27,7 @@ limitations under the License.
 	It has these top-level messages:
 		AWSElasticBlockStoreVolumeSource
 		Affinity
+		AttachedVolume
 		AzureFileVolumeSource
 		Binding
 		Capabilities
@@ -200,6 +201,10 @@ func (*AWSElasticBlockStoreVolumeSource) ProtoMessage()    {}
 func (m *Affinity) Reset()         { *m = Affinity{} }
 func (m *Affinity) String() string { return proto.CompactTextString(m) }
 func (*Affinity) ProtoMessage()    {}
+
+func (m *AttachedVolume) Reset()         { *m = AttachedVolume{} }
+func (m *AttachedVolume) String() string { return proto.CompactTextString(m) }
+func (*AttachedVolume) ProtoMessage()    {}
 
 func (m *AzureFileVolumeSource) Reset()         { *m = AzureFileVolumeSource{} }
 func (m *AzureFileVolumeSource) String() string { return proto.CompactTextString(m) }
@@ -788,6 +793,7 @@ func (*WeightedPodAffinityTerm) ProtoMessage()    {}
 func init() {
 	proto.RegisterType((*AWSElasticBlockStoreVolumeSource)(nil), "k8s.io.kubernetes.pkg.api.v1.AWSElasticBlockStoreVolumeSource")
 	proto.RegisterType((*Affinity)(nil), "k8s.io.kubernetes.pkg.api.v1.Affinity")
+	proto.RegisterType((*AttachedVolume)(nil), "k8s.io.kubernetes.pkg.api.v1.AttachedVolume")
 	proto.RegisterType((*AzureFileVolumeSource)(nil), "k8s.io.kubernetes.pkg.api.v1.AzureFileVolumeSource")
 	proto.RegisterType((*Binding)(nil), "k8s.io.kubernetes.pkg.api.v1.Binding")
 	proto.RegisterType((*Capabilities)(nil), "k8s.io.kubernetes.pkg.api.v1.Capabilities")
@@ -1017,6 +1023,32 @@ func (m *Affinity) MarshalTo(data []byte) (int, error) {
 		}
 		i += n3
 	}
+	return i, nil
+}
+
+func (m *AttachedVolume) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AttachedVolume) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Name)))
+	i += copy(data[i:], m.Name)
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.DevicePath)))
+	i += copy(data[i:], m.DevicePath)
 	return i, nil
 }
 
@@ -4172,6 +4204,18 @@ func (m *NodeStatus) MarshalTo(data []byte) (int, error) {
 			data[i] = uint8(l)
 			i++
 			i += copy(data[i:], s)
+		}
+	}
+	if len(m.VolumesAttached) > 0 {
+		for _, msg := range m.VolumesAttached {
+			data[i] = 0x52
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
 		}
 	}
 	return i, nil
@@ -7735,6 +7779,16 @@ func (m *Affinity) Size() (n int) {
 	return n
 }
 
+func (m *AttachedVolume) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.DevicePath)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *AzureFileVolumeSource) Size() (n int) {
 	var l int
 	_ = l
@@ -8884,6 +8938,12 @@ func (m *NodeStatus) Size() (n int) {
 	if len(m.VolumesInUse) > 0 {
 		for _, s := range m.VolumesInUse {
 			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.VolumesAttached) > 0 {
+		for _, e := range m.VolumesAttached {
+			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
@@ -10470,6 +10530,114 @@ func (m *Affinity) Unmarshal(data []byte) error {
 			if err := m.PodAntiAffinity.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AttachedVolume) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AttachedVolume: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AttachedVolume: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = UniqueVolumeName(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DevicePath", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DevicePath = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -21634,6 +21802,37 @@ func (m *NodeStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.VolumesInUse = append(m.VolumesInUse, UniqueVolumeName(data[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VolumesAttached", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.VolumesAttached = append(m.VolumesAttached, AttachedVolume{})
+			if err := m.VolumesAttached[len(m.VolumesAttached)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

@@ -60,10 +60,10 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 // Callers are responsible for retryinging on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName string) error {
+func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	pdName := volumeSource.PDName
@@ -79,18 +79,17 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName st
 	if err == nil && attached {
 		// Volume is already attached to node.
 		glog.Infof("Attach operation is successful. PD %q is already attached to node %q.", pdName, hostName)
-		return nil
+	} else {
+		if err := attacher.gceDisks.AttachDisk(pdName, hostName, readOnly); err != nil {
+			glog.Errorf("Error attaching PD %q to node %q: %+v", pdName, hostName, err)
+			return "", err
+		}
 	}
 
-	if err = attacher.gceDisks.AttachDisk(pdName, hostName, readOnly); err != nil {
-		glog.Errorf("Error attaching PD %q to node %q: %+v", pdName, hostName, err)
-		return err
-	}
-
-	return nil
+	return path.Join(diskByIdPath, diskGooglePrefix+pdName), nil
 }
 
-func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
+func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)

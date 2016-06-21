@@ -157,6 +157,11 @@ func (m *FakeNodeHandler) UpdateStatus(node *api.Node) (*api.Node, error) {
 	return node, nil
 }
 
+func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*api.Node, error) {
+	m.RequestCount++
+	return &api.Node{}, nil
+}
+
 func (m *FakeNodeHandler) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return nil, nil
 }
