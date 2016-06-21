@@ -74,6 +74,7 @@ function upgrade-master() {
   get-kubeconfig-bearertoken
 
   detect-master
+  parse-master-env
 
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
@@ -120,7 +121,6 @@ function prepare-upgrade() {
   tars_from_version
 }
 
-
 # Reads kube-env metadata from first node in NODE_NAMES.
 #
 # Assumed vars:
@@ -132,15 +132,6 @@ function get-node-env() {
   gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${NODE_NAMES[0]} --command \
     "curl --fail --silent -H 'Metadata-Flavor: Google' \
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
-}
-
-# Using provided node env, extracts value from provided key.
-#
-# Args:
-# $1 node env (kube-env of node; result of calling get-node-env)
-# $2 env key to use
-function get-env-val() {
-  echo "${1}" | grep ${2} | cut -d : -f 2 | cut -d \' -f 2
 }
 
 # Assumed vars:
