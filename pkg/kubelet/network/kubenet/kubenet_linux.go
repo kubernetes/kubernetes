@@ -468,20 +468,11 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if err != nil {
 		return nil, err
 	}
-	// Try to retrieve ip inside container network namespace
-	output, err := plugin.execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
-		"ip", "-o", "-4", "addr", "show", "dev", network.DefaultInterfaceName).CombinedOutput()
+	ip, err := network.GetPodIP(plugin.execer, nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
-		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
+		return nil, err
 	}
-	fields := strings.Fields(string(output))
-	if len(fields) < 4 {
-		return nil, fmt.Errorf("Unexpected command output %s ", output)
-	}
-	ip, _, err := net.ParseCIDR(fields[3])
-	if err != nil {
-		return nil, fmt.Errorf("Kubenet failed to parse ip from output %s due to %v", output, err)
-	}
+
 	plugin.podIPs[id] = ip.String()
 	return &network.PodNetworkStatus{IP: ip}, nil
 }

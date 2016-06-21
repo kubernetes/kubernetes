@@ -18,9 +18,7 @@ package cni
 
 import (
 	"fmt"
-	"net"
 	"sort"
-	"strings"
 
 	"github.com/appc/cni/libcni"
 	cnitypes "github.com/appc/cni/pkg/types"
@@ -138,30 +136,6 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	return plugin.defaultNetwork.deleteFromNetwork(name, namespace, id, netnsPath)
 }
 
-func (plugin *cniNetworkPlugin) getContainerIPAddress(netnsPath, addrType string) (net.IP, error) {
-	// Try to retrieve ip inside container network namespace
-	output, err := plugin.execer.Command(plugin.nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
-		"ip", "-o", addrType, "addr", "show", "dev", network.DefaultInterfaceName, "scope", "global").CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
-	}
-
-	lines := strings.Split(string(output), "\n")
-	if len(lines) < 1 {
-		return nil, fmt.Errorf("Unexpected command output %s", output)
-	}
-	fields := strings.Fields(lines[0])
-	if len(fields) < 4 {
-		return nil, fmt.Errorf("Unexpected address output %s ", lines[0])
-	}
-	ip, _, err := net.ParseCIDR(fields[3])
-	if err != nil {
-		return nil, fmt.Errorf("CNI failed to parse ip from output %s due to %v", output, err)
-	}
-
-	return ip, nil
-}
-
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
@@ -170,11 +144,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	ip, err := plugin.getContainerIPAddress(netnsPath, "-4")
-	if err != nil {
-		// Fall back to IPv6 address if no IPv4 address is present
-		ip, err = plugin.getContainerIPAddress(netnsPath, "-6")
-	}
+	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
