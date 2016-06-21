@@ -27,6 +27,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
+	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -108,12 +110,15 @@ type OperationExecutor interface {
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(
 	kubeClient internalclientset.Interface,
-	volumePluginMgr *volume.VolumePluginMgr) OperationExecutor {
+	volumePluginMgr *volume.VolumePluginMgr,
+	recorder record.EventRecorder) OperationExecutor {
+
 	return &operationExecutor{
 		kubeClient:      kubeClient,
 		volumePluginMgr: volumePluginMgr,
 		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
 			true /* exponentialBackOffOnError */),
+		recorder: recorder,
 	}
 }
 
@@ -341,6 +346,9 @@ type operationExecutor struct {
 	// pendingOperations keeps track of pending attach and detach operations so
 	// multiple operations are not started on the same volume
 	pendingOperations nestedpendingoperations.NestedPendingOperations
+
+	// recorder is used to record events in the API server
+	recorder record.EventRecorder
 }
 
 func (oe *operationExecutor) IsOperationPending(volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
@@ -703,13 +711,15 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 				deviceMountPath)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				return fmt.Errorf(
+				err := fmt.Errorf(
 					"MountVolume.MountDevice failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
 					volumeToMount.PodName,
 					volumeToMount.Pod.UID,
 					err)
+				oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+				return err
 			}
 
 			glog.Infof(
@@ -738,13 +748,15 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 		mountErr := volumeMounter.SetUp(fsGroup)
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
+			err := fmt.Errorf(
 				"MountVolume.SetUp failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
 				volumeToMount.VolumeName,
 				volumeToMount.VolumeSpec.Name(),
 				volumeToMount.PodName,
 				volumeToMount.Pod.UID,
 				mountErr)
+			oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+			return err
 		}
 
 		glog.Infof(
