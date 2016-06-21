@@ -180,7 +180,7 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
-	// this pod shouldn't be cascadingly deleted, because it has a valid referenece.
+	// this pod shouldn't be cascadingly deleted, because it has a valid reference.
 	pod = newPod(oneValidOwnerPodName, []v1.OwnerReference{
 		{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName},
 		{UID: remainingRC.ObjectMeta.UID, Name: remainingRCName},
