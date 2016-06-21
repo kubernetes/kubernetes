@@ -49,7 +49,7 @@ type VolumeOptions struct {
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
 	PVName string
-	// PVC.Name of the PersistentVolumeClaim, if we are auto-provisioning.
+	// PVC.Name of the PersistentVolumeClaim; only set during dynamic provisioning.
 	PVCName string
 	// Unique name of Kubernetes cluster.
 	ClusterName string
