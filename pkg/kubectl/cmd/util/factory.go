@@ -1312,19 +1312,19 @@ func (f *Factory) NewBuilder(thirdPartyDiscovery bool) *resource.Builder {
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
-func (f *Factory) ResourcesWithPodTemplates() []*meta.RESTMapping {
-	RESTMaps := []*meta.RESTMapping{}
-	ResourcesWithTemplates := []string{"Pod", "ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
-	Mapper, _ := f.Object(false)
+func (f *Factory) ResourcesWithPodSpecs() []*meta.RESTMapping {
+	restMaps := []*meta.RESTMapping{}
+	resourcesWithTemplates := []string{"Pod", "ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
+	mapper, _ := f.Object(false)
 
-	for _, Resource := range ResourcesWithTemplates {
-		Map, err := Mapper.RESTMapping(unversioned.GroupKind{Kind: Resource})
+	for _, resource := range resourcesWithTemplates {
+		restmap, err := mapper.RESTMapping(unversioned.GroupKind{Kind: resource})
 		if err == nil {
-			RESTMaps = append(RESTMaps, Map)
+			restMaps = append(restMaps, restmap)
 		} else {
-			mapping, _ := Mapper.RESTMapping(extensions.Kind(Resource))
-			RESTMaps = append(RESTMaps, mapping)
+			mapping, _ := mapper.RESTMapping(extensions.Kind(resource))
+			restMaps = append(restMaps, mapping)
 		}
 	}
-	return RESTMaps
+	return restMaps
 }
