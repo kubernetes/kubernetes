@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -1777,6 +1778,21 @@ func LoadFederationClientset_1_3() (*federation_release_1_3.Clientset, error) {
 	}
 
 	c, err := federation_release_1_3.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
+	}
+	// Set timeout for each client in the set.
+	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
+	return c, nil
+}
+
+func LoadFederationClientset_1_4() (*federation_release_1_4.Clientset, error) {
+	config, err := LoadFederatedConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := federation_release_1_4.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}
