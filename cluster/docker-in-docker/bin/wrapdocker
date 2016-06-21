@@ -198,6 +198,9 @@ if [ ! -z "${DOCKER_NETWORK_OFFSET:-}" ]; then
   # let docker reuse the given IP. If you run more than one dind slave, add
   # --fixed-cidr=a.b.c.d/24 to DOCKER_DAEMON_ARGS with disjunct networks.
   DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS} --bip=${IP_CIDR} --fixed-cidr=${FIXED_CIDR}"
+
+  # delete incompatible network settings
+  rm -rf "${STORAGE_DIR}/network"
 fi
 
 # stop docker daemon on shutdown to avoid loopback leaks
