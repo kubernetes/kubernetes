@@ -65,10 +65,8 @@ case "${OS_DISTRIBUTION}" in
   wily)
     ;;
   vivid)
-    echo "vivid is currently end-of-life and does not get updates." >&2
-    echo "Please consider using wily or jessie instead" >&2
-    echo "(will continue in 10 seconds)" >&2
-    sleep 10
+    echo "vivid is no longer supported by kube-up; please use jessie instead" >&2
+    exit 2
     ;;
   coreos)
     echo "coreos is no longer supported by kube-up; please use jessie instead" >&2
@@ -328,17 +326,8 @@ function detect-security-groups {
 #   AWS_IMAGE
 function detect-image () {
 case "${OS_DISTRIBUTION}" in
-  trusty|coreos)
-    detect-trusty-image
-    ;;
-  vivid)
-    detect-vivid-image
-    ;;
   wily)
     detect-wily-image
-    ;;
-  wheezy)
-    detect-wheezy-image
     ;;
   jessie)
     detect-jessie-image
@@ -348,72 +337,6 @@ case "${OS_DISTRIBUTION}" in
     exit 2
     ;;
 esac
-}
-
-# Detects the AMI to use for trusty (considering the region)
-# Used by CoreOS & Ubuntu
-#
-# Vars set:
-#   AWS_IMAGE
-function detect-trusty-image () {
-  # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
-  # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
-  # This will need to be updated from time to time as amis are deprecated
-  if [[ -z "${AWS_IMAGE-}" ]]; then
-    case "${AWS_REGION}" in
-      ap-northeast-1)
-        AWS_IMAGE=ami-93876e93
-        ;;
-
-      ap-northeast-2)
-        AWS_IMAGE=ami-62ac620c
-        ;;
-
-      ap-southeast-1)
-        AWS_IMAGE=ami-66546234
-        ;;
-
-      eu-central-1)
-        AWS_IMAGE=ami-e2a694ff
-        ;;
-
-      eu-west-1)
-        AWS_IMAGE=ami-d7fd6ea0
-        ;;
-
-      sa-east-1)
-        AWS_IMAGE=ami-a357eebe
-        ;;
-
-      us-east-1)
-        AWS_IMAGE=ami-6089d208
-        ;;
-
-      us-west-1)
-        AWS_IMAGE=ami-cf7d998b
-        ;;
-
-      cn-north-1)
-        AWS_IMAGE=ami-d436a4ed
-        ;;
-
-      us-gov-west-1)
-        AWS_IMAGE=ami-01523322
-        ;;
-
-      ap-southeast-2)
-        AWS_IMAGE=ami-cd4e3ff7
-        ;;
-
-      us-west-2)
-        AWS_IMAGE=ami-3b14370b
-        ;;
-
-      *)
-        echo "Please specify AWS_IMAGE directly (region ${AWS_REGION} not recognized)"
-        exit 1
-    esac
-  fi
 }
 
 # Detects the RootDevice to use in the Block Device Mapping (considering the AMI)

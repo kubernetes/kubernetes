@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
+source "${KUBE_ROOT}/cluster/aws/common/common.sh"
 
 SSH_USER=ubuntu
 
