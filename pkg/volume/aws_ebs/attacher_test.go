@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package aws_ebs
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -30,7 +30,7 @@ import (
 
 func TestGetDeviceName_Volume(t *testing.T) {
 	plugin := newPlugin()
-	name := "my-pd-volume"
+	name := "my-aws-volume"
 	spec := createVolSpec(name, false)
 
 	deviceName, err := plugin.GetVolumeName(spec)
@@ -44,7 +44,7 @@ func TestGetDeviceName_Volume(t *testing.T) {
 
 func TestGetDeviceName_PersistentVolume(t *testing.T) {
 	plugin := newPlugin()
-	name := "my-pd-pv"
+	name := "my-aws-pv"
 	spec := createPVSpec(name, true)
 
 	deviceName, err := plugin.GetVolumeName(spec)
@@ -59,16 +59,17 @@ func TestGetDeviceName_PersistentVolume(t *testing.T) {
 // One testcase for TestAttachDetach table test below
 type testcase struct {
 	name string
-	// For fake GCE:
+	// For fake AWS:
 	attach         attachCall
 	detach         detachCall
 	diskIsAttached diskIsAttachedCall
 	t              *testing.T
 
 	// Actual test to run
-	test func(test *testcase) error
+	test func(test *testcase) (string, error)
 	// Expected return of the test
-	expectedReturn error
+	expectedDevice string
+	expectedError  error
 }
 
 func TestAttachDetach(t *testing.T) {
@@ -82,72 +83,34 @@ func TestAttachDetach(t *testing.T) {
 	tests := []testcase{
 		// Successful Attach call
 		{
-			name:           "Attach_Positive",
-			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, nil},
-			attach:         attachCall{diskName, instanceID, readOnly, nil},
-			test: func(testcase *testcase) error {
+			name:   "Attach_Positive",
+			attach: attachCall{diskName, instanceID, readOnly, "/dev/sda", nil},
+			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, instanceID)
-				if devicePath != "/dev/disk/by-id/google-disk" {
-					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
-				}
-				return err
+				return attacher.Attach(spec, instanceID)
 			},
-		},
-
-		// Disk is already attached
-		{
-			name:           "Attach_Positive_AlreadyAttached",
-			diskIsAttached: diskIsAttachedCall{diskName, instanceID, true, nil},
-			test: func(testcase *testcase) error {
-				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, instanceID)
-				if devicePath != "/dev/disk/by-id/google-disk" {
-					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
-				}
-				return err
-			},
-		},
-
-		// DiskIsAttached fails and Attach succeeds
-		{
-			name:           "Attach_Positive_CheckFails",
-			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
-			attach:         attachCall{diskName, instanceID, readOnly, nil},
-			test: func(testcase *testcase) error {
-				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, instanceID)
-				if devicePath != "/dev/disk/by-id/google-disk" {
-					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
-				}
-				return err
-			},
+			expectedDevice: "/dev/sda",
 		},
 
 		// Attach call fails
 		{
-			name:           "Attach_Negative",
-			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
-			attach:         attachCall{diskName, instanceID, readOnly, attachError},
-			test: func(testcase *testcase) error {
+			name:   "Attach_Negative",
+			attach: attachCall{diskName, instanceID, readOnly, "", attachError},
+			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, instanceID)
-				if devicePath != "" {
-					return fmt.Errorf("devicePath incorrect. Expected<\"\"> Actual: <%q>", devicePath)
-				}
-				return err
+				return attacher.Attach(spec, instanceID)
 			},
-			expectedReturn: attachError,
+			expectedError: attachError,
 		},
 
 		// Detach succeeds
 		{
 			name:           "Detach_Positive",
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, true, nil},
-			detach:         detachCall{diskName, instanceID, nil},
-			test: func(testcase *testcase) error {
+			detach:         detachCall{diskName, instanceID, "/dev/sda", nil},
+			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, instanceID)
 			},
 		},
 
@@ -155,9 +118,9 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:           "Detach_Positive_AlreadyDetached",
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, nil},
-			test: func(testcase *testcase) error {
+			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, instanceID)
 			},
 		},
 
@@ -165,10 +128,10 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:           "Detach_Positive_CheckFails",
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
-			detach:         detachCall{diskName, instanceID, nil},
-			test: func(testcase *testcase) error {
+			detach:         detachCall{diskName, instanceID, "/dev/sda", nil},
+			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, instanceID)
 			},
 		},
 
@@ -176,20 +139,23 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:           "Detach_Negative",
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, diskCheckError},
-			detach:         detachCall{diskName, instanceID, detachError},
-			test: func(testcase *testcase) error {
+			detach:         detachCall{diskName, instanceID, "", detachError},
+			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, instanceID)
+				return "", detacher.Detach(diskName, instanceID)
 			},
-			expectedReturn: detachError,
+			expectedError: detachError,
 		},
 	}
 
 	for _, testcase := range tests {
 		testcase.t = t
-		err := testcase.test(&testcase)
-		if err != testcase.expectedReturn {
-			t.Errorf("%s failed: expected err=%q, got %q", testcase.name, testcase.expectedReturn.Error(), err.Error())
+		device, err := testcase.test(&testcase)
+		if err != testcase.expectedError {
+			t.Errorf("%s failed: expected err=%q, got %q", testcase.name, testcase.expectedError.Error(), err.Error())
+		}
+		if device != testcase.expectedDevice {
+			t.Errorf("%s failed: expected device=%q, got %q", testcase.name, testcase.expectedDevice, device)
 		}
 		t.Logf("Test %q succeeded", testcase.name)
 	}
@@ -197,28 +163,24 @@ func TestAttachDetach(t *testing.T) {
 
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *gcePersistentDiskPlugin {
-	host := volumetest.NewFakeVolumeHost(
-		"/tmp", /* rootDir */
-		nil,    /* kubeClient */
-		nil,    /* plugins */
-		"" /* rootContext */)
+func newPlugin() *awsElasticBlockStorePlugin {
+	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil, "")
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
-	return plugin.(*gcePersistentDiskPlugin)
+	return plugin.(*awsElasticBlockStorePlugin)
 }
 
-func newAttacher(testcase *testcase) *gcePersistentDiskAttacher {
-	return &gcePersistentDiskAttacher{
-		host:     nil,
-		gceDisks: testcase,
+func newAttacher(testcase *testcase) *awsElasticBlockStoreAttacher {
+	return &awsElasticBlockStoreAttacher{
+		host:       nil,
+		awsVolumes: testcase,
 	}
 }
 
-func newDetacher(testcase *testcase) *gcePersistentDiskDetacher {
-	return &gcePersistentDiskDetacher{
-		gceDisks: testcase,
+func newDetacher(testcase *testcase) *awsElasticBlockStoreDetacher {
+	return &awsElasticBlockStoreDetacher{
+		awsVolumes: testcase,
 	}
 }
 
@@ -226,8 +188,8 @@ func createVolSpec(name string, readOnly bool) *volume.Spec {
 	return &volume.Spec{
 		Volume: &api.Volume{
 			VolumeSource: api.VolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:   name,
+				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+					VolumeID: name,
 					ReadOnly: readOnly,
 				},
 			},
@@ -240,8 +202,8 @@ func createPVSpec(name string, readOnly bool) *volume.Spec {
 		PersistentVolume: &api.PersistentVolume{
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-						PDName:   name,
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+						VolumeID: name,
 						ReadOnly: readOnly,
 					},
 				},
@@ -250,19 +212,21 @@ func createPVSpec(name string, readOnly bool) *volume.Spec {
 	}
 }
 
-// Fake GCE implementation
+// Fake AWS implementation
 
 type attachCall struct {
-	diskName   string
-	instanceID string
-	readOnly   bool
-	ret        error
+	diskName      string
+	instanceID    string
+	readOnly      bool
+	retDeviceName string
+	ret           error
 }
 
 type detachCall struct {
-	devicePath string
-	instanceID string
-	ret        error
+	diskName      string
+	instanceID    string
+	retDeviceName string
+	ret           error
 }
 
 type diskIsAttachedCall struct {
@@ -271,59 +235,59 @@ type diskIsAttachedCall struct {
 	ret                  error
 }
 
-func (testcase *testcase) AttachDisk(diskName, instanceID string, readOnly bool) error {
+func (testcase *testcase) AttachDisk(diskName string, instanceID string, readOnly bool) (string, error) {
 	expected := &testcase.attach
 
 	if expected.diskName == "" && expected.instanceID == "" {
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
 		testcase.t.Errorf("Unexpected AttachDisk call!")
-		return errors.New("Unexpected AttachDisk call!")
+		return "", errors.New("Unexpected AttachDisk call!")
 	}
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return errors.New("Unexpected AttachDisk call: wrong diskName")
+		return "", errors.New("Unexpected AttachDisk call: wrong diskName")
 	}
 
 	if expected.instanceID != instanceID {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return errors.New("Unexpected AttachDisk call: wrong instanceID")
+		return "", errors.New("Unexpected AttachDisk call: wrong instanceID")
 	}
 
 	if expected.readOnly != readOnly {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected readOnly %v, got %v", expected.readOnly, readOnly)
-		return errors.New("Unexpected AttachDisk call: wrong readOnly")
+		return "", errors.New("Unexpected AttachDisk call: wrong readOnly")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, %v, returning %v", diskName, instanceID, readOnly, expected.ret)
+	glog.V(4).Infof("AttachDisk call: %s, %s, %v, returning %q, %v", diskName, instanceID, readOnly, expected.retDeviceName, expected.ret)
 
-	return expected.ret
+	return expected.retDeviceName, expected.ret
 }
 
-func (testcase *testcase) DetachDisk(devicePath, instanceID string) error {
+func (testcase *testcase) DetachDisk(diskName string, instanceID string) (string, error) {
 	expected := &testcase.detach
 
-	if expected.devicePath == "" && expected.instanceID == "" {
+	if expected.diskName == "" && expected.instanceID == "" {
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
 		testcase.t.Errorf("Unexpected DetachDisk call!")
-		return errors.New("Unexpected DetachDisk call!")
+		return "", errors.New("Unexpected DetachDisk call!")
 	}
 
-	if expected.devicePath != devicePath {
-		testcase.t.Errorf("Unexpected DetachDisk call: expected devicePath %s, got %s", expected.devicePath, devicePath)
-		return errors.New("Unexpected DetachDisk call: wrong diskName")
+	if expected.diskName != diskName {
+		testcase.t.Errorf("Unexpected DetachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
+		return "", errors.New("Unexpected DetachDisk call: wrong diskName")
 	}
 
 	if expected.instanceID != instanceID {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return errors.New("Unexpected DetachDisk call: wrong instanceID")
+		return "", errors.New("Unexpected DetachDisk call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", devicePath, instanceID, expected.ret)
+	glog.V(4).Infof("DetachDisk call: %s, %s, returning %q, %v", diskName, instanceID, expected.retDeviceName, expected.ret)
 
-	return expected.ret
+	return expected.retDeviceName, expected.ret
 }
 
 func (testcase *testcase) DiskIsAttached(diskName, instanceID string) (bool, error) {
@@ -351,14 +315,18 @@ func (testcase *testcase) DiskIsAttached(diskName, instanceID string) (bool, err
 	return expected.isAttached, expected.ret
 }
 
-func (testcase *testcase) CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error {
-	return errors.New("Not implemented")
+func (testcase *testcase) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
+	return "", errors.New("Not implemented")
 }
 
-func (testcase *testcase) DeleteDisk(diskToDelete string) error {
-	return errors.New("Not implemented")
+func (testcase *testcase) DeleteDisk(volumeName string) (bool, error) {
+	return false, errors.New("Not implemented")
 }
 
-func (testcase *testcase) GetAutoLabelsForPD(name string) (map[string]string, error) {
+func (testcase *testcase) GetVolumeLabels(volumeName string) (map[string]string, error) {
 	return map[string]string{}, errors.New("Not implemented")
+}
+
+func (testcase *testcase) GetDiskPath(volumeName string) (string, error) {
+	return "", errors.New("Not implemented")
 }
