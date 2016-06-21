@@ -14,6 +14,10 @@ parameters:
     description: uuid/name of a network to use for floating ip addresses
     default: public
 
+  lbaas_version:
+    type: string
+    description: version of OpenStack LBaaS service. not specifying means auto detect
+
   server_image:
     type: string
     description: glance image used to boot the server
@@ -293,6 +297,9 @@ resources:
             "$OS_PASSWORD": {get_param: os_password}
             "$OS_REGION_NAME": {get_param: os_region_name}
             "$OS_TENANT_ID": {get_param: os_tenant_id}
+            "$LBAAS_VERSION": {get_param: lbaas_version}
+            "$SUBNET_ID": {get_resource: fixed_subnet}
+            "$FLOATING_NETWORK_ID": {get_attr: [kube_master_floating, floating_network_id]}
             "$role": "kubernetes-master"
 
   run_salt:
