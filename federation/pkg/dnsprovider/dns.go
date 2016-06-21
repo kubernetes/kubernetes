@@ -29,6 +29,8 @@ type Zones interface {
 	List() ([]Zone, error)
 	// Add creates and returns a new managed zone, or an error if the operation failed
 	Add(Zone) (Zone, error)
+	// Remove deletes a managed zone, or returns an error if the operation failed.
+	Remove(Zone) error
 	// New allocates a new Zone, which can then be passed to Add()
 	// Arguments are as per the Zone interface below.
 	New(name string) (Zone, error)

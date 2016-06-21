@@ -31,6 +31,7 @@ type Route53API interface {
 	ChangeResourceRecordSets(*route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error)
 	ListHostedZones(*route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error)
 	CreateHostedZone(*route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error)
+	DeleteHostedZone(*route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error)
 }
 
 // Route53APIStub is a minimal implementation of Route53API, used primarily for unit testing.
@@ -109,4 +110,15 @@ func (r *Route53APIStub) CreateHostedZone(input *route53.CreateHostedZoneInput) 
 		Name: input.Name,
 	}
 	return &route53.CreateHostedZoneOutput{HostedZone: r.zones[*input.Name]}, nil
+}
+
+func (r *Route53APIStub) DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error) {
+	if _, ok := r.zones[*input.Id]; !ok {
+		return nil, fmt.Errorf("Error deleting hosted DNS zone: %s does not exist", *input.Id)
+	}
+	if len(r.recordSets[*input.Id]) > 0 {
+		return nil, fmt.Errorf("Error deleting hosted DNS zone: %s has resource records", *input.Id)
+	}
+	delete(r.zones, *input.Id)
+	return &route53.DeleteHostedZoneOutput{}, nil
 }
