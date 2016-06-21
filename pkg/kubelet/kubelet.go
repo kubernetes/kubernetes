@@ -521,7 +521,8 @@ func NewMainKubelet(
 		klet.kubeClient,
 		klet.volumePluginMgr,
 		klet.containerRuntime,
-		mounter)
+		mounter,
+		recorder)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -1640,7 +1641,6 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return err
 	}
 	if err := kl.volumeManager.WaitForAttachAndMount(defaultedPod); err != nil {
-		kl.recorder.Eventf(pod, api.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
 		return err
 	}

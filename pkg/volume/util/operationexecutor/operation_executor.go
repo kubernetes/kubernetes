@@ -22,11 +22,14 @@ package operationexecutor
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
+	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -104,12 +107,15 @@ type OperationExecutor interface {
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(
 	kubeClient internalclientset.Interface,
-	volumePluginMgr *volume.VolumePluginMgr) OperationExecutor {
+	volumePluginMgr *volume.VolumePluginMgr,
+	recorder record.EventRecorder) OperationExecutor {
+
 	return &operationExecutor{
 		kubeClient:      kubeClient,
 		volumePluginMgr: volumePluginMgr,
 		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
 			true /* exponentialBackOffOnError */),
+		recorder: recorder,
 	}
 }
 
@@ -337,6 +343,9 @@ type operationExecutor struct {
 	// pendingOperations keeps track of pending attach and detach operations so
 	// multiple operations are not started on the same volume
 	pendingOperations nestedpendingoperations.NestedPendingOperations
+
+	// recorder is used to record events in the API server
+	recorder record.EventRecorder
 }
 
 func (oe *operationExecutor) AttachVolume(
@@ -576,12 +585,13 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 		detachErr := volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
 		if detachErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
+			err := fmt.Errorf(
 				"DetachVolume.Detach failed for volume %q (spec.Name: %q) from node %q with: %v",
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name(),
 				volumeToDetach.NodeName,
 				detachErr)
+			return err
 		}
 
 		glog.Infof(
@@ -694,16 +704,24 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 				deviceMountPath)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				return fmt.Errorf(
+				err := fmt.Errorf(
 					"MountVolume.MountDevice failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
 					volumeToMount.PodName,
 					volumeToMount.Pod.UID,
 					err)
+				oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+				return err
 			}
 
 			glog.Infof(
+				"MountVolume.MountDevice succeeded for volume %q (spec.Name: %q) pod %q (UID: %q).",
+				volumeToMount.VolumeName,
+				volumeToMount.VolumeSpec.Name(),
+				volumeToMount.PodName,
+				volumeToMount.Pod.UID)
+			oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeNormal, kevents.SuccessfulMountVolume,
 				"MountVolume.MountDevice succeeded for volume %q (spec.Name: %q) pod %q (UID: %q).",
 				volumeToMount.VolumeName,
 				volumeToMount.VolumeSpec.Name(),
@@ -729,13 +747,15 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 		mountErr := volumeMounter.SetUp(fsGroup)
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
+			err := fmt.Errorf(
 				"MountVolume.SetUp failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
 				volumeToMount.VolumeName,
 				volumeToMount.VolumeSpec.Name(),
 				volumeToMount.PodName,
 				volumeToMount.Pod.UID,
 				mountErr)
+			oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+			return err
 		}
 
 		glog.Infof(
@@ -744,6 +764,13 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 			volumeToMount.VolumeSpec.Name(),
 			volumeToMount.PodName,
 			volumeToMount.Pod.UID)
+		if !strings.Contains(fmt.Sprintf("%v", volumeToMount.VolumeName), "kubernetes.io/secret/") {
+			oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeNormal, kevents.SuccessfulMountVolume,
+				"MountVolume.SetUp succeeded for volume %q pod %q (UID: %q)",
+				volumeToMount.VolumeName,
+				volumeToMount.PodName,
+				volumeToMount.Pod.UID)
+		}
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
@@ -801,13 +828,14 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 		unmountErr := volumeUnmounter.TearDown()
 		if unmountErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
+			err := fmt.Errorf(
 				"UnmountVolume.TearDown failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) with: %v",
 				volumeToUnmount.VolumeName,
 				volumeToUnmount.OuterVolumeSpecName,
 				volumeToUnmount.PodName,
 				volumeToUnmount.PodUID,
 				unmountErr)
+			return err
 		}
 
 		glog.Infof(
@@ -884,11 +912,12 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
+			err := fmt.Errorf(
 				"UnmountDevice failed for volume %q (spec.Name: %q) with: %v",
 				deviceToDetach.VolumeName,
 				deviceToDetach.VolumeSpec.Name(),
 				unmountDeviceErr)
+			return err
 		}
 		// Before logging that UnmountDevice succeeded and moving on,
 		// use mounter.DeviceOpened to check if the device is in use anywhere
