@@ -37,7 +37,6 @@ mkdir -p "${HOST_ARTIFACTS_DIR}"
 
 docker run --rm=true \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$(which docker)":/bin/docker \
   -v "${REPO_DIR}":/go/src/k8s.io/kubernetes \
   -v "${WORKSPACE}/_artifacts":/workspace/artifacts \
   -v /etc/localtime:/etc/localtime:ro \
@@ -45,5 +44,5 @@ docker run --rm=true \
   -e "KUBE_VERIFY_GIT_BRANCH=${KUBE_VERIFY_GIT_BRANCH:-}" \
   -e "REPO_DIR=${REPO_DIR}" \
   -e "HOST_ARTIFACTS_DIR=${HOST_ARTIFACTS_DIR}" \
-  -i gcr.io/google_containers/kubekins-test:0.11 \
+  -i gcr.io/google_containers/kubekins-test:go1.6.2-docker1.9.1-rev1 \
   bash -c "cd kubernetes && ${KUBE_TEST_SCRIPT:-./hack/jenkins/test-dockerized.sh}"

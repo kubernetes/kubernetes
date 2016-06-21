@@ -20,18 +20,26 @@ MAINTAINER  Jeff Lowdermilk <jeffml@google.com>
 
 ENV WORKSPACE               /workspace
 ENV TERM                    xterm
+# Note: 1.11+ changes the format of the tarball, so that line likely will need to be
+# changed.
+ENV DOCKER_VERSION          1.9.1
 
 WORKDIR /workspace
 
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
+# dnsutils is needed by federation cluster scripts.
 # file is used when uploading test artifacts to GCS.
-RUN apt-get install -y file
-# libapparmor1 is needed for docker-in-docker.
-RUN apt-get install -y libapparmor1
+# jq is used by hack/verify-godep-licenses.sh.
 # netcat is used by integration test scripts.
-RUN apt-get install -y netcat-openbsd
-# jq is used by hack/verify-godep-licenses.sh
-RUN apt-get install -y jq
+RUN apt-get update && apt-get install -y \
+  dnsutils \
+  file \
+  jq \
+  netcat-openbsd \
+  rsync \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl -L "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz" |\
+  tar -C /usr/bin -xvzf- --strip-components=3 usr/local/bin/docker
 RUN mkdir -p /go/src/k8s.io/kubernetes
 RUN ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
 

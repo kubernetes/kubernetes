@@ -42,7 +42,6 @@ docker_extra_args=()
 if [[ "${JENKINS_ENABLE_DOCKER_IN_DOCKER:-}" =~ ^[yY]$ ]]; then
     docker_extra_args+=(\
       -v /var/run/docker.sock:/var/run/docker.sock \
-      -v "$(which docker)":/bin/docker:ro \
       -v "${REPO_DIR}":/go/src/k8s.io/kubernetes \
       -e "REPO_DIR=${REPO_DIR}" \
       -e "HOST_ARTIFACTS_DIR=${HOST_ARTIFACTS_DIR}" \
@@ -62,5 +61,5 @@ docker run --rm=true -i \
   -e "WORKSPACE=/workspace" \
   "${docker_extra_args[@]:+${docker_extra_args[@]}}" \
   "${METADATA_SERVER_ADD_HOST_ARGS[@]:+${METADATA_SERVER_ADD_HOST_ARGS[@]}}" \
-  gcr.io/google_containers/kubekins-test:0.11 \
+  gcr.io/google_containers/kubekins-test:go1.6.2-docker1.9.1-rev1 \
   bash -c "bash <(curl -fsS --retry 3 --keepalive-time 2 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"
