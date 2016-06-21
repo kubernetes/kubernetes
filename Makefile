@@ -166,3 +166,26 @@ release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 .PHONY: release-skip-tests quick-release
 
+# Build a quick component release
+#
+# Example:
+#   make scheduler
+apiserver:
+	build/make-components.sh cmd/kube-apiserver
+.PHONY: apiserver
+
+controller-manager:
+	build/make-components.sh cmd/kube-controller-manager
+.PHONY: controller-manager
+
+scheduler:
+	build/make-components.sh plugin/cmd/kube-scheduler
+.PHONY: scheduler
+
+kubelet:
+	build/make-components.sh cmd/kubelet
+.PHONY: kubelet
+
+proxy:
+	build/make-components.sh cmd/kube-proxy
+.PHONY: proxy
