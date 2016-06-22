@@ -582,7 +582,7 @@ func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVo
 	}
 
 	if !exists {
-		return nil, fmt.Errorf("PersistentVolume '%v' is not in cache", id)
+		return nil, fmt.Errorf("PersistentVolume '%v' not found", id)
 	}
 
 	return o.(*api.PersistentVolume), nil
@@ -601,7 +601,7 @@ func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id st
 	}
 
 	if !exists {
-		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' is not in cache", namespace, id)
+		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' not found", namespace, id)
 	}
 
 	return o.(*api.PersistentVolumeClaim), nil
