@@ -134,7 +134,7 @@ func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
 	}
 
 	// SyncProviderConfig will start a goroutine to periodically synchronize the provider config.
-	// The synchronization interval is set by the expiration length of the config, and has a mininum
+	// The synchronization interval is set by the expiration length of the config, and has a minimum
 	// and maximum threshold.
 	stop := client.SyncProviderConfig(opts.IssuerURL)
 
