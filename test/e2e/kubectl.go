@@ -1232,6 +1232,10 @@ func curl(url string) (string, error) {
 }
 
 func validateGuestbookApp(c *client.Client, ns string) {
+	framework.Logf("Waiting for all frontend pods to be Running.")
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"tier": "frontend", "app": "guestbook"}))
+	err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Waiting for frontend to serve content.")
 	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
