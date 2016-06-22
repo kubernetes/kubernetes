@@ -165,7 +165,9 @@ if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
   export KUBE_GCE_MASTER_PROJECT="${GCI_STAGING_PROJECT}"
   export KUBE_GCE_MASTER_IMAGE="$(get_latest_gci_image "${GCI_STAGING_PROJECT}" "${JENKINS_GCI_IMAGE_FAMILY}")"
   export KUBE_OS_DISTRIBUTION="gci"
-  if [[ "${JENKINS_GCI_IMAGE_TYPE}" == preview-test ]]; then
+  if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-preview-test" ]]; then
+    # The family "gci-preview-test" is reserved for a special type of GCI images
+    # that are used to continuously validate Docker releases.
     export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
   fi
 fi
