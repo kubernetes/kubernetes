@@ -29,16 +29,19 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-if [[ "${FEDERATION:-}" == "true" ]];then
-    #TODO(colhom): the last cluster that was created in the loop above is the current context.
+if [[ "${FEDERATION:-}" == "true" ]]; then
+    cur_ip_octet2=180
+    # TODO(colhom): the last cluster that was created in the loop above is the current context.
     # Hence, it will be the cluster that hosts the federated components.
     # In the future, we will want to loop through the all the federated contexts,
     # select each one and call federated-up
     for zone in ${E2E_ZONES};do
-	(
-	    set-federation-zone-vars "$zone"
-	    test-setup
-	)
+        (
+        export CLUSTER_IP_RANGE="10.${cur_ip_octet2}.0.0/16"
+        set-federation-zone-vars "$zone"
+        test-setup
+        )
+        cur_ip_octet2="$((cur_ip_octet2 + 1))"
     done
     tagfile="${KUBE_ROOT}/federation/manifests/federated-image.tag"
     if [[ ! -f "$tagfile" ]]; then
