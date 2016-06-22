@@ -69,7 +69,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 		clusterCache.serviceQueue.Add(key)
 		return err
 	}
-	var needUpdate bool
+	var needUpdate, isDeletion bool
 	if exists {
 		service, ok := serviceInterface.(*v1.Service)
 		if ok {
@@ -82,10 +82,12 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 			}
 			glog.Infof("Found tombstone for %v", key)
 			needUpdate = cc.processServiceDeletion(cachedService, clusterName)
+			isDeletion = true
 		}
 	} else {
 		glog.Infof("Can not get service %v for cluster %s from serviceStore", key, clusterName)
 		needUpdate = cc.processServiceDeletion(cachedService, clusterName)
+		isDeletion = true
 	}
 
 	if needUpdate {
@@ -108,6 +110,15 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 				glog.Errorf("Failed to sync service: %+v, put back to service queue", err)
 				clusterCache.serviceQueue.Add(key)
 			}
+		}
+	}
+	if isDeletion {
+		// cachedService is not reliable here as
+		// deleting cache is the last step of federation service deletion
+		_, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name)
+		// rebuild service if federation service still exists
+		if err == nil || !errors.IsNotFound(err) {
+			return sc.ensureClusterService(cachedService, clusterName, cachedService.appliedState, clusterCache.clientset)
 		}
 	}
 	return nil
