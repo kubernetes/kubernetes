@@ -45,6 +45,14 @@ all:
 	hack/build-go.sh $(WHAT)
 .PHONY: all
 
+# Build ginkgo
+#
+# Example:
+# make ginkgo
+ginkgo:
+	hack/build-go.sh vendor/github.com/onsi/ginkgo/ginkgo	
+.PHONY: ginkgo
+
 # Runs all the presubmission verifications.
 #
 # Args:
@@ -111,7 +119,7 @@ test_e2e:
 #   make test_e2e_node FOCUS=kubelet SKIP=container
 #   make test_e2e_node REMOTE=true DELETE_INSTANCES=true
 # Build and run tests.
-test_e2e_node:
+test_e2e_node: ginkgo
 	hack/e2e-node-test.sh
 .PHONY: test_e2e_node
 
