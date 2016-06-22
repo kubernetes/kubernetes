@@ -659,6 +659,10 @@ func (kd *KubeDNS) getClusterZone() (string, error) {
 		}
 	}
 
+	if node == nil {
+		return "", fmt.Errorf("Could not find any nodes")
+	}
+
 	zone, ok := node.Annotations[unversioned.LabelZoneFailureDomain]
 	if !ok || zone == "" {
 		return "", fmt.Errorf("unknown cluster zone")
