@@ -167,8 +167,13 @@ func (p *AttachOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if pod.Status.Phase != api.PodRunning {
-			return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
+		// If the user has specified a name, it could be a init
+		// container, so we can proceed even if the pod is not yet
+		// running
+		if len(p.ContainerName) == 0 {
+			if pod.Status.Phase != api.PodRunning {
+				return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
+			}
 		}
 		p.Pod = pod
 		// TODO: convert this to a clean "wait" behavior
@@ -229,6 +234,13 @@ func (p *AttachOptions) Run() error {
 func (p *AttachOptions) GetContainer(pod *api.Pod) api.Container {
 	if len(p.ContainerName) > 0 {
 		for _, container := range pod.Spec.Containers {
+			if container.Name == p.ContainerName {
+				return container
+			}
+		}
+		// We need to search for the specified container in
+		// the list of init containers as well.
+		for _, container := range pod.Spec.InitContainers {
 			if container.Name == p.ContainerName {
 				return container
 			}
