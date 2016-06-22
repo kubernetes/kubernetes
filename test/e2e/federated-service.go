@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -118,10 +119,33 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 			clset := release_1_3.NewForConfigOrDie(restclient.AddUserAgent(cfg, UserAgentName))
 			clusterClientSets = append(clusterClientSets, clset)
 		}
+
+		for i, cs := range clusterClientSets {
+			if _, err := cs.Core().Namespaces().Get(f.Namespace.Name); errors.IsNotFound(err) {
+				ns := &v1.Namespace{
+					ObjectMeta: v1.ObjectMeta{
+						Name: f.Namespace.Name,
+					},
+				}
+				if _, err := cs.Core().Namespaces().Create(ns); err != nil {
+					framework.Logf("Couldn't create the namespace %s in cluster [%d]: %v", f.Namespace.Name, i, err)
+				}
+				framework.Logf("Namespace %s created in cluster [%d]", f.Namespace.Name, i)
+			} else if err != nil {
+				framework.Logf("Couldn't create the namespace %s in cluster [%d]: %v", f.Namespace.Name, i, err)
+			}
+		}
 	})
 
 	AfterEach(func() {
 		framework.SkipUnlessFederated(f.Client)
+
+		for i, cs := range clusterClientSets {
+			if err := cs.Core().Namespaces().Delete(f.Namespace.Name, &api.DeleteOptions{}); err != nil {
+				framework.Failf("Couldn't delete the namespace %s in cluster [%d]: %v", f.Namespace.Name, i, err)
+			}
+			framework.Logf("Namespace %s deleted in cluster [%d]", f.Namespace.Name, i)
+		}
 
 		// Delete the registered clusters in the federation API server.
 		clusterList, err := f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
