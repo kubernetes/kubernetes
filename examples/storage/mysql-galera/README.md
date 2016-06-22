@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/storage/mysql-galera/README.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -38,7 +33,7 @@ This document explains a simple demonstration example of running MySQL synchrono
 
 ### Prerequisites
 
-This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](../../docs/getting-started-guides/) for installation instructions for your platform.
+This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](../../../docs/getting-started-guides/) for installation instructions for your platform.
 
 Also, this example requires the image found in the ```image``` directory. For your convenience, it is built and available on Docker's public image repository as ```capttofu/percona_xtradb_cluster_5_6```. It can also be built which would merely require that the image in the pod or replication controller files is updated.
 

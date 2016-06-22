@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/examples/storage/vitess/README.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -42,7 +37,7 @@ Kubernetes as simple as launching more pods.
 The example brings up a database with 2 shards, and then runs a pool of
 [sharded guestbook](https://github.com/youtube/vitess/tree/master/examples/kubernetes/guestbook)
 pods. The guestbook app was ported from the original
-[guestbook](../../examples/guestbook-go/)
+[guestbook](../../../examples/guestbook-go/)
 example found elsewhere in this tree, modified to use Vitess as the backend.
 
 For a more detailed, step-by-step explanation of this example setup, see the
@@ -54,17 +49,17 @@ You'll need to install [Go 1.4+](https://golang.org/doc/install) to build
 `vtctlclient`, the command-line admin tool for Vitess.
 
 We also assume you have a running Kubernetes cluster with `kubectl` pointing to
-it by default. See the [Getting Started guides](../../docs/getting-started-guides/)
+it by default. See the [Getting Started guides](../../../docs/getting-started-guides/)
 for how to get to that point. Note that your Kubernetes cluster needs to have
 enough resources (CPU+RAM) to schedule all the pods. By default, this example
 requires a cluster-wide total of at least 6 virtual CPUs and 10GiB RAM. You can
 tune these requirements in the
-[resource limits](../../docs/user-guide/compute-resources.md)
+[resource limits](../../../docs/user-guide/compute-resources.md)
 section of each YAML file.
 
 Lastly, you need to open ports 30000-30001 (for the Vitess admin daemon) and 80 (for
 the guestbook app) in your firewall. See the
-[Services and Firewalls](../../docs/user-guide/services-firewalls.md)
+[Services and Firewalls](../../../docs/user-guide/services-firewalls.md)
 guide for examples of how to do that.
 
 ### Configure site-local settings
