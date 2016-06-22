@@ -54,6 +54,10 @@ func (c *FakeExtensions) ThirdPartyResources() unversioned.ThirdPartyResourceInt
 	return &FakeThirdPartyResources{c}
 }
 
+func (c *FakeExtensions) ThirdPartyResourceDatas(namespace string) unversioned.ThirdPartyResourceDataInterface {
+	return &FakeThirdPartyResourceDatas{c, namespace}
+}
+
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeExtensions) GetRESTClient() *restclient.RESTClient {

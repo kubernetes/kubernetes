@@ -31,6 +31,7 @@ type ExtensionsInterface interface {
 	ReplicaSetsGetter
 	ScalesGetter
 	ThirdPartyResourcesGetter
+	ThirdPartyResourceDatasGetter
 }
 
 // ExtensionsClient is used to interact with features provided by the Extensions group.
@@ -64,6 +65,10 @@ func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
 
 func (c *ExtensionsClient) ThirdPartyResources() ThirdPartyResourceInterface {
 	return newThirdPartyResources(c)
+}
+
+func (c *ExtensionsClient) ThirdPartyResourceDatas(namespace string) ThirdPartyResourceDataInterface {
+	return newThirdPartyResourceDatas(c, namespace)
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.
