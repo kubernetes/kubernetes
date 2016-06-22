@@ -30,7 +30,8 @@ import (
 )
 
 type cinderDiskAttacher struct {
-	host volume.VolumeHost
+	host           volume.VolumeHost
+	cinderProvider CinderProvider
 }
 
 var _ volume.Attacher = &cinderDiskAttacher{}
@@ -42,7 +43,14 @@ const (
 )
 
 func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
-	return &cinderDiskAttacher{host: plugin.host}, nil
+	cinder, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+	return &cinderDiskAttacher{
+		host:           plugin.host,
+		cinderProvider: cinder,
+	}, nil
 }
 
 func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
@@ -53,11 +61,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (
 
 	volumeID := volumeSource.VolumeID
 
-	cloud, err := getCloudProvider(attacher.host.GetCloudProvider())
-	if err != nil {
-		return "", err
-	}
-	instances, res := cloud.Instances()
+	instances, res := attacher.cinderProvider.Instances()
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
@@ -68,7 +72,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
-	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
+	attached, err := attacher.cinderProvider.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Warningf(
@@ -80,7 +84,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (
 		// Volume is already attached to node.
 		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, instanceid)
 	} else {
-		_, err = cloud.AttachDisk(instanceid, volumeID)
+		_, err = attacher.cinderProvider.AttachDisk(instanceid, volumeID)
 		if err == nil {
 			glog.Infof("Attach operation successful: volume %q attached to node %q.", volumeID, instanceid)
 		} else {
@@ -89,7 +93,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (
 		}
 	}
 
-	devicePath, err := cloud.GetAttachmentDiskPath(instanceid, volumeID)
+	devicePath, err := attacher.cinderProvider.GetAttachmentDiskPath(instanceid, volumeID)
 	if err != nil {
 		glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
 		return "", err
@@ -181,22 +185,26 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 }
 
 type cinderDiskDetacher struct {
-	host volume.VolumeHost
+	mounter        mount.Interface
+	cinderProvider CinderProvider
 }
 
 var _ volume.Detacher = &cinderDiskDetacher{}
 
 func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
-	return &cinderDiskDetacher{host: plugin.host}, nil
+	cinder, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+	return &cinderDiskDetacher{
+		mounter:        plugin.host.GetMounter(),
+		cinderProvider: cinder,
+	}, nil
 }
 
 func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName string) error {
 	volumeID := path.Base(deviceMountPath)
-	cloud, err := getCloudProvider(detacher.host.GetCloudProvider())
-	if err != nil {
-		return err
-	}
-	instances, res := cloud.Instances()
+	instances, res := detacher.cinderProvider.Instances()
 	if !res {
 		return fmt.Errorf("failed to list openstack instances")
 	}
@@ -205,7 +213,7 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 		instanceid = instanceid[(ind + 1):]
 	}
 
-	attached, err := cloud.DiskIsAttached(volumeID, instanceid)
+	attached, err := detacher.cinderProvider.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -219,7 +227,7 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 		return nil
 	}
 
-	if err = cloud.DetachDisk(instanceid, volumeID); err != nil {
+	if err = detacher.cinderProvider.DetachDisk(instanceid, volumeID); err != nil {
 		glog.Errorf("Error detaching volume %q: %v", volumeID, err)
 		return err
 	}
@@ -249,9 +257,8 @@ func (detacher *cinderDiskDetacher) WaitForDetach(devicePath string, timeout tim
 }
 
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	mounter := detacher.host.GetMounter()
 	volume := path.Base(deviceMountPath)
-	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, mounter); err != nil {
+	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.mounter); err != nil {
 		glog.Errorf("Error unmounting %q: %v", volume, err)
 	}
 
