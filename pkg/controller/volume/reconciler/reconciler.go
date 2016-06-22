@@ -92,6 +92,21 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 			if !rc.desiredStateOfWorld.VolumeExists(
 				attachedVolume.VolumeName, attachedVolume.NodeName) {
 				// Volume exists in actual state of world but not desired
+
+				// Mark desire to detach
+				timeElapsed, err := rc.actualStateOfWorld.MarkDesireToDetach(attachedVolume.VolumeName, attachedVolume.NodeName)
+				if err != nil {
+					glog.Errorf("Unexpected error actualStateOfWorld.MarkDesireToDetach(): %v", err)
+				}
+
+				// Update Node Status to indicate volume is no longer safe to mount.
+				err = rc.nodeStatusUpdater.UpdateNodeStatuses()
+				if err != nil {
+					// Skip detaching this volume if unable to update node status
+					glog.Infof("UpdateNodeStatuses failed with: %v", err)
+					continue
+				}
+
 				if !attachedVolume.MountedByNode {
 					glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 					err := rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, rc.actualStateOfWorld)
@@ -112,10 +127,6 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					}
 				} else {
 					// If volume is not safe to detach (is mounted) wait a max amount of time before detaching any way.
-					timeElapsed, err := rc.actualStateOfWorld.MarkDesireToDetach(attachedVolume.VolumeName, attachedVolume.NodeName)
-					if err != nil {
-						glog.Errorf("Unexpected error actualStateOfWorld.MarkDesireToDetach(): %v", err)
-					}
 					if timeElapsed > rc.maxWaitForUnmountDuration {
 						glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q. Volume is not safe to detach, but maxWaitForUnmountDuration expired.", attachedVolume.VolumeName, attachedVolume.NodeName)
 						err := rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, rc.actualStateOfWorld)
