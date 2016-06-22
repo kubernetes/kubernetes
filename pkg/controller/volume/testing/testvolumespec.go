@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -100,4 +101,15 @@ func CreateTestClient() *fake.Clientset {
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	return fakeClient
+}
+
+// NewPod returns a test pod object
+func NewPod(uid, name string) *api.Pod {
+	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       types.UID(uid),
+			Name:      name,
+			Namespace: name,
+		},
+	}
 }

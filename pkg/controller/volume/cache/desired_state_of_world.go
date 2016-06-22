@@ -57,7 +57,7 @@ type DesiredStateOfWorld interface {
 	// should be attached to the specified node, the volume is implicitly added.
 	// If no node with the name nodeName exists in list of nodes managed by the
 	// attach/detach attached controller, an error is returned.
-	AddPod(podName types.UniquePodName, volumeSpec *volume.Spec, nodeName string) (api.UniqueVolumeName, error)
+	AddPod(podName types.UniquePodName, pod *api.Pod, volumeSpec *volume.Spec, nodeName string) (api.UniqueVolumeName, error)
 
 	// DeleteNode removes the given node from the list of nodes managed by the
 	// attach/detach controller.
@@ -90,11 +90,28 @@ type DesiredStateOfWorld interface {
 	// and the nodes they should be attached to based on the current desired
 	// state of the world.
 	GetVolumesToAttach() []VolumeToAttach
+
+	// GetPodToAdd generates and returns a map of pods based on the current desired
+	// state of world
+	GetPodToAdd() map[types.UniquePodName]PodToAdd
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
 type VolumeToAttach struct {
 	operationexecutor.VolumeToAttach
+}
+
+// PodToAdd represents a pod that references the underlying volume and is
+// scheduled to the underlying node.
+type PodToAdd struct {
+	// pod contains the api object of pod
+	Pod *api.Pod
+
+	// volumeName contains the unique identifier for this volume.
+	VolumeName api.UniqueVolumeName
+
+	// nodeName contains the name of this node.
+	NodeName string
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
@@ -119,7 +136,7 @@ type desiredStateOfWorld struct {
 // nodeManaged represents a node that is being managed by the attach/detach
 // controller.
 type nodeManaged struct {
-	// nodName contains the name of this node.
+	// nodeName contains the name of this node.
 	nodeName string
 
 	// volumesToAttach is a map containing the set of volumes that should be
@@ -145,11 +162,14 @@ type volumeToAttach struct {
 	scheduledPods map[types.UniquePodName]pod
 }
 
-// The pod object represents a pod that references the underlying volume and is
+// The pod represents a pod that references the underlying volume and is
 // scheduled to the underlying node.
 type pod struct {
-	// podName contains the name of this pod.
+	// podName contains the unique identifier for this pod
 	podName types.UniquePodName
+
+	// pod object contains the api object of pod
+	podObj *api.Pod
 }
 
 func (dsw *desiredStateOfWorld) AddNode(nodeName string) {
@@ -166,6 +186,7 @@ func (dsw *desiredStateOfWorld) AddNode(nodeName string) {
 
 func (dsw *desiredStateOfWorld) AddPod(
 	podName types.UniquePodName,
+	podToAdd *api.Pod,
 	volumeSpec *volume.Spec,
 	nodeName string) (api.UniqueVolumeName, error) {
 	dsw.Lock()
@@ -204,11 +225,11 @@ func (dsw *desiredStateOfWorld) AddPod(
 		}
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
-
 	if _, podExists := volumeObj.scheduledPods[podName]; !podExists {
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName].scheduledPods[podName] =
 			pod{
 				podName: podName,
+				podObj:  podToAdd,
 			}
 	}
 
@@ -308,4 +329,23 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 	}
 
 	return volumesToAttach
+}
+
+func (dsw *desiredStateOfWorld) GetPodToAdd() map[types.UniquePodName]PodToAdd {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	pods := make(map[types.UniquePodName]PodToAdd)
+	for nodeName, nodeObj := range dsw.nodesManaged {
+		for volumeName, volumeObj := range nodeObj.volumesToAttach {
+			for podUID, pod := range volumeObj.scheduledPods {
+				pods[podUID] = PodToAdd{
+					Pod:        pod.podObj,
+					VolumeName: volumeName,
+					NodeName:   nodeName,
+				}
+			}
+		}
+	}
+	return pods
 }

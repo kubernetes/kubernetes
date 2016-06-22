@@ -81,7 +81,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
-	podName := types.UniquePodName("pod-uid")
+	podName := "pod-uid"
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
@@ -94,7 +94,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 			nodeName)
 	}
 
-	_, podErr := dsw.AddPod(podName, volumeSpec, nodeName)
+	_, podErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
 	if podErr != nil {
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podErr)
 	}
@@ -127,7 +127,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
-	podName := types.UniquePodName("pod-uid")
+	podName := "pod-uid"
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
@@ -140,7 +140,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 			nodeName)
 	}
 
-	generatedVolumeName, podAddErr := dsw.AddPod(podName, volumeSpec, nodeName)
+	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
 	if podAddErr != nil {
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
@@ -156,7 +156,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 
 	// Act
-	dsw.DeletePod(podName, generatedVolumeName, nodeName)
+	dsw.DeletePod(types.UniquePodName(podName), generatedVolumeName, nodeName)
 	volumeExists = dsw.VolumeExists(generatedVolumeName, nodeName)
 	if volumeExists {
 		t.Fatalf(
@@ -194,7 +194,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
-	podName := types.UniquePodName("pod-uid")
+	podName := "pod-uid"
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := "node-name"
@@ -207,7 +207,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 			nodeName)
 	}
 
-	generatedVolumeName, podAddErr := dsw.AddPod(podName, volumeSpec, nodeName)
+	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
 	if podAddErr != nil {
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
@@ -223,7 +223,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 
 	// Act
-	dsw.DeletePod(podName, generatedVolumeName, nodeName)
+	dsw.DeletePod(types.UniquePodName(podName), generatedVolumeName, nodeName)
 	volumeExists = dsw.VolumeExists(generatedVolumeName, nodeName)
 	if volumeExists {
 		t.Fatalf(
