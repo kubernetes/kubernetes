@@ -2694,6 +2694,7 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 			glog.V(2).Infof("Failed to delete pod %q, err: %v", format.Pod(pod), err)
 		}
 		kl.probeManager.RemovePod(pod)
+		kl.statusManager.DeletePodStatus(pod.UID)
 	}
 }
 
