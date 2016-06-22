@@ -440,7 +440,7 @@ type HostPathVolumeSource struct {
 type EmptyDirVolumeSource struct {
 	// TODO: Longer term we want to represent the selection of underlying
 	// media more like a scheduling problem - user says what traits they
-	// need, we give them a backing store that satisifies that.  For now
+	// need, we give them a backing store that satisfies that.  For now
 	// this will cover the most common needs.
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
@@ -2000,7 +2000,7 @@ type AttachedVolume struct {
 	// Name of the attached volume
 	Name UniqueVolumeName `json:"name"`
 
-	// DevicePath represents the device path where the volume should be avilable
+	// DevicePath represents the device path where the volume should be available
 	DevicePath string `json:"devicePath"`
 }
 
@@ -2686,7 +2686,7 @@ const (
 	// TODO: Consider supporting different formats, specifying CA/destinationCA.
 	SecretTypeTLS SecretType = "kubernetes.io/tls"
 
-	// TLSCertKey is the key for tls certificates in a TLS secert.
+	// TLSCertKey is the key for tls certificates in a TLS secret.
 	TLSCertKey = "tls.crt"
 	// TLSPrivateKeyKey is the key for the private key field in a TLS secret.
 	TLSPrivateKeyKey = "tls.key"

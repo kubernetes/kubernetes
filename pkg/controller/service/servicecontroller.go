@@ -125,7 +125,7 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 		return err
 	}
 
-	// We have to make this check beecause the ListWatch that we use in
+	// We have to make this check because the ListWatch that we use in
 	// WatchServices requires Client functions that aren't in the interface
 	// for some reason.
 	if _, ok := s.kubeClient.(*clientset.Clientset); !ok {
