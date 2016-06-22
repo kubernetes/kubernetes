@@ -29,7 +29,7 @@ import (
 func newTestInterface() (dnsprovider.Interface, error) {
 	// Use this to test the real cloud service - insert appropriate project-id.  Default token source will be used.  See
 	// https://github.com/golang/oauth2/blob/master/google/default.go for details.
-	// i, err := dnsprovider.GetDnsProvider(ProviderName, strings.NewReader("\n[global]\nproject-id = federation0-cluster00"))
+	// return dnsprovider.GetDnsProvider(ProviderName, strings.NewReader("\n[global]\nproject-id = federation0-cluster00"))
 	return NewFakeInterface() // Use this to stub out the entire cloud service
 }
 
@@ -46,17 +46,23 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// zones returns the zones interface for the configured dns provider account/project,
+// or fails if it can't be found
+func zones(t *testing.T) dnsprovider.Zones {
+	zonesInterface, supported := interface_.Zones()
+	if !supported {
+		t.Fatalf("Zones interface not supported by interface %v", interface_)
+	} else {
+		t.Logf("Got zones %v\n", zonesInterface)
+	}
+	return zonesInterface
+}
+
 // firstZone returns the first zone for the configured dns provider account/project,
 // or fails if it can't be found
 func firstZone(t *testing.T) dnsprovider.Zone {
 	t.Logf("Getting zones")
-	z, supported := interface_.Zones()
-	if supported {
-		t.Logf("Got zones %v\n", z)
-	} else {
-		t.Fatalf("Zones interface not supported by interface %v", interface_)
-	}
-	zones, err := z.List()
+	zones, err := zones(t).List()
 	if err != nil {
 		t.Fatalf("Failed to list zones: %v", err)
 	} else {
@@ -115,6 +121,30 @@ func addRrsetOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset d
 /* TestResourceRecordSetsList verifies that listing of zones succeeds */
 func TestZonesList(t *testing.T) {
 	firstZone(t)
+}
+
+/* TestZoneAddSuccess verifies that addition of a valid managed DNS zone succeeds */
+func TestZoneAddSuccess(t *testing.T) {
+	testZoneName := "ubernetesv2.test."
+	t.Logf("Getting zones")
+	z := zones(t)
+	t.Logf("Got zones, making new Zone")
+	input, err := z.New(testZoneName)
+	if err != nil {
+		t.Errorf("Failed to allocate new zone object %s: %v", testZoneName, err)
+	}
+	zone, err := z.Add(input)
+	if err != nil {
+		t.Errorf("Failed to create new managed DNS zone %s: %v", testZoneName, err)
+	}
+	defer func(zone dnsprovider.Zone) {
+		if zone != nil {
+			if err := z.Remove(zone); err != nil {
+				t.Errorf("Failed to delete zone %v: %v", zone, err)
+			}
+		}
+	}(zone)
+	t.Logf("Successfully added managed DNS zone: %v", zone)
 }
 
 /* TestResourceRecordSetsList verifies that listing of RRS's succeeds */
