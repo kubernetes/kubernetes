@@ -123,7 +123,9 @@ type Disks interface {
 
 	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
 	// representing this PD, namely failure domain and zone.
-	GetAutoLabelsForPD(name string) (map[string]string, error)
+	// zone can be provided to specify the zone for the PD,
+	// if empty all managed zones will be searched.
+	GetAutoLabelsForPD(name string, zone string) (map[string]string, error)
 }
 
 func init() {
@@ -2069,6 +2071,48 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	return instances, nil
 }
 
+// GetAllZones returns all the zones in which nodes are running
+func (gce *GCECloud) GetAllZones() (sets.String, error) {
+	// Fast-path for non-multizone
+	if len(gce.managedZones) == 1 {
+		return sets.NewString(gce.managedZones...), nil
+	}
+
+	// TODO: Caching, but this is currently only called when we are creating a volume,
+	// which is a relatively infrequent operation, and this is only # zones API calls
+	zones := sets.NewString()
+
+	// TODO: Parallelize, although O(zones) so not too bad (N <= 3 typically)
+	for _, zone := range gce.managedZones {
+		// We only retrieve one page in each zone - we only care about existence
+		listCall := gce.service.Instances.List(gce.projectID, zone)
+
+		// No filter: We assume that a zone is either used or unused
+		// We could only consider running nodes (like we do in List above),
+		// but probably if instances are starting we still want to consider them.
+		// I think we should wait until we have a reason to make the
+		// call one way or the other; we generally can't guarantee correct
+		// volume spreading if the set of zones is changing
+		// (and volume spreading is currently only a heuristic).
+		// Long term we want to replace GetAllZones (which primarily supports volume
+		// spreading) with a scheduler policy that is able to see the global state of
+		// volumes and the health of zones.
+
+		// Just a minimal set of fields - we only care about existence
+		listCall = listCall.Fields("items(name)")
+
+		res, err := listCall.Do()
+		if err != nil {
+			return nil, err
+		}
+		if len(res.Items) != 0 {
+			zones.Insert(zone)
+		}
+	}
+
+	return zones, nil
+}
+
 func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
 	for _, item := range metadata.Items {
 		if item.Key == key {
@@ -2221,13 +2265,33 @@ func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 // Builds the labels that should be automatically added to a PersistentVolume backed by a GCE PD
 // Specifically, this builds FailureDomain (zone) and Region labels.
 // The PersistentVolumeLabel admission controller calls this and adds the labels when a PV is created.
-func (gce *GCECloud) GetAutoLabelsForPD(name string) (map[string]string, error) {
-	disk, err := gce.getDiskByNameUnknownZone(name)
-	if err != nil {
-		return nil, err
+// If zone is specified, the volume will only be found in the specified zone,
+// otherwise all managed zones will be searched.
+func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
+	var disk *gceDisk
+	var err error
+	if zone == "" {
+		// We would like as far as possible to avoid this case,
+		// because GCE doesn't guarantee that volumes are uniquely named per region,
+		// just per zone.  However, creation of GCE PDs was originally done only
+		// by name, so we have to continue to support that.
+		// However, wherever possible the zone should be passed (and it is passed
+		// for most cases that we can control, e.g. dynamic volume provisioning)
+		disk, err = gce.getDiskByNameUnknownZone(name)
+		if err != nil {
+			return nil, err
+		}
+		zone = disk.Zone
+	} else {
+		// We could assume the disks exists; we have all the information we need
+		// However it is more consistent to ensure the disk exists,
+		// and in future we may gather addition information (e.g. disk type, IOPS etc)
+		disk, err = gce.getDiskByName(name, zone)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	zone := disk.Zone
 	region, err := GetGCERegion(zone)
 	if err != nil {
 		return nil, err
