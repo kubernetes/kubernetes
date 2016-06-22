@@ -95,6 +95,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
 	plugin.host = host
 	plugin.hairpinMode = hairpinMode
+	plugin.nonMasqueradeCIDR = nonMasqueradeCIDR
 	plugin.cniConfig = &libcni.CNIConfig{
 		Path: []string{DefaultCNIDir, plugin.vendorDir},
 	}
@@ -127,7 +128,11 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 		return fmt.Errorf("Failed to generate loopback config: %v", err)
 	}
 
-	plugin.nonMasqueradeCIDR = nonMasqueradeCIDR
+	plugin.nsenterPath, err = plugin.execer.LookPath("nsenter")
+	if err != nil {
+		return fmt.Errorf("Failed to find nsenter binary: %v", err)
+	}
+
 	// Need to SNAT outbound traffic from cluster
 	if err = plugin.ensureMasqRule(); err != nil {
 		return err
@@ -463,11 +468,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}
-	nsenterPath, err := plugin.getNsenterPath()
-	if err != nil {
-		return nil, err
-	}
-	ip, err := network.GetPodIP(plugin.execer, nsenterPath, netnsPath, network.DefaultInterfaceName)
+	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -554,17 +555,6 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 		return fmt.Errorf("Error removing container from network: %v", err)
 	}
 	return nil
-}
-
-func (plugin *kubenetNetworkPlugin) getNsenterPath() (string, error) {
-	if plugin.nsenterPath == "" {
-		nsenterPath, err := plugin.execer.LookPath("nsenter")
-		if err != nil {
-			return "", err
-		}
-		plugin.nsenterPath = nsenterPath
-	}
-	return plugin.nsenterPath, nil
 }
 
 // shaper retrieves the bandwidth shaper and, if it hasn't been fetched before,
