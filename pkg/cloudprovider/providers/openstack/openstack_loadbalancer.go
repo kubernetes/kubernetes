@@ -394,7 +394,6 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 		waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 
 		_, err = v2_pools.CreateAssociateMember(lbaas.network, pool.ID, v2_pools.MemberCreateOpts{
-			Name:         name,
 			ProtocolPort: int(ports[0].NodePort), //TODO: need to handle multi-port
 			Address:      addr,
 			SubnetID:     lbaas.opts.SubnetId,
