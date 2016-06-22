@@ -789,6 +789,8 @@ function kube::release::package_server_tarballs() {
 
     cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
 
+    cp "${RELEASE_DIR}/kubernetes-src.tar.gz" "${release_stage}/"
+
     kube::release::clean_cruft
 
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
