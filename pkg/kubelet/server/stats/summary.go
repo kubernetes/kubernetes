@@ -135,6 +135,7 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 				CapacityBytes:  &sb.imageFsInfo.Capacity,
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
 			},
+			PrimaryFs: sb.imageFsInfo.Device == sb.rootFsInfo.Device,
 		},
 	}
 

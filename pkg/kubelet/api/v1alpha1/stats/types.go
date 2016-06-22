@@ -56,6 +56,8 @@ type RuntimeStats struct {
 	// This filesystem could be the same as the primary (root) filesystem.
 	// Usage here refers to the total number of bytes occupied by images on the filesystem.
 	ImageFs *FsStats `json:"imageFs,omitempty"`
+	// This value is true if the filesystem where container images are stored is the same as the primary (root) filesystem.
+	PrimaryFs bool `json:"primaryFs,omitempty"`
 }
 
 const (
