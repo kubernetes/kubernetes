@@ -1785,6 +1785,10 @@ func (r *Runtime) GetNetNS(containerID kubecontainer.ContainerID) (string, error
 	return netnsPathFromName(makePodNetnsName(kubetypes.UID(containerID.ID))), nil
 }
 
+func (r *Runtime) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
+	return kubecontainer.ContainerID{ID: string(pod.ID)}, nil
+}
+
 func podDetailsFromServiceFile(serviceFilePath string) (string, string, string, bool, error) {
 	f, err := os.Open(serviceFilePath)
 	if err != nil {

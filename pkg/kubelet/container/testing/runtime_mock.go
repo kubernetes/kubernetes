@@ -133,6 +133,11 @@ func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
 	return "", args.Error(0)
 }
 
+func (r *Mock) GetPodContainerID(pod *Pod) (ContainerID, error) {
+	args := r.Called(pod)
+	return ContainerID{}, args.Error(0)
+}
+
 func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
 	args := r.Called(gcPolicy, ready)
 	return args.Error(0)

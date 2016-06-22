@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
@@ -495,24 +494,23 @@ func (plugin *kubenetNetworkPlugin) getRunningPods() ([]*hostport.RunningPod, er
 	}
 	runningPods := make([]*hostport.RunningPod, 0)
 	for _, p := range pods {
-		for _, c := range p.Containers {
-			if c.Name != dockertools.PodInfraContainerName {
-				continue
-			}
-			ipString, ok := plugin.podIPs[c.ID]
-			if !ok {
-				continue
-			}
-			podIP := net.ParseIP(ipString)
-			if podIP == nil {
-				continue
-			}
-			if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-				runningPods = append(runningPods, &hostport.RunningPod{
-					Pod: pod,
-					IP:  podIP,
-				})
-			}
+		containerID, err := plugin.host.GetRuntime().GetPodContainerID(p)
+		if err != nil {
+			continue
+		}
+		ipString, ok := plugin.podIPs[containerID]
+		if !ok {
+			continue
+		}
+		podIP := net.ParseIP(ipString)
+		if podIP == nil {
+			continue
+		}
+		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
+			runningPods = append(runningPods, &hostport.RunningPod{
+				Pod: pod,
+				IP:  podIP,
+			})
 		}
 	}
 	return runningPods, nil
