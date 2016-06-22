@@ -200,6 +200,16 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 			},
 			errorExpected: true,
 		},
+		{
+			affinity: map[string]string{
+				api.AffinityAnnotationKey: `
+					{"podAntiAffinity": {
+						"thisIsAInvalidAffinity": [{}
+					}}`,
+			},
+			// however, we should not got error here
+			errorExpected: false,
+		},
 	}
 	for _, test := range tests {
 		pod.ObjectMeta.Annotations = test.affinity
