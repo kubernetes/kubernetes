@@ -75,10 +75,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
-	nodeInformer := informers.CreateSharedNodeIndexInformer(
-		fakeKubeClient, resyncPeriod)
-	nsu := statusupdater.NewNodeStatusUpdater(
-		fakeKubeClient, nodeInformer, asw)
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
 	podName := "pod-uid"
@@ -121,10 +118,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
-	nodeInformer := informers.CreateSharedNodeIndexInformer(
-		fakeKubeClient, resyncPeriod)
-	nsu := statusupdater.NewNodeStatusUpdater(
-		fakeKubeClient, nodeInformer, asw)
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
 	podName := "pod-uid"
@@ -188,10 +182,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
-	nodeInformer := informers.CreateSharedNodeIndexInformer(
-		fakeKubeClient, resyncPeriod)
-	nsu := statusupdater.NewNodeStatusUpdater(
-		fakeKubeClient, nodeInformer, asw)
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
 	podName := "pod-uid"
@@ -239,6 +230,72 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
+}
+
+// Populates desiredStateOfWorld cache with one node/volume/pod tuple.
+// Has node update fail
+// Calls Run()
+// Verifies there is one attach call and no detach calls.
+// Marks the node/volume as unmounted.
+// Deletes the node/volume/pod tuple from desiredStateOfWorld cache.
+// Verifies there are NO detach call and no (new) attach calls.
+func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdateStatusFail(t *testing.T) {
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
+	podName := "pod-uid"
+	volumeName := api.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	nodeName := "node-name"
+	dsw.AddNode(nodeName)
+	volumeExists := dsw.VolumeExists(volumeName, nodeName)
+	if volumeExists {
+		t.Fatalf(
+			"Volume %q/node %q should not exist, but it does.",
+			volumeName,
+			nodeName)
+	}
+
+	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	if podAddErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+	}
+
+	// Act
+	go reconciler.Run(wait.NeverStop)
+
+	// Assert
+	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	// Act
+	dsw.DeletePod(types.UniquePodName(podName), generatedVolumeName, nodeName)
+	volumeExists = dsw.VolumeExists(generatedVolumeName, nodeName)
+	if volumeExists {
+		t.Fatalf(
+			"Deleted pod %q from volume %q/node %q. Volume should also be deleted but it still exists.",
+			podName,
+			generatedVolumeName,
+			nodeName)
+	}
+	asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
+	asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
+
+	// Assert
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 }
 
 func waitForNewAttacherCallCount(
