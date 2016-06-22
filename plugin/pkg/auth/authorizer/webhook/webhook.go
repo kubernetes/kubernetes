@@ -20,6 +20,7 @@ package webhook
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -151,16 +152,18 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 		if err := result.Error(); err != nil {
 			return err
 		}
+		var statusCode int
+		if result.StatusCode(&statusCode); statusCode < 200 || statusCode >= 300 {
+			return fmt.Errorf("Error contacting webhook: %d", statusCode)
+		}
 		if err := result.Into(r); err != nil {
 			return err
 		}
-		go func() {
-			if r.Status.Allowed {
-				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
-			} else {
-				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
-			}
-		}()
+		if r.Status.Allowed {
+			w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
+		} else {
+			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+		}
 	}
 	if r.Status.Allowed {
 		return nil
