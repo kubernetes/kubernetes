@@ -193,8 +193,10 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 func validateFlags(cmd *cobra.Command) error {
 	errs := []error{}
 	max, min := cmdutil.GetFlagInt(cmd, "max"), cmdutil.GetFlagInt(cmd, "min")
-	if max < 1 || max < min {
-		errs = append(errs, fmt.Errorf("--max=MAXPODS is required, and must be at least 1 and --min=MINPODS"))
+	if max < 1 {
+		errs = append(errs, fmt.Errorf("--max=MAXPODS is required and must be at least 1"))
+	} else if max < min {
+		errs = append(errs, fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS"))
 	}
 	return utilerrors.NewAggregate(errs)
 }
