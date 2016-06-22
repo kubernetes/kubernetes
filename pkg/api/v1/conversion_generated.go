@@ -4867,6 +4867,9 @@ func autoConvert_v1_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatus
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
+	out.PodMAC = in.PodMAC
+	out.PodGatewayIP = in.PodGatewayIP
+	out.PodLinkStatus = in.PodLinkStatus
 	out.StartTime = in.StartTime
 	if in.InitContainerStatuses != nil {
 		in, out := &in.InitContainerStatuses, &out.InitContainerStatuses
@@ -4914,6 +4917,9 @@ func autoConvert_api_PodStatus_To_v1_PodStatus(in *api.PodStatus, out *PodStatus
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
+	out.PodMAC = in.PodMAC
+	out.PodGatewayIP = in.PodGatewayIP
+	out.PodLinkStatus = in.PodLinkStatus
 	out.StartTime = in.StartTime
 	if in.InitContainerStatuses != nil {
 		in, out := &in.InitContainerStatuses, &out.InitContainerStatuses

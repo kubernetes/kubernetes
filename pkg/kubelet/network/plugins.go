@@ -90,6 +90,19 @@ type PodNetworkStatus struct {
 	//   - service endpoints are constructed with
 	//   - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
+
+	// Gateway is the pod's default gateway.
+	// It will be reported in PodStatus.PODgatewayIP field
+	Gateway net.IP
+
+	// MAC is the pod's hardware network address
+	// It will be reported in PodStatus.PodMAC field
+	MAC net.HardwareAddr `json:"mac" description:"MAC address of the pod"`
+
+	// LinkStatus is the link status of the primary pod interface
+	// it will be reported in PodStatus.PodLinkStatus
+	// TODO: Move away from string representation
+	LinkStatus string
 }
 
 // Host is an interface that plugins can use to access the kubelet.

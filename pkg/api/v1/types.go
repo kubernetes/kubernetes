@@ -1809,6 +1809,16 @@ type PodStatus struct {
 	// IP address allocated to the pod. Routable at least within the cluster.
 	// Empty if not yet allocated.
 	PodIP string `json:"podIP,omitempty" protobuf:"bytes,6,opt,name=podIP"`
+	// MAC address allocated to the pod. Empty if not yet allocated, or if not set by
+	// the Kubelet. Note that in some cases, such as IPVLAN, all the pods on a given node
+	// may share the same MAC address.
+	PodMAC string `json:"podMAC,omitempty" protobuf:"bytes,9,opt,name=podMAC"`
+	// Default gateway for the pod. Empty if not yet allocated, or if not configured
+	// on the pod. This could be the case of a CNI network without a default gateway.
+	PodGatewayIP string `json:"podGatewayIP,omitempty" protobuf:"bytes,10,opt,name=podGatewayIP"`
+	// Current link status of the Pod. Empty if the interface has not yet been
+	// configured.
+	PodLinkStatus string `json:"podLinkStatus,omitempty" protobuf:"bytes,11,opt,name=podLinkStatus"`
 
 	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.

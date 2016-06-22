@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
 	"path"
@@ -322,38 +323,54 @@ var (
 	ErrContainerCannotRun = errors.New("ContainerCannotRun")
 )
 
-// determineContainerIP determines the IP address of the given container.  It is expected
-// that the container passed is the infrastructure container of a pod and the responsibility
-// of the caller to ensure that the correct container is passed.
-func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *dockertypes.ContainerJSON) string {
-	result := ""
+// determineContainerNetworkInfo determines network info such as IP address and MAC for the
+// given container.  It is expected that the container passed is the infrastructure container
+// of a pod and the responsibility of the caller to ensure that the correct container is passed.
+func (dm *DockerManager) determineContainerNetworkInfo(podNamespace, podName string, container *dockertypes.ContainerJSON) *network.PodNetworkStatus {
+	result := &network.PodNetworkStatus{}
 
 	if container.NetworkSettings != nil {
-		result = container.NetworkSettings.IPAddress
+		ip := container.NetworkSettings.IPAddress
+		mac := container.NetworkSettings.MacAddress
 
 		// Fall back to IPv6 address if no IPv4 address is present
-		if result == "" {
-			result = container.NetworkSettings.GlobalIPv6Address
+		if ip == "" {
+			ip = container.NetworkSettings.GlobalIPv6Address
 		}
+		if ip != "" {
+			ipAddr, _, err := net.ParseCIDR(strings.Trim(ip, "\n"))
+			if err != nil {
+				glog.Warningf("Unable to retrieve IP address for container %s: %s", container.ID, err.Error())
+			}
+			result.IP = ipAddr
+		}
+		if mac != "" {
+			macAddr, err := net.ParseMAC(strings.Trim(mac, "\n"))
+			if err != nil {
+				glog.Warningf("Unable to retrieve MAC address for container %s:%s", container.ID, err.Error())
+			}
+			result.MAC = macAddr
+		}
+
+		// TODO: If available, extract network settings information for default gateway
+		// and link status from NetworkSettings.Networks
 	}
 
 	if dm.networkPlugin.Name() != network.DefaultPluginName {
-		netStatus, err := dm.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.DockerID(container.ID).ContainerID())
+		podNetStatus, err := dm.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.DockerID(container.ID).ContainerID())
 		if err != nil {
 			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
-		} else if netStatus != nil {
-			result = netStatus.IP.String()
 		}
+		result = podNetStatus
 	}
 
 	return result
 }
 
-func (dm *DockerManager) inspectContainer(id string, podName, podNamespace string) (*kubecontainer.ContainerStatus, string, error) {
-	var ip string
+func (dm *DockerManager) inspectContainer(id string, podName, podNamespace string) (*kubecontainer.ContainerStatus, *network.PodNetworkStatus, error) {
 	iResult, err := dm.client.InspectContainer(id)
 	if err != nil {
-		return nil, ip, err
+		return nil, nil, err
 	}
 	glog.V(4).Infof("Container inspect result: %+v", *iResult)
 
@@ -361,7 +378,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 	// replaced by checking docker labels eventually.
 	dockerName, hash, err := ParseDockerName(iResult.Name)
 	if err != nil {
-		return nil, ip, fmt.Errorf("Unable to parse docker name %q", iResult.Name)
+		return nil, nil, fmt.Errorf("Unable to parse docker name %q", iResult.Name)
 	}
 	containerName := dockerName.ContainerName
 
@@ -397,9 +414,10 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
 		if containerName == PodInfraContainerName {
-			ip = dm.determineContainerIP(podNamespace, podName, iResult)
+			podNetStatus := dm.determineContainerNetworkInfo(podNamespace, podName, iResult)
+			return &status, podNetStatus, nil
 		}
-		return &status, ip, nil
+		return &status, nil, nil
 	}
 
 	// Find containers that have exited or failed to start.
@@ -449,7 +467,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		// start container function etc.) Kubelet doesn't handle these scenarios yet.
 		status.State = kubecontainer.ContainerStateUnknown
 	}
-	return &status, "", nil
+	return &status, nil, nil
 }
 
 // makeEnvList converts EnvVar list to a list of strings, in the form of
@@ -1157,39 +1175,86 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	return nil
 }
 
-// Get the IP address of a container's interface using nsenter
-func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (string, error) {
+// Get Container Network Information: IP, MAC, Link Status, default gateway - leveraging nsenter
+func (dm *DockerManager) GetContainerNetworkInfo(containerID, interfaceName string) (*network.PodNetworkStatus, error) {
 	_, lookupErr := exec.LookPath("nsenter")
 	if lookupErr != nil {
-		return "", fmt.Errorf("Unable to obtain IP address of container: missing nsenter.")
+		return nil, fmt.Errorf("Unable to obtain IP address of container: missing nsenter.")
 	}
 	container, err := dm.client.InspectContainer(containerID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if !container.State.Running {
-		return "", fmt.Errorf("container not running (%s)", container.ID)
+		return nil, fmt.Errorf("container not running (%s)", container.ID)
 	}
 
 	containerPid := container.State.Pid
-	extractIPCmd := fmt.Sprintf("ip -4 addr show %s | grep inet | awk -F\" \" '{print $2}'", interfaceName)
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
-	command := exec.Command("nsenter", args...)
-	out, err := command.CombinedOutput()
 
-	// Fall back to IPv6 address if no IPv4 address is present
-	if err == nil && string(out) == "" {
-		extractIPCmd = fmt.Sprintf("ip -6 addr show %s scope global | grep inet6 | awk -F\" \" '{print $2}'", interfaceName)
-		args = []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
-		command = exec.Command("nsenter", args...)
-		out, err = command.CombinedOutput()
-	}
+	ipAddrCmd := fmt.Sprintf("ip addr show %s | awk -F\" \" "+
+		"'/%s:/ {match($0,\"state[[:blank:]]+(\\\\w+)[[:blank:]]+\",ls);} "+
+		"/inet6/ {ipv6=$2} "+
+		"/inet/ && !/inet6/ {ip=$2;} "+
+		"/link.*brd/ {mac=$2;} "+
+		"END {print ls[1]\";\"ip\";\"ipv6\";\"mac}'", interfaceName, interfaceName)
+	ipAddrArgs := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", ipAddrCmd}
+	command := exec.Command("nsenter", ipAddrArgs...)
+	ipAddrOut, err := command.CombinedOutput()
 
 	if err != nil {
-		return "", err
+		glog.Errorf("Unable to execute 'ip addr' for interface %s on container %s: %s",
+			interfaceName, containerID, err.Error())
+		return nil, err
 	}
-	return string(out), nil
+
+	ipAddrOutItems := strings.Split(string(ipAddrOut), ";")
+	if len(ipAddrOutItems) != 4 {
+		return nil, fmt.Errorf("Unable to retrieve network info. Expected 4 items, found %d", len(ipAddrOutItems))
+	}
+
+	lsStr := ipAddrOutItems[0]
+	ipStr := ipAddrOutItems[1]
+	ipv6Str := ipAddrOutItems[2]
+	macStr := ipAddrOutItems[3]
+
+	// Fall back to IPv6 address if no IPv4 address is present
+	if ipStr == "" {
+		ipStr = ipv6Str
+	}
+
+	ipRouteCmd := fmt.Sprintf("ip route list to 0.0.0.0/0 | " +
+		"head -n1 | awk -F\" \" '{print $3}'")
+	ipRouteArgs := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", ipRouteCmd}
+	command = exec.Command("nsenter", ipRouteArgs...)
+	ipRouteOut, err := command.CombinedOutput()
+
+	if err != nil {
+		glog.Errorf("Unable to execute 'ip route' for interface %s on container %s: %s",
+			interfaceName, containerID, err.Error())
+		return nil, err
+	}
+
+	gatewayIpStr := string(ipRouteOut)
+
+	ip, _, err := net.ParseCIDR(strings.Trim(ipStr, "\n"))
+	if err != nil {
+		glog.Warningf("Unable to retrieve IP address for %s interface on container %s: %s",
+			interfaceName, containerID, err.Error())
+	}
+	gatewayIp := net.ParseIP(strings.Trim(gatewayIpStr, "\n"))
+	if gatewayIp == nil {
+		glog.Warningf("Unable to retrieve gateway IP for container %s: %s",
+			containerID, err.Error())
+	}
+
+	mac, err := net.ParseMAC(strings.Trim(macStr, "\n"))
+	if err != nil {
+		glog.Warningf("Unable to retrieve MAC address for %s interface on container %s:%s",
+			interfaceName, containerID, err.Error())
+	}
+
+	return &network.PodNetworkStatus{IP: ip, MAC: mac, Gateway: gatewayIp, LinkStatus: lsStr}, nil
 }
 
 // TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
@@ -2020,7 +2085,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			}
 
 			// Overwrite the podIP passed in the pod status, since we just started the infra container.
-			podIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+			podNetStatus := dm.determineContainerNetworkInfo(pod.Name, pod.Namespace, podInfraContainer)
+			podIP = podNetStatus.IP.String()
 		}
 	}
 
@@ -2396,14 +2462,14 @@ func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string)
 		if dockerName.PodUID != uid {
 			continue
 		}
-		result, ip, err := dm.inspectContainer(c.ID, name, namespace)
+		containerStatus, netStatus, err := dm.inspectContainer(c.ID, name, namespace)
 		if err != nil {
 			if _, ok := err.(containerNotFoundError); ok {
 				// https://github.com/kubernetes/kubernetes/issues/22541
 				// Sometimes when docker's state is corrupt, a container can be listed
 				// but couldn't be inspected. We fake a status for this container so
 				// that we can still return a status for the pod to sync.
-				result = &kubecontainer.ContainerStatus{
+				containerStatus = &kubecontainer.ContainerStatus{
 					ID:    kubecontainer.DockerID(c.ID).ContainerID(),
 					Name:  dockerName.ContainerName,
 					State: kubecontainer.ContainerStateUnknown,
@@ -2413,9 +2479,20 @@ func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string)
 				return podStatus, err
 			}
 		}
-		containerStatuses = append(containerStatuses, result)
-		if ip != "" {
-			podStatus.IP = ip
+		containerStatuses = append(containerStatuses, containerStatus)
+		if netStatus != nil {
+			if netStatus.IP != nil {
+				podStatus.IP = netStatus.IP.String()
+			}
+			if netStatus.Gateway != nil {
+				podStatus.GatewayIP = netStatus.Gateway.String()
+			}
+			if netStatus.MAC != nil {
+				podStatus.MAC = netStatus.MAC.String()
+			}
+			if netStatus.LinkStatus != "" {
+				podStatus.LinkStatus = netStatus.LinkStatus
+			}
 		}
 	}
 
