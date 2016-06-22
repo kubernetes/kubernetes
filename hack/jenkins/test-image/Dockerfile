@@ -28,22 +28,23 @@ WORKDIR /workspace
 
 # dnsutils is needed by federation cluster scripts.
 # file is used when uploading test artifacts to GCS.
-# jq is used by hack/verify-godep-licenses.sh.
+# jq is used by hack/verify-godep-licenses.sh
 # python-pip is needed to install the AWS cli.
 # netcat is used by integration test scripts.
-RUN apt-get update && apt-get install -y \
-  dnsutils \
-  file \
-  jq \
-  python-pip \
-  netcat-openbsd \
-  rsync \
-  && rm -rf /var/lib/apt/lists/*
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y \
+	dnsutils \
+	file \
+	jq \
+	python-pip \
+	netcat-openbsd \
+	rsync \
+	--no-install-recommends \
+	&& rm -rf /var/lib/apt/lists/*
 
 RUN curl -L "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz" |\
   tar -C /usr/bin -xvzf- --strip-components=3 usr/local/bin/docker
 
-RUN mkdir -p /go/src/k8s.io/kubernetes
-RUN ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
+RUN mkdir -p /go/src/k8s.io/kubernetes \
+	&& ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
 
 RUN /bin/bash
