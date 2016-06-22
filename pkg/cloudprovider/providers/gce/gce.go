@@ -69,6 +69,9 @@ const (
 	// are iterated through to prevent infinite loops if the API
 	// were to continuously return a nextPageToken.
 	maxPages = 25
+
+	// Target Pool creation is limited to 200 instances.
+	maxTargetPoolCreateInstances = 200
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -660,10 +663,27 @@ func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP,
 	// Once we've deleted the resources (if necessary), build them back up (or for
 	// the first time if they're new).
 	if tpNeedsUpdate {
-		if err := gce.createTargetPool(name, serviceName, region, hosts, affinityType); err != nil {
+		createInstances := hosts
+		if len(hosts) > maxTargetPoolCreateInstances {
+			createInstances = createInstances[:maxTargetPoolCreateInstances]
+		}
+
+		if err := gce.createTargetPool(name, serviceName, region, createInstances, affinityType); err != nil {
 			return nil, fmt.Errorf("failed to create target pool %s: %v", name, err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created target pool", name, serviceName)
+		if len(hosts) <= maxTargetPoolCreateInstances {
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created target pool", name, serviceName)
+		} else {
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created initial target pool (now updating with %d hosts)", name, serviceName, len(hosts)-maxTargetPoolCreateInstances)
+
+			created := sets.NewString()
+			for _, host := range createInstances {
+				created.Insert(host.makeComparableHostPath())
+			}
+			if err := gce.updateTargetPool(name, region, created, hosts); err != nil {
+				return nil, fmt.Errorf("failed to update target pool %s: %v", name, err)
+			}
+		}
 	}
 	if tpNeedsUpdate || fwdRuleNeedsUpdate {
 		if err := gce.createForwardingRule(name, serviceName, region, ipAddress, ports); err != nil {
@@ -1103,6 +1123,10 @@ func (gce *GCECloud) UpdateLoadBalancer(name, region string, hostNames []string)
 		existing.Insert(hostURLToComparablePath(instance))
 	}
 
+	return gce.updateTargetPool(name, region, existing, hosts)
+}
+
+func (gce *GCECloud) updateTargetPool(name, region string, existing sets.String, hosts []*gceInstance) error {
 	var toAdd []*compute.InstanceReference
 	var toRemove []*compute.InstanceReference
 	for _, host := range hosts {
