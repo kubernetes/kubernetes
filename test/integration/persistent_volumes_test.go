@@ -340,6 +340,98 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	}
 }
 
+// TestPersistentVolumeClaimLabelSelectorMatchExpressions test binding using
+// MatchExpressions label selectors
+func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	deleteAllEtcdKeys()
+	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	defer watchPV.Stop()
+	defer watchPVC.Stop()
+
+	controller.Run()
+	defer controller.Stop()
+
+	var (
+		err     error
+		modes   = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+		reclaim = api.PersistentVolumeReclaimRetain
+
+		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
+		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
+		pvc      = createPVC("pvc-ls-1", "1G", modes)
+	)
+
+	pv_true.ObjectMeta.SetLabels(map[string]string{"foo": "valA", "bar": ""})
+	pv_false.ObjectMeta.SetLabels(map[string]string{"foo": "valB", "baz": ""})
+
+	_, err = testClient.PersistentVolumes().Create(pv_true)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolume: %v", err)
+	}
+	_, err = testClient.PersistentVolumes().Create(pv_false)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolume: %v", err)
+	}
+	t.Log("volumes created")
+
+	pvc.Spec.Selector = &unversioned.LabelSelector{
+		MatchExpressions: []unversioned.LabelSelectorRequirement{
+			{
+				Key:      "foo",
+				Operator: unversioned.LabelSelectorOpIn,
+				Values:   []string{"valA"},
+			},
+			{
+				Key:      "foo",
+				Operator: unversioned.LabelSelectorOpNotIn,
+				Values:   []string{"valB"},
+			},
+			{
+				Key:      "bar",
+				Operator: unversioned.LabelSelectorOpExists,
+				Values:   []string{},
+			},
+			{
+				Key:      "baz",
+				Operator: unversioned.LabelSelectorOpDoesNotExist,
+				Values:   []string{},
+			},
+		},
+	}
+
+	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	if err != nil {
+		t.Fatalf("Failed to create PersistentVolumeClaim: %v", err)
+	}
+	t.Log("claim created")
+
+	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
+	t.Log("volume bound")
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	t.Log("claim bound")
+
+	pv, err := testClient.PersistentVolumes().Get("pv-false")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef != nil {
+		t.Fatalf("False PV shouldn't be bound")
+	}
+	pv, err = testClient.PersistentVolumes().Get("pv-true")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pv: %v", err)
+	}
+	if pv.Spec.ClaimRef == nil {
+		t.Fatalf("True PV should be bound")
+	}
+	if pv.Spec.ClaimRef.Namespace != pvc.Namespace || pv.Spec.ClaimRef.Name != pvc.Name {
+		t.Fatalf("Bind mismatch! Expected %s/%s but got %s/%s", pvc.Namespace, pvc.Name, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	}
+}
+
 // TestPersistentVolumeMultiPVs tests binding of one PVC to 100 PVs with
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
