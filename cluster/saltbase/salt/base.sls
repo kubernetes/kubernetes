@@ -50,3 +50,10 @@ net.ipv4.neigh.default.gc_thresh1:
     - user: root
     - group: root
     - mode: 644
+
+/usr/local/share/doc/kubernetes/kubernetes-src.tar.gz:
+  file.managed:
+    - source: salt://kube-docs/kubernetes-src.tar.gz
+    - user: root
+    - group: root
+    - mode: 644
