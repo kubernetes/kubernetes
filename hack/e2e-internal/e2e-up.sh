@@ -29,16 +29,42 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
+function calc_next_cidr {
+    IFS=/ read -r ip mask <<< "${1}"
+    local inc="$((1 << 32-${mask}))"
+    local o1 o2 o3 o4
+    IFS=. read -r o1 o2 o3 o4 <<< "${ip}"
+    local ip_int="$((o1 * 256 ** 3 + o2 * 256 ** 2 + o3 * 256 + o4))"
+    local next_ip_int="$((ip_int + inc))"
+    local next_ip
+    for e in {3..0}
+    do
+        ((octet = next_ip_int / (256 ** e) ))
+        ((next_ip_int -= octet * 256 ** e))
+        next_ip+=${delim:-}${octet}
+        delim=.
+    done
+    echo "${next_ip}/${mask}"
+}
+
 if [[ "${FEDERATION:-}" == "true" ]];then
+    FEDERATION_START_CLUSTER_IP_RANGE="${FEDERATION_START_CLUSTER_IP_RANGE:-10.180.0.0/14}"
+    next_cidr=${FEDERATION_START_CLUSTER_IP_RANGE}
     #TODO(colhom): the last cluster that was created in the loop above is the current context.
     # Hence, it will be the cluster that hosts the federated components.
     # In the future, we will want to loop through the all the federated contexts,
     # select each one and call federated-up
-    for zone in ${E2E_ZONES};do
-	(
-	    set-federation-zone-vars "$zone"
-	    test-setup
-	)
+    for zone in ${E2E_ZONES}; do
+        (
+        # This variable should be exported because it is used by scripts which are executed
+        # in their own shells.
+        export CLUSTER_IP_RANGE=${next_cidr}
+        set-federation-zone-vars "$zone"
+        test-setup
+        )
+        # This must be calculated outside the subshell to have an effect in the
+        # next iteration of the loop.
+        next_cidr="$(calc_next_cidr ${next_cidr})"
     done
     tagfile="${KUBE_ROOT}/federation/manifests/federated-image.tag"
     if [[ ! -f "$tagfile" ]]; then
