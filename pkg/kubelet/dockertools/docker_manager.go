@@ -2318,6 +2318,16 @@ func (dm *DockerManager) GetNetNS(containerID kubecontainer.ContainerID) (string
 	return netnsPath, nil
 }
 
+func (dm *DockerManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
+	for _, c := range pod.Containers {
+		if c.Name == PodInfraContainerName {
+			return c.ID, nil
+		}
+	}
+
+	return kubecontainer.ContainerID{}, fmt.Errorf("Pod %s unknown to docker.", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
+}
+
 // Garbage collection of dead containers
 func (dm *DockerManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	return dm.containerGC.GarbageCollect(gcPolicy, allSourcesReady)
