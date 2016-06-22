@@ -18,6 +18,7 @@ package dockertools
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -34,196 +35,210 @@ import (
 //  * label setters and getters
 //  * label filters (maybe in the future)
 
+// Version label indicates the version of labels on a container. Whenever we make incompatible changes
+// to the labels, we should bump up the current label version.
 const (
-	kubernetesPodDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
-	kubernetesPodTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
-
-	kubernetesContainerHashLabel                   = "io.kubernetes.container.hash"
-	kubernetesContainerRestartCountLabel           = "io.kubernetes.container.restartCount"
-	kubernetesContainerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
-	kubernetesContainerPreStopHandlerLabel         = "io.kubernetes.container.preStopHandler"
-
-	// TODO(random-liu): Keep this for old containers, remove this when we drop support for v1.1.
-	kubernetesPodLabel = "io.kubernetes.pod.data"
-
-	cadvisorPrometheusMetricsLabel = "io.cadvisor.metric.prometheus"
+	versionLabel        = "io.kubernetes.label-version"
+	currentLabelVersion = "v1"
 )
 
-// Container information which has been labelled on each docker container
-// TODO(random-liu): The type of Hash should be compliance with kubelet container status.
-type labelledContainerInfo struct {
-	PodName                   string
-	PodNamespace              string
-	PodUID                    kubetypes.UID
-	PodDeletionGracePeriod    *int64
-	PodTerminationGracePeriod *int64
-	Name                      string
-	Hash                      string
-	RestartCount              int
-	TerminationMessagePath    string
-	PreStopHandler            *api.Handler
+// Labels supported now
+const (
+	// Labels added from kubernetes v1.1. Invluding types.Kubernetes.KubernetesPodNameLabel,
+	// types.KubernetesContainerNameLabel
+	// Notice that the podNameLabel contains namespaced pod name in v1.1. However because we don't
+	// really rely on the pod name now, it should be fine.
+	// TODO(random-liu): Remove the comment above when we drop support for v1.1
+
+	// Labels added from kubernetes v1.2. Including types.KubernetesPodNamespaceLabel, types.KubernetesPodUIDLabel
+	containerHashLabel             = "io.kubernetes.container.hash"
+	cadvisorPrometheusMetricsLabel = "io.cadvisor.metric.prometheus"
+
+	// Labels added from kubernetes v1.3
+	containerInfoLabel = "io.kubernetes.container.info"
+)
+
+// containerMeta is the metadata we need to labelled on each docker container. Each field will be one
+// label on the container. We could also use the label to select specific containers in the future.
+// Notice that the container meta should seldom or never change.
+type containerMeta struct {
+	PodName      string
+	PodNamespace string
+	PodUID       kubetypes.UID
+	Name         string
+	Hash         string
 }
 
-func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableCustomMetrics bool) map[string]string {
+// containerSpec is the pod and container spec we need to checkpoint for each container, it is part
+// of containerInfo.
+type containerSpec struct {
+	Ports                     []api.ContainerPort `json:"ports"`
+	TerminationMessagePath    string              `json:"terminationMessagePath"`
+	PodDeletionGracePeriod    *int64              `json:"podDeletionGracePeriod,omitempty"`
+	PodTerminationGracePeriod *int64              `json:"podTerminationGracePeriod,omitempty"`
+	PreStopHandler            *api.Handler        `json:"preStopHandler,omitempty"`
+}
+
+// containerInfo is all the information we need to checkpoint as the docker label for each docker
+// container. The whole ContainerInfo will be serialized and checkpointed as one label.
+type containerInfo struct {
+	containerMeta `json:"-"`
+	containerSpec
+	// LastStatus is the status of the previous container. If the current container is the
+	// first one, this field should be nil. With this, we can remove historical containers as
+	// soon as the new one is created.
+	// However, because kubelet may work with old containers without containerInfo, we still
+	// can't rely on this field. We only use it to calculate restart count for now.
+	// TODO(random-liu): Start to rely on this after we drop support for v1.2
+	LastStatus *kubecontainer.ContainerStatus `json:"lastStatus, omitempty"`
+}
+
+func newLabels(container *api.Container, pod *api.Pod, lastStatus *kubecontainer.ContainerStatus, enableCustomMetrics bool) map[string]string {
 	labels := map[string]string{}
+	// Apply container meta
+	labels[versionLabel] = currentLabelVersion
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
-	if pod.DeletionGracePeriodSeconds != nil {
-		labels[kubernetesPodDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
-	}
-	if pod.Spec.TerminationGracePeriodSeconds != nil {
-		labels[kubernetesPodTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
-	}
-
 	labels[types.KubernetesContainerNameLabel] = container.Name
-	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(restartCount)
-	labels[kubernetesContainerTerminationMessagePathLabel] = container.TerminationMessagePath
-	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
-		// Using json enconding so that the PreStop handler object is readable after writing as a label
-		rawPreStop, err := json.Marshal(container.Lifecycle.PreStop)
-		if err != nil {
-			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
-		} else {
-			labels[kubernetesContainerPreStopHandlerLabel] = string(rawPreStop)
-		}
-	}
+	labels[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 
+	// Apply container info
+	info := &containerInfo{
+		containerSpec: containerSpec{
+			Ports: container.Ports,
+			TerminationMessagePath:    container.TerminationMessagePath,
+			PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
+			PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
+		},
+		LastStatus: lastStatus,
+	}
+	if container.Lifecycle != nil {
+		info.PreStopHandler = container.Lifecycle.PreStop
+	}
+	raw, err := json.Marshal(info)
+	if err != nil {
+		glog.Errorf("Unable to marshal container info %+v for container %q of pod %q: %v", *info, container.Name, format.Pod(pod), err)
+	}
+	labels[containerInfoLabel] = string(raw)
+
+	// Special label used by cadvisor
 	if enableCustomMetrics {
 		path, err := custommetrics.GetCAdvisorCustomMetricsDefinitionPath(container)
 		if path != nil && err == nil {
 			labels[cadvisorPrometheusMetricsLabel] = *path
 		}
 	}
-
 	return labels
 }
 
-func getContainerInfoFromLabel(labels map[string]string) *labelledContainerInfo {
-	var err error
-	containerInfo := &labelledContainerInfo{
-		PodName:      getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
-		PodNamespace: getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
-		PodUID:       kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
-		Name:         getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
-		Hash:         getStringValueFromLabel(labels, kubernetesContainerHashLabel),
-		TerminationMessagePath: getStringValueFromLabel(labels, kubernetesContainerTerminationMessagePathLabel),
+func getContainerInfoFromLabel(labels map[string]string) containerInfo {
+	meta := containerMeta{
+		PodName:      types.GetPodName(labels),
+		PodNamespace: types.GetPodNamespace(labels),
+		PodUID:       kubetypes.UID(types.GetPodUID(labels)),
+		Name:         types.GetContainerName(labels),
+		Hash:         getStringFromLabel(labels, containerHashLabel),
 	}
-	if containerInfo.RestartCount, err = getIntValueFromLabel(labels, kubernetesContainerRestartCountLabel); err != nil {
-		logError(containerInfo, kubernetesContainerRestartCountLabel, err)
+	info := containerInfo{containerMeta: meta}
+	version := getStringFromLabel(labels, versionLabel)
+	if version != currentLabelVersion {
+		updateContainerInfoWithOldLabels(labels, &info)
+		return info
 	}
-	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(labels, kubernetesPodDeletionGracePeriodLabel); err != nil {
-		logError(containerInfo, kubernetesPodDeletionGracePeriodLabel, err)
+	err := getJsonObjectFromLabel(labels, containerInfoLabel, &info)
+	if err != nil {
+		logLabelError(meta, containerInfoLabel, err)
 	}
-	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(labels, kubernetesPodTerminationGracePeriodLabel); err != nil {
-		logError(containerInfo, kubernetesPodTerminationGracePeriodLabel, err)
-	}
-	preStopHandler := &api.Handler{}
-	if found, err := getJsonObjectFromLabel(labels, kubernetesContainerPreStopHandlerLabel, preStopHandler); err != nil {
-		logError(containerInfo, kubernetesContainerPreStopHandlerLabel, err)
-	} else if found {
-		containerInfo.PreStopHandler = preStopHandler
-	}
-	supplyContainerInfoWithOldLabel(labels, containerInfo)
-	return containerInfo
+	return info
 }
 
-func getStringValueFromLabel(labels map[string]string, label string) string {
-	if value, found := labels[label]; found {
-		return value
+func getStringFromLabel(labels map[string]string, label string) string {
+	value, found := labels[label]
+	if !found {
+		// Do not report error for now, because there should be many old containers without label now.
+		glog.V(4).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+		// Return empty string "" for these containers, the caller will get value by other means.
+		return ""
 	}
-	// Do not report error, because there should be many old containers without label now.
-	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
-	// Return empty string "" for these containers, the caller will get value by other ways.
-	return ""
-}
-
-func getIntValueFromLabel(labels map[string]string, label string) (int, error) {
-	if strValue, found := labels[label]; found {
-		intValue, err := strconv.Atoi(strValue)
-		if err != nil {
-			// This really should not happen. Just set value to 0 to handle this abnormal case
-			return 0, err
-		}
-		return intValue, nil
-	}
-	// Do not report error, because there should be many old containers without label now.
-	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
-	// Just set the value to 0
-	return 0, nil
-}
-
-func getInt64PointerFromLabel(labels map[string]string, label string) (*int64, error) {
-	if strValue, found := labels[label]; found {
-		int64Value, err := strconv.ParseInt(strValue, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		return &int64Value, nil
-	}
-	// Because it's normal that a container has no PodDeletionGracePeriod and PodTerminationGracePeriod label,
-	// don't report any error here.
-	return nil, nil
+	return value
 }
 
 // getJsonObjectFromLabel returns a bool value indicating whether an object is found
-func getJsonObjectFromLabel(labels map[string]string, label string, value interface{}) (bool, error) {
-	if strValue, found := labels[label]; found {
-		err := json.Unmarshal([]byte(strValue), value)
-		return found, err
+func getJsonObjectFromLabel(labels map[string]string, label string, value interface{}) error {
+	strValue, found := labels[label]
+	if !found {
+		return labelNotFoundError(label)
 	}
-	// Because it's normal that a container has no PreStopHandler label, don't report any error here.
-	return false, nil
+	err := json.Unmarshal([]byte(strValue), value)
+	if err != nil {
+		return parseLabelError(label, strValue, err)
+	}
+	return nil
 }
 
-// The label kubernetesPodLabel is added a long time ago (#7421), it serialized the whole api.Pod to a docker label.
+func logLabelError(meta containerMeta, label string, err error) {
+	glog.Errorf("Unable to get %q for container %q of pod %q: %v", label, meta.Name,
+		kubecontainer.BuildPodFullName(meta.PodName, meta.PodNamespace), err)
+}
+
+func parseLabelError(label string, value string, err error) error {
+	return fmt.Errorf("unable to parse label %q: value=%q, error=%v", label, value, err)
+}
+
+func labelNotFoundError(label string) error {
+	return fmt.Errorf("label %q not found", label)
+}
+
+// TODO(random-liu): Remove the following code when we drop support for v1.2.
+// Backward compatible labels for kubernetes v1.1 and before.
+const (
+	// podLabel is only set when the container has PreStop handler
+	podLabel                       = "io.kubernetes.pod.data"
+	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
+)
+
+// The label podLabel is added a long time ago (#7421), it serialized the whole api.Pod to a docker label.
 // We want to remove this label because it serialized too much useless information. However kubelet may still work
 // with old containers which only have this label for a long time until we completely deprecate the old label.
 // Before that to ensure correctness we have to supply information with the old labels when newly added labels
 // are not available.
-// TODO(random-liu): Remove this function when we can completely remove label kubernetesPodLabel, probably after
-// dropping support for v1.1.
-func supplyContainerInfoWithOldLabel(labels map[string]string, containerInfo *labelledContainerInfo) {
+func updateContainerInfoWithOldLabels(labels map[string]string, info *containerInfo) {
+	if s, found := labels[podTerminationGracePeriodLabel]; found {
+		terminationGracePeriod, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			logLabelError(info.containerMeta, podTerminationGracePeriodLabel, err)
+		} else {
+			info.PodTerminationGracePeriod = &terminationGracePeriod
+		}
+	}
 	// Get api.Pod from old label
 	var pod *api.Pod
-	data, found := labels[kubernetesPodLabel]
+	data, found := labels[podLabel]
 	if !found {
-		// Don't report any error here, because it's normal that a container has no pod label, especially
-		// when we gradually deprecate the old label
 		return
 	}
 	pod = &api.Pod{}
 	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(data), pod); err != nil {
-		// If the pod label can't be parsed, we should report an error
-		logError(containerInfo, kubernetesPodLabel, err)
+		logLabelError(info.containerMeta, podLabel, err)
 		return
 	}
-	if containerInfo.PodDeletionGracePeriod == nil {
-		containerInfo.PodDeletionGracePeriod = pod.DeletionGracePeriodSeconds
-	}
-	if containerInfo.PodTerminationGracePeriod == nil {
-		containerInfo.PodTerminationGracePeriod = pod.Spec.TerminationGracePeriodSeconds
-	}
+	info.PodDeletionGracePeriod = pod.DeletionGracePeriodSeconds
+	info.PodTerminationGracePeriod = pod.Spec.TerminationGracePeriodSeconds
 
 	// Get api.Container from api.Pod
 	var container *api.Container
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name == containerInfo.Name {
+		if pod.Spec.Containers[i].Name == info.Name {
 			container = &pod.Spec.Containers[i]
 			break
 		}
 	}
 	if container == nil {
-		glog.Errorf("Unable to find container %q in pod %q", containerInfo.Name, format.Pod(pod))
+		glog.Errorf("Unable to find container %q in pod %q", info.Name, format.Pod(pod))
 		return
 	}
-	if containerInfo.PreStopHandler == nil && container.Lifecycle != nil {
-		containerInfo.PreStopHandler = container.Lifecycle.PreStop
-	}
-}
-
-func logError(containerInfo *labelledContainerInfo, label string, err error) {
-	glog.Errorf("Unable to get %q for container %q of pod %q: %v", label, containerInfo.Name,
-		kubecontainer.BuildPodFullName(containerInfo.PodName, containerInfo.PodNamespace), err)
+	info.Ports = container.Ports
+	info.TerminationMessagePath = container.TerminationMessagePath
+	info.PreStopHandler = container.Lifecycle.PreStop
 }
