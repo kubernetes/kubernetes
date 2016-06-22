@@ -121,7 +121,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		glog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	inputs := sets.NewString(arguments.InputDirs...)
+	inputs := sets.NewString(context.Inputs...)
 	packages := generator.Packages{}
 	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
 	header = append(header, []byte(

@@ -70,11 +70,10 @@ func main() {
 	// Override defaults. These are Kubernetes specific input and output
 	// locations.
 	arguments.InputDirs = []string{
-		"k8s.io/kubernetes/pkg/",
-		"k8s.io/kubernetes/cmd/",
-		"k8s.io/kubernetes/plugin/",
+		"k8s.io/kubernetes/pkg/...",
+		"k8s.io/kubernetes/cmd/...",
+		"k8s.io/kubernetes/plugin/...",
 	}
-	arguments.Recursive = true
 	// arguments.VerifyOnly = true
 
 	if err := arguments.Execute(

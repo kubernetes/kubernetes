@@ -129,7 +129,9 @@ func (b *Builder) buildPackage(pkgPath string) (*build.Package, error) {
 	}
 	pkg, err = b.context.Import(pkgPath, cwd, build.ImportComment)
 	if err != nil {
-		return nil, fmt.Errorf("unable to import %q: %v", pkgPath, err)
+		if _, ok := err.(*build.NoGoError); !ok {
+			return nil, fmt.Errorf("unable to import %q: %v", pkgPath, err)
+		}
 	}
 	b.buildInfo[pkgPath] = pkg
 
@@ -348,6 +350,20 @@ func (b *Builder) makePackages() error {
 		}
 	}
 	return nil
+}
+
+// FindPackages fetches a list of the user-imported packages.
+func (b *Builder) FindPackages() []string {
+	result := []string{}
+	for pkgPath := range b.pkgs {
+		if b.userRequested[pkgPath] {
+			// Since walkType is recursive, all types that are in packages that
+			// were directly mentioned will be included.  We don't need to
+			// include all types in all transitive packages, though.
+			result = append(result, pkgPath)
+		}
+	}
+	return result
 }
 
 // FindTypes finalizes the package imports, and searches through all the
