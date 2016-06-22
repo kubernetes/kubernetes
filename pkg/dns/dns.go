@@ -125,6 +125,7 @@ func NewKubeDNS(client clientset.Interface, domain string, federations map[strin
 		domain:           domain,
 		cache:            NewTreeCache(),
 		cacheLock:        sync.RWMutex{},
+		nodesStore:       kcache.NewStore(kcache.MetaNamespaceKeyFunc),
 		reverseRecordMap: make(map[string]*skymsg.Service),
 		domainPath:       reverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
 		federations:      federations,
