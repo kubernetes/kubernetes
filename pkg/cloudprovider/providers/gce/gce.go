@@ -38,7 +38,6 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
-	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -71,8 +70,8 @@ const (
 	// were to continuously return a nextPageToken.
 	maxPages = 25
 
-	// TargetPools can only support 1000 VMs.
-	maxInstancesPerTargetPool = 1000
+	// Target Pool creation is limited to 200 instances.
+	maxTargetPoolCreateInstances = 200
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -126,11 +125,6 @@ type Disks interface {
 	// representing this PD, namely failure domain and zone.
 	GetAutoLabelsForPD(name string) (map[string]string, error)
 }
-
-type instRefSlice []*compute.InstanceReference
-
-func (p instRefSlice) Len() int      { return len(p) }
-func (p instRefSlice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
 
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
@@ -546,7 +540,7 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 	affinityType := apiService.Spec.SessionAffinity
 
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
-	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", loadBalancerName, gce.region, loadBalancerIP, portStr, hosts, serviceName, apiService.Annotations)
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", loadBalancerName, gce.region, loadBalancerIP, portStr, hostNames, serviceName, apiService.Annotations)
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
 	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(loadBalancerName, gce.region, loadBalancerIP, ports)
@@ -715,10 +709,27 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 	// Once we've deleted the resources (if necessary), build them back up (or for
 	// the first time if they're new).
 	if tpNeedsUpdate {
-		if err := gce.createTargetPool(loadBalancerName, serviceName.String(), gce.region, hosts, affinityType); err != nil {
+		createInstances := hosts
+		if len(hosts) > maxTargetPoolCreateInstances {
+			createInstances = createInstances[:maxTargetPoolCreateInstances]
+		}
+
+		if err := gce.createTargetPool(loadBalancerName, serviceName.String(), gce.region, createInstances, affinityType); err != nil {
 			return nil, fmt.Errorf("failed to create target pool %s: %v", loadBalancerName, err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created target pool", loadBalancerName, serviceName)
+		if len(hosts) <= maxTargetPoolCreateInstances {
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created target pool", loadBalancerName, serviceName)
+		} else {
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created initial target pool (now updating with %d hosts)", loadBalancerName, serviceName, len(hosts)-maxTargetPoolCreateInstances)
+
+			created := sets.NewString()
+			for _, host := range createInstances {
+				created.Insert(host.makeComparableHostPath())
+			}
+			if err := gce.updateTargetPool(loadBalancerName, created, hosts); err != nil {
+				return nil, fmt.Errorf("failed to update target pool %s: %v", loadBalancerName, err)
+			}
+		}
 	}
 	if tpNeedsUpdate || fwdRuleNeedsUpdate {
 		if err := gce.createForwardingRule(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports); err != nil {
@@ -907,22 +918,11 @@ func (gce *GCECloud) createForwardingRule(name, serviceName, region, ipAddress s
 	return nil
 }
 
-func restrictTargetPool(instances []string, max int) []string {
-	if len(instances) <= max {
-		return instances
-	}
-	rand.Shuffle(sort.StringSlice(instances))
-	return instances[:max]
-}
-
 func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []*gceInstance, affinityType api.ServiceAffinity) error {
 	var instances []string
 	for _, host := range hosts {
 		instances = append(instances, makeHostURL(gce.projectID, host.Zone, host.Name))
 	}
-	// Choose a random subset of nodes to send traffic to, if we
-	// exceed API maximums.
-	instances = restrictTargetPool(instances, maxInstancesPerTargetPool)
 	pool := &compute.TargetPool{
 		Name:            name,
 		Description:     fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName),
@@ -1158,42 +1158,6 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 	return address.Address, existed, nil
 }
 
-// computeUpdate takes the existing TargetPool and the set of running
-// instances and returns (toAdd, toRemove), the set of instances to
-// reprogram on the TargetPool this reconcile. max restricts the
-// number of nodes allowed to be programmed on the TargetPool.
-func computeUpdate(tp *compute.TargetPool, instances []*gceInstance, max int) ([]*compute.InstanceReference, []*compute.InstanceReference) {
-	existing := sets.NewString()
-	for _, instance := range tp.Instances {
-		existing.Insert(hostURLToComparablePath(instance))
-	}
-
-	var toAdd []*compute.InstanceReference
-	var toRemove []*compute.InstanceReference
-	for _, host := range instances {
-		link := host.makeComparableHostPath()
-		if !existing.Has(link) {
-			toAdd = append(toAdd, &compute.InstanceReference{Instance: link})
-		}
-		existing.Delete(link)
-	}
-	for link := range existing {
-		toRemove = append(toRemove, &compute.InstanceReference{Instance: link})
-	}
-
-	if len(tp.Instances)+len(toAdd)-len(toRemove) > max {
-		// TODO(zmerlynn): In theory, there are faster ways to handle
-		// this if room is much smaller than len(toAdd). In practice,
-		// meh.
-		room := max - len(tp.Instances) + len(toRemove)
-		glog.Infof("TargetPool maximums exceeded, shuffling in %d instances", room)
-		rand.Shuffle(instRefSlice(toAdd))
-		toAdd = toAdd[:room]
-	}
-
-	return toAdd, toRemove
-}
-
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
 func (gce *GCECloud) UpdateLoadBalancer(service *api.Service, hostNames []string) error {
 	hosts, err := gce.getInstancesByNames(hostNames)
@@ -1206,11 +1170,31 @@ func (gce *GCECloud) UpdateLoadBalancer(service *api.Service, hostNames []string
 	if err != nil {
 		return err
 	}
+	existing := sets.NewString()
+	for _, instance := range pool.Instances {
+		existing.Insert(hostURLToComparablePath(instance))
+	}
 
-	toAdd, toRemove := computeUpdate(pool, hosts, maxInstancesPerTargetPool)
-	if len(toRemove) > 0 {
-		rm := &compute.TargetPoolsRemoveInstanceRequest{Instances: toRemove}
-		op, err := gce.service.TargetPools.RemoveInstance(gce.projectID, gce.region, loadBalancerName, rm).Do()
+	return gce.updateTargetPool(loadBalancerName, existing, hosts)
+}
+
+func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.String, hosts []*gceInstance) error {
+	var toAdd []*compute.InstanceReference
+	var toRemove []*compute.InstanceReference
+	for _, host := range hosts {
+		link := host.makeComparableHostPath()
+		if !existing.Has(link) {
+			toAdd = append(toAdd, &compute.InstanceReference{Instance: link})
+		}
+		existing.Delete(link)
+	}
+	for link := range existing {
+		toRemove = append(toRemove, &compute.InstanceReference{Instance: link})
+	}
+
+	if len(toAdd) > 0 {
+		add := &compute.TargetPoolsAddInstanceRequest{Instances: toAdd}
+		op, err := gce.service.TargetPools.AddInstance(gce.projectID, gce.region, loadBalancerName, add).Do()
 		if err != nil {
 			return err
 		}
@@ -1219,9 +1203,9 @@ func (gce *GCECloud) UpdateLoadBalancer(service *api.Service, hostNames []string
 		}
 	}
 
-	if len(toAdd) > 0 {
-		add := &compute.TargetPoolsAddInstanceRequest{Instances: toAdd}
-		op, err := gce.service.TargetPools.AddInstance(gce.projectID, gce.region, loadBalancerName, add).Do()
+	if len(toRemove) > 0 {
+		rm := &compute.TargetPoolsRemoveInstanceRequest{Instances: toRemove}
+		op, err := gce.service.TargetPools.RemoveInstance(gce.projectID, gce.region, loadBalancerName, rm).Do()
 		if err != nil {
 			return err
 		}
@@ -1237,14 +1221,10 @@ func (gce *GCECloud) UpdateLoadBalancer(service *api.Service, hostNames []string
 	if err != nil {
 		return err
 	}
-	wantInstances := len(hosts)
-	if wantInstances > maxInstancesPerTargetPool {
-		wantInstances = maxInstancesPerTargetPool
-	}
-	if len(updatedPool.Instances) != wantInstances {
+	if len(updatedPool.Instances) != len(hosts) {
 		glog.Errorf("Unexpected number of instances (%d) in target pool %s after updating (expected %d). Instances in updated pool: %s",
-			len(updatedPool.Instances), loadBalancerName, wantInstances, strings.Join(updatedPool.Instances, ","))
-		return fmt.Errorf("Unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), loadBalancerName, wantInstances)
+			len(updatedPool.Instances), loadBalancerName, len(hosts), strings.Join(updatedPool.Instances, ","))
+		return fmt.Errorf("Unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), loadBalancerName, len(hosts))
 	}
 	return nil
 }
