@@ -216,7 +216,7 @@ var _ = framework.KubeDescribe("Addon update", func() {
 	})
 
 	// WARNING: the test is not parallel-friendly!
-	It("should propagate add-on file changes", func() {
+	It("should propagate add-on file changes [Slow]", func() {
 		// This test requires:
 		// - SSH
 		// - master access
