@@ -87,7 +87,7 @@ fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   detect-node-instance-groups
-  NODE_INSTANCE_GROUP=$(kube::util::join , NODE_INSTANCE_GROUPS)
+  NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUPS[@]}")
 fi
 
 ginkgo_args=()
