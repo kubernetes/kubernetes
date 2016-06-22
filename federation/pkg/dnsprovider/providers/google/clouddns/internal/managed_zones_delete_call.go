@@ -28,5 +28,5 @@ var _ interfaces.ManagedZonesDeleteCall = ManagedZonesDeleteCall{}
 type ManagedZonesDeleteCall struct{ impl *dns.ManagedZonesDeleteCall }
 
 func (call ManagedZonesDeleteCall) Do(opts ...googleapi.CallOption) error {
-	return call.Do(opts...)
+	return call.impl.Do(opts...)
 }
