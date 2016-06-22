@@ -137,7 +137,7 @@ func removeLabelOffNode(c *client.Client, nodeName string, labelKey string) {
 	framework.ExpectNoError(err)
 
 	By("verifying the node doesn't have the label " + labelKey)
-	if nodeUpdated.Labels != nil || len(nodeUpdated.Labels[labelKey]) != 0 {
+	if nodeUpdated.Labels == nil || len(nodeUpdated.Labels[labelKey]) != 0 {
 		framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
 	}
 }
