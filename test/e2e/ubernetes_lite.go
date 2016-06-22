@@ -38,13 +38,13 @@ var _ = framework.KubeDescribe("Ubernetes Lite", func() {
 	var err error
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
 	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.Client)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
 		framework.SkipUnlessAtLeast(zoneCount, 2, "Zone count is %d, only run for multi-zone clusters, skipping test")
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	It("should spread the pods of a service across zones", func() {
