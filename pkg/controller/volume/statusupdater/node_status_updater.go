@@ -121,6 +121,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 
 		glog.V(3).Infof(
 			"Updating status for node %q succeeded. patchBytes: %q",
+			nodeName,
 			string(patchBytes))
 	}
 	return nil
