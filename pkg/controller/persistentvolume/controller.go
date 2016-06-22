@@ -1131,6 +1131,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
+		PVCName:                       claim.Name,
 	}
 
 	// Provision the volume
