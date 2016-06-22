@@ -199,3 +199,31 @@ func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name stri
 func (plugin *NoopNetworkPlugin) Status() error {
 	return nil
 }
+
+// GetPodIP gets the IP of the pod by inspecting the network info inside the pod's network namespace.
+func GetPodIP(execer utilexec.Interface, id kubecontainer.ContainerID, nsenterPath, netnsPath, interfaceName string) (net.IP, error) {
+	// Try to retrieve ip inside container network namespace
+	output, err := execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
+		"ip", "-o", "-4", "addr", "show", "dev", interfaceName).CombinedOutput()
+
+	// Fall back to IPv6 address if no IPv4 address is present.
+	if err == nil && string(output) == "" {
+		output, err = execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
+			"ip", "-o", "-6", "addr", "show", "dev", interfaceName).CombinedOutput()
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
+	}
+
+	fields := strings.Fields(string(output))
+	if len(fields) < 4 {
+		return nil, fmt.Errorf("Unexpected command output %s ", output)
+	}
+
+	ip, _, err := net.ParseCIDR(fields[3])
+	if err != nil {
+		return nil, fmt.Errorf("Kubenet failed to parse ip from output %s due to %v", output, err)
+	}
+	return ip, nil
+}

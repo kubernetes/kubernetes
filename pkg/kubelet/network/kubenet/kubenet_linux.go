@@ -468,19 +468,10 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if err != nil {
 		return nil, err
 	}
-	// Try to retrieve ip inside container network namespace
-	output, err := plugin.execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
-		"ip", "-o", "-4", "addr", "show", "dev", network.DefaultInterfaceName).CombinedOutput()
+	// Try to retrieve ip inside container network namespace.
+	ip, err := network.GetPodIP(plugin.execer, id, nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
-		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
-	}
-	fields := strings.Fields(string(output))
-	if len(fields) < 4 {
-		return nil, fmt.Errorf("Unexpected command output %s ", output)
-	}
-	ip, _, err := net.ParseCIDR(fields[3])
-	if err != nil {
-		return nil, fmt.Errorf("Kubenet failed to parse ip from output %s due to %v", output, err)
+		return nil, err
 	}
 	plugin.podIPs[id] = ip.String()
 	return &network.PodNetworkStatus{IP: ip}, nil
@@ -494,6 +485,27 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 	return nil
 }
 
+// getNetworkContainerID returns the containerID that will be used to retrieve the pod IP.
+// For Docker, the container ID is the pod infra container's ID.
+// For rkt, the container ID is the API pod's UID.
+// TODO(yifan): The ID we return here is actually binded to each pod, we need to rename this
+// function to reflect that.
+func (plugin *kubenetNetworkPlugin) getNetworkContainerID(pod *kubecontainer.Pod) kubecontainer.ContainerID {
+	switch plugin.host.GetRuntime().Type() {
+	case "rkt": // TODO(yifan): Use rkt.RktType after we fixed the circular import.
+		if apiPod, ok := plugin.host.GetPodByName(pod.Namespace, pod.Name); ok {
+			return kubecontainer.ContainerID{ID: string(apiPod.UID)}
+		}
+	case "docker":
+		for _, c := range pod.Containers {
+			if c.Name == dockertools.PodInfraContainerName {
+				return c.ID
+			}
+		}
+	}
+	return kubecontainer.ContainerID{}
+}
+
 // Returns a list of pods running on this node and each pod's IP address.  Assumes
 // PodSpecs retrieved from the runtime include the name and ID of containers in
 // each pod.
@@ -504,24 +516,20 @@ func (plugin *kubenetNetworkPlugin) getRunningPods() ([]*hostport.RunningPod, er
 	}
 	runningPods := make([]*hostport.RunningPod, 0)
 	for _, p := range pods {
-		for _, c := range p.Containers {
-			if c.Name != dockertools.PodInfraContainerName {
-				continue
-			}
-			ipString, ok := plugin.podIPs[c.ID]
-			if !ok {
-				continue
-			}
-			podIP := net.ParseIP(ipString)
-			if podIP == nil {
-				continue
-			}
-			if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-				runningPods = append(runningPods, &hostport.RunningPod{
-					Pod: pod,
-					IP:  podIP,
-				})
-			}
+		containerID := plugin.getNetworkContainerID(p)
+		ipString, ok := plugin.podIPs[containerID]
+		if !ok {
+			continue
+		}
+		podIP := net.ParseIP(ipString)
+		if podIP == nil {
+			continue
+		}
+		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
+			runningPods = append(runningPods, &hostport.RunningPod{
+				Pod: pod,
+				IP:  podIP,
+			})
 		}
 	}
 	return runningPods, nil
