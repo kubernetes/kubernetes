@@ -1433,6 +1433,10 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 		return "", err
 	}
 	switch internalFieldPath {
+	case "spec.nodeName":
+		return pod.Spec.NodeName, nil
+	case "spec.serviceAccountName":
+		return pod.Spec.ServiceAccountName, nil
 	case "status.podIP":
 		return podIP, nil
 	}

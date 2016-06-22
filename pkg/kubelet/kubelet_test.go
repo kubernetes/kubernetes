@@ -1357,6 +1357,24 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						},
 					},
 					{
+						Name: "POD_NODE_NAME",
+						ValueFrom: &api.EnvVarSource{
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: testapi.Default.GroupVersion().String(),
+								FieldPath:  "spec.nodeName",
+							},
+						},
+					},
+					{
+						Name: "POD_SERVICE_ACCOUNT_NAME",
+						ValueFrom: &api.EnvVarSource{
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: testapi.Default.GroupVersion().String(),
+								FieldPath:  "spec.serviceAccountName",
+							},
+						},
+					},
+					{
 						Name: "POD_IP",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
@@ -1372,6 +1390,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "POD_NAME", Value: "dapi-test-pod-name"},
 				{Name: "POD_NAMESPACE", Value: "downward-api"},
+				{Name: "POD_NODE_NAME", Value: "node-name"},
+				{Name: "POD_SERVICE_ACCOUNT_NAME", Value: "special"},
 				{Name: "POD_IP", Value: "1.2.3.4"},
 			},
 		},
@@ -1522,6 +1542,10 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Namespace: tc.ns,
 				Name:      "dapi-test-pod-name",
+			},
+			Spec: api.PodSpec{
+				ServiceAccountName: "special",
+				NodeName:           "node-name",
 			},
 		}
 		podIP := "1.2.3.4"
