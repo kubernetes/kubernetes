@@ -24,13 +24,15 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 type awsElasticBlockStoreAttacher struct {
-	host volume.VolumeHost
+	host       volume.VolumeHost
+	awsVolumes aws.Volumes
 }
 
 var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
@@ -38,7 +40,15 @@ var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
 var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
-	return &awsElasticBlockStoreAttacher{host: plugin.host}, nil
+	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+
+	return &awsElasticBlockStoreAttacher{
+		host:       plugin.host,
+		awsVolumes: awsCloud,
+	}, nil
 }
 
 func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
@@ -49,14 +59,9 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 
 	volumeID := volumeSource.VolumeID
 
-	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
-	if err != nil {
-		return "", err
-	}
-
 	// awsCloud.AttachDisk checks if disk is already attached to node and
 	// succeeds in that case, so no need to do that separately.
-	devicePath, err := awsCloud.AttachDisk(volumeID, hostName, readOnly)
+	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, hostName, readOnly)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
 		return "", err
@@ -156,23 +161,28 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 }
 
 type awsElasticBlockStoreDetacher struct {
-	host volume.VolumeHost
+	mounter    mount.Interface
+	awsVolumes aws.Volumes
 }
 
 var _ volume.Detacher = &awsElasticBlockStoreDetacher{}
 
 func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error) {
-	return &awsElasticBlockStoreDetacher{host: plugin.host}, nil
+	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+
+	return &awsElasticBlockStoreDetacher{
+		mounter:    plugin.host.GetMounter(),
+		awsVolumes: awsCloud,
+	}, nil
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
 	volumeID := path.Base(deviceMountPath)
 
-	awsCloud, err := getCloudProvider(detacher.host.GetCloudProvider())
-	if err != nil {
-		return err
-	}
-	attached, err := awsCloud.DiskIsAttached(volumeID, hostName)
+	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, hostName)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -186,7 +196,7 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hos
 		return nil
 	}
 
-	if _, err = awsCloud.DetachDisk(volumeID, hostName); err != nil {
+	if _, err = detacher.awsVolumes.DetachDisk(volumeID, hostName); err != nil {
 		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
 		return err
 	}
@@ -215,9 +225,8 @@ func (detacher *awsElasticBlockStoreDetacher) WaitForDetach(devicePath string, t
 }
 
 func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
-	mounter := detacher.host.GetMounter()
 	volume := path.Base(deviceMountPath)
-	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, mounter); err != nil {
+	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.mounter); err != nil {
 		glog.Errorf("Error unmounting %q: %v", volume, err)
 	}
 
