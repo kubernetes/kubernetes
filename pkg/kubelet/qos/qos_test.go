@@ -123,6 +123,12 @@ func TestGetPodQos(t *testing.T) {
 			}),
 			expected: Burstable,
 		},
+		{
+			pod: newPod("burstable", []api.Container{
+				newContainer("burstable", getResourceList("0", "0"), getResourceList("100m", "200Mi")),
+			}),
+			expected: Burstable,
+		},
 	}
 	for _, testCase := range testCases {
 		if actual := GetPodQos(testCase.pod); testCase.expected != actual {
