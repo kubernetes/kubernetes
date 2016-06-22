@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console. 
 
-FROM ubuntu:14.04
+FROM ubuntu:16.04
 MAINTAINER Alex Robinson "arob@google.com"
 
 # Disable prompts from apt.
@@ -30,11 +30,16 @@ ENV DO_NOT_INSTALL_CATCH_ALL_CONFIG true
 
 RUN apt-get -q update && \
     apt-get install -y curl && \
+    apt-get install -y gcc && \
+    apt-get install -y make && \
     apt-get clean && \
     curl -s https://dl.google.com/cloudagents/install-logging-agent.sh | bash
 
 # Install the record reformer plugin.
 RUN /usr/sbin/google-fluentd-gem install fluent-plugin-record-reformer
+
+# Install plugin to read systemd-journal
+RUN /usr/sbin/google-fluentd-gem install fluent-plugin-systemd -v 0.0.3
 
 # Remove the misleading log file that gets generated when the agent is installed
 RUN rm -rf /var/log/google-fluentd
@@ -43,4 +48,4 @@ RUN rm -rf /var/log/google-fluentd
 COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
 
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS"
+CMD /bin/sh -c "rm /lib/x86_64-linux-gnu/libsystemd* && cp /host/lib/libsystemd* /lib/x86_64-linux-gnu/ && /usr/sbin/google-fluentd \"$FLUENTD_ARGS\""
