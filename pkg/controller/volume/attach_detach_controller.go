@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/volume/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/statusupdater"
 	"k8s.io/kubernetes/pkg/types"
@@ -50,6 +51,10 @@ const (
 	// from its node. Once this time has expired, the controller will assume the
 	// node or kubelet are unresponsive and will detach the volume anyway.
 	reconcilerMaxWaitForUnmountDuration time.Duration = 3 * time.Minute
+
+	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
+	// DesiredStateOfWorldPopulator loop waits between successive executions
+	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 5 * time.Minute
 )
 
 // AttachDetachController defines the operations supported by this controller.
@@ -119,6 +124,11 @@ func NewAttachDetachController(
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater)
 
+	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
+		desiredStateOfWorldPopulatorLoopSleepPeriod,
+		podInformer,
+		adc.desiredStateOfWorld)
+
 	return adc, nil
 }
 
@@ -170,6 +180,10 @@ type attachDetachController struct {
 	// nodeStatusUpdater is used to update node status with the list of attached
 	// volumes
 	nodeStatusUpdater statusupdater.NodeStatusUpdater
+
+	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
+	// populate the current pods using podInformer.
+	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -177,6 +191,7 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting Attach Detach Controller")
 
 	go adc.reconciler.Run(stopCh)
+	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Attach Detach Controller")
@@ -300,7 +315,7 @@ func (adc *attachDetachController) processPodVolumes(
 		if addVolumes {
 			// Add volume to desired state of world
 			_, err := adc.desiredStateOfWorld.AddPod(
-				uniquePodName, volumeSpec, pod.Spec.NodeName)
+				uniquePodName, pod, volumeSpec, pod.Spec.NodeName)
 			if err != nil {
 				glog.V(10).Infof(
 					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
