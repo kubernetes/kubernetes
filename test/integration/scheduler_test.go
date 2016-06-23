@@ -53,6 +53,7 @@ type nodeStateManager struct {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
@@ -300,6 +301,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 }
 
 func TestMultiScheduler(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master

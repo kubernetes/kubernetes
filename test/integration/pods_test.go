@@ -33,6 +33,9 @@ import (
 )
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -46,7 +49,6 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	var (
@@ -158,6 +160,9 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 }
 
 func TestPodReadOnlyFilesystem(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -172,7 +177,6 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	pod := &api.Pod{

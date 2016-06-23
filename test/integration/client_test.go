@@ -44,11 +44,13 @@ import (
 )
 
 func TestClient(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	ns := api.NamespaceDefault
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	info, err := client.Discovery().ServerVersion()
@@ -114,10 +116,12 @@ func TestClient(t *testing.T) {
 }
 
 func TestAtomicPut(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	rcBody := api.ReplicationController{
@@ -203,10 +207,12 @@ func TestAtomicPut(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	name := "patchpod"
@@ -309,10 +315,12 @@ func TestPatch(t *testing.T) {
 }
 
 func TestPatchWithCreateOnUpdate(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	endpointTemplate := &api.Endpoints{
@@ -415,10 +423,12 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 }
 
 func TestAPIVersions(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	clientVersion := c.APIVersion().String()
@@ -438,11 +448,13 @@ func TestAPIVersions(t *testing.T) {
 }
 
 func TestSingleWatch(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	ns := "blargh"
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	mkEvent := func(i int) *api.Event {
@@ -518,11 +530,13 @@ func TestMultiWatch(t *testing.T) {
 	// Disable this test as long as it demonstrates a problem.
 	// TODO: Reenable this test when we get #6059 resolved.
 	return
+
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	const watcherCount = 50
 	rt.GOMAXPROCS(watcherCount)
 
-	framework.DeleteAllEtcdKeys()
-	defer framework.DeleteAllEtcdKeys()
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
@@ -777,10 +791,12 @@ func runSelfLinkTestOnNamespace(t *testing.T, c *client.Client, namespace string
 }
 
 func TestSelfLinkOnNamespace(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	runSelfLinkTestOnNamespace(t, c, api.NamespaceDefault)

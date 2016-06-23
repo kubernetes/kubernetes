@@ -41,6 +41,9 @@ func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -53,7 +56,6 @@ func TestSecrets(t *testing.T) {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	DoTestSecrets(t, client)
 }

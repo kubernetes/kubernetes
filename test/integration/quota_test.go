@@ -54,6 +54,7 @@ func init() {
 // 	quota_test.go:100: Took 4.196205966s to scale up without quota
 // 	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	initializationCh := make(chan struct{})

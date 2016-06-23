@@ -34,10 +34,12 @@ import (
 )
 
 func TestDynamicClient(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	gv := testapi.Default.GroupVersion()
 	config := &restclient.Config{
 		Host:          s.URL,
