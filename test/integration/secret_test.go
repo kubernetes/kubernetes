@@ -21,15 +21,12 @@ package integration
 // This file tests use of the secrets API resource.
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -41,33 +38,24 @@ func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	DoTestSecrets(t, client)
+
+	ns := framework.CreateTestingNamespace("secret", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	DoTestSecrets(t, client, ns)
 }
 
 // DoTestSecrets test secrets for one api version.
-func DoTestSecrets(t *testing.T, client *client.Client) {
+func DoTestSecrets(t *testing.T, client *client.Client, ns *api.Namespace) {
 	// Make a secret object.
-	ns := "ns"
 	s := api.Secret{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "secret",
-			Namespace: ns,
+			Namespace: ns.Name,
 		},
 		Data: map[string][]byte{
 			"data": []byte("value1\n"),
@@ -82,7 +70,8 @@ func DoTestSecrets(t *testing.T, client *client.Client) {
 	// Template for pods that use a secret.
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "XXX",
+			Name:      "XXX",
+			Namespace: ns.Name,
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
@@ -113,17 +102,17 @@ func DoTestSecrets(t *testing.T, client *client.Client) {
 
 	// Create a pod to consume secret.
 	pod.ObjectMeta.Name = "uses-secret"
-	if _, err := client.Pods(ns).Create(pod); err != nil {
+	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
-	defer deletePodOrErrorf(t, client, ns, pod.Name)
+	defer deletePodOrErrorf(t, client, ns.Name, pod.Name)
 
 	// Create a pod that consumes non-existent secret.
 	pod.ObjectMeta.Name = "uses-non-existent-secret"
-	if _, err := client.Pods(ns).Create(pod); err != nil {
+	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
-	defer deletePodOrErrorf(t, client, ns, pod.Name)
+	defer deletePodOrErrorf(t, client, ns.Name, pod.Name)
 	// This pod may fail to run, but we don't currently prevent this, and this
 	// test can't check whether the kubelet actually pulls the secret.
 
