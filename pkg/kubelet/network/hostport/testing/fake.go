@@ -19,7 +19,6 @@ package testing
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 )
@@ -30,8 +29,8 @@ func NewFakeHostportHandler() hostport.HostportHandler {
 	return &fakeHandler{}
 }
 
-func (h *fakeHandler) OpenPodHostportsAndSync(newPod *api.Pod, natInterfaceName string, runningPods []*hostport.RunningPod) error {
-	return h.SyncHostports(natInterfaceName, runningPods)
+func (h *fakeHandler) OpenPodHostportsAndSync(newPod *hostport.RunningPod, natInterfaceName string, runningPods []*hostport.RunningPod) error {
+	return h.SyncHostports(natInterfaceName, append(runningPods, newPod))
 }
 
 func (h *fakeHandler) SyncHostports(natInterfaceName string, runningPods []*hostport.RunningPod) error {
