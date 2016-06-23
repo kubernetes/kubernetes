@@ -649,7 +649,8 @@ func (kd *KubeDNS) getClusterZoneAndRegion() (string, string, error) {
 			return "", "", fmt.Errorf("failed to retrieve the cluster nodes: %v", err)
 		}
 
-		// Select a node (arbitrarily the first node) that has `LabelZoneFailureDomain` set.
+		// Select a node (arbitrarily the first node) that has
+		// `LabelZoneFailureDomain` and `LabelZoneRegion` set.
 		for _, nodeItem := range nodeList.Items {
 			_, zfound := nodeItem.Labels[unversioned.LabelZoneFailureDomain]
 			_, rfound := nodeItem.Labels[unversioned.LabelZoneRegion]
@@ -661,6 +662,8 @@ func (kd *KubeDNS) getClusterZoneAndRegion() (string, string, error) {
 			if err := kd.nodesStore.Add(node); err != nil {
 				return "", "", fmt.Errorf("couldn't add the retrieved node to the cache: %v", err)
 			}
+			// Node is found, break out of the loop.
+			break
 		}
 	}
 
