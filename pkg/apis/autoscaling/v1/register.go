@@ -41,6 +41,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&HorizontalPodAutoscalerList{},
 		&Scale{},
 		&v1.ListOptions{},
+		&v1.DeleteOptions{},
 	)
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
