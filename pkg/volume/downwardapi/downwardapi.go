@@ -106,6 +106,16 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 	}, nil
 }
 
+func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	downwardAPIVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			DownwardAPI: &api.DownwardAPIVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(downwardAPIVolume), nil
+}
+
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.
 type downwardAPIVolume struct {
 	volName string

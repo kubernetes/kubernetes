@@ -38,8 +38,8 @@ import (
 const (
 	// reconcilerLoopSleepDuration is the amount of time the reconciler loop
 	// waits between successive executions
-	reconcilerLoopSleepDuration time.Duration = 0 * time.Millisecond
-
+	reconcilerLoopSleepDuration      time.Duration = 0 * time.Millisecond
+	reconcilerReconstructSleepPeriod time.Duration = 10 * time.Minute
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
 	waitForAttachTimeout time.Duration = 1 * time.Second
@@ -59,12 +59,14 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
+		reconcilerReconstructSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
 		asw,
 		oex,
-		&mount.FakeMounter{})
+		&mount.FakeMounter{},
+		"")
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
@@ -92,12 +94,14 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
+		reconcilerReconstructSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
 		asw,
 		oex,
-		&mount.FakeMounter{})
+		&mount.FakeMounter{},
+		"")
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -160,12 +164,14 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		true, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
+		reconcilerReconstructSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
 		asw,
 		oex,
-		&mount.FakeMounter{})
+		&mount.FakeMounter{},
+		"")
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -228,12 +234,14 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
+		reconcilerReconstructSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
 		asw,
 		oex,
-		&mount.FakeMounter{})
+		&mount.FakeMounter{},
+		"")
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -308,12 +316,14 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		true, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
+		reconcilerReconstructSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
 		asw,
 		oex,
-		&mount.FakeMounter{})
+		&mount.FakeMounter{},
+		"")
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",

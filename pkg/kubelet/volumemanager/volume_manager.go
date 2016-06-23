@@ -44,11 +44,12 @@ import (
 const (
 	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
 	// between successive executions
-	reconcilerLoopSleepPeriod time.Duration = 100 * time.Millisecond
+	reconcilerLoopSleepPeriod        time.Duration = 100 * time.Millisecond
+	reconcilerReconstructSleepPeriod time.Duration = 3 * time.Minute
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 100 * time.Millisecond
+	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 500 * time.Millisecond
 
 	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
 	// time the DesiredStateOfWorldPopulator loop waits between successive pod
@@ -76,6 +77,10 @@ const (
 	// operation is waiting it only blocks other operations on the same device,
 	// other devices are not affected.
 	waitForAttachTimeout time.Duration = 10 * time.Minute
+
+	// reconcilerStartGracePeriod is the maximum amount of time volume manager
+	// can wait to start reconciler
+	reconcilerStartGracePeriod time.Duration = 60 * time.Second
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
@@ -83,7 +88,7 @@ const (
 // this node and makes it so.
 type VolumeManager interface {
 	// Starts the volume manager and all the asynchronous loops that it controls
-	Run(stopCh <-chan struct{})
+	Run(readyCh <-chan bool, stopCh <-chan struct{})
 
 	// WaitForAttachAndMount processes the volumes referenced in the specified
 	// pod and blocks until they are all attached and mounted (reflected in
@@ -138,7 +143,8 @@ func NewVolumeManager(
 	kubeClient internalclientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
 	kubeContainerRuntime kubecontainer.Runtime,
-	mounter mount.Interface) (VolumeManager, error) {
+	mounter mount.Interface,
+	kubeletPodsDir string) (VolumeManager, error) {
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
@@ -153,12 +159,14 @@ func NewVolumeManager(
 		kubeClient,
 		controllerAttachDetachEnabled,
 		reconcilerLoopSleepPeriod,
+		reconcilerReconstructSleepPeriod,
 		waitForAttachTimeout,
 		hostName,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		vm.operationExecutor,
-		mounter)
+		mounter,
+		kubeletPodsDir)
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -208,12 +216,24 @@ type volumeManager struct {
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 }
 
-func (vm *volumeManager) Run(stopCh <-chan struct{}) {
+func (vm *volumeManager) Run(readyCh <-chan bool, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
-	glog.Infof("Starting Kubelet Volume Manager")
 
-	go vm.reconciler.Run(stopCh)
 	go vm.desiredStateOfWorldPopulator.Run(stopCh)
+	glog.V(2).Infof("The desired_state_of_world populator starts")
+
+	// Add all sources ready check so that reconciler reconstruct process will start after
+	// desired state of world is populated with pod volume information from apiserver. Otherwise,
+	// reconciler reconstruct process may add incomplete volume information and cause confusion.
+	select {
+	case <-readyCh:
+		glog.V(4).Infof("Volume manager start after all source ready")
+	case <-time.After(reconcilerStartGracePeriod):
+		glog.V(4).Infof("Volume manager start after %d seconds grace period", reconcilerStartGracePeriod)
+
+	}
+	glog.Infof("Starting Kubelet Volume Manager")
+	go vm.reconciler.Run(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Kubelet Volume Manager")

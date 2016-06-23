@@ -58,6 +58,10 @@ type GoRoutineMap interface {
 	// necessary during tests - the test should wait until all operations finish
 	// and evaluate results after that.
 	Wait()
+
+	// IsOperationPending returns true if the operation is pending, otherwise
+	// returns false
+	IsOperationPending(operationName string) bool
 }
 
 // NewGoRoutineMap returns a new instance of GoRoutineMap.
@@ -148,6 +152,16 @@ func (grm *goRoutineMap) operationComplete(
 		glog.Errorf("%v",
 			existingOp.expBackoff.GenerateNoRetriesPermittedMsg(operationName))
 	}
+}
+
+func (grm *goRoutineMap) IsOperationPending(operationName string) bool {
+	grm.lock.Lock()
+	defer grm.lock.Unlock()
+	existingOp, exists := grm.operations[operationName]
+	if exists && existingOp.operationPending {
+		return true
+	}
+	return false
 }
 
 func (grm *goRoutineMap) Wait() {

@@ -19,6 +19,7 @@ package options
 
 import (
 	_ "net/http/pprof"
+	"runtime"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -28,6 +29,26 @@ import (
 
 	"github.com/spf13/pflag"
 )
+
+const (
+	defaultRootDir             = "/var/lib/kubelet"
+	experimentalFlannelOverlay = false
+
+	// When these values are updated, also update test/e2e/framework/util.go
+	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
+	defaultPodInfraContainerImageVersion = "3.0"
+	// Auto detect cloud provider.
+	AutoDetectCloudProvider         = "auto-detect"
+	DefaultKubeletPodsDirName       = "pods"
+	DefaultKubeletVolumesDirName    = "volumes"
+	DefaultKubeletPluginsDirName    = "plugins"
+	DefaultKubeletContainersDirName = "containers"
+)
+
+// Returns the arch-specific pause image that kubelet should use as the default
+func GetDefaultPodInfraContainerImage() string {
+	return defaultPodInfraContainerImageName + "-" + runtime.GOARCH + ":" + defaultPodInfraContainerImageVersion
+}
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.

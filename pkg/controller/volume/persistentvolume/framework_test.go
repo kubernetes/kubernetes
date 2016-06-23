@@ -1006,6 +1006,10 @@ func (plugin *mockVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol.Spec, error) {
+	return nil, nil
+}
+
 func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *api.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
 	return nil, fmt.Errorf("Mounter is not supported by this plugin")
 }

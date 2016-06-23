@@ -247,7 +247,8 @@ func newTestKubeletWithImageList(
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
 		fakeRuntime,
-		kubelet.mounter)
+		kubelet.mounter,
+		kubelet.getPodsDir())
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
 	}
@@ -403,8 +404,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -473,8 +473,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -602,8 +601,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -696,8 +694,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -855,8 +852,7 @@ func TestPodVolumesExist(t *testing.T) {
 		},
 	}
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -3937,4 +3933,12 @@ func simulateVolumeInUseUpdate(
 			return
 		}
 	}
+}
+
+func runVolumeManager(kubelet *Kubelet) chan struct{} {
+	stopCh := make(chan struct{})
+	readyCh := make(chan bool, 1)
+	readyCh <- true
+	go kubelet.volumeManager.Run(readyCh, stopCh)
+	return stopCh
 }
