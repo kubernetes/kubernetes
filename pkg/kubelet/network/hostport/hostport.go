@@ -42,7 +42,7 @@ const (
 )
 
 type HostportHandler interface {
-	OpenPodHostportsAndSync(newPod *api.Pod, natInterfaceName string, runningPods []*RunningPod) error
+	OpenPodHostportsAndSync(newPod *RunningPod, natInterfaceName string, runningPods []*RunningPod) error
 	SyncHostports(natInterfaceName string, runningPods []*RunningPod) error
 }
 
@@ -172,10 +172,22 @@ func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Ch
 
 // OpenPodHostportsAndSync opens hostports for a new pod, gathers all hostports on
 // node, sets up iptables rules enable them. And finally clean up stale hostports
-func (h *handler) OpenPodHostportsAndSync(newPod *api.Pod, natInterfaceName string, runningPods []*RunningPod) error {
+func (h *handler) OpenPodHostportsAndSync(newPod *RunningPod, natInterfaceName string, runningPods []*RunningPod) error {
 	// try to open pod host port if specified
-	if err := h.openHostports(newPod); err != nil {
+	if err := h.openHostports(newPod.Pod); err != nil {
 		return err
+	}
+
+	// Add the new pod to running pods if it's not running already (e.g. in rkt's case).
+	var found bool
+	for _, p := range runningPods {
+		if p.Pod.UID == newPod.Pod.UID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		runningPods = append(runningPods, newPod)
 	}
 
 	return h.SyncHostports(natInterfaceName, runningPods)
