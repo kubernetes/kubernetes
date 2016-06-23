@@ -2989,7 +2989,7 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 
 	var buffer bytes.Buffer
 	output := ioutils.WriteCloserWrapper(&buffer)
-	err = kl.runner.ExecInContainer(container.ID, cmd, nil, output, output, false, nil)
+	err = kl.runner.ExecInContainer(container.ID, cmd, nil, output, output, false, nil, 0)
 	// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
 	// the command returned a nonzero exit code). Therefore, always return the output along with the
 	// error.
@@ -3008,7 +3008,7 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 	if container == nil {
 		return fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.runner.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize)
+	return kl.runner.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize, 0)
 }
 
 // AttachContainer uses the container runtime to attach the given streams to

@@ -232,7 +232,7 @@ func (p *prober) newExecInContainer(container api.Container, containerID kubecon
 	return execInContainer{func() ([]byte, error) {
 		var buffer bytes.Buffer
 		output := ioutils.WriteCloserWrapper(&buffer)
-		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil)
+		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil, 0)
 		// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
 		// the command returned a nonzero exit code). Therefore, always return the output along with the
 		// error.
