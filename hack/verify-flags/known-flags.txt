@@ -37,6 +37,7 @@ bind-pods-burst
 bind-pods-qps
 build-only
 build-services
+build-tag
 cadvisor-port
 cert-dir
 certificate-authority
