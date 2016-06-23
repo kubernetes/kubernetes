@@ -98,6 +98,9 @@ func (cache *TreeCache) setSubCache(key string, subCache *TreeCache, path ...str
 
 func (cache *TreeCache) getEntry(key string, path ...string) (interface{}, bool) {
 	childNode := cache.getSubCache(path...)
+	if childNode == nil {
+		return nil, false
+	}
 	val, ok := childNode.Entries[key]
 	return val, ok
 }
