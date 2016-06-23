@@ -2378,7 +2378,7 @@ func (kl *Kubelet) matchesNodeSelector(pod *api.Pod) bool {
 	node, err := kl.GetNode()
 	if err != nil {
 		glog.Errorf("error getting node: %v", err)
-		return true
+		return false
 	}
 	return predicates.PodMatchesNodeLabels(pod, node)
 }
