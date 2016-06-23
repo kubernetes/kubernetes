@@ -355,6 +355,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	for i, tc := range tests {
+		// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 		framework.DeleteAllEtcdKeys()
 
 		var m *master.Master

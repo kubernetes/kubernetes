@@ -104,11 +104,13 @@ func testSleep() {
 }
 
 func TestPersistentVolumeRecycler(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	glog.V(2).Infof("TestPersistentVolumeRecycler started")
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -152,11 +154,13 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 }
 
 func TestPersistentVolumeDeleter(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	glog.V(2).Infof("TestPersistentVolumeDeleter started")
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -202,13 +206,15 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 }
 
 func TestPersistentVolumeBindRace(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	// Test a race binding many claims to a PV that is pre-bound to a specific
 	// PVC. Only this specific PVC should get bound.
 	glog.V(2).Infof("TestPersistentVolumeBindRace started")
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -270,10 +276,12 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 // TestPersistentVolumeClaimLabelSelector test binding using label selectors
 func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -343,10 +351,12 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 // TestPersistentVolumeClaimLabelSelectorMatchExpressions test binding using
 // MatchExpressions label selectors
 func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -435,10 +445,12 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 // TestPersistentVolumeMultiPVs tests binding of one PVC to 100 PVs with
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -512,17 +524,17 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeReleased)
 	t.Log("volumes released")
-
-	framework.DeleteAllEtcdKeys()
 }
 
 // TestPersistentVolumeMultiPVsPVCs tests binding of 100 PVC to 100 PVs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, binder, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -593,16 +605,17 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 		glog.V(2).Infof("PVC %q is bound to PV %q", pvc.Name, pvc.Spec.VolumeName)
 	}
 	testSleep()
-	framework.DeleteAllEtcdKeys()
 }
 
 // TestPersistentVolumeProvisionMultiPVCs tests provisioning of many PVCs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, binder, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -671,17 +684,17 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: volumes are deleted")
-
-	framework.DeleteAllEtcdKeys()
 }
 
 // TestPersistentVolumeMultiPVsDiffAccessModes tests binding of one PVC to two
 // PVs with different access modes.
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -746,8 +759,6 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeReleased)
 	t.Log("volume released")
-
-	framework.DeleteAllEtcdKeys()
 }
 
 func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w watch.Interface, phase api.PersistentVolumePhase) {
