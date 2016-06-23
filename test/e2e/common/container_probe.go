@@ -233,6 +233,35 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}, 0, defaultObservationTimeout)
 	})
 
+	It("should be restarted with a docker exec liveness probe with timeout [Conformance]", func() {
+		// TODO: enable this test once the default exec handler supports timeout.
+		Skip("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
+		runLivenessTest(f, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-exec",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Command: []string{"/bin/sh", "-c", "sleep 600"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								Exec: &api.ExecAction{
+									Command: []string{"/bin/sh", "-c", "sleep 10"},
+								},
+							},
+							InitialDelaySeconds: 15,
+							TimeoutSeconds:      1,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 1, defaultObservationTimeout)
+	})
 })
 
 func getContainerStartedTime(p *api.Pod, containerName string) (time.Time, error) {
