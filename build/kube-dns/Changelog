@@ -6,3 +6,6 @@
 
  ## Version 1.4 (Tue June 21 2016 Nikhil Jindal <nikhiljindal@google.com>)
  - Initialising nodesStore (issue #27820)
+
+ ## Version 1.5 (Thu June 23 2016 Nikhil Jindal <nikhiljindal@google.com>)
+ - Adding support to return local service (pr #27708)
