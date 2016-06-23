@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v69",
+	"GodepVersion": "v74",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -1973,7 +1973,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/exp/inotify",
-			"Rev": "d00e13ec443927751b2bd49e97dea7bf3b6a6487"
+			"Rev": "292a51b8d262487dab23a588950e8052d63d9113"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
