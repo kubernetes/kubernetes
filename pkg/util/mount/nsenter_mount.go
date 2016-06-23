@@ -203,6 +203,11 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+//GetDeviceNameFromMount given a mount point, find the volume id from checking /proc/mounts
+func (n *NsenterMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return getDeviceNameFromMount(n, mountPath, pluginDir)
+}
+
 func (n *NsenterMounter) absHostPath(command string) string {
 	path, ok := n.paths[command]
 	if !ok {

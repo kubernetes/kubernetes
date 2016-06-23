@@ -98,6 +98,10 @@ type OperationExecutor interface {
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
 	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName string, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+
+	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
+	// otherwise it returns false
+	IsOperationPending(volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) bool
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -334,6 +338,10 @@ type operationExecutor struct {
 	pendingOperations nestedpendingoperations.NestedPendingOperations
 }
 
+func (oe *operationExecutor) IsOperationPending(volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+	return oe.pendingOperations.IsOperationPending(volumeName, podName)
+}
+
 func (oe *operationExecutor) AttachVolume(
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
@@ -386,6 +394,7 @@ func (oe *operationExecutor) MountVolume(
 func (oe *operationExecutor) UnmountVolume(
 	volumeToUnmount MountedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+
 	unmountFunc, err :=
 		oe.generateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld)
 	if err != nil {
@@ -805,11 +814,14 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 		}
 
 		glog.Infof(
-			"UnmountVolume.TearDown succeeded for volume %q (volume.spec.Name: %q) pod %q (UID: %q).",
+			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
 			volumeToUnmount.VolumeName,
 			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
-			volumeToUnmount.PodUID)
+			volumeToUnmount.PodUID,
+			volumeToUnmount.InnerVolumeSpecName,
+			volumeToUnmount.PluginName,
+			volumeToUnmount.VolumeGidValue)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsUnmounted(
@@ -872,7 +884,17 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 				deviceToDetach.VolumeSpec.Name(),
 				err)
 		}
-
+		refs, err := attachableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
+		if err != nil || len(refs) > 0 {
+			if err == nil {
+				err = fmt.Errorf("The device mount path %q is still mounted by other references %v", deviceMountPath, refs)
+			}
+			return fmt.Errorf(
+				"GetDeviceMountRefs check failed for volume %q (spec.Name: %q) with: %v",
+				deviceToDetach.VolumeName,
+				deviceToDetach.VolumeSpec.Name(),
+				err)
+		}
 		// Execute unmount
 		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {

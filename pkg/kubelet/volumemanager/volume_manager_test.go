@@ -26,10 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -57,8 +59,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("Failed to initialize volume manager: %v", err)
 	}
 
-	stopCh := make(chan struct{})
-	go manager.Run(stopCh)
+	stopCh := runVolumeManager(manager)
 	defer close(stopCh)
 
 	podManager.SetPods([]*api.Pod{pod})
@@ -148,8 +149,10 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			continue
 		}
 
-		stopCh := make(chan struct{})
-		go manager.Run(stopCh)
+		stopCh := runVolumeManager(manager)
+		defer func() {
+			close(stopCh)
+		}()
 
 		podManager.SetPods([]*api.Pod{pod})
 
@@ -169,8 +172,6 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Expected supplemental groups %v, got %v", tc.expected, actual)
 		}
-
-		close(stopCh)
 	}
 }
 
@@ -188,7 +189,8 @@ func newTestVolumeManager(
 		podManager,
 		kubeClient,
 		plugMgr,
-		&containertest.FakeRuntime{})
+		&containertest.FakeRuntime{},
+		"" /*kubelet pods directory*/)
 	return vm, err
 }
 
@@ -273,4 +275,13 @@ func simulateVolumeInUseUpdate(
 			return
 		}
 	}
+}
+
+func runVolumeManager(manager VolumeManager) chan struct{} {
+	stopCh := make(chan struct{})
+	//readyCh := make(chan bool, 1)
+	//readyCh <- true
+	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	go manager.Run(sourcesReady, stopCh)
+	return stopCh
 }
