@@ -57,13 +57,3 @@ function create-master-instance {
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
     ${preemptible_master}
 }
-
-# $1: template name (required)
-function create-node-instance-template {
-  local template_name="$1"
-  prepare-startup-script
-  create-node-template "$template_name" "${scope_flags}" \
-    "startup-script=${KUBE_TEMP}/configure-vm.sh" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "cluster-name=${KUBE_TEMP}/cluster-name.txt"
-}

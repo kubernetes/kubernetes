@@ -22,18 +22,17 @@
 # GCI and Trusty share the configuration code. We have to keep the GCI specific code
 # here as long as the release-1.2 branch has not been deprecated.
 
-# Creates the GCI specific metadata files if they do not exit.
-# Assumed var
-#   KUBE_TEMP
-function ensure-gci-metadata-files {
-  if [[ ! -f "${KUBE_TEMP}/gci-update.txt" ]]; then
-    cat >"${KUBE_TEMP}/gci-update.txt" << EOF
-update_disabled
-EOF
-  fi
-  if [[ ! -f "${KUBE_TEMP}/gci-docker.txt" ]]; then
-    cat >"${KUBE_TEMP}/gci-docker.txt" << EOF
-true
-EOF
-  fi
+source ./helper.sh
+
+# $1: template name (required)
+function create-node-instance-template {
+  local template_name="$1"
+  ensure-gci-metadata-files
+  create-node-template "$template_name" "${scope_flags[*]}" \
+    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
+    "user-data=${KUBE_ROOT}/cluster/gce/trusty/node.yaml" \
+    "configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh" \
+    "cluster-name=${KUBE_TEMP}/cluster-name.txt" \
+    "gci-update-strategy=${KUBE_TEMP}/gci-update.txt" \
+    "gci-ensure-gke-docker=${KUBE_TEMP}/gci-docker.txt"
 }
