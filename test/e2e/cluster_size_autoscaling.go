@@ -44,7 +44,7 @@ const (
 	scaleDownTimeout = 15 * time.Minute
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
-	gkeUpdateTimeout = 10 * time.Minute
+	gkeUpdateTimeout = 15 * time.Minute
 )
 
 var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
