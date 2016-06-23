@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -295,7 +296,7 @@ type fakeContainerCommandRunner struct {
 
 var _ kubecontainer.ContainerCommandRunner = &fakeContainerCommandRunner{}
 
-func (f *fakeContainerCommandRunner) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (f *fakeContainerCommandRunner) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	// record invoked values
 	f.containerID = containerID
 	f.cmd = cmd
@@ -341,7 +342,7 @@ func TestNewExecInContainer(t *testing.T) {
 		container := api.Container{}
 		containerID := kubecontainer.ContainerID{Type: "docker", ID: "containerID"}
 		cmd := []string{"/foo", "bar"}
-		exec := prober.newExecInContainer(container, containerID, cmd)
+		exec := prober.newExecInContainer(container, containerID, cmd, 0)
 
 		actualOutput, err := exec.CombinedOutput()
 		if e, a := containerID, runner.containerID; e != a {
