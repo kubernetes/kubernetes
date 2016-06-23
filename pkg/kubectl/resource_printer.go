@@ -342,20 +342,10 @@ type HumanReadablePrinter struct {
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
-func NewHumanReadablePrinter(noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) *HumanReadablePrinter {
+func NewHumanReadablePrinter(options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
-		Options: PrintOptions{
-			NoHeaders:          noHeaders,
-			WithNamespace:      withNamespace,
-			WithKind:           false,
-			KindName:           "",
-			Wide:               wide,
-			ShowAll:            showAll,
-			ShowLabels:         showLabels,
-			AbsoluteTimestamps: absoluteTimestamps,
-			ColumnLabels:       columnLabels,
-		},
+		Options:    options,
 	}
 	printer.addDefaultHandlers()
 	return printer
