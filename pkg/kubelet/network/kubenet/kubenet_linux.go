@@ -40,6 +40,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 
@@ -228,7 +229,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 
 			// Ensure cbr0 has no conflicting addresses; CNI's 'bridge'
 			// plugin will bail out if the bridge has an unexpected one
-			plugin.clearBridgeAddressesExcept(cidr.IP.String())
+			plugin.clearBridgeAddressesExcept(cidr)
 		}
 	}
 
@@ -237,7 +238,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	}
 }
 
-func (plugin *kubenetNetworkPlugin) clearBridgeAddressesExcept(keep string) {
+func (plugin *kubenetNetworkPlugin) clearBridgeAddressesExcept(keep *net.IPNet) {
 	bridge, err := netlink.LinkByName(BridgeName)
 	if err != nil {
 		return
@@ -249,8 +250,8 @@ func (plugin *kubenetNetworkPlugin) clearBridgeAddressesExcept(keep string) {
 	}
 
 	for _, addr := range addrs {
-		if addr.IPNet.String() != keep {
-			glog.V(5).Infof("Removing old address %s from %s", addr.IPNet.String(), BridgeName)
+		if !utilnet.IPNetEqual(addr.IPNet, keep) {
+			glog.V(2).Infof("Removing old address %s from %s", addr.IPNet.String(), BridgeName)
 			netlink.AddrDel(bridge, &addr)
 		}
 	}
