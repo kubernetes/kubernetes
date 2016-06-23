@@ -910,7 +910,7 @@ type fakeContainerCommandRunner struct {
 	StderrData string
 }
 
-func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	// record params
 	f.Cmd = cmd
 	f.ID = id
@@ -1898,6 +1898,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 		nil,
 		false,
 		nil,
+		0,
 	)
 	if err == nil {
 		t.Fatal("unexpected non-error")
@@ -1943,6 +1944,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 		nil,
 		false,
 		nil,
+		0,
 	)
 	if err == nil {
 		t.Fatal("unexpected non-error")
@@ -2004,6 +2006,7 @@ func TestExecInContainer(t *testing.T) {
 		stderr,
 		tty,
 		nil,
+		0,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)

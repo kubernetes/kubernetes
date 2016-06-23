@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -246,7 +247,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID k
 // Attaches the processes stdin, stdout, and stderr. Optionally uses a
 // tty.
 // TODO: handle terminal resizing, refer https://github.com/kubernetes/kubernetes/issues/29579
-func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	return fmt.Errorf("not implemented")
 }
 
