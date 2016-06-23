@@ -23,10 +23,17 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
-if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]]; then
-  source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
+if [[ "${NODE_OS_DISTRIBUTION}" == "debian" || "${NODE_OS_DISTRIBUTION}" == "coreos" || "${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+  source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
-  echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
+  echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
+  exit 1
+fi
+
+if [[ "${MASTER_OS_DISTRIBUTION}" == "debian" || "${MASTER_OS_DISTRIBUTION}" == "coreos" || "${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
+  source "${KUBE_ROOT}/cluster/gce/${MASTER_OS_DISTRIBUTION}/master-helper.sh"
+else
+  echo "Cannot operate on cluster using master os distro: ${MASTER_OS_DISTRIBUTION}" >&2
   exit 1
 fi
 
@@ -49,14 +56,17 @@ function get_latest_gci_image() {
   echo "${gci_images[0]}"
 }
 
-if [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
-  # If the master image is not set, we use the pinned GCI image.
+if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
+  # If the master image is not set, we use the latest GCI image.
   # Otherwise, we respect whatever is set by the user.
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-"$(get_latest_gci_image)"}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
-  # The default node image when using GCI is still the Debian based ContainerVM
-  # until GCI gets validated for node usage.
-  NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
+fi
+
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+  # If the node image is not set, we use the latest GCI image.
+  # Otherwise, we respect whatever is set by the user.
+  NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"$(get_latest_gci_image)"}
   NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
 fi
 
@@ -84,6 +94,11 @@ KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
 
 function join_csv {
   local IFS=','; echo "$*";
+}
+
+# This function returns the first string before the comma
+function split_csv {
+  echo "$*" | cut -d',' -f1
 }
 
 # Verify prereqs
@@ -253,9 +268,7 @@ function upload-server-tars() {
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
   SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
-  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
-    KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
-  fi
+  KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
 
   local server_binary_tar_urls=()
   local salt_tar_urls=()
@@ -286,26 +299,15 @@ function upload-server-tars() {
     server_binary_tar_urls+=("${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
     salt_tar_urls+=("${salt_gs_url/gs:\/\//https://storage.googleapis.com/}")
 
-    if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
-      local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
-      copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
-      # Convert from gs:// URL to an https:// URL
-      kube_manifests_tar_urls+=("${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}")
-    fi
+    local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
+    copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
+    # Convert from gs:// URL to an https:// URL
+    kube_manifests_tar_urls+=("${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}")
   done
 
-  if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
-    # TODO: Support fallback .tar.gz settings on CoreOS
-    SERVER_BINARY_TAR_URL="${server_binary_tar_urls[0]}"
-    SALT_TAR_URL="${salt_tar_urls[0]}"
-    KUBE_MANIFESTS_TAR_URL="${kube_manifests_tar_urls[0]}"
-  else
-    SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
-    SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
-    if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]]; then
-      KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
-    fi
-  fi
+  SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
+  SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
+  KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
 }
 
 # Detect minions created in the minion group
@@ -748,11 +750,6 @@ function create-nodes-template() {
 
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
-  # For master on GCI or trusty, we support the hybrid mode with nodes on ContainerVM.
-  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]] && \
-     [[ "${NODE_IMAGE}" == container* ]]; then
-    source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
-  fi
   create-node-instance-template $template_name
 }
 
@@ -793,7 +790,7 @@ function create-nodes() {
     # Spread the remaining number of nodes evenly
     this_mig_size=$((${instances_left} / (${NUM_MIGS}-${i}+1)))
     instances_left=$((instances_left-${this_mig_size}))
-    
+
     gcloud compute instance-groups managed \
         create "${group_name}" \
         --project "${PROJECT}" \
@@ -820,20 +817,20 @@ function create-nodes() {
 function create-cluster-autoscaler-mig-config() {
 
   # Each MIG must have at least one node, so the min number of nodes
-  # must be greater or equal to the number of migs. 
+  # must be greater or equal to the number of migs.
   if [[ ${AUTOSCALER_MIN_NODES} < ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MIN_NODES must be greater or equal ${NUM_MIGS}"
     exit 2
   fi
 
   # Each MIG must have at least one node, so the min number of nodes
-  # must be greater or equal to the number of migs. 
+  # must be greater or equal to the number of migs.
   if [[ ${AUTOSCALER_MAX_NODES} < ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MAX_NODES must be greater or equal ${NUM_MIGS}"
     exit 2
   fi
 
-  # The code assumes that the migs were created with create-nodes 
+  # The code assumes that the migs were created with create-nodes
   # function which tries to evenly spread nodes across the migs.
   AUTOSCALER_MIG_CONFIG=""
 
@@ -1175,9 +1172,14 @@ function check-resources {
 # Prepare to push new binaries to kubernetes cluster
 #  $1 - whether prepare push to node
 function prepare-push() {
+  local node="${1-}"
   #TODO(dawnchen): figure out how to upgrade coreos node
-  if [[ "${OS_DISTRIBUTION}" != "debian" ]]; then
-    echo "Updating a kubernetes cluster with ${OS_DISTRIBUTION} is not supported yet." >&2
+  if [[ "${node}" == "true" && "${NODE_OS_DISTRIBUTION}" != "debian" ]]; then
+    echo "Updating nodes in a kubernetes cluster with ${NODE_OS_DISTRIBUTION} is not supported yet." >&2
+    exit 1
+  fi
+  if [[ "${node}" != "true" && "${MASTER_OS_DISTRIBUTION}" != "debian" ]]; then
+    echo "Updating the master in a kubernetes cluster with ${MASTER_OS_DISTRIBUTION} is not supported yet." >&2
     exit 1
   fi
 
@@ -1195,7 +1197,7 @@ function prepare-push() {
   tars_from_version
 
   # Prepare node env vars and update MIG template
-  if [[ "${1-}" == "true" ]]; then
+  if [[ "${node}" == "true" ]]; then
     write-node-env
 
     # TODO(zmerlynn): Refactor setting scope flags.
