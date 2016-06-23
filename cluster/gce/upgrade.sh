@@ -202,11 +202,9 @@ function prepare-node-upgrade() {
   # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
   #                 through all create-node-instance-template implementations).
   local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
-  # For master on GCI, we support the hybrid mode with nodes on ContainerVM.
-  if [[  "${OS_DISTRIBUTION}" == "gci" && "${NODE_IMAGE}" == container* ]]; then
-    source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
-  fi
   create-node-instance-template "${template_name}"
+  # The following is echo'd so that callers can get the template name.
+  echo "Instance template name: ${template_name}"
   echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
 }
 

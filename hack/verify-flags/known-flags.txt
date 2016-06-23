@@ -280,6 +280,7 @@ make-symlinks
 manifest-url
 manifest-url-header
 masquerade-all
+master-os-distro
 master-service-namespace
 max-concurrency
 max-connection-bytes-per-sec
@@ -327,6 +328,7 @@ node-labels
 node-monitor-grace-period
 node-monitor-period
 node-name
+node-os-distro
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period
@@ -339,7 +341,6 @@ oidc-issuer-url
 oidc-username-claim
 only-idl
 oom-score-adj
-os-distro
 out-version
 outofdisk-transition-frequency
 output-base
