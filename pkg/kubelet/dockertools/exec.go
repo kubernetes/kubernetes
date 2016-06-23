@@ -74,8 +74,6 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 		if stdout != nil {
 			go io.Copy(stdout, p)
 		}
-
-		err = command.Wait()
 	} else {
 		if stdin != nil {
 			// Use an os.Pipe here as it returns true *os.File objects.
@@ -96,10 +94,16 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 		if stderr != nil {
 			command.Stderr = stderr
 		}
-
-		err = command.Run()
+		if err := command.Start(); err != nil {
+			return err
+		}
 	}
-
+	if timeout > 0 {
+		defer time.AfterFunc(timeout, func() {
+			command.Process.Kill()
+		}).Stop()
+	}
+	err = command.Wait()
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		return &utilexec.ExitErrorWrapper{ExitError: exitErr}
 	}
