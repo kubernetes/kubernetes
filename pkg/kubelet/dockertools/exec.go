@@ -113,6 +113,10 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.
 type NativeExecHandler struct{}
 
+// ExecInContainer executes a command in a Docker container. It may leave a
+// goroutine running the process in the container after the function returns
+// because of a timeout. However, the goroutine does not leak, it terminates
+// when the process exits.
 func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	createOpts := dockertypes.ExecConfig{
 		Cmd:          cmd,
@@ -126,47 +130,78 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 		return fmt.Errorf("failed to exec in container - Exec setup failed - %v", err)
 	}
 
-	// Have to start this before the call to client.StartExec because client.StartExec is a blocking
-	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
-	kubecontainer.HandleResizing(resize, func(size term.Size) {
-		client.ResizeExecTTY(execObj.ID, int(size.Height), int(size.Width))
-	})
+	ch := make(chan error, 1)
+	// Run client.StartExec in a new goroutine, because it is blocking and
+	// we may want to terminate earlier in case of a timeout.
+	go func() {
+		// Have to start this before the call to client.StartExec because client.StartExec is a blocking
+		// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
+		kubecontainer.HandleResizing(resize, func(size term.Size) {
+			client.ResizeExecTTY(execObj.ID, int(size.Height), int(size.Width))
+		})
 
-	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
-	streamOpts := StreamOptions{
-		InputStream:  stdin,
-		OutputStream: stdout,
-		ErrorStream:  stderr,
-		RawTerminal:  tty,
-	}
-	err = client.StartExec(execObj.ID, startOpts, streamOpts)
-	if err != nil {
-		return err
-	}
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	count := 0
-	for {
-		inspect, err2 := client.InspectExec(execObj.ID)
-		if err2 != nil {
-			return err2
+		startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
+		streamOpts := StreamOptions{
+			InputStream:  stdin,
+			OutputStream: stdout,
+			ErrorStream:  stderr,
+			RawTerminal:  tty,
 		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				err = &dockerExitError{inspect}
+		err = client.StartExec(execObj.ID, startOpts, streamOpts)
+		if err != nil {
+			ch <- err
+			return
+		}
+
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		count := 0
+		for {
+			inspect, err2 := client.InspectExec(execObj.ID)
+			if err2 != nil {
+				ch <- err2
+				return
 			}
-			break
+			if !inspect.Running {
+				if inspect.ExitCode != 0 {
+					err = &dockerExitError{inspect}
+				}
+				break
+			}
+			count++
+			if count == 5 {
+				glog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+				break
+			}
+			<-ticker.C
 		}
+		ch <- err
+		return
+	}()
 
-		count++
-		if count == 5 {
-			glog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
-			break
-		}
-
-		<-ticker.C
+	// No timeout, block until exec is finished.
+	if timeout <= 0 {
+		return <-ch
 	}
+	// Otherwise, wait for completion or timeout, whatever happens first.
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(timeout):
+		// FIXME: we should kill the process in the container, but the
+		// Docker API doesn't support it. See
+		// https://github.com/docker/docker/issues/9098.
+		// For liveness probes this is probably okay, since the
+		// container will be restarted. For readiness probes it means
+		// that probe processes could start piling up.
+		glog.Errorf("Exec session %s in container %s timed out, but process is still running!", execObj.ID, container.ID)
 
-	return err
+		// Return an utilexec.ExitError with code != 0, so that the
+		// probe result will be probe.Failure, not probe.Unknown as for
+		// errors that don't implement that interface.
+		return utilexec.CodeExitError{
+			Err:  fmt.Errorf("exec session timed out"),
+			Code: 1,
+		}
+	}
 }
