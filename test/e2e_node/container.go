@@ -34,7 +34,8 @@ type ConformanceContainer struct {
 	Volumes          []api.Volume
 	ImagePullSecrets []string
 
-	podName string
+	podName            string
+	PodSecurityContext *api.PodSecurityContext
 }
 
 func (cc *ConformanceContainer) Create() {
@@ -52,6 +53,7 @@ func (cc *ConformanceContainer) Create() {
 			Containers: []api.Container{
 				cc.Container,
 			},
+			SecurityContext:  cc.PodSecurityContext,
 			Volumes:          cc.Volumes,
 			ImagePullSecrets: imagePullSecrets,
 		},
