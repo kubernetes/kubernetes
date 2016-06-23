@@ -44,6 +44,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ScheduledJob{},
 		&ScheduledJobList{},
 		&v1.ListOptions{},
+		&v1.DeleteOptions{},
 	)
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
