@@ -433,7 +433,7 @@ func newNodes() *kapi.NodeList {
 			{
 				ObjectMeta: kapi.ObjectMeta{
 					Name: "testnode-1",
-					Annotations: map[string]string{
+					Labels: map[string]string{
 						// Note: The zone name here is an arbitrary string and doesn't exactly follow the
 						// format used by the cloud providers to name their zones. But that shouldn't matter
 						// for these tests here.

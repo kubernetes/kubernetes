@@ -648,7 +648,7 @@ func (kd *KubeDNS) getClusterZone() (string, error) {
 
 		// Select a node (arbitrarily the first node) that has `LabelZoneFailureDomain` set.
 		for _, nodeItem := range nodeList.Items {
-			if _, ok := nodeItem.Annotations[unversioned.LabelZoneFailureDomain]; !ok {
+			if _, ok := nodeItem.Labels[unversioned.LabelZoneFailureDomain]; !ok {
 				continue
 			}
 			// Make a copy of the node, don't rely on the loop variable.
@@ -663,7 +663,7 @@ func (kd *KubeDNS) getClusterZone() (string, error) {
 		return "", fmt.Errorf("Could not find any nodes")
 	}
 
-	zone, ok := node.Annotations[unversioned.LabelZoneFailureDomain]
+	zone, ok := node.Labels[unversioned.LabelZoneFailureDomain]
 	if !ok || zone == "" {
 		return "", fmt.Errorf("unknown cluster zone")
 	}
