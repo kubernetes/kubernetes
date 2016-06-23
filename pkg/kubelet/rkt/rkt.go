@@ -2038,7 +2038,7 @@ func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin i
 // Note: In rkt, the container ID is in the form of "UUID:appName", where UUID is
 // the rkt UUID, and appName is the container name.
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	glog.V(4).Infof("Rkt execing in container.")
 
 	id, err := parseContainerID(containerID)

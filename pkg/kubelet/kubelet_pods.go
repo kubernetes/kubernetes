@@ -29,6 +29,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -1235,12 +1236,13 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.runner.RunInContainer(container.ID, cmd)
+	// TODO(timstclair): Pass a proper timeout value.
+	return kl.runner.RunInContainer(container.ID, cmd, 0)
 }
 
 // ExecInContainer executes a command in a container, connecting the supplied
 // stdin/stdout/stderr to the command's IO streams.
-func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
 	if !ok {
 		return fmt.Errorf("streaming methods not supported by runtime")
@@ -1253,7 +1255,7 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 	if container == nil {
 		return fmt.Errorf("container not found (%q)", containerName)
 	}
-	return streamingRuntime.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize)
+	return streamingRuntime.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize, timeout)
 }
 
 // AttachContainer uses the container runtime to attach the given streams to

@@ -732,7 +732,7 @@ func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdi
 }
 
 // RunInContainer synchronously executes the command in the container, and returns the output.
-func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID, cmd []string) ([]byte, error) {
+func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	stdout, stderr, err := m.runtimeService.ExecSync(id.ID, cmd, 0)
 	// NOTE(timstclair): This does not correctly interleave stdout & stderr, but should be sufficient
 	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
@@ -744,7 +744,7 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 // Attaches the processes stdin, stdout, and stderr. Optionally uses a
 // tty.
 // TODO: Remove this method once the indirect streaming path is fully functional.
-func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	// Use `docker exec` directly for in-process docker integration for
 	// now to unblock other tests.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
