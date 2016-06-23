@@ -52,12 +52,12 @@ func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, 
 	// TODO(timstclair): Clean this up once PR#33366 merges.
 	if timeout <= 0 {
 		// Run until command exits.
-		return r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize)
+		return r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize, timeout)
 	}
 
 	errCh := make(chan error)
 	go func() {
-		errCh <- r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize)
+		errCh <- r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize, timeout)
 	}()
 
 	select {
