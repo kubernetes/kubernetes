@@ -19,6 +19,7 @@ package dockershim
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -43,7 +44,7 @@ func (ds *dockerService) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	return fmt.Errorf("not implemented")
 }
 
-func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	container, err := ds.client.InspectContainer(containerID.ID)
 	if err != nil {
 		return err
@@ -53,5 +54,5 @@ func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, 
 	}
 
 	handler := &dockertools.NativeExecHandler{}
-	return handler.ExecInContainer(ds.client, container, cmd, stdin, stdout, stderr, tty, resize)
+	return handler.ExecInContainer(ds.client, container, cmd, stdin, stdout, stderr, tty, resize, timeout)
 }

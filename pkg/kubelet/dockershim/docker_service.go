@@ -19,6 +19,7 @@ package dockershim
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -72,7 +73,7 @@ type DockerLegacyService interface {
 	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
 
 	// TODO: Remove this once exec is properly defined in CRI.
-	ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
+	ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
 }
 
 type dockerService struct {
