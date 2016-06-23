@@ -123,7 +123,7 @@ const (
 	NodeReadyInitialTimeout = 20 * time.Second
 
 	// How long pods have to be "ready" when a test begins.
-	PodReadyBeforeTimeout = 2 * time.Minute
+	PodReadyBeforeTimeout = 5 * time.Minute
 
 	// How long pods have to become scheduled onto nodes
 	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
