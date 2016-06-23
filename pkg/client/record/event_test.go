@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
+
+	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -32,7 +35,6 @@ import (
 	k8sruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
-	"net/http"
 )
 
 type testEventSink struct {
@@ -380,7 +382,8 @@ func TestEventf(t *testing.T) {
 }
 
 func recorderWithFakeClock(eventSource api.EventSource, eventBroadcaster EventBroadcaster, clock util.Clock) EventRecorder {
-	return &recorderImpl{eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
+	var wg sync.WaitGroup
+	return &recorderImpl{eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock, &wg}
 }
 
 func TestWriteEventError(t *testing.T) {
@@ -518,6 +521,9 @@ func TestLotsOfEvents(t *testing.T) {
 		<-recorderCalled
 		<-loggerCalled
 	}
+	// Make sure that all events were recorded
+	recorder.Flush()
+
 	// Make sure that every event was attempted 5 times
 	for i := 0; i < maxQueuedEvents; i++ {
 		if counts[i] < 5 {

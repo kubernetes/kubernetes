@@ -30,6 +30,8 @@ type FakeRecorder struct {
 	Events chan string
 }
 
+func (f *FakeRecorder) Flush() {}
+
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
 	if f.Events != nil {
 		f.Events <- fmt.Sprintf("%s %s %s", eventtype, reason, message)
