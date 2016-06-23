@@ -595,12 +595,13 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 	// domain path components, i.e. kd.domainPath, from the query.
 	path = path[:len(path)-len(kd.domainPath)]
 
-	// Append the zone name (zone in the cloud provider terminology, not a DNS zone)
-	zone, err := kd.getClusterZone()
+	// Append the zone name (zone in the cloud provider terminology, not a DNS
+	// zone) and the region name.
+	zone, region, err := kd.getClusterZoneAndRegion()
 	if err != nil {
-		return nil, fmt.Errorf("failed to obtain the cluster zone: %v", err)
+		return nil, fmt.Errorf("failed to obtain the cluster zone and region: %v", err)
 	}
-	path = append(path, zone)
+	path = append(path, zone, region)
 
 	// We have already established that the map entry exists for the given federation,
 	// we just need to retrieve the domain name, validate it and append it to the path.
@@ -620,21 +621,23 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 	return []skymsg.Service{{Host: name}}, nil
 }
 
-// getClusterZone returns the name of the zone the cluster is running in. It arbitrarily selects
-// a node and reads the failure domain annotation on the node. An alternative is to obtain this
-// pod's (i.e. kube-dns pod's) name using the downward API, get the pod, get the node the pod is
-// bound to and retrieve that node's annotations. But even just by reading those steps, it looks
-// complex and it is not entirely clear what that complexity is going to buy us. So taking a
-// simpler approach here.
-// Also note that zone here means the zone in cloud provider terminology, not the DNS zone.
-func (kd *KubeDNS) getClusterZone() (string, error) {
+// getClusterZoneAndRegion returns the name of the zone and the region the
+// cluster is running in. It arbitrarily selects a node and reads the failure
+// domain label on the node. An alternative is to obtain this pod's
+// (i.e. kube-dns pod's) name using the downward API, get the pod, get the
+// node the pod is bound to and retrieve that node's labels. But even just by
+// reading those steps, it looks complex and it is not entirely clear what
+// that complexity is going to buy us. So taking a simpler approach here.
+// Also note that zone here means the zone in cloud provider terminology, not
+// the DNS zone.
+func (kd *KubeDNS) getClusterZoneAndRegion() (string, string, error) {
 	var node *kapi.Node
 
 	objs := kd.nodesStore.List()
 	if len(objs) > 0 {
 		var ok bool
 		if node, ok = objs[0].(*kapi.Node); !ok {
-			return "", fmt.Errorf("expected node object, got: %T", objs[0])
+			return "", "", fmt.Errorf("expected node object, got: %T", objs[0])
 		}
 	} else {
 		// An alternative to listing nodes each time is to set a watch, but that is totally
@@ -643,31 +646,40 @@ func (kd *KubeDNS) getClusterZone() (string, error) {
 		// TODO(madhusudancs): Move this to external/v1 API.
 		nodeList, err := kd.kubeClient.Core().Nodes().List(kapi.ListOptions{})
 		if err != nil || len(nodeList.Items) == 0 {
-			return "", fmt.Errorf("failed to retrieve the cluster nodes: %v", err)
+			return "", "", fmt.Errorf("failed to retrieve the cluster nodes: %v", err)
 		}
 
-		// Select a node (arbitrarily the first node) that has `LabelZoneFailureDomain` set.
+		// Select a node (arbitrarily the first node) that has
+		// `LabelZoneFailureDomain` and `LabelZoneRegion` set.
 		for _, nodeItem := range nodeList.Items {
-			if _, ok := nodeItem.Labels[unversioned.LabelZoneFailureDomain]; !ok {
+			_, zfound := nodeItem.Labels[unversioned.LabelZoneFailureDomain]
+			_, rfound := nodeItem.Labels[unversioned.LabelZoneRegion]
+			if !zfound || !rfound {
 				continue
 			}
 			// Make a copy of the node, don't rely on the loop variable.
 			node = &(*(&nodeItem))
 			if err := kd.nodesStore.Add(node); err != nil {
-				return "", fmt.Errorf("couldn't add the retrieved node to the cache: %v", err)
+				return "", "", fmt.Errorf("couldn't add the retrieved node to the cache: %v", err)
 			}
+			// Node is found, break out of the loop.
+			break
 		}
 	}
 
 	if node == nil {
-		return "", fmt.Errorf("Could not find any nodes")
+		return "", "", fmt.Errorf("Could not find any nodes")
 	}
 
 	zone, ok := node.Labels[unversioned.LabelZoneFailureDomain]
 	if !ok || zone == "" {
-		return "", fmt.Errorf("unknown cluster zone")
+		return "", "", fmt.Errorf("unknown cluster zone")
 	}
-	return zone, nil
+	region, ok := node.Labels[unversioned.LabelZoneRegion]
+	if !ok || region == "" {
+		return "", "", fmt.Errorf("unknown cluster region")
+	}
+	return zone, region, nil
 }
 
 func (kd *KubeDNS) getServiceFQDN(service *kapi.Service) string {
