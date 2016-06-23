@@ -46,6 +46,8 @@ const (
 	gcePDDetachPollTime = 10 * time.Second
 	nodeStatusTimeout   = 1 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
+	gcePDRetryTimeout   = 5 * time.Minute
+	gcePDRetryPollTime  = 5 * time.Second
 )
 
 var _ = framework.KubeDescribe("Pod Disks", func() {
@@ -288,7 +290,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 func createPDWithRetry() (string, error) {
 	newDiskName := ""
 	var err error
-	for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < gcePDRetryTimeout; time.Sleep(gcePDRetryPollTime) {
 		if newDiskName, err = createPD(); err != nil {
 			framework.Logf("Couldn't create a new PD. Sleeping 5 seconds (%v)", err)
 			continue
@@ -301,7 +303,7 @@ func createPDWithRetry() (string, error) {
 
 func deletePDWithRetry(diskName string) {
 	var err error
-	for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < gcePDRetryTimeout; time.Sleep(gcePDRetryPollTime) {
 		if err = deletePD(diskName); err != nil {
 			framework.Logf("Couldn't delete PD %q. Sleeping 5 seconds (%v)", diskName, err)
 			continue
