@@ -766,7 +766,7 @@ type fakeContainerCommandRunner struct {
 	StderrData string
 }
 
-func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	// record params
 	f.Cmd = cmd
 	f.ID = id
@@ -1732,6 +1732,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 		nil,
 		false,
 		nil,
+		0,
 	)
 	require.Error(t, err)
 	require.True(t, fakeCommandRunner.ID.IsEmpty(), "Unexpected invocation of runner.ExecInContainer")
@@ -1773,6 +1774,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 		nil,
 		false,
 		nil,
+		0,
 	)
 	require.Error(t, err)
 	require.True(t, fakeCommandRunner.ID.IsEmpty(), "Unexpected invocation of runner.ExecInContainer")
@@ -1830,6 +1832,7 @@ func TestExecInContainer(t *testing.T) {
 		stderr,
 		tty,
 		nil,
+		0,
 	)
 	require.NoError(t, err)
 	require.Equal(t, fakeCommandRunner.ID.ID, containerID, "ID")
