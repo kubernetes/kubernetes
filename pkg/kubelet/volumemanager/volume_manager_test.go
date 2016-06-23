@@ -58,8 +58,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("Failed to initialize volume manager: %v", err)
 	}
 
-	stopCh := make(chan struct{})
-	go manager.Run(stopCh)
+	stopCh := runVolumeManager(manager)
 	defer close(stopCh)
 
 	podManager.SetPods([]*api.Pod{pod})
@@ -149,8 +148,10 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			continue
 		}
 
-		stopCh := make(chan struct{})
-		go manager.Run(stopCh)
+		stopCh := runVolumeManager(manager)
+		defer func() {
+			close(stopCh)
+		}()
 
 		podManager.SetPods([]*api.Pod{pod})
 
@@ -170,8 +171,6 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Expected supplemental groups %v, got %v", tc.expected, actual)
 		}
-
-		close(stopCh)
 	}
 }
 
@@ -190,7 +189,8 @@ func newTestVolumeManager(
 		kubeClient,
 		plugMgr,
 		&containertest.FakeRuntime{},
-		&mount.FakeMounter{})
+		&mount.FakeMounter{},
+		"")
 	return vm, err
 }
 
@@ -275,4 +275,12 @@ func simulateVolumeInUseUpdate(
 			return
 		}
 	}
+}
+
+func runVolumeManager(manager VolumeManager) chan struct{} {
+	stopCh := make(chan struct{})
+	readyCh := make(chan bool, 1)
+	readyCh <- true
+	go manager.Run(readyCh, stopCh)
+	return stopCh
 }

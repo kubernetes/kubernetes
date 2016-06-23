@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -40,7 +41,7 @@ func (kl *Kubelet) getRootDir() string {
 // getPodsDir returns the full path to the directory under which pod
 // directories are created.
 func (kl *Kubelet) getPodsDir() string {
-	return path.Join(kl.getRootDir(), "pods")
+	return path.Join(kl.getRootDir(), options.DefaultKubeletPodsDirName)
 }
 
 // getPluginsDir returns the full path to the directory under which plugin
@@ -48,7 +49,7 @@ func (kl *Kubelet) getPodsDir() string {
 // they need to persist.  Plugins should create subdirectories under this named
 // after their own names.
 func (kl *Kubelet) getPluginsDir() string {
-	return path.Join(kl.getRootDir(), "plugins")
+	return path.Join(kl.getRootDir(), options.DefaultKubeletPluginsDirName)
 }
 
 // getPluginDir returns a data directory name for a given plugin name.
@@ -90,7 +91,7 @@ func (kl *Kubelet) getPodDir(podUID types.UID) string {
 // which volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
-	return path.Join(kl.getPodDir(podUID), "volumes")
+	return path.Join(kl.getPodDir(podUID), options.DefaultKubeletVolumesDirName)
 }
 
 // getPodVolumeDir returns the full path to the directory which represents the
@@ -104,7 +105,7 @@ func (kl *Kubelet) getPodVolumeDir(podUID types.UID, pluginName string, volumeNa
 // which plugins may store data for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodPluginsDir(podUID types.UID) string {
-	return path.Join(kl.getPodDir(podUID), "plugins")
+	return path.Join(kl.getPodDir(podUID), options.DefaultKubeletPluginsDirName)
 }
 
 // getPodPluginDir returns a data directory name for a given plugin name for a
@@ -126,7 +127,7 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	//     old && new   = use new (but warn)
 	oldPath := path.Join(kl.getPodDir(podUID), ctrName)
 	oldExists := dirExists(oldPath)
-	newPath := path.Join(kl.getPodDir(podUID), "containers", ctrName)
+	newPath := path.Join(kl.getPodDir(podUID), options.DefaultKubeletContainersDirName, ctrName)
 	newExists := dirExists(newPath)
 	if oldExists && !newExists {
 		return oldPath
