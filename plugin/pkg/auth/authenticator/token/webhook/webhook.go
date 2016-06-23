@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -64,11 +65,15 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 		if err := result.Error(); err != nil {
 			return nil, false, err
 		}
+		var statusCode int
+		if result.StatusCode(&statusCode); statusCode < 200 || statusCode >= 300 {
+			return nil, false, fmt.Errorf("Error contacting webhook: %d", statusCode)
+		}
 		spec := r.Spec
 		if err := result.Into(r); err != nil {
 			return nil, false, err
 		}
-		go w.responseCache.Add(spec, r.Status, w.ttl)
+		w.responseCache.Add(spec, r.Status, w.ttl)
 	}
 	if !r.Status.Authenticated {
 		return nil, false, nil
