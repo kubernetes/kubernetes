@@ -387,12 +387,12 @@ func testValidFederationQueries(t *testing.T, kd *KubeDNS) {
 		// Federation suffix is just a domain.
 		{
 			q: "mysvc.myns.myfederation.svc.cluster.local.",
-			a: "mysvc.myns.myfederation.svc.testcontinent-testreg-testzone.example.com.",
+			a: "mysvc.myns.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
 		},
 		// Federation suffix is a subdomain.
 		{
 			q: "secsvc.default.secondfederation.svc.cluster.local.",
-			a: "secsvc.default.secondfederation.svc.testcontinent-testreg-testzone.second.example.com.",
+			a: "secsvc.default.secondfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.second.example.com.",
 		},
 	}
 
@@ -438,6 +438,7 @@ func newNodes() *kapi.NodeList {
 						// format used by the cloud providers to name their zones. But that shouldn't matter
 						// for these tests here.
 						unversioned.LabelZoneFailureDomain: "testcontinent-testreg-testzone",
+						unversioned.LabelZoneRegion:        "testcontinent-testreg",
 					},
 				},
 			},
