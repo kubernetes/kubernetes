@@ -124,6 +124,19 @@ func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types
 	}}, nil
 }
 
+func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	azureVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			AzureFile: &api.AzureFileVolumeSource{
+				SecretName: volName,
+				ShareName:  volName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(azureVolume), nil
+}
+
 // azureFile volumes represent mount of an AzureFile share.
 type azureFile struct {
 	volName string

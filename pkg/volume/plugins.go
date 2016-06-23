@@ -98,6 +98,12 @@ type VolumePlugin interface {
 	// - name: The volume name, as per the api.Volume spec.
 	// - podUID: The UID of the enclosing pod
 	NewUnmounter(name string, podUID types.UID) (Unmounter, error)
+
+	// ConstructVolumeSpec constructs a volume spec based on the given volume name
+	// and mountPath. The spec may have incomplete information due to limited
+	// information from input. This function is used by volume manager to reconstruct
+	// volume spec by reading the volume directories from disk
+	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -151,6 +157,7 @@ type AttachableVolumePlugin interface {
 	VolumePlugin
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
+	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
