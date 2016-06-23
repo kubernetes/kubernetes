@@ -949,6 +949,9 @@ function kube::release::package_kube_manifests_tarball() {
   objects=$(cd "${KUBE_ROOT}/cluster/saltbase/salt/kube-dns" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   mkdir -p "${dst_dir}/dns"
   tar c -C "${KUBE_ROOT}/cluster/saltbase/salt/kube-dns" ${objects} | tar x -C "${dst_dir}/dns"
+  if [[ "${FEDERATION:-}" == "true" ]]; then
+    sed -i 's/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/- --federations="'"${FEDERATIONS_DOMAIN_MAP}"'"/g' "${dst_dir}/dns/skydns-rc.yaml.in"
+  fi
 
   # This is for coreos only. ContainerVM, GCI, or Trusty does not use it.
   cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
