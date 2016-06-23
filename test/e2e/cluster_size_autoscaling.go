@@ -273,24 +273,18 @@ func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
 }
 
 func enableAutoscaler(nodePool string, minCount, maxCount int) error {
-	updateRequest := "{" +
-		" \"update\": {" +
-		"  \"desiredNodePoolId\": \"" + nodePool + "\"," +
-		"  \"desiredNodePoolAutoscaling\": {" +
-		"   \"enabled\": \"true\"," +
-		"   \"minNodeCount\": \"" + strconv.Itoa(minCount) + "\"," +
-		"   \"maxNodeCount\": \"" + strconv.Itoa(maxCount) + "\"" +
-		"  }" +
-		" }" +
-		"}"
+	output, err := exec.Command("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+		"--enable-autoscaling",
+		"--min-nodes="+strconv.Itoa(minCount),
+		"--max-nodes="+strconv.Itoa(maxCount),
+		"--node-pool="+nodePool,
+		"--project="+framework.TestContext.CloudConfig.ProjectID,
+		"--zone="+framework.TestContext.CloudConfig.Zone).Output()
 
-	url := getGKEClusterUrl()
-	glog.Infof("Using gke api url %s", url)
-	putResult, err := doPut(url, updateRequest)
 	if err != nil {
-		return fmt.Errorf("Failed to put %s: %v", url, err)
+		return fmt.Errorf("Failed to enable autoscaling: %v", err)
 	}
-	glog.Infof("Config update result: %s", putResult)
+	glog.Infof("Config update result: %s", output)
 
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
 		if val, err := isAutoscalerEnabled(minCount); err == nil && val {
