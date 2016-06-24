@@ -213,8 +213,12 @@ func (im *realImageManager) GarbageCollect() error {
 	if err != nil {
 		return err
 	}
-	usage := int64(fsInfo.Usage)
 	capacity := int64(fsInfo.Capacity)
+	available := int64(fsInfo.Available)
+	if available > capacity {
+		glog.Warningf("available %d is larger than capacity %d", available, capacity)
+		available = capacity
+	}
 
 	// Check valid capacity.
 	if capacity == 0 {
@@ -224,9 +228,9 @@ func (im *realImageManager) GarbageCollect() error {
 	}
 
 	// If over the max threshold, free enough to place us at the lower threshold.
-	usagePercent := int(usage * 100 / capacity)
+	usagePercent := 100 - int(available*100/capacity)
 	if usagePercent >= im.policy.HighThresholdPercent {
-		amountToFree := usage - (int64(im.policy.LowThresholdPercent) * capacity / 100)
+		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		glog.Infof("[ImageManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, im.policy.HighThresholdPercent, amountToFree)
 		freed, err := im.freeSpace(amountToFree, time.Now())
 		if err != nil {
