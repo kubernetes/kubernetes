@@ -489,6 +489,11 @@
 			"Rev": "8b320e7c550067b1dfb37bd1682e8067023e0751"
 		},
 		{
+			"ImportPath": "github.com/coreos/go-etcd/etcd",
+			"Comment": "v2.0.0-38-g003851b",
+			"Rev": "003851be7bb0694fe3cc457a49529a19388ee7cf"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-oidc/http",
 			"Rev": "5cf2aa52da8c574d3aa4458f471ad6ae2240fe6b"
 		},
