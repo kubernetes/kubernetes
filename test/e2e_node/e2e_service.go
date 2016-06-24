@@ -52,6 +52,11 @@ type logFileData struct {
 	journalctlCommand []string
 }
 
+const (
+	// This is consistent with the level used in a cluster e2e test.
+	LOG_VERBOSITY_LEVEL = "4"
+)
+
 func newE2eService(nodeName string) *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
@@ -194,7 +199,7 @@ func (es *e2eService) startApiServer() (*killCmd, error) {
 		"--service-cluster-ip-range", "10.0.0.1/24",
 		"--kubelet-port", "10250",
 		"--allow-privileged", "true",
-		"--v", "8", "--logtostderr",
+		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:8080/healthz",
@@ -235,7 +240,7 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--serialize-image-pulls", "false",
 		"--config", es.kubeletStaticPodDir,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
-		"--v", "8", "--logtostderr",
+		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
 	cmd := exec.Command("sudo", cmdArgs...)
 	hcc := newHealthCheckCommand(
