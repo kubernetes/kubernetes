@@ -961,7 +961,11 @@ function kube::release::package_kube_manifests_tarball() {
     fi
     if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
       sed -i 's/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/- --federations="'"${FEDERATIONS_DOMAIN_MAP}"'"/g' "${dst_dir}/dns/skydns-rc.yaml.in"
+    else
+      sed -i '/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/d' "${dst_dir}/dns/skydns-rc.yaml.in"
     fi
+  else
+    sed -i '/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/d' "${dst_dir}/dns/skydns-rc.yaml.in"
   fi
 
   # This is for coreos only. ContainerVM, GCI, or Trusty does not use it.
