@@ -146,8 +146,14 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
 
+			// TODO(mml): replace with calls to framework.DeleteNamespaces and
+			// framework.WaitForNamespacesDeleted.  But first we need to re-write
+			// them to expect versioned clients.
+			// ALSO TODO(mml): Utility functions like these should [optionally?]
+			// accept a list of clients/clusters to act upon, to increase
+			// re-usablity.
 			for i, cs := range clusterClientSets {
-				if err := cs.Core().Namespaces().Delete(f.Namespace.Name, &api.DeleteOptions{}); err != nil {
+				if err := cs.Core().Namespaces().Delete(f.Namespace.Name, api.NewDeleteOptions(0)); err != nil {
 					framework.Failf("Couldn't delete the namespace %s in cluster [%d]: %v", f.Namespace.Name, i, err)
 				}
 				framework.Logf("Namespace %s deleted in cluster [%d]", f.Namespace.Name, i)
