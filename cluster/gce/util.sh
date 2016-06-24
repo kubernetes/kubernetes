@@ -953,17 +953,6 @@ function kube-down {
   echo "Bringing down cluster"
   set +e  # Do not stop on error
 
-  # Delete autoscaler for nodes if present. We assume that all or none instance groups have an autoscaler
-  local autoscaler
-  autoscaler=( $(gcloud compute instance-groups managed list \
-    --zone "${ZONE}" --project "${PROJECT}" --regexp="${NODE_INSTANCE_PREFIX}-.+" \
-    --format='value(autoscaled)') )
-  if [[ "${autoscaler:-}" == "yes" ]]; then
-    for group in ${INSTANCE_GROUPS[@]:-}; do
-      gcloud compute instance-groups managed stop-autoscaling "${group}" --zone "${ZONE}" --project "${PROJECT}"
-    done
-  fi
-
   # Get the name of the managed instance group template before we delete the
   # managed instance group. (The name of the managed instance group template may
   # change during a cluster upgrade.)
