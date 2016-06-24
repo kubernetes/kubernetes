@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
@@ -35,6 +36,8 @@ import (
 var (
 	groupVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
 )
+
+const retryBackoff = 500 * time.Millisecond
 
 // Ensure Webhook implements the authorizer.Authorizer interface.
 var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
@@ -67,7 +70,12 @@ type WebhookAuthorizer struct {
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
 func New(kubeConfigFile string, authorizedTTL, unauthorizedTTL time.Duration) (*WebhookAuthorizer, error) {
-	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions)
+	return newWithBackoff(kubeConfigFile, authorizedTTL, unauthorizedTTL, retryBackoff)
+}
+
+// newWithBackoff allows tests to skip the sleep.
+func newWithBackoff(kubeConfigFile string, authorizedTTL, unauthorizedTTL, initialBackoff time.Duration) (*WebhookAuthorizer, error) {
+	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions, initialBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +156,9 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(v1beta1.SubjectAccessReviewStatus)
 	} else {
-		result := w.RestClient.Post().Body(r).Do()
+		result := w.WithExponentialBackoff(func() restclient.Result {
+			return w.RestClient.Post().Body(r).Do()
+		})
 		if err := result.Error(); err != nil {
 			return err
 		}
