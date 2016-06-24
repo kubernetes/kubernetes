@@ -56,7 +56,12 @@ const (
 	DNSTTL = 180 * time.Second
 )
 
+var FederatedServiceLabels = map[string]string{
+	"foo": "bar",
+}
+
 var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func() {
+
 	var clusterClientSets []*release_1_3.Clientset
 	var federationName string
 	f := framework.NewDefaultFederatedFramework("service")
@@ -137,28 +142,29 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 		}
 	})
 
-	AfterEach(func() {
-		framework.SkipUnlessFederated(f.Client)
-
-		for i, cs := range clusterClientSets {
-			if err := cs.Core().Namespaces().Delete(f.Namespace.Name, &api.DeleteOptions{}); err != nil {
-				framework.Failf("Couldn't delete the namespace %s in cluster [%d]: %v", f.Namespace.Name, i, err)
-			}
-			framework.Logf("Namespace %s deleted in cluster [%d]", f.Namespace.Name, i)
-		}
-
-		// Delete the registered clusters in the federation API server.
-		clusterList, err := f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		for _, cluster := range clusterList.Items {
-			err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &api.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred())
-		}
-	})
-
 	Describe("DNS", func() {
+		AfterEach(func() {
+			framework.SkipUnlessFederated(f.Client)
+
+			for i, cs := range clusterClientSets {
+				if err := cs.Core().Namespaces().Delete(f.Namespace.Name, &api.DeleteOptions{}); err != nil {
+					framework.Failf("Couldn't delete the namespace %s in cluster [%d]: %v", f.Namespace.Name, i, err)
+				}
+				framework.Logf("Namespace %s deleted in cluster [%d]", f.Namespace.Name, i)
+			}
+
+			// Delete the registered clusters in the federation API server.
+			clusterList, err := f.FederationClientset.Federation().Clusters().List(api.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, cluster := range clusterList.Items {
+				err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &api.DeleteOptions{})
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
 		BeforeEach(func() {
 			framework.SkipUnlessFederated(f.Client)
+			createBackendPods(clusterClientSets, f.Namespace.Name)
 			createService(f.FederationClientset_1_3, clusterClientSets, f.Namespace.Name)
 		})
 
@@ -202,10 +208,14 @@ var _ = framework.KubeDescribe("[Feature:Federation] Federated Services", func()
 				for _, name := range svcDNSNames {
 					discoverService(f, name, true)
 				}
+			})
 
-				// TODO(mml): This currently takes 9 minutes.  Consider reducing the
-				// TTL and/or running the pods in parallel.
-				Context("[Slow]", func() {
+			// TODO(mml): This currently takes 9 minutes.  Consider reducing the
+			// TTL and/or running the pods in parallel.
+			Context("[Slow] missing local service", func() {
+				It("should never find DNS entries for a missing local service", func() {
+					framework.SkipUnlessFederated(f.Client)
+
 					localSvcDNSNames := []string{
 						FederatedServiceName,
 						fmt.Sprintf("%s.%s", FederatedServiceName, f.Namespace.Name),
@@ -247,10 +257,6 @@ func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, s
 		// Renaming for clarity/readability
 		clSvc := clSvcList.Items[0]
 
-		// The federation service has no cluster IP.  Clear any cluster IP before
-		// comparison.
-		clSvc.Spec.ClusterIP = ""
-
 		Expect(clSvc.Name).To(Equal(service.Name))
 		// Some fields are expected to be different, so make them the same before checking equality.
 		clSvc.Spec.ClusterIP = service.Spec.ClusterIP
@@ -258,6 +264,11 @@ func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, s
 		clSvc.Spec.DeprecatedPublicIPs = service.Spec.DeprecatedPublicIPs
 		clSvc.Spec.LoadBalancerIP = service.Spec.LoadBalancerIP
 		clSvc.Spec.LoadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
+		// N.B. We cannot iterate over the port objects directly, as their values
+		// only get copied and our updates will get lost.
+		for i := range clSvc.Spec.Ports {
+			clSvc.Spec.Ports[i].NodePort = service.Spec.Ports[i].NodePort
+		}
 		Expect(clSvc.Spec).To(Equal(service.Spec))
 	}
 }
@@ -265,29 +276,18 @@ func waitForFederatedServiceShard(cs *release_1_3.Clientset, namespace string, s
 func createService(fcs *federation_release_1_3.Clientset, clusterClientSets []*release_1_3.Clientset, namespace string) {
 	By(fmt.Sprintf("Creating federated service %q in namespace %q", FederatedServiceName, namespace))
 
-	labels := map[string]string{
-		"foo": "bar",
-	}
-
-	svc1port := "svc1"
-	svc2port := "svc2"
-
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
 			Name: FederatedServiceName,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: labels,
+			Selector: FederatedServiceLabels,
+			Type:     "LoadBalancer",
 			Ports: []v1.ServicePort{
 				{
-					Name:       "portname1",
+					Name:       "http",
 					Port:       80,
-					TargetPort: intstr.FromString(svc1port),
-				},
-				{
-					Name:       "portname2",
-					Port:       81,
-					TargetPort: intstr.FromString(svc2port),
+					TargetPort: intstr.FromInt(8080),
 				},
 			},
 		},
@@ -342,7 +342,7 @@ func podExitCodeDetector(f *framework.Framework, name string, code int32) func()
 }
 
 func discoverService(f *framework.Framework, name string, exists bool) {
-	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 1; done", name)}
+	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 10; done", name)}
 	By(fmt.Sprintf("Looking up %q", name))
 
 	pod := &api.Pod{
@@ -368,10 +368,36 @@ func discoverService(f *framework.Framework, name string, exists bool) {
 
 	if exists {
 		// TODO(mml): Eventually check the IP address is correct, too.
-		Eventually(podExitCodeDetector(f, FederatedServicePod, 0), DNSTTL, time.Second*2).
+		Eventually(podExitCodeDetector(f, FederatedServicePod, 0), 10*DNSTTL, time.Second*2).
 			Should(BeNil(), "%q should exit 0, but it never did", command)
 	} else {
-		Consistently(podExitCodeDetector(f, FederatedServicePod, 0), DNSTTL, time.Second*2).
+		Consistently(podExitCodeDetector(f, FederatedServicePod, 0), 10*DNSTTL, time.Second*2).
 			ShouldNot(BeNil(), "%q should never exit 0, but it did", command)
+	}
+}
+
+func createBackendPods(clusterClientSets []*release_1_3.Clientset, namespace string) {
+	name := "backend"
+
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    FederatedServiceLabels,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "backend",
+					Image: "gcr.io/google_containers/echoserver:1.4",
+				},
+			},
+			RestartPolicy: v1.RestartPolicyAlways,
+		},
+	}
+
+	for _, client := range clusterClientSets {
+		_, err := client.Core().Pods(namespace).Create(pod)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Creating pod %q/%q", namespace, name))
 	}
 }
