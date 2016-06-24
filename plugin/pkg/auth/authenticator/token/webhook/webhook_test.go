@@ -148,7 +148,7 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
-	return New(p, cacheTime)
+	return newWithBackoff(p, cacheTime, 0)
 }
 
 func TestTLSConfig(t *testing.T) {
