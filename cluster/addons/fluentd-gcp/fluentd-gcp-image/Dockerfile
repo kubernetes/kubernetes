@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console. 
 
-FROM ubuntu:14.04
+FROM gcr.io/google_containers/ubuntu-slim:0.1
 MAINTAINER Alex Robinson "arob@google.com"
 
 # Disable prompts from apt.
@@ -28,16 +28,26 @@ ENV DEBIAN_FRONTEND noninteractive
 # Keeps unneeded configs from being installed along with fluentd.
 ENV DO_NOT_INSTALL_CATCH_ALL_CONFIG true
 
-RUN apt-get -q update && \
-    apt-get install -y curl && \
-    apt-get clean && \
-    curl -s https://dl.google.com/cloudagents/install-logging-agent.sh | bash
+# --reinstall is required to install lsb-base (required by install-logging-agent.sh)
+RUN apt-get update && apt-get install --reinstall -y --no-install-recommends \
+  curl ca-certificates \
+  bash \
+  lsb-base \
+  lsb-release && \
+  curl -sSL https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+  curl -sSL https://dl.google.com/cloudagents/install-logging-agent.sh | bash && \
+  apt-get autoremove -y && \
+  apt-get clean -y && \
+  rm -rf /var/lib/apt/lists/* \
+  /opt/google-fluentd/embedded/share/doc \
+  /opt/google-fluentd/embedded/share/gtk-doc \
+  /opt/google-fluentd/embedded/lib/postgresql \
+  /opt/google-fluentd/embedded/bin/postgres \
+  /opt/google-fluentd/embedded/share/postgresql \
+  /var/log/google-fluentd
 
 # Install the record reformer plugin.
 RUN /usr/sbin/google-fluentd-gem install fluent-plugin-record-reformer
-
-# Remove the misleading log file that gets generated when the agent is installed
-RUN rm -rf /var/log/google-fluentd
 
 # Copy the Fluentd configuration file for logging Docker container logs.
 COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
