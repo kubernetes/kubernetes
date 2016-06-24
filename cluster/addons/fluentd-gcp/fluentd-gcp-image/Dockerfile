@@ -40,6 +40,9 @@ RUN apt-get -q update && \
 RUN /usr/sbin/google-fluentd-gem install fluent-plugin-record-reformer -v 0.8.1
 RUN /usr/sbin/google-fluentd-gem install fluent-plugin-systemd -v 0.0.3
 
+# Install plugin to read systemd-journal
+RUN /usr/sbin/google-fluentd-gem install fluent-plugin-systemd -v 0.0.3
+
 # Remove the misleading log file that gets generated when the agent is installed
 RUN rm -rf /var/log/google-fluentd
 
@@ -50,4 +53,4 @@ COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
 COPY google-fluentd-journal.conf /etc/google-fluentd/google-fluentd-journal.conf
 
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS"
+CMD /bin/sh -c "rm /lib/x86_64-linux-gnu/libsystemd* && cp /host/lib/libsystemd* /lib/x86_64-linux-gnu/ && /usr/sbin/google-fluentd \"$FLUENTD_ARGS\""
