@@ -22,11 +22,7 @@ spec:
         - --etcd-servers=http://localhost:2379
         - --service-cluster-ip-range={{.FEDERATION_SERVICE_CIDR}}
         - --secure-port=443
-        {{if eq .KUBERNETES_PROVIDER "aws"}}
-        - --external-hostname={{.FEDERATION_API_HOST}}
-        {{else}}
         - --advertise-address={{.FEDERATION_API_HOST}}
-        {{end}}
         # TODO: --admission-control values must be set when support is added for each type of control.
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
         ports:
