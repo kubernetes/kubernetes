@@ -2064,7 +2064,7 @@ type ServiceSpec struct {
 	// The IP Address of the service.
 	// Deprecated: Use clusterIP instead.
 	// +genconversion=false
-	DeprecatedPortalIP string `json:"portalIP,omitempty" protobuf:"bytes,9,opt,name=portalIP"`
+	DeprecatedPortalIP string `json:"portalIP,omitempty" protobuf:"-"`
 
 	// ClusterIP is usually assigned by the master and is the IP address of the service.
 	// If specified, it will be allocated to the service if it is unused
