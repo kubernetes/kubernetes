@@ -131,6 +131,7 @@ while true; do sleep 1; done
 				name := "termination-message-container"
 				terminationMessage := "DONE"
 				terminationMessagePath := "/dev/termination-log"
+				priv := true
 				c := ConformanceContainer{
 					Framework: f,
 					Container: api.Container{
@@ -139,6 +140,9 @@ while true; do sleep 1; done
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
 						TerminationMessagePath: terminationMessagePath,
+						SecurityContext: &api.SecurityContext{
+							Privileged: &priv,
+						},
 					},
 					RestartPolicy: api.RestartPolicyNever,
 				}
