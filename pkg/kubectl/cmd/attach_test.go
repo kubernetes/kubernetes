@@ -35,15 +35,15 @@ import (
 )
 
 type fakeRemoteAttach struct {
-	method    string
-	url       *url.URL
-	attachErr error
+	method string
+	url    *url.URL
+	err    error
 }
 
 func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
 	f.method = method
 	f.url = url
-	return f.attachErr
+	return f.err
 }
 
 func TestPodAndContainerAttach(t *testing.T) {
@@ -86,6 +86,12 @@ func TestPodAndContainerAttach(t *testing.T) {
 			expectedContainer: "initfoo",
 			name:              "init container in flag",
 		},
+		{
+			p:           &AttachOptions{ContainerName: "bar"},
+			args:        []string{"foo", "-c", "wrong"},
+			expectError: true,
+			name:        "non-existing container in flag",
+		},
 	}
 
 	for _, test := range tests {
@@ -123,7 +129,8 @@ func TestAttach(t *testing.T) {
 	tests := []struct {
 		name, version, podPath, attachPath, container string
 		pod                                           *api.Pod
-		attachErr                                     bool
+		remoteAttachErr                               bool
+		exepctedErr                                   string
 	}{
 		{
 			name:       "pod attach",
@@ -131,14 +138,26 @@ func TestAttach(t *testing.T) {
 			podPath:    "/api/" + version + "/namespaces/test/pods/foo",
 			attachPath: "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:        attachPod(),
+			container:  "bar",
 		},
 		{
-			name:       "pod attach error",
-			version:    version,
-			podPath:    "/api/" + version + "/namespaces/test/pods/foo",
-			attachPath: "/api/" + version + "/namespaces/test/pods/foo/attach",
-			pod:        attachPod(),
-			attachErr:  true,
+			name:            "pod attach error",
+			version:         version,
+			podPath:         "/api/" + version + "/namespaces/test/pods/foo",
+			attachPath:      "/api/" + version + "/namespaces/test/pods/foo/attach",
+			pod:             attachPod(),
+			remoteAttachErr: true,
+			container:       "bar",
+			exepctedErr:     "attach error",
+		},
+		{
+			name:        "container not found error",
+			version:     version,
+			podPath:     "/api/" + version + "/namespaces/test/pods/foo",
+			attachPath:  "/api/" + version + "/namespaces/test/pods/foo/attach",
+			pod:         attachPod(),
+			container:   "foo",
+			exepctedErr: "cannot attach to the container: container not found (foo)",
 		},
 	}
 	for _, test := range tests {
@@ -162,42 +181,42 @@ func TestAttach(t *testing.T) {
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
-		ex := &fakeRemoteAttach{}
-		if test.attachErr {
-			ex.attachErr = fmt.Errorf("attach error")
+		remoteAttach := &fakeRemoteAttach{}
+		if test.remoteAttachErr {
+			remoteAttach.err = fmt.Errorf("attach error")
 		}
 		params := &AttachOptions{
-			ContainerName: "bar",
+			ContainerName: test.container,
 			In:            bufIn,
 			Out:           bufOut,
 			Err:           bufErr,
-			Attach:        ex,
+			Attach:        remoteAttach,
 		}
 		cmd := &cobra.Command{}
 		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {
 			t.Fatal(err)
 		}
 		err := params.Run()
-		if test.attachErr && err != ex.attachErr {
+		if test.exepctedErr != "" && err.Error() != test.exepctedErr {
 			t.Errorf("%s: Unexpected exec error: %v", test.name, err)
 			continue
 		}
-		if !test.attachErr && err != nil {
+		if test.exepctedErr == "" && err != nil {
 			t.Errorf("%s: Unexpected error: %v", test.name, err)
 			continue
 		}
-		if test.attachErr {
+		if test.exepctedErr != "" {
 			continue
 		}
-		if ex.url.Path != test.attachPath {
+		if remoteAttach.url.Path != test.attachPath {
 			t.Errorf("%s: Did not get expected path for exec request", test.name)
 			continue
 		}
-		if ex.method != "POST" {
-			t.Errorf("%s: Did not get method for attach request: %s", test.name, ex.method)
+		if remoteAttach.method != "POST" {
+			t.Errorf("%s: Did not get method for attach request: %s", test.name, remoteAttach.method)
 		}
-		if ex.url.Query().Get("container") != "bar" {
-			t.Errorf("%s: Did not have query parameters: %s", test.name, ex.url.Query())
+		if remoteAttach.url.Query().Get("container") != "bar" {
+			t.Errorf("%s: Did not have query parameters: %s", test.name, remoteAttach.url.Query())
 		}
 	}
 }
