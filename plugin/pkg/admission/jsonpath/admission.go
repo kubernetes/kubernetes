@@ -17,7 +17,6 @@ limitations under the License.
 package jsonpath
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +27,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 	util_jsonpath "k8s.io/kubernetes/pkg/util/jsonpath"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
@@ -35,12 +35,12 @@ import (
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
 
 // MassageJSONPath attempts to be flexible with JSONPath expressions, it accepts:
-//   * metadata.name (no leading '.' or curly brances '{...}'
-//   * {metadata.name} (no leading '.')
-//   * .metadata.name (no curly braces '{...}')
-//   * {.metadata.name} (complete expression)
+//   * metadata.namespace (no leading '.' or curly brances '{...}'
+//   * {metadata.namespace} (no leading '.')
+//   * .metadata.namespace (no curly braces '{...}')
+//   * {.metadata.namespace} (complete expression)
 // And transforms them all into a valid jsonpat expression:
-//   {.metadata.name}
+//   {.metadata.namespace}
 // TODO: This is copied from pkg/kubectl/custom_column_printer.go move into the pkg/util/jsonpath package.
 func massageJSONPath(pathExpression string) (string, error) {
 	if len(pathExpression) == 0 {
@@ -64,30 +64,34 @@ func massageJSONPath(pathExpression string) (string, error) {
 
 type JSONPathAdmissionRule struct {
 	// Version indicates the version for the rule.  For now this has to be "v1"
-	Version string
+	Version string `json:"version" yaml:"version"`
 
 	// Name is the name of this rule
-	Name string
+	Name string `json:"name" yaml:"name"`
 
 	// KindRegexp holds a regular expression used to determine which Kinds of
 	// objects this rule applies to.
-	KindRegexp string `json:"kindRegexp", yaml:"kindRegexp"`
+	KindRegexp string `json:"kindRegexp" yaml:"kindRegexp"`
 
 	// Path holds a JSONPath expression to select particular fields
-	Path string `json:"path", yaml:"path"`
+	Path string `json:"path" yaml:"path"`
+
+	// APIVersion holds the version of the object to use with the
+	// JSONPath above.  (e.g. "v1" or "v1beta1")
+	APIVersion string `json:"apiVersion" yaml:"apiVersion"`
 
 	// MatchRegexp holds a matching expression, all values returned by the JSONPath expression (above)
 	// must match this expression for the object to be admitted
-	MatchRegexp string `json:"matchRegexp", yaml:"matchRegexp"`
+	MatchRegexp string `json:"matchRegexp" yaml:"matchRegexp"`
 
 	// AcceptEmptyMatch indicates if an empty match is acceptable.  Empty match means that the
 	// JSONPath expression above returns no values.  Default is false, meaning that at least one
 	// value that matches MatchRegexp is required for admission
-	AcceptEmptyMatch bool `json:"acceptEmptyMatch", yaml:"acceptEmptyMatch"`
+	AcceptEmptyMatch bool `json:"acceptEmptyMatch" yaml:"acceptEmptyMatch"`
 }
 
 type JSONPathAdmissionConfig struct {
-	Rules []JSONPathAdmissionRule `json:"rules", yaml:"rules"`
+	Rules []JSONPathAdmissionRule `json:"rules" yaml:"rules"`
 }
 
 func init() {
@@ -115,26 +119,30 @@ type jsonPathRule struct {
 	name            string
 	kindRE          *regexp.Regexp
 	path            *util_jsonpath.JSONPath
+	apiVersion      string
 	matchRE         *regexp.Regexp
 	acceptNoMatches bool
 }
 
 func (r *jsonPathRule) String() string {
-	return fmt.Sprintf("%s: %s %s %s %v", r.name, r.kindRE.String(), r.path, r.matchRE.String(), r.acceptNoMatches)
+	return fmt.Sprintf("%s: %s %s %v", r.name, r.kindRE.String(), r.matchRE.String(), r.acceptNoMatches)
 }
 
 func (r *jsonPathRule) admit(a admission.Attributes) error {
 	if !r.kindRE.MatchString(a.GetKind().Kind) {
 		return nil
 	}
-
-	vals, err := r.path.FindResults(a.GetObject())
+	gvk := a.GetKind()
+	gvk.Version = r.apiVersion
+	vObj, err := api.Scheme.ConvertToVersion(a.GetObject(), gvk.GroupVersion())
+	if err != nil {
+		return err
+	}
+	vals, err := r.path.FindResults(vObj)
 	if err != nil {
 		return err
 	}
 	resultCount := 0
-	buff := &bytes.Buffer{}
-	r.path.Execute(buff, a.GetObject())
 	for _, arr := range vals {
 		resultCount += len(arr)
 		for _, val := range arr {
@@ -155,6 +163,7 @@ func (r *jsonPathRule) admit(a admission.Attributes) error {
 }
 
 type jsonPath struct {
+	*admission.Handler
 	rules []jsonPathRule
 }
 
@@ -165,10 +174,6 @@ func (j *jsonPath) Admit(a admission.Attributes) (err error) {
 		}
 	}
 	return nil
-}
-
-func (j *jsonPath) Handles(operation admission.Operation) bool {
-	return operation == admission.Create || operation == admission.Update
 }
 
 func makeRule(rule *JSONPathAdmissionRule) (*jsonPathRule, error) {
@@ -189,6 +194,7 @@ func makeRule(rule *JSONPathAdmissionRule) (*jsonPathRule, error) {
 		return nil, err
 	}
 	return &jsonPathRule{
+		apiVersion:      rule.APIVersion,
 		kindRE:          kre,
 		path:            path,
 		matchRE:         mre,
@@ -199,7 +205,10 @@ func makeRule(rule *JSONPathAdmissionRule) (*jsonPathRule, error) {
 
 // NewJSONPathAdmission creates an admission controller based on a JSONPathConfig
 func NewJSONPathAdmission(config JSONPathAdmissionConfig) (admission.Interface, error) {
-	result := &jsonPath{}
+	result := &jsonPath{
+		Handler: admission.NewHandler(admission.Create, admission.Update),
+	}
+
 	for ix := range config.Rules {
 		rule, err := makeRule(&config.Rules[ix])
 		if err != nil {

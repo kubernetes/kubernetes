@@ -1,3 +1,19 @@
+/*
+Copyright 2016 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package jsonpath
 
 import (
@@ -24,7 +40,10 @@ func makeAttributes(kind, resource string, obj runtime.Object, ops []admission.O
 }
 
 func TestHandles(t *testing.T) {
-	j := &jsonPath{}
+	j, err := NewJSONPathAdmission(JSONPathAdmissionConfig{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	handles := []admission.Operation{admission.Create, admission.Update}
 	for _, op := range handles {
@@ -44,17 +63,20 @@ func TestHandles(t *testing.T) {
 func TestJSONPathMultiRule(t *testing.T) {
 	config := JSONPathAdmissionConfig{
 		Rules: []JSONPathAdmissionRule{
-			JSONPathAdmissionRule{
+			{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".metadata.name",
 				MatchRegexp: "^Foo.*$",
 			},
-			JSONPathAdmissionRule{
+			{
+				APIVersion:  "v1",
 				KindRegexp:  "Service",
 				Path:        ".metadata.name",
 				MatchRegexp: "^Foo.*$",
 			},
-			JSONPathAdmissionRule{
+			{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".spec.containers[*].name",
 				MatchRegexp: "^Foo.*$",
@@ -119,7 +141,7 @@ func TestJSONPathMultiRule(t *testing.T) {
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
-						api.Container{
+						{
 							Name: "FooBaz",
 						},
 					},
@@ -175,6 +197,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "simple",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".metadata.name",
 				MatchRegexp: "^Foo.*$",
@@ -191,6 +214,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "simple fail",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".metadata.name",
 				MatchRegexp: "^Foo.*$",
@@ -207,6 +231,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "no kind match",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".metadata.name",
 				MatchRegexp: "^Foo.*$",
@@ -223,6 +248,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "complicated kind-match",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "(Service)|(Pod)",
 				Path:        ".metadata.name",
 				MatchRegexp: "^Foo.*$",
@@ -239,6 +265,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "complicated kind-match",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "(Service)|(Pod)",
 				Path:        ".metadata.name",
 				MatchRegexp: "^Foo.*$",
@@ -255,6 +282,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "multi-match",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".spec.containers[*].name",
 				MatchRegexp: "^Foo.*$",
@@ -265,10 +293,10 @@ func TestJSONPathRule(t *testing.T) {
 			obj: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
-						api.Container{
+						{
 							Name: "FooBar",
 						},
-						api.Container{
+						{
 							Name: "FooBaz",
 						},
 					},
@@ -278,6 +306,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "multi-match fail",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".spec.containers[*].name",
 				MatchRegexp: "^Foo.*$",
@@ -288,13 +317,13 @@ func TestJSONPathRule(t *testing.T) {
 			obj: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
-						api.Container{
+						{
 							Name: "FooBar",
 						},
-						api.Container{
+						{
 							Name: "FooBaz",
 						},
-						api.Container{
+						{
 							Name: "BazFooBar",
 						},
 					},
@@ -304,6 +333,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "multi-match no match fail",
 			rule: JSONPathAdmissionRule{
+				APIVersion:  "v1",
 				KindRegexp:  "Pod",
 				Path:        ".spec.containers[*].name",
 				MatchRegexp: "^Foo.*$",
@@ -320,6 +350,7 @@ func TestJSONPathRule(t *testing.T) {
 		{
 			name: "multi-match no match ok",
 			rule: JSONPathAdmissionRule{
+				APIVersion:       "v1",
 				KindRegexp:       "Pod",
 				Path:             ".spec.containers[*].name",
 				MatchRegexp:      "^Foo.*$",
