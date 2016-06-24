@@ -89,6 +89,10 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := runtime.Encode(codec, item)
 	if err != nil {
+		if runtime.IsNotRegisteredError(err) {
+			t.Logf("%v: skipped %v (%s)", name, err, printer.Sprintf("%#v", item))
+			return
+		}
 		t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
 		return
 	}
