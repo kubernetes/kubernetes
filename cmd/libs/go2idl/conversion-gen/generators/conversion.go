@@ -88,23 +88,23 @@ func getInternalTypeFor(context *generator.Context, t *types.Type) (*types.Type,
 	return context.Universe.Package(internalPackage).Type(t.Name.Name), true
 }
 
-type conversionType struct {
+type conversionPair struct {
 	inType  *types.Type
 	outType *types.Type
 }
 
 // All of the types in conversions map are of type "DeclarationOf" with
 // the underlying type being "Func".
-type conversions map[conversionType]*types.Type
+type conversionFuncMap map[conversionPair]*types.Type
 
-// Returns all already existing conversion functions that we are able to find.
-func existingConversionFunctions(context *generator.Context) conversions {
+// Returns all manually-defined conversion functions that we are able to find.
+func getManualConversionFunctions(context *generator.Context) conversionFuncMap {
 	scopeName := types.Name{Package: conversionPackagePath, Name: "Scope"}
 	errorName := types.Name{Package: "", Name: "error"}
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 
-	preexisting := make(conversions)
+	manualMap := make(conversionFuncMap)
 	for _, p := range context.Universe {
 		for _, f := range p.Functions {
 			if f.Underlying == nil || f.Underlying.Kind != types.Func {
@@ -137,28 +137,28 @@ func existingConversionFunctions(context *generator.Context) conversions {
 			args := argsFromType(inType.Elem, outType.Elem)
 			sw.Do("Convert_$.inType|public$_To_$.outType|public$", args)
 			if f.Name.Name == buffer.String() {
-				key := conversionType{inType.Elem, outType.Elem}
-				if v, ok := preexisting[key]; ok && v != nil {
+				key := conversionPair{inType.Elem, outType.Elem}
+				if v, ok := manualMap[key]; ok && v != nil {
 					panic(fmt.Sprintf("duplicate static conversion defined: %#v", key))
 				}
-				preexisting[key] = f
+				manualMap[key] = f
 			}
 			buffer.Reset()
 		}
 	}
-	return preexisting
+	return manualMap
 }
 
 // All of the types in conversions map are of type "DeclarationOf" with
 // the underlying type being "Func".
-type defaulters map[*types.Type]*types.Type
+type defaulterFuncMap map[*types.Type]*types.Type
 
-// Returns all already existing defaulting functions that we are able to find.
-func existingDefaultingFunctions(context *generator.Context) defaulters {
+// Returns all manually-defined defaulting functions that we are able to find.
+func getManualDefaultingFunctions(context *generator.Context) defaulterFuncMap {
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 
-	preexisting := make(defaulters)
+	manualMap := make(defaulterFuncMap)
 	for _, p := range context.Universe {
 		for _, f := range p.Functions {
 			if f.Underlying == nil || f.Underlying.Kind != types.Func {
@@ -191,15 +191,15 @@ func existingDefaultingFunctions(context *generator.Context) defaulters {
 			sw.Do("$.inType|defaultfn$", args)
 			if f.Name.Name == buffer.String() {
 				key := inType.Elem
-				if v, ok := preexisting[key]; ok && v != nil {
+				if v, ok := manualMap[key]; ok && v != nil {
 					panic(fmt.Sprintf("duplicate static defaulter defined: %#v", key))
 				}
-				preexisting[key] = f
+				manualMap[key] = f
 			}
 			buffer.Reset()
 		}
 	}
-	return preexisting
+	return manualMap
 }
 
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
@@ -218,8 +218,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 `)...)
 
 	// Compute all pre-existing conversion functions.
-	preexisting := existingConversionFunctions(context)
-	preexistingDefaults := existingDefaultingFunctions(context)
+	manualConversions := getManualConversionFunctions(context)
+	manualDefaulters := getManualDefaultingFunctions(context)
 
 	// We are generating conversions only for packages that are explicitly
 	// passed as InputDir, and only for those that have a corresponding type
@@ -254,7 +254,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			}
 			// If we can generate conversion in any direction, we should
 			// generate this package.
-			if isConvertible(t, internalType, preexisting) || isConvertible(internalType, t, preexisting) {
+			if isConvertible(t, internalType, manualConversions) || isConvertible(internalType, t, manualConversions) {
 				convertibleType = true
 			}
 		}
@@ -268,7 +268,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						generators = []generator.Generator{}
 						generators = append(
-							generators, NewGenConversion("conversion_generated", path, preexisting, preexistingDefaults))
+							generators, NewGenConversion("conversion_generated", path, manualConversions, manualDefaulters))
 						return generators
 					},
 					FilterFunc: func(c *generator.Context, t *types.Type) bool {
@@ -292,21 +292,21 @@ func findMember(t *types.Type, name string) (types.Member, bool) {
 	return types.Member{}, false
 }
 
-func isConvertible(in, out *types.Type, preexisting conversions) bool {
+func isConvertible(in, out *types.Type, manualConversions conversionFuncMap) bool {
 	// If there is pre-existing conversion function, return true immediately.
-	if _, ok := preexisting[conversionType{in, out}]; ok {
+	if _, ok := manualConversions[conversionPair{in, out}]; ok {
 		return true
 	}
-	return isDirectlyConvertible(in, out, preexisting)
+	return isDirectlyConvertible(in, out, manualConversions)
 }
 
-func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
+func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFuncMap) bool {
 	// If one of the types is Alias, resolve it.
 	if in.Kind == types.Alias {
-		return isConvertible(in.Underlying, out, preexisting)
+		return isConvertible(in.Underlying, out, manualConversions)
 	}
 	if out.Kind == types.Alias {
-		return isConvertible(in, out.Underlying, preexisting)
+		return isConvertible(in, out.Underlying, manualConversions)
 	}
 
 	if in.Kind != out.Kind {
@@ -347,15 +347,15 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 				}
 				return false
 			}
-			convertible = convertible && isConvertible(inMember.Type, outMember.Type, preexisting)
+			convertible = convertible && isConvertible(inMember.Type, outMember.Type, manualConversions)
 		}
 		return convertible
 	case types.Map:
-		return isConvertible(in.Key, out.Key, preexisting) && isConvertible(in.Elem, out.Elem, preexisting)
+		return isConvertible(in.Key, out.Key, manualConversions) && isConvertible(in.Elem, out.Elem, manualConversions)
 	case types.Slice:
-		return isConvertible(in.Elem, out.Elem, preexisting)
+		return isConvertible(in.Elem, out.Elem, manualConversions)
 	case types.Pointer:
-		return isConvertible(in.Elem, out.Elem, preexisting)
+		return isConvertible(in.Elem, out.Elem, manualConversions)
 	}
 	glog.Fatalf("All other types should be filtered before")
 	return false
@@ -389,25 +389,25 @@ const (
 // genConversion produces a file with a autogenerated conversions.
 type genConversion struct {
 	generator.DefaultGen
-	targetPackage string
-	preexisting   conversions
-	defaulters    defaulters
-	imports       namer.ImportTracker
-	typesForInit  []conversionType
+	targetPackage     string
+	manualConversions conversionFuncMap
+	manualDefaulters  defaulterFuncMap
+	imports           namer.ImportTracker
+	typesForInit      []conversionPair
 
 	globalVariables map[string]interface{}
 }
 
-func NewGenConversion(sanitizedName, targetPackage string, preexisting conversions, defaulters defaulters) generator.Generator {
+func NewGenConversion(sanitizedName, targetPackage string, manualConversions conversionFuncMap, manualDefaulters defaulterFuncMap) generator.Generator {
 	return &genConversion{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
-		targetPackage: targetPackage,
-		preexisting:   preexisting,
-		defaulters:    defaulters,
-		imports:       generator.NewImportTracker(),
-		typesForInit:  make([]conversionType, 0),
+		targetPackage:     targetPackage,
+		manualConversions: manualConversions,
+		manualDefaulters:  manualDefaulters,
+		imports:           generator.NewImportTracker(),
+		typesForInit:      make([]conversionPair, 0),
 	}
 }
 
@@ -453,12 +453,12 @@ func (g *genConversion) Filter(c *generator.Context, t *types.Type) bool {
 	// We explicitly return true if any conversion is possible - this needs
 	// to be checked again while generating code for that type.
 	convertible := false
-	if isConvertible(t, internalType, g.preexisting) {
-		g.typesForInit = append(g.typesForInit, conversionType{t, internalType})
+	if isConvertible(t, internalType, g.manualConversions) {
+		g.typesForInit = append(g.typesForInit, conversionPair{t, internalType})
 		convertible = true
 	}
-	if isConvertible(internalType, t, g.preexisting) {
-		g.typesForInit = append(g.typesForInit, conversionType{internalType, t})
+	if isConvertible(internalType, t, g.manualConversions) {
+		g.typesForInit = append(g.typesForInit, conversionPair{internalType, t})
 		convertible = true
 	}
 	return convertible
@@ -513,7 +513,7 @@ func (g *genConversion) funcNameTmpl(inType, outType *types.Type) string {
 }
 
 func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, bool) {
-	function, ok := g.preexisting[conversionType{inType, outType}]
+	function, ok := g.manualConversions[conversionPair{inType, outType}]
 	return function, ok
 }
 
@@ -547,10 +547,10 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	internalType, _ := getInternalTypeFor(c, t)
-	if isDirectlyConvertible(t, internalType, g.preexisting) {
+	if isDirectlyConvertible(t, internalType, g.manualConversions) {
 		g.generateConversion(t, internalType, sw)
 	}
-	if isDirectlyConvertible(internalType, t, g.preexisting) {
+	if isDirectlyConvertible(internalType, t, g.manualConversions) {
 		g.generateConversion(internalType, t, sw)
 	}
 	return sw.Error()
@@ -561,14 +561,14 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 
 	sw.Do(fmt.Sprintf("func auto%s(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", funcName), g.withGlobals(argsFromType(inType, outType)))
 	// if no defaulter of form SetDefaults_XXX is defined, do not inline a check for defaulting.
-	if function, ok := g.defaulters[inType]; ok {
+	if function, ok := g.manualDefaulters[inType]; ok {
 		sw.Do("$.|raw$(in)\n", function)
 	}
 	g.generateFor(inType, outType, sw)
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
 
-	// If there is no public preexisting Convert method, generate it.
+	// If there is no public manual Conversion method, generate it.
 	if _, ok := g.preexists(inType, outType); !ok {
 		sw.Do(fmt.Sprintf("func %s(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", funcName), g.withGlobals(argsFromType(inType, outType)))
 		sw.Do(fmt.Sprintf("return auto%s(in, out, s)\n", funcName), argsFromType(inType, outType))
