@@ -1044,8 +1044,14 @@ func DeepCopy_v1beta3_LocalObjectReference(in LocalObjectReference, out *LocalOb
 
 func DeepCopy_v1beta3_MetadataFile(in MetadataFile, out *MetadataFile, c *conversion.Cloner) error {
 	out.Name = in.Name
-	if err := DeepCopy_v1beta3_ObjectFieldSelector(in.FieldRef, &out.FieldRef, c); err != nil {
-		return err
+	if in.FieldRef != nil {
+		in, out := in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_v1beta3_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
 	}
 	return nil
 }
