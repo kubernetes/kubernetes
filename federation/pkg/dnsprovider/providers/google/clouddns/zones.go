@@ -51,6 +51,13 @@ func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {
 	return &Zone{response, &zones}, nil
 }
 
+func (zones Zones) Remove(zone dnsprovider.Zone) error {
+	if err := zones.impl.Delete(zones.project(), zone.(*Zone).impl.Name()).Do(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (zones Zones) New(name string) (dnsprovider.Zone, error) {
 	managedZone := zones.impl.NewManagedZone(name)
 	return &Zone{managedZone, &zones}, nil

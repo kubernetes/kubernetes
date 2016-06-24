@@ -1157,41 +1157,6 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	return nil
 }
 
-// Get the IP address of a container's interface using nsenter
-func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (string, error) {
-	_, lookupErr := exec.LookPath("nsenter")
-	if lookupErr != nil {
-		return "", fmt.Errorf("Unable to obtain IP address of container: missing nsenter.")
-	}
-	container, err := dm.client.InspectContainer(containerID)
-	if err != nil {
-		return "", err
-	}
-
-	if !container.State.Running {
-		return "", fmt.Errorf("container not running (%s)", container.ID)
-	}
-
-	containerPid := container.State.Pid
-	extractIPCmd := fmt.Sprintf("ip -4 addr show %s | grep inet | awk -F\" \" '{print $2}'", interfaceName)
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
-	command := exec.Command("nsenter", args...)
-	out, err := command.CombinedOutput()
-
-	// Fall back to IPv6 address if no IPv4 address is present
-	if err == nil && string(out) == "" {
-		extractIPCmd = fmt.Sprintf("ip -6 addr show %s scope global | grep inet6 | awk -F\" \" '{print $2}'", interfaceName)
-		args = []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
-		command = exec.Command("nsenter", args...)
-		out, err = command.CombinedOutput()
-	}
-
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
-}
-
 // TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
 // We can only deprecate this after refactoring kubelet.
 // TODO(random-liu): After using pod status for KillPod(), we can also remove the kubernetesPodLabel, because all the needed information should have
@@ -2351,6 +2316,16 @@ func (dm *DockerManager) GetNetNS(containerID kubecontainer.ContainerID) (string
 	}
 	netnsPath := fmt.Sprintf(DockerNetnsFmt, inspectResult.State.Pid)
 	return netnsPath, nil
+}
+
+func (dm *DockerManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
+	for _, c := range pod.Containers {
+		if c.Name == PodInfraContainerName {
+			return c.ID, nil
+		}
+	}
+
+	return kubecontainer.ContainerID{}, fmt.Errorf("Pod %s unknown to docker.", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
 }
 
 // Garbage collection of dead containers

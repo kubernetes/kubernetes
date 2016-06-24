@@ -28,8 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+	"hash/fnv"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"math/rand"
+	"strconv"
+	"strings"
 )
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
@@ -186,4 +191,60 @@ func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
 		prefix = prefix[:maxLength-pvLen-1]
 	}
 	return prefix + "-" + pvName
+}
+
+// ChooseZone implements our heuristics for choosing a zone for volume creation based on the volume name
+// Volumes are generally round-robin-ed across all active zones, using the hash of the PVC Name.
+// However, if the PVCName ends with `-<integer>`, we will hash the prefix, and then add the integer to the hash.
+// This means that a PetSet's volumes (`claimname-petsetname-id`) will spread across available zones,
+// assuming the id values are consecutive.
+func ChooseZoneForVolume(zones sets.String, pvcName string) string {
+	// We create the volume in a zone determined by the name
+	// Eventually the scheduler will coordinate placement into an available zone
+	var hash uint32
+	var index uint32
+
+	if pvcName == "" {
+		// We should always be called with a name; this shouldn't happen
+		glog.Warningf("No name defined during volume create; choosing random zone")
+
+		hash = rand.Uint32()
+	} else {
+		hashString := pvcName
+
+		// Heuristic to make sure that volumes in a PetSet are spread across zones
+		// PetSet PVCs are (currently) named ClaimName-PetSetName-Id,
+		// where Id is an integer index
+		lastDash := strings.LastIndexByte(pvcName, '-')
+		if lastDash != -1 {
+			petIDString := pvcName[lastDash+1:]
+			petID, err := strconv.ParseUint(petIDString, 10, 32)
+			if err == nil {
+				// Offset by the pet id, so we round-robin across zones
+				index = uint32(petID)
+				// We still hash the volume name, but only the base
+				hashString = pvcName[:lastDash]
+				glog.V(2).Infof("Detected PetSet-style volume name %q; index=%d", pvcName, index)
+			}
+		}
+
+		// We hash the (base) volume name, so we don't bias towards the first N zones
+		h := fnv.New32()
+		h.Write([]byte(hashString))
+		hash = h.Sum32()
+	}
+
+	// Zones.List returns zones in a consistent order (sorted)
+	// We do have a potential failure case where volumes will not be properly spread,
+	// if the set of zones changes during PetSet volume creation.  However, this is
+	// probably relatively unlikely because we expect the set of zones to be essentially
+	// static for clusters.
+	// Hopefully we can address this problem if/when we do full scheduler integration of
+	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
+	// unhealthy zones)
+	zoneSlice := zones.List()
+	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
+
+	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
+	return zone
 }

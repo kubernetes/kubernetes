@@ -49,6 +49,8 @@ type VolumeOptions struct {
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
 	PVName string
+	// PVC.Name of the PersistentVolumeClaim; only set during dynamic provisioning.
+	PVCName string
 	// Unique name of Kubernetes cluster.
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS

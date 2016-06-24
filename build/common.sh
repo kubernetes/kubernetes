@@ -170,10 +170,14 @@ function kube::build::verify_prereqs() {
 
 function kube::build::docker_available_on_osx() {
   if [[ -z "${DOCKER_HOST}" ]]; then
+    if [[ -S "/var/run/docker.sock" ]]; then
+      kube::log::status "Using Docker for MacOS"
+      return 0
+    fi
+    
     kube::log::status "No docker host is set. Checking options for setting one..."
-
     if [[ -z "$(which docker-machine)" && -z "$(which boot2docker)" ]]; then
-      kube::log::status "It looks like you're running Mac OS X, and neither docker-machine or boot2docker are nowhere to be found."
+      kube::log::status "It looks like you're running Mac OS X, and neither Docker for Mac, docker-machine or boot2docker are nowhere to be found."
       kube::log::status "See: https://docs.docker.com/machine/ for installation instructions."
       return 1
     elif [[ -n "$(which docker-machine)" ]]; then
@@ -789,6 +793,8 @@ function kube::release::package_server_tarballs() {
 
     cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
 
+    cp "${RELEASE_DIR}/kubernetes-src.tar.gz" "${release_stage}/"
+
     kube::release::clean_cruft
 
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
@@ -943,6 +949,24 @@ function kube::release::package_kube_manifests_tarball() {
   objects=$(cd "${KUBE_ROOT}/cluster/saltbase/salt/kube-dns" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   mkdir -p "${dst_dir}/dns"
   tar c -C "${KUBE_ROOT}/cluster/saltbase/salt/kube-dns" ${objects} | tar x -C "${dst_dir}/dns"
+
+  # We leave the `{{ pillar['federations_domain_map'] }}` parameter as is, if
+  # the right federation environment variables isn't set. This is to allow
+  # users to provide these pillar values using the regular salt's mechanisms
+  # during cluster bootstrap.
+  if [[ "${FEDERATION:-}" == "true" ]]; then
+    FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
+    if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+      FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+    fi
+    if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+      sed -i 's/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/- --federations="'"${FEDERATIONS_DOMAIN_MAP}"'"/g' "${dst_dir}/dns/skydns-rc.yaml.in"
+    else
+      sed -i '/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/d' "${dst_dir}/dns/skydns-rc.yaml.in"
+    fi
+  else
+    sed -i '/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/d' "${dst_dir}/dns/skydns-rc.yaml.in"
+  fi
 
   # This is for coreos only. ContainerVM, GCI, or Trusty does not use it.
   cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"

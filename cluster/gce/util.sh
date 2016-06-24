@@ -953,21 +953,10 @@ function kube-down {
   echo "Bringing down cluster"
   set +e  # Do not stop on error
 
-  # Delete autoscaler for nodes if present. We assume that all or none instance groups have an autoscaler
-  local autoscaler
-  autoscaler=( $(gcloud compute instance-groups managed list \
-    --zone "${ZONE}" --project "${PROJECT}" --regexp="${NODE_INSTANCE_PREFIX}-.+" \
-    --format='value(autoscaled)') )
-  if [[ "${autoscaler:-}" == "yes" ]]; then
-    for group in ${INSTANCE_GROUPS[@]:-}; do
-      gcloud compute instance-groups managed stop-autoscaling "${group}" --zone "${ZONE}" --project "${PROJECT}"
-    done
-  fi
-
   # Get the name of the managed instance group template before we delete the
   # managed instance group. (The name of the managed instance group template may
   # change during a cluster upgrade.)
-  local template=$(get-template "${PROJECT}")
+  local templates=$(get-template "${PROJECT}")
 
   for group in ${INSTANCE_GROUPS[@]:-}; do
     if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
@@ -984,12 +973,14 @@ function kube-down {
     echo -e "Failed to delete instance group(s)." >&2
   }
 
-  if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-    gcloud compute instance-templates delete \
-      --project "${PROJECT}" \
-      --quiet \
-      "${template}"
-  fi
+  for template in ${templates[@]:-}; do
+    if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
+      gcloud compute instance-templates delete \
+        --project "${PROJECT}" \
+        --quiet \
+        "${template}"
+    fi
+  done
 
   # First delete the master (if it exists).
   if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
@@ -1097,7 +1088,7 @@ function kube-down {
 #
 # $1: project
 function get-template {
-  gcloud compute instance-templates list "${NODE_INSTANCE_PREFIX}-template" \
+  gcloud compute instance-templates list -r "${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?" \
     --project="${1}" --format='value(name)'
 }
 

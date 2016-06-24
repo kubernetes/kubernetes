@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: Move out kube-proxy to a DaemonSet again
+# This is disabled for the v1.3 release, due to bootstrapping complexities
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:

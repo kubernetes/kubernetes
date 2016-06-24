@@ -29,6 +29,7 @@ import (
 	"reflect"
 	"testing"
 	"text/template"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
@@ -182,7 +183,7 @@ current-context: default
 				return fmt.Errorf("failed to execute test template: %v", err)
 			}
 			// Create a new authorizer
-			_, err = New(p, 0, 0)
+			_, err = newWithBackoff(p, 0, 0, 0)
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -197,6 +198,7 @@ current-context: default
 // Service mocks a remote service.
 type Service interface {
 	Review(*v1beta1.SubjectAccessReview)
+	HTTPStatusCode() int
 }
 
 // NewTestServer wraps a Service as an httptest.Server.
@@ -226,6 +228,10 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
 			return
 		}
+		if s.HTTPStatusCode() < 200 || s.HTTPStatusCode() >= 300 {
+			http.Error(w, "HTTP Error", s.HTTPStatusCode())
+			return
+		}
 		s.Review(&review)
 		type status struct {
 			Allowed bool   `json:"allowed"`
@@ -250,18 +256,20 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 
 // A service that can be set to allow all or deny all authorization requests.
 type mockService struct {
-	allow bool
+	allow      bool
+	statusCode int
 }
 
 func (m *mockService) Review(r *v1beta1.SubjectAccessReview) {
 	r.Status.Allowed = m.allow
 }
-func (m *mockService) Allow() { m.allow = true }
-func (m *mockService) Deny()  { m.allow = false }
+func (m *mockService) Allow()              { m.allow = true }
+func (m *mockService) Deny()               { m.allow = false }
+func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newAuthorizer creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new WebhookAuthorizer from it.
-func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte) (*WebhookAuthorizer, error) {
+func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (*WebhookAuthorizer, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -283,7 +291,7 @@ func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte) (*Webho
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
-	return New(p, 0, 0)
+	return newWithBackoff(p, cacheTime, cacheTime, 0)
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -330,6 +338,7 @@ func TestTLSConfig(t *testing.T) {
 		// Use a closure so defer statements trigger between loop iterations.
 		func() {
 			service := new(mockService)
+			service.statusCode = 200
 
 			server, err := NewTestServer(service, tt.serverCert, tt.serverKey, tt.serverCA)
 			if err != nil {
@@ -338,7 +347,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newAuthorizer(server.URL, tt.clientCert, tt.clientKey, tt.clientCA)
+			wh, err := newAuthorizer(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -384,6 +393,8 @@ func (rec *recorderService) Last() (v1beta1.SubjectAccessReview, error) {
 	return rec.last, rec.err
 }
 
+func (rec *recorderService) HTTPStatusCode() int { return 200 }
+
 func TestWebhook(t *testing.T) {
 	serv := new(recorderService)
 	s, err := NewTestServer(serv, serverCert, serverKey, caCert)
@@ -392,7 +403,7 @@ func TestWebhook(t *testing.T) {
 	}
 	defer s.Close()
 
-	wh, err := newAuthorizer(s.URL, clientCert, clientKey, caCert)
+	wh, err := newAuthorizer(s.URL, clientCert, clientKey, caCert, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -475,5 +486,55 @@ func TestWebhook(t *testing.T) {
 		if !reflect.DeepEqual(gotAttr, tt.want) {
 			t.Errorf("case %d: got != want:\n%s", i, diff.ObjectGoPrintDiff(gotAttr, tt.want))
 		}
+	}
+}
+
+// TestWebhookCache verifies that error responses from the server are not
+// cached, but successful responses are.
+func TestWebhookCache(t *testing.T) {
+	serv := new(mockService)
+	s, err := NewTestServer(serv, serverCert, serverKey, caCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	// Create an authorizer that caches successful responses "forever" (100 days).
+	wh, err := newAuthorizer(s.URL, clientCert, clientKey, caCert, 2400*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	attr := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "alice"}}
+	serv.allow = true
+	serv.statusCode = 500
+	if err := wh.Authorize(attr); err == nil {
+		t.Errorf("Webhook returned HTTP 500, but authorizer reported success.")
+	}
+	serv.statusCode = 404
+	if err := wh.Authorize(attr); err == nil {
+		t.Errorf("Webhook returned HTTP 404, but authorizer reported success.")
+	}
+	serv.statusCode = 200
+	if err := wh.Authorize(attr); err != nil {
+		t.Errorf("Webhook returned HTTP 200, but authorizer reported unauthorized.")
+	}
+	serv.statusCode = 500
+	if err := wh.Authorize(attr); err != nil {
+		t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
+	}
+	// For a different request, webhook should be called again.
+	attr = authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "bob"}}
+	serv.statusCode = 500
+	if err := wh.Authorize(attr); err == nil {
+		t.Errorf("Webhook returned HTTP 500, but authorizer reported success.")
+	}
+	serv.statusCode = 200
+	if err := wh.Authorize(attr); err != nil {
+		t.Errorf("Webhook returned HTTP 200, but authorizer reported unauthorized.")
+	}
+	serv.statusCode = 500
+	if err := wh.Authorize(attr); err != nil {
+		t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
 	}
 }

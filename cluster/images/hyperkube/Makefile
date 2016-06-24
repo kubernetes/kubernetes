@@ -61,7 +61,9 @@ endif
 	cp ../../saltbase/salt/kube-dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/skydns-svc.yaml
 	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons
 	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons
-	cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/kube-proxy.yaml
+	
+	# TODO: Move out kube-proxy to a DaemonSet again
+	#cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/kube-proxy.yaml
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 
 	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/*.yaml static-pods/*.json

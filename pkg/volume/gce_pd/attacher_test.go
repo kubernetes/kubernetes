@@ -31,7 +31,7 @@ import (
 func TestGetDeviceName_Volume(t *testing.T) {
 	plugin := newPlugin()
 	name := "my-pd-volume"
-	spec := createVSpec(name, false)
+	spec := createVolSpec(name, false)
 
 	deviceName, err := plugin.GetVolumeName(spec)
 	if err != nil {
@@ -75,7 +75,7 @@ func TestAttachDetach(t *testing.T) {
 	diskName := "disk"
 	instanceID := "instance"
 	readOnly := false
-	spec := createVSpec(diskName, readOnly)
+	spec := createVolSpec(diskName, readOnly)
 	attachError := errors.New("Fake attach error")
 	detachError := errors.New("Fake detach error")
 	diskCheckError := errors.New("Fake DiskIsAttached error")
@@ -222,7 +222,7 @@ func newDetacher(testcase *testcase) *gcePersistentDiskDetacher {
 	}
 }
 
-func createVSpec(name string, readOnly bool) *volume.Spec {
+func createVolSpec(name string, readOnly bool) *volume.Spec {
 	return &volume.Spec{
 		Volume: &api.Volume{
 			VolumeSource: api.VolumeSource{
@@ -359,6 +359,6 @@ func (testcase *testcase) DeleteDisk(diskToDelete string) error {
 	return errors.New("Not implemented")
 }
 
-func (testcase *testcase) GetAutoLabelsForPD(name string) (map[string]string, error) {
+func (testcase *testcase) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
 	return map[string]string{}, errors.New("Not implemented")
 }

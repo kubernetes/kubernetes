@@ -34,13 +34,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 
@@ -96,6 +96,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
 	plugin.host = host
 	plugin.hairpinMode = hairpinMode
+	plugin.nonMasqueradeCIDR = nonMasqueradeCIDR
 	plugin.cniConfig = &libcni.CNIConfig{
 		Path: []string{DefaultCNIDir, plugin.vendorDir},
 	}
@@ -128,7 +129,11 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 		return fmt.Errorf("Failed to generate loopback config: %v", err)
 	}
 
-	plugin.nonMasqueradeCIDR = nonMasqueradeCIDR
+	plugin.nsenterPath, err = plugin.execer.LookPath("nsenter")
+	if err != nil {
+		return fmt.Errorf("Failed to find nsenter binary: %v", err)
+	}
+
 	// Need to SNAT outbound traffic from cluster
 	if err = plugin.ensureMasqRule(); err != nil {
 		return err
@@ -224,7 +229,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 
 			// Ensure cbr0 has no conflicting addresses; CNI's 'bridge'
 			// plugin will bail out if the bridge has an unexpected one
-			plugin.clearBridgeAddressesExcept(cidr.IP.String())
+			plugin.clearBridgeAddressesExcept(cidr)
 		}
 	}
 
@@ -233,7 +238,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	}
 }
 
-func (plugin *kubenetNetworkPlugin) clearBridgeAddressesExcept(keep string) {
+func (plugin *kubenetNetworkPlugin) clearBridgeAddressesExcept(keep *net.IPNet) {
 	bridge, err := netlink.LinkByName(BridgeName)
 	if err != nil {
 		return
@@ -245,8 +250,8 @@ func (plugin *kubenetNetworkPlugin) clearBridgeAddressesExcept(keep string) {
 	}
 
 	for _, addr := range addrs {
-		if addr.IPNet.String() != keep {
-			glog.V(5).Infof("Removing old address %s from %s", addr.IPNet.String(), BridgeName)
+		if !utilnet.IPNetEqual(addr.IPNet, keep) {
+			glog.V(2).Infof("Removing old address %s from %s", addr.IPNet.String(), BridgeName)
 			netlink.AddrDel(bridge, &addr)
 		}
 	}
@@ -344,7 +349,9 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	if err != nil {
 		return err
 	}
-	if err := plugin.hostportHandler.OpenPodHostportsAndSync(pod, BridgeName, runningPods); err != nil {
+
+	newPod := &hostport.RunningPod{Pod: pod, IP: ip4}
+	if err := plugin.hostportHandler.OpenPodHostportsAndSync(newPod, BridgeName, runningPods); err != nil {
 		return err
 	}
 
@@ -464,24 +471,11 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}
-	nsenterPath, err := plugin.getNsenterPath()
+	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
-	// Try to retrieve ip inside container network namespace
-	output, err := plugin.execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
-		"ip", "-o", "-4", "addr", "show", "dev", network.DefaultInterfaceName).CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
-	}
-	fields := strings.Fields(string(output))
-	if len(fields) < 4 {
-		return nil, fmt.Errorf("Unexpected command output %s ", output)
-	}
-	ip, _, err := net.ParseCIDR(fields[3])
-	if err != nil {
-		return nil, fmt.Errorf("Kubenet failed to parse ip from output %s due to %v", output, err)
-	}
+
 	plugin.podIPs[id] = ip.String()
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
@@ -504,24 +498,23 @@ func (plugin *kubenetNetworkPlugin) getRunningPods() ([]*hostport.RunningPod, er
 	}
 	runningPods := make([]*hostport.RunningPod, 0)
 	for _, p := range pods {
-		for _, c := range p.Containers {
-			if c.Name != dockertools.PodInfraContainerName {
-				continue
-			}
-			ipString, ok := plugin.podIPs[c.ID]
-			if !ok {
-				continue
-			}
-			podIP := net.ParseIP(ipString)
-			if podIP == nil {
-				continue
-			}
-			if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-				runningPods = append(runningPods, &hostport.RunningPod{
-					Pod: pod,
-					IP:  podIP,
-				})
-			}
+		containerID, err := plugin.host.GetRuntime().GetPodContainerID(p)
+		if err != nil {
+			continue
+		}
+		ipString, ok := plugin.podIPs[containerID]
+		if !ok {
+			continue
+		}
+		podIP := net.ParseIP(ipString)
+		if podIP == nil {
+			continue
+		}
+		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
+			runningPods = append(runningPods, &hostport.RunningPod{
+				Pod: pod,
+				IP:  podIP,
+			})
 		}
 	}
 	return runningPods, nil
@@ -565,17 +558,6 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 		return fmt.Errorf("Error removing container from network: %v", err)
 	}
 	return nil
-}
-
-func (plugin *kubenetNetworkPlugin) getNsenterPath() (string, error) {
-	if plugin.nsenterPath == "" {
-		nsenterPath, err := plugin.execer.LookPath("nsenter")
-		if err != nil {
-			return "", err
-		}
-		plugin.nsenterPath = nsenterPath
-	}
-	return plugin.nsenterPath, nil
 }
 
 // shaper retrieves the bandwidth shaper and, if it hasn't been fetched before,

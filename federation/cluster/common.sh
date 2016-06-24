@@ -135,6 +135,30 @@ function create-federation-api-objects {
 	    fi
 	    sleep 5
 	done
+
+	# Poll until DNS record for federation-apiserver is propagated
+	# TODO(colhom): REQUIREMENT for any other providers which use a DNS name for routing to loadbalancers
+	# right now it's just AWS that does this.
+	which nslookup
+	set +o errexit
+	if [[ "$KUBERNETES_PROVIDER" == "aws" ]];then
+	    for i in {1..60};do
+		echo "attempting to nslookup ${FEDERATION_API_HOST} ($i / 60)"
+		nslookup "${FEDERATION_API_HOST}"
+		if [[ $? -eq 0 ]];then
+		    echo "Lookup for ${FEDERATION_API_HOST} successful!"
+		    break
+		fi
+		sleep 10
+	    done
+
+	    if [[ $i -eq 60 ]];then
+		echo "Failed to resolve A record for ${FEDERATION_API_HOST}. Will exit"
+		exit 1
+	    fi
+	fi
+	set -o errexit
+
 	KUBE_MASTER_IP="${FEDERATION_API_HOST}:443"
     else
 	echo "provider ${KUBERNETES_PROVIDER} is not (yet) supported for e2e testing"

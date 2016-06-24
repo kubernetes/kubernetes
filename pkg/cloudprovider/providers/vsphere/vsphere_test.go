@@ -37,6 +37,7 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
 	cfg.Network.PublicNetwork = os.Getenv("VSPHERE_PUBLIC_NETWORK")
 	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
+	cfg.Disk.SCSIControllerType = os.Getenv("VSPHERE_SCSICONTROLLER_TYPE")
 	if os.Getenv("VSPHERE_INSECURE") != "" {
 		InsecureFlag, err = strconv.ParseBool(os.Getenv("VSPHERE_INSECURE"))
 	} else {

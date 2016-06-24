@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -159,7 +160,10 @@ func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (m
 		return nil, fmt.Errorf("unable to build GCE cloud provider for PD")
 	}
 
-	labels, err := provider.GetAutoLabelsForPD(volume.Spec.GCEPersistentDisk.PDName)
+	// If the zone is already labeled, honor the hint
+	zone := volume.Labels[unversioned.LabelZoneFailureDomain]
+
+	labels, err := provider.GetAutoLabelsForPD(volume.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {
 		return nil, err
 	}

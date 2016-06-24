@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
@@ -150,7 +152,7 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 /* ensureDnsRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
    if endpoints is nil or empty, a CNAME record to uplevelCname is ensured.
 */
-func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoints []string, uplevelCname string, endpointReachable bool) error {
+func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoints []string, uplevelCname string) error {
 	dnsZone, err := getDnsZone(dnsZoneName, s.dnsZones)
 	if err != nil {
 		return err
@@ -164,86 +166,90 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 		return err
 	}
 	if rrset == nil {
-		if endpointReachable {
-			// It doesn't exist yet, so create it, if we indeed have healthy endpoints
-			if len(endpoints) < 1 {
-				// There are no endpoint addresses at this level, so CNAME to uplevel, if provided
-				if uplevelCname != "" {
-					newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
-					rrset, err = rrsets.Add(newRrset)
-					if err != nil {
-						return err
-					}
-				}
-				// else we want no record, and we have no record, so we're all good.
-			} else {
-				// We have valid endpoint addresses, so just add them as A records.
-				// But first resolve DNS names, as some cloud providers (like AWS) expose
-				// load balancers behind DNS names, not IP addresses.
-				resolvedEndpoints, err := getResolvedEndpoints(endpoints)
-				if err != nil {
-					return err // TODO: We could potentially add the ones we did get back, even if some of them failed to resolve.
-				}
-				newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
+		glog.V(4).Infof("No recordsets found for DNS name %q.  Need to add either A records (if we have healthy endpoints), or a CNAME record to %q", dnsName, uplevelCname)
+		if len(endpoints) < 1 {
+			glog.V(4).Infof("There are no healthy endpoint addresses at level %q, so CNAME to %q, if provided", dnsName, uplevelCname)
+			if uplevelCname != "" {
+				glog.V(4).Infof("Creating CNAME to %q for %q", uplevelCname, dnsName)
+				newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
 				rrset, err = rrsets.Add(newRrset)
 				if err != nil {
 					return err
 				}
+				glog.V(4).Infof("Successfully created CNAME to %q for %q", uplevelCname, dnsName)
+			} else {
+				glog.V(4).Infof("We want no record for %q, and we have no record, so we're all good.", dnsName)
 			}
+		} else {
+			// We have valid endpoint addresses, so just add them as A records.
+			// But first resolve DNS names, as some cloud providers (like AWS) expose
+			// load balancers behind DNS names, not IP addresses.
+			glog.V(4).Infof("We have valid endpoint addresses %v at level %q, so add them as A records, after resolving DNS names", endpoints, dnsName)
+			resolvedEndpoints, err := getResolvedEndpoints(endpoints)
+			if err != nil {
+				return err // TODO: We could potentially add the ones we did get back, even if some of them failed to resolve.
+			}
+			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
+			glog.V(4).Infof("Adding recordset %v", newRrset)
+			rrset, err = rrsets.Add(newRrset)
+			if err != nil {
+				return err
+			}
+			glog.V(4).Infof("Successfully added recordset %v", newRrset)
 		}
 	} else {
 		// the rrset already exists, so make it right.
+		glog.V(4).Infof("Recordset %v already exists.  Ensuring that it is correct.")
 		if len(endpoints) < 1 {
 			// Need an appropriate CNAME record.  Check that we have it.
 			newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
+			glog.V(4).Infof("No healthy endpoints for %s.  Have recordset %v. Need recordset %v", dnsName, rrset, newRrset)
 			if rrset == newRrset {
-				if !endpointReachable {
-					if err = rrsets.Remove(rrset); err != nil {
-						return err
-					}
-				}
 				// The existing rrset is equal to the required one - our work is done here
+				glog.V(4).Infof("Existing recordset %v is equal to needed recordset %v, our work is done here.", rrset, newRrset)
 				return nil
 			} else {
 				// Need to replace the existing one with a better one (or just remove it if we have no healthy endpoints).
 				// TODO: Ideally do these inside a transaction, or do an atomic update, but dnsprovider interface doesn't support that yet.
+				glog.V(4).Infof("Existing recordset %v is not equal to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
 				if err = rrsets.Remove(rrset); err != nil {
 					return err
 				}
-				if uplevelCname != "" && endpointReachable {
+				glog.V(4).Infof("Successfully removed existing recordset %v", rrset)
+				if uplevelCname != "" {
 					if _, err = rrsets.Add(newRrset); err != nil {
 						return err
 					}
+					glog.V(4).Infof("Successfully added needed recordset %v", newRrset)
+				} else {
+					glog.V(4).Infof("Uplevel CNAME is empty string. Not adding recordset %v", newRrset)
 				}
 			}
 		} else {
 			// We have an rrset in DNS, possibly with some missing addresses and some unwanted addresses.
 			// And we have healthy endpoints.  Just replace what's there with the healthy endpoints, if it's not already correct.
+			glog.V(4).Infof("%s: Healthy endpoints %v exist.  Recordset %v exists.  Reconciling.", dnsName, endpoints, rrset)
 			resolvedEndpoints, err := getResolvedEndpoints(endpoints)
 			if err != nil { // Some invalid addresses or otherwise unresolvable DNS names.
 				return err // TODO: We could potentially add the ones we did get back, even if some of them failed to resolve.
 			}
 			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
+			glog.V(4).Infof("Have recordset %v. Need recordset %v", rrset, newRrset)
 			if rrset == newRrset {
-				if !endpointReachable {
-					if err = rrsets.Remove(rrset); err != nil {
-						return err
-					}
-				}
-				// The existing rrset is equal to the required one - our work is done here
+				glog.V(4).Infof("Existing recordset %v is equal to needed recordset %v, our work is done here.", rrset, newRrset)
 				// TODO: We could be more thorough about checking for equivalence to avoid unnecessary updates, but in the
 				//       worst case we'll just replace what's there with an equivalent, if not exactly identical record set.
 				return nil
 			} else {
 				// Need to replace the existing one with a better one
 				// TODO: Ideally do these inside a transaction, or do an atomic update, but dnsprovider interface doesn't support that yet.
+				glog.V(4).Infof("Existing recordset %v is not equal to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
 				if err = rrsets.Remove(rrset); err != nil {
 					return err
 				}
-				if endpointReachable {
-					if _, err = rrsets.Add(newRrset); err != nil {
-						return err
-					}
+				glog.V(4).Infof("Successfully removed existing recordset %v", rrset)
+				if _, err = rrsets.Add(newRrset); err != nil {
+					return err
 				}
 			}
 		}
@@ -297,7 +303,6 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	if err != nil {
 		return err
 	}
-	_, endpointReachable := cachedService.endpointMap[clusterName]
 	commonPrefix := serviceName + "." + namespaceName + "." + s.federationName + ".svc"
 	// dnsNames is the path up the DNS search tree, starting at the leaf
 	dnsNames := []string{
@@ -310,7 +315,7 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	endpoints := [][]string{zoneEndpoints, regionEndpoints, globalEndpoints}
 
 	for i, endpoint := range endpoints {
-		if err = s.ensureDnsRrsets(dnsZoneName, dnsNames[i], endpoint, dnsNames[i+1], endpointReachable); err != nil {
+		if err = s.ensureDnsRrsets(dnsZoneName, dnsNames[i], endpoint, dnsNames[i+1]); err != nil {
 			return err
 		}
 	}

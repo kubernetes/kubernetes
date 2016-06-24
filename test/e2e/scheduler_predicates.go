@@ -137,7 +137,7 @@ func removeLabelOffNode(c *client.Client, nodeName string, labelKey string) {
 	framework.ExpectNoError(err)
 
 	By("verifying the node doesn't have the label " + labelKey)
-	if nodeUpdated.Labels != nil || len(nodeUpdated.Labels[labelKey]) != 0 {
+	if nodeUpdated.Labels != nil && len(nodeUpdated.Labels[labelKey]) != 0 {
 		framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
 	}
 }
@@ -222,7 +222,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, false)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {

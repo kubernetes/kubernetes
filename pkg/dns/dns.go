@@ -92,7 +92,14 @@ type KubeDNS struct {
 	// A Records and SRV Records for (regular) services and headless Services.
 	cache *TreeCache
 
+	// TODO(nikhiljindal): Remove this. It can be recreated using clusterIPServiceMap.
 	reverseRecordMap map[string]*skymsg.Service
+
+	// Map of cluster IP to service object. Headless services are not part of this map.
+	// Used to get a service when given its cluster IP.
+	// Access to this is coordinated using cacheLock. We use the same lock for cache and this map
+	// to ensure that they dont get out of sync.
+	clusterIPServiceMap map[string]*kapi.Service
 
 	// caller is responsible for using the cacheLock before invoking methods on cache
 	// the cache is not thread-safe, and the caller can guarantee thread safety by using
@@ -119,19 +126,28 @@ type KubeDNS struct {
 	nodesStore kcache.Store
 }
 
-func NewKubeDNS(client clientset.Interface, domain string, federations map[string]string) *KubeDNS {
+func NewKubeDNS(client clientset.Interface, domain string, federations map[string]string) (*KubeDNS, error) {
+	// Verify that federation names should not contain dots ('.')
+	// We can not allow dots since we use that as separator for path segments (svcname.nsname.fedname.svc.domain)
+	for key := range federations {
+		if strings.ContainsAny(key, ".") {
+			return nil, fmt.Errorf("invalid federation name: %s, cannot have '.'", key)
+		}
+	}
 	kd := &KubeDNS{
-		kubeClient:       client,
-		domain:           domain,
-		cache:            NewTreeCache(),
-		cacheLock:        sync.RWMutex{},
-		reverseRecordMap: make(map[string]*skymsg.Service),
-		domainPath:       reverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
-		federations:      federations,
+		kubeClient:          client,
+		domain:              domain,
+		cache:               NewTreeCache(),
+		cacheLock:           sync.RWMutex{},
+		nodesStore:          kcache.NewStore(kcache.MetaNamespaceKeyFunc),
+		reverseRecordMap:    make(map[string]*skymsg.Service),
+		clusterIPServiceMap: make(map[string]*kapi.Service),
+		domainPath:          reverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
+		federations:         federations,
 	}
 	kd.setEndpointsStore()
 	kd.setServicesStore()
-	return kd
+	return kd, nil
 }
 
 func (kd *KubeDNS) Start() {
@@ -244,6 +260,7 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 		defer kd.cacheLock.Unlock()
 		kd.cache.deletePath(subCachePath...)
 		delete(kd.reverseRecordMap, s.Spec.ClusterIP)
+		delete(kd.clusterIPServiceMap, s.Spec.ClusterIP)
 	}
 }
 
@@ -318,6 +335,7 @@ func (kd *KubeDNS) newPortalService(service *kapi.Service) {
 	defer kd.cacheLock.Unlock()
 	kd.cache.setSubCache(service.Name, subCache, subCachePath...)
 	kd.reverseRecordMap[service.Spec.ClusterIP] = reverseRecord
+	kd.clusterIPServiceMap[service.Spec.ClusterIP] = service
 }
 
 func (kd *KubeDNS) generateRecordsForHeadlessService(e *kapi.Endpoints, svc *kapi.Service) error {
@@ -421,7 +439,74 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 	glog.Infof("Received DNS Request:%s, exact:%v", name, exact)
 	trimmed := strings.TrimRight(name, ".")
 	segments := strings.Split(trimmed, ".")
+	isFederationQuery := false
+	federationSegments := []string{}
+	if !exact && kd.isFederationQuery(segments) {
+		glog.Infof("federation service query: Received federation query. Going to try to find local service first")
+		// Try quering the non-federation (local) service first.
+		// Will try the federation one later, if this fails.
+		isFederationQuery = true
+		federationSegments = append(federationSegments, segments...)
+		// To try local service, remove federation name from segments.
+		// Federation name is 3rd in the segment (after service name and namespace).
+		segments = append(segments[:2], segments[3:]...)
+	}
 	path := reverseArray(segments)
+	records, err := kd.getRecordsForPath(path, exact)
+	if err != nil {
+		return nil, err
+	}
+	if !isFederationQuery {
+		if len(records) > 0 {
+			return records, nil
+		}
+		return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+	}
+
+	// For federation query, verify that the local service has endpoints.
+	validRecord := false
+	for _, val := range records {
+		// We know that a headless service has endpoints for sure if a record was returned for it.
+		// The record contains endpoint IPs. So nothing to check for headless services.
+		if !kd.isHeadlessServiceRecord(&val) {
+			ok, err := kd.serviceWithClusterIPHasEndpoints(&val)
+			if err != nil {
+				glog.Infof("federation service query: unexpected error while trying to find if service has endpoint: %v")
+				continue
+			}
+			if !ok {
+				glog.Infof("federation service query: skipping record since service has no endpoint: %v", val)
+				continue
+			}
+		}
+		validRecord = true
+		break
+	}
+	if validRecord {
+		// There is a local service with valid endpoints, return its CNAME.
+		name := strings.Join(reverseArray(path), ".")
+		// Ensure that this name that we are returning as a CNAME response is a fully qualified
+		// domain name so that the client's resolver library doesn't have to go through its
+		// search list all over again.
+		if !strings.HasSuffix(name, ".") {
+			name = name + "."
+		}
+		glog.Infof("federation service query: Returning CNAME for local service : %s", name)
+		return []skymsg.Service{{Host: name}}, nil
+	}
+
+	// If the name query is not an exact query and does not match any records in the local store,
+	// attempt to send a federation redirect (CNAME) response.
+	if !exact {
+		glog.Infof("federation service query: Did not find a local service. Trying federation redirect (CNAME) response")
+		return kd.federationRecords(reverseArray(federationSegments))
+	}
+
+	return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+}
+
+func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Service, error) {
+	retval := []skymsg.Service{}
 	if kd.isPodRecord(path) {
 		ip, err := kd.getPodIP(path)
 		if err == nil {
@@ -447,21 +532,50 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 	kd.cacheLock.RLock()
 	defer kd.cacheLock.RUnlock()
 	records := kd.cache.getValuesForPathWithWildcards(path...)
+	glog.V(2).Infof("Received %d records from cache", len(records))
 	for _, val := range records {
 		retval = append(retval, *val)
 	}
 	glog.Infof("records:%v, retval:%v, path:%v", records, retval, path)
-	if len(retval) > 0 {
-		return retval, nil
-	}
+	return retval, nil
+}
 
-	// If the name query is not an exact query and does not match any records in the local store,
-	// attempt to send a federation redirect (CNAME) response.
-	if !exact {
-		return kd.federationRecords(path)
-	}
+// Returns true if the given record corresponds to a headless service.
+// Important: Assumes that we already have the cacheLock. Callers responsibility to acquire it.
+// This is because the code will panic, if we try to acquire it again if we already have it.
+func (kd *KubeDNS) isHeadlessServiceRecord(msg *skymsg.Service) bool {
+	// If it is not a headless service, then msg.Host will be the cluster IP.
+	// So we can check if msg.host exists in our clusterIPServiceMap.
+	_, ok := kd.clusterIPServiceMap[msg.Host]
+	// It is headless service if no record was found.
+	return !ok
+}
 
-	return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+// Returns true if the service corresponding to the given message has endpoints.
+// Note: Works only for services with ClusterIP. Will return an error for headless service (service without a clusterIP).
+// Important: Assumes that we already have the cacheLock. Callers responsibility to acquire it.
+// This is because the code will panic, if we try to acquire it again if we already have it.
+func (kd *KubeDNS) serviceWithClusterIPHasEndpoints(msg *skymsg.Service) (bool, error) {
+	svc, ok := kd.clusterIPServiceMap[msg.Host]
+	if !ok {
+		// It is a headless service.
+		return false, fmt.Errorf("method not expected to be called for headless service")
+	}
+	key, err := kcache.MetaNamespaceKeyFunc(svc)
+	if err != nil {
+		return false, err
+	}
+	e, exists, err := kd.endpointsStore.GetByKey(key)
+	if err != nil {
+		return false, fmt.Errorf("failed to get endpoints object from endpoints store - %v", err)
+	}
+	if !exists {
+		return false, nil
+	}
+	if e, ok := e.(*kapi.Endpoints); ok {
+		return len(e.Subsets) > 0, nil
+	}
+	return false, fmt.Errorf("unexpected: found non-endpoint object in endpoint store: %v", e)
 }
 
 // ReverseRecords performs a reverse lookup for the given name.
@@ -557,23 +671,42 @@ func getSkyMsg(ip string, port int) (*skymsg.Service, string) {
 //   5. Fourth segment is exactly "svc"
 //   6. The remaining segments match kd.domainPath.
 //   7. And federation must be one of the listed federations in the config.
+//   Note: Because of the above conditions, this method will treat wildcard queries such as
+//   *.mysvc.myns.myfederation.svc.domain.path as non-federation queries.
+//   We can add support for wildcard queries later, if needed.
 func (kd *KubeDNS) isFederationQuery(path []string) bool {
-	if len(path) == 4+len(kd.domainPath) &&
-		len(validation.IsDNS952Label(path[0])) == 0 &&
-		len(validation.IsDNS1123Label(path[1])) == 0 &&
-		len(validation.IsDNS1123Label(path[2])) == 0 &&
-		path[3] == serviceSubdomain {
-		for i, domComp := range kd.domainPath {
-			// kd.domainPath is reversed, so we need to look in the `path` in the reverse order.
-			if domComp != path[len(path)-i-1] {
-				return false
-			}
-		}
-		if _, ok := kd.federations[path[2]]; ok {
-			return true
+	if len(path) != 4+len(kd.domainPath) {
+		glog.V(2).Infof("not a federation query: len(%q) != 4+len(%q)", path, kd.domainPath)
+		return false
+	}
+	if errs := validation.IsDNS952Label(path[0]); len(errs) != 0 {
+		glog.V(2).Infof("not a federation query: %q is not an RFC 952 label: %q", path[0], errs)
+		return false
+	}
+	if errs := validation.IsDNS1123Label(path[1]); len(errs) != 0 {
+		glog.V(2).Infof("not a federation query: %q is not an RFC 1123 label: %q", path[1], errs)
+		return false
+	}
+	if errs := validation.IsDNS1123Label(path[2]); len(errs) != 0 {
+		glog.V(2).Infof("not a federation query: %q is not an RFC 1123 label: %q", path[2], errs)
+		return false
+	}
+	if path[3] != serviceSubdomain {
+		glog.V(2).Infof("not a federation query: %q != %q (serviceSubdomain)", path[3], serviceSubdomain)
+		return false
+	}
+	for i, domComp := range kd.domainPath {
+		// kd.domainPath is reversed, so we need to look in the `path` in the reverse order.
+		if domComp != path[len(path)-i-1] {
+			glog.V(2).Infof("not a federation query: kd.domainPath[%d] != path[%d] (%q != %q)", i, len(path)-i-1, domComp, path[len(path)-i-1])
+			return false
 		}
 	}
-	return false
+	if _, ok := kd.federations[path[2]]; !ok {
+		glog.V(2).Infof("not a federation query: kd.federations[%q] not found", path[2])
+		return false
+	}
+	return true
 }
 
 // federationRecords checks if the given `queryPath` is for a federated service and if it is,
@@ -594,12 +727,13 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 	// domain path components, i.e. kd.domainPath, from the query.
 	path = path[:len(path)-len(kd.domainPath)]
 
-	// Append the zone name (zone in the cloud provider terminology, not a DNS zone)
-	zone, err := kd.getClusterZone()
+	// Append the zone name (zone in the cloud provider terminology, not a DNS
+	// zone) and the region name.
+	zone, region, err := kd.getClusterZoneAndRegion()
 	if err != nil {
-		return nil, fmt.Errorf("failed to obtain the cluster zone: %v", err)
+		return nil, fmt.Errorf("failed to obtain the cluster zone and region: %v", err)
 	}
-	path = append(path, zone)
+	path = append(path, zone, region)
 
 	// We have already established that the map entry exists for the given federation,
 	// we just need to retrieve the domain name, validate it and append it to the path.
@@ -619,21 +753,23 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 	return []skymsg.Service{{Host: name}}, nil
 }
 
-// getClusterZone returns the name of the zone the cluster is running in. It arbitrarily selects
-// a node and reads the failure domain annotation on the node. An alternative is to obtain this
-// pod's (i.e. kube-dns pod's) name using the downward API, get the pod, get the node the pod is
-// bound to and retrieve that node's annotations. But even just by reading those steps, it looks
-// complex and it is not entirely clear what that complexity is going to buy us. So taking a
-// simpler approach here.
-// Also note that zone here means the zone in cloud provider terminology, not the DNS zone.
-func (kd *KubeDNS) getClusterZone() (string, error) {
+// getClusterZoneAndRegion returns the name of the zone and the region the
+// cluster is running in. It arbitrarily selects a node and reads the failure
+// domain label on the node. An alternative is to obtain this pod's
+// (i.e. kube-dns pod's) name using the downward API, get the pod, get the
+// node the pod is bound to and retrieve that node's labels. But even just by
+// reading those steps, it looks complex and it is not entirely clear what
+// that complexity is going to buy us. So taking a simpler approach here.
+// Also note that zone here means the zone in cloud provider terminology, not
+// the DNS zone.
+func (kd *KubeDNS) getClusterZoneAndRegion() (string, string, error) {
 	var node *kapi.Node
 
 	objs := kd.nodesStore.List()
 	if len(objs) > 0 {
 		var ok bool
 		if node, ok = objs[0].(*kapi.Node); !ok {
-			return "", fmt.Errorf("expected node object, got: %T", objs[0])
+			return "", "", fmt.Errorf("expected node object, got: %T", objs[0])
 		}
 	} else {
 		// An alternative to listing nodes each time is to set a watch, but that is totally
@@ -642,27 +778,40 @@ func (kd *KubeDNS) getClusterZone() (string, error) {
 		// TODO(madhusudancs): Move this to external/v1 API.
 		nodeList, err := kd.kubeClient.Core().Nodes().List(kapi.ListOptions{})
 		if err != nil || len(nodeList.Items) == 0 {
-			return "", fmt.Errorf("failed to retrieve the cluster nodes: %v", err)
+			return "", "", fmt.Errorf("failed to retrieve the cluster nodes: %v", err)
 		}
 
-		// Select a node (arbitrarily the first node) that has `LabelZoneFailureDomain` set.
+		// Select a node (arbitrarily the first node) that has
+		// `LabelZoneFailureDomain` and `LabelZoneRegion` set.
 		for _, nodeItem := range nodeList.Items {
-			if _, ok := nodeItem.Annotations[unversioned.LabelZoneFailureDomain]; !ok {
+			_, zfound := nodeItem.Labels[unversioned.LabelZoneFailureDomain]
+			_, rfound := nodeItem.Labels[unversioned.LabelZoneRegion]
+			if !zfound || !rfound {
 				continue
 			}
 			// Make a copy of the node, don't rely on the loop variable.
 			node = &(*(&nodeItem))
 			if err := kd.nodesStore.Add(node); err != nil {
-				return "", fmt.Errorf("couldn't add the retrieved node to the cache: %v", err)
+				return "", "", fmt.Errorf("couldn't add the retrieved node to the cache: %v", err)
 			}
+			// Node is found, break out of the loop.
+			break
 		}
 	}
 
-	zone, ok := node.Annotations[unversioned.LabelZoneFailureDomain]
-	if !ok || zone == "" {
-		return "", fmt.Errorf("unknown cluster zone")
+	if node == nil {
+		return "", "", fmt.Errorf("Could not find any nodes")
 	}
-	return zone, nil
+
+	zone, ok := node.Labels[unversioned.LabelZoneFailureDomain]
+	if !ok || zone == "" {
+		return "", "", fmt.Errorf("unknown cluster zone")
+	}
+	region, ok := node.Labels[unversioned.LabelZoneRegion]
+	if !ok || region == "" {
+		return "", "", fmt.Errorf("unknown cluster region")
+	}
+	return zone, region, nil
 }
 
 func (kd *KubeDNS) getServiceFQDN(service *kapi.Service) string {

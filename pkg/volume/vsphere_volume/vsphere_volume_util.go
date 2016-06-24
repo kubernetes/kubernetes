@@ -68,8 +68,6 @@ func (util *VsphereDiskUtil) AttachDisk(vm *vsphereVolumeMounter, globalPDPath s
 	numTries := 0
 	for {
 		devicePath = verifyDevicePath(diskUUID)
-		// probe the attached vol so that symlink in /dev/disk/by-id is created
-		scsiHostRescan()
 
 		_, err := os.Stat(devicePath)
 		if err == nil {
@@ -105,18 +103,6 @@ func (util *VsphereDiskUtil) AttachDisk(vm *vsphereVolumeMounter, globalPDPath s
 		glog.V(2).Infof("Safe mount successful: %q\n", devicePath)
 	}
 	return nil
-}
-
-// rescan scsi bus
-func scsiHostRescan() {
-	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := ioutil.ReadDir(scsi_path); err == nil {
-		for _, f := range dirs {
-			name := scsi_path + f.Name() + "/scan"
-			data := []byte("- - -")
-			ioutil.WriteFile(name, data, 0666)
-		}
-	}
 }
 
 func verifyDevicePath(diskUUID string) string {

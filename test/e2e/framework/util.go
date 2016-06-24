@@ -123,7 +123,7 @@ const (
 	NodeReadyInitialTimeout = 20 * time.Second
 
 	// How long pods have to be "ready" when a test begins.
-	PodReadyBeforeTimeout = 2 * time.Minute
+	PodReadyBeforeTimeout = 5 * time.Minute
 
 	// How long pods have to become scheduled onto nodes
 	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
@@ -554,7 +554,7 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 // even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
-func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
+func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string, restartDockerOnFailures bool) error {
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
@@ -566,6 +566,10 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
 		wg.Done()
 	}()
+
+	// We will be restarting all not-ready kubeProxies every 5 minutes,
+	// to workaround #25543 issue.
+	badKubeProxySince := make(map[string]time.Time)
 
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		// We get the new list of pods and replication controllers in every
@@ -597,6 +601,8 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 				if hasReplicationControllersForPod(rcList, pod) {
 					replicaOk++
 				}
+				// If the pod is healthy, remove it from bad ones.
+				delete(badKubeProxySince, pod.Name)
 			} else {
 				if pod.Status.Phase != api.PodFailed {
 					Logf("The status of Pod %s is %s, waiting for it to be either Running or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
@@ -606,6 +612,34 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 					badPods = append(badPods, pod)
 				}
 				//ignore failed pods that are controlled by a replication controller
+			}
+		}
+
+		// Try to repair all KubeProxies that are not-ready long enough by restarting Docker:
+		// see https://github.com/kubernetes/kubernetes/issues/24295#issuecomment-218920357
+		// for exact details.
+		if restartDockerOnFailures {
+			for _, badPod := range badPods {
+				name := badPod.Name
+				if len(name) > 10 && name[:10] == "kube-proxy" {
+					if _, ok := badKubeProxySince[name]; !ok {
+						badKubeProxySince[name] = time.Now()
+					}
+					if time.Since(badKubeProxySince[name]) > 5*time.Minute {
+						node, err := c.Nodes().Get(badPod.Spec.NodeName)
+						if err != nil {
+							Logf("Couldn't get node: %v", err)
+							continue
+						}
+						err = IssueSSHCommand("sudo service docker restart", TestContext.Provider, node)
+						if err != nil {
+							Logf("Couldn't restart docker on %s: %v", name, err)
+							continue
+						}
+						Logf("Docker on %s node restarted", badPod.Spec.NodeName)
+						delete(badKubeProxySince, name)
+					}
+				}
 			}
 		}
 
@@ -3913,7 +3947,7 @@ func WaitForIngressAddress(c *client.Client, ns, ingName string, timeout time.Du
 // Looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie("log", podName, container, fmt.Sprintf("--namespace=%v", ns))
+		return RunKubectlOrDie("logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
 	})
 }
 

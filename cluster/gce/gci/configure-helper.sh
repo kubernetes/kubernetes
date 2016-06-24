@@ -868,7 +868,7 @@ function start-fluentd {
   echo "Start fluentd pod"
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]]; then
     if [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
-      cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-gcp.yaml" /etc/kubernetes/manifests/
+      cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gci/fluentd-gcp.yaml" /etc/kubernetes/manifests/
     elif [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
       # Running fluentd-es on the master is pointless, as it can't communicate
       # with elasticsearch from there in the default configuration.
@@ -910,7 +910,9 @@ Welcome to Kubernetes ${version}!
 You can find documentation for Kubernetes at:
   http://docs.kubernetes.io/
 
-You can download the build image for this release at:
+The source for this release can be found at:
+  /home/kubernetes/kubernetes-src.tar.gz
+Or you can download it at:
   https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
 
 It is based on the Kubernetes source at:

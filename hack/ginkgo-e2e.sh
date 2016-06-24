@@ -46,7 +46,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
-    KUBERNETES_PROVIDER=""
+    KUBERNETES_PROVIDER="skeleton"
 
     detect-master-from-kubeconfig
 
@@ -87,7 +87,7 @@ fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   detect-node-instance-groups
-  NODE_INSTANCE_GROUP=$(kube::util::join , NODE_INSTANCE_GROUPS)
+  NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUPS[@]}")
 fi
 
 ginkgo_args=()

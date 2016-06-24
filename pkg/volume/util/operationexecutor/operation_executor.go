@@ -575,11 +575,12 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
 			glog.Infof(
-				"Entering MountVolume.WaitForAttach for volume %q (spec.Name: %q) pod %q (UID: %q).",
+				"Entering MountVolume.WaitForAttach for volume %q (spec.Name: %q) pod %q (UID: %q) DevicePath: %q",
 				volumeToMount.VolumeName,
 				volumeToMount.VolumeSpec.Name(),
 				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
+				volumeToMount.Pod.UID,
+				volumeToMount.DevicePath)
 
 			devicePath, err := volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, volumeToMount.DevicePath, waitForAttachTimeout)
@@ -889,12 +890,13 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					volumeToMount.VolumeSpec, nodeName, volumeToMount.DevicePath)
-				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q)",
+					volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
 					volumeToMount.PodName,
-					volumeToMount.Pod.UID)
+					volumeToMount.Pod.UID,
+					attachedVolume.DevicePath)
 
 				if addVolumeNodeErr != nil {
 					// On failure, return error. Caller will log and retry.

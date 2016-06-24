@@ -1149,6 +1149,7 @@ func (r *Runtime) preparePod(pod *api.Pod, podIP string, pullSecrets []api.Secre
 		newUnitOption("Service", "ExecStopPost", markPodFinished),
 		// This enables graceful stop.
 		newUnitOption("Service", "KillMode", "mixed"),
+		newUnitOption("Service", "TimeoutStopSec", fmt.Sprintf("%ds", getPodTerminationGracePeriodInSecond(pod))),
 		// Track pod info for garbage collection
 		newUnitOption(unitKubernetesSection, unitPodUID, string(pod.UID)),
 		newUnitOption(unitKubernetesSection, unitPodName, pod.Name),
@@ -1572,14 +1573,22 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return result, nil
 }
 
-func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) {
-	gracePeriod := int64(minimumGracePeriodInSeconds)
+func getPodTerminationGracePeriodInSecond(pod *api.Pod) int64 {
+	var gracePeriod int64
 	switch {
 	case pod.DeletionGracePeriodSeconds != nil:
 		gracePeriod = *pod.DeletionGracePeriodSeconds
 	case pod.Spec.TerminationGracePeriodSeconds != nil:
 		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
 	}
+	if gracePeriod < minimumGracePeriodInSeconds {
+		gracePeriod = minimumGracePeriodInSeconds
+	}
+	return gracePeriod
+}
+
+func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) {
+	gracePeriod := getPodTerminationGracePeriodInSecond(pod)
 
 	done := make(chan struct{})
 	go func() {
@@ -1783,6 +1792,10 @@ func (r *Runtime) GetNetNS(containerID kubecontainer.ContainerID) (string, error
 	// This deception is only possible because we played the same trick in
 	// `networkPlugin.SetUpPod` and `networkPlugin.TearDownPod`.
 	return netnsPathFromName(makePodNetnsName(kubetypes.UID(containerID.ID))), nil
+}
+
+func (r *Runtime) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
+	return kubecontainer.ContainerID{ID: string(pod.ID)}, nil
 }
 
 func podDetailsFromServiceFile(serviceFilePath string) (string, string, string, bool, error) {
