@@ -158,6 +158,9 @@ function install-kube-binary-config {
   fi
 
   cp "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
+  cp "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
+  chmod a+r "${KUBE_HOME}/kubernetes/LICENSES"
+  chmod a+r "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz"
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   dst_dir="${KUBE_HOME}/kube-manifests"
