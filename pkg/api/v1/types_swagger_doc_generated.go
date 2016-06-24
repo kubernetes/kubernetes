@@ -316,6 +316,26 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
 }
 
+var map_DeprecatedDownwardAPIVolumeFile = map[string]string{
+	"":                 "DeprecatedDownwardAPIVolumeFile represents information to create the file containing the pod field This type is deprecated and should be replaced by use of the downwardAPI volume source.",
+	"name":             "Required: Name is the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
+	"fieldRef":         "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
+	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+}
+
+func (DeprecatedDownwardAPIVolumeFile) SwaggerDoc() map[string]string {
+	return map_DeprecatedDownwardAPIVolumeFile
+}
+
+var map_DeprecatedDownwardAPIVolumeSource = map[string]string{
+	"":      "DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info. This type is deprecated and should be replaced by use of the downwardAPI volume source.",
+	"items": "Items is a list of downward API volume file",
+}
+
+func (DeprecatedDownwardAPIVolumeSource) SwaggerDoc() map[string]string {
+	return map_DeprecatedDownwardAPIVolumeSource
+}
+
 var map_DownwardAPIVolumeFile = map[string]string{
 	"":                 "DownwardAPIVolumeFile represents information to create the file containing the pod field",
 	"path":             "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
@@ -489,6 +509,16 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 	return map_FCVolumeSource
 }
 
+var map_FSGroupStrategyOptions = map[string]string{
+	"":       "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+	"type":   "Type is the strategy that will dictate what FSGroup is used in the SecurityContext.",
+	"ranges": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
+}
+
+func (FSGroupStrategyOptions) SwaggerDoc() map[string]string {
+	return map_FSGroupStrategyOptions
+}
+
 var map_FlexVolumeSource = map[string]string{
 	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
 	"driver":    "Driver is the name of the driver to use for this volume.",
@@ -586,6 +616,16 @@ var map_HostPathVolumeSource = map[string]string{
 
 func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 	return map_HostPathVolumeSource
+}
+
+var map_IDRange = map[string]string{
+	"":    "IDRange provides a min/max of an allowed range of IDs.",
+	"min": "Min is the start of the range, inclusive.",
+	"max": "Max is the end of the range, inclusive.",
+}
+
+func (IDRange) SwaggerDoc() map[string]string {
+	return map_IDRange
 }
 
 var map_ISCSIVolumeSource = map[string]string{
@@ -1236,6 +1276,7 @@ var map_PodSpec = map[string]string{
 	"activeDeadlineSeconds":         "Optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
 	"dnsPolicy":                     "Set DNS policy for containers within the pod. One of 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\".",
 	"nodeSelector":                  "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md",
+	"host":                          "A request to schedule this pod onto a specific node Deprecated: Use nodeName instead.",
 	"serviceAccountName":            "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md",
 	"serviceAccount":                "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
 	"nodeName":                      "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
@@ -1472,6 +1513,28 @@ func (ResourceRequirements) SwaggerDoc() map[string]string {
 	return map_ResourceRequirements
 }
 
+var map_RunAsUserStrategyOptions = map[string]string{
+	"":            "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.",
+	"type":        "Type is the strategy that will dictate what RunAsUser is used in the SecurityContext.",
+	"uid":         "UID is the user id that containers must run as.  Required for the MustRunAs strategy if not using namespace/service account allocated uids.",
+	"uidRangeMin": "UIDRangeMin defines the min value for a strategy that allocates by range.",
+	"uidRangeMax": "UIDRangeMax defines the max value for a strategy that allocates by range.",
+}
+
+func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
+	return map_RunAsUserStrategyOptions
+}
+
+var map_SELinuxContextStrategyOptions = map[string]string{
+	"":               "SELinuxContextStrategyOptions defines the strategy type and any options used to create the strategy.",
+	"type":           "Type is the strategy that will dictate what SELinux context is used in the SecurityContext.",
+	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs",
+}
+
+func (SELinuxContextStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SELinuxContextStrategyOptions
+}
+
 var map_SELinuxOptions = map[string]string{
 	"":      "SELinuxOptions are the labels to be applied to the container",
 	"user":  "User is a SELinux user label that applies to the container.",
@@ -1536,6 +1599,40 @@ var map_SecurityContext = map[string]string{
 
 func (SecurityContext) SwaggerDoc() map[string]string {
 	return map_SecurityContext
+}
+
+var map_SecurityContextConstraints = map[string]string{
+	"":                         "SecurityContextConstraints governs the ability to make requests that affect the SecurityContext that will be applied to a container.",
+	"priority":                 "Priority influences the sort order of SCCs when evaluating which SCCs to try first for a given pod request based on access in the Users and Groups fields.  The higher the int, the higher priority.  If scores for multiple SCCs are equal they will be sorted by name.",
+	"allowPrivilegedContainer": "AllowPrivilegedContainer determines if a container can request to be run as privileged.",
+	"defaultAddCapabilities":   "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
+	"requiredDropCapabilities": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
+	"allowedCapabilities":      "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field maybe added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
+	"allowHostDirVolumePlugin": "AllowHostDirVolumePlugin determines if the policy allow containers to use the HostDir volume plugin",
+	"volumes":                  "Volumes is a white list of allowed volume plugins.  FSType corresponds directly with the field names of a VolumeSource (azureFile, configMap, emptyDir).  To allow all volumes you may use '*'.",
+	"allowHostNetwork":         "AllowHostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
+	"allowHostPorts":           "AllowHostPorts determines if the policy allows host ports in the containers.",
+	"allowHostPID":             "AllowHostPID determines if the policy allows host pid in the containers.",
+	"allowHostIPC":             "AllowHostIPC determines if the policy allows host ipc in the containers.",
+	"seLinuxContext":           "SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext.",
+	"runAsUser":                "RunAsUser is the strategy that will dictate what RunAsUser is used in the SecurityContext.",
+	"supplementalGroups":       "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
+	"fsGroup":                  "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
+	"readOnlyRootFilesystem":   "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the SCC should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
+	"users":                    "The users who have permissions to use this security context constraints",
+	"groups":                   "The groups that have permission to use this security context constraints",
+}
+
+func (SecurityContextConstraints) SwaggerDoc() map[string]string {
+	return map_SecurityContextConstraints
+}
+
+var map_SecurityContextConstraintsList = map[string]string{
+	"": "SecurityContextConstraintsList is a list of SecurityContextConstraints objects",
+}
+
+func (SecurityContextConstraintsList) SwaggerDoc() map[string]string {
+	return map_SecurityContextConstraintsList
 }
 
 var map_SerializedReference = map[string]string{
@@ -1615,6 +1712,7 @@ var map_ServiceSpec = map[string]string{
 	"":                         "ServiceSpec describes the attributes that a user creates on a service.",
 	"ports":                    "The list of ports that are exposed by this service. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies",
 	"selector":                 "This service will route traffic to pods having labels matching this selector. Label keys and values that must match in order to receive traffic for this service. If empty, all pods are selected, if not specified, endpoints must be manually specified. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview",
+	"portalIP":                 "The IP Address of the service. Deprecated: Use clusterIP instead.",
 	"clusterIP":                "ClusterIP is usually assigned by the master and is the IP address of the service. If specified, it will be allocated to the service if it is unused or else creation of the service will fail. Valid values are None, empty string (\"\"), or a valid IP address. 'None' can be specified for a headless service when proxying is not required. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies",
 	"type":                     "Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer. Defaults to ClusterIP. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services",
 	"externalIPs":              "externalIPs is a list of IP addresses for which nodes in the cluster will also accept traffic for this service.  These IPs are not managed by Kubernetes.  The user is responsible for ensuring that traffic arrives at a node with this IP.  A common example is external load-balancers that are not part of the Kubernetes system.  A previous form of this functionality exists as the deprecatedPublicIPs field.  When using this field, callers should also clear the deprecatedPublicIPs field.",
@@ -1635,6 +1733,16 @@ var map_ServiceStatus = map[string]string{
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
+}
+
+var map_SupplementalGroupsStrategyOptions = map[string]string{
+	"":       "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+	"type":   "Type is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
+	"ranges": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
+}
+
+func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SupplementalGroupsStrategyOptions
 }
 
 var map_TCPSocketAction = map[string]string{
@@ -1712,6 +1820,7 @@ var map_VolumeSource = map[string]string{
 	"azureFile":     "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"configMap":     "ConfigMap represents a configMap that should populate this volume",
 	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"metadata":      "Metadata represents metadata about the pod that should populate this volume Deprecated: Use downwardAPI instead.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

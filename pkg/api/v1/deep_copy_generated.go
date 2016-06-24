@@ -57,6 +57,8 @@ func init() {
 		DeepCopy_v1_ContainerStatus,
 		DeepCopy_v1_DaemonEndpoint,
 		DeepCopy_v1_DeleteOptions,
+		DeepCopy_v1_DeprecatedDownwardAPIVolumeFile,
+		DeepCopy_v1_DeprecatedDownwardAPIVolumeSource,
 		DeepCopy_v1_DownwardAPIVolumeFile,
 		DeepCopy_v1_DownwardAPIVolumeSource,
 		DeepCopy_v1_EmptyDirVolumeSource,
@@ -73,6 +75,7 @@ func init() {
 		DeepCopy_v1_ExecAction,
 		DeepCopy_v1_ExportOptions,
 		DeepCopy_v1_FCVolumeSource,
+		DeepCopy_v1_FSGroupStrategyOptions,
 		DeepCopy_v1_FlexVolumeSource,
 		DeepCopy_v1_FlockerVolumeSource,
 		DeepCopy_v1_GCEPersistentDiskVolumeSource,
@@ -82,6 +85,7 @@ func init() {
 		DeepCopy_v1_HTTPHeader,
 		DeepCopy_v1_Handler,
 		DeepCopy_v1_HostPathVolumeSource,
+		DeepCopy_v1_IDRange,
 		DeepCopy_v1_ISCSIVolumeSource,
 		DeepCopy_v1_KeyToPath,
 		DeepCopy_v1_Lifecycle,
@@ -158,12 +162,16 @@ func init() {
 		DeepCopy_v1_ResourceQuotaSpec,
 		DeepCopy_v1_ResourceQuotaStatus,
 		DeepCopy_v1_ResourceRequirements,
+		DeepCopy_v1_RunAsUserStrategyOptions,
+		DeepCopy_v1_SELinuxContextStrategyOptions,
 		DeepCopy_v1_SELinuxOptions,
 		DeepCopy_v1_Secret,
 		DeepCopy_v1_SecretKeySelector,
 		DeepCopy_v1_SecretList,
 		DeepCopy_v1_SecretVolumeSource,
 		DeepCopy_v1_SecurityContext,
+		DeepCopy_v1_SecurityContextConstraints,
+		DeepCopy_v1_SecurityContextConstraintsList,
 		DeepCopy_v1_SerializedReference,
 		DeepCopy_v1_Service,
 		DeepCopy_v1_ServiceAccount,
@@ -173,6 +181,7 @@ func init() {
 		DeepCopy_v1_ServiceProxyOptions,
 		DeepCopy_v1_ServiceSpec,
 		DeepCopy_v1_ServiceStatus,
+		DeepCopy_v1_SupplementalGroupsStrategyOptions,
 		DeepCopy_v1_TCPSocketAction,
 		DeepCopy_v1_Taint,
 		DeepCopy_v1_Toleration,
@@ -650,6 +659,44 @@ func DeepCopy_v1_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *conversi
 	return nil
 }
 
+func DeepCopy_v1_DeprecatedDownwardAPIVolumeFile(in DeprecatedDownwardAPIVolumeFile, out *DeprecatedDownwardAPIVolumeFile, c *conversion.Cloner) error {
+	out.Path = in.Path
+	if in.FieldRef != nil {
+		in, out := in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_v1_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ResourceFieldSelector)
+		if err := DeepCopy_v1_ResourceFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_DeprecatedDownwardAPIVolumeSource(in DeprecatedDownwardAPIVolumeSource, out *DeprecatedDownwardAPIVolumeSource, c *conversion.Cloner) error {
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]DeprecatedDownwardAPIVolumeFile, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_DeprecatedDownwardAPIVolumeFile(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func DeepCopy_v1_DownwardAPIVolumeFile(in DownwardAPIVolumeFile, out *DownwardAPIVolumeFile, c *conversion.Cloner) error {
 	out.Path = in.Path
 	if in.FieldRef != nil {
@@ -942,6 +989,22 @@ func DeepCopy_v1_FCVolumeSource(in FCVolumeSource, out *FCVolumeSource, c *conve
 	return nil
 }
 
+func DeepCopy_v1_FSGroupStrategyOptions(in FSGroupStrategyOptions, out *FSGroupStrategyOptions, c *conversion.Cloner) error {
+	out.Type = in.Type
+	if in.Ranges != nil {
+		in, out := in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_IDRange(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
+	}
+	return nil
+}
+
 func DeepCopy_v1_FlexVolumeSource(in FlexVolumeSource, out *FlexVolumeSource, c *conversion.Cloner) error {
 	out.Driver = in.Driver
 	out.FSType = in.FSType
@@ -1054,6 +1117,12 @@ func DeepCopy_v1_Handler(in Handler, out *Handler, c *conversion.Cloner) error {
 
 func DeepCopy_v1_HostPathVolumeSource(in HostPathVolumeSource, out *HostPathVolumeSource, c *conversion.Cloner) error {
 	out.Path = in.Path
+	return nil
+}
+
+func DeepCopy_v1_IDRange(in IDRange, out *IDRange, c *conversion.Cloner) error {
+	out.Min = in.Min
+	out.Max = in.Max
 	return nil
 }
 
@@ -2303,6 +2372,7 @@ func DeepCopy_v1_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error {
 	} else {
 		out.NodeSelector = nil
 	}
+	out.DeprecatedHost = in.DeprecatedHost
 	out.ServiceAccountName = in.ServiceAccountName
 	out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
 	out.NodeName = in.NodeName
@@ -2722,6 +2792,46 @@ func DeepCopy_v1_ResourceRequirements(in ResourceRequirements, out *ResourceRequ
 	return nil
 }
 
+func DeepCopy_v1_RunAsUserStrategyOptions(in RunAsUserStrategyOptions, out *RunAsUserStrategyOptions, c *conversion.Cloner) error {
+	out.Type = in.Type
+	if in.UID != nil {
+		in, out := in.UID, &out.UID
+		*out = new(int64)
+		**out = *in
+	} else {
+		out.UID = nil
+	}
+	if in.UIDRangeMin != nil {
+		in, out := in.UIDRangeMin, &out.UIDRangeMin
+		*out = new(int64)
+		**out = *in
+	} else {
+		out.UIDRangeMin = nil
+	}
+	if in.UIDRangeMax != nil {
+		in, out := in.UIDRangeMax, &out.UIDRangeMax
+		*out = new(int64)
+		**out = *in
+	} else {
+		out.UIDRangeMax = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_SELinuxContextStrategyOptions(in SELinuxContextStrategyOptions, out *SELinuxContextStrategyOptions, c *conversion.Cloner) error {
+	out.Type = in.Type
+	if in.SELinuxOptions != nil {
+		in, out := in.SELinuxOptions, &out.SELinuxOptions
+		*out = new(SELinuxOptions)
+		if err := DeepCopy_v1_SELinuxOptions(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	return nil
+}
+
 func DeepCopy_v1_SELinuxOptions(in SELinuxOptions, out *SELinuxOptions, c *conversion.Cloner) error {
 	out.User = in.User
 	out.Role = in.Role
@@ -2845,6 +2955,113 @@ func DeepCopy_v1_SecurityContext(in SecurityContext, out *SecurityContext, c *co
 		**out = *in
 	} else {
 		out.ReadOnlyRootFilesystem = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_SecurityContextConstraints(in SecurityContextConstraints, out *SecurityContextConstraints, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Priority != nil {
+		in, out := in.Priority, &out.Priority
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.Priority = nil
+	}
+	out.AllowPrivilegedContainer = in.AllowPrivilegedContainer
+	if in.DefaultAddCapabilities != nil {
+		in, out := in.DefaultAddCapabilities, &out.DefaultAddCapabilities
+		*out = make([]Capability, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.DefaultAddCapabilities = nil
+	}
+	if in.RequiredDropCapabilities != nil {
+		in, out := in.RequiredDropCapabilities, &out.RequiredDropCapabilities
+		*out = make([]Capability, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.RequiredDropCapabilities = nil
+	}
+	if in.AllowedCapabilities != nil {
+		in, out := in.AllowedCapabilities, &out.AllowedCapabilities
+		*out = make([]Capability, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.AllowedCapabilities = nil
+	}
+	out.AllowHostDirVolumePlugin = in.AllowHostDirVolumePlugin
+	if in.Volumes != nil {
+		in, out := in.Volumes, &out.Volumes
+		*out = make([]FSType, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.Volumes = nil
+	}
+	out.AllowHostNetwork = in.AllowHostNetwork
+	out.AllowHostPorts = in.AllowHostPorts
+	out.AllowHostPID = in.AllowHostPID
+	out.AllowHostIPC = in.AllowHostIPC
+	if err := DeepCopy_v1_SELinuxContextStrategyOptions(in.SELinuxContext, &out.SELinuxContext, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1_RunAsUserStrategyOptions(in.RunAsUser, &out.RunAsUser, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1_SupplementalGroupsStrategyOptions(in.SupplementalGroups, &out.SupplementalGroups, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1_FSGroupStrategyOptions(in.FSGroup, &out.FSGroup, c); err != nil {
+		return err
+	}
+	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	if in.Users != nil {
+		in, out := in.Users, &out.Users
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.Users = nil
+	}
+	if in.Groups != nil {
+		in, out := in.Groups, &out.Groups
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.Groups = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_SecurityContextConstraintsList(in SecurityContextConstraintsList, out *SecurityContextConstraintsList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]SecurityContextConstraints, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_SecurityContextConstraints(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -2989,6 +3206,7 @@ func DeepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 	} else {
 		out.Selector = nil
 	}
+	out.DeprecatedPortalIP = in.DeprecatedPortalIP
 	out.ClusterIP = in.ClusterIP
 	out.Type = in.Type
 	if in.ExternalIPs != nil {
@@ -3020,6 +3238,22 @@ func DeepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 func DeepCopy_v1_ServiceStatus(in ServiceStatus, out *ServiceStatus, c *conversion.Cloner) error {
 	if err := DeepCopy_v1_LoadBalancerStatus(in.LoadBalancer, &out.LoadBalancer, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func DeepCopy_v1_SupplementalGroupsStrategyOptions(in SupplementalGroupsStrategyOptions, out *SupplementalGroupsStrategyOptions, c *conversion.Cloner) error {
+	out.Type = in.Type
+	if in.Ranges != nil {
+		in, out := in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_IDRange(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
@@ -3242,6 +3476,15 @@ func DeepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.Metadata != nil {
+		in, out := in.Metadata, &out.Metadata
+		*out = new(DeprecatedDownwardAPIVolumeSource)
+		if err := DeepCopy_v1_DeprecatedDownwardAPIVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Metadata = nil
 	}
 	return nil
 }
