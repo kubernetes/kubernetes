@@ -103,30 +103,31 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	var err error
 	clientset.CoreClient, err = unversionedcore.NewForConfig(&configShallowCopy)
 	if err != nil {
-		return &clientset, err
+		return nil, err
 	}
 	clientset.ExtensionsClient, err = unversionedextensions.NewForConfig(&configShallowCopy)
 	if err != nil {
-		return &clientset, err
+		return nil, err
 	}
 	clientset.AutoscalingClient, err = unversionedautoscaling.NewForConfig(&configShallowCopy)
 	if err != nil {
-		return &clientset, err
+		return nil, err
 	}
 	clientset.BatchClient, err = unversionedbatch.NewForConfig(&configShallowCopy)
 	if err != nil {
-		return &clientset, err
+		return nil, err
 	}
 	clientset.RbacClient, err = unversionedrbac.NewForConfig(&configShallowCopy)
 	if err != nil {
-		return &clientset, err
+		return nil, err
 	}
 
 	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+		return nil, err
 	}
-	return &clientset, err
+	return &clientset, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
