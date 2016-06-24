@@ -17,10 +17,16 @@ limitations under the License.
 package v1
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/runtime"
+
+	sccutil "k8s.io/kubernetes/pkg/securitycontextconstraints/util"
+
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
@@ -48,7 +54,30 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		SetDefaults_LimitRangeItem,
 		SetDefaults_ConfigMap,
 		SetDefaults_RBDVolumeSource,
+		SetDefaults_SCC,
+		SetDefaults_ServicePort,
+		SetDefaults_EndpointPort,
 	)
+}
+
+func SetDefaults_ServicePort(obj *ServicePort) {
+	// Carry conversion to make port case valid
+	switch strings.ToUpper(string(obj.Protocol)) {
+	case string(ProtocolTCP):
+		obj.Protocol = ProtocolTCP
+	case string(ProtocolUDP):
+		obj.Protocol = ProtocolUDP
+	}
+}
+
+func SetDefaults_EndpointPort(obj *EndpointPort) {
+	// Carry conversion to make port case valid
+	switch strings.ToUpper(string(obj.Protocol)) {
+	case string(ProtocolTCP):
+		obj.Protocol = ProtocolTCP
+	case string(ProtocolUDP):
+		obj.Protocol = ProtocolUDP
+	}
 }
 
 func SetDefaults_PodExecOptions(obj *PodExecOptions) {
@@ -89,6 +118,13 @@ func SetDefaults_ContainerPort(obj *ContainerPort) {
 	if obj.Protocol == "" {
 		obj.Protocol = ProtocolTCP
 	}
+	// Carry conversion to make port case valid
+	switch strings.ToUpper(string(obj.Protocol)) {
+	case string(ProtocolTCP):
+		obj.Protocol = ProtocolTCP
+	case string(ProtocolUDP):
+		obj.Protocol = ProtocolUDP
+	}
 }
 func SetDefaults_Container(obj *Container) {
 	if obj.ImagePullPolicy == "" {
@@ -122,6 +158,10 @@ func SetDefaults_ServiceSpec(obj *ServiceSpec) {
 		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
 			sp.TargetPort = intstr.FromInt(int(sp.Port))
 		}
+		//Carry conversion
+		if len(obj.ClusterIP) == 0 && len(obj.DeprecatedPortalIP) > 0 {
+			obj.ClusterIP = obj.DeprecatedPortalIP
+		}
 	}
 }
 func SetDefaults_Pod(obj *Pod) {
@@ -154,6 +194,14 @@ func SetDefaults_PodSpec(obj *PodSpec) {
 	}
 	if obj.SecurityContext == nil {
 		obj.SecurityContext = &PodSecurityContext{}
+	}
+	// Carry migration from serviceAccount to serviceAccountName
+	if len(obj.ServiceAccountName) == 0 && len(obj.DeprecatedServiceAccount) > 0 {
+		obj.ServiceAccountName = obj.DeprecatedServiceAccount
+	}
+	// Carry migration from host to nodeName
+	if len(obj.NodeName) == 0 && len(obj.DeprecatedHost) > 0 {
+		obj.NodeName = obj.DeprecatedHost
 	}
 	if obj.TerminationGracePeriodSeconds == nil {
 		period := int64(DefaultTerminationGracePeriodSeconds)
@@ -271,6 +319,7 @@ func SetDefaults_LimitRangeItem(obj *LimitRangeItem) {
 		}
 	}
 }
+
 func SetDefaults_ConfigMap(obj *ConfigMap) {
 	if obj.Data == nil {
 		obj.Data = make(map[string]string)
@@ -298,4 +347,69 @@ func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
 	if obj.Keyring == "" {
 		obj.Keyring = "/etc/ceph/keyring"
 	}
+}
+
+// Default SCCs for new fields.  FSGroup and SupplementalGroups are
+// set to the RunAsAny strategy if they are unset on the scc.
+func SetDefaults_SCC(scc *SecurityContextConstraints) {
+	if len(scc.FSGroup.Type) == 0 {
+		scc.FSGroup.Type = FSGroupStrategyRunAsAny
+	}
+	if len(scc.SupplementalGroups.Type) == 0 {
+		scc.SupplementalGroups.Type = SupplementalGroupsStrategyRunAsAny
+	}
+
+	// defaults the volume slice of the SCC.
+	// In order to support old clients the boolean fields will always take precedence.
+	defaultAllowedVolumes := fsTypeToStringSet(scc.Volumes)
+
+	// assume a nil volume slice is allowing everything for backwards compatibility
+	if defaultAllowedVolumes == nil {
+		defaultAllowedVolumes = sets.NewString(string(FSTypeAll))
+	}
+
+	if scc.AllowHostDirVolumePlugin {
+		// if already allowing all then there is no reason to add
+		if !defaultAllowedVolumes.Has(string(FSTypeAll)) {
+			defaultAllowedVolumes.Insert(string(FSTypeHostPath))
+		}
+	} else {
+		// we should only default all volumes if the SCC came in with FSTypeAll or we defaulted it
+		// otherwise we should only change the volumes slice to ensure that it does not conflict with
+		// the AllowHostDirVolumePlugin setting
+		shouldDefaultAllVolumes := defaultAllowedVolumes.Has(string(FSTypeAll))
+
+		// remove anything from volumes that conflicts with AllowHostDirVolumePlugin = false
+		defaultAllowedVolumes.Delete(string(FSTypeAll))
+		defaultAllowedVolumes.Delete(string(FSTypeHostPath))
+
+		if shouldDefaultAllVolumes {
+			allVolumes := sccutil.GetAllFSTypesExcept(string(FSTypeHostPath))
+			defaultAllowedVolumes.Insert(allVolumes.List()...)
+		}
+	}
+
+	scc.Volumes = StringSetToFSType(defaultAllowedVolumes)
+}
+
+func StringSetToFSType(set sets.String) []FSType {
+	if set == nil {
+		return nil
+	}
+	volumes := []FSType{}
+	for _, v := range set.List() {
+		volumes = append(volumes, FSType(v))
+	}
+	return volumes
+}
+
+func fsTypeToStringSet(volumes []FSType) sets.String {
+	if volumes == nil {
+		return nil
+	}
+	set := sets.NewString()
+	for _, v := range volumes {
+		set.Insert(string(v))
+	}
+	return set
 }

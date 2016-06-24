@@ -180,11 +180,11 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			Ports:    ports,
 		},
 	}
-	targetPortString, found := params["target-port"]
-	if !found {
-		targetPortString, found = params["container-port"]
+	targetPortString := params["target-port"]
+	if len(targetPortString) == 0 {
+		targetPortString = params["container-port"]
 	}
-	if found && len(targetPortString) > 0 {
+	if len(targetPortString) > 0 {
 		var targetPort intstr.IntOrString
 		if portNum, err := strconv.Atoi(targetPortString); err != nil {
 			targetPort = intstr.FromString(targetPortString)

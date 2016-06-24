@@ -34,6 +34,7 @@ func main() {
 	// Override defaults. These are Kubernetes specific input locations.
 	arguments.InputDirs = []string{
 		"k8s.io/kubernetes/pkg/api/v1",
+		"k8s.io/kubernetes/pkg/api/v1beta3",
 		"k8s.io/kubernetes/pkg/api",
 		"k8s.io/kubernetes/pkg/apis/authentication.k8s.io",
 		"k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1",

@@ -18,13 +18,23 @@ package unversioned
 
 type ComponentStatusExpansion interface{}
 
+type ConfigMapExpansion interface{}
+
 type EndpointsExpansion interface{}
 
+type EventExpansion interface{}
+
 type LimitRangeExpansion interface{}
+
+type NamespaceExpansion interface{}
+
+type NodeExpansion interface{}
 
 type PersistentVolumeExpansion interface{}
 
 type PersistentVolumeClaimExpansion interface{}
+
+type PodExpansion interface{}
 
 type PodTemplateExpansion interface{}
 
@@ -34,6 +44,8 @@ type ResourceQuotaExpansion interface{}
 
 type SecretExpansion interface{}
 
-type ServiceAccountExpansion interface{}
+type SecurityContextConstraintsExpansion interface{}
 
-type ConfigMapExpansion interface{}
+type ServiceExpansion interface{}
+
+type ServiceAccountExpansion interface{}

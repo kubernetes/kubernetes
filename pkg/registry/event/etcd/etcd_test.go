@@ -42,6 +42,7 @@ func validNewEvent(namespace string) *api.Event {
 		},
 		Reason: "forTesting",
 		InvolvedObject: api.ObjectReference{
+			Kind:      "Pod",
 			Name:      "bar",
 			Namespace: namespace,
 		},

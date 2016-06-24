@@ -152,14 +152,21 @@ __custom_func() {
 	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	valid_resources = `Valid resource types include:
+   * buildconfigs (aka 'bc')
+   * builds
    * componentstatuses (aka 'cs')
    * configmaps
    * daemonsets (aka 'ds')
+   * deploymentconfigs (aka 'dc')
    * deployments
    * events (aka 'ev')
    * endpoints (aka 'ep')
    * horizontalpodautoscalers (aka 'hpa')
+   * imagestreamimages (aka 'isimage')
+   * imagestreams (aka 'is')
+   * imagestreamtags (aka 'istag')
    * ingress (aka 'ing')
+   * groups
    * jobs
    * limitranges (aka 'limits')
    * nodes (aka 'no')
@@ -167,13 +174,18 @@ __custom_func() {
    * pods (aka 'po')
    * persistentvolumes (aka 'pv')
    * persistentvolumeclaims (aka 'pvc')
+   * policies
+   * projects
    * quota
    * resourcequotas (aka 'quota')
    * replicasets (aka 'rs')
    * replicationcontrollers (aka 'rc')
+   * rolebindings
+   * routes
    * secrets
    * serviceaccounts (aka 'sa')
    * services (aka 'svc')
+   * users
 `
 )
 

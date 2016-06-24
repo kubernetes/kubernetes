@@ -101,6 +101,9 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+
+		&SecurityContextConstraints{},
+		&SecurityContextConstraintsList{},
 	)
 
 	// Register Unversioned types under their own special group

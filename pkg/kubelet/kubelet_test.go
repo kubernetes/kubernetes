@@ -1250,8 +1250,8 @@ func TestDNSConfigurationParams(t *testing.T) {
 		}
 	}
 	t.Logf("nameservers %+v", options[1].DNS)
-	if len(options[0].DNS) != 1 {
-		t.Errorf("expected cluster nameserver only, got %+v", options[0].DNS)
+	if len(options[0].DNS) != len(options[1].DNS)+1 {
+		t.Errorf("expected prepend of cluster nameserver, got %+v", options[0].DNS)
 	} else if options[0].DNS[0] != clusterNS {
 		t.Errorf("expected nameserver %s, got %v", clusterNS, options[0].DNS[0])
 	}

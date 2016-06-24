@@ -18,14 +18,18 @@ package v1beta1
 
 type DaemonSetExpansion interface{}
 
+type DeploymentExpansion interface{}
+
 type HorizontalPodAutoscalerExpansion interface{}
 
 type IngressExpansion interface{}
 
 type JobExpansion interface{}
 
-type ThirdPartyResourceExpansion interface{}
+type PodSecurityPolicyExpansion interface{}
 
 type ReplicaSetExpansion interface{}
 
-type PodSecurityPolicyExpansion interface{}
+type ScaleExpansion interface{}
+
+type ThirdPartyResourceExpansion interface{}
