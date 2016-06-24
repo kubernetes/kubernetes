@@ -349,7 +349,9 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	if err != nil {
 		return err
 	}
-	if err := plugin.hostportHandler.OpenPodHostportsAndSync(pod, BridgeName, runningPods); err != nil {
+
+	newPod := &hostport.RunningPod{Pod: pod, IP: ip4}
+	if err := plugin.hostportHandler.OpenPodHostportsAndSync(newPod, BridgeName, runningPods); err != nil {
 		return err
 	}
 
