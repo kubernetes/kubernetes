@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
@@ -34,6 +35,8 @@ import (
 var (
 	groupVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
 )
+
+const retryBackoff = 500 * time.Millisecond
 
 // Ensure WebhookTokenAuthenticator implements the authenticator.Token interface.
 var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
@@ -46,7 +49,12 @@ type WebhookTokenAuthenticator struct {
 
 // New creates a new WebhookTokenAuthenticator from the provided kubeconfig file.
 func New(kubeConfigFile string, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
-	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions)
+	return newWithBackoff(kubeConfigFile, ttl, retryBackoff)
+}
+
+// newWithBackoff allows tests to skip the sleep.
+func newWithBackoff(kubeConfigFile string, ttl, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
+	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions, initialBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +69,9 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 	if entry, ok := w.responseCache.Get(r.Spec); ok {
 		r.Status = entry.(v1beta1.TokenReviewStatus)
 	} else {
-		result := w.RestClient.Post().Body(r).Do()
+		result := w.WithExponentialBackoff(func() restclient.Result {
+			return w.RestClient.Post().Body(r).Do()
+		})
 		if err := result.Error(); err != nil {
 			return nil, false, err
 		}
