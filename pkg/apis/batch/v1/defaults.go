@@ -39,4 +39,8 @@ func SetDefaults_Job(obj *Job) {
 		obj.Spec.Parallelism = new(int32)
 		*obj.Spec.Parallelism = 1
 	}
+	if obj.Spec.Completions == nil {
+		obj.Spec.Completions = new(int32)
+		*obj.Spec.Completions = 1
+	}
 }

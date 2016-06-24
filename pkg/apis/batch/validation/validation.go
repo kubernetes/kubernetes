@@ -110,12 +110,17 @@ func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if spec.Parallelism != nil {
+	if spec.Parallelism == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("parallelism"), ""))
+	} else {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Parallelism), fldPath.Child("parallelism"))...)
 	}
-	if spec.Completions != nil {
+	if spec.Completions == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("completions"), ""))
+	} else {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Completions), fldPath.Child("completions"))...)
 	}
+
 	if spec.ActiveDeadlineSeconds != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
 	}
