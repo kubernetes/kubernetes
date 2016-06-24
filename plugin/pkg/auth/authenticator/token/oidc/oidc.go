@@ -14,17 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// oidc implements the authenticator.Token interface using the OpenID Connect protocol.
+/*
+oidc implements the authenticator.Token interface using the OpenID Connect protocol.
+
+	config := oidc.OIDCOptions{
+		IssuerURL:     "https://accounts.google.com",
+		ClientID:      os.Getenv("GOOGLE_CLIENT_ID"),
+		UsernameClaim: "email",
+	}
+	tokenAuthenticator, err := oidc.New(config)
+*/
 package oidc
 
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
+	"sync"
+	"sync/atomic"
 
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/oidc"
@@ -32,43 +43,61 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util/crypto"
 	"k8s.io/kubernetes/pkg/util/net"
-)
-
-const (
-	DefaultRetries = 5
-	DefaultBackoff = time.Second * 3
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type OIDCOptions struct {
-	IssuerURL     string
-	ClientID      string
-	CAFile        string
-	UsernameClaim string
-	GroupsClaim   string
+	// IssuerURL is the URL the provider signs ID Tokens as. This will be the "iss"
+	// field of all tokens produced by the provider and is used for configuration
+	// discovery.
+	//
+	// The URL is usually the provider's URL without a path, for example
+	// "https://accounts.google.com" or "https://login.salesforce.com".
+	//
+	// The provider must implement configuration discovery.
+	// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
+	IssuerURL string
 
-	// 0 disables retry
-	MaxRetries   int
-	RetryBackoff time.Duration
+	// ClientID the JWT must be issued for, the "sub" field. This plugin only trusts a single
+	// client to ensure the plugin can be used with public providers.
+	//
+	// The plugin supports the "authorized party" OpenID Connect claim, which allows
+	// specialized providers to issue tokens to a client for a different client.
+	// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+	ClientID string
+
+	// Path to a PEM encoded root certificate of the provider.
+	CAFile string
+
+	// UsernameClaim is the JWT field to use as the user's username.
+	UsernameClaim string
+
+	// GroupsClaim, if specified, causes the OIDCAuthenticator to try to populate the user's
+	// groups with a ID Token field. If the GrouppClaim field is present in a ID Token the value
+	// must be a list of strings.
+	GroupsClaim string
 }
 
 type OIDCAuthenticator struct {
-	clientConfig     oidc.ClientConfig
-	client           *oidc.Client
-	usernameClaim    string
-	groupsClaim      string
-	stopSyncProvider chan struct{}
-	maxRetries       int
-	retryBackoff     time.Duration
+	issuerURL string
+
+	trustedClientID string
+
+	usernameClaim string
+	groupsClaim   string
+
+	httpClient *http.Client
+
+	// Contains an *oidc.Client. Do not access directly. Use client() method.
+	oidcClient atomic.Value
+
+	// Guards the close method and is used to lock during initialization and closing.
+	mu    sync.Mutex
+	close func() // May be nil
 }
 
-// New creates a new OpenID Connect client with the given issuerURL and clientID.
-// NOTE(yifan): For now we assume the server provides the "jwks_uri" so we don't
-// need to manager the key sets by ourselves.
+// New creates a token authenticator which validates OpenID Connect ID Tokens.
 func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
-	var cfg oidc.ProviderConfig
-	var err error
-	var roots *x509.CertPool
-
 	url, err := url.Parse(opts.IssuerURL)
 	if err != nil {
 		return nil, err
@@ -78,14 +107,18 @@ func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
 		return nil, fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", opts.IssuerURL, url.Scheme)
 	}
 
+	if opts.UsernameClaim == "" {
+		return nil, errors.New("no username claim provided")
+	}
+
+	var roots *x509.CertPool
 	if opts.CAFile != "" {
 		roots, err = crypto.CertPoolFromFile(opts.CAFile)
 		if err != nil {
-			glog.Errorf("Failed to read the CA file: %v", err)
+			return nil, fmt.Errorf("Failed to read the CA file: %v", err)
 		}
-	}
-	if roots == nil {
-		glog.Info("No x509 certificates provided, will use host's root CA set")
+	} else {
+		glog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
 	}
 
 	// Copied from http.DefaultTransport.
@@ -95,61 +128,86 @@ func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
 		TLSClientConfig: &tls.Config{RootCAs: roots},
 	})
 
-	hc := &http.Client{}
-	hc.Transport = tr
-
-	maxRetries := opts.MaxRetries
-	if maxRetries < 0 {
-		maxRetries = DefaultRetries
-	}
-	retryBackoff := opts.RetryBackoff
-	if retryBackoff < 0 {
-		retryBackoff = DefaultBackoff
+	authenticator := &OIDCAuthenticator{
+		issuerURL:       opts.IssuerURL,
+		trustedClientID: opts.ClientID,
+		usernameClaim:   opts.UsernameClaim,
+		groupsClaim:     opts.GroupsClaim,
+		httpClient:      &http.Client{Transport: tr},
 	}
 
-	for i := 0; i <= maxRetries; i++ {
-		if i == maxRetries {
-			return nil, fmt.Errorf("failed to fetch provider config after %v retries", maxRetries)
-		}
+	// Attempt to initialize the authenticator asynchronously.
+	//
+	// Ignore errors instead of returning it since the OpenID Connect provider might not be
+	// available yet, for instance if it's running on the cluster and needs the API server
+	// to come up first. Errors will be logged within the client() method.
+	go func() {
+		defer runtime.HandleCrash()
+		authenticator.client()
+	}()
 
-		cfg, err = oidc.FetchProviderConfig(hc, strings.TrimSuffix(opts.IssuerURL, "/"))
-		if err == nil {
-			break
-		}
-		glog.Errorf("Failed to fetch provider config, trying again in %v: %v", retryBackoff, err)
-		time.Sleep(retryBackoff)
+	return authenticator, nil
+}
+
+// Close stops all goroutines used by the authenticator.
+func (a *OIDCAuthenticator) Close() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.close != nil {
+		a.close()
+	}
+	return
+}
+
+func (a *OIDCAuthenticator) client() (*oidc.Client, error) {
+	// Fast check to see if client has already been initialized.
+	if client := a.oidcClient.Load(); client != nil {
+		return client.(*oidc.Client), nil
 	}
 
-	glog.Infof("Fetched provider config from %s: %#v", opts.IssuerURL, cfg)
-
-	ccfg := oidc.ClientConfig{
-		HTTPClient:     hc,
-		Credentials:    oidc.ClientCredentials{ID: opts.ClientID},
-		ProviderConfig: cfg,
+	// Acquire lock, then recheck initialization.
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if client := a.oidcClient.Load(); client != nil {
+		return client.(*oidc.Client), nil
 	}
 
-	client, err := oidc.NewClient(ccfg)
+	// Try to initialize client.
+	providerConfig, err := oidc.FetchProviderConfig(a.httpClient, strings.TrimSuffix(a.issuerURL, "/"))
 	if err != nil {
-		return nil, err
+		glog.Errorf("oidc authenticator: failed to fetch provider discovery data: %v", err)
+		return nil, fmt.Errorf("fetch provider config: %v", err)
+	}
+
+	clientConfig := oidc.ClientConfig{
+		HTTPClient:     a.httpClient,
+		Credentials:    oidc.ClientCredentials{ID: a.trustedClientID},
+		ProviderConfig: providerConfig,
+	}
+
+	client, err := oidc.NewClient(clientConfig)
+	if err != nil {
+		glog.Errorf("oidc authenticator: failed to create client: %v", err)
+		return nil, fmt.Errorf("create client: %v", err)
 	}
 
 	// SyncProviderConfig will start a goroutine to periodically synchronize the provider config.
 	// The synchronization interval is set by the expiration length of the config, and has a mininum
 	// and maximum threshold.
-	stop := client.SyncProviderConfig(opts.IssuerURL)
-
-	return &OIDCAuthenticator{
-		ccfg,
-		client,
-		opts.UsernameClaim,
-		opts.GroupsClaim,
-		stop,
-		maxRetries,
-		retryBackoff,
-	}, nil
+	stop := client.SyncProviderConfig(a.issuerURL)
+	a.oidcClient.Store(client)
+	a.close = func() {
+		// This assumes the stop is an unbuffered channel.
+		// So instead of closing the channel, we send am empty struct here.
+		// This guarantees that when this function returns, there is no flying requests,
+		// because a send to an unbuffered channel happens after the receive from the channel.
+		stop <- struct{}{}
+	}
+	return client, nil
 }
 
-// AuthenticateToken decodes and verifies a JWT using the OIDC client, if the verification succeeds,
+// AuthenticateToken decodes and verifies a ID Token using the OIDC client, if the verification succeeds,
 // then it will extract the user info from the JWT claims.
 func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
 	jwt, err := jose.ParseJWT(value)
@@ -157,7 +215,11 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 		return nil, false, err
 	}
 
-	if err := a.client.VerifyJWT(jwt); err != nil {
+	client, err := a.client()
+	if err != nil {
+		return nil, false, err
+	}
+	if err := client.VerifyJWT(jwt); err != nil {
 		return nil, false, err
 	}
 
@@ -181,7 +243,7 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 		username = claim
 	default:
 		// For all other cases, use issuerURL + claim as the user name.
-		username = fmt.Sprintf("%s#%s", a.clientConfig.ProviderConfig.Issuer, claim)
+		username = fmt.Sprintf("%s#%s", a.issuerURL, claim)
 	}
 
 	// TODO(yifan): Add UID, also populate the issuer to upper layer.
@@ -198,13 +260,4 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 		}
 	}
 	return info, true, nil
-}
-
-// Close closes the OIDC authenticator, this will close the provider sync goroutine.
-func (a *OIDCAuthenticator) Close() {
-	// This assumes the s.stopSyncProvider is an unbuffered channel.
-	// So instead of closing the channel, we send am empty struct here.
-	// This guarantees that when this function returns, there is no flying requests,
-	// because a send to an unbuffered channel happens after the receive from the channel.
-	a.stopSyncProvider <- struct{}{}
 }
