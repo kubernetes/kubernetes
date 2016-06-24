@@ -309,16 +309,13 @@ func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFunc
 		return isConvertible(in, out.Underlying, manualConversions)
 	}
 
+	if in == out {
+		return true
+	}
 	if in.Kind != out.Kind {
 		return false
 	}
 	switch in.Kind {
-	case types.Builtin, types.Struct, types.Map, types.Slice, types.Pointer:
-	default:
-		// We don't support conversion of other types yet.
-		return false
-	}
-	switch out.Kind {
 	case types.Builtin, types.Struct, types.Map, types.Slice, types.Pointer:
 	default:
 		// We don't support conversion of other types yet.
