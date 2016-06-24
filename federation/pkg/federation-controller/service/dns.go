@@ -172,6 +172,7 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			if uplevelCname != "" {
 				glog.V(4).Infof("Creating CNAME to %q for %q", uplevelCname, dnsName)
 				newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
+				glog.V(4).Infof("Adding recordset %v", newRrset)
 				rrset, err = rrsets.Add(newRrset)
 				if err != nil {
 					return err
@@ -199,7 +200,7 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 		}
 	} else {
 		// the rrset already exists, so make it right.
-		glog.V(4).Infof("Recordset %v already exists.  Ensuring that it is correct.")
+		glog.V(4).Infof("Recordset %v already exists.  Ensuring that it is correct.", rrset)
 		if len(endpoints) < 1 {
 			// Need an appropriate CNAME record.  Check that we have it.
 			newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
