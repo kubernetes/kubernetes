@@ -155,14 +155,15 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	var err error
 $range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(&configShallowCopy)
 	if err!=nil {
-		return &clientset, err
+		return nil, err
 	}
 $end$
 	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
 	if err!=nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+		return nil, err
 	}
-	return &clientset, err
+	return &clientset, nil
 }
 `
 
