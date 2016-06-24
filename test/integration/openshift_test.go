@@ -37,5 +37,5 @@ func TestMasterExportsSymbols(t *testing.T) {
 	m := &master.Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
-	_ = (m).NewBootstrapController()
+	_ = (m).NewBootstrapController(master.EndpointReconcilerConfig{})
 }
