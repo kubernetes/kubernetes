@@ -95,9 +95,8 @@ label is required for that non-master PR.
 
 ### Reviewing pre-release notes
 
-**NOTE: THIS TOOLING IS NOT YET AVAILABLE, BUT COMING SOON!**
-
 At any time, you can see what the release notes will look like on any branch.
+(NOTE: This only works on Linux for now)
 
 ```
 $ git pull https://github.com/kubernetes/release
@@ -105,7 +104,7 @@ $ RELNOTES=$PWD/release/relnotes
 $ cd /to/your/kubernetes/repo
 $ $RELNOTES -man # for details on how to use the tool
 # Show release notes from the last release on a branch to HEAD
-$ $RELNOTES --raw --branch=master
+$ $RELNOTES --branch=master
 ```
 
 ## Visual overview
