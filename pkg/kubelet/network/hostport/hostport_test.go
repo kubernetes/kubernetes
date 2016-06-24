@@ -185,7 +185,7 @@ func TestOpenPodHostports(t *testing.T) {
 		})
 	}
 
-	err := h.OpenPodHostportsAndSync(tests[0].pod, "br0", runningPods)
+	err := h.OpenPodHostportsAndSync(&RunningPod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", runningPods)
 	if err != nil {
 		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
 	}
