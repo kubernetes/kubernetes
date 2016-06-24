@@ -675,22 +675,38 @@ func getSkyMsg(ip string, port int) (*skymsg.Service, string) {
 //   *.mysvc.myns.myfederation.svc.domain.path as non-federation queries.
 //   We can add support for wildcard queries later, if needed.
 func (kd *KubeDNS) isFederationQuery(path []string) bool {
-	if len(path) == 4+len(kd.domainPath) &&
-		len(validation.IsDNS952Label(path[0])) == 0 &&
-		len(validation.IsDNS1123Label(path[1])) == 0 &&
-		len(validation.IsDNS1123Label(path[2])) == 0 &&
-		path[3] == serviceSubdomain {
-		for i, domComp := range kd.domainPath {
-			// kd.domainPath is reversed, so we need to look in the `path` in the reverse order.
-			if domComp != path[len(path)-i-1] {
-				return false
-			}
-		}
-		if _, ok := kd.federations[path[2]]; ok {
-			return true
+	if len(path) != 4+len(kd.domainPath) {
+		glog.V(2).Infof("not a federation query: len(%q) != 4+len(%q)", path, kd.domainPath)
+		return false
+	}
+	if errs := validation.IsDNS952Label(path[0]); len(errs) != 0 {
+		glog.V(2).Infof("not a federation query: %q is not an RFC 952 label: %q", path[0], errs)
+		return false
+	}
+	if errs := validation.IsDNS1123Label(path[1]); len(errs) != 0 {
+		glog.V(2).Infof("not a federation query: %q is not an RFC 1123 label: %q", path[1], errs)
+		return false
+	}
+	if errs := validation.IsDNS1123Label(path[2]); len(errs) != 0 {
+		glog.V(2).Infof("not a federation query: %q is not an RFC 1123 label: %q", path[2], errs)
+		return false
+	}
+	if path[3] != serviceSubdomain {
+		glog.V(2).Infof("not a federation query: %q != %q (serviceSubdomain)", path[3], serviceSubdomain)
+		return false
+	}
+	for i, domComp := range kd.domainPath {
+		// kd.domainPath is reversed, so we need to look in the `path` in the reverse order.
+		if domComp != path[len(path)-i-1] {
+			glog.V(2).Infof("not a federation query: kd.domainPath[%d] != path[%d] (%q != %q)", i, len(path)-i-1, domComp, path[len(path)-i-1])
+			return false
 		}
 	}
-	return false
+	if _, ok := kd.federations[path[2]]; !ok {
+		glog.V(2).Infof("not a federation query: kd.federations[%q] not found", path[2])
+		return false
+	}
+	return true
 }
 
 // federationRecords checks if the given `queryPath` is for a federated service and if it is,
