@@ -58,6 +58,51 @@
     ]
    },
    {
+    "path": "/api/v1/bindings",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.Binding",
+      "method": "POST",
+      "summary": "create a Binding",
+      "nickname": "createNamespacedBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Binding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Binding"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/componentstatuses",
     "description": "API at /api/v1",
     "operations": [
@@ -880,6 +925,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1.ConfigMap",
+      "method": "POST",
+      "summary": "create a ConfigMap",
+      "nickname": "createNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.ConfigMap",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -1652,6 +1736,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.EndpointsList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Endpoints",
+      "method": "POST",
+      "summary": "create a Endpoints",
+      "nickname": "createNamespacedEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Endpoints"
        }
       ],
       "produces": [
@@ -2444,6 +2567,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1.Event",
+      "method": "POST",
+      "summary": "create a Event",
+      "nickname": "createNamespacedEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -3216,6 +3378,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.LimitRangeList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.LimitRange",
+      "method": "POST",
+      "summary": "create a LimitRange",
+      "nickname": "createNamespacedLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.LimitRange",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.LimitRange"
        }
       ],
       "produces": [
@@ -6197,6 +6398,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1.PersistentVolumeClaim",
+      "method": "POST",
+      "summary": "create a PersistentVolumeClaim",
+      "nickname": "createNamespacedPersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.PersistentVolumeClaim",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PersistentVolumeClaim"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -8260,6 +8500,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1.Pod",
+      "method": "POST",
+      "summary": "create a Pod",
+      "nickname": "createNamespacedPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Pod"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -10275,6 +10554,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1.PodTemplate",
+      "method": "POST",
+      "summary": "create a PodTemplate",
+      "nickname": "createNamespacedPodTemplate",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.PodTemplate",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.PodTemplate"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -11047,6 +11365,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.ReplicationControllerList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.ReplicationController",
+      "method": "POST",
+      "summary": "create a ReplicationController",
+      "nickname": "createNamespacedReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ReplicationController"
        }
       ],
       "produces": [
@@ -12169,6 +12526,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1.ResourceQuota",
+      "method": "POST",
+      "summary": "create a ResourceQuota",
+      "nickname": "createNamespacedResourceQuota",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.ResourceQuota",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ResourceQuota"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -13116,6 +13512,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1.Secret",
+      "method": "POST",
+      "summary": "create a Secret",
+      "nickname": "createNamespacedSecret",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Secret",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Secret"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -13175,6 +13610,561 @@
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
         "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "*versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/securitycontextconstraints",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.SecurityContextConstraintsList",
+      "method": "GET",
+      "summary": "list or watch objects of kind SecurityContextConstraints",
+      "nickname": "listSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.SecurityContextConstraintsList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.SecurityContextConstraints",
+      "method": "POST",
+      "summary": "create a SecurityContextConstraints",
+      "nickname": "createSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.SecurityContextConstraints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.SecurityContextConstraints"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete collection of SecurityContextConstraints",
+      "nickname": "deletecollectionSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/securitycontextconstraints",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "*versioned.Event",
+      "method": "GET",
+      "summary": "watch individual changes to a list of SecurityContextConstraints",
+      "nickname": "watchSecurityContextConstraintsList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "*versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/securitycontextconstraints/{name}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.SecurityContextConstraints",
+      "method": "GET",
+      "summary": "read the specified SecurityContextConstraints",
+      "nickname": "readSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the SecurityContextConstraints",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.SecurityContextConstraints"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.SecurityContextConstraints",
+      "method": "PUT",
+      "summary": "replace the specified SecurityContextConstraints",
+      "nickname": "replaceSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.SecurityContextConstraints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the SecurityContextConstraints",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.SecurityContextConstraints"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.SecurityContextConstraints",
+      "method": "PATCH",
+      "summary": "partially update the specified SecurityContextConstraints",
+      "nickname": "patchSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the SecurityContextConstraints",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.SecurityContextConstraints"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete a SecurityContextConstraints",
+      "nickname": "deleteSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the SecurityContextConstraints",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/securitycontextconstraints/{name}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "*versioned.Event",
+      "method": "GET",
+      "summary": "watch changes to an object of kind SecurityContextConstraints",
+      "nickname": "watchSecurityContextConstraints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the SecurityContextConstraints",
+        "required": true,
         "allowMultiple": false
        }
       ],
@@ -13888,6 +14878,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.ServiceAccountList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.ServiceAccount",
+      "method": "POST",
+      "summary": "create a ServiceAccount",
+      "nickname": "createNamespacedServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.ServiceAccount",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ServiceAccount"
        }
       ],
       "produces": [
@@ -15003,6 +16032,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.ServiceList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Service",
+      "method": "POST",
+      "summary": "create a Service",
+      "nickname": "createNamespacedService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Service"
        }
       ],
       "produces": [
@@ -17733,6 +18801,10 @@
       "type": "object",
       "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md"
      },
+     "host": {
+      "type": "string",
+      "description": "A request to schedule this pod onto a specific node Deprecated: Use nodeName instead."
+     },
      "serviceAccountName": {
       "type": "string",
       "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md"
@@ -17868,6 +18940,10 @@
      "vsphereVolume": {
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "metadata": {
+      "$ref": "v1.DeprecatedDownwardAPIVolumeSource",
+      "description": "Metadata represents metadata about the pod that should populate this volume Deprecated: Use downwardAPI instead."
      }
     }
    },
@@ -18040,6 +19116,40 @@
        "$ref": "v1.KeyToPath"
       },
       "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'."
+     }
+    }
+   },
+   "v1.DeprecatedDownwardAPIVolumeSource": {
+    "id": "v1.DeprecatedDownwardAPIVolumeSource",
+    "description": "DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info. This type is deprecated and should be replaced by use of the downwardAPI volume source.",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.DeprecatedDownwardAPIVolumeFile"
+      },
+      "description": "Items is a list of downward API volume file"
+     }
+    }
+   },
+   "v1.DeprecatedDownwardAPIVolumeFile": {
+    "id": "v1.DeprecatedDownwardAPIVolumeFile",
+    "description": "DeprecatedDownwardAPIVolumeFile represents information to create the file containing the pod field This type is deprecated and should be replaced by use of the downwardAPI volume source.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Required: Name is the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'"
+     },
+     "fieldRef": {
+      "$ref": "v1.ObjectFieldSelector",
+      "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ResourceFieldSelector",
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
      }
     }
    },
@@ -19096,6 +20206,247 @@
      }
     }
    },
+   "v1.SecurityContextConstraintsList": {
+    "id": "v1.SecurityContextConstraintsList",
+    "description": "SecurityContextConstraintsList is a list of SecurityContextConstraints objects",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.SecurityContextConstraints"
+      }
+     }
+    }
+   },
+   "v1.SecurityContextConstraints": {
+    "id": "v1.SecurityContextConstraints",
+    "description": "SecurityContextConstraints governs the ability to make requests that affect the SecurityContext that will be applied to a container.",
+    "required": [
+     "priority",
+     "allowPrivilegedContainer",
+     "defaultAddCapabilities",
+     "requiredDropCapabilities",
+     "allowedCapabilities",
+     "allowHostDirVolumePlugin",
+     "volumes",
+     "allowHostNetwork",
+     "allowHostPorts",
+     "allowHostPID",
+     "allowHostIPC",
+     "readOnlyRootFilesystem"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "priority": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Priority influences the sort order of SCCs when evaluating which SCCs to try first for a given pod request based on access in the Users and Groups fields.  The higher the int, the higher priority.  If scores for multiple SCCs are equal they will be sorted by name."
+     },
+     "allowPrivilegedContainer": {
+      "type": "boolean",
+      "description": "AllowPrivilegedContainer determines if a container can request to be run as privileged."
+     },
+     "defaultAddCapabilities": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Capability"
+      },
+      "description": "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities."
+     },
+     "requiredDropCapabilities": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Capability"
+      },
+      "description": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added."
+     },
+     "allowedCapabilities": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Capability"
+      },
+      "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field maybe added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities."
+     },
+     "allowHostDirVolumePlugin": {
+      "type": "boolean",
+      "description": "AllowHostDirVolumePlugin determines if the policy allow containers to use the HostDir volume plugin"
+     },
+     "volumes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.FSType"
+      },
+      "description": "Volumes is a white list of allowed volume plugins.  FSType corresponds directly with the field names of a VolumeSource (azureFile, configMap, emptyDir).  To allow all volumes you may use '*'."
+     },
+     "allowHostNetwork": {
+      "type": "boolean",
+      "description": "AllowHostNetwork determines if the policy allows the use of HostNetwork in the pod spec."
+     },
+     "allowHostPorts": {
+      "type": "boolean",
+      "description": "AllowHostPorts determines if the policy allows host ports in the containers."
+     },
+     "allowHostPID": {
+      "type": "boolean",
+      "description": "AllowHostPID determines if the policy allows host pid in the containers."
+     },
+     "allowHostIPC": {
+      "type": "boolean",
+      "description": "AllowHostIPC determines if the policy allows host ipc in the containers."
+     },
+     "seLinuxContext": {
+      "$ref": "v1.SELinuxContextStrategyOptions",
+      "description": "SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext."
+     },
+     "runAsUser": {
+      "$ref": "v1.RunAsUserStrategyOptions",
+      "description": "RunAsUser is the strategy that will dictate what RunAsUser is used in the SecurityContext."
+     },
+     "supplementalGroups": {
+      "$ref": "v1.SupplementalGroupsStrategyOptions",
+      "description": "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext."
+     },
+     "fsGroup": {
+      "$ref": "v1.FSGroupStrategyOptions",
+      "description": "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext."
+     },
+     "readOnlyRootFilesystem": {
+      "type": "boolean",
+      "description": "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the SCC should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to."
+     },
+     "users": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "The users who have permissions to use this security context constraints"
+     },
+     "groups": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "The groups that have permission to use this security context constraints"
+     }
+    }
+   },
+   "v1.FSType": {
+    "id": "v1.FSType",
+    "properties": {}
+   },
+   "v1.SELinuxContextStrategyOptions": {
+    "id": "v1.SELinuxContextStrategyOptions",
+    "description": "SELinuxContextStrategyOptions defines the strategy type and any options used to create the strategy.",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type is the strategy that will dictate what SELinux context is used in the SecurityContext."
+     },
+     "seLinuxOptions": {
+      "$ref": "v1.SELinuxOptions",
+      "description": "seLinuxOptions required to run as; required for MustRunAs"
+     }
+    }
+   },
+   "v1.RunAsUserStrategyOptions": {
+    "id": "v1.RunAsUserStrategyOptions",
+    "description": "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type is the strategy that will dictate what RunAsUser is used in the SecurityContext."
+     },
+     "uid": {
+      "type": "integer",
+      "format": "int64",
+      "description": "UID is the user id that containers must run as.  Required for the MustRunAs strategy if not using namespace/service account allocated uids."
+     },
+     "uidRangeMin": {
+      "type": "integer",
+      "format": "int64",
+      "description": "UIDRangeMin defines the min value for a strategy that allocates by range."
+     },
+     "uidRangeMax": {
+      "type": "integer",
+      "format": "int64",
+      "description": "UIDRangeMax defines the max value for a strategy that allocates by range."
+     }
+    }
+   },
+   "v1.SupplementalGroupsStrategyOptions": {
+    "id": "v1.SupplementalGroupsStrategyOptions",
+    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type is the strategy that will dictate what supplemental groups is used in the SecurityContext."
+     },
+     "ranges": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.IDRange"
+      },
+      "description": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end."
+     }
+    }
+   },
+   "v1.IDRange": {
+    "id": "v1.IDRange",
+    "description": "IDRange provides a min/max of an allowed range of IDs.",
+    "properties": {
+     "min": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Min is the start of the range, inclusive."
+     },
+     "max": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Max is the end of the range, inclusive."
+     }
+    }
+   },
+   "v1.FSGroupStrategyOptions": {
+    "id": "v1.FSGroupStrategyOptions",
+    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type is the strategy that will dictate what FSGroup is used in the SecurityContext."
+     },
+     "ranges": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.IDRange"
+      },
+      "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end."
+     }
+    }
+   },
    "v1.ServiceAccountList": {
     "id": "v1.ServiceAccountList",
     "description": "ServiceAccountList is a list of ServiceAccount objects",
@@ -19227,6 +20578,10 @@
      "selector": {
       "type": "object",
       "description": "This service will route traffic to pods having labels matching this selector. Label keys and values that must match in order to receive traffic for this service. If empty, all pods are selected, if not specified, endpoints must be manually specified. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview"
+     },
+     "portalIP": {
+      "type": "string",
+      "description": "The IP Address of the service. Deprecated: Use clusterIP instead."
      },
      "clusterIP": {
       "type": "string",
