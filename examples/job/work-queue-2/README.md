@@ -58,7 +58,7 @@ Here is an overview of the steps in this example:
 ## Starting Redis
 
 For this example, for simplicitly, we will start a single instance of Redis.
-See the [Redis Example](../../../examples/redis/README.md) for an example
+See the [Redis Example](../../../examples/storage/redis/README.md) for an example
 of deploying Redis scaleably and redundantly.
 
 Start a temporary Pod running Redis and a service so we can find it.

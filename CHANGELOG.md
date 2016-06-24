@@ -737,7 +737,7 @@ container in the pod will run with the FSGroup as a supplemental group
 Pod’s SELinux context, if specified
   * A stable client library release\_1\_2 is added. The library is [here](pkg/client/clientset_generated/release_1_2/), and detailed doc is [here](docs/devel/generating-clientset.md#released-clientsets). We will keep the interface of this go client stable.
   * New Azure File Service Volume Plugin enables mounting Microsoft Azure File
-Volumes (SMB 2.1 and 3.0) into a Pod. See [example](https://github.com/kubernetes/kubernetes/blob/release-1.2/examples/azure_file/README.md) for details.
+Volumes (SMB 2.1 and 3.0) into a Pod. See [example](https://github.com/kubernetes/kubernetes/blob/release-1.2/examples/volumes/azure_file/README.md) for details.
   * Logs usage and root filesystem usage of a container, volumes usage of a pod and node disk usage are exposed through Kubelet new metrics API.
 
 ### Experimental Features
@@ -766,7 +766,7 @@ by Kubernetes. Changes were introduced in PR [#13580](https://github.com/kuberne
 or GA.
   * New Flex Volume Plugin enables users to use out-of-process volume plugins that
 are installed to “/usr/libexec/kubernetes/kubelet-plugins/volume/exec/” on
-every node, instead of being compiled into the Kubernetes binary. See [example](examples/flexvolume/README.md) for details.
+every node, instead of being compiled into the Kubernetes binary. See [example](examples/volumes/flexvolume/README.md) for details.
   * vendor volumes into a pod. It expects vendor drivers are installed in the
 volume plugin path on each kubelet node. This is an alpha feature and may
 change in future.
