@@ -18,7 +18,7 @@ spec:
       requests:
         # Any change here should be accompanied by a proportional change in CPU
         # requests of other per-node add-ons (e.g. kube-proxy).
-        cpu: 80m
+        cpu: 100m
         memory: 200Mi
     env:
     - name: FLUENTD_ARGS
