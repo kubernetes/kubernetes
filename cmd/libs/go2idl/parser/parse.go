@@ -337,7 +337,13 @@ func (b *Builder) typeCheckPackage(id string) (*tc.Package, error) {
 
 func (b *Builder) makePackages() error {
 	b.pkgs = map[string]*tc.Package{}
+
+	// Take a snapshot to iterate, since this will recursively mutate b.parsed.
+	keys := []string{}
 	for id := range b.parsed {
+		keys = append(keys, id)
+	}
+	for _, id := range keys {
 		// We have to check here even though we made a new one above,
 		// because typeCheckPackage follows the import graph, which may
 		// cause a package to be filled before we get to it in this
