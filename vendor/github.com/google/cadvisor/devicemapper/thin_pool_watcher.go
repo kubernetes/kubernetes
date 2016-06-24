@@ -150,8 +150,8 @@ func (w *ThinPoolWatcher) Refresh() error {
 }
 
 const (
-	thinPoolDmsetupStatusTokens           = 11
 	thinPoolDmsetupStatusHeldMetadataRoot = 6
+	thinPoolDmsetupStatusMinFields        = thinPoolDmsetupStatusHeldMetadataRoot + 1
 )
 
 // checkReservation checks to see whether the thin device is currently holding
@@ -163,14 +163,14 @@ func (w *ThinPoolWatcher) checkReservation(poolName string) (bool, error) {
 		return false, err
 	}
 
-	tokens := strings.Split(string(output), " ")
-	// Split returns the input as the last item in the result, adjust the
-	// number of tokens by one
-	if len(tokens) != thinPoolDmsetupStatusTokens+1 {
-		return false, fmt.Errorf("unexpected output of dmsetup status command; expected 11 fields, got %v; output: %v", len(tokens), string(output))
+	// we care about the field at fields[thinPoolDmsetupStatusHeldMetadataRoot],
+	// so make sure we get enough fields
+	fields := strings.Fields(string(output))
+	if len(fields) < thinPoolDmsetupStatusMinFields {
+		return false, fmt.Errorf("unexpected output of dmsetup status command; expected at least %d fields, got %v; output: %v", thinPoolDmsetupStatusMinFields, len(fields), string(output))
 	}
 
-	heldMetadataRoot := tokens[thinPoolDmsetupStatusHeldMetadataRoot]
+	heldMetadataRoot := fields[thinPoolDmsetupStatusHeldMetadataRoot]
 	currentlyReserved := heldMetadataRoot != "-"
 	return currentlyReserved, nil
 }
