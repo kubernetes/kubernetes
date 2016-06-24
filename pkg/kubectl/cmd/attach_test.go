@@ -79,7 +79,15 @@ func TestPodAndContainerAttach(t *testing.T) {
 			expectedContainer: "bar",
 			name:              "container in flag",
 		},
+		{
+			p:                 &AttachOptions{ContainerName: "initfoo"},
+			args:              []string{"foo"},
+			expectedPod:       "foo",
+			expectedContainer: "initfoo",
+			name:              "init container in flag",
+		},
 	}
+
 	for _, test := range tests {
 		f, tf, codec := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
@@ -269,6 +277,11 @@ func attachPod() *api.Pod {
 			Containers: []api.Container{
 				{
 					Name: "bar",
+				},
+			},
+			InitContainers: []api.Container{
+				{
+					Name: "initfoo",
 				},
 			},
 		},
