@@ -253,7 +253,7 @@ function do-node-upgrade() {
         echo "Rolling update ${update} is ${result} state and finished."
         break
       fi
-      echo "Rolling update ${update} is stil in ${result} state."
+      echo "Rolling update ${update} is still in ${result} state."
       sleep 10
     done
   done
