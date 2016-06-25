@@ -1772,35 +1772,35 @@ __EOF__
   # Command
   # Create a deployment (revision 1)
   kubectl create -f hack/testdata/deployment-revision1.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1 - should be no-op
-  kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Update the deployment (revision 2)
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1
-  kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]}"
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1000000 - should be no-op
-  kubectl rollout undo deployment nginx-deployment --to-revision=1000000 "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to last revision
-  kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx "${kube_flags[@]}"
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Pause the deployment
-  kubectl-with-retry rollout pause deployment nginx-deployment "${kube_flags[@]}"
+  kubectl-with-retry rollout pause deployment nginx "${kube_flags[@]}"
   # A paused deployment cannot be rolled back
-  ! kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  ! kubectl rollout undo deployment nginx "${kube_flags[@]}"
   # Resume the deployment
-  kubectl-with-retry rollout resume deployment nginx-deployment "${kube_flags[@]}"
+  kubectl-with-retry rollout resume deployment nginx "${kube_flags[@]}"
   # The resumed deployment can now be rolled back
-  kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx "${kube_flags[@]}"
   # Clean up
-  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment nginx "${kube_flags[@]}"
 
   ### Set image of a deployment 
   # Pre-condition: no deployment exists
