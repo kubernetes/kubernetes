@@ -139,14 +139,14 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
 		return
 	}
-	volumeList, ok := volumeListObj.(*api.List)
+	volumeList, ok := volumeListObj.(*api.PersistentVolumeList)
 	if !ok {
 		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of volumes, got: %+v", volumeListObj)
 		return
 	}
 	for _, volume := range volumeList.Items {
 		// Ignore template volumes from kubernetes 1.2
-		deleted := ctrl.upgradeVolumeFrom1_2(volume.(*api.PersistentVolume))
+		deleted := ctrl.upgradeVolumeFrom1_2(&volume)
 		if !deleted {
 			storeObjectUpdate(ctrl.volumes.store, volume, "volume")
 		}
@@ -157,9 +157,9 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
 		return
 	}
-	claimList, ok := claimListObj.(*api.List)
+	claimList, ok := claimListObj.(*api.PersistentVolumeClaimList)
 	if !ok {
-		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of claims, got: %+v", volumeListObj)
+		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of claims, got: %+v", claimListObj)
 		return
 	}
 	for _, claim := range claimList.Items {
