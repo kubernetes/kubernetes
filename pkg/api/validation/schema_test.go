@@ -209,6 +209,7 @@ func TestInvalid(t *testing.T) {
 		"invalidPod1.json", // command is a string, instead of []string.
 		"invalidPod2.json", // hostPort if of type string, instead of int.
 		"invalidPod3.json", // volumes is not an array of objects.
+		"invalidPod4.yaml", // string list with empty string.
 		"invalidPod.yaml",  // command is a string, instead of []string.
 	}
 	for _, test := range tests {
