@@ -281,7 +281,7 @@ EOF
 # $3: If non-empty then the DNS server IP to configure in each pod.
 # $4: If non-empty then added to each pod's domain search list.
 # $5: Pathname of the kubelet config file or directory.
-# $6: Whether or not we run kubelet in priviliged mode
+# $6: Whether or not we run kubelet in privileged mode
 # $7: If empty then flannel is used otherwise CNI is used.
 function create-kubelet-opts() {
   if [ -n "$7" ] ; then
@@ -477,7 +477,7 @@ function provision-master() {
       '${ADMISSION_CONTROL}' \
       '${SERVICE_NODE_PORT_RANGE}' \
       '${MASTER_IP}' \
-      '${ALLOW_PRIVILIGED}'
+      '${ALLOW_PRIVILEGED}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
