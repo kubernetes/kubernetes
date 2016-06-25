@@ -18,6 +18,8 @@ metadata:
   name: mock
 spec:
   replicas: 1
+  selector:
+    app: mock
   template:
     metadata:
       labels:
