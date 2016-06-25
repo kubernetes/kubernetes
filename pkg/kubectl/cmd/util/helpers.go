@@ -105,17 +105,22 @@ func fatal(msg string) {
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr(err, fatalErrHandler)
+	checkErr("", err, fatalErrHandler)
 }
 
-func checkErr(err error, handleErr func(string)) {
+// checkErrWithPrefix works like CheckErr, but adds a caller-defined prefix to non-nil errors
+func checkErrWithPrefix(prefix string, err error) {
+	checkErr(prefix, err, fatalErrHandler)
+}
+
+func checkErr(pref string, err error, handleErr func(string)) {
 	if err == nil {
 		return
 	}
 
 	if errors.IsInvalid(err) {
 		details := err.(*errors.StatusError).Status().Details
-		prefix := fmt.Sprintf("The %s %q is invalid.\n", details.Kind, details.Name)
+		prefix := fmt.Sprintf("%sThe %s %q is invalid.\n", pref, details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
 		handleErr(MultilineError(prefix, errs))
 	}
@@ -125,23 +130,23 @@ func checkErr(err error, handleErr func(string)) {
 
 		switch {
 		case len(noMatch.PartialResource.Group) > 0 && len(noMatch.PartialResource.Version) > 0:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Group, noMatch.PartialResource.Version))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q and version %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Group, noMatch.PartialResource.Version))
 		case len(noMatch.PartialResource.Group) > 0:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Group))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Group))
 		case len(noMatch.PartialResource.Version) > 0:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Version))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in version %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Version))
 		default:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q", noMatch.PartialResource.Resource))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q", pref, noMatch.PartialResource.Resource))
 		}
 		return
 	}
 
 	// handle multiline errors
 	if clientcmd.IsConfigurationInvalid(err) {
-		handleErr(MultilineError("Error in configuration: ", err))
+		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", pref), err))
 	}
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
-		handleErr(MultipleErrors("", agg.Errors()))
+		handleErr(MultipleErrors(pref, agg.Errors()))
 	}
 
 	msg, ok := StandardErrorMessage(err)
@@ -151,7 +156,7 @@ func checkErr(err error, handleErr func(string)) {
 			msg = fmt.Sprintf("error: %s", msg)
 		}
 	}
-	handleErr(msg)
+	handleErr(fmt.Sprintf("%s%s", pref, msg))
 }
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
