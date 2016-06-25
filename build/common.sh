@@ -960,7 +960,7 @@ function kube::release::package_kube_manifests_tarball() {
       FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
     fi
     if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-      sed -i 's/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/- --federations="'"${FEDERATIONS_DOMAIN_MAP}"'"/g' "${dst_dir}/dns/skydns-rc.yaml.in"
+      sed -i 's/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/- --federations='"${FEDERATIONS_DOMAIN_MAP}"'/g' "${dst_dir}/dns/skydns-rc.yaml.in"
     else
       sed -i '/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/d' "${dst_dir}/dns/skydns-rc.yaml.in"
     fi
