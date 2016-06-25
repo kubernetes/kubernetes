@@ -41,6 +41,14 @@ import (
 const (
 	// The revision annotation of a deployment's replica sets which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
+	// DesiredReplicasAnnotation is the desired replicas for a deployment recorded as an annotation
+	// in its replica sets. Helps in separating scaling events from the rollout process and for
+	// determining if the new replica set for a deployment is really saturated.
+	DesiredReplicasAnnotation = "deployment.kubernetes.io/desired-replicas"
+	// MaxReplicasAnnotation is the maximum replicas a deployment can have at a given point, which
+	// is deployment.spec.replicas + maxSurge. Used by the underlying replica sets to estimate their
+	// proportions in case the deployment has surge replicas.
+	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
 
 	// Here are the possible rollback event reasons
 	RollbackRevisionNotFound  = "DeploymentRollbackRevisionNotFound"
@@ -432,6 +440,21 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 	default:
 		return 0, fmt.Errorf("deployment type %v isn't supported", deployment.Spec.Strategy.Type)
 	}
+}
+
+// IsSaturated checks if the new replica set is saturated by comparing its size with its deployment size.
+// Both the deployment and the replica set have to believe this replica set can own all of the desired
+// replicas in the deployment and the annotation helps in achieving that.
+func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) bool {
+	if rs == nil {
+		return false
+	}
+	desiredString := rs.Annotations[DesiredReplicasAnnotation]
+	desired, err := strconv.Atoi(desiredString)
+	if err != nil {
+		return false
+	}
+	return rs.Spec.Replicas == deployment.Spec.Replicas && int32(desired) == deployment.Spec.Replicas
 }
 
 // Polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
