@@ -67,7 +67,9 @@ import (
 const (
 	DockerType = "docker"
 
-	minimumDockerAPIVersion = "1.20"
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	// docker verison should be at least 1.9.x
+	minimumDockerAPIVersion = "1.21"
 
 	// Remote API version for docker daemon version v1.10
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
