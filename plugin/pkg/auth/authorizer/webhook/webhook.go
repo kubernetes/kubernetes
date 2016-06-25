@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -160,6 +162,8 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 			return w.RestClient.Post().Body(r).Do()
 		})
 		if err := result.Error(); err != nil {
+			// An error here indicates bad configuration or an outage. Log for debugging.
+			glog.Errorf("Failed to make webhook authorizer request: %v", err)
 			return err
 		}
 		var statusCode int
