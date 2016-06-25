@@ -447,6 +447,7 @@ hairpin_mode: '$(echo "$HAIRPIN_MODE" | sed -e "s/'/''/g")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
+network_policy_provider: '$(echo "$NETWORK_POLICY_PROVIDER" | sed -e "s/'/''/g")'
 enable_manifest_url: '$(echo "${ENABLE_MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "${MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "${MANIFEST_URL_HEADER:-}" | sed -e "s/'/''/g")'
@@ -650,6 +651,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://kubernetes-master
     certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
