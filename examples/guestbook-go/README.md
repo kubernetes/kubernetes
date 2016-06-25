@@ -93,7 +93,7 @@ Use the `examples/guestbook-go/redis-master-controller.json` file to create a [r
 
     ```console
     me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-bz1p
-    
+
     me@kubernetes-minion-3:~$ sudo docker ps
     CONTAINER ID        IMAGE     COMMAND                  CREATED             STATUS
     d5c458dabe50        redis     "/entrypoint.sh redis"   5 minutes ago       Up 5 minutes
@@ -124,6 +124,32 @@ Services find the pods to load balance based on pod labels. The pod that you cre
     ```
 
     Result: All new pods will see the `redis-master` service running on the host (`$REDIS_MASTER_SERVICE_HOST` environment variable) at port 6379, or running on `redis-master:6379`. After the service is created, the service proxy on each node is configured to set up a proxy on the specified port (in our example, that's port 6379).
+
+    A service can map an incoming port to any `targetPort` in the backend pod.  Once created, the service proxy on each node is configured to set up a proxy on the specified port (in this case port 6379).
+
+`targetPort` will default to `port` if it is omitted in the configuration. For simplicity's sake, we omit it in the following configurations.
+
+The traffic flow from slaves to masters can be described in two steps, like so:
+
+  - A *redis slave* will connect to "port" on the *redis master service*
+  - Traffic will be forwarded from the service "port" (on the service node) to the  *targetPort* on the pod that the service listens to.
+
+#### Finding a service
+
+Kubernetes supports two primary modes of finding a service— environment variables and DNS.
+
+The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](../../docs/user-guide/services.md#environment-variables).
+
+An alternative is to use the [cluster's DNS service](../../docs/user-guide/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the service name.
+
+This example has been configured to use the DNS service by default.
+
+If your cluster does not have the DNS service enabled, then you can use environment variables by setting the
+`GET_HOSTS_FROM` env value in both
+`examples/guestbook-go/redis-slave-controller.json` and `examples/guestbook-go/guestbook-controller.json`
+from `dns` to `env` before you start up the app.
+(However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services by
+running `kubectl --namespace=kube-system get rc`, and looking for a controller prefixed `kube-dns`.)
 
 
 ### Step Three: Create the Redis slave pods <a id="step-three"></a>
@@ -229,14 +255,14 @@ This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni
     redis-master-xx4uv             1/1       Running   0          23m
     redis-slave-b6wj4              1/1       Running   0          6m
     redis-slave-iai40              1/1       Running   0          6m
-    ... 
+    ...
     ```
 
     Result: You see a single Redis master, two Redis slaves, and three guestbook pods.
 
 ### Step Six: Create the guestbook service <a id="step-six"></a>
 
-Just like the others, we create a service to group the guestbook pods but this time, to make the guestbook front-end externally visible, we specify `"type": "LoadBalancer"`.
+Just like the others, we create a service to group the guestbook pods but this time, to make the guestbook front-end externally visible, we specify `"type": "LoadBalancer"`. If your cluster doesn't have "LoadBalancer" specify `"type": "NodePort"` instead of `"type": LoadBalancer"`. You can also specify which node's port will be used by adding `"nodePort": <PortNumber>` above, or bellow, `"port":3000,`.
 
 1. Use the [guestbook-service.json](guestbook-service.json) file to create the guestbook service by running the `kubectl create -f` *`filename`* command:
 
