@@ -274,7 +274,6 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 	tests := []struct {
 		key                 string
-		name                string
 		ignoreNotFound      bool
 		precondition        *storage.Preconditions
 		expectNotFoundErr   bool
