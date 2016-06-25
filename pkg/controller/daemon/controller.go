@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -239,7 +240,7 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	go dsc.podController.Run(stopCh)
 	go dsc.nodeController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go wait.Until(dsc.worker, time.Second, stopCh)
+		go wait.Until(dsc.runWorker, time.Second, stopCh)
 	}
 
 	if dsc.internalPodInformer != nil {
@@ -251,19 +252,17 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	dsc.queue.ShutDown()
 }
 
-func (dsc *DaemonSetsController) worker() {
+func (dsc *DaemonSetsController) runWorker() {
 	for {
-		func() {
-			dsKey, quit := dsc.queue.Get()
-			if quit {
-				return
-			}
-			defer dsc.queue.Done(dsKey)
-			err := dsc.syncHandler(dsKey.(string))
-			if err != nil {
-				glog.Errorf("Error syncing daemon set with key %s: %v", dsKey.(string), err)
-			}
-		}()
+		dsKey, quit := dsc.queue.Get()
+		if quit {
+			continue
+		}
+		err := dsc.syncHandler(dsKey.(string))
+		if err != nil {
+			glog.Errorf("Error syncing daemon set with key %s: %v", dsKey.(string), err)
+		}
+		dsc.queue.Done(dsKey)
 	}
 }
 
