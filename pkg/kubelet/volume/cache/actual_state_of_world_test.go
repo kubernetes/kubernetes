@@ -31,7 +31,7 @@ import (
 func Test_AddVolume_Positive_NewVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr, nil)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -71,7 +71,7 @@ func Test_AddVolume_Positive_ExistingVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	devicePath := "fake/device/path"
-	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr, nil)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -114,7 +114,7 @@ func Test_AddVolume_Positive_ExistingVolume(t *testing.T) {
 func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr, nil)
 	devicePath := "fake/device/path"
 
 	pod := &api.Pod{
@@ -171,7 +171,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr, nil)
 	devicePath := "fake/device/path"
 
 	pod := &api.Pod{
@@ -232,7 +232,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr, nil)
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{

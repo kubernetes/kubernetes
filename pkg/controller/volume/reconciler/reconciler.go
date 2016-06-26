@@ -119,7 +119,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				glog.Infof("Checking if volume %+v is mounted on any node, currently reported on node %v", attachedVolume, attachedVolume.NodeName)
 				mounted, err := rc.nodeStatusUpdater.IsVolumeMounted(attachedVolume)
 				if err != nil {
-					glog.Errorf("Couldn't determine if volume %v is in use, assuming it is: %v", err)
+					glog.Errorf("Couldn't determine if volume %+v is in use, assuming it is: %v", attachedVolume, err)
 					continue
 				}
 				if !mounted {

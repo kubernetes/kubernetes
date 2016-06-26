@@ -273,6 +273,9 @@ func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 	if err != nil {
 		return err
 	}
+	if asw.kubeClient == nil {
+		return nil
+	}
 	// Update the node status in the apiserver because this will prevent
 	// the attach-detach controller from mutating the same volume.
 	// For the same reason, if this fails don't retry, because the
