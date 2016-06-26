@@ -51,7 +51,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
-	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr, nil)
 	kubeClient := createTestClient()
 	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
@@ -83,7 +83,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
-	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr, nil)
 	kubeClient := createTestClient()
 	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
@@ -150,7 +150,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
-	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr, nil)
 	kubeClient := createTestClient()
 	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
@@ -216,7 +216,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
-	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr, nil)
 	kubeClient := createTestClient()
 	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(
@@ -295,7 +295,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
-	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr, nil)
 	kubeClient := createTestClient()
 	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr)
 	reconciler := NewReconciler(

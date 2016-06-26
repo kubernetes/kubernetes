@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -154,11 +155,13 @@ type AttachedVolume struct {
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
 func NewActualStateOfWorld(
 	nodeName string,
-	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
+	volumePluginMgr *volume.VolumePluginMgr,
+	kubeClient internalclientset.Interface) ActualStateOfWorld {
 	return &actualStateOfWorld{
 		nodeName:        nodeName,
 		attachedVolumes: make(map[api.UniqueVolumeName]attachedVolume),
 		volumePluginMgr: volumePluginMgr,
+		kubeClient:      kubeClient,
 	}
 }
 
@@ -190,6 +193,7 @@ type actualStateOfWorld struct {
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
 	sync.RWMutex
+	kubeClient internalclientset.Interface
 }
 
 // attachedVolume represents a volume the kubelet volume manager believes to be
@@ -265,7 +269,42 @@ type mountedPod struct {
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 	volumeSpec *volume.Spec, nodeName string, devicePath string) error {
-	_, err := asw.AddVolume(volumeSpec, devicePath)
+	volumeName, err := asw.AddVolume(volumeSpec, devicePath)
+	if err != nil {
+		return err
+	}
+	if asw.kubeClient == nil {
+		return nil
+	}
+	// Update the node status in the apiserver because this will prevent
+	// the attach-detach controller from mutating the same volume.
+	// For the same reason, if this fails don't retry, because the
+	// attache-detach controller might've taken the lock. It could fail
+	// for different reasons, eg: kubelet status update; returning an error
+	// should cause the caller to retry.
+	if err := asw.addVolumeToNode(volumeName, nodeName); err != nil {
+		// Rollback the AddVolume above, if we can't record it on the node.
+		asw.MarkVolumeAsDetached(volumeName, nodeName)
+		return err
+	}
+	return nil
+}
+
+func (asw *actualStateOfWorld) addVolumeToNode(volumeName api.UniqueVolumeName, nodeName string) error {
+	node, err := asw.kubeClient.Core().Nodes().Get(nodeName)
+	if err != nil {
+		return fmt.Errorf("error getting node %q: %v", nodeName, err)
+	}
+	if node == nil {
+		return fmt.Errorf("No node instance returned for %q", nodeName)
+	}
+	for _, v := range node.Status.VolumesInUse {
+		if v == volumeName {
+			return nil
+		}
+	}
+	glog.Infof("Adding new volume %+v to node %v", volumeName, nodeName)
+	_, err = asw.kubeClient.Core().Nodes().UpdateStatus(node)
 	return err
 }
 

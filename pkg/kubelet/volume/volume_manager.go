@@ -120,12 +120,19 @@ func NewVolumeManager(
 	hostName string,
 	podManager pod.Manager,
 	kubeClient internalclientset.Interface,
-	volumePluginMgr *volume.VolumePluginMgr) (VolumeManager, error) {
+	volumePluginMgr *volume.VolumePluginMgr,
+	syncNodeStatus bool) (VolumeManager, error) {
+
+	glog.Infof("Creating new volume manager with hostname %v", hostName)
+	nodeClient := kubeClient
+	if !syncNodeStatus {
+		nodeClient = nil
+	}
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr),
-		actualStateOfWorld:  cache.NewActualStateOfWorld(hostName, volumePluginMgr),
+		actualStateOfWorld:  cache.NewActualStateOfWorld(hostName, volumePluginMgr, nodeClient),
 		operationExecutor: operationexecutor.NewOperationExecutor(
 			kubeClient,
 			volumePluginMgr),
