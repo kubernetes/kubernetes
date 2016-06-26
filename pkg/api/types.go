@@ -233,6 +233,9 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// ThirdPartyVolume is a generic representation of a third party volume, it is used by third party developers to
+	// attach their own volume to a kubelet's host machine and then exposed to the pod.
+	ThirdPartyVolume *ThirdPartyVolumeSource `json:"thirdPartyVolume,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -273,6 +276,9 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// ThirdPartyVolume is a generic representation of a third party volume, it is used by third party developers to
+	// attach their own volume to a kubelet's host machine and then exposed to the pod.
+	ThirdPartyVolume *ThirdPartyVolumeSource `json:"thirdPartyVolume,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -757,6 +763,12 @@ type ConfigMapVolumeSource struct {
 	// the volume setup will error. Paths must be relative and may not contain
 	// the '..' path or start with '..'.
 	Items []KeyToPath `json:"items,omitempty"`
+}
+
+// Represents a third party volume resource.
+type ThirdPartyVolumeSource struct {
+	// Data is the raw JSON data for this volume.
+	Data []byte `json:"data,omitempty"`
 }
 
 // Maps a string key to a path within a volume.
