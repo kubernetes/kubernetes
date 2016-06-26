@@ -74,7 +74,8 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		mathrand.Seed(time.Now().UTC().UnixNano())
 	})
 
-	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host [Slow]", func() {
+	// Flaky-- Issue #27691
+	It("[Flaky] should schedule a pod w/ a RW PD, remove it, then schedule it on another host [Slow]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
@@ -133,6 +134,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		return
 	})
 
+	// Flaky-- Issue #27477
 	It("[Flaky] should schedule a pod w/ a readonly PD on two hosts, then remove both. [Slow]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
