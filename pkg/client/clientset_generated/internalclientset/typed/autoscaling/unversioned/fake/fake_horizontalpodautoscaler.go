@@ -114,3 +114,14 @@ func (c *FakeHorizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interf
 		InvokesWatch(core.NewWatchAction(horizontalpodautoscalersResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched horizontalPodAutoscaler.
+func (c *FakeHorizontalPodAutoscalers) Patch(name string, pt api.PatchType, data []byte) (result *autoscaling.HorizontalPodAutoscaler, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(horizontalpodautoscalersResource, c.ns, name, data), &autoscaling.HorizontalPodAutoscaler{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscaling.HorizontalPodAutoscaler), err
+}

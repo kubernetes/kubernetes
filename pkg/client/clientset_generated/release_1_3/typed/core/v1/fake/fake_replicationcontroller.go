@@ -114,3 +114,14 @@ func (c *FakeReplicationControllers) Watch(opts api.ListOptions) (watch.Interfac
 		InvokesWatch(core.NewWatchAction(replicationcontrollersResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched replicationController.
+func (c *FakeReplicationControllers) Patch(name string, pt api.PatchType, data []byte) (result *v1.ReplicationController, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(replicationcontrollersResource, c.ns, name, data), &v1.ReplicationController{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ReplicationController), err
+}

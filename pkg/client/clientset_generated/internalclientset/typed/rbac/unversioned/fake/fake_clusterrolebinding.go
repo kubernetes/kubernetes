@@ -97,3 +97,13 @@ func (c *FakeClusterRoleBindings) Watch(opts api.ListOptions) (watch.Interface, 
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(clusterrolebindingsResource, opts))
 }
+
+// Patch applies the patch and returns the patched clusterRoleBinding.
+func (c *FakeClusterRoleBindings) Patch(name string, pt api.PatchType, data []byte) (result *rbac.ClusterRoleBinding, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(clusterrolebindingsResource, name, data), &rbac.ClusterRoleBinding{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*rbac.ClusterRoleBinding), err
+}

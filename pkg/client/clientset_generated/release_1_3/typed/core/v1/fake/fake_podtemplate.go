@@ -104,3 +104,14 @@ func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) 
 		InvokesWatch(core.NewWatchAction(podtemplatesResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched podTemplate.
+func (c *FakePodTemplates) Patch(name string, pt api.PatchType, data []byte) (result *v1.PodTemplate, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(podtemplatesResource, c.ns, name, data), &v1.PodTemplate{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.PodTemplate), err
+}

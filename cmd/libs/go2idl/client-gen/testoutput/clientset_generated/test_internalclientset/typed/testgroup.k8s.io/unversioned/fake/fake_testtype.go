@@ -114,3 +114,14 @@ func (c *FakeTestTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(testtypesResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched testType.
+func (c *FakeTestTypes) Patch(name string, pt api.PatchType, data []byte) (result *testgroup_k8s_io.TestType, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(testtypesResource, c.ns, name, data), &testgroup_k8s_io.TestType{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*testgroup_k8s_io.TestType), err
+}

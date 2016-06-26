@@ -38,6 +38,7 @@ type ReplicaSetInterface interface {
 	Get(name string) (*extensions.ReplicaSet, error)
 	List(opts api.ListOptions) (*extensions.ReplicaSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *extensions.ReplicaSet, err error)
 	ReplicaSetExpansion
 }
 
@@ -147,4 +148,17 @@ func (c *replicaSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("replicasets").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched replicaSet.
+func (c *replicaSets) Patch(name string, pt api.PatchType, data []byte) (result *extensions.ReplicaSet, err error) {
+	result = &extensions.ReplicaSet{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("replicasets").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

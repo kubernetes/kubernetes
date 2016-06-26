@@ -114,3 +114,14 @@ func (c *FakeDeployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(deploymentsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched deployment.
+func (c *FakeDeployments) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Deployment, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(deploymentsResource, c.ns, name, data), &v1beta1.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Deployment), err
+}

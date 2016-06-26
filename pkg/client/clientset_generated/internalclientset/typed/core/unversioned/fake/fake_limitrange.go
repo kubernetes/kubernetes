@@ -103,3 +103,14 @@ func (c *FakeLimitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(limitrangesResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched limitRange.
+func (c *FakeLimitRanges) Patch(name string, pt api.PatchType, data []byte) (result *api.LimitRange, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(limitrangesResource, c.ns, name, data), &api.LimitRange{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.LimitRange), err
+}

@@ -114,3 +114,14 @@ func (c *FakeDaemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction(daemonsetsResource, c.ns, opts))
 
 }
+
+// Patch applies the patch and returns the patched daemonSet.
+func (c *FakeDaemonSets) Patch(name string, pt api.PatchType, data []byte) (result *extensions.DaemonSet, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(daemonsetsResource, c.ns, name, data), &extensions.DaemonSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.DaemonSet), err
+}
