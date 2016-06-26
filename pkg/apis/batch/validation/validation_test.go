@@ -70,6 +70,7 @@ func TestValidateJob(t *testing.T) {
 	validGeneratedSelector := getValidGeneratedSelector()
 	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
 
+	positive := int32(1)
 	successCases := map[string]batch.Job{
 		"manual selector": {
 			ObjectMeta: api.ObjectMeta{
@@ -78,6 +79,8 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
+				Parallelism:    &positive,
+				Completions:    &positive,
 				Selector:       validManualSelector,
 				ManualSelector: newBool(true),
 				Template:       validPodTemplateSpecForManual,
@@ -90,8 +93,10 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
-				Selector: validGeneratedSelector,
-				Template: validPodTemplateSpecForGenerated,
+				Parallelism: &positive,
+				Completions: &positive,
+				Selector:    validGeneratedSelector,
+				Template:    validPodTemplateSpecForGenerated,
 			},
 		},
 	}
@@ -111,6 +116,19 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Parallelism: &negative,
+				Completions: &positive,
+				Selector:    validGeneratedSelector,
+				Template:    validPodTemplateSpecForGenerated,
+			},
+		},
+		"spec.parallelism: Required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				Completions: &positive,
 				Selector:    validGeneratedSelector,
 				Template:    validPodTemplateSpecForGenerated,
 			},
@@ -122,7 +140,20 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
+				Parallelism: &positive,
 				Completions: &negative,
+				Selector:    validGeneratedSelector,
+				Template:    validPodTemplateSpecForGenerated,
+			},
+		},
+		"spec.completions: Required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				Parallelism: &positive,
 				Selector:    validGeneratedSelector,
 				Template:    validPodTemplateSpecForGenerated,
 			},
@@ -134,6 +165,8 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
+				Parallelism:           &positive,
+				Completions:           &positive,
 				ActiveDeadlineSeconds: &negative64,
 				Selector:              validGeneratedSelector,
 				Template:              validPodTemplateSpecForGenerated,
@@ -146,7 +179,9 @@ func TestValidateJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.JobSpec{
-				Template: validPodTemplateSpecForGenerated,
+				Parallelism: &positive,
+				Completions: &positive,
+				Template:    validPodTemplateSpecForGenerated,
 			},
 		},
 		"spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
@@ -158,6 +193,8 @@ func TestValidateJob(t *testing.T) {
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
 				ManualSelector: newBool(true),
+				Parallelism:    &positive,
+				Completions:    &positive,
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
@@ -179,6 +216,8 @@ func TestValidateJob(t *testing.T) {
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
 				ManualSelector: newBool(true),
+				Parallelism:    &positive,
+				Completions:    &positive,
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: map[string]string{"controller-uid": "4d5e6f"},
@@ -200,6 +239,8 @@ func TestValidateJob(t *testing.T) {
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
 				ManualSelector: newBool(true),
+				Parallelism:    &positive,
+				Completions:    &positive,
 				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: validManualSelector.MatchLabels,
@@ -308,6 +349,7 @@ func TestValidateScheduledJob(t *testing.T) {
 	validManualSelector := getValidManualSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
+	positive := int32(1)
 
 	successCases := map[string]batch.ScheduledJob{
 		"basic scheduled job": {
@@ -321,7 +363,9 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+						Parallelism: &positive,
+						Completions: &positive,
+						Template:    validPodTemplateSpec,
 					},
 				},
 			},
@@ -348,7 +392,9 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+						Parallelism: &positive,
+						Completions: &positive,
+						Template:    validPodTemplateSpec,
 					},
 				},
 			},
@@ -364,7 +410,9 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+						Parallelism: &positive,
+						Completions: &positive,
+						Template:    validPodTemplateSpec,
 					},
 				},
 			},
@@ -381,7 +429,9 @@ func TestValidateScheduledJob(t *testing.T) {
 				StartingDeadlineSeconds: &negative64,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+						Parallelism: &positive,
+						Completions: &positive,
+						Template:    validPodTemplateSpec,
 					},
 				},
 			},
@@ -396,7 +446,9 @@ func TestValidateScheduledJob(t *testing.T) {
 				Schedule: "* * * * * ?",
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+						Parallelism: &positive,
+						Completions: &positive,
+						Template:    validPodTemplateSpec,
 					},
 				},
 			},
@@ -413,6 +465,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Parallelism: &negative,
+						Completions: &positive,
 						Template:    validPodTemplateSpec,
 					},
 				},
@@ -430,6 +483,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 
 					Spec: batch.JobSpec{
+						Parallelism: &positive,
 						Completions: &negative,
 						Template:    validPodTemplateSpec,
 					},
@@ -447,6 +501,8 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
+						Parallelism:           &positive,
+						Completions:           &positive,
 						ActiveDeadlineSeconds: &negative64,
 						Template:              validPodTemplateSpec,
 					},
@@ -464,8 +520,10 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Selector: validManualSelector,
-						Template: validPodTemplateSpec,
+						Parallelism: &positive,
+						Completions: &positive,
+						Selector:    validManualSelector,
+						Template:    validPodTemplateSpec,
 					},
 				},
 			},
@@ -481,6 +539,8 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
+						Parallelism:    &positive,
+						Completions:    &positive,
 						ManualSelector: newBool(true),
 						Template:       validPodTemplateSpec,
 					},
@@ -498,6 +558,8 @@ func TestValidateScheduledJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
+						Parallelism: &positive,
+						Completions: &positive,
 						Template: api.PodTemplateSpec{
 							Spec: api.PodSpec{
 								RestartPolicy: api.RestartPolicyAlways,
