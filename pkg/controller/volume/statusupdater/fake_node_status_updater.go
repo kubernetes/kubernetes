@@ -18,6 +18,7 @@ package statusupdater
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/controller/volume/cache"
 )
 
 func NewFakeNodeStatusUpdater(returnError bool) NodeStatusUpdater {
@@ -36,4 +37,8 @@ func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatuses() error {
 	}
 
 	return nil
+}
+
+func (fnsu *fakeNodeStatusUpdater) IsVolumeMounted(volume cache.AttachedVolume) (bool, error) {
+	return volume.MountedByNode, nil
 }

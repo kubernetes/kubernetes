@@ -99,6 +99,16 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					glog.Errorf("Unexpected error actualStateOfWorld.MarkDesireToDetach(): %v", err)
 				}
 
+				// Note that we need to fetch *after* marking it in use, so the
+				// UpdateNodeStatus and IsVolumeMounted need to be ordered:
+				//
+				// controller				             node
+				// ------------------------------------------------
+				//	mark desire to detach				 mark in use
+				//  is in use?							 is attached?
+				// On both sides we must get the node afresh before taking
+				// the second "lock".
+
 				// Update Node Status to indicate volume is no longer safe to mount.
 				err = rc.nodeStatusUpdater.UpdateNodeStatuses()
 				if err != nil {
@@ -106,8 +116,13 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					glog.Infof("UpdateNodeStatuses failed with: %v", err)
 					continue
 				}
-
-				if !attachedVolume.MountedByNode {
+				glog.Infof("Checking if volume %+v is mounted on any node, currently reported on node %v", attachedVolume, attachedVolume.NodeName)
+				mounted, err := rc.nodeStatusUpdater.IsVolumeMounted(attachedVolume)
+				if err != nil {
+					glog.Errorf("Couldn't determine if volume %v is in use, assuming it is: %v", err)
+					continue
+				}
+				if !mounted {
 					glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 					err := rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, rc.actualStateOfWorld)
 					if err == nil {

@@ -284,6 +284,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 		asw.MarkVolumeAsDetached(volumeName, nodeName)
 		return err
 	}
+	return nil
 }
 
 func (asw *actualStateOfWorld) addVolumeToNode(volumeName api.UniqueVolumeName, nodeName string) error {

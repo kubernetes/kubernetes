@@ -37,6 +37,9 @@ type NodeStatusUpdater interface {
 	// Gets a list of node statuses that should be updated from the actual state
 	// of the world and updates them.
 	UpdateNodeStatuses() error
+
+	// TODO: find a better home for this? it really isn't about node status update.
+	IsVolumeMounted(volume cache.AttachedVolume) (bool, error)
 }
 
 // NewNodeStatusUpdater returns a new instance of NodeStatusUpdater.
@@ -55,6 +58,30 @@ type nodeStatusUpdater struct {
 	kubeClient         internalclientset.Interface
 	nodeInformer       framework.SharedInformer
 	actualStateOfWorld cache.ActualStateOfWorld
+}
+
+// IsVolumeMountedByNode returns true if a volume is mounted by *any* node.
+// This is a safety barrier. If there's a bug that leaks volumes attached
+// to a node, we will not be able to detach it till the GC timeout. This is
+// preferable to most other scenarios which would lead to data corruption.
+// TODO: Verify GC actually cleans up the detacher keeps ignoring it because
+// it's in use.
+func (nsu *nodeStatusUpdater) IsVolumeMounted(attachedVolume cache.AttachedVolume) (bool, error) {
+	nodeList, err := nsu.kubeClient.Core().Nodes().List(api.ListOptions{})
+	if err != nil {
+		return true, err
+	}
+	// TODO: this can get expensive with large clusters.
+	for _, n := range nodeList.Items {
+		for _, v := range n.Status.VolumesInUse {
+			if v == attachedVolume.VolumeName {
+				// TODO: Make sure this isn't too spammy.
+				glog.Infof("Volume %v in use by node %v", v, n.Name)
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
