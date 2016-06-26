@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -2763,8 +2764,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				BootID:                  "1b3",
 				KernelVersion:           "3.16.0-0.bpo.4-amd64",
 				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				OperatingSystem:         "linux",
-				Architecture:            "amd64",
+				OperatingSystem:         goruntime.GOOS,
+				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
@@ -3010,8 +3011,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				BootID:                  "1b3",
 				KernelVersion:           "3.16.0-0.bpo.4-amd64",
 				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				OperatingSystem:         "linux",
-				Architecture:            "amd64",
+				OperatingSystem:         goruntime.GOOS,
+				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
@@ -3294,8 +3295,8 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				BootID:                  "1b3",
 				KernelVersion:           "3.16.0-0.bpo.4-amd64",
 				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				OperatingSystem:         "linux",
-				Architecture:            "amd64",
+				OperatingSystem:         goruntime.GOOS,
+				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
 				KubeProxyVersion:        version.Get().String(),
