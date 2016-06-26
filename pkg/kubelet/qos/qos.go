@@ -14,17 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package qos
 
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-)
-
-const (
-	Guaranteed = "Guaranteed"
-	Burstable  = "Burstable"
-	BestEffort = "BestEffort"
 )
 
 // isResourceGuaranteed returns true if the container's resource requirements are Guaranteed.
@@ -51,7 +45,7 @@ func isResourceBestEffort(container *api.Container, resource api.ResourceName) b
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQos(pod *api.Pod) string {
+func GetPodQos(pod *api.Pod) QOSClass {
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
@@ -106,7 +100,7 @@ func GetPodQos(pod *api.Pod) string {
 }
 
 // QoSList is a set of (resource name, QoS class) pairs.
-type QoSList map[api.ResourceName]string
+type QoSList map[api.ResourceName]QOSClass
 
 // GetQoS returns a mapping of resource name to QoS class of a container
 func GetQoS(container *api.Container) QoSList {
