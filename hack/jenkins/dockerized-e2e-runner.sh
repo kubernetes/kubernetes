@@ -63,4 +63,4 @@ docker run --rm=true -i \
   "${docker_extra_args[@]:+${docker_extra_args[@]}}" \
   "${METADATA_SERVER_ADD_HOST_ARGS[@]:+${METADATA_SERVER_ADD_HOST_ARGS[@]}}" \
   gcr.io/google_containers/kubekins-test:0.11 \
-  bash -c "bash <(curl -fsS --retry 3 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"
+  bash -c "bash <(curl -fsS --retry 3 --keepalive-time 2 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"
