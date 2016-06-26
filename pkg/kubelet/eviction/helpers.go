@@ -299,10 +299,10 @@ func (ms *multiSorter) Less(i, j int) bool {
 	return ms.cmp[k](p1, p2) < 0
 }
 
-// qos compares pods by QoS (BestEffort < Burstable < Guaranteed)
+// qosComparator compares pods by QoS (BestEffort < Burstable < Guaranteed)
 func qosComparator(p1, p2 *api.Pod) int {
-	qosP1 := qos.GetPodQos(p1)
-	qosP2 := qos.GetPodQos(p2)
+	qosP1 := qos.GetPodQOS(p1)
+	qosP2 := qos.GetPodQOS(p2)
 	// its a tie
 	if qosP1 == qosP2 {
 		return 0

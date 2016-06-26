@@ -62,7 +62,7 @@ func (list SortableResourceQuotas) Less(i, j int) bool {
 }
 
 // SortedQoSResourceNames returns the sorted resource names of a QoS list.
-func SortedQoSResourceNames(list qos.QoSList) []api.ResourceName {
+func SortedQoSResourceNames(list qos.QOSList) []api.ResourceName {
 	resources := make([]api.ResourceName, 0, len(list))
 	for res := range list {
 		resources = append(resources, res)

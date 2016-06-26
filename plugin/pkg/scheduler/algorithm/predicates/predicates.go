@@ -1020,7 +1020,7 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 
 // Determine if a pod is scheduled with best-effort QoS
 func isPodBestEffort(pod *api.Pod) bool {
-	return qos.GetPodQos(pod) == qos.BestEffort
+	return qos.GetPodQOS(pod) == qos.BestEffort
 }
 
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
