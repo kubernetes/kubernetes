@@ -174,6 +174,10 @@ func (p *ExecOptions) Run() error {
 		return err
 	}
 
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
+	}
+
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
