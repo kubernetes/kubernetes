@@ -864,7 +864,38 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 			return nil
 		}
 
+		// This will write to node status that we're about to start using the volume.
+		// If we don't need the given volume, there might be a delay of upto 10s
+		// before we proclaim that we don't need it, because we *don't* synchronously
+		// delete the same volume from the node status map.
+		// TODO: consider fixing this post 1.3.
+		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
+			volumeToMount.VolumeSpec, nodeName, volumeToMount.DevicePath)
+
+		if addVolumeNodeErr != nil {
+
+			actualStateOfWorld.MarkVolumeAsDetached(volumeToMount.VolumeName, nodeName)
+
+			// On failure, return error. Caller will log and retry.
+			return fmt.Errorf(
+				"VerifyControllerAttachedVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v.",
+				volumeToMount.VolumeName,
+				volumeToMount.VolumeSpec.Name(),
+				volumeToMount.PodName,
+				volumeToMount.Pod.UID,
+				addVolumeNodeErr)
+		}
+
 		// Fetch current node object
+		// Note that we need to fetch *after* marking it in use:
+		//
+		// controller				             node
+		// ------------------------------------------------
+		//	mark desire to detach				 mark in use
+		//  is in use?							 is attached?
+		// On both sides we must get the node afresh before taking
+		// the second "lock".
+
 		node, fetchErr := oe.kubeClient.Core().Nodes().Get(nodeName)
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
@@ -889,28 +920,24 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
-				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
 				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
 					volumeToMount.PodName,
 					volumeToMount.Pod.UID,
 					attachedVolume.DevicePath)
-
-				if addVolumeNodeErr != nil {
-					// On failure, return error. Caller will log and retry.
-					return fmt.Errorf(
-						"VerifyControllerAttachedVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v.",
-						volumeToMount.VolumeName,
-						volumeToMount.VolumeSpec.Name(),
-						volumeToMount.PodName,
-						volumeToMount.Pod.UID,
-						addVolumeNodeErr)
-				}
 				return nil
 			}
 		}
+
+		// This just deletes the volume from the internal map. The kublet will
+		// update node status periodically.
+		// TODO: what if we just left the volume in place? we intend to use it,
+		// and we're just waiting on the attacher to attach it. Investigate if
+		// leaking this volume in the node object for extended durations will
+		// prevent it from getting detached from another node it might be
+		// mounted on.
+		actualStateOfWorld.MarkVolumeAsDetached(volumeToMount.VolumeName, nodeName)
 
 		// Volume not attached, return error. Caller will log and retry.
 		return fmt.Errorf("Volume %q (spec.Name: %q) pod %q (UID: %q) is not yet attached according to node status.",
