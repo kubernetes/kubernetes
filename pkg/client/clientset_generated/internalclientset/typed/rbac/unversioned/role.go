@@ -37,6 +37,7 @@ type RoleInterface interface {
 	Get(name string) (*rbac.Role, error)
 	List(opts api.ListOptions) (*rbac.RoleList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *rbac.Role, err error)
 	RoleExpansion
 }
 
@@ -133,4 +134,17 @@ func (c *roles) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("roles").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched role.
+func (c *roles) Patch(name string, pt api.PatchType, data []byte) (result *rbac.Role, err error) {
+	result = &rbac.Role{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("roles").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

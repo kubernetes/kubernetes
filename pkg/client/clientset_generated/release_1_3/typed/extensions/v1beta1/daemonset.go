@@ -38,6 +38,7 @@ type DaemonSetInterface interface {
 	Get(name string) (*v1beta1.DaemonSet, error)
 	List(opts api.ListOptions) (*v1beta1.DaemonSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
@@ -147,4 +148,17 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("daemonsets").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched daemonSet.
+func (c *daemonSets) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.DaemonSet, err error) {
+	result = &v1beta1.DaemonSet{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("daemonsets").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

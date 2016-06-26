@@ -38,6 +38,7 @@ type NodeInterface interface {
 	Get(name string) (*v1.Node, error)
 	List(opts api.ListOptions) (*v1.NodeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1.Node, err error)
 	NodeExpansion
 }
 
@@ -137,4 +138,16 @@ func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("nodes").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched node.
+func (c *nodes) Patch(name string, pt api.PatchType, data []byte) (result *v1.Node, err error) {
+	result = &v1.Node{}
+	err = c.client.Patch(pt).
+		Resource("nodes").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

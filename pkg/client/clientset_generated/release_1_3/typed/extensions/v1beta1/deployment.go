@@ -38,6 +38,7 @@ type DeploymentInterface interface {
 	Get(name string) (*v1beta1.Deployment, error)
 	List(opts api.ListOptions) (*v1beta1.DeploymentList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Deployment, err error)
 	DeploymentExpansion
 }
 
@@ -147,4 +148,17 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("deployments").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched deployment.
+func (c *deployments) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Deployment, err error) {
+	result = &v1beta1.Deployment{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }
