@@ -141,7 +141,7 @@ function dump_cluster_logs() {
 
 ### Pre Set Up ###
 if running_in_docker; then
-    curl -fsSL --retry 3 -o "${WORKSPACE}/google-cloud-sdk.tar.gz" 'https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz'
+    curl -fsSL --retry 3 --keepalive-time 2 -o "${WORKSPACE}/google-cloud-sdk.tar.gz" 'https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz'
     install_google_cloud_sdk_tarball "${WORKSPACE}/google-cloud-sdk.tar.gz" /
 fi
 
@@ -269,7 +269,7 @@ cd kubernetes
 # Upload build start time and k8s version to GCS, but not on PR Jenkins.
 # On PR Jenkins this is done before the build.
 if [[ ! "${JOB_NAME}" =~ -pull- ]]; then
-    JENKINS_BUILD_STARTED=true bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh")
+    JENKINS_BUILD_STARTED=true bash <(curl -fsS --retry 3 --keepalive-time 2 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh")
 fi
 
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
@@ -287,7 +287,7 @@ if [[ ( ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ) && 
   gcp_list_resources="true"
   # Always pull the script from HEAD, overwriting the local one if it exists.
   # We do this to pick up fixes if we are running tests from a branch or tag.
-  curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/gce/list-resources.sh" > "${gcp_list_resources_script}"
+  curl -fsS --retry 3 --keepalive-time 2 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/gce/list-resources.sh" > "${gcp_list_resources_script}"
 else
   gcp_list_resources="false"
 fi

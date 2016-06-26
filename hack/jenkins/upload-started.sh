@@ -34,5 +34,5 @@ echo
 if [[ -x ./hack/jenkins/upload-to-gcs.sh ]]; then
   ./hack/jenkins/upload-to-gcs.sh
 else
-  curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
+  curl -fsS --retry 3 --keepalive-time 2 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
 fi
