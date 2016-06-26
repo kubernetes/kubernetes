@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package qos
 
 import (
 	"testing"
@@ -62,7 +62,7 @@ func newPod(name string, containers []api.Container) *api.Pod {
 func TestGetPodQos(t *testing.T) {
 	testCases := []struct {
 		pod      *api.Pod
-		expected string
+		expected QOSClass
 	}{
 		{
 			pod: newPod("guaranteed", []api.Container{

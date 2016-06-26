@@ -44,7 +44,7 @@ import (
 	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
-	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
@@ -540,7 +540,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, out, "")
-		fmt.Fprintf(out, "QoS Tier:\t%s\n", qosutil.GetPodQos(pod))
+		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.GetPodQos(pod))
 		if events != nil {
 			DescribeEvents(events, out)
 		}
