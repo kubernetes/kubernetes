@@ -106,12 +106,12 @@ func NewKubeletServer() *KubeletServer {
 			ImageGCLowThresholdPercent:   80,
 			LowDiskSpaceThresholdMB:      256,
 			MasterServiceNamespace:       api.NamespaceDefault,
-			MaxContainerCount:            240,
-			MaxPerPodContainerCount:      2,
+			MaxContainerCount:            -1,
+			MaxPerPodContainerCount:      1,
 			MaxOpenFiles:                 1000000,
 			MaxPods:                      110,
 			NvidiaGPUs:                   0,
-			MinimumGCAge:                 unversioned.Duration{Duration: 1 * time.Minute},
+			MinimumGCAge:                 unversioned.Duration{Duration: 0},
 			NetworkPluginDir:             "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
 			NetworkPluginName:            "",
 			NonMasqueradeCIDR:            "10.0.0.0/8",
@@ -189,8 +189,11 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RunOnce, "runonce", s.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server")
 	fs.BoolVar(&s.EnableDebuggingHandlers, "enable-debugging-handlers", s.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.DurationVar(&s.MinimumGCAge.Duration, "minimum-container-ttl-duration", s.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
+	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.  Default: 2.")
+	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space.  Default: 100.")
+	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
