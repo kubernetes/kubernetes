@@ -53,8 +53,6 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 		Out: cmdOut,
 		Err: cmdErr,
 
-		CommandName: "kubectl attach",
-
 		Attach: &DefaultRemoteAttach{},
 	}
 	cmd := &cobra.Command{
@@ -141,6 +139,10 @@ func (p *AttachOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn 
 		return err
 	}
 	p.Client = client
+
+	if p.CommandName == "" {
+		p.CommandName = cmd.CommandPath()
+	}
 
 	return nil
 }
