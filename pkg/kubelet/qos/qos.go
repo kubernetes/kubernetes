@@ -41,11 +41,11 @@ func isResourceBestEffort(container *api.Container, resource api.ResourceName) b
 	return !hasReq || req.Value() == 0
 }
 
-// GetPodQos returns the QoS class of a pod.
+// GetPodQOS returns the QoS class of a pod.
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQos(pod *api.Pod) QOSClass {
+func GetPodQOS(pod *api.Pod) QOSClass {
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
@@ -99,23 +99,23 @@ func GetPodQos(pod *api.Pod) QOSClass {
 	return Burstable
 }
 
-// QoSList is a set of (resource name, QoS class) pairs.
-type QoSList map[api.ResourceName]QOSClass
+// QOSList is a set of (resource name, QoS class) pairs.
+type QOSList map[api.ResourceName]QOSClass
 
-// GetQoS returns a mapping of resource name to QoS class of a container
-func GetQoS(container *api.Container) QoSList {
-	resourceToQoS := QoSList{}
+// GetQOS returns a mapping of resource name to QoS class of a container
+func GetQOS(container *api.Container) QOSList {
+	resourceToQOS := QOSList{}
 	for resource := range allResources(container) {
 		switch {
 		case isResourceGuaranteed(container, resource):
-			resourceToQoS[resource] = Guaranteed
+			resourceToQOS[resource] = Guaranteed
 		case isResourceBestEffort(container, resource):
-			resourceToQoS[resource] = BestEffort
+			resourceToQOS[resource] = BestEffort
 		default:
-			resourceToQoS[resource] = Burstable
+			resourceToQOS[resource] = Burstable
 		}
 	}
-	return resourceToQoS
+	return resourceToQOS
 }
 
 // supportedComputeResources is the list of supported compute resources
