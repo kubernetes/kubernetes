@@ -67,6 +67,8 @@ type TestContextType struct {
 	DumpLogsOnFailure bool
 	// Name of the node to run tests on (node e2e suite only).
 	NodeName string
+	// Whether to enable the QoS Cgroup Hierarchy or not
+	CgroupsPerQOS bool
 }
 
 type CloudConfig struct {
@@ -148,4 +150,5 @@ func RegisterClusterFlags() {
 // Register flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on (node e2e suite only).")
+	flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 }

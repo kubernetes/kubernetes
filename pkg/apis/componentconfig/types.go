@@ -258,14 +258,18 @@ type KubeletConfiguration struct {
 	CloudConfigFile string `json:"cloudConfigFile,omitempty"`
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	KubeletCgroups string `json:"kubeletCgroups,omitempty"`
+	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
+	// And all Burstable and BestEffort pods are brought up under their
+	// specific top level QoS cgroup.
+	CgroupsPerQOS bool `json:"CgroupsPerQOS,omitempty"`
 	// Cgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string `json:"runtimeCgroups,omitempty"`
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
 	SystemCgroups string `json:"systemCgroups,omitempty"`
-	// cgroupRoot is the root cgroup to use for pods. This is handled by the
-	// container runtime on a best effort basis.
+	// CgroupRoot is the root cgroup to use for pods.
+	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
