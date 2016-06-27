@@ -506,7 +506,7 @@ func (ctrl *PersistentVolumeController) updateClaimPhase(claim *api.PersistentVo
 		glog.V(4).Infof("updating PersistentVolumeClaim[%s]: set phase %s failed: %v", claimToClaimKey(claim), phase, err)
 		return newClaim, err
 	}
-	_, err = storeObjectUpdate(ctrl.claims, newClaim, "claim")
+	_, err = ctrl.storeClaimUpdate(newClaim)
 	if err != nil {
 		glog.V(4).Infof("updating PersistentVolumeClaim[%s]: cannot update internal cache: %v", claimToClaimKey(claim), err)
 		return newClaim, err
@@ -565,7 +565,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.Persistent
 		glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s failed: %v", volume.Name, phase, err)
 		return newVol, err
 	}
-	_, err = storeObjectUpdate(ctrl.volumes.store, newVol, "volume")
+	_, err = ctrl.storeVolumeUpdate(newVol)
 	if err != nil {
 		glog.V(4).Infof("updating PersistentVolume[%s]: cannot update internal cache: %v", volume.Name, err)
 		return newVol, err
@@ -650,7 +650,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *api.Persistent
 			glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volume.Name, claimToClaimKey(claim), err)
 			return newVol, err
 		}
-		_, err = storeObjectUpdate(ctrl.volumes.store, newVol, "volume")
+		_, err = ctrl.storeVolumeUpdate(newVol)
 		if err != nil {
 			glog.V(4).Infof("updating PersistentVolume[%s]: cannot update internal cache: %v", volume.Name, err)
 			return newVol, err
@@ -712,7 +712,7 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *api.PersistentV
 			glog.V(4).Infof("updating PersistentVolumeClaim[%s]: binding to %q failed: %v", claimToClaimKey(claim), volume.Name, err)
 			return newClaim, err
 		}
-		_, err = storeObjectUpdate(ctrl.claims, newClaim, "claim")
+		_, err = ctrl.storeClaimUpdate(newClaim)
 		if err != nil {
 			glog.V(4).Infof("updating PersistentVolumeClaim[%s]: cannot update internal cache: %v", claimToClaimKey(claim), err)
 			return newClaim, err
@@ -806,7 +806,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolum
 		glog.V(4).Infof("updating PersistentVolume[%s]: rollback failed: %v", volume.Name, err)
 		return err
 	}
-	_, err = storeObjectUpdate(ctrl.volumes.store, newVol, "volume")
+	_, err = ctrl.storeVolumeUpdate(newVol)
 	if err != nil {
 		glog.V(4).Infof("updating PersistentVolume[%s]: cannot update internal cache: %v", volume.Name, err)
 		return err
@@ -1171,7 +1171,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 			// Save succeeded.
 			glog.V(3).Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
 
-			_, err = storeObjectUpdate(ctrl.volumes.store, newVol, "volume")
+			_, err = ctrl.storeVolumeUpdate(newVol)
 			if err != nil {
 				// We will get an "volume added" event soon, this is not a big error
 				glog.V(4).Infof("provisionClaimOperation [%s]: cannot update internal cache: %v", volume.Name, err)
