@@ -64,8 +64,9 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExists(t, generatedVolumeName, dsw)
-	verifyVolumeExistsInVolumesToMount(t, generatedVolumeName, dsw)
+	verifyVolumeExistsDsw(t, generatedVolumeName, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
 }
 
@@ -107,8 +108,9 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExists(t, generatedVolumeName, dsw)
-	verifyVolumeExistsInVolumesToMount(t, generatedVolumeName, dsw)
+	verifyVolumeExistsDsw(t, generatedVolumeName, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
 }
 
@@ -145,8 +147,9 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
-	verifyVolumeExists(t, generatedVolumeName, dsw)
-	verifyVolumeExistsInVolumesToMount(t, generatedVolumeName, dsw)
+	verifyVolumeExistsDsw(t, generatedVolumeName, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
 
 	// Act
@@ -158,7 +161,140 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	verifyPodDoesntExistInVolumeDsw(t, podName, generatedVolumeName, dsw)
 }
 
-func verifyVolumeExists(
+// Calls AddPodToVolume() to add three new volumes to data struct
+// Verifies newly added pod/volume exists via PodExistsInVolume()
+// VolumeExists() and GetVolumesToMount()
+// Marks only second volume as reported in use.
+// Verifies only that volume is marked reported in use
+// Marks only first volume as reported in use.
+// Verifies only that volume is marked reported in use
+func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+
+	pod1 := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "volume1-name",
+					VolumeSource: api.VolumeSource{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	volume1Spec := &volume.Spec{Volume: &pod1.Spec.Volumes[0]}
+	pod1Name := volumehelper.GetUniquePodName(pod1)
+
+	pod2 := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pod2",
+			UID:  "pod2uid",
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "volume2-name",
+					VolumeSource: api.VolumeSource{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device2",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	volume2Spec := &volume.Spec{Volume: &pod2.Spec.Volumes[0]}
+	pod2Name := volumehelper.GetUniquePodName(pod2)
+
+	pod3 := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pod3",
+			UID:  "pod3uid",
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "volume3-name",
+					VolumeSource: api.VolumeSource{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device3",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	volume3Spec := &volume.Spec{Volume: &pod3.Spec.Volumes[0]}
+	pod3Name := volumehelper.GetUniquePodName(pod3)
+
+	generatedVolume1Name, err := dsw.AddPodToVolume(
+		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGidValue */)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	generatedVolume2Name, err := dsw.AddPodToVolume(
+		pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGidValue */)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	generatedVolume3Name, err := dsw.AddPodToVolume(
+		pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGidValue */)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	volumesReportedInUse := []api.UniqueVolumeName{generatedVolume2Name}
+	dsw.MarkVolumesReportedInUse(volumesReportedInUse)
+
+	// Assert
+	verifyVolumeExistsDsw(t, generatedVolume1Name, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolume1Name, false /* expectReportedInUse */, dsw)
+	verifyPodExistsInVolumeDsw(t, pod1Name, generatedVolume1Name, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume2Name, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolume2Name, true /* expectReportedInUse */, dsw)
+	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolume2Name, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume3Name, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolume3Name, false /* expectReportedInUse */, dsw)
+	verifyPodExistsInVolumeDsw(t, pod3Name, generatedVolume3Name, dsw)
+
+	// Act
+	volumesReportedInUse = []api.UniqueVolumeName{generatedVolume3Name}
+	dsw.MarkVolumesReportedInUse(volumesReportedInUse)
+
+	// Assert
+	verifyVolumeExistsDsw(t, generatedVolume1Name, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolume1Name, false /* expectReportedInUse */, dsw)
+	verifyPodExistsInVolumeDsw(t, pod1Name, generatedVolume1Name, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume2Name, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolume2Name, false /* expectReportedInUse */, dsw)
+	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolume2Name, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume3Name, dsw)
+	verifyVolumeExistsInVolumesToMount(
+		t, generatedVolume3Name, true /* expectReportedInUse */, dsw)
+	verifyPodExistsInVolumeDsw(t, pod3Name, generatedVolume3Name, dsw)
+}
+
+func verifyVolumeExistsDsw(
 	t *testing.T, expectedVolumeName api.UniqueVolumeName, dsw DesiredStateOfWorld) {
 	volumeExists := dsw.VolumeExists(expectedVolumeName)
 	if !volumeExists {
@@ -181,10 +317,21 @@ func verifyVolumeDoesntExist(
 }
 
 func verifyVolumeExistsInVolumesToMount(
-	t *testing.T, expectedVolumeName api.UniqueVolumeName, dsw DesiredStateOfWorld) {
+	t *testing.T,
+	expectedVolumeName api.UniqueVolumeName,
+	expectReportedInUse bool,
+	dsw DesiredStateOfWorld) {
 	volumesToMount := dsw.GetVolumesToMount()
 	for _, volume := range volumesToMount {
 		if volume.VolumeName == expectedVolumeName {
+			if volume.ReportedInUse != expectReportedInUse {
+				t.Fatalf(
+					"Found volume %v in the list of VolumesToMount, but ReportedInUse incorrect. Expected: <%v> Actual: <%v>",
+					expectedVolumeName,
+					expectReportedInUse,
+					volume.ReportedInUse)
+			}
+
 			return
 		}
 	}

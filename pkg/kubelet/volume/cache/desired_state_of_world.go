@@ -53,6 +53,16 @@ type DesiredStateOfWorld interface {
 	// volume, this is a no-op.
 	AddPodToVolume(podName types.UniquePodName, pod *api.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGidValue string) (api.UniqueVolumeName, error)
 
+	// MarkVolumesReportedInUse sets the ReportedInUse value to true for the
+	// reportedVolumes. For volumes not in the reportedVolumes list, the
+	// ReportedInUse value is reset to false. The default ReportedInUse value
+	// for a newly created volume is false.
+	// When set to true this value indicates that the volume was successfully
+	// added to the VolumesInUse field in the node's status.
+	// If a volume in the reportedVolumes list does not exist in the list of
+	// volumes that should be attached to this node, it is skipped without error.
+	MarkVolumesReportedInUse(reportedVolumes []api.UniqueVolumeName)
+
 	// DeletePodFromVolume removes the given pod from the given volume in the
 	// cache indicating the specified pod no longer requires the specified
 	// volume.
@@ -128,6 +138,10 @@ type volumeToMount struct {
 
 	// volumeGidValue contains the value of the GID annotation, if present.
 	volumeGidValue string
+
+	// reportedInUse indicates that the volume was successfully added to the
+	// VolumesInUse field in the node's status.
+	reportedInUse bool
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -186,6 +200,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			podsToMount:        make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable: dsw.isAttachableVolume(volumeSpec),
 			volumeGidValue:     volumeGidValue,
+			reportedInUse:      false,
 		}
 		dsw.volumesToMount[volumeName] = volumeObj
 	}
@@ -201,6 +216,25 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	}
 
 	return volumeName, nil
+}
+
+func (dsw *desiredStateOfWorld) MarkVolumesReportedInUse(
+	reportedVolumes []api.UniqueVolumeName) {
+	dsw.Lock()
+	defer dsw.Unlock()
+
+	reportedVolumesMap := make(
+		map[api.UniqueVolumeName]bool, len(reportedVolumes) /* capacity */)
+
+	for _, reportedVolume := range reportedVolumes {
+		reportedVolumesMap[reportedVolume] = true
+	}
+
+	for volumeName, volumeObj := range dsw.volumesToMount {
+		_, volumeReported := reportedVolumesMap[volumeName]
+		volumeObj.reportedInUse = volumeReported
+		dsw.volumesToMount[volumeName] = volumeObj
+	}
 }
 
 func (dsw *desiredStateOfWorld) DeletePodFromVolume(
@@ -266,7 +300,8 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						VolumeSpec:          podObj.spec,
 						PluginIsAttachable:  volumeObj.pluginIsAttachable,
 						OuterVolumeSpecName: podObj.outerVolumeSpecName,
-						VolumeGidValue:      volumeObj.volumeGidValue}})
+						VolumeGidValue:      volumeObj.volumeGidValue,
+						ReportedInUse:       volumeObj.reportedInUse}})
 		}
 	}
 	return volumesToMount
