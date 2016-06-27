@@ -47,6 +47,93 @@ docker:
       - pkg: docker-io
 
 {% endif %}
+{% elif grains.cloud is defined and grains.cloud == 'azure-legacy' %}
+
+{% if pillar.get('is_systemd') %}
+
+{{ pillar.get('systemd_system_path') }}/docker.service:
+  file.managed:
+    - source: salt://docker/docker.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - defaults:
+        environment_file: {{ environment_file }}
+
+# The docker service.running block below doesn't work reliably
+# Instead we run our script which e.g. does a systemd daemon-reload
+# But we keep the service block below, so it can be used by dependencies
+# TODO: Fix this
+fix-service-docker:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker.service
+      - file: {{ environment_file }}
+{% endif %}
+
+{{ environment_file }}:
+  file.managed:
+    - source: salt://docker/docker-defaults
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+    - require:
+      - pkg: docker-engine
+
+apt-key:
+  pkgrepo.managed:
+    - humanname: Dotdeb
+    - name: deb https://apt.dockerproject.org/repo ubuntu-trusty main
+    - dist: ubuntu-trusty
+    - file: /etc/apt/sources.list.d/docker.list
+    - keyid: 58118E89F3A912897C070ADBF76221572C52609D
+    - keyserver: hkp://p80.pool.sks-keyservers.net:80
+
+lxc-docker:
+  pkg:
+    - purged
+
+docker-io:
+  pkg:
+    - purged
+
+cbr0:
+  network.managed:
+    - enabled: True
+    - type: bridge
+{% if grains['roles'][0] == 'kubernetes-pool' %}
+    - proto: none
+{% else %}
+    - proto: dhcp
+{% endif %}
+    - ports: none
+    - bridge: cbr0
+{% if grains['roles'][0] == 'kubernetes-pool' %}
+    - ipaddr: {{ grains['cbr-cidr'] }}
+{% endif %}
+    - delay: 0
+    - bypassfirewall: True
+    - require_in:
+      - service: docker
+
+docker-engine:
+   pkg:
+     - installed
+     - require:
+       - pkgrepo: 'apt-key'
+
+docker:
+   service.running:
+     - enable: True
+     - require:
+       - file: {{ environment_file }}
+     - watch:
+       - file: {{ environment_file }}
+
 {% elif grains.cloud is defined and grains.cloud in ['vsphere', 'photon-controller'] and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
 
 {% if pillar.get('is_systemd') %}
@@ -294,6 +381,7 @@ docker-upgrade:
     - name: /opt/kubernetes/helpers/pkg install-no-start {{ docker_pkg_name }} {{ override_docker_ver }} /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
+
 {% endif %} # end override_docker_ver != ''
 
 {% if pillar.get('is_systemd') %}
