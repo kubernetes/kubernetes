@@ -116,7 +116,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := volumehelper.GetUniquePodName(pod)
-	_, err := dsw.AddPodToVolume(
+	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
@@ -126,7 +126,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
-	waitForAttach(t, fakePlugin, asw)
+	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -183,8 +183,9 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := volumehelper.GetUniquePodName(pod)
-	_, err := dsw.AddPodToVolume(
+	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+	dsw.MarkVolumesReportedInUse([]api.UniqueVolumeName{generatedVolumeName})
 
 	// Assert
 	if err != nil {
@@ -193,7 +194,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
-	waitForAttach(t, fakePlugin, asw)
+	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
@@ -259,7 +260,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
-	waitForAttach(t, fakePlugin, asw)
+	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -275,7 +276,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
-	waitForDetach(t, fakePlugin, asw)
+	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyTearDownCallCount(
@@ -338,7 +339,8 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
-	waitForAttach(t, fakePlugin, asw)
+	dsw.MarkVolumesReportedInUse([]api.UniqueVolumeName{generatedVolumeName})
+	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
@@ -353,7 +355,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
-	waitForDetach(t, fakePlugin, asw)
+	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyTearDownCallCount(
@@ -361,16 +363,19 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
 }
 
-func waitForAttach(
+func waitForMount(
 	t *testing.T,
 	fakePlugin *volumetesting.FakeVolumePlugin,
+	volumeName api.UniqueVolumeName,
 	asw cache.ActualStateOfWorld) {
 	err := retryWithExponentialBackOff(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			mountedVolumes := asw.GetMountedVolumes()
-			if len(mountedVolumes) > 0 {
-				return true, nil
+			for _, mountedVolume := range mountedVolumes {
+				if mountedVolume.VolumeName == volumeName {
+					return true, nil
+				}
 			}
 
 			return false, nil
@@ -378,28 +383,28 @@ func waitForAttach(
 	)
 
 	if err != nil {
-		t.Fatalf("Timed out waiting for len of asw.GetMountedVolumes() to become non-zero.")
+		t.Fatalf("Timed out waiting for volume %q to be attached.", volumeName)
 	}
 }
 
 func waitForDetach(
 	t *testing.T,
 	fakePlugin *volumetesting.FakeVolumePlugin,
+	volumeName api.UniqueVolumeName,
 	asw cache.ActualStateOfWorld) {
 	err := retryWithExponentialBackOff(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
-			attachedVolumes := asw.GetAttachedVolumes()
-			if len(attachedVolumes) == 0 {
-				return true, nil
+			if asw.VolumeExists(volumeName) {
+				return false, nil
 			}
 
-			return false, nil
+			return true, nil
 		},
 	)
 
 	if err != nil {
-		t.Fatalf("Timed out waiting for len of asw.attachedVolumes() to become zero.")
+		t.Fatalf("Timed out waiting for volume %q to be detached.", volumeName)
 	}
 }
 
