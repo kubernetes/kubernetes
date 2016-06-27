@@ -664,6 +664,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should invoke init containers on a RestartNever pod", func() {
+		framework.SkipIfContainerRuntimeIs("rkt") // #25988
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
@@ -729,6 +730,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should invoke init containers on a RestartAlways pod", func() {
+		framework.SkipIfContainerRuntimeIs("rkt") // #25988
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
@@ -798,6 +800,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should not start app containers if init containers fail on a RestartAlways pod", func() {
+		framework.SkipIfContainerRuntimeIs("rkt") // #25988
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
@@ -913,6 +916,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
+		framework.SkipIfContainerRuntimeIs("rkt") // #25988
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")

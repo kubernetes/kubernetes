@@ -348,6 +348,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should support inline execution and attach", func() {
+			framework.SkipIfContainerRuntimeIs("rkt") // #23335
 			framework.SkipUnlessServerVersionGTE(jobsVersion, c)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -1044,6 +1045,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		jobName := "e2e-test-rm-busybox-job"
 
 		It("should create a job from an image, then delete the job [Conformance]", func() {
+			// The rkt runtime doesn't support attach, see #23335
+			framework.SkipIfContainerRuntimeIs("rkt")
 			framework.SkipUnlessServerVersionGTE(jobsVersion, c)
 
 			By("executing a command with run --rm and attach with stdin")
