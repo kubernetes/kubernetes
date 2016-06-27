@@ -2089,6 +2089,7 @@ message PodSpec {
 
   // DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
+  // +k8s:conversion-gen=false
   optional string serviceAccount = 9;
 
   // NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
@@ -2099,14 +2100,17 @@ message PodSpec {
   // Host networking requested for this pod. Use the host's network namespace.
   // If this option is set, the ports that will be used must be specified.
   // Default to false.
+  // +k8s:conversion-gen=false
   optional bool hostNetwork = 11;
 
   // Use the host's pid namespace.
   // Optional: Default to false.
+  // +k8s:conversion-gen=false
   optional bool hostPID = 12;
 
   // Use the host's ipc namespace.
   // Optional: Default to false.
+  // +k8s:conversion-gen=false
   optional bool hostIPC = 13;
 
   // SecurityContext holds pod-level security attributes and common container settings.
