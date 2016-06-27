@@ -183,9 +183,13 @@ func findNodesThatFit(
 
 	if len(filtered) > 0 && len(extenders) != 0 {
 		for _, extender := range extenders {
-			filteredList, err := extender.Filter(pod, filtered)
+			filteredList, failedMap, err := extender.Filter(pod, filtered)
 			if err != nil {
 				return []*api.Node{}, FailedPredicateMap{}, err
+			}
+
+			for failedNodeName, failedMsg := range failedMap {
+				failedPredicateMap[failedNodeName] = failedMsg
 			}
 			filtered = filteredList
 			if len(filtered) == 0 {
