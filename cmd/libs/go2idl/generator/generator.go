@@ -166,6 +166,9 @@ type Context struct {
 	// If true, Execute* calls will just verify that the existing output is
 	// correct. (You may set this after calling NewContext.)
 	Verify bool
+
+	// Allows generators to add packages at runtime.
+	builder *parser.Builder
 }
 
 // NewContext generates a context from the given builder, naming systems, and
@@ -183,6 +186,7 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 		FileTypes: map[string]FileType{
 			GolangFileType: NewGolangFile(),
 		},
+		builder: b,
 	}
 
 	for name, systemNamer := range nameSystems {
@@ -193,4 +197,11 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 		}
 	}
 	return c, nil
+}
+
+// AddDir adds a Go package to the context. The specified path must be a single
+// go package import path.  GOPATH, GOROOT, and the location of your go binary
+// (`which go`) will all be searched, in the normal Go fashion.
+func (ctxt *Context) AddDir(path string) error {
+	return ctxt.builder.AddDirTo(path, &ctxt.Universe)
 }
