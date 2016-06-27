@@ -572,6 +572,10 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 }
 
 func verifyServiceNodePort(options *options.ServerRunOptions) {
+	if options.KubernetesServiceNodePort < 0 || options.KubernetesServiceNodePort > 65535 {
+		glog.Fatalf("--kubernetes-service-node-port %v must be between 0 and 65535, inclusive. If 0, the Kubernetes master service will be of type ClusterIP.", options.KubernetesServiceNodePort)
+	}
+
 	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
 		glog.Fatalf("Kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort))
 	}
@@ -583,10 +587,25 @@ func verifyEtcdServersList(options *options.ServerRunOptions) {
 	}
 }
 
+func verifySecurePort(options *options.ServerRunOptions) {
+	if options.SecurePort < 0 || options.SecurePort > 65535 {
+		glog.Fatalf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort)
+	}
+}
+
+// TODO: Allow 0 to turn off insecure port.
+func verifyInsecurePort(options *options.ServerRunOptions) {
+	if options.InsecurePort < 1 || options.InsecurePort > 65535 {
+		glog.Fatalf("--insecure-port %v must be between 1 and 65535, inclusive.", options.InsecurePort)
+	}
+}
+
 func ValidateRunOptions(options *options.ServerRunOptions) {
 	verifyClusterIPFlags(options)
 	verifyServiceNodePort(options)
 	verifyEtcdServersList(options)
+	verifySecurePort(options)
+	verifyInsecurePort(options)
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
