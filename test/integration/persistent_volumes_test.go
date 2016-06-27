@@ -108,7 +108,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -156,7 +156,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -208,7 +208,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -273,7 +273,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -346,7 +346,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -438,7 +438,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -513,7 +513,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeReleased)
 	t.Log("volumes released")
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 }
 
 // TestPersistentVolumeMultiPVsPVCs tests binding of 100 PVC to 100 PVs.
@@ -522,7 +522,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, binder, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -593,7 +593,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 		glog.V(2).Infof("PVC %q is bound to PV %q", pvc.Name, pvc.Spec.VolumeName)
 	}
 	testSleep()
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 }
 
 // TestPersistentVolumeProvisionMultiPVCs tests provisioning of many PVCs.
@@ -602,7 +602,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, binder, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -672,7 +672,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	}
 	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: volumes are deleted")
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 }
 
 // TestPersistentVolumeMultiPVsDiffAccessModes tests binding of one PVC to two
@@ -681,7 +681,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	testClient, controller, watchPV, watchPVC := createClients(t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -747,7 +747,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeReleased)
 	t.Log("volume released")
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 }
 
 func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w watch.Interface, phase api.PersistentVolumePhase) {

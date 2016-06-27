@@ -51,20 +51,6 @@ func withEtcdKey(f func(string)) {
 	f(prefix)
 }
 
-func deleteAllEtcdKeys() {
-	keysAPI := etcd.NewKeysAPI(newEtcdClient())
-	keys, err := keysAPI.Get(context.TODO(), "/", nil)
-	if err != nil {
-		glog.Fatalf("Unable to list root etcd keys: %v", err)
-	}
-	for _, node := range keys.Node.Nodes {
-		if _, err := keysAPI.Delete(context.TODO(), node.Key, &etcd.DeleteOptions{Recursive: true}); err != nil {
-			glog.Fatalf("Unable delete key: %v", err)
-		}
-	}
-
-}
-
 func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 	if err := c.Pods(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
