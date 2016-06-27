@@ -165,7 +165,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 	for _, claim := range claimList.Items {
 		storeObjectUpdate(ctrl.claims, claim, "claim")
 	}
-	glog.V(4).Infof("controller initialized")
+	glog.V(2).Infof("Persistent volume controller cache initialized")
 }
 
 // addVolume is callback from framework.Controller watching PersistentVolume
