@@ -24,6 +24,8 @@ import (
 	fakeunversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned/fake"
 	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
 	fakeunversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned/fake"
+	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
+	fakeunversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned/fake"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	fakeunversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned/fake"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
@@ -90,4 +92,9 @@ func (c *Clientset) Batch() unversionedbatch.BatchInterface {
 // Rbac retrieves the RbacClient
 func (c *Clientset) Rbac() unversionedrbac.RbacInterface {
 	return &fakeunversionedrbac.FakeRbac{Fake: &c.Fake}
+}
+
+// Certificates retrieves the CertificatesClient
+func (c *Clientset) Certificates() unversionedcertificates.CertificatesInterface {
+	return &fakeunversionedcertificates.FakeCertificates{Fake: &c.Fake}
 }
