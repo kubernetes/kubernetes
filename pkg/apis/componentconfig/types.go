@@ -471,6 +471,9 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentNamespaceSyncs is the number of namespace objects that are
 	// allowed to sync concurrently.
 	ConcurrentNamespaceSyncs int32 `json:"concurrentNamespaceSyncs"`
+	// concurrentSATokenSyncs is the number of service account token syncing operations
+	// that will be done concurrently.
+	ConcurrentSATokenSyncs int32 `json:"concurrentSATokenSyncs"`
 	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
 	LookupCacheSizeForRC int32 `json:"lookupCacheSizeForRC"`
