@@ -193,6 +193,11 @@ func NegotiateVersion(client *Client, c *restclient.Config, requestedGV *unversi
 			return nil, fmt.Errorf("client does not support API version %q; client supported API versions: %v", preferredGV, clientVersions)
 
 		}
+		// If the server supports no versions, then we should just use the preferredGV
+		// This can happen because discovery fails due to 403 Forbidden errors
+		if len(serverVersions) == 0 {
+			return preferredGV, nil
+		}
 		if serverVersions.Has(preferredGV.String()) {
 			return preferredGV, nil
 		}
