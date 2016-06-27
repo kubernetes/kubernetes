@@ -25,7 +25,7 @@ type unsupportedCgroupManager struct{}
 // Make sure that unsupportedCgroupManager implements the CgroupManager interface
 var _ CgroupManager = &unsupportedCgroupManager{}
 
-func NewCgroupManager(_ *cgroupSubsystems) CgroupManager {
+func NewCgroupManager(_ interface{}) CgroupManager {
 	return &unsupportedCgroupManager{}
 }
 
