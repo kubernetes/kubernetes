@@ -26,13 +26,13 @@ import (
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
 	unversioned.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty"`
+	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The certificate request itself and any additonal information.
-	Spec CertificateSigningRequestSpec `json:"spec,omitempty"`
+	Spec CertificateSigningRequestSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Derived information about the request.
-	Status CertificateSigningRequestStatus `json:"status,omitempty"`
+	Status CertificateSigningRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // This information is immutable after the request is created. Only the Request
@@ -40,21 +40,21 @@ type CertificateSigningRequest struct {
 // Kubernetes and cannot be modified by users.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
-	Request []byte `json:"request"`
+	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// Information about the requesting user (if relevant)
 	// See user.Info interface for details
-	Username string   `json:"username,omitempty"`
-	UID      string   `json:"uid,omitempty"`
-	Groups   []string `json:"groups,omitempty"`
+	Username string   `json:"username,omitempty" protobuf:"bytes,2,opt,name=username"`
+	UID      string   `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
+	Groups   []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
 }
 
 type CertificateSigningRequestStatus struct {
 	// Conditions applied to the request, such as approval or denial.
-	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty"`
+	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
-	Certificate []byte `json:"certificate,omitempty"`
+	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }
 
 type RequestConditionType string
@@ -67,18 +67,18 @@ const (
 
 type CertificateSigningRequestCondition struct {
 	// request approval state, currently Approved or Denied.
-	Type RequestConditionType `json:"type"`
+	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
 	// brief reason for the request state
-	Reason string `json:"reason,omitempty"`
+	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
 	// human readable message with details about the request state
-	Message string `json:"message,omitempty"`
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// timestamp for the last update to this condition
-	LastUpdateTime unversioned.Time `json:"lastUpdateTime,omitempty"`
+	LastUpdateTime unversioned.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
 }
 
 type CertificateSigningRequestList struct {
 	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items []CertificateSigningRequest `json:"items,omitempty"`
+	Items []CertificateSigningRequest `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 }
