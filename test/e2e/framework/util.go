@@ -3209,7 +3209,7 @@ func WaitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds i
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			if !deploymentutil.IsPodAvailable(&pod, int32(minReadySeconds)) {
+			if !deploymentutil.IsPodAvailable(&pod, int32(minReadySeconds), time.Now()) {
 				return false, nil
 			}
 		}
@@ -3260,7 +3260,7 @@ func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 	if err == nil {
 		for _, pod := range podList.Items {
 			availability := "not available"
-			if deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
+			if deploymentutil.IsPodAvailable(&pod, minReadySeconds, time.Now()) {
 				availability = "available"
 			}
 			Logf("Pod %s is %s: %+v", pod.Name, availability, pod)
