@@ -573,11 +573,26 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 	glog.V(5).Infof("generating for type %v", t)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	peerType := getPeerTypeFor(c, t, g.peerPackages)
+	didForward, didBackward := false, false
 	if isDirectlyConvertible(t, peerType, g.manualConversions) {
+		didForward = true
 		g.generateConversion(t, peerType, sw)
 	}
 	if isDirectlyConvertible(peerType, t, g.manualConversions) {
+		didBackward = true
 		g.generateConversion(peerType, t, sw)
+	}
+	if didForward != didBackward {
+		glog.Fatalf("Could only generate one direction of conversion for %v <-> %v", t, peerType)
+	}
+	if !didForward && !didBackward {
+		// TODO: This should be fatal but we have at least 8 types that
+		// currently fail this.  The right thing to do is to figure out why they
+		// can't be generated and mark those fields as
+		// +k8s:conversion-gen=false, and ONLY do manual conversions for those
+		// fields, with the manual Convert_...() calling autoConvert_...()
+		// first.
+		glog.Errorf("Warning: could not generate autoConvert functions for %v <-> %v", t, peerType)
 	}
 	return sw.Error()
 }
