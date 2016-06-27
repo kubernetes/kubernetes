@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -45,6 +46,12 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		Convert_v1_ServiceSpec_To_api_ServiceSpec,
 		Convert_v1_ResourceList_To_api_ResourceList,
+
+		Convert_api_VolumeSource_To_v1_VolumeSource,
+		Convert_v1_VolumeSource_To_api_VolumeSource,
+
+		Convert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints,
+		Convert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -422,8 +429,13 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 	} else {
 		out.ImagePullSecrets = nil
 	}
+
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
+
+	// carry conversion
+	out.DeprecatedHost = in.NodeName
+
 	return nil
 }
 
@@ -471,6 +483,12 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		out.ServiceAccountName = in.DeprecatedServiceAccount
 	}
 	out.NodeName = in.NodeName
+
+	// carry conversion
+	if in.NodeName == "" {
+		out.NodeName = in.DeprecatedHost
+	}
+
 	if in.SecurityContext != nil {
 		out.SecurityContext = new(api.PodSecurityContext)
 		if err := Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
@@ -594,7 +612,11 @@ func Convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Service
 		return err
 	}
 	// Publish both externalIPs and deprecatedPublicIPs fields in v1.
-	out.DeprecatedPublicIPs = in.ExternalIPs
+	for _, ip := range in.ExternalIPs {
+		out.DeprecatedPublicIPs = append(out.DeprecatedPublicIPs, ip)
+	}
+	// Carry conversion
+	out.DeprecatedPortalIP = in.ClusterIP
 	return nil
 }
 
@@ -656,6 +678,80 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.Reso
 		val.RoundUp(milliScale)
 
 		(*out)[api.ResourceName(key)] = val
+	}
+	return nil
+}
+
+// This will Convert our internal represantation of VolumeSource to its v1 representation
+// Used for keeping backwards compatibility for the Metadata field
+func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
+	if err := autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s); err != nil {
+		return err
+	}
+
+	// Metadata is a copy of DownwardAPI
+	if out.DownwardAPI != nil {
+		out.Metadata = &DeprecatedDownwardAPIVolumeSource{}
+		for _, item := range out.DownwardAPI.Items {
+			out.Metadata.Items = append(out.Metadata.Items, DeprecatedDownwardAPIVolumeFile{
+				Path:             item.Path,
+				FieldRef:         item.FieldRef,
+				ResourceFieldRef: item.ResourceFieldRef,
+			})
+		}
+	}
+
+	return nil
+}
+
+// This will Convert the v1 representation of VolumeSource to our internal representation
+// Used for keeping backwards compatibility for the Metadata field
+func Convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.VolumeSource, s conversion.Scope) error {
+	if err := autoConvert_v1_VolumeSource_To_api_VolumeSource(in, out, s); err != nil {
+		return err
+	}
+
+	// Metadata overrides DownwardAPI
+	if in.Metadata != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG: got metadata on volume source: %#v\n", in.Metadata)
+		out.DownwardAPI = &api.DownwardAPIVolumeSource{}
+		for _, item := range in.Metadata.Items {
+			file := api.DownwardAPIVolumeFile{Path: item.Path}
+			if item.FieldRef != nil {
+				file.FieldRef = new(api.ObjectFieldSelector)
+				if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(item.FieldRef, file.FieldRef, s); err != nil {
+					return err
+				}
+			}
+			if item.ResourceFieldRef != nil {
+				file.ResourceFieldRef = new(api.ResourceFieldSelector)
+				if err := Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(item.ResourceFieldRef, file.ResourceFieldRef, s); err != nil {
+					return err
+				}
+			}
+			out.DownwardAPI.Items = append(out.DownwardAPI.Items, file)
+		}
+	}
+	return nil
+}
+
+func Convert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints(in *SecurityContextConstraints, out *api.SecurityContextConstraints, s conversion.Scope) error {
+	return autoConvert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints(in, out, s)
+}
+
+func Convert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints(in *api.SecurityContextConstraints, out *SecurityContextConstraints, s conversion.Scope) error {
+	if err := autoConvert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints(in, out, s); err != nil {
+		return err
+	}
+
+	if in.Volumes != nil {
+		for _, v := range in.Volumes {
+			// set the Allow* fields based on the existence in the volume slice
+			switch v {
+			case api.FSTypeHostPath, api.FSTypeAll:
+				out.AllowHostDirVolumePlugin = true
+			}
+		}
 	}
 	return nil
 }

@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -44,6 +45,7 @@ type SharedInformer interface {
 	GetController() ControllerInterface
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
+	LastSyncResourceVersion() string
 }
 
 type SharedIndexInformer interface {
@@ -65,11 +67,12 @@ func NewSharedInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPer
 // be shared amongst all consumers.
 func NewSharedIndexInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers cache.Indexers) SharedIndexInformer {
 	sharedIndexInformer := &sharedIndexInformer{
-		processor:        &sharedProcessor{},
-		indexer:          cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
-		listerWatcher:    lw,
-		objectType:       objType,
-		fullResyncPeriod: resyncPeriod,
+		processor:             &sharedProcessor{},
+		indexer:               cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		listerWatcher:         lw,
+		objectType:            objType,
+		fullResyncPeriod:      resyncPeriod,
+		cacheMutationDetector: NewCacheMutationDetector(fmt.Sprintf("%v", reflect.TypeOf(objType))),
 	}
 	return sharedIndexInformer
 }
@@ -78,7 +81,8 @@ type sharedIndexInformer struct {
 	indexer    cache.Indexer
 	controller *Controller
 
-	processor *sharedProcessor
+	processor             *sharedProcessor
+	cacheMutationDetector CacheMutationDetector
 
 	// This block is tracked to handle late initialization of the controller
 	listerWatcher    cache.ListerWatcher
@@ -141,6 +145,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.started = true
 	}()
 
+	s.cacheMutationDetector.Run(stopCh)
 	s.processor.run(stopCh)
 	s.controller.Run(stopCh)
 }
@@ -159,6 +164,16 @@ func (s *sharedIndexInformer) HasSynced() bool {
 		return false
 	}
 	return s.controller.HasSynced()
+}
+
+func (s *sharedIndexInformer) LastSyncResourceVersion() string {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.controller == nil {
+		return ""
+	}
+	return s.controller.reflector.LastSyncResourceVersion()
 }
 
 func (s *sharedIndexInformer) GetStore() cache.Store {
@@ -202,6 +217,8 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	for _, d := range obj.(cache.Deltas) {
 		switch d.Type {
 		case cache.Sync, cache.Added, cache.Updated:
+			s.cacheMutationDetector.AddObject(d.Object)
+
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
 				if err := s.indexer.Update(d.Object); err != nil {
 					return err

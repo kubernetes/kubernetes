@@ -161,7 +161,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 		cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 		cmd.Flags().Set("image", "nginx")
 		cmd.Flags().Set("generator", "run/v1")
-		err := Run(f, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
+		err := Run(f, nil, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("unexpected non-error (%s)", test.name)
 		}

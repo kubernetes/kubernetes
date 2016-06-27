@@ -463,6 +463,39 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			// Set the bytes field on the RawExtension
 			r.Raw = bytes
 		},
+		func(scc *api.SecurityContextConstraints, c fuzz.Continue) {
+			c.FuzzNoCustom(scc) // fuzz self without calling this function again
+			userTypes := []api.RunAsUserStrategyType{api.RunAsUserStrategyMustRunAsNonRoot, api.RunAsUserStrategyMustRunAs, api.RunAsUserStrategyRunAsAny, api.RunAsUserStrategyMustRunAsRange}
+			scc.RunAsUser.Type = userTypes[c.Rand.Intn(len(userTypes))]
+			seLinuxTypes := []api.SELinuxContextStrategyType{api.SELinuxStrategyRunAsAny, api.SELinuxStrategyMustRunAs}
+			scc.SELinuxContext.Type = seLinuxTypes[c.Rand.Intn(len(seLinuxTypes))]
+			supGroupTypes := []api.SupplementalGroupsStrategyType{api.SupplementalGroupsStrategyMustRunAs, api.SupplementalGroupsStrategyRunAsAny}
+			scc.SupplementalGroups.Type = supGroupTypes[c.Rand.Intn(len(supGroupTypes))]
+			fsGroupTypes := []api.FSGroupStrategyType{api.FSGroupStrategyMustRunAs, api.FSGroupStrategyRunAsAny}
+			scc.FSGroup.Type = fsGroupTypes[c.Rand.Intn(len(fsGroupTypes))]
+
+			// when fuzzing the volume types ensure it is set to avoid the defaulter's expansion.
+			// Do not use FSTypeAll or host dir setting to steer clear of defaulting mechanics
+			// which are covered in specific unit tests.
+			volumeTypes := []api.FSType{api.FSTypeAWSElasticBlockStore,
+				api.FSTypeAzureFile,
+				api.FSTypeCephFS,
+				api.FSTypeCinder,
+				api.FSTypeDownwardAPI,
+				api.FSTypeEmptyDir,
+				api.FSTypeFC,
+				api.FSTypeFlexVolume,
+				api.FSTypeFlocker,
+				api.FSTypeGCEPersistentDisk,
+				api.FSTypeGitRepo,
+				api.FSTypeGlusterfs,
+				api.FSTypeISCSI,
+				api.FSTypeNFS,
+				api.FSTypePersistentVolumeClaim,
+				api.FSTypeRBD,
+				api.FSTypeSecret}
+			scc.Volumes = []api.FSType{volumeTypes[c.Rand.Intn(len(volumeTypes))]}
+		},
 	)
 	return f
 }
