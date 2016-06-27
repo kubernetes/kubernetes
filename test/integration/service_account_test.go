@@ -337,7 +337,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 // It is the responsibility of the caller to ensure the returned stopFunc is called
 func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func()) {
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// Listener
 	var m *master.Master
