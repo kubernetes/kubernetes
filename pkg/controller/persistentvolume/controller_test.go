@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"flag"
 	"testing"
 	"time"
 
@@ -33,77 +34,16 @@ import (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
-	expectedChanges := []int{4, 1, 1, 2, 1, 1, 1}
+	flag.Set("alsologtostderr", "true")
+	flag.Set("v", "5")
+
+	expectedChanges := []int{1}
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
 		// it was connected to real API server, i.e. we call add/update/delete
 		// Claim/Volume methods. Also, all changes to volumes and claims are
 		// sent to add/update/delete Claim/Volume as real controller would do.
-		{
-			// addClaim gets a new claim. Check it's bound to a volume.
-			"5-2 - complete bind",
-			newVolumeArray("volume5-2", "10Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRetain),
-			newVolumeArray("volume5-2", "10Gi", "uid5-2", "claim5-2", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
-			noclaims, /* added in testAddClaim5_2 */
-			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", api.ClaimBound, annBoundByController, annBindCompleted),
-			noevents, noerrors,
-			// Custom test function that generates an add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", api.ClaimPending)
-				reactor.addClaimEvent(claim)
-				return nil
-			},
-		},
-		{
-			// deleteClaim with a bound claim makes bound volume released.
-			"5-3 - delete claim",
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", api.VolumeReleased, api.PersistentVolumeReclaimRetain, annBoundByController),
-			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", api.ClaimBound, annBoundByController, annBindCompleted),
-			noclaims,
-			noevents, noerrors,
-			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				obj := ctrl.claims.List()[0]
-				claim := obj.(*api.PersistentVolumeClaim)
-				reactor.deleteClaimEvent(claim)
-				return nil
-			},
-		},
-		{
-			// deleteVolume with a bound volume. Check the claim is Lost.
-			"5-4 - delete volume",
-			newVolumeArray("volume5-4", "10Gi", "uid5-4", "claim5-4", api.VolumeBound, api.PersistentVolumeReclaimRetain),
-			novolumes,
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimBound, annBoundByController, annBindCompleted),
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimLost, annBoundByController, annBindCompleted),
-			[]string{"Warning ClaimLost"}, noerrors,
-			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				obj := ctrl.volumes.store.List()[0]
-				volume := obj.(*api.PersistentVolume)
-				reactor.deleteVolumeEvent(volume)
-				return nil
-			},
-		},
-		{
-			// addVolume with provisioned volume from Kubernetes 1.2. No "action"
-			// is expected - it should stay bound.
-			"5-5 - add bound volume from 1.2",
-			novolumes,
-			[]*api.PersistentVolume{addVolumeAnnotation(newVolume("volume5-5", "10Gi", "uid5-5", "claim5-5", api.VolumeBound, api.PersistentVolumeReclaimDelete), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
-			newClaimArray("claim5-5", "uid5-5", "1Gi", "", api.ClaimPending),
-			newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", api.ClaimBound, annBindCompleted, annBoundByController),
-			noevents, noerrors,
-			// Custom test function that generates a add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-5", "10Gi", "uid5-5", "claim5-5", api.VolumeBound, api.PersistentVolumeReclaimDelete)
-				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)
-				reactor.addVolumeEvent(volume)
-				return nil
-			},
-		},
 		{
 			// updateVolume with provisioned volume from Kubernetes 1.2. No
 			// "action" is expected - it should stay bound.
@@ -121,94 +61,69 @@ func TestControllerSync(t *testing.T) {
 				return nil
 			},
 		},
-		{
-			// addVolume with unprovisioned volume from Kubernetes 1.2. The
-			// volume should be deleted.
-			"5-7 - add unprovisioned volume from 1.2",
-			novolumes,
-			novolumes,
-			newClaimArray("claim5-7", "uid5-7", "1Gi", "", api.ClaimPending),
-			newClaimArray("claim5-7", "uid5-7", "1Gi", "", api.ClaimPending),
-			noevents, noerrors,
-			// Custom test function that generates a add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-7", "10Gi", "uid5-7", "claim5-7", api.VolumeBound, api.PersistentVolumeReclaimDelete)
-				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, "yes")
-				reactor.addVolumeEvent(volume)
-				return nil
-			},
-		},
-		{
-			// updateVolume with unprovisioned volume from Kubernetes 1.2. The
-			// volume should be deleted.
-			"5-8 - update bound volume from 1.2",
-			novolumes,
-			novolumes,
-			newClaimArray("claim5-8", "uid5-8", "1Gi", "", api.ClaimPending),
-			newClaimArray("claim5-8", "uid5-8", "1Gi", "", api.ClaimPending),
-			noevents, noerrors,
-			// Custom test function that generates a add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-8", "10Gi", "uid5-8", "claim5-8", api.VolumeBound, api.PersistentVolumeReclaimDelete)
-				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, "yes")
-				reactor.modifyVolumeEvent(volume)
-				return nil
-			},
-		},
 	}
 
-	for ix, test := range tests {
-		glog.V(4).Infof("starting test %q", test.name)
-
-		// Initialize the controller
-		client := &fake.Clientset{}
-		volumeSource := framework.NewFakePVControllerSource()
-		claimSource := framework.NewFakePVCControllerSource()
-		ctrl := newTestController(client, volumeSource, claimSource, true)
-		reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource, test.errors)
-		for _, claim := range test.initialClaims {
-			claimSource.Add(claim)
-			reactor.claims[claim.Name] = claim
+	timeout := time.After(5 * time.Minute)
+Loop:
+	for {
+		select {
+		case <-timeout:
+			break Loop
+		default:
 		}
-		for _, volume := range test.initialVolumes {
-			volumeSource.Add(volume)
-			reactor.volumes[volume.Name] = volume
-		}
+		for ix, test := range tests {
+			glog.V(4).Infof("starting test %q =======================================================================", test.name)
 
-		// Start the controller
-		count := reactor.getChangeCount()
-		go ctrl.Run()
+			// Initialize the controller
+			client := &fake.Clientset{}
+			volumeSource := framework.NewFakePVControllerSource()
+			claimSource := framework.NewFakePVCControllerSource()
+			ctrl := newTestController(client, volumeSource, claimSource, true)
+			reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource, test.errors)
+			for _, claim := range test.initialClaims {
+				claimSource.Add(claim)
+				reactor.claims[claim.Name] = claim
+			}
+			for _, volume := range test.initialVolumes {
+				volumeSource.Add(volume)
+				reactor.volumes[volume.Name] = volume
+			}
 
-		// Wait for the controller to pass initial sync and fill its caches.
-		for !ctrl.volumeController.HasSynced() ||
-			!ctrl.claimController.HasSynced() ||
-			len(ctrl.claims.ListKeys()) < len(test.initialClaims) ||
-			len(ctrl.volumes.store.ListKeys()) < len(test.initialVolumes) {
+			// Start the controller
+			count := reactor.getChangeCount()
+			go ctrl.Run()
 
-			time.Sleep(10 * time.Millisecond)
-		}
-		glog.V(4).Infof("controller synced, starting test")
+			// Wait for the controller to pass initial sync and fill its caches.
+			for !ctrl.volumeController.HasSynced() ||
+				!ctrl.claimController.HasSynced() ||
+				len(ctrl.claims.ListKeys()) < len(test.initialClaims) ||
+				len(ctrl.volumes.store.ListKeys()) < len(test.initialVolumes) {
 
-		// Call the tested function
-		err := test.test(ctrl, reactor, test)
-		if err != nil {
-			t.Errorf("Test %q initial test call failed: %v", test.name, err)
-		}
-		// Simulate a periodic resync, just in case some events arrived in a
-		// wrong order.
-		ctrl.claims.Resync()
-		ctrl.volumes.store.Resync()
+				time.Sleep(10 * time.Millisecond)
+			}
+			glog.V(4).Infof("controller synced, starting test")
 
-		// Wait at least once, just in case expectedChanges[ix] == 0
-		reactor.waitTest()
-		// Wait for expected number of operations.
-		for reactor.getChangeCount() < count+expectedChanges[ix] {
+			// Call the tested function
+			err := test.test(ctrl, reactor, test)
+			if err != nil {
+				t.Errorf("Test %q initial test call failed: %v", test.name, err)
+			}
+			// Simulate a periodic resync, just in case some events arrived in a
+			// wrong order.
+			ctrl.claims.Resync()
+			ctrl.volumes.store.Resync()
+
+			// Wait at least once, just in case expectedChanges[ix] == 0
 			reactor.waitTest()
+			// Wait for expected number of operations.
+			for reactor.getChangeCount() < count+expectedChanges[ix] {
+				reactor.waitTest()
+			}
+
+			ctrl.Stop()
+
+			evaluateTestResults(ctrl, reactor, test, t)
 		}
-
-		ctrl.Stop()
-
-		evaluateTestResults(ctrl, reactor, test, t)
 	}
 }
 
