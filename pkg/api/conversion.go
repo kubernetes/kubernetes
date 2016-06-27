@@ -100,15 +100,12 @@ func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.T
 }
 
 func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *unversioned.ListMeta, s conversion.Scope) error {
-	out.ResourceVersion = in.ResourceVersion
-	out.SelfLink = in.SelfLink
+	*out = *in
 	return nil
 }
 
 func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
-	out.Type = in.Type
-	out.IntVal = in.IntVal
-	out.StrVal = in.StrVal
+	*out = *in
 	return nil
 }
 

@@ -695,6 +695,11 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 				funcName := g.funcNameTmpl(inType.Elem, outType.Elem)
 				sw.Do(fmt.Sprintf("if err := %s(&(*in)[i], &(*out)[i], s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
 			} else {
+				// TODO: This triggers on v1.ObjectMeta <-> api.ObjectMeta and
+				// similar because neither package is the target package, and
+				// we really don't know which package will have the conversion
+				// function defined.  This fires on basically every object
+				// conversion outside of pkg/api/v1.
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
 				sw.Do("if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {\n", nil)
 			}
