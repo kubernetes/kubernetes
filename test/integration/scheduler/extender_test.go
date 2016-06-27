@@ -79,11 +79,12 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 
 	if strings.Contains(req.URL.Path, filter) {
 		resp := &schedulerapi.ExtenderFilterResult{}
-		nodes, err := e.Filter(&args.Pod, &args.Nodes)
+		nodes, failedNodes, err := e.Filter(&args.Pod, &args.Nodes)
 		if err != nil {
 			resp.Error = err.Error()
 		} else {
 			resp.Nodes = *nodes
+			resp.FailedNodes = failedNodes
 		}
 
 		if err := encoder.Encode(resp); err != nil {
@@ -102,14 +103,15 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 	}
 }
 
-func (e *Extender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, error) {
+func (e *Extender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, schedulerapi.FailedNodesMap, error) {
 	filtered := []api.Node{}
+	failedNodesMap := schedulerapi.FailedNodesMap{}
 	for _, node := range nodes.Items {
 		fits := true
 		for _, predicate := range e.predicates {
 			fit, err := predicate(pod, &node)
 			if err != nil {
-				return &api.NodeList{}, err
+				return &api.NodeList{}, schedulerapi.FailedNodesMap{}, err
 			}
 			if !fit {
 				fits = false
@@ -118,9 +120,11 @@ func (e *Extender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, err
 		}
 		if fits {
 			filtered = append(filtered, node)
+		} else {
+			failedNodesMap[node.Name] = fmt.Sprintf("extender failed: %s", e.name)
 		}
 	}
-	return &api.NodeList{Items: filtered}, nil
+	return &api.NodeList{Items: filtered}, failedNodesMap, nil
 }
 
 func (e *Extender) Prioritize(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, error) {

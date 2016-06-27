@@ -26,8 +26,9 @@ import (
 // managed by Kubernetes.
 type SchedulerExtender interface {
 	// Filter based on extender-implemented predicate functions. The filtered list is
-	// expected to be a subset of the supplied list.
-	Filter(pod *api.Pod, nodes []*api.Node) (filteredNodes []*api.Node, err error)
+	// expected to be a subset of the supplied list. failedNodesMap optionally contains
+	// the list of failed nodes and failure reasons.
+	Filter(pod *api.Pod, nodes []*api.Node) (filteredNodes []*api.Node, failedNodesMap schedulerapi.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
