@@ -220,6 +220,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		EnableControllerAttachDetach: s.EnableControllerAttachDetach,
 		EnableCustomMetrics:          s.EnableCustomMetrics,
 		EnableDebuggingHandlers:      s.EnableDebuggingHandlers,
+		CgroupsPerQOS:                s.CgroupsPerQOS,
 		EnableServer:                 s.EnableServer,
 		EventBurst:                   int(s.EventBurst),
 		EventRecordQPS:               float32(s.EventRecordQPS),
@@ -363,12 +364,13 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		if kcfg.SystemCgroups != "" && kcfg.CgroupRoot == "" {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
-
 		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface, cm.NodeConfig{
 			RuntimeCgroupsName: kcfg.RuntimeCgroups,
 			SystemCgroupsName:  kcfg.SystemCgroups,
 			KubeletCgroupsName: kcfg.KubeletCgroups,
 			ContainerRuntime:   kcfg.ContainerRuntime,
+			CgroupsPerQOS:      kcfg.CgroupsPerQOS,
+			CgroupRoot:         kcfg.CgroupRoot,
 		})
 		if err != nil {
 			return err
@@ -575,6 +577,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		EnableCustomMetrics:          false,
 		EnableDebuggingHandlers:      true,
 		EnableServer:                 true,
+		CgroupsPerQOS:                false,
 		FileCheckFrequency:           fileCheckFrequency,
 		// Since this kubelet runs with --configure-cbr0=false, it needs to use
 		// hairpin-veth to allow hairpin packets. Note that this deviates from
@@ -798,6 +801,7 @@ type KubeletConfig struct {
 	EnableControllerAttachDetach   bool
 	EnableCustomMetrics            bool
 	EnableDebuggingHandlers        bool
+	CgroupsPerQOS                  bool
 	EnableServer                   bool
 	EventClient                    *clientset.Clientset
 	EventBurst                     int
@@ -929,6 +933,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.NodeLabels,
 		kc.NodeStatusUpdateFrequency,
 		kc.OSInterface,
+		kc.CgroupsPerQOS,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
 		kc.RuntimeRequestTimeout,

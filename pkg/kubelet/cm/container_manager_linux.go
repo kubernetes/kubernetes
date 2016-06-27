@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -97,7 +98,10 @@ type containerManagerImpl struct {
 	status Status
 	// External containers being managed.
 	systemContainers []*systemContainer
+	qosContainers    QOSContainersInfo
 	periodicTasks    []func()
+	// holds all the mounted cgroup subsystems
+	subsystems *cgroupSubsystems
 }
 
 type features struct {
@@ -161,10 +165,24 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
+	// Check if Cgroup-root actually exists on the node
+	if nodeConfig.CgroupsPerQOS {
+		if nodeConfig.CgroupRoot == "" {
+			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
+		}
+		if _, err := os.Stat(nodeConfig.CgroupRoot); err != nil {
+			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist : %v", err)
+		}
+	}
+	subsystems, err := getCgroupSubsystems()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mounted subsystems: %v", err)
+	}
 	return &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
 		mountUtil:         mountUtil,
 		NodeConfig:        nodeConfig,
+		subsystems:        subsystems,
 	}, nil
 }
 
@@ -189,6 +207,41 @@ const (
 	KernelTunableError  KernelTunableBehavior = "error"
 	KernelTunableModify KernelTunableBehavior = "modify"
 )
+
+// InitQOS creates the top level qos cgroup containers
+// We create top level QoS containers for only Burstable and Best Effort
+// and not Guaranteed QoS class. All guaranteed pods are nested under the
+// RootContainer by default. InitQOS is called only once during kubelet bootstrapping.
+// TODO(@dubstack) Add support for cgroup-root to work on both systemd and cgroupfs
+// drivers. Currently we only support systems running cgroupfs driver
+func InitQOS(rootContainer string, subsystems *cgroupSubsystems) (QOSContainersInfo, error) {
+	cm := NewCgroupManager(subsystems)
+	// Top level for Qos containers are created only for Burstable
+	// and Best Effort classes
+	qosClasses := [2]qos.QOSClass{qos.Burstable, qos.BestEffort}
+
+	// Create containers for both qos classes
+	for _, qosClass := range qosClasses {
+		// get the container's absolute name
+		absoluteContainerName := path.Join(rootContainer, string(qosClass))
+		// containerConfig object stores the cgroup specifications
+		containerConfig := &CgroupConfig{
+			Name:               absoluteContainerName,
+			ResourceParameters: &ResourceConfig{},
+		}
+		// TODO(@dubstack) Add support on systemd cgroups driver
+		if err := cm.Create(containerConfig); err != nil {
+			return QOSContainersInfo{}, fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
+		}
+	}
+	// Store the top level qos container names
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: rootContainer,
+		Burstable:  path.Join(rootContainer, string(qos.Burstable)),
+		BestEffort: path.Join(rootContainer, string(qos.BestEffort)),
+	}
+	return qosContainersInfo, nil
+}
 
 // setupKernelTunables validates kernel tunable flags are set as expected
 // depending upon the specified option, it will either warn, error, or modify the kernel tunable flags
@@ -238,6 +291,15 @@ func (cm *containerManagerImpl) setupNode() error {
 	// TODO: plumb kernel tunable options into container manager, right now, we modify by default
 	if err := setupKernelTunables(KernelTunableModify); err != nil {
 		return err
+	}
+
+	// Setup top level qos containers only if CgroupsPerQOS flag is specified as true
+	if cm.NodeConfig.CgroupsPerQOS {
+		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupRoot, cm.subsystems)
+		if err != nil {
+			return fmt.Errorf("failed to initialise top level QOS containers: %v", err)
+		}
+		cm.qosContainers = qosContainersInfo
 	}
 
 	systemContainers := []*systemContainer{}
