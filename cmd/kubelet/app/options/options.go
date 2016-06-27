@@ -82,7 +82,7 @@ func NewKubeletServer() *KubeletServer {
 			CAdvisorPort:                 4194,
 			VolumeStatsAggPeriod:         unversioned.Duration{Duration: time.Minute},
 			CertDirectory:                "/var/run/kubernetes",
-			CgroupRoot:                   "",
+			CgroupRoot:                   "/",
 			ConfigureCBR0:                false,
 			ContainerRuntime:             "docker",
 			RuntimeRequestTimeout:        unversioned.Duration{Duration: 2 * time.Minute},
