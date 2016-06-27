@@ -712,6 +712,28 @@ ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 EOF
   fi
+
+  # Federation specific environment variables.
+  if [[ -n "${FEDERATION:-}" ]]; then
+    cat >>$file <<EOF
+FEDERATION: $(yaml-quote ${FEDERATION})
+EOF
+  fi
+  if [ -n "${FEDERATIONS_DOMAIN_MAP:-}" ]; then
+    cat >>$file <<EOF
+FEDERATIONS_DOMAIN_MAP: $(yaml-quote ${FEDERATIONS_DOMAIN_MAP})
+EOF
+  fi
+  if [ -n "${FEDERATION_NAME:-}" ]; then
+    cat >>$file <<EOF
+FEDERATION_NAME: $(yaml-quote ${FEDERATION_NAME})
+EOF
+  fi
+  if [ -n "${DNS_ZONE_NAME:-}" ]; then
+    cat >>$file <<EOF
+DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})
+EOF
+  fi
 }
 
 function sha1sum-file() {
