@@ -21,11 +21,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
+	"github.com/fsnotify/fsnotify"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/util/filewatcher"
 )
 
 type PasswordAuthenticator struct {
+	path  string
+	mutex *sync.Mutex
 	users map[string]*userPasswordInfo
 }
 
@@ -37,6 +43,25 @@ type userPasswordInfo struct {
 // NewCSV returns a PasswordAuthenticator, populated from a CSV file.
 // The CSV file must contain records in the format "password,username,useruid"
 func NewCSV(path string) (*PasswordAuthenticator, error) {
+	users, err := ReadCSV(path)
+	if err != nil {
+		return nil, err
+	}
+	authenticator := &PasswordAuthenticator{
+		path:  path,
+		mutex: &sync.Mutex{},
+		users: users,
+	}
+	watcher, err := filewatcher.CreateFileWatcher(path)
+	if err != nil {
+		glog.Errorf("failed to add file watcher on %s", path)
+	} else {
+		go filewatcher.StartFileEventLoop(watcher, authenticator.HandleEvent, authenticator.HandleError)
+	}
+	return authenticator, nil
+}
+
+func ReadCSV(path string) (map[string]*userPasswordInfo, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -62,8 +87,37 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 		}
 		users[obj.info.Name] = obj
 	}
+	return users, nil
+}
 
-	return &PasswordAuthenticator{users}, nil
+func (a *PasswordAuthenticator) Update(users map[string]*userPasswordInfo) {
+	a.mutex.Lock()
+	a.users = users
+	a.mutex.Unlock()
+}
+
+func (a *PasswordAuthenticator) HandleEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
+	if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Remove == fsnotify.Remove {
+		glog.Infof("file event caught: %s", event)
+		tokens, err := ReadCSV(a.path)
+		if err != nil {
+			glog.Infof("update token failed, %s", err)
+		} else {
+			glog.Infof("file updated: %s", a.path)
+			a.Update(tokens)
+		}
+	}
+	if event.Op&fsnotify.Remove == fsnotify.Remove {
+		// Some file editor do remove operations on file, eg. Vim
+		// And the file watcher will be invalid, so we add again.
+		watcher.Remove(a.path)
+		watcher.Add(a.path)
+	}
+}
+
+func (a *PasswordAuthenticator) HandleError(watcher *fsnotify.Watcher, err error) {
+	glog.Errorf("file watcher of %s got error %s", a.path, err)
+	watcher.Close()
 }
 
 func (a *PasswordAuthenticator) AuthenticatePassword(username, password string) (user.Info, bool, error) {
