@@ -299,7 +299,8 @@ func newTestKubeletWithImageList(
 		kubelet.hostname,
 		kubelet.podManager,
 		fakeKubeClient,
-		kubelet.volumePluginMgr)
+		kubelet.volumePluginMgr,
+		fakeRuntime)
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
 	}
