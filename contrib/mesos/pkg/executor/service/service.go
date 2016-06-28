@@ -190,7 +190,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	// make a separate client for events
-	eventClientConfig.QPS = s.EventRecordQPS
+	eventClientConfig.QPS = float32(s.EventRecordQPS)
 	eventClientConfig.Burst = int(s.EventBurst)
 	kcfg.EventClient, err = clientset.NewForConfig(eventClientConfig)
 	if err != nil {

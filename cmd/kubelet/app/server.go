@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -221,7 +222,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		EnableDebuggingHandlers:      s.EnableDebuggingHandlers,
 		EnableServer:                 s.EnableServer,
 		EventBurst:                   int(s.EventBurst),
-		EventRecordQPS:               s.EventRecordQPS,
+		EventRecordQPS:               float32(s.EventRecordQPS),
 		FileCheckFrequency:           s.FileCheckFrequency.Duration,
 		HostnameOverride:             s.HostnameOverride,
 		HostNetworkSources:           hostNetworkSources,
@@ -255,7 +256,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		RegisterNode:                   s.RegisterNode,
 		RegisterSchedulable:            s.RegisterSchedulable,
 		RegistryBurst:                  int(s.RegistryBurst),
-		RegistryPullQPS:                s.RegistryPullQPS,
+		RegistryPullQPS:                float64(s.RegistryPullQPS),
 		ResolverConfig:                 s.ResolverConfig,
 		Reservation:                    *reservation,
 		KubeletCgroups:                 s.KubeletCgroups,
@@ -331,7 +332,7 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 			// make a separate client for events
 			eventClientConfig := *clientConfig
-			eventClientConfig.QPS = s.EventRecordQPS
+			eventClientConfig.QPS = float32(s.EventRecordQPS)
 			eventClientConfig.Burst = int(s.EventBurst)
 			kcfg.EventClient, err = clientset.NewForConfig(&eventClientConfig)
 		}
@@ -339,7 +340,7 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 			glog.Warningf("No API client: %v", err)
 		}
 
-		if s.CloudProvider == options.AutoDetectCloudProvider {
+		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
 			kcfg.AutoDetectCloudProvider = true
 		} else {
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
@@ -506,7 +507,7 @@ func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 
 	clientConfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
-	clientConfig.QPS = s.KubeAPIQPS
+	clientConfig.QPS = float32(s.KubeAPIQPS)
 	clientConfig.Burst = int(s.KubeAPIBurst)
 
 	addChaosToClientConfig(s, clientConfig)

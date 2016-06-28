@@ -41,6 +41,8 @@ const (
 
 	// From pkg/kubelet/rkt/rkt.go to avoid circular import
 	defaultRktAPIServiceEndpoint = "localhost:15441"
+
+	AutoDetectCloudProvider = "auto-detect"
 )
 
 var zeroDuration = unversioned.Duration{}
@@ -138,7 +140,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.Address = "0.0.0.0"
 	}
 	if obj.CloudProvider == "" {
-		obj.CloudProvider = "auto-detect"
+		obj.CloudProvider = AutoDetectCloudProvider
 	}
 	if obj.CAdvisorPort == 0 {
 		obj.CAdvisorPort = 4194
@@ -170,8 +172,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EventBurst == 0 {
 		obj.EventBurst = 10
 	}
-	if obj.EventRecordQPS == 0 {
-		obj.EventRecordQPS = 5.0
+	if obj.EventRecordQPS == nil {
+		temp := int32(5)
+		obj.EventRecordQPS = &temp
 	}
 	if obj.EnableControllerAttachDetach == nil {
 		obj.EnableControllerAttachDetach = boolVar(true)
@@ -271,7 +274,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.RegistryBurst = 10
 	}
 	if obj.RegistryPullQPS == nil {
-		temp := float64(5)
+		temp := int32(5)
 		obj.RegistryPullQPS = &temp
 	}
 	if obj.ResolverConfig == "" {
@@ -301,8 +304,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.ContentType == "" {
 		obj.ContentType = "application/vnd.kubernetes.protobuf"
 	}
-	if obj.KubeAPIQPS == 0 {
-		obj.KubeAPIQPS = 5
+	if obj.KubeAPIQPS == nil {
+		temp := int32(5)
+		obj.KubeAPIQPS = &temp
 	}
 	if obj.KubeAPIBurst == 0 {
 		obj.KubeAPIBurst = 10
@@ -314,10 +318,17 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.HairpinMode = PromiscuousBridge
 	}
 	if obj.EvictionHard == nil {
-		obj.EvictionHard = &"memory.available<100Mi"
+		temp := "memory.available<100Mi"
+		obj.EvictionHard = &temp
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = unversioned.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.SystemReserved == nil {
+		obj.SystemReserved = make(map[string]string)
+	}
+	if obj.KubeReserved == nil {
+		obj.KubeReserved = make(map[string]string)
 	}
 }
 
