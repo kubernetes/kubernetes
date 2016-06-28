@@ -30,6 +30,7 @@ limitations under the License.
 		ClusterRoleBindingList
 		ClusterRoleList
 		PolicyRule
+		Resources
 		Role
 		RoleBinding
 		RoleBindingList
@@ -69,6 +70,10 @@ func (m *PolicyRule) Reset()         { *m = PolicyRule{} }
 func (m *PolicyRule) String() string { return proto.CompactTextString(m) }
 func (*PolicyRule) ProtoMessage()    {}
 
+func (m *Resources) Reset()         { *m = Resources{} }
+func (m *Resources) String() string { return proto.CompactTextString(m) }
+func (*Resources) ProtoMessage()    {}
+
 func (m *Role) Reset()         { *m = Role{} }
 func (m *Role) String() string { return proto.CompactTextString(m) }
 func (*Role) ProtoMessage()    {}
@@ -95,6 +100,7 @@ func init() {
 	proto.RegisterType((*ClusterRoleBindingList)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.ClusterRoleBindingList")
 	proto.RegisterType((*ClusterRoleList)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.ClusterRoleList")
 	proto.RegisterType((*PolicyRule)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.PolicyRule")
+	proto.RegisterType((*Resources)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.Resources")
 	proto.RegisterType((*Role)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.Role")
 	proto.RegisterType((*RoleBinding)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.RoleBinding")
 	proto.RegisterType((*RoleBindingList)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.RoleBindingList")
@@ -314,20 +320,15 @@ func (m *PolicyRule) MarshalTo(data []byte) (int, error) {
 			i += copy(data[i:], s)
 		}
 	}
-	if len(m.Resources) > 0 {
-		for _, s := range m.Resources {
-			data[i] = 0x22
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			data[i] = uint8(l)
-			i++
-			i += copy(data[i:], s)
+	if m.Resources != nil {
+		data[i] = 0x22
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.Resources.Size()))
+		n7, err := m.Resources.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
 		}
+		i += n7
 	}
 	if len(m.ResourceNames) > 0 {
 		for _, s := range m.ResourceNames {
@@ -362,6 +363,39 @@ func (m *PolicyRule) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m Resources) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m Resources) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m) > 0 {
+		for _, s := range m {
+			data[i] = 0xa
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			data[i] = uint8(l)
+			i++
+			i += copy(data[i:], s)
+		}
+	}
+	return i, nil
+}
+
 func (m *Role) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -380,11 +414,11 @@ func (m *Role) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n7, err := m.ObjectMeta.MarshalTo(data[i:])
+	n8, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n7
+	i += n8
 	if len(m.Rules) > 0 {
 		for _, msg := range m.Rules {
 			data[i] = 0x12
@@ -418,11 +452,11 @@ func (m *RoleBinding) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n8, err := m.ObjectMeta.MarshalTo(data[i:])
+	n9, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n8
+	i += n9
 	if len(m.Subjects) > 0 {
 		for _, msg := range m.Subjects {
 			data[i] = 0x12
@@ -438,11 +472,11 @@ func (m *RoleBinding) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.RoleRef.Size()))
-	n9, err := m.RoleRef.MarshalTo(data[i:])
+	n10, err := m.RoleRef.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n9
+	i += n10
 	return i, nil
 }
 
@@ -464,11 +498,11 @@ func (m *RoleBindingList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n10, err := m.ListMeta.MarshalTo(data[i:])
+	n11, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n10
+	i += n11
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -502,11 +536,11 @@ func (m *RoleList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n11, err := m.ListMeta.MarshalTo(data[i:])
+	n12, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n11
+	i += n12
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -658,11 +692,9 @@ func (m *PolicyRule) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	if len(m.Resources) > 0 {
-		for _, s := range m.Resources {
-			l = len(s)
-			n += 1 + l + sovGenerated(uint64(l))
-		}
+	if m.Resources != nil {
+		l = m.Resources.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	if len(m.ResourceNames) > 0 {
 		for _, s := range m.ResourceNames {
@@ -672,6 +704,18 @@ func (m *PolicyRule) Size() (n int) {
 	}
 	if len(m.NonResourceURLs) > 0 {
 		for _, s := range m.NonResourceURLs {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m Resources) Size() (n int) {
+	var l int
+	_ = l
+	if len(m) > 0 {
+		for _, s := range m {
 			l = len(s)
 			n += 1 + l + sovGenerated(uint64(l))
 		}
@@ -1359,7 +1403,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
 			}
-			var stringLen uint64
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -1369,20 +1413,24 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 				}
 				b := data[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthGenerated
 			}
-			postIndex := iNdEx + intStringLen
+			postIndex := iNdEx + msglen
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Resources = append(m.Resources, string(data[iNdEx:postIndex]))
+			if m.Resources == nil {
+				m.Resources = Resources{}
+			}
+			if err := m.Resources.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
@@ -1441,6 +1489,85 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.NonResourceURLs = append(m.NonResourceURLs, string(data[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Resources) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Resources: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Resources: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			*m = append(*m, string(data[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

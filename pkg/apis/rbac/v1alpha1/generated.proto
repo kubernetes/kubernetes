@@ -86,7 +86,7 @@ message PolicyRule {
   repeated string apiGroups = 3;
 
   // Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
-  repeated string resources = 4;
+  optional Resources resources = 4;
 
   // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
   repeated string resourceNames = 5;
@@ -95,6 +95,12 @@ message PolicyRule {
   // This name is intentionally different than the internal type so that the DefaultConvert works nicely and because the ordering may be different.
   // Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
   repeated string nonResourceURLs = 6;
+}
+
+// +protobuf.nullable=true
+message Resources {
+  // items, if empty, will result in an empty slice
+  repeated string items = 1;
 }
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.

@@ -487,6 +487,14 @@ func (q *Quantity) Sign() int {
 	return q.i.Sign()
 }
 
+// Scale returns the scale of the quantity.
+func (q *Quantity) Scale() Scale {
+	if q.d.Dec != nil {
+		return Scale(-q.d.Scale())
+	}
+	return q.i.scale
+}
+
 // AsScaled returns the current value, rounded up to the provided scale, and returns
 // false if the scale resulted in a loss of precision.
 func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {

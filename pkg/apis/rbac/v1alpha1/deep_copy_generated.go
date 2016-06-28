@@ -153,7 +153,7 @@ func DeepCopy_v1alpha1_PolicyRule(in PolicyRule, out *PolicyRule, c *conversion.
 	}
 	if in.Resources != nil {
 		in, out := in.Resources, &out.Resources
-		*out = make([]string, len(in))
+		*out = make(Resources, len(in))
 		copy(*out, in)
 	} else {
 		out.Resources = nil

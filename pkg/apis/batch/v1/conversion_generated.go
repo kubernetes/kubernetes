@@ -26,6 +26,8 @@ import (
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -180,19 +182,11 @@ func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s conv
 }
 
 func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(unversioned.LabelSelector)
-		if err := Convert_v1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.ManualSelector = in.ManualSelector
+	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
+	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
+	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
 	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -200,19 +194,11 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 }
 
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1_LabelSelector(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.ManualSelector = in.ManualSelector
+	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
+	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
+	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
+	out.Selector = (*LabelSelector)(unsafe.Pointer(in.Selector))
+	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
 	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -220,19 +206,13 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 }
 
 func autoConvert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]batch.JobCondition, len(*in))
-		for i := range *in {
-			if err := Convert_v1_JobCondition_To_batch_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
-	out.StartTime = in.StartTime
-	out.CompletionTime = in.CompletionTime
+	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -244,19 +224,13 @@ func Convert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus
 }
 
 func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]JobCondition, len(*in))
-		for i := range *in {
-			if err := Convert_batch_JobCondition_To_v1_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
-	out.StartTime = in.StartTime
-	out.CompletionTime = in.CompletionTime
+	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -268,17 +242,14 @@ func Convert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobStatus
 }
 
 func autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	out.MatchLabels = in.MatchLabels
-	if in.MatchExpressions != nil {
-		in, out := &in.MatchExpressions, &out.MatchExpressions
-		*out = make([]unversioned.LabelSelectorRequirement, len(*in))
-		for i := range *in {
-			if err := Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchExpressions = nil
+	{
+		m := (*map[string]string)(unsafe.Pointer(&in.MatchLabels))
+		out.MatchLabels = *m
+	}
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.MatchExpressions))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.MatchExpressions))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
 	return nil
 }
@@ -288,17 +259,14 @@ func Convert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, ou
 }
 
 func autoConvert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	out.MatchLabels = in.MatchLabels
-	if in.MatchExpressions != nil {
-		in, out := &in.MatchExpressions, &out.MatchExpressions
-		*out = make([]LabelSelectorRequirement, len(*in))
-		for i := range *in {
-			if err := Convert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchExpressions = nil
+	{
+		m := (*map[string]string)(unsafe.Pointer(&in.MatchLabels))
+		out.MatchLabels = *m
+	}
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.MatchExpressions))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.MatchExpressions))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
 	}
 	return nil
 }
@@ -310,7 +278,11 @@ func Convert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.Label
 func autoConvert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	out.Values = in.Values
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Values))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Values))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
+	}
 	return nil
 }
 
@@ -321,7 +293,11 @@ func Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement
 func autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Operator = LabelSelectorOperator(in.Operator)
-	out.Values = in.Values
+	{
+		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Values))
+		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Values))
+		outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len
+	}
 	return nil
 }
 

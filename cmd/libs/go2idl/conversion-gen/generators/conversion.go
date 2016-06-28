@@ -274,7 +274,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						generators = []generator.Generator{}
 						generators = append(
-							generators, NewGenConversion("conversion_generated", path, preexisting, preexistingDefaults))
+							generators, NewGenConversion("conversion_generated", path, preexisting, preexistingDefaults, arguments.Unsafe))
 						return generators
 					},
 					FilterFunc: func(c *generator.Context, t *types.Type) bool {
@@ -367,6 +367,14 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 	return false
 }
 
+// unwrapAlias recurses down aliased types to find the bedrock type.
+func unwrapAlias(in *types.Type) *types.Type {
+	if in.Kind == types.Alias {
+		return unwrapAlias(in.Underlying)
+	}
+	return in
+}
+
 func areTypesAliased(in, out *types.Type) bool {
 	// If one of the types is Alias, resolve it.
 	if in.Kind == types.Alias {
@@ -379,6 +387,41 @@ func areTypesAliased(in, out *types.Type) bool {
 	return in == out
 }
 
+func typesMemoryEqual(inType, outType *types.Type) bool {
+	in, out := unwrapAlias(inType), unwrapAlias(outType)
+	switch {
+	case in == out:
+		return true
+	case in.Kind == out.Kind:
+		switch in.Kind {
+		case types.Struct:
+			if len(in.Members) != len(out.Members) {
+				return false
+			}
+			for i, inMember := range in.Members {
+				outMember := out.Members[i]
+				if !typesMemoryEqual(inMember.Type, outMember.Type) {
+					return false
+				}
+			}
+			return true
+		case types.Pointer:
+			return typesMemoryEqual(in.Elem, out.Elem)
+		case types.Map:
+			return typesMemoryEqual(in.Key, out.Key) && typesMemoryEqual(in.Elem, out.Elem)
+		case types.Slice:
+			return typesMemoryEqual(in.Elem, out.Elem)
+		case types.Interface:
+			// TODO: determine whether the interfaces are actually equivalent - for now, they must have the
+			// same type.
+			return false
+		case types.Builtin:
+			return in.Name.Name == out.Name.Name
+		}
+	}
+	return false
+}
+
 const (
 	apiPackagePath        = "k8s.io/kubernetes/pkg/api"
 	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
@@ -388,6 +431,7 @@ const (
 type genConversion struct {
 	generator.DefaultGen
 	targetPackage string
+	unsafe        bool
 	preexisting   conversions
 	defaulters    defaulters
 	imports       namer.ImportTracker
@@ -396,12 +440,13 @@ type genConversion struct {
 	globalVariables map[string]interface{}
 }
 
-func NewGenConversion(sanitizedName, targetPackage string, preexisting conversions, defaulters defaulters) generator.Generator {
+func NewGenConversion(sanitizedName, targetPackage string, preexisting conversions, defaulters defaulters, unsafe bool) generator.Generator {
 	return &genConversion{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
 		targetPackage: targetPackage,
+		unsafe:        unsafe,
 		preexisting:   preexisting,
 		defaulters:    defaulters,
 		imports:       generator.NewImportTracker(),
@@ -520,9 +565,13 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	g.imports.AddType(scheme)
 	scope := c.Universe.Type(types.Name{Package: conversionPackagePath, Name: "Scope"})
 	g.imports.AddType(scope)
+	pointer := c.Universe.Type(types.Name{Package: "unsafe", Name: "Pointer"})
+	sliceHeader := c.Universe.Type(types.Name{Package: "reflect", Name: "SliceHeader"})
 	g.globalVariables = map[string]interface{}{
-		"scheme": scheme,
-		"Scope":  scope,
+		"scheme":      scheme,
+		"Scope":       scope,
+		"Pointer":     pointer,
+		"SliceHeader": sliceHeader,
 	}
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
@@ -596,6 +645,12 @@ func (g *genConversion) generateFor(inType, outType *types.Type, sw *generator.S
 		f = g.doUnknown
 	}
 	f(inType, outType, sw)
+}
+
+func (g *genConversion) doUnsafe(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	sw.Do("out = (*$.outType|raw$)($.Pointer|raw$(in))\n", g.withGlobals(map[string]interface{}{
+		"outType": outType,
+	}))
 }
 
 func (g *genConversion) doBuiltin(inType, outType *types.Type, sw *generator.SnippetWriter) {
@@ -685,11 +740,26 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			// this field has "genconversion=false" comment to ignore it.
 			continue
 		}
+		t, outT := m.Type, outMember.Type
+		// create a copy of both underlying types but give them the top level alias name (since aliases
+		// are assignable)
+		if underlying := unwrapAlias(t); underlying != t {
+			copied := *underlying
+			copied.Name = t.Name
+			t = &copied
+		}
+		if underlying := unwrapAlias(outT); underlying != outT {
+			copied := *underlying
+			copied.Name = outT.Name
+			outT = &copied
+		}
+
 		args := map[string]interface{}{
-			"inType":  m.Type,
-			"outType": outMember.Type,
+			"inType":  t,
+			"outType": outT,
 			"name":    m.Name,
 		}
+		// check based on the top level name, not the underlying names
 		if function, ok := g.preexists(m.Type, outMember.Type); ok {
 			args["function"] = function
 			sw.Do("if err := $.function|raw$(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
@@ -697,32 +767,60 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("}\n", nil)
 			continue
 		}
-		switch m.Type.Kind {
+
+		// if no custom conversion has been defined, try a direct memory copy for any type
+		// that has exactly equivalent values
+		if g.unsafe && typesMemoryEqual(m.Type, outMember.Type) {
+			args := g.withGlobals(map[string]interface{}{
+				"name":    m.Name,
+				"outType": outMember.Type,
+			})
+			switch t.Kind {
+			case types.Pointer:
+				sw.Do("out.$.name$ = ($.outType|raw$)($.Pointer|raw$(in.$.name$))\n", args)
+				continue
+			case types.Map:
+				sw.Do("{\n", nil)
+				sw.Do("m := (*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
+				sw.Do("out.$.name$ = *m\n", args)
+				sw.Do("}\n", nil)
+				continue
+			case types.Slice:
+				sw.Do("{\n", nil)
+				sw.Do("outHdr := (*$.SliceHeader|raw$)($.Pointer|raw$(&out.$.name$))\n", args)
+				sw.Do("inHdr := (*$.SliceHeader|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
+				sw.Do("outHdr.Data, outHdr.Len = inHdr.Data, inHdr.Len\n", nil)
+				sw.Do("}\n", nil)
+				continue
+			}
+		}
+
+		switch t.Kind {
 		case types.Builtin:
-			if m.Type == outMember.Type {
+			if t == outT {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 			} else {
 				sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 			}
 		case types.Map, types.Slice, types.Pointer:
-			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+			if g.isDirectlyAssignable(t, outT) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 				continue
 			}
 
 			sw.Do("if in.$.name$ != nil {\n", args)
 			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
-			g.generateFor(m.Type, outMember.Type, sw)
+			g.generateFor(t, outT, sw)
 			sw.Do("} else {\n", nil)
 			sw.Do("out.$.name$ = nil\n", args)
 			sw.Do("}\n", nil)
 		case types.Struct:
-			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+			if g.isDirectlyAssignable(t, outT) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 				continue
 			}
-			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-				funcName := g.funcNameTmpl(m.Type, outMember.Type)
+			if g.convertibleOnlyWithinPackage(t, outT) {
+				funcName := g.funcNameTmpl(t, outT)
 				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
@@ -731,15 +829,15 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		case types.Alias:
-			if outMember.Type.IsAssignable() {
-				if m.Type == outMember.Type {
+			if outT.IsAssignable() {
+				if t == outT {
 					sw.Do("out.$.name$ = in.$.name$\n", args)
 				} else {
 					sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 				}
 			} else {
-				if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-					funcName := g.funcNameTmpl(m.Type, outMember.Type)
+				if g.convertibleOnlyWithinPackage(t, outT) {
+					funcName := g.funcNameTmpl(t, outT)
 					sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
 				} else {
 					sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
@@ -749,8 +847,8 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("}\n", nil)
 			}
 		default:
-			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-				funcName := g.funcNameTmpl(m.Type, outMember.Type)
+			if g.convertibleOnlyWithinPackage(t, outT) {
+				funcName := g.funcNameTmpl(t, outT)
 				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)

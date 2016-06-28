@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"unsafe"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -645,17 +646,18 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.Reso
 	if *in == nil {
 		return nil
 	}
-
-	if *out == nil {
-		*out = make(api.ResourceList, len(*in))
+	{
+		m := (*api.ResourceList)(unsafe.Pointer(in))
+		*out = *m
 	}
-	for key, val := range *in {
+	for key, val := range *out {
 		// TODO(#18538): We round up resource values to milli scale to maintain API compatibility.
 		// In the future, we should instead reject values that need rounding.
 		const milliScale = -3
-		val.RoundUp(milliScale)
-
-		(*out)[api.ResourceName(key)] = val
+		if val.Scale() < milliScale {
+			val.RoundUp(milliScale)
+			(*out)[api.ResourceName(key)] = val
+		}
 	}
 	return nil
 }
