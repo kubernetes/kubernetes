@@ -34,19 +34,23 @@ Documentation for other releases can be found at
 
 # Troubleshooting
 
-Sometimes things go wrong.  This guide is aimed at making them right.  It has two sections:
+Sometimes things go wrong.  This guide is aimed at making them right. It has two
+sections:
    * [Troubleshooting your application](user-guide/application-troubleshooting.md) - Useful for users who are deploying code into Kubernetes and wondering why it is not working.
    * [Troubleshooting your cluster](admin/cluster-troubleshooting.md) - Useful for cluster administrators and people whose Kubernetes cluster is unhappy.
 
-You should also check the [known issues for the release](../CHANGELOG.md) you're using.
+You should also check the [known issues for the release](../CHANGELOG.md) you're
+using.
 
 # Getting help
 
-If your problem isn't answered by any of the guides above, there are variety of ways for you to get help from the Kubernetes team.
+If your problem isn't answered by any of the guides above, there are variety of
+ways for you to get help from the Kubernetes team.
 
 ## Questions
 
-If you aren't familiar with it, many of your questions may be answered by the [user guide](user-guide/README.md).
+If you aren't familiar with it, many of your questions may be answered by the
+[user guide](user-guide/README.md).
 
 We also have a number of FAQ pages:
    * [User FAQ](https://github.com/kubernetes/kubernetes/wiki/User-FAQ)
@@ -61,11 +65,22 @@ You may also find the Stack Overflow topics relevant:
 
 ## Stack Overflow
 
-Someone else from the community may have already asked a similar question or may be able to help with your problem. The Kubernetes team will also monitor [posts tagged kubernetes](http://stackoverflow.com/questions/tagged/kubernetes). If there aren't any existing questions that help, please [ask a new one](http://stackoverflow.com/questions/ask?tags=kubernetes)!
+Someone else from the community may have already asked a similar question or may
+be able to help with your problem. The Kubernetes team will also monitor [posts tagged kubernetes](http://stackoverflow.com/questions/tagged/kubernetes).
+If there aren't any existing questions that help, please [ask a new one](http://stackoverflow.com/questions/ask?tags=kubernetes)!
 
 ## <a name="slack"></a>Slack
 
-The Kubernetes team hangs out on Slack in the `#kubernetes-users` channel.  You can participate in the Kubernetes team [here](https://kubernetes.slack.com).  Slack requires registration, but the Kubernetes team is open invitation to anyone to register [here](http://slack.kubernetes.io).  Feel free to come and ask any and all questions.
+The Kubernetes team hangs out on Slack in the `#kubernetes-users` channel. You
+can participate in discussion with the Kubernetes team [here](https://kubernetes.slack.com).
+Slack requires registration, but the Kubernetes team is open invitation to
+anyone to register [here](http://slack.kubernetes.io). Feel free to come and
+ask any and all questions.
+
+Once registered, browse the growing list of channels for various subjects of
+interest. For example, people new to Kubernetes may also want to join the
+`#kubernetes-novice` channel. As another example, developers should join the
+`#kubernetes-dev` channel.
 
 ## Mailing List
 
@@ -73,11 +88,14 @@ The Google Container Engine mailing list is [google-containers@googlegroups.com]
 
 ## Bugs and Feature requests
 
-If you have what looks like a bug, or you would like to make a feature request, please use the [Github issue tracking system](https://github.com/kubernetes/kubernetes/issues).
+If you have what looks like a bug, or you would like to make a feature request,
+please use the [Github issue tracking system](https://github.com/kubernetes/kubernetes/issues).
 
-Before you file an issue, please search existing issues to see if your issue is already covered.
+Before you file an issue, please search existing issues to see if your issue is
+already covered.
 
-If filing a bug, please include detailed information about how to reproduce the problem, such as:
+If filing a bug, please include detailed information about how to reproduce the
+problem, such as:
 * Kubernetes version: `kubectl version`
 * Cloud provider, OS distro, network configuration, and Docker version
 * Steps to reproduce the problem
