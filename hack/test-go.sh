@@ -255,7 +255,9 @@ runTests() {
   # must make sure the output from parallel runs is not mixed. To achieve this,
   # we spawn a subshell for each parallel process, redirecting the output to
   # separate files.
-  printf "%s\n" "${@}" | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
+  # cmd/libs/go2idl/generator is fragile when run under coverage, so ignore it for now.
+  # see: https://github.com/kubernetes/kubernetes/issues/24967
+  printf "%s\n" "${@}" | grep -v "cmd/libs/go2idl/generator"| xargs -I{} -n1 -P${KUBE_COVERPROCS} \
     bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
         go test ${goflags[@]:+${goflags[@]}} \
           ${KUBE_RACE} \
