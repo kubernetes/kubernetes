@@ -22,7 +22,6 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
@@ -33,7 +32,6 @@ func init() {
 		DeepCopy_v1alpha1_Cluster,
 		DeepCopy_v1alpha1_ClusterCondition,
 		DeepCopy_v1alpha1_ClusterList,
-		DeepCopy_v1alpha1_ClusterMeta,
 		DeepCopy_v1alpha1_ClusterSpec,
 		DeepCopy_v1alpha1_ClusterStatus,
 		DeepCopy_v1alpha1_ServerAddressByClientCIDR,
@@ -94,11 +92,6 @@ func DeepCopy_v1alpha1_ClusterList(in ClusterList, out *ClusterList, c *conversi
 	return nil
 }
 
-func DeepCopy_v1alpha1_ClusterMeta(in ClusterMeta, out *ClusterMeta, c *conversion.Cloner) error {
-	out.Version = in.Version
-	return nil
-}
-
 func DeepCopy_v1alpha1_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conversion.Cloner) error {
 	if in.ServerAddressByClientCIDRs != nil {
 		in, out := in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
@@ -134,35 +127,6 @@ func DeepCopy_v1alpha1_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *co
 		}
 	} else {
 		out.Conditions = nil
-	}
-	if in.Capacity != nil {
-		in, out := in.Capacity, &out.Capacity
-		*out = make(v1.ResourceList)
-		for key, val := range in {
-			newVal := new(resource.Quantity)
-			if err := resource.DeepCopy_resource_Quantity(val, newVal, c); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Capacity = nil
-	}
-	if in.Allocatable != nil {
-		in, out := in.Allocatable, &out.Allocatable
-		*out = make(v1.ResourceList)
-		for key, val := range in {
-			newVal := new(resource.Quantity)
-			if err := resource.DeepCopy_resource_Quantity(val, newVal, c); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Allocatable = nil
-	}
-	if err := DeepCopy_v1alpha1_ClusterMeta(in.ClusterMeta, &out.ClusterMeta, c); err != nil {
-		return err
 	}
 	if in.Zones != nil {
 		in, out := in.Zones, &out.Zones

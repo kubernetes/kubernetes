@@ -2116,22 +2116,6 @@ func describeCluster(cluster *federation.Cluster) (string, error) {
 					c.Message)
 			}
 		}
-
-		fmt.Fprintf(out, "Version:\t%s\n", cluster.Status.Version)
-
-		if len(cluster.Status.Capacity) > 0 {
-			fmt.Fprintf(out, "Capacity:\n")
-			for resource, value := range cluster.Status.Capacity {
-				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
-			}
-		}
-
-		if len(cluster.Status.Allocatable) > 0 {
-			fmt.Fprintf(out, "Allocatable:\n")
-			for resource, value := range cluster.Status.Allocatable {
-				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
-			}
-		}
 		return nil
 	})
 }
