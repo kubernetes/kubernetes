@@ -152,6 +152,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 			clone, err := conversion.NewCloner().DeepCopy(&volume)
 			if err != nil {
 				glog.Errorf("error cloning volume %q: %v", volume.Name, err)
+				continue
 			}
 			volumeClone := clone.(*api.PersistentVolume)
 			ctrl.storeVolumeUpdate(volumeClone)
@@ -172,6 +173,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		clone, err := conversion.NewCloner().DeepCopy(&claim)
 		if err != nil {
 			glog.Errorf("error cloning claim %q: %v", claimToClaimKey(&claim), err)
+			continue
 		}
 		claimClone := clone.(*api.PersistentVolumeClaim)
 		ctrl.storeClaimUpdate(claimClone)
