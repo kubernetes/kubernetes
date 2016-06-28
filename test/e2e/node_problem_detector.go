@@ -199,8 +199,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Consistently(func() error {
 				return verifyNoEvents(c.Events(eventNamespace), eventListOptions)
 			}, pollConsistent, pollInterval).Should(Succeed())
-			By("Make sure the default node condition is false")
-			Consistently(func() error {
+			By("Make sure the default node condition is generated")
+			Eventually(func() error {
 				return verifyCondition(c.Nodes(), node.Name, condition, api.ConditionFalse, defaultReason, defaultMessage)
 			}, pollConsistent, pollInterval).Should(Succeed())
 
