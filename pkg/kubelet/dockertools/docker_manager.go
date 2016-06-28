@@ -104,8 +104,8 @@ var (
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
 	podInfraContainerImagePullPolicy = api.PullIfNotPresent
 
-	// Default set of security options.
-	defaultSecurityOpt = []string{"seccomp:unconfined"}
+	// Default security option, only seccomp for now
+	defaultSeccompProfile = "unconfined"
 )
 
 type DockerManager struct {
@@ -558,7 +558,7 @@ func (dm *DockerManager) runContainer(
 		ContainerName: container.Name,
 	}
 
-	securityOpts, err := dm.getSecurityOpt(pod, container.Name)
+	securityOpts, err := dm.getSecurityOpts(pod, container.Name)
 	if err != nil {
 		return kubecontainer.ContainerID{}, err
 	}
@@ -977,7 +977,7 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 	return nil
 }
 
-func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string, error) {
+func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]string, error) {
 	version, err := dm.APIVersion()
 	if err != nil {
 		return nil, err
@@ -988,10 +988,17 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 	if err != nil {
 		return nil, err
 	}
-	if result < 0 {
-		// return early for old versions
-		return nil, nil
+	var optFmt string
+	switch {
+	case result < 0:
+		return nil, nil // return early for Docker < 1.10
+	case result == 0:
+		optFmt = "%s:%s" // use colon notation for Docker 1.10
+	case result > 0:
+		optFmt = "%s=%s" // use = notation for Docker >= 1.11
 	}
+
+	defaultSecurityOpts := []string{fmt.Sprintf(optFmt, "seccomp", defaultSeccompProfile)}
 
 	profile, profileOK := pod.ObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+ctrName]
 	if !profileOK {
@@ -999,13 +1006,13 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		profile, profileOK = pod.ObjectMeta.Annotations[api.SeccompPodAnnotationKey]
 		if !profileOK {
 			// return early the default
-			return defaultSecurityOpt, nil
+			return defaultSecurityOpts, nil
 		}
 	}
 
 	if profile == "unconfined" {
 		// return early the default
-		return defaultSecurityOpt, nil
+		return defaultSecurityOpts, nil
 	}
 
 	if profile == "docker/default" {
@@ -1029,7 +1036,7 @@ func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string,
 		return nil, err
 	}
 
-	return []string{fmt.Sprintf("seccomp=%s", b.Bytes())}, nil
+	return []string{fmt.Sprintf(optFmt, "seccomp", b.Bytes())}, nil
 }
 
 type dockerExitError struct {
