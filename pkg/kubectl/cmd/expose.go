@@ -264,7 +264,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 
 		// Serialize the object with the annotation applied.
-		object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, object)
+		object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, name, false, object)
 		if err != nil {
 			return err
 		}

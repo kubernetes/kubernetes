@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
+	"strings"
 )
 
 // GetOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -40,6 +41,7 @@ type GetOptions struct {
 const (
 	get_long = `Display one or many resources.
 
+` + kubectl.Warn + `
 ` + kubectl.PossibleResourceTypes + `
 
 By specifying the output as 'template' and providing a Go template as the value
@@ -182,7 +184,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 		// print the current object
 		if !isWatchOnly {
-			if err := printer.PrintObj(obj, out); err != nil {
+			err := printer.PrintObj(obj, out)
+			if err == nil {
+				if len(args) >= 1 && strings.Contains(args[0], "pods") && cmd.Flag("show-all").Value.String() != "true" && cmd.Flag("no-headers").Value.String() != "true" {
+					if _, err := fmt.Fprintf(out, kubectl.Warn); err != nil {
+						return err
+					}
+				}
+			} else {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 		}
@@ -194,7 +203,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		}
 
 		kubectl.WatchLoop(w, func(e watch.Event) error {
-			return printer.PrintObj(e.Object, out)
+			err := printer.PrintObj(e.Object, out)
+			if err == nil && len(args) >= 1 && strings.Contains(args[0], "pods") && cmd.Flag("show-all").Value.String() != "true" && cmd.Flag("no-headers").Value.String() != "true" {
+				_, err = fmt.Fprintf(out, kubectl.Warn)
+			}
+			return err
 		})
 		return nil
 	}
@@ -244,7 +257,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			return err
 		}
 
-		if err := printer.PrintObj(obj, out); err != nil {
+                err = printer.PrintObj(obj, out)
+                if err == nil && len(args) >= 1 && strings.Contains(args[0], "pods") && cmd.Flag("show-all").Value.String() != "true" && cmd.Flag("no-headers").Value.String() != "true" {
+                        _, err = fmt.Fprintf(out, kubectl.Warn)
+                }
+
+		if err != nil {
 			allErrs = append(allErrs, err)
 		}
 		return utilerrors.NewAggregate(allErrs)
@@ -312,16 +330,25 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			}
 			lastMapping = mapping
 		}
+
 		if _, found := printer.(*kubectl.HumanReadablePrinter); found {
 			if err := printer.PrintObj(original, w); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
+
 		if err := printer.PrintObj(original, w); err != nil {
 			allErrs = append(allErrs, err)
 			continue
 		}
 	}
-	return utilerrors.NewAggregate(allErrs)
+
+	if len(args) >= 1 && len(objs) > 0 && strings.Contains(args[0], "pods") && cmd.Flag("show-all").Value.String() != "true" && cmd.Flag("no-headers").Value.String() != "true" {
+		if _, err = fmt.Fprintf(w, kubectl.Warn); err != nil {
+			return err
+		}
+	}
+
+        return utilerrors.NewAggregate(allErrs)
 }

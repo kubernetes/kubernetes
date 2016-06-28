@@ -168,7 +168,7 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 			return err
 		}
 
-		object, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(namespace, false, object)
+		object, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(namespace, name, false, object)
 		if err != nil {
 			return err
 		}

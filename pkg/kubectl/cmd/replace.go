@@ -237,7 +237,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 			}
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			return err
 		}

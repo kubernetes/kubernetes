@@ -152,7 +152,7 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 
 // createAndRefresh creates an object from input info and refreshes info with that object
 func createAndRefresh(info *resource.Info) error {
-	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, info.Name, true, info.Object)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 		return err
 	}
 	if !options.DryRun {
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
+		obj, err = resource.NewHelper(client, mapping).Create(namespace, "", false, info.Object)
 		if err != nil {
 			return err
 		}

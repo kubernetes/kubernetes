@@ -30,6 +30,11 @@ import (
 
 const (
 	kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
+	Warn                    = `
+WARN: By default only active pods are displayed, to display terminated
+pods as well set -a, --show-all option. It is done intentionally to let see
+statuses they finish with.
+`
 	// TODO: auto-generate this
 	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (po), services (svc), deployments,
 replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),

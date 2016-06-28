@@ -520,6 +520,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("output", "json")
+	cmd.Flags().Set("no-headers", "true")
 	cmd.Run(cmd, []string{"pods,services"})
 
 	if tf.Printer.(*testPrinter).Objects != nil {

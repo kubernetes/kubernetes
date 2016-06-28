@@ -495,7 +495,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 			return nil, "", nil, nil, err
 		}
 
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
+		obj, err = resource.NewHelper(client, mapping).Create(namespace, info.Name, false, info.Object)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}

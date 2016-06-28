@@ -202,7 +202,7 @@ func TestHelperCreate(t *testing.T) {
 			Versioner:       testapi.Default.MetadataAccessor(),
 			NamespaceScoped: true,
 		}
-		_, err := modifier.Create("bar", test.Modify, test.Object)
+		_, err := modifier.Create("bar", "", test.Modify, test.Object)
 		if (err != nil) != test.Err {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}

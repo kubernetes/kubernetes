@@ -17,13 +17,16 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
+	apierr "k8s.io/kubernetes/pkg/api/errors"
 )
 
 // Helper provides methods for retrieving or mutating a RESTful
@@ -102,22 +105,48 @@ func (m *Helper) Delete(namespace, name string) error {
 		Error()
 }
 
-func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
+func (m *Helper) Create(namespace string, name string, modify bool, obj runtime.Object) (runtime.Object, error) {
 	if modify {
-		// Attempt to version the object based on client logic.
+		/* Attempt to version the object based on client logic.
+		   If we don't know how to clear the version on this object, so send it to the server as is
+		*/
 		version, err := m.Versioner.ResourceVersion(obj)
-		if err != nil {
-			// We don't know how to clear the version on this object, so send it to the server as is
-			return m.createResource(m.RESTClient, m.Resource, namespace, obj)
-		}
-		if version != "" {
+		if err == nil && version != "" {
 			if err := m.Versioner.SetResourceVersion(obj, ""); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	return m.createResource(m.RESTClient, m.Resource, namespace, obj)
+	ret_obj, err := m.createResource(m.RESTClient, m.Resource, namespace, obj)
+
+	if err != nil && apierr.IsAlreadyExists(err) {
+		//check whether the existent pod/job is terminated
+		if m.Resource == "pods" || m.Resource == "jobs" {
+			exist_obj, get_err := m.Get(namespace, name, false)
+			if get_err == nil {
+				append_warn_msg := fmt.Sprintf("\n Existant %s is in termanited state! Please check its status and delete it!\n Use `kubectl get %s/%s` \n",
+					map[bool]string{true: "pod", false: "job"}[m.Resource == "pods"], m.Resource, name)
+				switch exist_obj.(type) {
+					case *api.Pod:
+						pod, _ := exist_obj.(*api.Pod)
+						if get_err == nil && api.IsPodTerminated(pod) {
+							status_err, _ := err.(*apierr.StatusError)
+							status_err.ErrStatus.Message += append_warn_msg
+						}
+					case *batch.Job:
+						job, _ := exist_obj.(*batch.Job)
+						if get_err == nil && batch.IsJobFinished(*job) {
+							status_err, _ := err.(*apierr.StatusError)
+							status_err.ErrStatus.Message += append_warn_msg
+						}
+				}
+
+			}
+		}
+	}
+
+	return ret_obj, err
 }
 
 func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object) (runtime.Object, error) {
