@@ -60,7 +60,7 @@ Either the [on call](on-call-rotations.md) manually or the [github "munger"](htt
 There are several requirements for the submit-queue to work:
 * Author must have signed CLA ("cla: yes" label added to PR)
 * No changes can be made since last lgtm label was applied
-* k8s-bot must have reported the GCE E2E build and test steps passed (Travis, Jenkins unit/integration, Jenkins e2e)
+* k8s-bot must have reported the GCE E2E build and test steps passed (Jenkins unit/integration, Jenkins e2e)
 
 Additionally, for infrequent or new contributors, we require the on call to apply the "ok-to-merge" label manually.  This is gated by the [whitelist](https://github.com/kubernetes/contrib/blob/master/mungegithub/whitelist.txt).
 
