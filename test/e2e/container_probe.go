@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	probTestContainerName       = "test-webserber"
+	probTestContainerName       = "test-webserver"
 	probTestInitialDelaySeconds = 30
 )
 
