@@ -61,16 +61,18 @@ type GoRoutineMap interface {
 
 // NewGoRoutineMap returns a new instance of GoRoutineMap.
 func NewGoRoutineMap(exponentialBackOffOnError bool) GoRoutineMap {
-	return &goRoutineMap{
+	g := &goRoutineMap{
 		operations:                make(map[string]operation),
 		exponentialBackOffOnError: exponentialBackOffOnError,
 	}
+	g.cond = sync.NewCond(g)
+	return g
 }
 
 type goRoutineMap struct {
 	operations                map[string]operation
 	exponentialBackOffOnError bool
-	wg                        sync.WaitGroup
+	cond                      *sync.Cond
 	sync.Mutex
 }
 
@@ -102,7 +104,6 @@ func (grm *goRoutineMap) Run(operationName string, operationFunc func() error) e
 		lastErrorTime:       existingOp.lastErrorTime,
 		durationBeforeRetry: existingOp.durationBeforeRetry,
 	}
-	grm.wg.Add(1)
 	go func() (err error) {
 		// Handle unhandled panics (very unlikely)
 		defer k8sRuntime.HandleCrash()
@@ -117,7 +118,7 @@ func (grm *goRoutineMap) Run(operationName string, operationFunc func() error) e
 }
 
 func (grm *goRoutineMap) operationComplete(operationName string, err *error) {
-	defer grm.wg.Done()
+	defer grm.cond.Signal()
 	grm.Lock()
 	defer grm.Unlock()
 
@@ -157,7 +158,12 @@ func (grm *goRoutineMap) operationComplete(operationName string, err *error) {
 }
 
 func (grm *goRoutineMap) Wait() {
-	grm.wg.Wait()
+	grm.Lock()
+	defer grm.Unlock()
+
+	for len(grm.operations) > 0 {
+		grm.cond.Wait()
+	}
 }
 
 func recoverFromPanic(operationName string, err *error) {
