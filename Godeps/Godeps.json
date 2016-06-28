@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v74",
+	"GodepVersion": "v67",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -744,18 +744,18 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.2-54-g7c47e25",
-			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
+			"Comment": "v1.2-66-gc4afa8e",
+			"Rev": "c4afa8e5421428d584b32d36d7b35f2c9ae5f823"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/log",
-			"Comment": "v1.2-54-g7c47e25",
-			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
+			"Comment": "v1.2-66-gc4afa8e",
+			"Rev": "c4afa8e5421428d584b32d36d7b35f2c9ae5f823"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/swagger",
-			"Comment": "v1.2-54-g7c47e25",
-			"Rev": "7c47e2558a0bbbaba9ecab06bc6681e73028a28a"
+			"Comment": "v1.2-66-gc4afa8e",
+			"Rev": "c4afa8e5421428d584b32d36d7b35f2c9ae5f823"
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",

@@ -14,6 +14,7 @@ type ModelBuildable interface {
 
 type modelBuilder struct {
 	Models *ModelList
+	Config *Config
 }
 
 type documentable interface {
@@ -231,7 +232,7 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 
 	if field.Name == fieldType.Name() && field.Anonymous && !hasNamedJSONTag(field) {
 		// embedded struct
-		sub := modelBuilder{new(ModelList)}
+		sub := modelBuilder{new(ModelList), b.Config}
 		sub.addModel(fieldType, "")
 		subKey := sub.keyFrom(fieldType)
 		// merge properties from sub
@@ -410,6 +411,11 @@ func (b modelBuilder) jsonSchemaType(modelName string) string {
 }
 
 func (b modelBuilder) jsonSchemaFormat(modelName string) string {
+	if b.Config != nil && b.Config.SchemaFormatHandler != nil {
+		if mapped := b.Config.SchemaFormatHandler(modelName); mapped != "" {
+			return mapped
+		}
+	}
 	schemaMap := map[string]string{
 		"int":        "int32",
 		"int32":      "int32",

@@ -130,25 +130,25 @@ func (r *Response) WriteHeaderAndEntity(status int, value interface{}) error {
 }
 
 // WriteAsXml is a convenience method for writing a value in xml (requires Xml tags on the value)
-// It uses the standard encoding/xml package for marshalling the valuel ; not using a registered EntityReaderWriter.
+// It uses the standard encoding/xml package for marshalling the value ; not using a registered EntityReaderWriter.
 func (r *Response) WriteAsXml(value interface{}) error {
 	return writeXML(r, http.StatusOK, MIME_XML, value)
 }
 
 // WriteHeaderAndXml is a convenience method for writing a status and value in xml (requires Xml tags on the value)
-// It uses the standard encoding/xml package for marshalling the valuel ; not using a registered EntityReaderWriter.
+// It uses the standard encoding/xml package for marshalling the value ; not using a registered EntityReaderWriter.
 func (r *Response) WriteHeaderAndXml(status int, value interface{}) error {
 	return writeXML(r, status, MIME_XML, value)
 }
 
 // WriteAsJson is a convenience method for writing a value in json.
-// It uses the standard encoding/json package for marshalling the valuel ; not using a registered EntityReaderWriter.
+// It uses the standard encoding/json package for marshalling the value ; not using a registered EntityReaderWriter.
 func (r *Response) WriteAsJson(value interface{}) error {
 	return writeJSON(r, http.StatusOK, MIME_JSON, value)
 }
 
 // WriteJson is a convenience method for writing a value in Json with a given Content-Type.
-// It uses the standard encoding/json package for marshalling the valuel ; not using a registered EntityReaderWriter.
+// It uses the standard encoding/json package for marshalling the value ; not using a registered EntityReaderWriter.
 func (r *Response) WriteJson(value interface{}, contentType string) error {
 	return writeJSON(r, http.StatusOK, contentType, value)
 }
