@@ -117,6 +117,11 @@ type ActualStateOfWorld interface {
 	// volumes that do not need to update contents should not fail.
 	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) (bool, string, error)
 
+	// VolumeExists returns true if the given volume exists in the list of
+	// attached volumes in the cache, indicating the volume is attached to this
+	// node.
+	VolumeExists(volumeName api.UniqueVolumeName) bool
+
 	// GetMountedVolumes generates and returns a list of volumes and the pods
 	// they are successfully attached and mounted for based on the current
 	// actual state of the world.
@@ -127,12 +132,17 @@ type ActualStateOfWorld interface {
 	// current actual state of the world.
 	GetMountedVolumesForPod(podName volumetypes.UniquePodName) []MountedVolume
 
-	// GetAttachedVolumes generates and returns a list of all attached volumes.
-	GetAttachedVolumes() []AttachedVolume
+	// GetGloballyMountedVolumes generates and returns a list of all attached
+	// volumes that are globally mounted. This list can be used to determine
+	// which volumes should be reported as "in use" in the node's VolumesInUse
+	// status field. Globally mounted here refers to the shared plugin mount
+	// point for the attachable volume from which the pod specific mount points
+	// are created (via bind mount).
+	GetGloballyMountedVolumes() []AttachedVolume
 
 	// GetUnmountedVolumes generates and returns a list of attached volumes that
 	// have no mountedPods. This list can be used to determine which volumes are
-	// no longer referenced and may be detached.
+	// no longer referenced and may be globally unmounted and detached.
 	GetUnmountedVolumes() []AttachedVolume
 }
 
@@ -492,6 +502,15 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 	return podExists, volumeObj.devicePath, nil
 }
 
+func (asw *actualStateOfWorld) VolumeExists(
+	volumeName api.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	_, volumeExists := asw.attachedVolumes[volumeName]
+	return volumeExists
+}
+
 func (asw *actualStateOfWorld) GetMountedVolumes() []MountedVolume {
 	asw.RLock()
 	defer asw.RUnlock()
@@ -525,17 +544,20 @@ func (asw *actualStateOfWorld) GetMountedVolumesForPod(
 	return mountedVolume
 }
 
-func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
+func (asw *actualStateOfWorld) GetGloballyMountedVolumes() []AttachedVolume {
 	asw.RLock()
 	defer asw.RUnlock()
-	unmountedVolumes := make([]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	globallyMountedVolumes := make(
+		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
 	for _, volumeObj := range asw.attachedVolumes {
-		unmountedVolumes = append(
-			unmountedVolumes,
-			asw.getAttachedVolume(&volumeObj))
+		if volumeObj.globallyMounted {
+			globallyMountedVolumes = append(
+				globallyMountedVolumes,
+				asw.newAttachedVolume(&volumeObj))
+		}
 	}
 
-	return unmountedVolumes
+	return globallyMountedVolumes
 }
 
 func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
@@ -546,14 +568,14 @@ func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
 		if len(volumeObj.mountedPods) == 0 {
 			unmountedVolumes = append(
 				unmountedVolumes,
-				asw.getAttachedVolume(&volumeObj))
+				asw.newAttachedVolume(&volumeObj))
 		}
 	}
 
 	return unmountedVolumes
 }
 
-func (asw *actualStateOfWorld) getAttachedVolume(
+func (asw *actualStateOfWorld) newAttachedVolume(
 	attachedVolume *attachedVolume) AttachedVolume {
 	return AttachedVolume{
 		AttachedVolume: operationexecutor.AttachedVolume{
