@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -55,25 +56,27 @@ type ImageOptions struct {
 	ContainerImages        map[string]string
 }
 
-const (
+var (
 	image_resources = `
   pod (po), replicationcontroller (rc), deployment, daemonset (ds), job, replicaset (rs)`
 
-	image_long = `Update existing container image(s) of resources.
+	image_long = dedent.Dedent(`
+		Update existing container image(s) of resources.
 
-Possible resources include (case insensitive):` + image_resources
+		Possible resources include (case insensitive):`) + image_resources
 
-	image_example = `# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
-kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
+	image_example = dedent.Dedent(`
+		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
+		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
-# Update all deployments' and rc's nginx container's image to 'nginx:1.9.1'
-kubectl set image deployments,rc nginx=nginx:1.9.1 --all
+		# Update all deployments' and rc's nginx container's image to 'nginx:1.9.1'
+		kubectl set image deployments,rc nginx=nginx:1.9.1 --all
 
-# Update image of all containers of daemonset abc to 'nginx:1.9.1'
-kubectl set image daemonset abc *=nginx:1.9.1
+		# Update image of all containers of daemonset abc to 'nginx:1.9.1'
+		kubectl set image daemonset abc *=nginx:1.9.1
 
-# Print result (in yaml format) of updating nginx container image from local file, without hitting the server 
-kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`
+		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server 
+		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
 func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {

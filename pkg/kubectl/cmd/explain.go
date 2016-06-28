@@ -19,6 +19,7 @@ package cmd
 import (
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -27,16 +28,18 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	explainExamples = `# Get the documentation of the resource and its fields
-kubectl explain pods
+var (
+	explainExamples = dedent.Dedent(`
+		# Get the documentation of the resource and its fields
+		kubectl explain pods
 
-# Get the documentation of a specific field of a resource
-kubectl explain pods.spec.containers`
+		# Get the documentation of a specific field of a resource
+		kubectl explain pods.spec.containers`)
 
-	explainLong = `Documentation of resources.
+	explainLong = dedent.Dedent(`
+		Documentation of resources.
 
-` + kubectl.PossibleResourceTypes
+		`) + kubectl.PossibleResourceTypes
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
