@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
+	nodecidrcontroller "k8s.io/kubernetes/pkg/controller/nodecidr"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -157,8 +158,14 @@ func (s *CMServer) Run(_ []string) error {
 	nodeController := nodecontroller.NewNodeController(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-controller")),
 		s.PodEvictionTimeout.Duration, flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, int(s.DeletingPodsBurst)),
 		flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, int(s.DeletingPodsBurst)),
-		s.NodeMonitorGracePeriod.Duration, s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR, int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
+		s.NodeMonitorGracePeriod.Duration, s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration)
 	nodeController.Run(s.NodeSyncPeriod.Duration)
+
+	if s.AllocateNodeCIDRs {
+		nodeCIDRController := nodecidrcontroller.NewNodeCIDRController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "nodecidr-controller")),
+			clusterCIDR, serviceCIDR, int(s.NodeCIDRMaskSize))
+		nodeCIDRController.Run(s.NodeSyncPeriod.Duration)
+	}
 
 	nodeStatusUpdaterController := node.NewStatusUpdater(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-status-controller")), s.NodeMonitorPeriod.Duration, time.Now)
 	if err := nodeStatusUpdaterController.Run(wait.NeverStop); err != nil {

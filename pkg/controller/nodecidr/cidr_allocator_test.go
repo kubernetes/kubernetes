@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package nodecidr
 
 import (
-	"github.com/golang/glog"
 	"math/big"
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/golang/glog"
 )
 
 func TestRangeAllocatorFullyAllocated(t *testing.T) {
