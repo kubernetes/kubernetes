@@ -19,7 +19,7 @@ package service
 import (
 	"testing"
 
-	"k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -58,8 +58,8 @@ func TestProcessEndpointUpdate(t *testing.T) {
 	cc := clusterClientCache{
 		clientMap: map[string]*clusterCache{
 			clusterName: {
-				cluster: &v1alpha1.Cluster{
-					Status: v1alpha1.ClusterStatus{
+				cluster: &v1beta1.Cluster{
+					Status: v1beta1.ClusterStatus{
 						Zones:  []string{"foozone"},
 						Region: "fooregion",
 					},
@@ -111,8 +111,8 @@ func TestProcessEndpointDeletion(t *testing.T) {
 	cc := clusterClientCache{
 		clientMap: map[string]*clusterCache{
 			clusterName: {
-				cluster: &v1alpha1.Cluster{
-					Status: v1alpha1.ClusterStatus{
+				cluster: &v1beta1.Cluster{
+					Status: v1beta1.ClusterStatus{
 						Zones:  []string{"foozone"},
 						Region: "fooregion",
 					},
