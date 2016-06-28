@@ -71,21 +71,10 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// Cluster metadata
-type ClusterMeta struct {
-	// Release version of the cluster.
-	Version string `json:"version,omitempty"`
-}
-
 // ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
 type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
 	Conditions []ClusterCondition `json:"conditions,omitempty"`
-	// Capacity represents the total resources of the cluster
-	Capacity api.ResourceList `json:"capacity,omitempty"`
-	// Allocatable represents the total resources of a cluster that are available for scheduling.
-	Allocatable api.ResourceList `json:"allocatable,omitempty"`
-	ClusterMeta `json:",inline"`
 	// Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.
 	Zones []string `json:"zones,omitempty"`

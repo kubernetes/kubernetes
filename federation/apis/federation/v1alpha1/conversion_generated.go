@@ -23,7 +23,6 @@ package v1alpha1
 import (
 	federation "k8s.io/kubernetes/federation/apis/federation"
 	api "k8s.io/kubernetes/pkg/api"
-	resource "k8s.io/kubernetes/pkg/api/resource"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
@@ -36,8 +35,6 @@ func init() {
 		Convert_federation_ClusterCondition_To_v1alpha1_ClusterCondition,
 		Convert_v1alpha1_ClusterList_To_federation_ClusterList,
 		Convert_federation_ClusterList_To_v1alpha1_ClusterList,
-		Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta,
-		Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta,
 		Convert_v1alpha1_ClusterSpec_To_federation_ClusterSpec,
 		Convert_federation_ClusterSpec_To_v1alpha1_ClusterSpec,
 		Convert_v1alpha1_ClusterStatus_To_federation_ClusterStatus,
@@ -178,24 +175,6 @@ func Convert_federation_ClusterList_To_v1alpha1_ClusterList(in *federation.Clust
 	return autoConvert_federation_ClusterList_To_v1alpha1_ClusterList(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClusterMeta_To_federation_ClusterMeta(in *ClusterMeta, out *federation.ClusterMeta, s conversion.Scope) error {
-	out.Version = in.Version
-	return nil
-}
-
-func Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta(in *ClusterMeta, out *federation.ClusterMeta, s conversion.Scope) error {
-	return autoConvert_v1alpha1_ClusterMeta_To_federation_ClusterMeta(in, out, s)
-}
-
-func autoConvert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(in *federation.ClusterMeta, out *ClusterMeta, s conversion.Scope) error {
-	out.Version = in.Version
-	return nil
-}
-
-func Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(in *federation.ClusterMeta, out *ClusterMeta, s conversion.Scope) error {
-	return autoConvert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(in, out, s)
-}
-
 func autoConvert_v1alpha1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out *federation.ClusterSpec, s conversion.Scope) error {
 	if in.ServerAddressByClientCIDRs != nil {
 		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
@@ -266,15 +245,6 @@ func autoConvert_v1alpha1_ClusterStatus_To_federation_ClusterStatus(in *ClusterS
 	} else {
 		out.Conditions = nil
 	}
-	if err := v1.Convert_v1_ResourceList_To_api_ResourceList(&in.Capacity, &out.Capacity, s); err != nil {
-		return err
-	}
-	if err := v1.Convert_v1_ResourceList_To_api_ResourceList(&in.Allocatable, &out.Allocatable, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta(&in.ClusterMeta, &out.ClusterMeta, s); err != nil {
-		return err
-	}
 	out.Zones = in.Zones
 	out.Region = in.Region
 	return nil
@@ -295,35 +265,6 @@ func autoConvert_federation_ClusterStatus_To_v1alpha1_ClusterStatus(in *federati
 		}
 	} else {
 		out.Conditions = nil
-	}
-	if in.Capacity != nil {
-		in, out := &in.Capacity, &out.Capacity
-		*out = make(v1.ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[v1.ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Capacity = nil
-	}
-	if in.Allocatable != nil {
-		in, out := &in.Allocatable, &out.Allocatable
-		*out = make(v1.ResourceList, len(*in))
-		for key, val := range *in {
-			newVal := new(resource.Quantity)
-			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[v1.ResourceName(key)] = *newVal
-		}
-	} else {
-		out.Allocatable = nil
-	}
-	if err := Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(&in.ClusterMeta, &out.ClusterMeta, s); err != nil {
-		return err
 	}
 	out.Zones = in.Zones
 	out.Region = in.Region
