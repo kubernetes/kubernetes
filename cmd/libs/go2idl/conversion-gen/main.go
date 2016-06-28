@@ -46,6 +46,8 @@ func main() {
 		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1",
 		"k8s.io/kubernetes/pkg/apis/apps",
 		"k8s.io/kubernetes/pkg/apis/apps/v1alpha1",
+		"k8s.io/kubernetes/pkg/apis/certificates",
+		"k8s.io/kubernetes/pkg/apis/certificates/v1alpha1",
 		"k8s.io/kubernetes/pkg/apis/componentconfig",
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1",
 		"k8s.io/kubernetes/pkg/apis/policy",

@@ -42,7 +42,7 @@ OUTPUT_TMP="${KUBE_ROOT}/${TMP_SUBPATH}"
 
 echo "Generating api reference docs at ${OUTPUT_TMP}"
 
-DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 batch/v1 autoscaling/v1"
+DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 batch/v1 autoscaling/v1 certificates/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 for ver in $VERSIONS; do
   mkdir -p "${OUTPUT_TMP}/${ver}"
