@@ -24,7 +24,7 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
-	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
@@ -176,17 +176,17 @@ func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Inte
 				return s.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
-		&v1alpha1.Cluster{},
+		&v1beta1.Cluster{},
 		clusterSyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			DeleteFunc: s.clusterCache.delFromClusterSet,
 			AddFunc:    s.clusterCache.addToClientMap,
 			UpdateFunc: func(old, cur interface{}) {
-				oldCluster, ok := old.(*v1alpha1.Cluster)
+				oldCluster, ok := old.(*v1beta1.Cluster)
 				if !ok {
 					return
 				}
-				curCluster, ok := cur.(*v1alpha1.Cluster)
+				curCluster, ok := cur.(*v1beta1.Cluster)
 				if !ok {
 					return
 				}
@@ -608,7 +608,7 @@ func portEqualExcludeNodePort(x, y *v1.ServicePort) bool {
 	return true
 }
 
-func clustersFromList(list *v1alpha1.ClusterList) []string {
+func clustersFromList(list *v1beta1.ClusterList) []string {
 	result := []string{}
 	for ix := range list.Items {
 		result = append(result, list.Items[ix].Name)
@@ -619,7 +619,7 @@ func clustersFromList(list *v1alpha1.ClusterList) []string {
 // getClusterConditionPredicate filter all clusters meet condition of
 // condition.type=Ready and condition.status=true
 func getClusterConditionPredicate() federationcache.ClusterConditionPredicate {
-	return func(cluster v1alpha1.Cluster) bool {
+	return func(cluster v1beta1.Cluster) bool {
 		// If we have no info, don't accept
 		if len(cluster.Status.Conditions) == 0 {
 			return false
@@ -627,7 +627,7 @@ func getClusterConditionPredicate() federationcache.ClusterConditionPredicate {
 		for _, cond := range cluster.Status.Conditions {
 			//We consider the cluster for load balancing only when its ClusterReady condition status
 			//is ConditionTrue
-			if cond.Type == v1alpha1.ClusterReady && cond.Status != v1.ConditionTrue {
+			if cond.Type == v1beta1.ClusterReady && cond.Status != v1.ConditionTrue {
 				glog.V(4).Infof("Ignoring cluser %v with %v condition status %v", cluster.Name, cond.Type, cond.Status)
 				return false
 			}
