@@ -27,7 +27,8 @@ import (
 )
 
 // Calls AddVolume() once to add volume
-// Verifies newly added volume exists in GetAttachedVolumes()
+// Verifies newly added volume exists in GetUnmountedVolumes()
+// Verifies newly added volume doesn't exist in GetGloballyMountedVolumes()
 func Test_AddVolume_Positive_NewVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
@@ -61,12 +62,15 @@ func Test_AddVolume_Positive_NewVolume(t *testing.T) {
 		t.Fatalf("AddVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExistsInAttachedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
+	verifyVolumeExistsInUnmountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 }
 
 // Calls AddVolume() twice to add the same volume
-// Verifies newly added volume exists in GetAttachedVolumes() and second call
-// doesn't fail
+// Verifies second call doesn't fail
+// Verifies newly added volume exists in GetUnmountedVolumes()
+// Verifies newly added volume doesn't exist in GetGloballyMountedVolumes()
 func Test_AddVolume_Positive_ExistingVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
@@ -105,7 +109,9 @@ func Test_AddVolume_Positive_ExistingVolume(t *testing.T) {
 		t.Fatalf("AddVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExistsInAttachedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
+	verifyVolumeExistsInUnmountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 }
 
 // Populates data struct with a volume
@@ -160,7 +166,9 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExistsInAttachedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
+	verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 }
 
@@ -223,7 +231,9 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExistsInAttachedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
+	verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 }
 
@@ -280,7 +290,9 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 		t.Fatalf("AddPodToVolume did not fail. Expected: <\"no volume with the name ... exists in the list of attached volumes\"> Actual: <no error>")
 	}
 
-	verifyVolumeDoesntExistInAttachedVolumes(t, volumeName, asw)
+	verifyVolumeExistsAsw(t, volumeName, false /* shouldExist */, asw)
+	verifyVolumeDoesntExistInUnmountedVolumes(t, volumeName, asw)
+	verifyVolumeDoesntExistInGloballyMountedVolumes(t, volumeName, asw)
 	verifyPodDoesntExistInVolumeAsw(
 		t,
 		podName,
@@ -289,28 +301,116 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 		asw)
 }
 
-func verifyVolumeExistsInAttachedVolumes(
+// Calls AddVolume() once to add volume
+// Calls MarkDeviceAsMounted() to mark volume as globally mounted.
+// Verifies newly added volume exists in GetUnmountedVolumes()
+// Verifies newly added volume exists in GetGloballyMountedVolumes()
+func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: api.VolumeSource{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	devicePath := "fake/device/path"
+	generatedVolumeName, err := asw.AddVolume(volumeSpec, devicePath)
+	if err != nil {
+		t.Fatalf("AddVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	err = asw.MarkDeviceAsMounted(generatedVolumeName)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("MarkDeviceAsMounted failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
+	verifyVolumeExistsInUnmountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeExistsInGloballyMountedVolumes(t, generatedVolumeName, asw)
+}
+
+func verifyVolumeExistsInGloballyMountedVolumes(
 	t *testing.T, expectedVolumeName api.UniqueVolumeName, asw ActualStateOfWorld) {
-	attachedVolumes := asw.GetAttachedVolumes()
-	for _, volume := range attachedVolumes {
+	globallyMountedVolumes := asw.GetGloballyMountedVolumes()
+	for _, volume := range globallyMountedVolumes {
 		if volume.VolumeName == expectedVolumeName {
 			return
 		}
 	}
 
 	t.Fatalf(
-		"Could not find volume %v in the list of attached volumes for actual state of world %+v",
+		"Could not find volume %v in the list of GloballyMountedVolumes for actual state of world %+v",
 		expectedVolumeName,
-		attachedVolumes)
+		globallyMountedVolumes)
 }
 
-func verifyVolumeDoesntExistInAttachedVolumes(
+func verifyVolumeDoesntExistInGloballyMountedVolumes(
 	t *testing.T, volumeToCheck api.UniqueVolumeName, asw ActualStateOfWorld) {
-	attachedVolumes := asw.GetAttachedVolumes()
-	for _, volume := range attachedVolumes {
+	globallyMountedVolumes := asw.GetGloballyMountedVolumes()
+	for _, volume := range globallyMountedVolumes {
 		if volume.VolumeName == volumeToCheck {
 			t.Fatalf(
-				"Found volume %v in the list of attached volumes. Expected it not to exist.",
+				"Found volume %v in the list of GloballyMountedVolumes. Expected it not to exist.",
+				volumeToCheck)
+		}
+	}
+}
+
+func verifyVolumeExistsAsw(
+	t *testing.T,
+	expectedVolumeName api.UniqueVolumeName,
+	shouldExist bool,
+	asw ActualStateOfWorld) {
+	volumeExists := asw.VolumeExists(expectedVolumeName)
+	if shouldExist != volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) response incorrect. Expected: <%v> Actual: <%v>",
+			expectedVolumeName,
+			shouldExist,
+			volumeExists)
+	}
+}
+
+func verifyVolumeExistsInUnmountedVolumes(
+	t *testing.T, expectedVolumeName api.UniqueVolumeName, asw ActualStateOfWorld) {
+	unmountedVolumes := asw.GetUnmountedVolumes()
+	for _, volume := range unmountedVolumes {
+		if volume.VolumeName == expectedVolumeName {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"Could not find volume %v in the list of UnmountedVolumes for actual state of world %+v",
+		expectedVolumeName,
+		unmountedVolumes)
+}
+
+func verifyVolumeDoesntExistInUnmountedVolumes(
+	t *testing.T, volumeToCheck api.UniqueVolumeName, asw ActualStateOfWorld) {
+	unmountedVolumes := asw.GetUnmountedVolumes()
+	for _, volume := range unmountedVolumes {
+		if volume.VolumeName == volumeToCheck {
+			t.Fatalf(
+				"Found volume %v in the list of UnmountedVolumes. Expected it not to exist.",
 				volumeToCheck)
 		}
 	}
