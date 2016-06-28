@@ -115,17 +115,31 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
 
+const (
+	// DefaultEndpointReconcilerInterval is the default amount of time for how often the endpoints for
+	// the kubernetes Service are reconciled.
+	DefaultEndpointReconcilerInterval = 10 * time.Second
+)
+
 type Config struct {
 	*genericapiserver.Config
 
-	EnableCoreControllers   bool
-	DeleteCollectionWorkers int
-	EventTTL                time.Duration
-	KubeletClient           kubeletclient.KubeletClient
+	EnableCoreControllers    bool
+	EndpointReconcilerConfig EndpointReconcilerConfig
+	DeleteCollectionWorkers  int
+	EventTTL                 time.Duration
+	KubeletClient            kubeletclient.KubeletClient
 	// Used to start and monitor tunneling
 	Tunneler genericapiserver.Tunneler
 
 	disableThirdPartyControllerForTesting bool
+}
+
+// EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
+// used by the master.
+type EndpointReconcilerConfig struct {
+	Reconciler EndpointReconciler
+	Interval   time.Duration
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -193,7 +207,7 @@ func New(c *Config) (*Master, error) {
 
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
-		m.NewBootstrapController().Start()
+		m.NewBootstrapController(c.EndpointReconcilerConfig).Start()
 	}
 
 	return m, nil
@@ -512,14 +526,27 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	}
 }
 
-// NewBootstrapController returns a controller for watching the core capabilities of the master.
-func (m *Master) NewBootstrapController() *Controller {
+// NewBootstrapController returns a controller for watching the core capabilities of the master.  If
+// endpointReconcilerConfig.Interval is 0, the default value of DefaultEndpointReconcilerInterval
+// will be used instead.  If endpointReconcilerConfig.Reconciler is nil, the default
+// MasterCountEndpointReconciler will be used.
+func (m *Master) NewBootstrapController(endpointReconcilerConfig EndpointReconcilerConfig) *Controller {
+	if endpointReconcilerConfig.Interval == 0 {
+		endpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	}
+
+	if endpointReconcilerConfig.Reconciler == nil {
+		// use a default endpoint	reconciler if nothing is set
+		// m.endpointRegistry is set via m.InstallAPIs -> m.initV1ResourcesStorage
+		endpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(m.MasterCount, m.endpointRegistry)
+	}
+
 	return &Controller{
 		NamespaceRegistry: m.namespaceRegistry,
 		ServiceRegistry:   m.serviceRegistry,
 
-		EndpointReconciler: NewMasterCountEndpointReconciler(m.MasterCount, m.endpointRegistry),
-		EndpointInterval:   10 * time.Second,
+		EndpointReconciler: endpointReconcilerConfig.Reconciler,
+		EndpointInterval:   endpointReconcilerConfig.Interval,
 
 		SystemNamespaces:         []string{api.NamespaceSystem},
 		SystemNamespacesInterval: 1 * time.Minute,
