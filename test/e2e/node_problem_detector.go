@@ -86,6 +86,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		}
 
 		BeforeEach(func() {
+			framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 			// Randomize the source name to avoid conflict with real node problem detector
 			source = "kernel-monitor-" + uid
 			config = `
