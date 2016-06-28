@@ -205,14 +205,14 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			// Need an appropriate CNAME record.  Check that we have it.
 			newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
 			glog.V(4).Infof("No healthy endpoints for %s.  Have recordset %v. Need recordset %v", dnsName, rrset, newRrset)
-			if rrset == newRrset {
-				// The existing rrset is equal to the required one - our work is done here
-				glog.V(4).Infof("Existing recordset %v is equal to needed recordset %v, our work is done here.", rrset, newRrset)
+			if dnsprovider.ResourceRecordSetsEquivalent(rrset, newRrset) {
+				// The existing rrset is equivalent to the required one - our work is done here
+				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", rrset, newRrset)
 				return nil
 			} else {
 				// Need to replace the existing one with a better one (or just remove it if we have no healthy endpoints).
 				// TODO: Ideally do these inside a transaction, or do an atomic update, but dnsprovider interface doesn't support that yet.
-				glog.V(4).Infof("Existing recordset %v not equal to needed recordset %v removing existing and adding needed.", rrset, newRrset)
+				glog.V(4).Infof("Existing recordset %v not equivalent to needed recordset %v removing existing and adding needed.", rrset, newRrset)
 				if err = rrsets.Remove(rrset); err != nil {
 					return err
 				}
@@ -236,15 +236,15 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			}
 			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
 			glog.V(4).Infof("Have recordset %v. Need recordset %v", rrset, newRrset)
-			if rrset == newRrset {
-				glog.V(4).Infof("Existing recordset %v is equal to needed recordset %v, our work is done here.", rrset, newRrset)
+			if dnsprovider.ResourceRecordSetsEquivalent(rrset, newRrset) {
+				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", rrset, newRrset)
 				// TODO: We could be more thorough about checking for equivalence to avoid unnecessary updates, but in the
 				//       worst case we'll just replace what's there with an equivalent, if not exactly identical record set.
 				return nil
 			} else {
 				// Need to replace the existing one with a better one
 				// TODO: Ideally do these inside a transaction, or do an atomic update, but dnsprovider interface doesn't support that yet.
-				glog.V(4).Infof("Existing recordset %v is not equal to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
+				glog.V(4).Infof("Existing recordset %v is not equivalent to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
 				if err = rrsets.Remove(rrset); err != nil {
 					return err
 				}
