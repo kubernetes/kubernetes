@@ -62,10 +62,15 @@ function fetch_published_version_tars() {
     clean_binaries
     local -r published_version="${1}"
     IFS='/' read -a varr <<< "${published_version}"
-    bucket="${varr[0]}"
-    build_version=$(gsutil cat gs://kubernetes-release/${published_version}.txt)
+    local -r path="${varr[0]}"
+    if [[ "${path}" == "release" ]]; then
+      local -r bucket="kubernetes-release"
+    else
+      local -r bucket="kubernetes-release-dev"
+    fi
+    build_version=$(gsutil cat "gs://${bucket}/${published_version}.txt")
     echo "Using published version $bucket/$build_version (from ${published_version})"
-    fetch_tars_from_gcs "${bucket}" "${build_version}"
+    fetch_tars_from_gcs "gs://${bucket}/${path}" "${build_version}"
     unpack_binaries
     # Set CLUSTER_API_VERSION for GKE CI
     export CLUSTER_API_VERSION=$(echo ${build_version} | cut -c 2-)
@@ -79,13 +84,10 @@ function clean_binaries() {
 }
 
 function fetch_tars_from_gcs() {
-    local -r bucket="${1}"
+    local -r gspath="${1}"
     local -r build_version="${2}"
-    echo "Pulling binaries from GCS; using server version ${bucket}/${build_version}."
-    gsutil -mq cp \
-        "gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz" \
-        "gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz" \
-        .
+    echo "Pulling binaries from GCS; using server version ${gspath}/${build_version}."
+    gsutil -mq cp "${gspath}/${build_version}/kubernetes.tar.gz" "${gspath}/${build_version}/kubernetes-test.tar.gz" .
 }
 
 function unpack_binaries() {
