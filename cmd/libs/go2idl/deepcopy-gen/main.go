@@ -38,6 +38,19 @@ func main() {
 
 	// Override defaults. These are Kubernetes specific input locations.
 	arguments.InputDirs = []string{
+		// generate all types, but do not register them
+		"+k8s.io/kubernetes/pkg/api/unversioned",
+
+		"-k8s.io/kubernetes/pkg/api/meta",
+		"-k8s.io/kubernetes/pkg/api/meta/metatypes",
+		"-k8s.io/kubernetes/pkg/api/resource",
+		"-k8s.io/kubernetes/pkg/conversion",
+		"-k8s.io/kubernetes/pkg/labels",
+		"-k8s.io/kubernetes/pkg/runtime",
+		"-k8s.io/kubernetes/pkg/runtime/serializer",
+		"-k8s.io/kubernetes/pkg/util/intstr",
+		"-k8s.io/kubernetes/pkg/util/sets",
+
 		"k8s.io/kubernetes/pkg/api",
 		"k8s.io/kubernetes/pkg/api/v1",
 		"k8s.io/kubernetes/pkg/apis/authentication.k8s.io",
@@ -61,19 +74,6 @@ func main() {
 		"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
 		"k8s.io/kubernetes/federation/apis/federation",
 		"k8s.io/kubernetes/federation/apis/federation/v1alpha1",
-
-		// generate all types, but do not register them
-		"+k8s.io/kubernetes/pkg/api/unversioned",
-
-		"-k8s.io/kubernetes/pkg/api/meta",
-		"-k8s.io/kubernetes/pkg/api/meta/metatypes",
-		"-k8s.io/kubernetes/pkg/api/resource",
-		"-k8s.io/kubernetes/pkg/conversion",
-		"-k8s.io/kubernetes/pkg/labels",
-		"-k8s.io/kubernetes/pkg/runtime",
-		"-k8s.io/kubernetes/pkg/runtime/serializer",
-		"-k8s.io/kubernetes/pkg/util/intstr",
-		"-k8s.io/kubernetes/pkg/util/sets",
 	}
 
 	if err := arguments.Execute(

@@ -391,8 +391,16 @@ type Interface interface{Method(a, b string) (c, d string)}
 				t.Errorf("type %s not found", n)
 				continue
 			}
-			if e, a := item.k, thisType.Kind; e != a {
-				t.Errorf("%v-%s: type kind wrong, wanted %v, got %v (%#v)", nameIndex, n, e, a, thisType)
+			underlyingType := thisType
+			if item.k != types.Alias && thisType.Kind == types.Alias {
+				underlyingType = thisType.Underlying
+				if underlyingType == nil {
+					t.Errorf("underlying type %s not found", n)
+					continue
+				}
+			}
+			if e, a := item.k, underlyingType.Kind; e != a {
+				t.Errorf("%v-%s: type kind wrong, wanted %v, got %v (%#v)", nameIndex, n, e, a, underlyingType)
 			}
 			if e, a := item.names[nameIndex], namer.Name(thisType); e != a {
 				t.Errorf("%v-%s: Expected %q, got %q", nameIndex, n, e, a)
