@@ -186,15 +186,15 @@ type KubeletConfiguration struct {
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32 `json:"readOnlyPort"`
-	// tLSCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
+	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
 	// passed to certDir.
-	TLSCertFile string `json:"tLSCertFile"`
-	// tLSPrivateKeyFile is the ile containing x509 private key matching
+	TLSCertFile string `json:"tlsCertFile"`
+	// tlsPrivateKeyFile is the ile containing x509 private key matching
 	// tlsCertFile.
-	TLSPrivateKeyFile string `json:"tLSPrivateKeyFile"`
+	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
 	// certDirectory is the directory where the TLS certs are located (by
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
@@ -227,18 +227,18 @@ type KubeletConfiguration struct {
 	HostIPCSources []string `json:"hostIPCSources"`
 	// registryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
-	RegistryPullQPS *float64 `json:"registryPullQPS"`
+	RegistryPullQPS *int32 `json:"registryPullQPS"`
 	// registryBurst is the maximum size of a bursty pulls, temporarily allows
 	// pulls to burst to this number, while still not exceeding registryQps.
-	// Only used if registryQps > 0.
-	RegistryBurst int64 `json:"registryBurst"`
+	// Only used if registryQPS > 0.
+	RegistryBurst int32 `json:"registryBurst"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
-	EventRecordQPS float32 `json:"eventRecordQPS"`
+	EventRecordQPS *int32 `json:"eventRecordQPS"`
 	// eventBurst is the maximum size of a bursty event records, temporarily
 	// allows event records to burst to this number, while still not exceeding
 	// event-qps. Only used if eventQps > 0
-	EventBurst int64 `json:"eventBurst"`
+	EventBurst int32 `json:"eventBurst"`
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
 	EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers"`
@@ -247,7 +247,7 @@ type KubeletConfiguration struct {
 	MinimumGCAge unversioned.Duration `json:"minimumGCAge"`
 	// maxPerPodContainerCount is the maximum number of old instances to
 	// retain per container. Each container takes up some disk space.
-	MaxPerPodContainerCount int64 `json:"maxPerPodContainerCount"`
+	MaxPerPodContainerCount int32 `json:"maxPerPodContainerCount"`
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount *int32 `json:"maxContainerCount"`
@@ -295,7 +295,7 @@ type KubeletConfiguration struct {
 	// lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
 	// maintain. When disk space falls below this threshold, new pods would
 	// be rejected.
-	LowDiskSpaceThresholdMB int64 `json:"lowDiskSpaceThresholdMB"`
+	LowDiskSpaceThresholdMB int32 `json:"lowDiskSpaceThresholdMB"`
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod unversioned.Duration `json:"volumeStatsAggPeriod"`
 	// networkPluginName is the name of the network plugin to be invoked for
@@ -389,7 +389,7 @@ type KubeletConfiguration struct {
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
-	KubeAPIQPS float32 `json:"kubeAPIQPS"`
+	KubeAPIQPS *int32 `json:"kubeAPIQPS"`
 	// kubeAPIBurst is the burst to allow while talking with kubernetes
 	// apiserver
 	KubeAPIBurst int32 `json:"kubeAPIBurst"`
@@ -415,7 +415,7 @@ type KubeletConfiguration struct {
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool `json:"enableCustomMetrics"`
 	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
-	EvictionHard string `json:"evictionHard"`
+	EvictionHard *string `json:"evictionHard"`
 	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
 	EvictionSoft string `json:"evictionSoft"`
 	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
@@ -430,4 +430,14 @@ type KubeletConfiguration struct {
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach"`
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for non-kubernetes components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	SystemReserved map[string]string `json:"systemReserved"`
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for kubernetes system components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	KubeReserved map[string]string `json:"kubeReserved"`
 }
