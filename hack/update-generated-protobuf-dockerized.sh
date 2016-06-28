@@ -43,4 +43,5 @@ gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 PATH="${KUBE_ROOT}/_output/local/go/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
-  --proto-import="${KUBE_ROOT}/third_party/protobuf"
+  --proto-import="${KUBE_ROOT}/third_party/protobuf" \
+  $@

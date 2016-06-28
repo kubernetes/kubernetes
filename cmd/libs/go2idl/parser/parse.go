@@ -576,7 +576,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		return out
 	case *tc.Named:
 		switch t.Underlying().(type) {
-		case *tc.Named, *tc.Basic:
+		case *tc.Named, *tc.Basic, *tc.Map, *tc.Slice:
 			name := tcNameToName(t.String())
 			out := u.Type(name)
 			if out.Kind != types.Unknown {

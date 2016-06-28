@@ -25,6 +25,7 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	types "k8s.io/kubernetes/pkg/types"
 )
 
 func init() {
@@ -3593,7 +3594,7 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 	out.GenerateName = in.GenerateName
 	out.Namespace = in.Namespace
 	out.SelfLink = in.SelfLink
-	out.UID = in.UID
+	out.UID = types.UID(in.UID)
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.CreationTimestamp, &out.CreationTimestamp, s); err != nil {
@@ -3627,7 +3628,7 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 	out.GenerateName = in.GenerateName
 	out.Namespace = in.Namespace
 	out.SelfLink = in.SelfLink
-	out.UID = in.UID
+	out.UID = types.UID(in.UID)
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.CreationTimestamp, &out.CreationTimestamp, s); err != nil {
@@ -3660,7 +3661,7 @@ func autoConvert_v1_ObjectReference_To_api_ObjectReference(in *ObjectReference, 
 	out.Kind = in.Kind
 	out.Namespace = in.Namespace
 	out.Name = in.Name
-	out.UID = in.UID
+	out.UID = types.UID(in.UID)
 	out.APIVersion = in.APIVersion
 	out.ResourceVersion = in.ResourceVersion
 	out.FieldPath = in.FieldPath
@@ -3675,7 +3676,7 @@ func autoConvert_api_ObjectReference_To_v1_ObjectReference(in *api.ObjectReferen
 	out.Kind = in.Kind
 	out.Namespace = in.Namespace
 	out.Name = in.Name
-	out.UID = in.UID
+	out.UID = types.UID(in.UID)
 	out.APIVersion = in.APIVersion
 	out.ResourceVersion = in.ResourceVersion
 	out.FieldPath = in.FieldPath
@@ -3690,7 +3691,7 @@ func autoConvert_v1_OwnerReference_To_api_OwnerReference(in *OwnerReference, out
 	out.APIVersion = in.APIVersion
 	out.Kind = in.Kind
 	out.Name = in.Name
-	out.UID = in.UID
+	out.UID = types.UID(in.UID)
 	out.Controller = in.Controller
 	return nil
 }
@@ -3703,7 +3704,7 @@ func autoConvert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference,
 	out.APIVersion = in.APIVersion
 	out.Kind = in.Kind
 	out.Name = in.Name
-	out.UID = in.UID
+	out.UID = types.UID(in.UID)
 	out.Controller = in.Controller
 	return nil
 }

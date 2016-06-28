@@ -75,6 +75,10 @@ type protobufPackage struct {
 	// A list of names that this package exports
 	LocalNames map[string]struct{}
 
+	// A list of type names in this package that will need marshaller rewriting
+	// to remove synthetic protobuf fields.
+	OptionalTypeNames map[string]struct{}
+
 	// A list of struct tags to generate onto named struct fields
 	StructTags map[string]map[string]string
 
@@ -110,7 +114,9 @@ func (p *protobufPackage) filterFunc(c *generator.Context, t *types.Type) bool {
 	case types.Builtin:
 		return false
 	case types.Alias:
-		return false
+		if !isOptionalAlias(t) {
+			return false
+		}
 	case types.Slice, types.Array, types.Map:
 		return false
 	case types.Pointer:
@@ -125,6 +131,11 @@ func (p *protobufPackage) filterFunc(c *generator.Context, t *types.Type) bool {
 
 func (p *protobufPackage) HasGoType(name string) bool {
 	_, ok := p.LocalNames[name]
+	return ok
+}
+
+func (p *protobufPackage) OptionalTypeName(name string) bool {
+	_, ok := p.OptionalTypeNames[name]
 	return ok
 }
 
