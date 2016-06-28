@@ -1717,6 +1717,39 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 	}
 }
 
+func TestSecurityOptsOperator(t *testing.T) {
+	dm110, _ := newTestDockerManagerWithVersion("1.10.1", "1.22")
+	dm111, _ := newTestDockerManagerWithVersion("1.11.0", "1.23")
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar"},
+			},
+		},
+	}
+	opts, err := dm110.getSecurityOpts(pod, "bar")
+	if err != nil {
+		t.Fatalf("error getting security opts for Docker 1.10: %v", err)
+	}
+	if expected := []string{"seccomp:unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
+		t.Fatalf("security opts for Docker 1.10: expected %v, got: %v", expected, opts)
+	}
+
+	opts, err = dm111.getSecurityOpts(pod, "bar")
+	if err != nil {
+		t.Fatalf("error getting security opts for Docker 1.11: %v", err)
+	}
+	if expected := []string{"seccomp=unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
+		t.Fatalf("security opts for Docker 1.11: expected %v, got: %v", expected, opts)
+	}
+}
+
 func TestSeccompIsUnconfinedByDefaultWithDockerV110(t *testing.T) {
 	dm, fakeDocker := newTestDockerManagerWithVersion("1.10.1", "1.22")
 	pod := &api.Pod{
@@ -1910,7 +1943,7 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dm, fakeDocker := newTestDockerManagerWithVersion("1.10.1", "1.22")
+		dm, fakeDocker := newTestDockerManagerWithVersion("1.11.0", "1.23")
 		_, filename, _, _ := goruntime.Caller(0)
 		dm.seccompProfileRoot = path.Join(path.Dir(filename), "fixtures", "seccomp")
 
