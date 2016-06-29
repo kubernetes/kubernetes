@@ -16,7 +16,11 @@ limitations under the License.
 
 package generators
 
-import "testing"
+import (
+	"testing"
+
+	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+)
 
 func Test_isRootedUnder(t *testing.T) {
 	testCases := []struct {
@@ -97,6 +101,167 @@ func Test_isRootedUnder(t *testing.T) {
 		r := isRootedUnder(tc.path, tc.roots)
 		if r != tc.expect {
 			t.Errorf("case[%d]: expected %t, got %t for %q in %q", i, tc.expect, r, tc.path, tc.roots)
+		}
+	}
+}
+
+func Test_hasDeepCopyMethod(t *testing.T) {
+	testCases := []struct {
+		typ    types.Type
+		expect bool
+	}{
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "typename"},
+				Kind: types.Builtin,
+				// No DeepCopy method.
+				Methods: map[string]*types.Type{},
+			},
+			expect: false,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "typename"},
+				Kind: types.Builtin,
+				Methods: map[string]*types.Type{
+					// No DeepCopy method.
+					"method": {
+						Name: types.Name{Package: "pkgname", Name: "func()"},
+						Kind: types.Func,
+						Signature: &types.Signature{
+							Parameters: []*types.Type{},
+							Results:    []*types.Type{},
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "typename"},
+				Kind: types.Builtin,
+				Methods: map[string]*types.Type{
+					// Wrong signature (no result).
+					"DeepCopy": {
+						Name: types.Name{Package: "pkgname", Name: "func()"},
+						Kind: types.Func,
+						Signature: &types.Signature{
+							Parameters: []*types.Type{},
+							Results:    []*types.Type{},
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "typename"},
+				Kind: types.Builtin,
+				Methods: map[string]*types.Type{
+					// Wrong signature (wrong result).
+					"DeepCopy": {
+						Name: types.Name{Package: "pkgname", Name: "func() int"},
+						Kind: types.Func,
+						Signature: &types.Signature{
+							Parameters: []*types.Type{},
+							Results: []*types.Type{
+								{
+									Name: types.Name{Name: "int"},
+									Kind: types.Builtin,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "typename"},
+				Kind: types.Builtin,
+				Methods: map[string]*types.Type{
+					// Correct signature.
+					"DeepCopy": {
+						Name: types.Name{Package: "pkgname", Name: "func() pkgname.typename"},
+						Kind: types.Func,
+						Signature: &types.Signature{
+							Parameters: []*types.Type{},
+							Results: []*types.Type{
+								{
+									Name: types.Name{Package: "pkgname", Name: "typename"},
+									Kind: types.Builtin,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: true,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "typename"},
+				Kind: types.Builtin,
+				Methods: map[string]*types.Type{
+					// Wrong signature (has params).
+					"DeepCopy": {
+						Name: types.Name{Package: "pkgname", Name: "func(int) pkgname.typename"},
+						Kind: types.Func,
+						Signature: &types.Signature{
+							Parameters: []*types.Type{
+								{
+									Name: types.Name{Name: "int"},
+									Kind: types.Builtin,
+								},
+							},
+							Results: []*types.Type{
+								{
+									Name: types.Name{Package: "pkgname", Name: "typename"},
+									Kind: types.Builtin,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			typ: types.Type{
+				Name: types.Name{Package: "pkgname", Name: "typename"},
+				Kind: types.Builtin,
+				Methods: map[string]*types.Type{
+					// Wrong signature (extra results).
+					"DeepCopy": {
+						Name: types.Name{Package: "pkgname", Name: "func() (pkgname.typename, int)"},
+						Kind: types.Func,
+						Signature: &types.Signature{
+							Parameters: []*types.Type{},
+							Results: []*types.Type{
+								{
+									Name: types.Name{Package: "pkgname", Name: "typename"},
+									Kind: types.Builtin,
+								},
+								{
+									Name: types.Name{Name: "int"},
+									Kind: types.Builtin,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+	}
+
+	for i, tc := range testCases {
+		r := hasDeepCopyMethod(&tc.typ)
+		if r != tc.expect {
+			t.Errorf("case[%d]: expected %t, got %t", i, tc.expect, r)
 		}
 	}
 }

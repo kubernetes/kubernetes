@@ -22,7 +22,6 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
@@ -41,9 +40,7 @@ func init() {
 }
 
 func DeepCopy_v1alpha1_CertificateSigningRequest(in CertificateSigningRequest, out *CertificateSigningRequest, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -60,19 +57,13 @@ func DeepCopy_v1alpha1_CertificateSigningRequestCondition(in CertificateSigningR
 	out.Type = in.Type
 	out.Reason = in.Reason
 	out.Message = in.Message
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastUpdateTime, &out.LastUpdateTime, c); err != nil {
-		return err
-	}
+	out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
 	return nil
 }
 
 func DeepCopy_v1alpha1_CertificateSigningRequestList(in CertificateSigningRequestList, out *CertificateSigningRequestList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]CertificateSigningRequest, len(in))

@@ -163,6 +163,29 @@ func (g *genDeepCopy) copyableWithinPackage(t *types.Type) bool {
 	return copyableWithinPackage(t, g.boundingDirs)
 }
 
+// hasDeepCopyMethod returns true if an appropriate DeepCopy() method is
+// defined for the given type.  This allows more efficient deep copy
+// implementations to be defined by the type's author.  The correct signature
+// for a type T is:
+//    func (t T) DeepCopy() T
+// or:
+//    func (t *T) DeepCopyt() T
+func hasDeepCopyMethod(t *types.Type) bool {
+	for mn, mt := range t.Methods {
+		if mn != "DeepCopy" {
+			continue
+		}
+		if len(mt.Signature.Parameters) != 0 {
+			return false
+		}
+		if len(mt.Signature.Results) != 1 || mt.Signature.Results[0].Name != t.Name {
+			return false
+		}
+		return true
+	}
+	return false
+}
+
 func isRootedUnder(pkg string, roots []string) bool {
 	// Add trailing / to avoid false matches, e.g. foo/bar vs foo/barn.  This
 	// assumes that bounding dirs do not have trailing slashes.
@@ -176,6 +199,7 @@ func isRootedUnder(pkg string, roots []string) bool {
 }
 
 func copyableWithinPackage(t *types.Type, boundingDirs []string) bool {
+	// If the type opts out of copy-generation, stop.
 	if types.ExtractCommentTags("+", t.CommentLines)["gencopy"] == "false" {
 		return false
 	}
@@ -314,6 +338,10 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("*out = make($.|raw$)\n", t)
 	if t.Key.IsAssignable() {
 		switch {
+		case hasDeepCopyMethod(t.Elem):
+			sw.Do("for key, val := range in {\n", nil)
+			sw.Do("(*out)[key] = val.DeepCopy()\n", nil)
+			sw.Do("}\n", nil)
 		case t.Elem.IsAnonymousStruct():
 			sw.Do("for key := range in {\n", nil)
 			sw.Do("(*out)[key] = struct{}{}\n", nil)
@@ -354,7 +382,9 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("copy(*out, in)\n", nil)
 	} else {
 		sw.Do("for i := range in {\n", nil)
-		if t.Elem.IsAssignable() {
+		if hasDeepCopyMethod(t.Elem) {
+			sw.Do("(*out)[i] = in[i].DeepCopy()\n", nil)
+		} else if t.Elem.IsAssignable() {
 			sw.Do("(*out)[i] = in[i]\n", nil)
 		} else if g.copyableWithinPackage(t.Elem) {
 			funcName := g.funcNameTmpl(t.Elem)
@@ -395,7 +425,11 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("out.$.name$ = nil\n", args)
 			sw.Do("}\n", nil)
 		case types.Struct:
-			if g.copyableWithinPackage(t) {
+			if hasDeepCopyMethod(t) {
+				sw.Do("out.$.name$ = in.$.name$.DeepCopy()\n", args)
+			} else if t.IsAssignable() {
+				sw.Do("out.$.name$ = in.$.name$\n", args)
+			} else if g.copyableWithinPackage(t) {
 				funcName := g.funcNameTmpl(t)
 				sw.Do(fmt.Sprintf("if err := %s(in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
 				sw.Do("return err\n", nil)
@@ -426,7 +460,9 @@ func (g *genDeepCopy) doInterface(t *types.Type, sw *generator.SnippetWriter) {
 
 func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("*out = new($.Elem|raw$)\n", t)
-	if t.Elem.Kind == types.Builtin {
+	if hasDeepCopyMethod(t.Elem) {
+		sw.Do("**out = in.DeepCopy()\n", nil)
+	} else if t.Elem.IsAssignable() {
 		sw.Do("**out = *in", nil)
 	} else if g.copyableWithinPackage(t.Elem) {
 		funcName := g.funcNameTmpl(t.Elem)

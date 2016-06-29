@@ -22,7 +22,6 @@ package federation
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -41,9 +40,7 @@ func init() {
 }
 
 func DeepCopy_federation_Cluster(in Cluster, out *Cluster, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -59,24 +56,16 @@ func DeepCopy_federation_Cluster(in Cluster, out *Cluster, c *conversion.Cloner)
 func DeepCopy_federation_ClusterCondition(in ClusterCondition, out *ClusterCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
-		return err
-	}
+	out.LastProbeTime = in.LastProbeTime.DeepCopy()
+	out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return nil
 }
 
 func DeepCopy_federation_ClusterList(in ClusterList, out *ClusterList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]Cluster, len(in))
@@ -96,9 +85,7 @@ func DeepCopy_federation_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conver
 		in, out := in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 		*out = make([]ServerAddressByClientCIDR, len(in))
 		for i := range in {
-			if err := DeepCopy_federation_ServerAddressByClientCIDR(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.ServerAddressByClientCIDRs = nil
@@ -106,9 +93,7 @@ func DeepCopy_federation_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conver
 	if in.SecretRef != nil {
 		in, out := in.SecretRef, &out.SecretRef
 		*out = new(api.LocalObjectReference)
-		if err := api.DeepCopy_api_LocalObjectReference(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.SecretRef = nil
 	}
