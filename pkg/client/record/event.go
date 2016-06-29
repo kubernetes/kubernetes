@@ -19,6 +19,7 @@ package record
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -70,6 +71,9 @@ type EventRecorder interface {
 
 	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
 	PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{})
+
+	// Flush makes sure all events are sent to server.
+	Flush()
 }
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
@@ -94,16 +98,19 @@ type EventBroadcaster interface {
 
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
-	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), defaultSleepDuration}
+	var wg sync.WaitGroup
+	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), defaultSleepDuration, wg}
 }
 
 func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
-	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), sleepDuration}
+	var wg sync.WaitGroup
+	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), sleepDuration, wg}
 }
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
 	sleepDuration time.Duration
+	wg            sync.WaitGroup
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
@@ -116,6 +123,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 	eventCorrelator := NewEventCorrelator(util.RealClock{})
 	return eventBroadcaster.StartEventWatcher(
 		func(event *api.Event) {
+			defer eventBroadcaster.wg.Done()
 			recordToSink(sink, event, eventCorrelator, randGen, eventBroadcaster.sleepDuration)
 		})
 }
@@ -242,13 +250,14 @@ func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler fun
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
 func (eventBroadcaster *eventBroadcasterImpl) NewRecorder(source api.EventSource) EventRecorder {
-	return &recorderImpl{source, eventBroadcaster.Broadcaster, util.RealClock{}}
+	return &recorderImpl{source, eventBroadcaster.Broadcaster, util.RealClock{}, &eventBroadcaster.wg}
 }
 
 type recorderImpl struct {
 	source api.EventSource
 	*watch.Broadcaster
 	clock util.Clock
+	wg    *sync.WaitGroup
 }
 
 func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, eventtype, reason, message string) {
@@ -266,11 +275,20 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unv
 	event := recorder.makeEvent(ref, eventtype, reason, message)
 	event.Source = recorder.source
 
+	recorder.wg.Add(2)
 	go func() {
 		// NOTE: events should be a non-blocking operation
+		// NOTE: however, if you call this from short-living programs, you should
+		// call Flush() to make sure all events have been recorded.
 		defer utilruntime.HandleCrash()
+		defer recorder.wg.Done()
 		recorder.Action(watch.Added, event)
 	}()
+}
+
+// Flush will make sure all events are successfully recorded.
+func (recorder *recorderImpl) Flush() {
+	recorder.wg.Wait()
 }
 
 func validateEventType(eventtype string) bool {

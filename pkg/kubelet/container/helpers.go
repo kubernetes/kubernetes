@@ -181,6 +181,8 @@ func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp
 	}
 }
 
+func (irecorder *innerEventRecorder) Flush() {}
+
 // Pod must not be nil.
 func IsHostNetworkPod(pod *api.Pod) bool {
 	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
