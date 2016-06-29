@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
-	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api "k8s.io/kubernetes/pkg/api"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -30,13 +30,13 @@ type ClustersGetter interface {
 
 // ClusterInterface has methods to work with Cluster resources.
 type ClusterInterface interface {
-	Create(*v1alpha1.Cluster) (*v1alpha1.Cluster, error)
-	Update(*v1alpha1.Cluster) (*v1alpha1.Cluster, error)
-	UpdateStatus(*v1alpha1.Cluster) (*v1alpha1.Cluster, error)
+	Create(*v1beta1.Cluster) (*v1beta1.Cluster, error)
+	Update(*v1beta1.Cluster) (*v1beta1.Cluster, error)
+	UpdateStatus(*v1beta1.Cluster) (*v1beta1.Cluster, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*v1alpha1.Cluster, error)
-	List(opts api.ListOptions) (*v1alpha1.ClusterList, error)
+	Get(name string) (*v1beta1.Cluster, error)
+	List(opts api.ListOptions) (*v1beta1.ClusterList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	ClusterExpansion
 }
@@ -54,8 +54,8 @@ func newClusters(c *FederationClient) *clusters {
 }
 
 // Create takes the representation of a cluster and creates it.  Returns the server's representation of the cluster, and an error, if there is any.
-func (c *clusters) Create(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, err error) {
-	result = &v1alpha1.Cluster{}
+func (c *clusters) Create(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
+	result = &v1beta1.Cluster{}
 	err = c.client.Post().
 		Resource("clusters").
 		Body(cluster).
@@ -65,8 +65,8 @@ func (c *clusters) Create(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, 
 }
 
 // Update takes the representation of a cluster and updates it. Returns the server's representation of the cluster, and an error, if there is any.
-func (c *clusters) Update(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, err error) {
-	result = &v1alpha1.Cluster{}
+func (c *clusters) Update(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
+	result = &v1beta1.Cluster{}
 	err = c.client.Put().
 		Resource("clusters").
 		Name(cluster.Name).
@@ -76,8 +76,8 @@ func (c *clusters) Update(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, 
 	return
 }
 
-func (c *clusters) UpdateStatus(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, err error) {
-	result = &v1alpha1.Cluster{}
+func (c *clusters) UpdateStatus(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
+	result = &v1beta1.Cluster{}
 	err = c.client.Put().
 		Resource("clusters").
 		Name(cluster.Name).
@@ -109,8 +109,8 @@ func (c *clusters) DeleteCollection(options *api.DeleteOptions, listOptions api.
 }
 
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
-func (c *clusters) Get(name string) (result *v1alpha1.Cluster, err error) {
-	result = &v1alpha1.Cluster{}
+func (c *clusters) Get(name string) (result *v1beta1.Cluster, err error) {
+	result = &v1beta1.Cluster{}
 	err = c.client.Get().
 		Resource("clusters").
 		Name(name).
@@ -120,8 +120,8 @@ func (c *clusters) Get(name string) (result *v1alpha1.Cluster, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Clusters that match those selectors.
-func (c *clusters) List(opts api.ListOptions) (result *v1alpha1.ClusterList, err error) {
-	result = &v1alpha1.ClusterList{}
+func (c *clusters) List(opts api.ListOptions) (result *v1beta1.ClusterList, err error) {
+	result = &v1beta1.ClusterList{}
 	err = c.client.Get().
 		Resource("clusters").
 		VersionedParams(&opts, api.ParameterCodec).

@@ -60,7 +60,7 @@ func main() {
 		"k8s.io/kubernetes/pkg/apis/rbac",
 		"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
 		"k8s.io/kubernetes/federation/apis/federation",
-		"k8s.io/kubernetes/federation/apis/federation/v1alpha1",
+		"k8s.io/kubernetes/federation/apis/federation/v1beta1",
 
 		// generate all types, but do not register them
 		"+k8s.io/kubernetes/pkg/api/unversioned",

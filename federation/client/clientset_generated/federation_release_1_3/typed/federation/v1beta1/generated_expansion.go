@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +genconversion=true
-package v1alpha1
+package v1beta1
+
+type ClusterExpansion interface{}
