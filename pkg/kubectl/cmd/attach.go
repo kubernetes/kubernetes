@@ -186,7 +186,10 @@ func (p *AttachOptions) Run() error {
 
 	// check for TTY
 	tty := p.TTY
-	containerToAttach := p.GetContainer(pod)
+	containerToAttach, err := p.containerToAttachTo(pod)
+	if err != nil {
+		return fmt.Errorf("cannot attach to the container: %v", err)
+	}
 	if tty && !containerToAttach.TTY {
 		tty = false
 		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
@@ -231,26 +234,32 @@ func (p *AttachOptions) Run() error {
 	return nil
 }
 
-// GetContainer returns the container to attach to, with a fallback.
-func (p *AttachOptions) GetContainer(pod *api.Pod) api.Container {
+// containerToAttach returns a reference to the container to attach to, given
+// by name or the first container if name is empty.
+func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error) {
 	if len(p.ContainerName) > 0 {
-		for _, container := range pod.Spec.Containers {
-			if container.Name == p.ContainerName {
-				return container
+		for i := range pod.Spec.Containers {
+			if pod.Spec.Containers[i].Name == p.ContainerName {
+				return &pod.Spec.Containers[i], nil
 			}
 		}
-		for _, container := range pod.Spec.InitContainers {
-			if container.Name == p.ContainerName {
-				return container
+		for i := range pod.Spec.InitContainers {
+			if pod.Spec.InitContainers[i].Name == p.ContainerName {
+				return &pod.Spec.InitContainers[i], nil
 			}
 		}
+		return nil, fmt.Errorf("container not found (%s)", p.ContainerName)
 	}
 
 	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
-	return pod.Spec.Containers[0]
+	return &pod.Spec.Containers[0], nil
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.
-func (p *AttachOptions) GetContainerName(pod *api.Pod) string {
-	return p.GetContainer(pod).Name
+func (p *AttachOptions) GetContainerName(pod *api.Pod) (string, error) {
+	c, err := p.containerToAttachTo(pod)
+	if err != nil {
+		return "", err
+	}
+	return c.Name, nil
 }
