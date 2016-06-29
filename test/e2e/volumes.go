@@ -141,10 +141,10 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 			Volumes: volumes,
 		},
 	}
-	_, err := podClient.Create(serverPod)
+	serverPod, err := podClient.Create(serverPod)
 	framework.ExpectNoError(err, "Failed to create %s pod: %v", serverPod.Name, err)
 
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod.Name, config.namespace))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod))
 
 	By("locating the server pod")
 	pod, err := podClient.Get(serverPod.Name)
@@ -244,13 +244,14 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	if fsGroup != nil {
 		clientPod.Spec.SecurityContext.FSGroup = fsGroup
 	}
-	if _, err := podsNamespacer.Create(clientPod); err != nil {
+	clientPod, err := podsNamespacer.Create(clientPod)
+	if err != nil {
 		framework.Failf("Failed to create %s pod: %v", clientPod.Name, err)
 	}
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, clientPod.Name, config.namespace))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, clientPod))
 
 	By("Checking that text file contents are perfect.")
-	_, err := framework.LookForStringInPodExec(config.namespace, clientPod.Name, []string{"cat", "/opt/index.html"}, expectedContent, time.Minute)
+	_, err = framework.LookForStringInPodExec(config.namespace, clientPod.Name, []string{"cat", "/opt/index.html"}, expectedContent, time.Minute)
 	Expect(err).NotTo(HaveOccurred(), "failed: finding the contents of the mounted file.")
 
 	if fsGroup != nil {

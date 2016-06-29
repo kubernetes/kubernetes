@@ -324,7 +324,7 @@ func (f *Framework) AfterEach() {
 		case "json":
 			for i := range summaries {
 				typeName := reflect.TypeOf(summaries[i]).String()
-				Logf("%v JSON\n%v", typeName[strings.LastIndex(typeName, ".")+1:len(typeName)], summaries[i].PrintJSON())
+				Logf("%v JSON\n%v", typeName[strings.LastIndex(typeName, ".")+1:], summaries[i].PrintJSON())
 				Logf("Finished")
 			}
 		default:
@@ -359,24 +359,24 @@ func (f *Framework) WaitForPodTerminated(podName, reason string) error {
 
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
-	return WaitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
+	return WaitForPodNameRunningInNamespace(f.Client, podName, f.Namespace.Name)
 }
 
 // WaitForPodReady waits for the pod to flip to ready in the namespace.
 func (f *Framework) WaitForPodReady(podName string) error {
-	return waitTimeoutForPodReadyInNamespace(f.Client, podName, f.Namespace.Name, PodStartTimeout)
+	return waitTimeoutForPodReadyInNamespace(f.Client, podName, f.Namespace.Name, "", PodStartTimeout)
 }
 
 // WaitForPodRunningSlow waits for the pod to run in the namespace.
 // It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
 func (f *Framework) WaitForPodRunningSlow(podName string) error {
-	return waitForPodRunningInNamespaceSlow(f.Client, podName, f.Namespace.Name)
+	return waitForPodRunningInNamespaceSlow(f.Client, podName, f.Namespace.Name, "")
 }
 
 // WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
 // success or failure.
 func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return WaitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name)
+	return WaitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name, "")
 }
 
 // Runs the given pod and verifies that the output of exact container matches the desired output.
