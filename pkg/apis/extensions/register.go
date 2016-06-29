@@ -68,6 +68,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Ingress{},
 		&IngressList{},
 		&api.ListOptions{},
+		&api.DeleteOptions{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&api.ExportOptions{},
