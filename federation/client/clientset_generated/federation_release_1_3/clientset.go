@@ -19,7 +19,7 @@ package federation_release_1_3
 import (
 	"github.com/golang/glog"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/core/v1"
-	v1alpha1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1alpha1"
+	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -27,7 +27,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Federation() v1alpha1federation.FederationInterface
+	Federation() v1beta1federation.FederationInterface
 	Core() v1core.CoreInterface
 }
 
@@ -35,12 +35,12 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*v1alpha1federation.FederationClient
+	*v1beta1federation.FederationClient
 	*v1core.CoreClient
 }
 
 // Federation retrieves the FederationClient
-func (c *Clientset) Federation() v1alpha1federation.FederationInterface {
+func (c *Clientset) Federation() v1beta1federation.FederationInterface {
 	if c == nil {
 		return nil
 	}
@@ -68,7 +68,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.FederationClient, err = v1alpha1federation.NewForConfig(&configShallowCopy)
+	clientset.FederationClient, err = v1beta1federation.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.FederationClient = v1alpha1federation.NewForConfigOrDie(c)
+	clientset.FederationClient = v1beta1federation.NewForConfigOrDie(c)
 	clientset.CoreClient = v1core.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -99,7 +99,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
-	clientset.FederationClient = v1alpha1federation.New(c)
+	clientset.FederationClient = v1beta1federation.New(c)
 	clientset.CoreClient = v1core.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)

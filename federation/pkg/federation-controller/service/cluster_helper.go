@@ -19,7 +19,7 @@ package service
 import (
 	"sync"
 
-	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
@@ -38,7 +38,7 @@ import (
 
 type clusterCache struct {
 	clientset *release_1_3.Clientset
-	cluster   *v1alpha1.Cluster
+	cluster   *v1beta1.Cluster
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
@@ -58,7 +58,7 @@ type clusterClientCache struct {
 	clientMap map[string]*clusterCache
 }
 
-func (cc *clusterClientCache) startClusterLW(cluster *v1alpha1.Cluster, clusterName string) {
+func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterName string) {
 	cachedClusterClient, ok := cc.clientMap[clusterName]
 	// only create when no existing cachedClusterClient
 	if ok {
@@ -162,7 +162,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1alpha1.Cluster, clusterN
 // delFromClusterSet delete a cluster from clusterSet and
 // delete the corresponding restclient from the map clusterKubeClientMap
 func (cc *clusterClientCache) delFromClusterSet(obj interface{}) {
-	cluster, ok := obj.(*v1alpha1.Cluster)
+	cluster, ok := obj.(*v1beta1.Cluster)
 	cc.rwlock.Lock()
 	defer cc.rwlock.Unlock()
 	if ok {
@@ -181,10 +181,10 @@ func (cc *clusterClientCache) delFromClusterSet(obj interface{}) {
 // addToClusterSet inserts the new cluster to clusterSet and creates a corresponding
 // restclient to map clusterKubeClientMap
 func (cc *clusterClientCache) addToClientMap(obj interface{}) {
-	cluster := obj.(*v1alpha1.Cluster)
+	cluster := obj.(*v1beta1.Cluster)
 	cc.rwlock.Lock()
 	defer cc.rwlock.Unlock()
-	cluster, ok := obj.(*v1alpha1.Cluster)
+	cluster, ok := obj.(*v1beta1.Cluster)
 	if !ok {
 		return
 	}
@@ -196,7 +196,7 @@ func (cc *clusterClientCache) addToClientMap(obj interface{}) {
 	}
 }
 
-func newClusterClientset(c *v1alpha1.Cluster) (*release_1_3.Clientset, error) {
+func newClusterClientset(c *v1beta1.Cluster) (*release_1_3.Clientset, error) {
 	clusterConfig, err := util.BuildClusterConfig(c)
 	if clusterConfig != nil {
 		clientset := release_1_3.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))

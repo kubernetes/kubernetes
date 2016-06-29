@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -44,7 +44,7 @@ type ClusterClient struct {
 	kubeClient      *clientset.Clientset
 }
 
-func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error) {
+func NewClusterClientSet(c *federation_v1beta1.Cluster) (*ClusterClient, error) {
 	clusterConfig, err := util.BuildClusterConfig(c)
 	if err != nil {
 		return nil, err
@@ -64,35 +64,35 @@ func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error)
 }
 
 // GetClusterHealthStatus gets the kubernetes cluster health status by requesting "/healthz"
-func (self *ClusterClient) GetClusterHealthStatus() *federation_v1alpha1.ClusterStatus {
-	clusterStatus := federation_v1alpha1.ClusterStatus{}
+func (self *ClusterClient) GetClusterHealthStatus() *federation_v1beta1.ClusterStatus {
+	clusterStatus := federation_v1beta1.ClusterStatus{}
 	currentTime := unversioned.Now()
-	newClusterReadyCondition := federation_v1alpha1.ClusterCondition{
-		Type:               federation_v1alpha1.ClusterReady,
+	newClusterReadyCondition := federation_v1beta1.ClusterCondition{
+		Type:               federation_v1beta1.ClusterReady,
 		Status:             v1.ConditionTrue,
 		Reason:             "ClusterReady",
 		Message:            "/healthz responded with ok",
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
-	newClusterNotReadyCondition := federation_v1alpha1.ClusterCondition{
-		Type:               federation_v1alpha1.ClusterReady,
+	newClusterNotReadyCondition := federation_v1beta1.ClusterCondition{
+		Type:               federation_v1beta1.ClusterReady,
 		Status:             v1.ConditionFalse,
 		Reason:             "ClusterNotReady",
 		Message:            "/healthz responded without ok",
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
-	newNodeOfflineCondition := federation_v1alpha1.ClusterCondition{
-		Type:               federation_v1alpha1.ClusterOffline,
+	newNodeOfflineCondition := federation_v1beta1.ClusterCondition{
+		Type:               federation_v1beta1.ClusterOffline,
 		Status:             v1.ConditionTrue,
 		Reason:             "ClusterNotReachable",
 		Message:            "cluster is not reachable",
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
-	newNodeNotOfflineCondition := federation_v1alpha1.ClusterCondition{
-		Type:               federation_v1alpha1.ClusterOffline,
+	newNodeNotOfflineCondition := federation_v1beta1.ClusterCondition{
+		Type:               federation_v1beta1.ClusterOffline,
 		Status:             v1.ConditionFalse,
 		Reason:             "ClusterReachable",
 		Message:            "cluster is reachable",
