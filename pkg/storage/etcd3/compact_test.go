@@ -36,7 +36,7 @@ func TestCompact(t *testing.T) {
 		t.Fatalf("Put failed: %v", err)
 	}
 
-	_, err = compact(ctx, client, putResp.Header.Revision)
+	_, _, err = compact(ctx, client, 0, putResp.Header.Revision)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
 	}
