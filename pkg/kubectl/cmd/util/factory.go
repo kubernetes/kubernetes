@@ -158,6 +158,9 @@ const (
 	RunPodV1GeneratorName                       = "run-pod/v1"
 	ServiceV1GeneratorName                      = "service/v1"
 	ServiceV2GeneratorName                      = "service/v2"
+	ServiceNodePortGeneratorV1Name              = "service-nodeport/v1"
+	ServiceClusterIPGeneratorV1Name             = "service-clusterip/v1"
+	ServiceLoadBalancerGeneratorV1Name          = "service-loadbalancer/v1"
 	ServiceAccountV1GeneratorName               = "serviceaccount/v1"
 	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
 	HorizontalPodAutoscalerV1GeneratorName      = "horizontalpodautoscaler/v1"
@@ -179,6 +182,15 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	generators["expose"] = map[string]kubectl.Generator{
 		ServiceV1GeneratorName: kubectl.ServiceGeneratorV1{},
 		ServiceV2GeneratorName: kubectl.ServiceGeneratorV2{},
+	}
+	generators["service-clusterip"] = map[string]kubectl.Generator{
+		ServiceClusterIPGeneratorV1Name: kubectl.ServiceClusterIPGeneratorV1{},
+	}
+	generators["service-nodeport"] = map[string]kubectl.Generator{
+		ServiceNodePortGeneratorV1Name: kubectl.ServiceNodePortGeneratorV1{},
+	}
+	generators["service-loadbalancer"] = map[string]kubectl.Generator{
+		ServiceLoadBalancerGeneratorV1Name: kubectl.ServiceLoadBalancerGeneratorV1{},
 	}
 	generators["run"] = map[string]kubectl.Generator{
 		RunV1GeneratorName:                kubectl.BasicReplicationController{},
