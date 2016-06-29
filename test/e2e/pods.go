@@ -281,7 +281,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx:1.7.9",
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -428,7 +428,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx:1.7.9",
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -514,7 +514,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx:1.7.9",
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -1351,7 +1351,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		if err != nil {
 			framework.Failf("failed to get pod: %v", err)
 		}
-		pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx:1.7.9"
+		pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
 		pod, err = podClient.Update(pod)
 		if err != nil {
 			framework.Failf("error updating pod=%s/%s %v", podName, containerName, err)
