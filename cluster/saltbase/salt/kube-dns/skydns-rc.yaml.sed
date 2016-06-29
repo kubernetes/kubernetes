@@ -106,7 +106,7 @@ spec:
             cpu: 10m
             memory: 20Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null
         - -port=8080
         - -quiet
         ports:
