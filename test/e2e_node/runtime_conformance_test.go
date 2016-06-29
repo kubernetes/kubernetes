@@ -97,14 +97,12 @@ while true; do sleep 1; done
 					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
+						Framework:     f,
 						Container:     testContainer,
-						Client:        f.Client,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
-						NodeName:      *nodeName,
-						Namespace:     f.Namespace.Name,
 					}
-					Expect(terminateContainer.Create()).To(Succeed())
+					terminateContainer.Create()
 					defer terminateContainer.Delete()
 
 					By("it should get the expected 'RestartCount'")
@@ -136,6 +134,7 @@ while true; do sleep 1; done
 				terminationMessage := "DONE"
 				terminationMessagePath := "/dev/termination-log"
 				c := ConformanceContainer{
+					Framework: f,
 					Container: api.Container{
 						Image:   ImageRegistry[busyBoxImage],
 						Name:    name,
@@ -143,14 +142,11 @@ while true; do sleep 1; done
 						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
 						TerminationMessagePath: terminationMessagePath,
 					},
-					Client:        f.Client,
 					RestartPolicy: api.RestartPolicyNever,
-					NodeName:      *nodeName,
-					Namespace:     f.Namespace.Name,
 				}
 
 				By("create the container")
-				Expect(c.Create()).To(Succeed())
+				c.Create()
 				defer c.Delete()
 
 				By("wait for the container to succeed")
@@ -236,6 +232,7 @@ while true; do sleep 1; done
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{
+						Framework: f,
 						Container: api.Container{
 							Name:    name,
 							Image:   testCase.image,
@@ -243,10 +240,7 @@ while true; do sleep 1; done
 							// PullAlways makes sure that the image will always be pulled even if it is present before the test.
 							ImagePullPolicy: api.PullAlways,
 						},
-						Client:        f.Client,
 						RestartPolicy: api.RestartPolicyNever,
-						NodeName:      *nodeName,
-						Namespace:     f.Namespace.Name,
 					}
 					if testCase.secret {
 						secret.Name = "image-pull-secret-" + string(util.NewUUID())
@@ -258,7 +252,7 @@ while true; do sleep 1; done
 					}
 
 					By("create the container")
-					Expect(container.Create()).To(Succeed())
+					container.Create()
 					defer container.Delete()
 
 					By("check the pod phase")

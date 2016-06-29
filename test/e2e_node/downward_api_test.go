@@ -158,7 +158,7 @@ func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, e
 			RestartPolicy: api.RestartPolicyNever,
 		},
 	}
-	assignPodToNode(pod)
+	f.MungePodSpec(pod)
 
 	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
 }
