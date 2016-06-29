@@ -165,7 +165,7 @@ const (
 	containerSuffix = "-c"
 )
 
-func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
+func createSummaryTestPods(f *NodeFramework, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
 	podNames := sets.NewString()
 	volumes := sets.NewString(volumeNamePrefix)
 	for i := 0; i < count; i++ {
@@ -192,7 +192,7 @@ func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count i
 	return podNames, volumes
 }
 
-func createPod(f *framework.Framework, podName string, containers []api.Container, volumes []api.Volume) {
+func createPod(f *NodeFramework, podName string, containers []api.Container, volumes []api.Volume) {
 	podClient := f.Client.Pods(f.Namespace.Name)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{

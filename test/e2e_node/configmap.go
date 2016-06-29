@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 	})
 })
 
-func newConfigMap(f *framework.Framework, name string) *api.ConfigMap {
+func newConfigMap(f *NodeFramework, name string) *api.ConfigMap {
 	return &api.ConfigMap{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: f.Namespace.Name,
@@ -206,7 +206,7 @@ func newConfigMap(f *framework.Framework, name string) *api.ConfigMap {
 	}
 }
 
-func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
+func doConfigMapE2EWithoutMappings(f *NodeFramework, uid, fsGroup int64) {
 	var (
 		name            = "configmap-test-volume-" + string(util.NewUUID())
 		volumeName      = "configmap-volume"
@@ -273,7 +273,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 
 }
 
-func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
+func doConfigMapE2EWithMappings(f *NodeFramework, uid, fsGroup int64) {
 	var (
 		name            = "configmap-test-volume-map-" + string(util.NewUUID())
 		volumeName      = "configmap-volume"

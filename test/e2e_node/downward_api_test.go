@@ -130,7 +130,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 	})
 })
 
-func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, expectations []string) {
+func testDownwardAPI(f *NodeFramework, podName string, env []api.EnvVar, expectations []string) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   podName,

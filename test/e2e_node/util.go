@@ -18,6 +18,8 @@ package e2e_node
 
 import (
 	"flag"
+	"io/ioutil"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -31,18 +33,40 @@ var buildServices = flag.Bool("build-services", true, "If true, build local exec
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 
-func NewDefaultFramework(baseName string) *framework.Framework {
+type NodeFramework struct {
+	*framework.Framework
+	OSDistro string
+}
+
+func NewDefaultFramework(baseName string) *NodeFramework {
 	// Provides a client config for the framework to create a client.
 	f := func() (*restclient.Config, error) {
 		return &restclient.Config{Host: *apiServerAddress}, nil
 	}
-	return framework.NewFrameworkWithConfigGetter(baseName,
-		framework.FrameworkOptions{
-			ClientQPS:   100,
-			ClientBurst: 100,
-		}, nil, f)
+	return &NodeFramework{
+		Framework: framework.NewFrameworkWithConfigGetter(baseName,
+			framework.FrameworkOptions{
+				ClientQPS:   100,
+				ClientBurst: 100,
+			}, nil, f),
+		OSDistro: getOSReleaseID(),
+	}
 }
 
 func assignPodToNode(pod *api.Pod) {
 	pod.Spec.NodeName = *nodeName
+}
+
+func getOSReleaseID() string {
+	data, err := ioutil.ReadFile("/etc/os-release")
+	if err != nil {
+		return "linux"
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "ID=") {
+			return line[3:]
+		}
+	}
+
+	return "linux"
 }
