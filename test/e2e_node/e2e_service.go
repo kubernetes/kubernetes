@@ -319,9 +319,15 @@ type killCmd struct {
 }
 
 func (k *killCmd) Kill() error {
+	if k == nil {
+		glog.V(2).Infof("The killCmd is nil, nothing will be killed")
+		return nil
+	}
+
 	if k.override != nil {
 		return k.override.Run()
 	}
+
 	name := k.name
 	cmd := k.cmd
 
