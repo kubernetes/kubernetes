@@ -35,6 +35,7 @@ bench-workers
 bind-address
 bind-pods-burst
 bind-pods-qps
+bounding-dirs
 build-only
 build-services
 build-tag
