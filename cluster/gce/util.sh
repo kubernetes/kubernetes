@@ -693,6 +693,14 @@ function create-master() {
       --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
   fi
 
+  # Create disk for influxdb if enabled
+  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]]; then
+    gcloud compute disks create "${INSTANCE_PREFIX}-influxdb-pd" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --size "10GiB" &
+  fi
+
   # Generate a bearer token for this cluster. We push this separately
   # from the other cluster variables so that the client (this
   # computer) can forget it later. This should disappear with
@@ -1076,6 +1084,15 @@ function kube-down {
       "${MASTER_NAME}-ip"
   fi
 
+  # Delete persistent disk for influx-db.
+  if gcloud compute disks describe "${INSTANCE_PREFIX}"-influxdb-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+    gcloud compute disks delete \
+      --project "${PROJECT}" \
+      --quiet \
+      --zone "${ZONE}" \
+      "${INSTANCE_PREFIX}"-influxdb-pd
+  fi
+
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   clear-kubeconfig
   set -e
@@ -1129,6 +1146,11 @@ function check-resources {
 
   if gcloud compute disks describe --project "${PROJECT}" "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Persistent disk ${CLUSTER_REGISTRY_DISK}"
+    return 1
+  fi
+
+  if gcloud compute disks describe --project "${PROJECT}" "${INSTANCE_PREFIX}-influxdb-pd" --zone "${ZONE}" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Persistent disk ${INSTANCE_PREFIX}-influxdb-pd"
     return 1
   fi
 
