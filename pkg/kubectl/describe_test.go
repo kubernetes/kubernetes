@@ -568,7 +568,7 @@ func TestDescribeCluster(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "foo") || !strings.Contains(out, "Version:") {
+	if !strings.Contains(out, "foo") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }

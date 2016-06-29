@@ -504,7 +504,8 @@ func NewMainKubelet(
 		hostname,
 		klet.podManager,
 		klet.kubeClient,
-		klet.volumePluginMgr)
+		klet.volumePluginMgr,
+		klet.containerRuntime)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -3404,7 +3405,11 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		return err
 	}
 	// Update the current status on the API server
-	_, err = kl.kubeClient.Core().Nodes().UpdateStatus(node)
+	updatedNode, err := kl.kubeClient.Core().Nodes().UpdateStatus(node)
+	if err == nil {
+		kl.volumeManager.MarkVolumesAsReportedInUse(
+			updatedNode.Status.VolumesInUse)
+	}
 	return err
 }
 

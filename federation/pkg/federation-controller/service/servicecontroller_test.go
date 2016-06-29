@@ -20,7 +20,7 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -39,22 +39,22 @@ func TestGetClusterConditionPredicate(t *testing.T) {
 	}
 
 	tests := []struct {
-		cluster           v1alpha1.Cluster
+		cluster           v1beta1.Cluster
 		expectAccept      bool
 		name              string
 		serviceController *ServiceController
 	}{
 		{
-			cluster:           v1alpha1.Cluster{},
+			cluster:           v1beta1.Cluster{},
 			expectAccept:      false,
 			name:              "empty",
 			serviceController: &serviceController,
 		},
 		{
-			cluster: v1alpha1.Cluster{
-				Status: v1alpha1.ClusterStatus{
-					Conditions: []v1alpha1.ClusterCondition{
-						{Type: v1alpha1.ClusterReady, Status: v1.ConditionTrue},
+			cluster: v1beta1.Cluster{
+				Status: v1beta1.ClusterStatus{
+					Conditions: []v1beta1.ClusterCondition{
+						{Type: v1beta1.ClusterReady, Status: v1.ConditionTrue},
 					},
 				},
 			},
@@ -63,10 +63,10 @@ func TestGetClusterConditionPredicate(t *testing.T) {
 			serviceController: &serviceController,
 		},
 		{
-			cluster: v1alpha1.Cluster{
-				Status: v1alpha1.ClusterStatus{
-					Conditions: []v1alpha1.ClusterCondition{
-						{Type: v1alpha1.ClusterReady, Status: v1.ConditionFalse},
+			cluster: v1beta1.Cluster{
+				Status: v1beta1.ClusterStatus{
+					Conditions: []v1beta1.ClusterCondition{
+						{Type: v1beta1.ClusterReady, Status: v1.ConditionFalse},
 					},
 				},
 			},

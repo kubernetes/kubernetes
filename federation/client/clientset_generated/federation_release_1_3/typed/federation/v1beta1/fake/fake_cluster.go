@@ -17,7 +17,7 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
@@ -30,60 +30,60 @@ type FakeClusters struct {
 	Fake *FakeFederation
 }
 
-var clustersResource = unversioned.GroupVersionResource{Group: "federation", Version: "v1alpha1", Resource: "clusters"}
+var clustersResource = unversioned.GroupVersionResource{Group: "federation", Version: "v1beta1", Resource: "clusters"}
 
-func (c *FakeClusters) Create(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, err error) {
+func (c *FakeClusters) Create(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(clustersResource, cluster), &v1alpha1.Cluster{})
+		Invokes(core.NewRootCreateAction(clustersResource, cluster), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Cluster), err
+	return obj.(*v1beta1.Cluster), err
 }
 
-func (c *FakeClusters) Update(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, err error) {
+func (c *FakeClusters) Update(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(clustersResource, cluster), &v1alpha1.Cluster{})
+		Invokes(core.NewRootUpdateAction(clustersResource, cluster), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Cluster), err
+	return obj.(*v1beta1.Cluster), err
 }
 
-func (c *FakeClusters) UpdateStatus(cluster *v1alpha1.Cluster) (*v1alpha1.Cluster, error) {
+func (c *FakeClusters) UpdateStatus(cluster *v1beta1.Cluster) (*v1beta1.Cluster, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction(clustersResource, "status", cluster), &v1alpha1.Cluster{})
+		Invokes(core.NewRootUpdateSubresourceAction(clustersResource, "status", cluster), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Cluster), err
+	return obj.(*v1beta1.Cluster), err
 }
 
 func (c *FakeClusters) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(clustersResource, name), &v1alpha1.Cluster{})
+		Invokes(core.NewRootDeleteAction(clustersResource, name), &v1beta1.Cluster{})
 	return err
 }
 
 func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(clustersResource, listOptions)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.ClusterList{})
+	_, err := c.Fake.Invokes(action, &v1beta1.ClusterList{})
 	return err
 }
 
-func (c *FakeClusters) Get(name string) (result *v1alpha1.Cluster, err error) {
+func (c *FakeClusters) Get(name string) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(clustersResource, name), &v1alpha1.Cluster{})
+		Invokes(core.NewRootGetAction(clustersResource, name), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Cluster), err
+	return obj.(*v1beta1.Cluster), err
 }
 
-func (c *FakeClusters) List(opts api.ListOptions) (result *v1alpha1.ClusterList, err error) {
+func (c *FakeClusters) List(opts api.ListOptions) (result *v1beta1.ClusterList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(clustersResource, opts), &v1alpha1.ClusterList{})
+		Invokes(core.NewRootListAction(clustersResource, opts), &v1beta1.ClusterList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -92,8 +92,8 @@ func (c *FakeClusters) List(opts api.ListOptions) (result *v1alpha1.ClusterList,
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.ClusterList{}
-	for _, item := range obj.(*v1alpha1.ClusterList).Items {
+	list := &v1beta1.ClusterList{}
+	for _, item := range obj.(*v1beta1.ClusterList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}

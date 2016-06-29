@@ -376,6 +376,22 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 	}
 }
 
+func TestFileLocking(t *testing.T) {
+	f, _ := ioutil.TempFile("", "")
+	defer os.Remove(f.Name())
+
+	err := lockFile(f.Name())
+	if err != nil {
+		t.Errorf("unexpected error while locking file: %v", err)
+	}
+	defer unlockFile(f.Name())
+
+	err = lockFile(f.Name())
+	if err == nil {
+		t.Error("expected error while locking file.")
+	}
+}
+
 func Example_noMergingOnExplicitPaths() {
 	commandLineFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(commandLineFile.Name())

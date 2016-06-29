@@ -17,12 +17,10 @@
     - makedirs: true
     - dir_mode: 755
     - context:
-        # 20m might cause kube-proxy CPU starvation on full nodes, resulting in
-        # delayed service updates. But, giving it more would be a breaking change 
-        # to the overhead requirements for existing clusters.
+        # Increasing to 100m to avoid CPU starvation on full nodes.
         # Any change here should be accompanied by a proportional change in CPU
         # requests of other per-node add-ons (e.g. fluentd).
-        cpurequest: '20m'
+        cpurequest: '100m'
     - require:
       - service: docker
       - service: kubelet

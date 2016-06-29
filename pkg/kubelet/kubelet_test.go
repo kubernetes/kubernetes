@@ -298,7 +298,8 @@ func newTestKubeletWithImageList(
 		kubelet.hostname,
 		kubelet.podManager,
 		fakeKubeClient,
-		kubelet.volumePluginMgr)
+		kubelet.volumePluginMgr,
+		fakeRuntime)
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
 	}
@@ -596,7 +597,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	}
 
 	// Verify volumes detached and no longer reported as in use
-	err = waitForVolumeDetach(kubelet.volumeManager)
+	err = waitForVolumeDetach(api.UniqueVolumeName("fake/vol1"), kubelet.volumeManager)
 	if err != nil {
 		t.Error(err)
 	}
@@ -610,7 +611,6 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
 }
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
@@ -656,6 +656,13 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	}()
 
 	kubelet.podManager.SetPods([]*api.Pod{pod})
+
+	// Fake node status update
+	go simulateVolumeInUseUpdate(
+		api.UniqueVolumeName("fake/vol1"),
+		stopCh,
+		kubelet.volumeManager)
+
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	if err != nil {
 		t.Errorf("Expected success: %v", err)
@@ -746,6 +753,12 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	// Add pod
 	kubelet.podManager.SetPods([]*api.Pod{pod})
 
+	// Fake node status update
+	go simulateVolumeInUseUpdate(
+		api.UniqueVolumeName("fake/vol1"),
+		stopCh,
+		kubelet.volumeManager)
+
 	// Verify volumes attached
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	if err != nil {
@@ -814,7 +827,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	}
 
 	// Verify volumes detached and no longer reported as in use
-	err = waitForVolumeDetach(kubelet.volumeManager)
+	err = waitForVolumeDetach(api.UniqueVolumeName("fake/vol1"), kubelet.volumeManager)
 	if err != nil {
 		t.Error(err)
 	}
@@ -827,7 +840,6 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
 }
 
 func TestPodVolumesExist(t *testing.T) {
@@ -4970,19 +4982,15 @@ func waitForVolumeUnmount(
 }
 
 func waitForVolumeDetach(
+	volumeName api.UniqueVolumeName,
 	volumeManager kubeletvolume.VolumeManager) error {
 	attachedVolumes := []api.UniqueVolumeName{}
 	err := retryWithExponentialBackOff(
 		time.Duration(50*time.Millisecond),
 		func() (bool, error) {
 			// Verify volumes detached
-			attachedVolumes = volumeManager.GetVolumesInUse()
-
-			if len(attachedVolumes) != 0 {
-				return false, nil
-			}
-
-			return true, nil
+			volumeAttached := volumeManager.VolumeIsAttached(volumeName)
+			return !volumeAttached, nil
 		},
 	)
 
@@ -5002,4 +5010,21 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 		Steps:    6,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func simulateVolumeInUseUpdate(
+	volumeName api.UniqueVolumeName,
+	stopCh <-chan struct{},
+	volumeManager kubeletvolume.VolumeManager) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			volumeManager.MarkVolumesAsReportedInUse(
+				[]api.UniqueVolumeName{volumeName})
+		case <-stopCh:
+			return
+		}
+	}
 }

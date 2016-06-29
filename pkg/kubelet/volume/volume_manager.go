@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volume/cache"
@@ -47,6 +48,12 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 100 * time.Millisecond
+
+	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
+	// time the DesiredStateOfWorldPopulator loop waits between successive pod
+	// cleanup calls (to prevent calling containerruntime.GetPodStatus too
+	// frequently).
+	desiredStateOfWorldPopulatorGetPodStatusRetryDuration time.Duration = 2 * time.Second
 
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
@@ -102,10 +109,24 @@ type VolumeManager interface {
 	// pod object is bad, and should be avoided.
 	GetVolumesForPodAndAppendSupplementalGroups(pod *api.Pod) container.VolumeMap
 
-	// Returns a list of all volumes that are currently attached according to
-	// the actual state of the world cache and implement the volume.Attacher
-	// interface.
+	// Returns a list of all volumes that implement the volume.Attacher
+	// interface and are currently in use according to the actual and desired
+	// state of the world caches. A volume is considered "in use" as soon as it
+	// is added to the desired state of world, indicating it *should* be
+	// attached to this node and remains "in use" until it is removed from both
+	// the desired state of the world and the actual state of the world, or it
+	// has been unmounted (as indicated in actual state of world).
+	// TODO(#27653): VolumesInUse should be handled gracefully on kubelet'
+	// restarts.
 	GetVolumesInUse() []api.UniqueVolumeName
+
+	// VolumeIsAttached returns true if the given volume is attached to this
+	// node.
+	VolumeIsAttached(volumeName api.UniqueVolumeName) bool
+
+	// Marks the specified volume as having successfully been reported as "in
+	// use" in the nodes's volume status.
+	MarkVolumesAsReportedInUse(volumesReportedAsInUse []api.UniqueVolumeName)
 }
 
 // NewVolumeManager returns a new concrete instance implementing the
@@ -120,7 +141,8 @@ func NewVolumeManager(
 	hostName string,
 	podManager pod.Manager,
 	kubeClient internalclientset.Interface,
-	volumePluginMgr *volume.VolumePluginMgr) (VolumeManager, error) {
+	volumePluginMgr *volume.VolumePluginMgr,
+	kubeContainerRuntime kubecontainer.Runtime) (VolumeManager, error) {
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
@@ -143,8 +165,10 @@ func NewVolumeManager(
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
+		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
 		podManager,
-		vm.desiredStateOfWorld)
+		vm.desiredStateOfWorld,
+		kubeContainerRuntime)
 
 	return vm, nil
 }
@@ -209,16 +233,47 @@ func (vm *volumeManager) GetVolumesForPodAndAppendSupplementalGroups(
 }
 
 func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
-	attachedVolumes := vm.actualStateOfWorld.GetAttachedVolumes()
-	volumesInUse :=
-		make([]api.UniqueVolumeName, 0 /* len */, len(attachedVolumes) /* cap */)
-	for _, attachedVolume := range attachedVolumes {
-		if attachedVolume.PluginIsAttachable {
-			volumesInUse = append(volumesInUse, attachedVolume.VolumeName)
+	// Report volumes in desired state of world and actual state of world so
+	// that volumes are marked in use as soon as the decision is made that the
+	// volume *should* be attached to this node until it is safely unmounted.
+	desiredVolumes := vm.desiredStateOfWorld.GetVolumesToMount()
+	mountedVolumes := vm.actualStateOfWorld.GetGloballyMountedVolumes()
+	volumesToReportInUse :=
+		make(
+			[]api.UniqueVolumeName,
+			0, /* len */
+			len(desiredVolumes)+len(mountedVolumes) /* cap */)
+	desiredVolumesMap :=
+		make(
+			map[api.UniqueVolumeName]bool,
+			len(desiredVolumes)+len(mountedVolumes) /* cap */)
+
+	for _, volume := range desiredVolumes {
+		if volume.PluginIsAttachable {
+			desiredVolumesMap[volume.VolumeName] = true
+			volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
 		}
 	}
 
-	return volumesInUse
+	for _, volume := range mountedVolumes {
+		if volume.PluginIsAttachable {
+			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
+				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
+			}
+		}
+	}
+
+	return volumesToReportInUse
+}
+
+func (vm *volumeManager) VolumeIsAttached(
+	volumeName api.UniqueVolumeName) bool {
+	return vm.actualStateOfWorld.VolumeExists(volumeName)
+}
+
+func (vm *volumeManager) MarkVolumesAsReportedInUse(
+	volumesReportedAsInUse []api.UniqueVolumeName) {
+	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
 }
 
 // getVolumesForPodHelper is a helper method implements the common logic for

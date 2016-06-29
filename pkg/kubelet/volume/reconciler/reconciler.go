@@ -295,7 +295,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 							attachedVolume.VolumeName,
 							attachedVolume.VolumeSpec.Name())
 						err := rc.operationExecutor.DetachVolume(
-							attachedVolume.AttachedVolume, rc.actualStateOfWorld)
+							attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
 						if err != nil &&
 							!goroutinemap.IsAlreadyExists(err) &&
 							!goroutinemap.IsExponentialBackoff(err) {

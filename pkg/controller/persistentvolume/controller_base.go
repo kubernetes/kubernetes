@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -139,16 +140,22 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
 		return
 	}
-	volumeList, ok := volumeListObj.(*api.List)
+	volumeList, ok := volumeListObj.(*api.PersistentVolumeList)
 	if !ok {
 		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of volumes, got: %+v", volumeListObj)
 		return
 	}
 	for _, volume := range volumeList.Items {
 		// Ignore template volumes from kubernetes 1.2
-		deleted := ctrl.upgradeVolumeFrom1_2(volume.(*api.PersistentVolume))
+		deleted := ctrl.upgradeVolumeFrom1_2(&volume)
 		if !deleted {
-			storeObjectUpdate(ctrl.volumes.store, volume, "volume")
+			clone, err := conversion.NewCloner().DeepCopy(&volume)
+			if err != nil {
+				glog.Errorf("error cloning volume %q: %v", volume.Name, err)
+				continue
+			}
+			volumeClone := clone.(*api.PersistentVolume)
+			ctrl.storeVolumeUpdate(volumeClone)
 		}
 	}
 
@@ -157,15 +164,29 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
 		return
 	}
-	claimList, ok := claimListObj.(*api.List)
+	claimList, ok := claimListObj.(*api.PersistentVolumeClaimList)
 	if !ok {
-		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of claims, got: %+v", volumeListObj)
+		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of claims, got: %+v", claimListObj)
 		return
 	}
 	for _, claim := range claimList.Items {
-		storeObjectUpdate(ctrl.claims, claim, "claim")
+		clone, err := conversion.NewCloner().DeepCopy(&claim)
+		if err != nil {
+			glog.Errorf("error cloning claim %q: %v", claimToClaimKey(&claim), err)
+			continue
+		}
+		claimClone := clone.(*api.PersistentVolumeClaim)
+		ctrl.storeClaimUpdate(claimClone)
 	}
 	glog.V(4).Infof("controller initialized")
+}
+
+func (ctrl *PersistentVolumeController) storeVolumeUpdate(volume *api.PersistentVolume) (bool, error) {
+	return storeObjectUpdate(ctrl.volumes.store, volume, "volume")
+}
+
+func (ctrl *PersistentVolumeController) storeClaimUpdate(claim *api.PersistentVolumeClaim) (bool, error) {
+	return storeObjectUpdate(ctrl.claims, claim, "claim")
 }
 
 // addVolume is callback from framework.Controller watching PersistentVolume
@@ -184,7 +205,7 @@ func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 
 	// Store the new volume version in the cache and do not process it if this
 	// is an old version.
-	new, err := storeObjectUpdate(ctrl.volumes.store, obj, "volume")
+	new, err := ctrl.storeVolumeUpdate(pv)
 	if err != nil {
 		glog.Errorf("%v", err)
 	}
@@ -219,7 +240,7 @@ func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{})
 
 	// Store the new volume version in the cache and do not process it if this
 	// is an old version.
-	new, err := storeObjectUpdate(ctrl.volumes.store, newObj, "volume")
+	new, err := ctrl.storeVolumeUpdate(newVolume)
 	if err != nil {
 		glog.Errorf("%v", err)
 	}
@@ -291,7 +312,13 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 func (ctrl *PersistentVolumeController) addClaim(obj interface{}) {
 	// Store the new claim version in the cache and do not process it if this is
 	// an old version.
-	new, err := storeObjectUpdate(ctrl.claims, obj, "claim")
+	claim, ok := obj.(*api.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but addClaim received %+v", obj)
+		return
+	}
+
+	new, err := ctrl.storeClaimUpdate(claim)
 	if err != nil {
 		glog.Errorf("%v", err)
 	}
@@ -299,11 +326,6 @@ func (ctrl *PersistentVolumeController) addClaim(obj interface{}) {
 		return
 	}
 
-	claim, ok := obj.(*api.PersistentVolumeClaim)
-	if !ok {
-		glog.Errorf("Expected PersistentVolumeClaim but addClaim received %+v", obj)
-		return
-	}
 	if err := ctrl.syncClaim(claim); err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
@@ -320,7 +342,13 @@ func (ctrl *PersistentVolumeController) addClaim(obj interface{}) {
 func (ctrl *PersistentVolumeController) updateClaim(oldObj, newObj interface{}) {
 	// Store the new claim version in the cache and do not process it if this is
 	// an old version.
-	new, err := storeObjectUpdate(ctrl.claims, newObj, "claim")
+	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but updateClaim received %+v", newObj)
+		return
+	}
+
+	new, err := ctrl.storeClaimUpdate(newClaim)
 	if err != nil {
 		glog.Errorf("%v", err)
 	}
@@ -328,11 +356,6 @@ func (ctrl *PersistentVolumeController) updateClaim(oldObj, newObj interface{}) 
 		return
 	}
 
-	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
-	if !ok {
-		glog.Errorf("Expected PersistentVolumeClaim but updateClaim received %+v", newObj)
-		return
-	}
 	if err := ctrl.syncClaim(newClaim); err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller

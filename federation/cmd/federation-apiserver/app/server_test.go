@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"

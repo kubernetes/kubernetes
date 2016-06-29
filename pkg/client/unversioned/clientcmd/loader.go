@@ -381,10 +381,36 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 			return err
 		}
 	}
+
+	err = lockFile(filename)
+	if err != nil {
+		return err
+	}
+	defer unlockFile(filename)
+
 	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
 		return err
 	}
 	return nil
+}
+
+func lockFile(filename string) error {
+	// TODO: find a way to do this with actual file locks. Will
+	// probably need seperate solution for windows and linux.
+	f, err := os.OpenFile(lockName(filename), os.O_CREATE|os.O_EXCL, 0)
+	if err != nil {
+		return err
+	}
+	f.Close()
+	return nil
+}
+
+func unlockFile(filename string) error {
+	return os.Remove(lockName(filename))
+}
+
+func lockName(filename string) string {
+	return filename + ".lock"
 }
 
 // Write serializes the config to yaml.

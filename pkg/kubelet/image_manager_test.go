@@ -374,8 +374,8 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 
 	// Expect 40% usage.
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:    400,
-		Capacity: 1000,
+		Available: 600,
+		Capacity:  1000,
 	}, nil)
 
 	assert.NoError(t, manager.GarbageCollect())
@@ -401,8 +401,8 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 
 	// Expect 95% usage and most of it gets freed.
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:    950,
-		Capacity: 1000,
+		Available: 50,
+		Capacity:  1000,
 	}, nil)
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 450),
@@ -420,8 +420,8 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 
 	// Expect 95% usage and little of it gets freed.
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:    950,
-		Capacity: 1000,
+		Available: 50,
+		Capacity:  1000,
 	}, nil)
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 50),

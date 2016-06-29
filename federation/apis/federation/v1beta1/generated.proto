@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.federation.apis.federation.v1alpha1;
+package k8s.io.kubernetes.federation.apis.federation.v1beta1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
@@ -27,7 +27,7 @@ import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1alpha1";
+option go_package = "v1beta1";
 
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 message Cluster {
@@ -73,12 +73,6 @@ message ClusterList {
   repeated Cluster items = 2;
 }
 
-// Cluster metadata
-message ClusterMeta {
-  // Release version of the cluster.
-  optional string version = 1;
-}
-
 // ClusterSpec describes the attributes of a kubernetes cluster.
 message ClusterSpec {
   // A map of client CIDR to server address.
@@ -99,14 +93,6 @@ message ClusterSpec {
 message ClusterStatus {
   // Conditions is an array of current cluster conditions.
   repeated ClusterCondition conditions = 1;
-
-  // Capacity represents the total resources of the cluster
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> capacity = 2;
-
-  // Allocatable represents the total resources of a cluster that are available for scheduling.
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> allocatable = 3;
-
-  optional ClusterMeta clusterMeta = 4;
 
   // Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
   // These will always be in the same region.

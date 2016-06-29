@@ -123,8 +123,8 @@ type volumeReactor struct {
 	changedObjects       []interface{}
 	changedSinceLastSync int
 	ctrl                 *PersistentVolumeController
-	volumeSource         *framework.FakeControllerSource
-	claimSource          *framework.FakeControllerSource
+	volumeSource         *framework.FakePVControllerSource
+	claimSource          *framework.FakePVCControllerSource
 	lock                 sync.Mutex
 	errors               []reactorError
 }
@@ -542,7 +542,7 @@ func (r *volumeReactor) addClaimEvent(claim *api.PersistentVolumeClaim) {
 	r.claimSource.Add(claim)
 }
 
-func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource, claimSource *framework.FakeControllerSource, errors []reactorError) *volumeReactor {
+func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource *framework.FakePVControllerSource, claimSource *framework.FakePVCControllerSource, errors []reactorError) *volumeReactor {
 	reactor := &volumeReactor{
 		volumes:      make(map[string]*api.PersistentVolume),
 		claims:       make(map[string]*api.PersistentVolumeClaim),
@@ -557,10 +557,10 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 
 func newTestController(kubeClient clientset.Interface, volumeSource, claimSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
 	if volumeSource == nil {
-		volumeSource = framework.NewFakeControllerSource()
+		volumeSource = framework.NewFakePVControllerSource()
 	}
 	if claimSource == nil {
-		claimSource = framework.NewFakeControllerSource()
+		claimSource = framework.NewFakePVCControllerSource()
 	}
 	ctrl := NewPersistentVolumeController(
 		kubeClient,
