@@ -36,14 +36,11 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 
 			BeforeEach(func() {
 				podName = "bin-false" + string(util.NewUUID())
-				pod := &api.Pod{
+				f.CreatePodAsync(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						Name:      podName,
-						Namespace: f.Namespace.Name,
+						Name: podName,
 					},
 					Spec: api.PodSpec{
-						// Force the Pod to schedule to the node without a scheduler running
-						NodeName: *nodeName,
 						// Don't restart the Pod since it is expected to exit
 						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
@@ -54,15 +51,12 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 							},
 						},
 					},
-				}
-
-				_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+				})
 			})
 
 			It("should have an error terminated reason", func() {
 				Eventually(func() error {
-					podData, err := f.Client.Pods(f.Namespace.Name).Get(podName)
+					podData, err := f.PodClient().Get(podName)
 					if err != nil {
 						return err
 					}
@@ -81,7 +75,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 			})
 
 			It("should be possible to delete", func() {
-				err := f.Client.Pods(f.Namespace.Name).Delete(podName, &api.DeleteOptions{})
+				err := f.PodClient().Delete(podName, &api.DeleteOptions{})
 				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 			})
 		})
