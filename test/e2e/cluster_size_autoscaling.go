@@ -132,6 +132,42 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
+	It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		By("Creating new node-pool with one n1-standard-4 machine")
+		const extraPoolName = "extra-pool"
+		output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", extraPoolName, "--quiet",
+			"--machine-type=n1-standard-4",
+			"--num-nodes=1",
+			"--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone,
+			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+		defer func() {
+			glog.Infof("Deleting node pool %s", extraPoolName)
+			output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "delete", extraPoolName, "--quiet",
+				"--project="+framework.TestContext.CloudConfig.ProjectID,
+				"--zone="+framework.TestContext.CloudConfig.Zone,
+				"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+			if err != nil {
+				glog.Infof("Error: %v", err)
+			}
+			glog.Infof("Node-pool deletion output: %s", output)
+		}()
+		framework.ExpectNoError(err)
+		glog.Infof("Creating node-pool: %s", output)
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
+
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
+		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
+
+		// Verify, that cluster size is increased
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+	})
+
 	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		CreateHostPortPods(f, "host-port", nodeCount+2, false)
 		defer framework.DeleteRC(f.Client, f.Namespace.Name, "host-port")
