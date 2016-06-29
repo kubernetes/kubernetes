@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volume/cache"
@@ -47,6 +48,12 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 100 * time.Millisecond
+
+	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
+	// time the DesiredStateOfWorldPopulator loop waits between successive pod
+	// cleanup calls (to prevent calling containerruntime.GetPodStatus too
+	// frequently).
+	desiredStateOfWorldPopulatorGetPodStatusRetryDuration time.Duration = 2 * time.Second
 
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
@@ -134,7 +141,8 @@ func NewVolumeManager(
 	hostName string,
 	podManager pod.Manager,
 	kubeClient internalclientset.Interface,
-	volumePluginMgr *volume.VolumePluginMgr) (VolumeManager, error) {
+	volumePluginMgr *volume.VolumePluginMgr,
+	kubeContainerRuntime kubecontainer.Runtime) (VolumeManager, error) {
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
@@ -157,8 +165,10 @@ func NewVolumeManager(
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
+		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
 		podManager,
-		vm.desiredStateOfWorld)
+		vm.desiredStateOfWorld,
+		kubeContainerRuntime)
 
 	return vm, nil
 }
