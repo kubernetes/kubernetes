@@ -143,7 +143,7 @@ func MatchesServerVersion(client *Client, c *restclient.Config) error {
 		return fmt.Errorf("couldn't read version from server: %v\n", err)
 	}
 	// GitVersion includes GitCommit and GitTreeState, but best to be safe?
-	if cVer.GitVersion != sVer.GitVersion || cVer.GitCommit != sVer.GitCommit || cVer.GitTreeState != cVer.GitTreeState {
+	if cVer.GitVersion != sVer.GitVersion || cVer.GitCommit != sVer.GitCommit || cVer.GitTreeState != sVer.GitTreeState {
 		return fmt.Errorf("server version (%#v) differs from client version (%#v)!\n", sVer, cVer)
 	}
 
