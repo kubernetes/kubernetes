@@ -292,7 +292,7 @@ function detect-master-from-kubeconfig() {
 
 # Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
 # "v1.2.0-alpha.1.881+376438b69c7612") or a version' publication of the form
-# <path>/<version> (e.g. "release/stable",' "ci/latest-1").
+# <bucket>/<version> (e.g. "release/stable",' "ci/latest-1").
 #
 # See the docs on getting builds for more information about version
 # publication.
@@ -303,12 +303,7 @@ function detect-master-from-kubeconfig() {
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    IFS='/' read -a path <<< "${1}"
-    if [[ "${path[0]}" == "release" ]]; then
-      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
-    else
-      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
-    fi
+    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/${1}.txt)
   else
     KUBE_VERSION=${1}
   fi
@@ -339,8 +334,8 @@ function tars_from_version() {
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
     KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} | sha1sum | awk '{print $1}')
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
     KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} | sha1sum | awk '{print $1}')
@@ -489,7 +484,7 @@ function build-runtime-config() {
   if [[ -n ${appends} ]]; then
     if [[ -n ${RUNTIME_CONFIG} ]]; then
       RUNTIME_CONFIG="${RUNTIME_CONFIG},${appends}"
-    else
+    else 
       RUNTIME_CONFIG="${appends}"
     fi
   fi
