@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
-	"k8s.io/kubernetes/third_party/forked/expansion"
+	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 
 	"github.com/golang/glog"
 )
