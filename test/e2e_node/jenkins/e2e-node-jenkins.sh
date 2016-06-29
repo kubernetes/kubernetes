@@ -38,4 +38,4 @@ go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="g
   --zone="$GCE_ZONE" --project="$GCE_PROJECT" --image-project="$GCE_IMAGE_PROJECT" \
   --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" --cleanup="$CLEANUP" \
   --results-dir="$ARTIFACTS" --ginkgo-flags="$GINKGO_FLAGS" \
-  --setup-node="$SETUP_NODE"
+  --setup-node="$SETUP_NODE" --instance-metadata="$GCE_INSTANCE_METADATA"
