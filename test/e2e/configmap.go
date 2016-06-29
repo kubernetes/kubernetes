@@ -131,10 +131,10 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 			f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 		By("Creating the pod")
-		_, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
 
 		pollLogs := func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
