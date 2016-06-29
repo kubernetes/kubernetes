@@ -106,6 +106,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			}
 			framework.Logf("%d clusters are Ready", len(contexts))
 
+			clusterClientSets = make([]*release_1_3.Clientset, len(clusterList.Items))
 			for i, cluster := range clusterList.Items {
 				framework.Logf("Creating a clientset for the cluster %s", cluster.Name)
 
@@ -125,7 +126,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				cfg.QPS = KubeAPIQPS
 				cfg.Burst = KubeAPIBurst
 				clset := release_1_3.NewForConfigOrDie(restclient.AddUserAgent(cfg, UserAgentName))
-				clusterClientSets = append(clusterClientSets, clset)
+				clusterClientSets[i] = clset
 			}
 
 			clusterNamespaceCreated = make([]bool, len(clusterClientSets))
@@ -221,10 +222,15 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				if backendPods != nil {
 					deleteBackendPodsOrFail(clusterClientSets, f.Namespace.Name, backendPods)
 					backendPods = nil
+				} else {
+					By("No backend pods to delete.  BackendPods is nil.")
 				}
+
 				if service != nil {
 					deleteServiceOrFail(f.FederationClientset_1_3, f.Namespace.Name, service.Name)
 					service = nil
+				} else {
+					By("No service to delete.  Service is nil")
 				}
 			})
 
@@ -252,7 +258,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 					// Delete all the backend pods from the shard which is local to the discovery pod.
 					deleteBackendPodsOrFail([]*release_1_3.Clientset{f.Clientset_1_3}, f.Namespace.Name, []*v1.Pod{backendPods[0]})
-					backendPods[0] = nil // So we don't try to delete it again in an outer AfterEach
+
 				})
 
 				It("should be able to discover a non-local federated service", func() {
@@ -279,7 +285,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 							fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name),
 						}
 						for i, name := range localSvcDNSNames {
-							discoverService(f, name, false, FederatedServicePodName+strconv.Itoa(i))
+							discoverService(f, name, false, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
 						}
 					})
 				})
@@ -452,17 +458,24 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 		},
 	}
 
+	By(fmt.Sprintf("Creating pod %q in namespace %q", pod.Name, f.Namespace.Name))
 	_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err, "Trying to create pod to run %q", command)
-	defer func() { f.Client.Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0)) }()
+	By(fmt.Sprintf("Successfully created pod %q in namespace %q", pod.Name, f.Namespace.Name))
+	defer func() {
+		By(fmt.Sprintf("Deleting pod %q from namespace %q", podName, f.Namespace.Name))
+		err := f.Client.Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
+		framework.ExpectNoError(err, "Deleting pod %q from namespace %q", podName, f.Namespace.Name)
+		By(fmt.Sprintf("Deleted pod %q from namespace %q", podName, f.Namespace.Name))
+	}()
 
 	if exists {
 		// TODO(mml): Eventually check the IP address is correct, too.
 		Eventually(podExitCodeDetector(f, podName, 0), 3*DNSTTL, time.Second*2).
 			Should(BeNil(), "%q should exit 0, but it never did", command)
 	} else {
-		Consistently(podExitCodeDetector(f, podName, 0), 3*DNSTTL, time.Second*2).
-			ShouldNot(BeNil(), "%q should never exit 0, but it did", command)
+		Eventually(podExitCodeDetector(f, podName, 0), 3*DNSTTL, time.Second*2).
+			ShouldNot(BeNil(), "%q should eventually not exit 0, but it always did", command)
 	}
 }
 
@@ -473,9 +486,9 @@ If creation of any pod fails, the test fails (possibly with a partially created 
 func createBackendPodsOrFail(clusterClientSets []*release_1_3.Clientset, namespace string, name string) []*v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    FederatedServiceLabels,
+			Name: name,
+			// Namespace: namespace,
+			Labels: FederatedServiceLabels,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -489,8 +502,10 @@ func createBackendPodsOrFail(clusterClientSets []*release_1_3.Clientset, namespa
 	}
 	pods := make([]*v1.Pod, len(clusterClientSets))
 	for i, client := range clusterClientSets {
+		By(fmt.Sprintf("Creating pod %q in namespace %q in cluster %d", pod.Name, namespace, i))
 		createdPod, err := client.Core().Pods(namespace).Create(pod)
 		framework.ExpectNoError(err, "Creating pod %q in namespace %q in cluster %d", name, namespace, i)
+		By(fmt.Sprintf("Successfully created pod %q in namespace %q in cluster %d: %v", pod.Name, namespace, i, *createdPod))
 		pods[i] = createdPod
 	}
 	return pods
@@ -507,7 +522,14 @@ func deleteBackendPodsOrFail(clusterClientSets []*release_1_3.Clientset, namespa
 	for i, client := range clusterClientSets {
 		if pods[i] != nil {
 			err := client.Core().Pods(namespace).Delete(pods[i].Name, api.NewDeleteOptions(0))
-			framework.ExpectNoError(err, "Deleting pod %q in namespace %q from cluster %d", pods[i].Name, namespace, i)
+			if errors.IsNotFound(err) {
+				By(fmt.Sprintf("Pod %q in namespace %q in cluster %d does not exist.  No need to delete it.", pods[i].Name, namespace, i))
+			} else {
+				framework.ExpectNoError(err, "Deleting pod %q in namespace %q from cluster %d", pods[i].Name, namespace, i)
+			}
+			By(fmt.Sprintf("Backend pod %q in namespace %q in cluster %d deleted or does not exist", pods[i].Name, namespace, i))
+		} else {
+			By(fmt.Sprintf("No backend pod to delete for cluster %d", i))
 		}
 	}
 }
