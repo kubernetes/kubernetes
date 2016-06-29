@@ -59,7 +59,7 @@ func newPod(name string, containers []api.Container) *api.Pod {
 	}
 }
 
-func TestGetPodQos(t *testing.T) {
+func TestGetPodQOS(t *testing.T) {
 	testCases := []struct {
 		pod      *api.Pod
 		expected QOSClass
@@ -125,7 +125,7 @@ func TestGetPodQos(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		if actual := GetPodQos(testCase.pod); testCase.expected != actual {
+		if actual := GetPodQOS(testCase.pod); testCase.expected != actual {
 			t.Errorf("invalid qos pod %s, expected: %s, actual: %s", testCase.pod.Name, testCase.expected, actual)
 		}
 	}

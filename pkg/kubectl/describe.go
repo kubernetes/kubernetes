@@ -540,7 +540,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, out, "")
-		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.GetPodQos(pod))
+		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
 		if events != nil {
 			DescribeEvents(events, out)
 		}

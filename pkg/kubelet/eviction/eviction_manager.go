@@ -87,7 +87,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if len(m.nodeConditions) == 0 {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
-	notBestEffort := qos.BestEffort != qos.GetPodQos(attrs.Pod)
+	notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
 	if notBestEffort {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
