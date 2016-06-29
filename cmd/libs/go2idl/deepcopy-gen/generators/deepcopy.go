@@ -171,7 +171,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				ttag := extractTag(t.CommentLines)
 				if ttag != nil && ttag.value == "true" {
 					glog.V(5).Infof("    tag=true")
-					if !copyableWithinPackage(t, boundingDirs) {
+					if !copyableType(t) {
 						glog.Fatalf("Type %v requests deepcopy generation but is not copyable", t)
 					}
 					pkgNeedsGeneration = true
@@ -247,15 +247,22 @@ func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
 			enabled = true
 		}
 	}
-	copyable := enabled && g.copyableWithinPackage(t)
+	copyable := enabled && copyableType(t)
 	if copyable {
 		g.typesForInit = append(g.typesForInit, t)
 	}
 	return copyable
 }
 
-func (g *genDeepCopy) copyableWithinPackage(t *types.Type) bool {
-	return copyableWithinPackage(t, g.boundingDirs)
+func (g *genDeepCopy) copyableAndInBounds(t *types.Type) bool {
+	if !copyableType(t) {
+		return false
+	}
+	// Only packages within the restricted range can be processed.
+	if !isRootedUnder(t.Name.Package, g.boundingDirs) {
+		return false
+	}
+	return true
 }
 
 // hasDeepCopyMethod returns true if an appropriate DeepCopy() method is
@@ -293,14 +300,10 @@ func isRootedUnder(pkg string, roots []string) bool {
 	return false
 }
 
-func copyableWithinPackage(t *types.Type, boundingDirs []string) bool {
+func copyableType(t *types.Type) bool {
 	// If the type opts out of copy-generation, stop.
 	ttag := extractTag(t.CommentLines)
 	if ttag != nil && ttag.value == "false" {
-		return false
-	}
-	// Only packages within the restricted range can be processed.
-	if !isRootedUnder(t.Name.Package, boundingDirs) {
 		return false
 	}
 	// TODO: Consider generating functions for other kinds too.
@@ -477,7 +480,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("}\n", nil)
 		default:
 			sw.Do("for key, val := range in {\n", nil)
-			if g.copyableWithinPackage(t.Elem) {
+			if g.copyableAndInBounds(t.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
 				funcName := g.funcNameTmpl(t.Elem)
 				sw.Do(fmt.Sprintf("if err := %s(val, newVal, c); err != nil {\n", funcName), argsFromType(t.Elem))
@@ -511,7 +514,7 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("(*out)[i] = in[i].DeepCopy()\n", nil)
 		} else if t.Elem.IsAssignable() {
 			sw.Do("(*out)[i] = in[i]\n", nil)
-		} else if g.copyableWithinPackage(t.Elem) {
+		} else if g.copyableAndInBounds(t.Elem) {
 			funcName := g.funcNameTmpl(t.Elem)
 			sw.Do(fmt.Sprintf("if err := %s(in[i], &(*out)[i], c); err != nil {\n", funcName), argsFromType(t.Elem))
 			sw.Do("return err\n", nil)
@@ -554,7 +557,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("out.$.name$ = in.$.name$.DeepCopy()\n", args)
 			} else if t.IsAssignable() {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
-			} else if g.copyableWithinPackage(t) {
+			} else if g.copyableAndInBounds(t) {
 				funcName := g.funcNameTmpl(t)
 				sw.Do(fmt.Sprintf("if err := %s(in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
 				sw.Do("return err\n", nil)
@@ -589,7 +592,7 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("**out = in.DeepCopy()\n", nil)
 	} else if t.Elem.IsAssignable() {
 		sw.Do("**out = *in", nil)
-	} else if g.copyableWithinPackage(t.Elem) {
+	} else if g.copyableAndInBounds(t.Elem) {
 		funcName := g.funcNameTmpl(t.Elem)
 		sw.Do(fmt.Sprintf("if err := %s(*in, *out, c); err != nil {\n", funcName), argsFromType(t.Elem))
 		sw.Do("return err\n", nil)
