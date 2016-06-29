@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen/generators"
 
 	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 )
 
 func main() {
@@ -60,6 +61,15 @@ func main() {
 		"k8s.io/kubernetes/federation/apis/federation/v1beta1",
 	}
 
+	// Custom args.
+	customArgs := &generators.CustomArgs{
+		BoundingDirs: []string{"k8s.io/kubernetes"},
+	}
+	pflag.CommandLine.StringSliceVar(&customArgs.BoundingDirs, "bounding-dirs", customArgs.BoundingDirs,
+		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
+	arguments.CustomArgs = customArgs
+
+	// Run it.
 	if err := arguments.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
