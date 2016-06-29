@@ -162,7 +162,6 @@ func (o *ResourcesOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args
 
 func (o *ResourcesOptions) Validate() error {
 	var err error
-	//if len(o.Limits) == 0 && len(o.Requests) == 0 && o.Remove == false {
 	if (len(o.Limits) == 0 && len(o.Requests) == 0) != o.Remove {
 		return fmt.Errorf("you must specify an update to limits or requests (in the form of --limits/--requests or --remove but not both)")
 	}
