@@ -26,11 +26,11 @@ import (
 	"reflect"
 	"strings"
 
+	customreflect "k8s.io/kubernetes/third_party/forked/reflect"
 	"k8s.io/kubernetes/third_party/golang/go/ast"
 	"k8s.io/kubernetes/third_party/golang/go/parser"
 	"k8s.io/kubernetes/third_party/golang/go/printer"
 	"k8s.io/kubernetes/third_party/golang/go/token"
-	customreflect "k8s.io/kubernetes/third_party/golang/reflect"
 )
 
 func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast.File) error) error {
