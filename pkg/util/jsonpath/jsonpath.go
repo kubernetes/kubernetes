@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/kubernetes/third_party/golang/template"
+	"k8s.io/kubernetes/third_party/forked/template"
 )
 
 type JSONPath struct {
