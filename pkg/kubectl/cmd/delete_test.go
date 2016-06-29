@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
@@ -445,5 +446,56 @@ func TestDeleteMultipleSelector(t *testing.T) {
 
 	if buf.String() != "pod/foo\npod/bar\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestResourceErrors(t *testing.T) {
+	testCases := map[string]struct {
+		args  []string
+		flags map[string]string
+		errFn func(error) bool
+	}{
+		"no args": {
+			args:  []string{},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "you must provide one or more resources") },
+		},
+		"resources but no selectors": {
+			args: []string{"pods"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+			},
+		},
+		"multiple resources but no selectors": {
+			args: []string{"pods,deployments"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+			},
+		},
+	}
+
+	for k, testCase := range testCases {
+		f, tf, _ := NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.Namespace = "test"
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdDelete(f, buf)
+		cmd.SetOutput(buf)
+
+		for k, v := range testCase.flags {
+			cmd.Flags().Set(k, v)
+		}
+		err := RunDelete(f, buf, cmd, testCase.args, &DeleteOptions{})
+		if !testCase.errFn(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+			continue
+		}
+		if tf.Printer.(*testPrinter).Objects != nil {
+			t.Errorf("unexpected print to default printer")
+		}
+		if buf.Len() > 0 {
+			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+		}
 	}
 }
