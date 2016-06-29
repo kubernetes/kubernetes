@@ -17,6 +17,7 @@ limitations under the License.
 package clientcmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -382,38 +383,21 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 		}
 	}
 
-	err = lockFile(filename)
+	temp, err := ioutil.TempFile(dir, filepath.Base(filename))
 	if err != nil {
 		return err
 	}
-	defer unlockFile(filename)
+	tempName := temp.Name()
+	defer os.Remove(tempName) // Just in case we fail before we move it.
+	defer temp.Close()
 
-	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
+	if _, err = io.Copy(temp, bytes.NewReader(content)); err != nil {
 		return err
 	}
-	return nil
+
+	return os.Rename(tempName, filename)
 }
 
-func lockFile(filename string) error {
-	// TODO: find a way to do this with actual file locks. Will
-	// probably need seperate solution for windows and linux.
-	f, err := os.OpenFile(lockName(filename), os.O_CREATE|os.O_EXCL, 0)
-	if err != nil {
-		return err
-	}
-	f.Close()
-	return nil
-}
-
-func unlockFile(filename string) error {
-	return os.Remove(lockName(filename))
-}
-
-func lockName(filename string) string {
-	return filename + ".lock"
-}
-
-// Write serializes the config to yaml.
 // Encapsulates serialization without assuming the destination is a file.
 func Write(config clientcmdapi.Config) ([]byte, error) {
 	return runtime.Encode(clientcmdlatest.Codec, &config)
