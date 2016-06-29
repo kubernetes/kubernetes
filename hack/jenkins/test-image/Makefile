@@ -14,7 +14,9 @@
 
 all: push
 
-TAG = 0.11
+# Tag format: $GO_VERSION-$EMBEDDED_DOCKER_VERSION-$REVISION
+# These versions are specified in the Dockerfile
+TAG = go1.6.2-docker1.9.1-rev1
 
 container:
 	docker build -t gcr.io/google_containers/kubekins-test .
