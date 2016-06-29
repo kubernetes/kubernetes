@@ -900,6 +900,13 @@ func (s *GenericAPIServer) InstallSwaggerAPI() {
 		ApiPath:         "/swaggerapi/",
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
+		SchemaFormatHandler: func(typeName string) string {
+			switch typeName {
+			case "unversioned.Time", "*unversioned.Time":
+				return "date-time"
+			}
+			return ""
+		},
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, s.HandlerContainer)
 }
