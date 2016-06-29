@@ -267,10 +267,10 @@ type Type struct {
 	// If Kind == DeclarationOf, this is the type of the declaration.
 	Underlying *Type
 
-	// If Kind == Interface, this is the list of all required functions.
+	// If Kind == Interface, this is the set of all required functions.
 	// Otherwise, if this is a named type, this is the list of methods that
 	// type has. (All elements will have Kind=="Func")
-	Methods []*Type
+	Methods map[string]*Type
 
 	// If Kind == func, this is the signature of the function.
 	Signature *Signature
@@ -285,9 +285,32 @@ func (t *Type) String() string {
 	return t.Name.String()
 }
 
-// IsAssignable returns whether the type is assignable.
+// IsPrimitive returns whether the type is a built-in type or is an alias to a
+// built-in type.  For example: strings and aliases of strings are primitives,
+// structs are not.
+func (t *Type) IsPrimitive() bool {
+	if t.Kind == Builtin || (t.Kind == Alias && t.Underlying.Kind == Builtin) {
+		return true
+	}
+	return false
+}
+
+// IsAssignable returns whether the type is deep-assignable.  For example,
+// slices and maps and pointers are shallow copies, but ints and strings are
+// complete.
 func (t *Type) IsAssignable() bool {
-	return t.Kind == Builtin || (t.Kind == Alias && t.Underlying.Kind == Builtin)
+	if t.IsPrimitive() {
+		return true
+	}
+	if t.Kind == Struct {
+		for _, m := range t.Members {
+			if !m.Type.IsAssignable() {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // IsAnonymousStruct returns true if the type is an anonymous struct or an alias

@@ -613,9 +613,9 @@ func (g *genConversion) doBuiltin(inType, outType *types.Type, sw *generator.Sni
 
 func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("*out = make($.|raw$, len(*in))\n", outType)
-	if outType.Key.IsAssignable() {
+	if isDirectlyAssignable(inType.Key, outType.Key) {
 		sw.Do("for key, val := range *in {\n", nil)
-		if outType.Elem.IsAssignable() {
+		if isDirectlyAssignable(inType.Elem, outType.Elem) {
 			if inType.Key == outType.Key {
 				sw.Do("(*out)[key] = ", nil)
 			} else {
@@ -659,7 +659,7 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 		sw.Do("copy(*out, *in)\n", nil)
 	} else {
 		sw.Do("for i := range *in {\n", nil)
-		if outType.Elem.IsAssignable() {
+		if isDirectlyAssignable(inType.Elem, outType.Elem) {
 			if inType.Elem == outType.Elem {
 				sw.Do("(*out)[i] = (*in)[i]\n", nil)
 			} else {
@@ -750,7 +750,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		case types.Alias:
-			if outT.IsAssignable() {
+			if isDirectlyAssignable(t, outT) {
 				if t == outT {
 					sw.Do("out.$.name$ = in.$.name$\n", args)
 				} else {
@@ -787,7 +787,7 @@ func (g *genConversion) isDirectlyAssignable(inType, outType *types.Type) bool {
 
 func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("*out = new($.Elem|raw$)\n", outType)
-	if outType.Elem.IsAssignable() {
+	if isDirectlyAssignable(inType.Elem, outType.Elem) {
 		if inType.Elem == outType.Elem {
 			sw.Do("**out = **in\n", nil)
 		} else {
@@ -815,4 +815,15 @@ func (g *genConversion) doAlias(inType, outType *types.Type, sw *generator.Snipp
 
 func (g *genConversion) doUnknown(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("// FIXME: Type $.|raw$ is unsupported.\n", inType)
+}
+
+func isDirectlyAssignable(inType, outType *types.Type) bool {
+	// TODO: This should maybe check for actual assignability between the two
+	// types, rather than superficial traits that happen to indicate it is
+	// assignable in the ways we currently use this code.
+	return inType.IsAssignable() && (inType.IsPrimitive() || isSamePackage(inType, outType))
+}
+
+func isSamePackage(inType, outType *types.Type) bool {
+	return inType.Name.Package == outType.Name.Package
 }

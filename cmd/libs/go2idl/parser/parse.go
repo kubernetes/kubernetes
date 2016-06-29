@@ -570,7 +570,10 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		out.Kind = types.Interface
 		t.Complete()
 		for i := 0; i < t.NumMethods(); i++ {
-			out.Methods = append(out.Methods, b.walkType(u, nil, t.Method(i).Type()))
+			if out.Methods == nil {
+				out.Methods = map[string]*types.Type{}
+			}
+			out.Methods[t.Method(i).Name()] = b.walkType(u, nil, t.Method(i).Type())
 		}
 		return out
 	case *tc.Named:
@@ -599,7 +602,10 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 				// methods, add them. (Interface types will
 				// have already added methods.)
 				for i := 0; i < t.NumMethods(); i++ {
-					out.Methods = append(out.Methods, b.walkType(u, nil, t.Method(i).Type()))
+					if out.Methods == nil {
+						out.Methods = map[string]*types.Type{}
+					}
+					out.Methods[t.Method(i).Name()] = b.walkType(u, nil, t.Method(i).Type())
 				}
 			}
 			return out

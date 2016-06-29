@@ -385,6 +385,16 @@ func ParseQuantity(str string) (Quantity, error) {
 	return Quantity{d: infDecAmount{amount}, Format: format}, nil
 }
 
+// DeepCopy returns a deep-copy of the Quantity value.  Note that the method
+// receiver is a value, so we can mutate it in-place and return it.
+func (q Quantity) DeepCopy() Quantity {
+	if q.d.Dec != nil {
+		tmp := &inf.Dec{}
+		q.d.Dec = tmp.Set(q.d.Dec)
+	}
+	return q
+}
+
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:

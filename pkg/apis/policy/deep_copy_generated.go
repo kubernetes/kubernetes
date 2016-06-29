@@ -24,7 +24,6 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func init() {
@@ -40,28 +39,20 @@ func init() {
 }
 
 func DeepCopy_policy_PodDisruptionBudget(in PodDisruptionBudget, out *PodDisruptionBudget, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
 	if err := DeepCopy_policy_PodDisruptionBudgetSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_policy_PodDisruptionBudgetStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Status = in.Status
 	return nil
 }
 
 func DeepCopy_policy_PodDisruptionBudgetList(in PodDisruptionBudgetList, out *PodDisruptionBudgetList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]PodDisruptionBudget, len(in))
@@ -77,9 +68,7 @@ func DeepCopy_policy_PodDisruptionBudgetList(in PodDisruptionBudgetList, out *Po
 }
 
 func DeepCopy_policy_PodDisruptionBudgetSpec(in PodDisruptionBudgetSpec, out *PodDisruptionBudgetSpec, c *conversion.Cloner) error {
-	if err := intstr.DeepCopy_intstr_IntOrString(in.MinAvailable, &out.MinAvailable, c); err != nil {
-		return err
-	}
+	out.MinAvailable = in.MinAvailable
 	if in.Selector != nil {
 		in, out := in.Selector, &out.Selector
 		*out = new(unversioned.LabelSelector)

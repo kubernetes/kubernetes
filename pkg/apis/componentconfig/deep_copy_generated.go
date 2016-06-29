@@ -22,7 +22,6 @@ package componentconfig
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -55,9 +54,7 @@ func DeepCopy_componentconfig_IPVar(in IPVar, out *IPVar, c *conversion.Cloner) 
 }
 
 func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControllerManagerConfiguration, out *KubeControllerManagerConfiguration, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.Port = in.Port
 	out.Address = in.Address
 	out.CloudProvider = in.CloudProvider
@@ -74,46 +71,22 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	out.LookupCacheSizeForRC = in.LookupCacheSizeForRC
 	out.LookupCacheSizeForRS = in.LookupCacheSizeForRS
 	out.LookupCacheSizeForDaemonSet = in.LookupCacheSizeForDaemonSet
-	if err := unversioned.DeepCopy_unversioned_Duration(in.ServiceSyncPeriod, &out.ServiceSyncPeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.NodeSyncPeriod, &out.NodeSyncPeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.ResourceQuotaSyncPeriod, &out.ResourceQuotaSyncPeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.NamespaceSyncPeriod, &out.NamespaceSyncPeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.PVClaimBinderSyncPeriod, &out.PVClaimBinderSyncPeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.MinResyncPeriod, &out.MinResyncPeriod, c); err != nil {
-		return err
-	}
+	out.ServiceSyncPeriod = in.ServiceSyncPeriod
+	out.NodeSyncPeriod = in.NodeSyncPeriod
+	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
+	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
+	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	out.MinResyncPeriod = in.MinResyncPeriod
 	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
-	if err := unversioned.DeepCopy_unversioned_Duration(in.HorizontalPodAutoscalerSyncPeriod, &out.HorizontalPodAutoscalerSyncPeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.DeploymentControllerSyncPeriod, &out.DeploymentControllerSyncPeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.PodEvictionTimeout, &out.PodEvictionTimeout, c); err != nil {
-		return err
-	}
+	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
+	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
+	out.PodEvictionTimeout = in.PodEvictionTimeout
 	out.DeletingPodsQps = in.DeletingPodsQps
 	out.DeletingPodsBurst = in.DeletingPodsBurst
-	if err := unversioned.DeepCopy_unversioned_Duration(in.NodeMonitorGracePeriod, &out.NodeMonitorGracePeriod, c); err != nil {
-		return err
-	}
+	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
 	out.RegisterRetryCount = in.RegisterRetryCount
-	if err := unversioned.DeepCopy_unversioned_Duration(in.NodeStartupGracePeriod, &out.NodeStartupGracePeriod, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.NodeMonitorPeriod, &out.NodeMonitorPeriod, c); err != nil {
-		return err
-	}
+	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
+	out.NodeMonitorPeriod = in.NodeMonitorPeriod
 	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterName = in.ClusterName
@@ -126,23 +99,15 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
-	if err := DeepCopy_componentconfig_LeaderElectionConfiguration(in.LeaderElection, &out.LeaderElection, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_componentconfig_VolumeConfiguration(in.VolumeConfiguration, &out.VolumeConfiguration, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.ControllerStartInterval, &out.ControllerStartInterval, c); err != nil {
-		return err
-	}
+	out.LeaderElection = in.LeaderElection
+	out.VolumeConfiguration = in.VolumeConfiguration
+	out.ControllerStartInterval = in.ControllerStartInterval
 	out.EnableGarbageCollector = in.EnableGarbageCollector
 	return nil
 }
 
 func DeepCopy_componentconfig_KubeProxyConfiguration(in KubeProxyConfiguration, out *KubeProxyConfiguration, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.BindAddress = in.BindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
@@ -155,9 +120,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in KubeProxyConfiguration, 
 	} else {
 		out.IPTablesMasqueradeBit = nil
 	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, c); err != nil {
-		return err
-	}
+	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
@@ -171,20 +134,14 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in KubeProxyConfiguration, 
 	out.Mode = in.Mode
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	if err := unversioned.DeepCopy_unversioned_Duration(in.UDPIdleTimeout, &out.UDPIdleTimeout, c); err != nil {
-		return err
-	}
+	out.UDPIdleTimeout = in.UDPIdleTimeout
 	out.ConntrackMax = in.ConntrackMax
-	if err := unversioned.DeepCopy_unversioned_Duration(in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, c); err != nil {
-		return err
-	}
+	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 	return nil
 }
 
 func DeepCopy_componentconfig_KubeSchedulerConfiguration(in KubeSchedulerConfiguration, out *KubeSchedulerConfiguration, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.Port = in.Port
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
@@ -196,23 +153,15 @@ func DeepCopy_componentconfig_KubeSchedulerConfiguration(in KubeSchedulerConfigu
 	out.SchedulerName = in.SchedulerName
 	out.HardPodAffinitySymmetricWeight = in.HardPodAffinitySymmetricWeight
 	out.FailureDomains = in.FailureDomains
-	if err := DeepCopy_componentconfig_LeaderElectionConfiguration(in.LeaderElection, &out.LeaderElection, c); err != nil {
-		return err
-	}
+	out.LeaderElection = in.LeaderElection
 	return nil
 }
 
 func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out *KubeletConfiguration, c *conversion.Cloner) error {
 	out.Config = in.Config
-	if err := unversioned.DeepCopy_unversioned_Duration(in.SyncFrequency, &out.SyncFrequency, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.FileCheckFrequency, &out.FileCheckFrequency, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.HTTPCheckFrequency, &out.HTTPCheckFrequency, c); err != nil {
-		return err
-	}
+	out.SyncFrequency = in.SyncFrequency
+	out.FileCheckFrequency = in.FileCheckFrequency
+	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
 	out.ManifestURLHeader = in.ManifestURLHeader
 	out.EnableServer = in.EnableServer
@@ -236,9 +185,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.EventRecordQPS = in.EventRecordQPS
 	out.EventBurst = in.EventBurst
 	out.EnableDebuggingHandlers = in.EnableDebuggingHandlers
-	if err := unversioned.DeepCopy_unversioned_Duration(in.MinimumGCAge, &out.MinimumGCAge, c); err != nil {
-		return err
-	}
+	out.MinimumGCAge = in.MinimumGCAge
 	out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
 	out.MaxContainerCount = in.MaxContainerCount
 	out.CAdvisorPort = in.CAdvisorPort
@@ -249,21 +196,13 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.ClusterDomain = in.ClusterDomain
 	out.MasterServiceNamespace = in.MasterServiceNamespace
 	out.ClusterDNS = in.ClusterDNS
-	if err := unversioned.DeepCopy_unversioned_Duration(in.StreamingConnectionIdleTimeout, &out.StreamingConnectionIdleTimeout, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.NodeStatusUpdateFrequency, &out.NodeStatusUpdateFrequency, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.ImageMinimumGCAge, &out.ImageMinimumGCAge, c); err != nil {
-		return err
-	}
+	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
+	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
+	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.ImageGCHighThresholdPercent = in.ImageGCHighThresholdPercent
 	out.ImageGCLowThresholdPercent = in.ImageGCLowThresholdPercent
 	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
-	if err := unversioned.DeepCopy_unversioned_Duration(in.VolumeStatsAggPeriod, &out.VolumeStatsAggPeriod, c); err != nil {
-		return err
-	}
+	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.NetworkPluginName = in.NetworkPluginName
 	out.NetworkPluginDir = in.NetworkPluginDir
 	out.VolumePluginDir = in.VolumePluginDir
@@ -274,9 +213,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
 	out.ContainerRuntime = in.ContainerRuntime
-	if err := unversioned.DeepCopy_unversioned_Duration(in.RuntimeRequestTimeout, &out.RuntimeRequestTimeout, c); err != nil {
-		return err
-	}
+	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.RktPath = in.RktPath
 	out.RktAPIEndpoint = in.RktAPIEndpoint
 	out.RktStage1Image = in.RktStage1Image
@@ -300,9 +237,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.KubeAPIBurst = in.KubeAPIBurst
 	out.SerializeImagePulls = in.SerializeImagePulls
 	out.ExperimentalFlannelOverlay = in.ExperimentalFlannelOverlay
-	if err := unversioned.DeepCopy_unversioned_Duration(in.OutOfDiskTransitionFrequency, &out.OutOfDiskTransitionFrequency, c); err != nil {
-		return err
-	}
+	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 	out.NodeIP = in.NodeIP
 	if in.NodeLabels != nil {
 		in, out := in.NodeLabels, &out.NodeLabels
@@ -318,9 +253,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.EvictionHard = in.EvictionHard
 	out.EvictionSoft = in.EvictionSoft
 	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
-	if err := unversioned.DeepCopy_unversioned_Duration(in.EvictionPressureTransitionPeriod, &out.EvictionPressureTransitionPeriod, c); err != nil {
-		return err
-	}
+	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.PodsPerCore = in.PodsPerCore
 	out.EnableControllerAttachDetach = in.EnableControllerAttachDetach
@@ -329,15 +262,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 
 func DeepCopy_componentconfig_LeaderElectionConfiguration(in LeaderElectionConfiguration, out *LeaderElectionConfiguration, c *conversion.Cloner) error {
 	out.LeaderElect = in.LeaderElect
-	if err := unversioned.DeepCopy_unversioned_Duration(in.LeaseDuration, &out.LeaseDuration, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.RenewDeadline, &out.RenewDeadline, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.RetryPeriod, &out.RetryPeriod, c); err != nil {
-		return err
-	}
+	out.LeaseDuration = in.LeaseDuration
+	out.RenewDeadline = in.RenewDeadline
+	out.RetryPeriod = in.RetryPeriod
 	return nil
 }
 
@@ -366,9 +293,7 @@ func DeepCopy_componentconfig_PortRangeVar(in PortRangeVar, out *PortRangeVar, c
 func DeepCopy_componentconfig_VolumeConfiguration(in VolumeConfiguration, out *VolumeConfiguration, c *conversion.Cloner) error {
 	out.EnableHostPathProvisioning = in.EnableHostPathProvisioning
 	out.EnableDynamicProvisioning = in.EnableDynamicProvisioning
-	if err := DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in.PersistentVolumeRecyclerConfiguration, &out.PersistentVolumeRecyclerConfiguration, c); err != nil {
-		return err
-	}
+	out.PersistentVolumeRecyclerConfiguration = in.PersistentVolumeRecyclerConfiguration
 	out.FlexVolumePluginDir = in.FlexVolumePluginDir
 	return nil
 }
