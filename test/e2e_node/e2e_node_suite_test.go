@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/test/e2e/framework"
+
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	more_reporters "github.com/onsi/ginkgo/reporters"
@@ -41,6 +43,11 @@ var e2es *e2eService
 
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 var junitFileNumber = flag.Int("junit-file-number", 1, "Used to create junit filename - e.g. junit_01.xml.")
+
+func init() {
+	framework.RegisterCommonFlags()
+	framework.RegisterNodeFlags()
+}
 
 func TestE2eNode(t *testing.T) {
 	flag.Parse()
@@ -67,12 +74,12 @@ var _ = BeforeSuite(func() {
 	if *buildServices {
 		buildGo()
 	}
-	if *nodeName == "" {
+	if framework.TestContext.NodeName == "" {
 		output, err := exec.Command("hostname").CombinedOutput()
 		if err != nil {
 			glog.Fatalf("Could not get node name from hostname %v.  Output:\n%s", err, output)
 		}
-		*nodeName = strings.TrimSpace(fmt.Sprintf("%s", output))
+		framework.TestContext.NodeName = strings.TrimSpace(fmt.Sprintf("%s", output))
 	}
 
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
@@ -89,7 +96,7 @@ var _ = BeforeSuite(func() {
 	maskLocksmithdOnCoreos()
 
 	if *startServices {
-		e2es = newE2eService(*nodeName)
+		e2es = newE2eService(framework.TestContext.NodeName)
 		if err := e2es.start(); err != nil {
 			Fail(fmt.Sprintf("Unable to start node services.\n%v", err))
 		}

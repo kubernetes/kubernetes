@@ -121,13 +121,8 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 			},
 		}
 
-		assignPodToNode(pod)
-
 		By("Creating the pod")
-		_, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		f.CreatePod(pod)
 
 		pollLogs := func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
@@ -184,7 +179,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 			},
 		}
 
-		assignPodToNode(pod)
+		f.MungePodSpec(pod)
 
 		framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
 			"CONFIG_DATA_1=value-1",
@@ -265,7 +260,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
-	assignPodToNode(pod)
+	f.MungePodSpec(pod)
 
 	framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
@@ -338,7 +333,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
-	assignPodToNode(pod)
+	f.MungePodSpec(pod)
 
 	framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
 		"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",

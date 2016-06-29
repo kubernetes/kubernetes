@@ -23,7 +23,8 @@ import (
 )
 
 func init() {
-	framework.RegisterFlags()
+	framework.RegisterCommonFlags()
+	framework.RegisterClusterFlags()
 }
 
 func TestE2E(t *testing.T) {
