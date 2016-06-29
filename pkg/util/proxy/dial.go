@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/third_party/golang/netutil"
+	"k8s.io/kubernetes/third_party/forked/netutil"
 )
 
 func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
