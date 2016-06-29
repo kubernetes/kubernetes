@@ -36,8 +36,8 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-In a self-hosted Kubernetes deployment (see (this
-comment)[https://github.com/kubernetes/kubernetes/issues/246#issuecomment-64533959]
+In a self-hosted Kubernetes deployment (see [this
+comment](https://github.com/kubernetes/kubernetes/issues/246#issuecomment-64533959)
 for background on self hosted kubernetes), we have the initial bootstrap problem.
 When running self-hosted components, there needs to be a mechanism for pivoting
 from the initial bootstrap state to the kubernetes-managed (self-hosted) state.
