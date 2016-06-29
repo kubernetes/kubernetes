@@ -2061,6 +2061,58 @@ func TestCheckVersionCompatibility(t *testing.T) {
 	}
 }
 
+func TestNewDockerVersion(t *testing.T) {
+	cases := []struct {
+		value string
+		out   string
+		err   bool
+	}{
+		{value: "1", err: true},
+		{value: "1.8", err: true},
+		{value: "1.8.1", out: "1.8.1"},
+		{value: "1.8.1-fc21.other", out: "1.8.1-fc21.other"},
+		{value: "1.8.1-beta.12", out: "1.8.1-beta.12"},
+	}
+	for _, test := range cases {
+		v, err := newDockerVersion(test.value)
+		switch {
+		case err != nil && test.err:
+			continue
+		case (err != nil) != test.err:
+			t.Errorf("error for %q: expected %t, got %v", test.value, test.err, err)
+			continue
+		}
+		if v.String() != test.out {
+			t.Errorf("unexpected parsed version %q for %q", v, test.value)
+		}
+	}
+}
+
+func TestDockerVersionComparison(t *testing.T) {
+	v, err := newDockerVersion("1.10.3")
+	assert.NoError(t, err)
+	for i, test := range []struct {
+		version string
+		compare int
+		err     bool
+	}{
+		{version: "1.9.2", compare: 1},
+		{version: "1.9.2-rc2", compare: 1},
+		{version: "1.10.3", compare: 0},
+		{version: "1.10.3-rc3", compare: 1},
+		{version: "1.10.4", compare: -1},
+		{version: "1.10.4-rc1", compare: -1},
+		{version: "1.11.1", compare: -1},
+		{version: "1.11.1-rc4", compare: -1},
+		{version: "invalid", compare: -1, err: true},
+	} {
+		testCase := fmt.Sprintf("test case #%d test version %q", i, test.version)
+		res, err := v.Compare(test.version)
+		assert.Equal(t, test.compare, res, testCase)
+		assert.Equal(t, test.err, err != nil, testCase)
+	}
+}
+
 func TestVersion(t *testing.T) {
 	expectedVersion := "1.8.1"
 	expectedAPIVersion := "1.20"
