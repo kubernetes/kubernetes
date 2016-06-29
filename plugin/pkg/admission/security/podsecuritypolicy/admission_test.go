@@ -1193,7 +1193,8 @@ func createNamespaceForTest() *kapi.Namespace {
 func createSAForTest() *kapi.ServiceAccount {
 	return &kapi.ServiceAccount{
 		ObjectMeta: kapi.ObjectMeta{
-			Name: "default",
+			Namespace: "default",
+			Name:      "default",
 		},
 	}
 }

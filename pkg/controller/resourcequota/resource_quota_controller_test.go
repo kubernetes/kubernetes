@@ -162,6 +162,10 @@ func TestSyncResourceQuota(t *testing.T) {
 
 func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	resourceQuota := api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "default",
+			Name:      "rq",
+		},
 		Spec: api.ResourceQuotaSpec{
 			Hard: api.ResourceList{
 				api.ResourceCPU: resource.MustParse("4"),
@@ -250,6 +254,10 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 
 func TestSyncResourceQuotaNoChange(t *testing.T) {
 	resourceQuota := api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "default",
+			Name:      "rq",
+		},
 		Spec: api.ResourceQuotaSpec{
 			Hard: api.ResourceList{
 				api.ResourceCPU: resource.MustParse("4"),

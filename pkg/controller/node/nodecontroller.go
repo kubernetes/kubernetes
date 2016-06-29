@@ -1005,9 +1005,9 @@ func (nc *NodeController) markAllPodsNotReady(nodeName string) error {
 			if cond.Type == api.PodReady {
 				pod.Status.Conditions[i].Status = api.ConditionFalse
 				glog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
-				pod, err := nc.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(&pod)
+				_, err := nc.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(&pod)
 				if err != nil {
-					glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
+					glog.Warningf("Failed to update status for pod %q: %v", format.Pod(&pod), err)
 					errMsg = append(errMsg, fmt.Sprintf("%v", err))
 				}
 				break

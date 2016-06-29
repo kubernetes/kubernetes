@@ -133,8 +133,9 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 			testNamespace: testNamespacePendingFinalize,
 			kubeClientActionSet: sets.NewString(
 				strings.Join([]string{"get", "namespaces", ""}, "-"),
-				strings.Join([]string{"list", "pods", ""}, "-"),
 				strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
+				strings.Join([]string{"list", "pods", ""}, "-"),
+				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
 			dynamicClientActionSet: dynamicClientActionSet,
 		},

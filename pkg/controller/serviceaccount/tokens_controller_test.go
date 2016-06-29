@@ -223,7 +223,7 @@ func TestTokenCreation(t *testing.T) {
 		ExpectedActions []core.Action
 	}{
 		"new serviceaccount with no secrets": {
-			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences()), createdTokenSecret()},
+			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences())},
 
 			AddedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []core.Action{
@@ -233,7 +233,7 @@ func TestTokenCreation(t *testing.T) {
 			},
 		},
 		"new serviceaccount with no secrets encountering create error": {
-			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences()), createdTokenSecret()},
+			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences())},
 			MaxRetries:    10,
 			IsAsync:       true,
 			Reactors: []reaction{{
@@ -250,7 +250,6 @@ func TestTokenCreation(t *testing.T) {
 					}
 				},
 			}},
-
 			AddedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []core.Action{
 				// Attempt 1
@@ -295,7 +294,7 @@ func TestTokenCreation(t *testing.T) {
 			},
 		},
 		"new serviceaccount with missing secrets": {
-			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences()), createdTokenSecret()},
+			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences())},
 
 			AddedServiceAccount: serviceAccount(missingSecretReferences()),
 			ExpectedActions: []core.Action{
@@ -305,7 +304,7 @@ func TestTokenCreation(t *testing.T) {
 			},
 		},
 		"new serviceaccount with non-token secrets": {
-			ClientObjects: []runtime.Object{serviceAccount(regularSecretReferences()), createdTokenSecret(), opaqueSecret()},
+			ClientObjects: []runtime.Object{serviceAccount(regularSecretReferences()), opaqueSecret()},
 
 			AddedServiceAccount: serviceAccount(regularSecretReferences()),
 			ExpectedActions: []core.Action{
@@ -329,9 +328,8 @@ func TestTokenCreation(t *testing.T) {
 				core.NewGetAction(unversioned.GroupVersionResource{Resource: "serviceaccounts"}, api.NamespaceDefault, "default"),
 			},
 		},
-
 		"updated serviceaccount with no secrets": {
-			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences()), createdTokenSecret()},
+			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences())},
 
 			UpdatedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []core.Action{
@@ -341,7 +339,7 @@ func TestTokenCreation(t *testing.T) {
 			},
 		},
 		"updated serviceaccount with missing secrets": {
-			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences()), createdTokenSecret()},
+			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences())},
 
 			UpdatedServiceAccount: serviceAccount(missingSecretReferences()),
 			ExpectedActions: []core.Action{
@@ -351,7 +349,7 @@ func TestTokenCreation(t *testing.T) {
 			},
 		},
 		"updated serviceaccount with non-token secrets": {
-			ClientObjects: []runtime.Object{serviceAccount(regularSecretReferences()), createdTokenSecret(), opaqueSecret()},
+			ClientObjects: []runtime.Object{serviceAccount(regularSecretReferences()), opaqueSecret()},
 
 			UpdatedServiceAccount: serviceAccount(regularSecretReferences()),
 			ExpectedActions: []core.Action{
@@ -367,7 +365,7 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions:       []core.Action{},
 		},
 		"updated serviceaccount with no secrets with resource conflict": {
-			ClientObjects: []runtime.Object{updatedServiceAccount(emptySecretReferences()), createdTokenSecret()},
+			ClientObjects: []runtime.Object{updatedServiceAccount(emptySecretReferences())},
 
 			UpdatedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []core.Action{

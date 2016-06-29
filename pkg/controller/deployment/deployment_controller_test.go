@@ -44,6 +44,7 @@ func rs(name string, replicas int, selector map[string]string, timestamp unversi
 		ObjectMeta: api.ObjectMeta{
 			Name:              name,
 			CreationTimestamp: timestamp,
+			Namespace:         api.NamespaceDefault,
 		},
 		Spec: exp.ReplicaSetSpec{
 			Replicas: int32(replicas),
@@ -64,7 +65,8 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOrString, selector map[string]string) exp.Deployment {
 	return exp.Deployment{
 		ObjectMeta: api.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: api.NamespaceDefault,
 		},
 		Spec: exp.DeploymentSpec{
 			Replicas: int32(replicas),
@@ -140,10 +142,6 @@ func newReplicaSet(d *exp.Deployment, name string, replicas int) *exp.ReplicaSet
 			Template: d.Spec.Template,
 		},
 	}
-}
-
-func newListOptions() api.ListOptions {
-	return api.ListOptions{}
 }
 
 // TestScale tests proportional scaling of deployments. Note that fenceposts for
@@ -966,22 +964,25 @@ type fixture struct {
 	// Actions expected to happen on the client. Objects from here are also
 	// preloaded into NewSimpleFake.
 	actions []core.Action
-	objects *api.List
+	objects []runtime.Object
 }
 
 func (f *fixture) expectUpdateDeploymentAction(d *exp.Deployment) {
 	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "deployments"}, d.Namespace, d))
-	f.objects.Items = append(f.objects.Items, d)
+}
+
+func (f *fixture) expectUpdateDeploymentStatusAction(d *exp.Deployment) {
+	action := core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
+	action.Subresource = "status"
+	f.actions = append(f.actions, action)
 }
 
 func (f *fixture) expectCreateRSAction(rs *exp.ReplicaSet) {
 	f.actions = append(f.actions, core.NewCreateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
-	f.objects.Items = append(f.objects.Items, rs)
 }
 
 func (f *fixture) expectUpdateRSAction(rs *exp.ReplicaSet) {
 	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
-	f.objects.Items = append(f.objects.Items, rs)
 }
 
 func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
@@ -991,12 +992,12 @@ func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
 func newFixture(t *testing.T) *fixture {
 	f := &fixture{}
 	f.t = t
-	f.objects = &api.List{}
+	f.objects = []runtime.Object{}
 	return f
 }
 
 func (f *fixture) run(deploymentName string) {
-	f.client = fake.NewSimpleClientset(f.objects)
+	f.client = fake.NewSimpleClientset(f.objects...)
 	c := NewDeploymentController(f.client, controller.NoResyncPeriodFunc)
 	c.eventRecorder = &record.FakeRecorder{}
 	c.rsStoreSynced = alwaysReady
@@ -1040,16 +1041,13 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 
 	d := newDeployment(1, nil)
 	f.dStore = append(f.dStore, d)
+	f.objects = append(f.objects, d)
 
-	// expect that one ReplicaSet with zero replicas is created
-	// then is updated to 1 replica
-	rs := newReplicaSet(d, "deploymentrs-4186632231", 0)
-	updatedRS := newReplicaSet(d, "deploymentrs-4186632231", 1)
+	rs := newReplicaSet(d, "deploymentrs-4186632231", 1)
 
 	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentAction(d)
-	f.expectUpdateRSAction(updatedRS)
-	f.expectUpdateDeploymentAction(d)
+	f.expectUpdateDeploymentStatusAction(d)
 
 	f.run(getKey(d, t))
 }
