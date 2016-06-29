@@ -39,7 +39,7 @@ type Config struct {
 	RoundRobin bool `json:"round_robin,omitempty"`
 	// Round robin selection of nameservers from among those listed, rather than have all forwarded requests try the first listed server first every time.
 	NSRotate bool `json:"ns_rotate,omitempty"`
-	// List of ip:port, seperated by commas of recursive nameservers to forward queries to.
+	// List of ip:port, separated by commas of recursive nameservers to forward queries to.
 	Nameservers []string `json:"nameservers,omitempty"`
 	// Never provide a recursive service.
 	NoRec       bool          `json:"no_rec,omitempty"`

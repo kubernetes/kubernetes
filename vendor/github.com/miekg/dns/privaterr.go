@@ -65,6 +65,20 @@ func (r *PrivateRR) copy() RR {
 	}
 	return rr
 }
+func (r *PrivateRR) pack(msg []byte, off int, compression map[string]int, compress bool) (int, error) {
+	off, err := r.Hdr.pack(msg, off, compression, compress)
+	if err != nil {
+		return off, err
+	}
+	headerEnd := off
+	n, err := r.Data.Pack(msg[off:])
+	if err != nil {
+		return len(msg), err
+	}
+	off += n
+	r.Header().Rdlength = uint16(off - headerEnd)
+	return off, nil
+}
 
 // PrivateHandle registers a private resource record type. It requires
 // string and numeric representation of private RR type and generator function as argument.
@@ -75,19 +89,36 @@ func PrivateHandle(rtypestr string, rtype uint16, generator func() PrivateRdata)
 	TypeToString[rtype] = rtypestr
 	StringToType[rtypestr] = rtype
 
+	typeToUnpack[rtype] = func(h RR_Header, msg []byte, off int) (RR, int, error) {
+		if noRdata(h) {
+			return &h, off, nil
+		}
+		var err error
+
+		rr := mkPrivateRR(h.Rrtype)
+		rr.Hdr = h
+
+		off1, err := rr.Data.Unpack(msg[off:])
+		off += off1
+		if err != nil {
+			return rr, off, err
+		}
+		return rr, off, err
+	}
+
 	setPrivateRR := func(h RR_Header, c chan lex, o, f string) (RR, *ParseError, string) {
 		rr := mkPrivateRR(h.Rrtype)
 		rr.Hdr = h
 
 		var l lex
 		text := make([]string, 0, 2) // could be 0..N elements, median is probably 1
-	FETCH:
+	Fetch:
 		for {
 			// TODO(miek): we could also be returning _QUOTE, this might or might not
 			// be an issue (basically parsing TXT becomes hard)
 			switch l = <-c; l.value {
 			case zNewline, zEOF:
-				break FETCH
+				break Fetch
 			case zString:
 				text = append(text, l.token)
 			}
@@ -112,6 +143,7 @@ func PrivateHandleRemove(rtype uint16) {
 		delete(TypeToString, rtype)
 		delete(typeToparserFunc, rtype)
 		delete(StringToType, rtypestr)
+		delete(typeToUnpack, rtype)
 	}
 	return
 }
