@@ -551,7 +551,25 @@ enable_cluster_autoscaler: '$(echo "${ENABLE_CLUSTER_AUTOSCALER}" | sed -e "s/'/
 autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
 EOF
     fi
-
+    if [[ "${FEDERATION:-}" == "true" ]]; then
+      FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
+      if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+        FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+      fi
+      if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+federations_domain_map: '$(echo "- --federations=${FEDERATIONS_DOMAIN_MAP}" | sed -e "s/'/''/g")'
+EOF
+      else
+        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+federations_domain_map: ''
+EOF
+      fi
+    else
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+federations_domain_map: ''
+EOF
+    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes

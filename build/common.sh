@@ -953,24 +953,6 @@ function kube::release::package_kube_manifests_tarball() {
   mkdir -p "${dst_dir}/dns"
   tar c -C "${KUBE_ROOT}/cluster/saltbase/salt/kube-dns" ${objects} | tar x -C "${dst_dir}/dns"
 
-  # We leave the `{{ pillar['federations_domain_map'] }}` parameter as is, if
-  # the right federation environment variables isn't set. This is to allow
-  # users to provide these pillar values using the regular salt's mechanisms
-  # during cluster bootstrap.
-  if [[ "${FEDERATION:-}" == "true" ]]; then
-    FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
-    if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-      FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-    fi
-    if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-      sed -i 's/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/- --federations='"${FEDERATIONS_DOMAIN_MAP}"'/g' "${dst_dir}/dns/skydns-rc.yaml.in"
-    else
-      sed -i '/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/d' "${dst_dir}/dns/skydns-rc.yaml.in"
-    fi
-  else
-    sed -i '/{{ pillar\['"'"'federations_domain_map'"'"'\] }}/d' "${dst_dir}/dns/skydns-rc.yaml.in"
-  fi
-
   # This is for coreos only. ContainerVM, GCI, or Trusty does not use it.
   cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
 
