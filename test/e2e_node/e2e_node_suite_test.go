@@ -19,10 +19,8 @@ limitations under the License.
 package e2e_node
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -83,11 +81,6 @@ var _ = BeforeSuite(func() {
 		Expect(err).ShouldNot(HaveOccurred())
 	}
 
-	// TODO(yifan): Temporary workaround to disable coreos from auto restart
-	// by masking the locksmithd.
-	// We should mask locksmithd when provisioning the machine.
-	maskLocksmithdOnCoreos()
-
 	if *startServices {
 		e2es = newE2eService(*nodeName)
 		if err := e2es.start(); err != nil {
@@ -111,16 +104,3 @@ var _ = AfterSuite(func() {
 
 	glog.Infof("Tests Finished")
 })
-
-func maskLocksmithdOnCoreos() {
-	data, err := ioutil.ReadFile("/etc/os-release")
-	if err != nil {
-		glog.Fatalf("Could not read /etc/os-release: %v", err)
-	}
-	if bytes.Contains(data, []byte("ID=coreos")) {
-		if output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput(); err != nil {
-			glog.Fatalf("Could not mask locksmithd: %v, output: %q", err, string(output))
-		}
-		glog.Infof("Locksmithd is masked successfully")
-	}
-}
