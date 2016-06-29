@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -352,29 +354,74 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.
 func (f *Framework) WaitForPodTerminated(podName, reason string) error {
-	return waitForPodTerminatedInNamespace(f.Client, podName, reason, f.Namespace.Name)
+	return f.WaitForPodCondition(podName, fmt.Sprintf("terminated due to %s", reason), PodStartTimeout,
+		f.PodCondition(func(pod *api.Pod) (bool, error) {
+			if pod.Status.Phase == api.PodFailed {
+				if pod.Status.Reason == reason {
+					return true, nil
+				} else {
+					return true, fmt.Errorf("pod %s terminated with reason %v, expected %v", podName, pod.Status.Reason, reason)
+				}
+			}
+			return false, nil
+		}))
 }
 
-// WaitForPodRunning waits for the pod to run in the namespace.
+// WaitForPodRunning waits for the pod to run in the framework's namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
-	return WaitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
+	return f.WaitForPodCondition(podName, "pod running", PodStartTimeout, client.PodRunning)
 }
 
 // WaitForPodReady waits for the pod to flip to ready in the namespace.
 func (f *Framework) WaitForPodReady(podName string) error {
-	return waitTimeoutForPodReadyInNamespace(f.Client, podName, f.Namespace.Name, PodStartTimeout)
+	return f.WaitForPodCondition(podName, "pod running", PodStartTimeout, client.PodRunningAndReady)
+}
+
+// WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
+func (f *Framework) WaitForPodNotPending(podName string) error {
+	return f.WaitForPodCondition(podName, "pod not pending", PodStartTimeout, client.PodNotPending)
 }
 
 // WaitForPodRunningSlow waits for the pod to run in the namespace.
 // It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
 func (f *Framework) WaitForPodRunningSlow(podName string) error {
-	return waitForPodRunningInNamespaceSlow(f.Client, podName, f.Namespace.Name)
+	return f.WaitForPodCondition(podName, "pod running (slow)", slowPodStartTimeout, client.PodRunning)
 }
 
 // WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
 // success or failure.
 func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return WaitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name)
+	return f.WaitForPodCondition(podName, "pod no longer running", podNoLongerRunningTimeout, client.PodCompleted)
+}
+
+func (f *Framework) WaitForPodCondition(podName, desc string, timeout time.Duration, condition watch.ConditionFunc) error {
+	Logf("Waiting up to %[1]v for pod %[2]s to meet condition %[3]s", timeout, podName, desc)
+	start := time.Now()
+	w, err := f.PodClient().Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+	if err != nil {
+		return fmt.Errorf("error watching pod %s for %s: %v", podName, desc, err)
+	}
+	event, err := watch.Until(podNoLongerRunningTimeout, w, client.PodCompleted)
+	if err != nil {
+		return fmt.Errorf("error waiting for pod %s to meet condition %s: %v", podName, desc, err)
+	}
+	Logf("Pod %s met %s (elapsed: %v): %#v", podName, desc, time.Since(start), event)
+	return nil
+}
+
+// Wraps a function on a Pod to create a watch condition.
+func (f *Framework) PodCondition(condition func(*api.Pod) (bool, error)) watch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrs.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		}
+		switch t := event.Object.(type) {
+		case *api.Pod:
+			return condition(t)
+		}
+		return false, nil
+	}
 }
 
 // Runs the given pod and verifies that the output of exact container matches the desired output.

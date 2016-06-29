@@ -1212,50 +1212,20 @@ func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 
 // Waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
+// TODO(timstclair): Dedup with Framework#WaitForPodRunning by creating a "framework.Namespace"
+// abstraction to hold all these helpers.
 func WaitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
-}
-
-// Waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
-// Returns an error if timeout occurs first, or pod goes in to failed state.
-func waitForPodRunningInNamespaceSlow(c *client.Client, podName string, namespace string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
-}
-
-func waitTimeoutForPodRunningInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
 	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, client.PodRunning)
-	return err
-}
-
-// Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
-// Returns an error if timeout occurs first.
-func WaitForPodNoLongerRunningInNamespace(c *client.Client, podName string, namespace string) error {
-	return waitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, podNoLongerRunningTimeout)
-}
-
-func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
-	if err != nil {
-		return err
-	}
-	_, err = watch.Until(timeout, w, client.PodCompleted)
-	return err
-}
-
-func waitTimeoutForPodReadyInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
-	if err != nil {
-		return err
-	}
-	_, err = watch.Until(timeout, w, client.PodRunningAndReady)
+	_, err = watch.Until(PodStartTimeout, w, client.PodRunning)
 	return err
 }
 
 // WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
+// TODO(timstclair): Dedup with Framework#WaitForPodNotPending by creating a "framework.Namespace"
+// abstraction to hold all these helpers.
 func WaitForPodNotPending(c *client.Client, ns, podName string) error {
 	w, err := c.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
 	if err != nil {
@@ -1263,22 +1233,6 @@ func WaitForPodNotPending(c *client.Client, ns, podName string) error {
 	}
 	_, err = watch.Until(PodStartTimeout, w, client.PodNotPending)
 	return err
-}
-
-// waitForPodTerminatedInNamespace returns an error if it took too long for the pod
-// to terminate or if the pod terminated with an unexpected reason.
-func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespace string) error {
-	return waitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", PodStartTimeout, func(pod *api.Pod) (bool, error) {
-		if pod.Status.Phase == api.PodFailed {
-			if pod.Status.Reason == reason {
-				return true, nil
-			} else {
-				return true, fmt.Errorf("Expected pod %v in namespace %v to be terminated with reason %v, got reason: %v", podName, namespace, reason, pod.Status.Reason)
-			}
-		}
-
-		return false, nil
-	})
 }
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
@@ -3529,11 +3483,11 @@ func RunHostCmdOrDie(ns, name, cmd string) string {
 
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
-func LaunchHostExecPod(client *client.Client, ns, name string) *api.Pod {
-	hostExecPod := NewHostExecPodSpec(ns, name)
-	pod, err := client.Pods(ns).Create(hostExecPod)
+func (f *Framework) LaunchHostExecPod(name string) *api.Pod {
+	hostExecPod := NewHostExecPodSpec(f.Namespace.Name, name)
+	pod, err := f.PodClient().Create(hostExecPod)
 	ExpectNoError(err)
-	err = WaitForPodRunningInNamespace(client, pod.Name, pod.Namespace)
+	err = f.WaitForPodRunning(pod.Name)
 	ExpectNoError(err)
 	return pod
 }

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -34,7 +33,8 @@ type State struct {
 	Received map[string]int
 }
 
-func testPreStop(c *client.Client, ns string) {
+func testPreStop(f *framework.Framework) {
+	c, ns := f.Client, f.Namespace.Name
 	// This is the server that will receive the preStop notification
 	podDescr := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -61,7 +61,7 @@ func testPreStop(c *client.Client, ns string) {
 	}()
 
 	By("Waiting for pods to come up.")
-	err = framework.WaitForPodRunningInNamespace(c, podDescr.Name, ns)
+	err = f.WaitForPodRunning(podDescr.Name)
 	framework.ExpectNoError(err, "waiting for server pod to start")
 
 	val := "{\"Source\": \"prestop\"}"
@@ -106,7 +106,7 @@ func testPreStop(c *client.Client, ns string) {
 		}
 	}()
 
-	err = framework.WaitForPodRunningInNamespace(c, preStopDescr.Name, ns)
+	err = f.WaitForPodRunning(preStopDescr.Name)
 	framework.ExpectNoError(err, "waiting for tester pod to start")
 
 	// Delete the pod with the preStop handler.
@@ -163,6 +163,6 @@ var _ = framework.KubeDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 
 	It("should call prestop when killing a pod [Conformance]", func() {
-		testPreStop(f.Client, f.Namespace.Name)
+		testPreStop(f)
 	})
 })

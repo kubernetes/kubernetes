@@ -172,7 +172,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 	defer client.Delete(pod.Name, nil)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"

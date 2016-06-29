@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("PrivilegedPod", func() {
 		f: f,
 	}
 	It("should test privileged pod", func() {
-		config.hostExecPod = framework.LaunchHostExecPod(config.f.Client, config.f.Namespace.Name, "hostexec")
+		config.hostExecPod = f.LaunchHostExecPod("hostexec")
 
 		By("Creating a privileged pod")
 		config.createPrivilegedPod()

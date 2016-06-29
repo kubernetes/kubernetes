@@ -502,7 +502,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -552,7 +552,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -640,7 +640,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -704,7 +704,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -736,7 +736,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -768,7 +768,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -902,7 +902,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -963,7 +963,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -995,7 +995,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -1084,7 +1084,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -1153,7 +1153,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -1185,7 +1185,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -1257,7 +1257,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -1289,7 +1289,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -1320,7 +1320,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -1354,7 +1354,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -1427,7 +1427,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, tolerationPodName))
+		framework.ExpectNoError(f.WaitForPodNotPending(tolerationPodName))
 		deployedPod, err := c.Pods(ns).Get(tolerationPodName)
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
@@ -1469,7 +1469,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(f.WaitForPodRunning(podName))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
@@ -1552,7 +1552,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podNameNoTolerations))
+		framework.ExpectNoError(f.WaitForPodNotPending(podNameNoTolerations))
 		deployedPod, err := c.Pods(ns).Get(podNameNoTolerations)
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
