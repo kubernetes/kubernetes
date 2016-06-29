@@ -143,6 +143,9 @@ function dump_cluster_logs() {
 if running_in_docker; then
     curl -fsSL --retry 3 --keepalive-time 2 -o "${WORKSPACE}/google-cloud-sdk.tar.gz" 'https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz'
     install_google_cloud_sdk_tarball "${WORKSPACE}/google-cloud-sdk.tar.gz" /
+    if [[ "${KUBERNETES_PROVIDER}" == 'aws' ]]; then
+        pip install awscli
+    fi
 fi
 
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
