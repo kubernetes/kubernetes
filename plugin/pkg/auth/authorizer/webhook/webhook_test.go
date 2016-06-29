@@ -299,22 +299,25 @@ func TestTLSConfig(t *testing.T) {
 		test                            string
 		clientCert, clientKey, clientCA []byte
 		serverCert, serverKey, serverCA []byte
-		wantErr                         bool
+		wantAuth, wantErr               bool
 	}{
 		{
 			test:       "TLS setup between client and server",
 			clientCert: clientCert, clientKey: clientKey, clientCA: caCert,
 			serverCert: serverCert, serverKey: serverKey, serverCA: caCert,
+			wantAuth: true,
 		},
 		{
 			test:       "Server does not require client auth",
 			clientCA:   caCert,
 			serverCert: serverCert, serverKey: serverKey,
+			wantAuth: true,
 		},
 		{
 			test:       "Server does not require client auth, client provides it",
 			clientCert: clientCert, clientKey: clientKey, clientCA: caCert,
 			serverCert: serverCert, serverKey: serverKey,
+			wantAuth: true,
 		},
 		{
 			test:       "Client does not trust server",
@@ -357,7 +360,16 @@ func TestTLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			err = wh.Authorize(attr)
+			authorized, _, err := wh.Authorize(attr)
+			if tt.wantAuth {
+				if !authorized {
+					t.Errorf("expected successful authorization")
+				}
+			} else {
+				if authorized {
+					t.Errorf("expected failed authorization")
+				}
+			}
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error making authorization request: %v", err)
@@ -370,7 +382,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if err := wh.Authorize(attr); err == nil {
+			if authorized, _, _ := wh.Authorize(attr); authorized {
 				t.Errorf("%s: incorrectly authorized with DenyAll policy", tt.test)
 			}
 		}()
@@ -473,8 +485,12 @@ func TestWebhook(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		if err := wh.Authorize(tt.attr); err != nil {
-			t.Errorf("case %d: authorization failed: %v", i, err)
+		authorized, _, err := wh.Authorize(tt.attr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !authorized {
+			t.Errorf("case %d: authorization failed", i)
 			continue
 		}
 
@@ -485,6 +501,34 @@ func TestWebhook(t *testing.T) {
 		}
 		if !reflect.DeepEqual(gotAttr, tt.want) {
 			t.Errorf("case %d: got != want:\n%s", i, diff.ObjectGoPrintDiff(gotAttr, tt.want))
+		}
+	}
+}
+
+type webhookCacheTestCase struct {
+	statusCode         int
+	expectedErr        bool
+	expectedAuthorized bool
+	expectedCached     bool
+}
+
+func testWebhookCacheCases(t *testing.T, serv *mockService, wh *WebhookAuthorizer, attr authorizer.AttributesRecord, tests []webhookCacheTestCase) {
+	for _, test := range tests {
+		serv.statusCode = test.statusCode
+		authorized, _, err := wh.Authorize(attr)
+		if test.expectedErr && err == nil {
+			t.Errorf("Expected error")
+		} else if !test.expectedErr && err != nil {
+			t.Fatal(err)
+		}
+		if test.expectedAuthorized && !authorized {
+			if test.expectedCached {
+				t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
+			} else {
+				t.Errorf("Webhook returned HTTP %d, but authorizer reported unauthorized.", test.statusCode)
+			}
+		} else if !test.expectedAuthorized && authorized {
+			t.Errorf("Webhook returned HTTP %d, but authorizer reported success.", test.statusCode)
 		}
 	}
 }
@@ -505,36 +549,27 @@ func TestWebhookCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	tests := []webhookCacheTestCase{
+		{statusCode: 500, expectedErr: true, expectedAuthorized: false, expectedCached: false},
+		{statusCode: 404, expectedErr: true, expectedAuthorized: false, expectedCached: false},
+		{statusCode: 403, expectedErr: true, expectedAuthorized: false, expectedCached: false},
+		{statusCode: 401, expectedErr: true, expectedAuthorized: false, expectedCached: false},
+		{statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCached: false},
+		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
+	}
+
 	attr := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "alice"}}
 	serv.allow = true
-	serv.statusCode = 500
-	if err := wh.Authorize(attr); err == nil {
-		t.Errorf("Webhook returned HTTP 500, but authorizer reported success.")
-	}
-	serv.statusCode = 404
-	if err := wh.Authorize(attr); err == nil {
-		t.Errorf("Webhook returned HTTP 404, but authorizer reported success.")
-	}
-	serv.statusCode = 200
-	if err := wh.Authorize(attr); err != nil {
-		t.Errorf("Webhook returned HTTP 200, but authorizer reported unauthorized.")
-	}
-	serv.statusCode = 500
-	if err := wh.Authorize(attr); err != nil {
-		t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
-	}
+
+	testWebhookCacheCases(t, serv, wh, attr, tests)
+
 	// For a different request, webhook should be called again.
+	tests = []webhookCacheTestCase{
+		{statusCode: 500, expectedErr: true, expectedAuthorized: false, expectedCached: false},
+		{statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCached: false},
+		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
+	}
 	attr = authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "bob"}}
-	serv.statusCode = 500
-	if err := wh.Authorize(attr); err == nil {
-		t.Errorf("Webhook returned HTTP 500, but authorizer reported success.")
-	}
-	serv.statusCode = 200
-	if err := wh.Authorize(attr); err != nil {
-		t.Errorf("Webhook returned HTTP 200, but authorizer reported unauthorized.")
-	}
-	serv.statusCode = 500
-	if err := wh.Authorize(attr); err != nil {
-		t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
-	}
+
+	testWebhookCacheCases(t, serv, wh, attr, tests)
 }

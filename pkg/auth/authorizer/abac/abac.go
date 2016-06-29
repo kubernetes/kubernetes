@@ -21,7 +21,6 @@ package abac
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -222,13 +221,13 @@ func resourceMatches(p api.Policy, a authorizer.Attributes) bool {
 }
 
 // Authorizer implements authorizer.Authorize
-func (pl policyList) Authorize(a authorizer.Attributes) error {
+func (pl policyList) Authorize(a authorizer.Attributes) (bool, string, error) {
 	for _, p := range pl {
 		if matches(*p, a) {
-			return nil
+			return true, "", nil
 		}
 	}
-	return errors.New("No policy matched.")
+	return false, "No policy matched.", nil
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.
