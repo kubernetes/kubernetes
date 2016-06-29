@@ -40,7 +40,7 @@ func installFederationAPIs(s *genericoptions.ServerRunOptions, g *genericapiserv
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *federationGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1alpha1": federationResources,
+			"v1beta1": federationResources,
 		},
 		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,

@@ -863,10 +863,9 @@ func printCluster(c *federation.Cluster, w io.Writer, options PrintOptions) erro
 		statuses = append(statuses, "Unknown")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n",
 		c.Name,
 		strings.Join(statuses, ","),
-		c.Status.Version,
 		translateTimestamp(c.CreationTimestamp),
 	); err != nil {
 		return err

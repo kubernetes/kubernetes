@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -71,21 +71,10 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
-// Cluster metadata
-type ClusterMeta struct {
-	// Release version of the cluster.
-	Version string `json:"version,omitempty" protobuf:"bytes,1,opt,name=version"`
-}
-
 // ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
 type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
 	Conditions []ClusterCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
-	// Capacity represents the total resources of the cluster
-	Capacity v1.ResourceList `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity,casttype=k8s.io/kubernetes/pkg/api/v1.ResourceList,castkey=k8s.io/kubernetes/pkg/api/v1.ResourceName"`
-	// Allocatable represents the total resources of a cluster that are available for scheduling.
-	Allocatable v1.ResourceList `json:"allocatable,omitempty" protobuf:"bytes,3,rep,name=allocatable,casttype=k8s.io/kubernetes/pkg/api/v1.ResourceList,castkey=k8s.io/kubernetes/pkg/api/v1.ResourceName"`
-	ClusterMeta `json:",inline" protobuf:"bytes,4,opt,name=clusterMeta"`
 	// Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.
 	Zones []string `json:"zones,omitempty" protobuf:"bytes,5,rep,name=zones"`
