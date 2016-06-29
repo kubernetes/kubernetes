@@ -526,16 +526,12 @@ func TestStaticPodStatus(t *testing.T) {
 	mirrorPod.UID = "new-mirror-pod"
 	mirrorPod.Status = api.PodStatus{}
 	m.podManager.AddPod(mirrorPod)
-	// Expect update to new mirrorPod.
+
+	// Expect no update to mirror pod, since UID has changed.
 	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []core.Action{
 		core.GetActionImpl{ActionImpl: core.ActionImpl{Verb: "get", Resource: unversioned.GroupVersionResource{Resource: "pods"}}},
-		core.UpdateActionImpl{ActionImpl: core.ActionImpl{Verb: "update", Resource: unversioned.GroupVersionResource{Resource: "pods"}, Subresource: "status"}},
 	})
-	updateAction = client.Actions()[1].(core.UpdateActionImpl)
-	updatedPod = updateAction.Object.(*api.Pod)
-	assert.Equal(t, mirrorPod.UID, updatedPod.UID, "Expected mirrorPod (%q), but got %q", mirrorPod.UID, updatedPod.UID)
-	assert.True(t, isStatusEqual(&status, &updatedPod.Status), "Expected: %+v, Got: %+v", status, updatedPod.Status)
 }
 
 func TestSetContainerReadiness(t *testing.T) {
