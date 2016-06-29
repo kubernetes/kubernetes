@@ -377,8 +377,8 @@ func parseZone(r io.Reader, origin, f string, t chan *Token, include int) {
 				t <- &Token{Error: &ParseError{f, "expecting $GENERATE value, not this...", l}}
 				return
 			}
-			if e := generate(l, c, t, origin); e != "" {
-				t <- &Token{Error: &ParseError{f, e, l}}
+			if errMsg := generate(l, c, t, origin); errMsg != "" {
+				t <- &Token{Error: &ParseError{f, errMsg, l}}
 				return
 			}
 			st = zExpectOwnerDir
@@ -966,8 +966,8 @@ func stringToNodeID(l lex) (uint64, *ParseError) {
 		return 0, &ParseError{l.token, "bad NID/L64 NodeID/Locator64", l}
 	}
 	s := l.token[0:4] + l.token[5:9] + l.token[10:14] + l.token[15:19]
-	u, e := strconv.ParseUint(s, 16, 64)
-	if e != nil {
+	u, err := strconv.ParseUint(s, 16, 64)
+	if err != nil {
 		return 0, &ParseError{l.token, "bad NID/L64 NodeID/Locator64", l}
 	}
 	return u, nil
