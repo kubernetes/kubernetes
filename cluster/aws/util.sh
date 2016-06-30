@@ -1490,12 +1490,12 @@ function kube-down {
       $AWS_CMD delete-route-table --route-table-id $route_table_id > $LOG
     done
     
-    dchp_ids=$($AWS_CMD describe-dhcp-options \
+    dhcp_ids=$($AWS_CMD describe-dhcp-options \
     			--filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
     			--query DhcpOptions[].DhcpOptionsId
     			);
-    for dchp_id in ${dchp_ids}; do
-        aws ec2 delete-dhcp-options --dhcp-options-id=${dchp_id};
+    for dhcp_id in ${dhcp_ids}; do
+        aws ec2 delete-dhcp-options --dhcp-options-id=${dhcp_id};
     done
 
     echo "Deleting VPC: ${vpc_id}"
