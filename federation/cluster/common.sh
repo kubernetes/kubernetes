@@ -174,8 +174,9 @@ function create-federation-api-objects {
       $host_kubectl create secret generic ${name} --from-file="${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
     done
 
-    $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
-    $template "${manifests_root}/federation-controller-manager-deployment.yaml" | $host_kubectl create -f -
+    for file in federation-etcd-pvc.yaml federation-apiserver-{deployment,secrets}.yaml federation-controller-manager-deployment.yaml; do
+      $template "${manifests_root}/${file}" | $host_kubectl create -f -
+    done
 
     # Update the users kubeconfig to include federation-apiserver credentials.
     CONTEXT=federation-cluster \
