@@ -18,10 +18,10 @@ package oidc
 
 import (
 	"fmt"
-	"net/http/httptest"
 	"os"
 	"path"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -61,61 +61,7 @@ func generateExpiredToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, 
 	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
 }
 
-func TestOIDCDiscoveryTimeout(t *testing.T) {
-	expectErr := fmt.Errorf("failed to fetch provider config after 1 retries")
-	_, err := New(OIDCOptions{"https://127.0.0.1:9999/bar", "client-foo", "", "sub", "", 1, 100 * time.Millisecond})
-	if !reflect.DeepEqual(err, expectErr) {
-		t.Errorf("Expecting %v, but got %v", expectErr, err)
-	}
-}
-
-func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
-	var err error
-	expectErr := fmt.Errorf("failed to fetch provider config after 0 retries")
-
-	cert := path.Join(os.TempDir(), "oidc-cert")
-	key := path.Join(os.TempDir(), "oidc-key")
-
-	defer os.Remove(cert)
-	defer os.Remove(key)
-
-	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
-
-	op := oidctesting.NewOIDCProvider(t)
-	srv, err := op.ServeTLSWithKeyPair(cert, key)
-	if err != nil {
-		t.Fatalf("Cannot start server %v", err)
-	}
-	defer srv.Close()
-
-	op.PCFG = oidc.ProviderConfig{
-		Issuer: oidctesting.MustParseURL(srv.URL), // An invalid ProviderConfig. Keys endpoint is required.
-	}
-
-	_, err = New(OIDCOptions{srv.URL, "client-foo", cert, "sub", "", 0, 0})
-	if !reflect.DeepEqual(err, expectErr) {
-		t.Errorf("Expecting %v, but got %v", expectErr, err)
-	}
-}
-
-func TestOIDCDiscoverySecureConnection(t *testing.T) {
-	// Verify that plain HTTP issuer URL is forbidden.
-	op := oidctesting.NewOIDCProvider(t)
-	srv := httptest.NewServer(op.Mux)
-	defer srv.Close()
-
-	op.PCFG = oidc.ProviderConfig{
-		Issuer:       oidctesting.MustParseURL(srv.URL),
-		KeysEndpoint: oidctesting.MustParseURL(srv.URL + "/keys"),
-	}
-
-	expectErr := fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", srv.URL, "http")
-
-	_, err := New(OIDCOptions{srv.URL, "client-foo", "", "sub", "", 0, 0})
-	if !reflect.DeepEqual(err, expectErr) {
-		t.Errorf("Expecting %v, but got %v", expectErr, err)
-	}
-
+func TestTLSConfig(t *testing.T) {
 	// Verify the cert/key pair works.
 	cert1 := path.Join(os.TempDir(), "oidc-cert-1")
 	key1 := path.Join(os.TempDir(), "oidc-key-1")
@@ -130,24 +76,105 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert1, key1)
 	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert2, key2)
 
-	// Create a TLS server using cert/key pair 1.
-	tlsSrv, err := op.ServeTLSWithKeyPair(cert1, key1)
-	if err != nil {
-		t.Fatalf("Cannot start server: %v", err)
-	}
-	defer tlsSrv.Close()
+	tests := []struct {
+		testCase string
 
-	op.PCFG = oidc.ProviderConfig{
-		Issuer:       oidctesting.MustParseURL(tlsSrv.URL),
-		KeysEndpoint: oidctesting.MustParseURL(tlsSrv.URL + "/keys"),
+		serverCertFile string
+		serverKeyFile  string
+
+		trustedCertFile string
+
+		wantErr bool
+	}{
+		{
+			testCase:       "provider using untrusted custom cert",
+			serverCertFile: cert1,
+			serverKeyFile:  key1,
+			wantErr:        true,
+		},
+		{
+			testCase:        "provider using untrusted cert",
+			serverCertFile:  cert1,
+			serverKeyFile:   key1,
+			trustedCertFile: cert2,
+			wantErr:         true,
+		},
+		{
+			testCase:        "provider using trusted cert",
+			serverCertFile:  cert1,
+			serverKeyFile:   key1,
+			trustedCertFile: cert1,
+			wantErr:         false,
+		},
 	}
 
-	// Create a client using cert2, should fail.
-	_, err = New(OIDCOptions{tlsSrv.URL, "client-foo", cert2, "sub", "", 0, 0})
-	if err == nil {
-		t.Fatalf("Expecting error, but got nothing")
-	}
+	for _, tc := range tests {
+		func() {
+			op := oidctesting.NewOIDCProvider(t)
+			srv, err := op.ServeTLSWithKeyPair(tc.serverCertFile, tc.serverKeyFile)
+			if err != nil {
+				t.Errorf("%s: %v", tc.testCase, err)
+				return
+			}
+			defer srv.Close()
+			op.AddMinimalProviderConfig(srv)
 
+			issuer := srv.URL
+			clientID := "client-foo"
+
+			options := OIDCOptions{
+				IssuerURL:     srv.URL,
+				ClientID:      clientID,
+				CAFile:        tc.trustedCertFile,
+				UsernameClaim: "email",
+				GroupsClaim:   "groups",
+			}
+
+			authenticator, err := New(options)
+			if err != nil {
+				t.Errorf("%s: failed to initialize authenticator: %v", tc.testCase, err)
+				return
+			}
+			defer authenticator.Close()
+
+			email := "user-1@example.com"
+			groups := []string{"group1", "group2"}
+			sort.Strings(groups)
+
+			token := generateGoodToken(t, op, issuer, "user-1", clientID, "email", email, "groups", groups)
+
+			// Because this authenticator behaves differently for subsequent requests, run these
+			// tests multiple times (but expect the same result).
+			for i := 1; i < 4; i++ {
+
+				user, ok, err := authenticator.AuthenticateToken(token)
+				if err != nil {
+					if !tc.wantErr {
+						t.Errorf("%s (req #%d): failed to authenticate token: %v", tc.testCase, i, err)
+					}
+					continue
+				}
+
+				if tc.wantErr {
+					t.Errorf("%s (req #%d): expected error authenticating", tc.testCase, i)
+					continue
+				}
+				if !ok {
+					t.Errorf("%s (req #%d): did not get user or error", tc.testCase, i)
+					continue
+				}
+
+				if gotUsername := user.GetName(); email != gotUsername {
+					t.Errorf("%s (req #%d): GetName() expected=%q got %q", tc.testCase, i, email, gotUsername)
+				}
+				gotGroups := user.GetGroups()
+				sort.Strings(gotGroups)
+				if !reflect.DeepEqual(gotGroups, groups) {
+					t.Errorf("%s (req #%d): GetGroups() expected=%q got %q", tc.testCase, i, groups, gotGroups)
+				}
+			}
+		}()
+	}
 }
 
 func TestOIDCAuthentication(t *testing.T) {
@@ -252,7 +279,7 @@ func TestOIDCAuthentication(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim, 1, 100 * time.Millisecond})
+		client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue

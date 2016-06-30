@@ -156,8 +156,6 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 		CAFile:        caFile,
 		UsernameClaim: usernameClaim,
 		GroupsClaim:   groupsClaim,
-		MaxRetries:    oidc.DefaultRetries,
-		RetryBackoff:  oidc.DefaultBackoff,
 	})
 	if err != nil {
 		return nil, err
