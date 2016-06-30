@@ -43,6 +43,8 @@ const (
 	// When these values are updated, also update test/e2e/framework/util.go
 	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
 	defaultPodInfraContainerImageVersion = "3.0"
+	// Auto detect cloud provider.
+	AutoDetectCloudProvider = "auto-detect"
 )
 
 // Returns the arch-specific pause image that kubelet should use as the default
@@ -83,6 +85,7 @@ func NewKubeletServer() *KubeletServer {
 			VolumeStatsAggPeriod:         unversioned.Duration{Duration: time.Minute},
 			CertDirectory:                "/var/run/kubernetes",
 			CgroupRoot:                   "",
+			CloudProvider:                AutoDetectCloudProvider,
 			ConfigureCBR0:                false,
 			ContainerRuntime:             "docker",
 			RuntimeRequestTimeout:        unversioned.Duration{Duration: 2 * time.Minute},
@@ -215,7 +218,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.StringVar(&s.NetworkPluginDir, "network-plugin-dir", s.NetworkPluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for network plugins")
 	fs.StringVar(&s.VolumePluginDir, "volume-plugin-dir", s.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
-	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
+	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services. By default, kubelet will attempt to auto-detect the cloud provider. Specify empty string for running with no cloud provider. [default=auto-detect]")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 
 	fs.StringVar(&s.KubeletCgroups, "resource-container", s.KubeletCgroups, "Optional absolute name of the resource-only container to create and run the Kubelet in.")

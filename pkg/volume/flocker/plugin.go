@@ -18,18 +18,16 @@ package flocker
 
 import (
 	"fmt"
-	"path"
 	"time"
 
-	flockerclient "github.com/ClusterHQ/flocker-go"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+
+	flockerclient "github.com/ClusterHQ/flocker-go"
 )
 
 const (
@@ -165,15 +163,6 @@ func (b flockerMounter) newFlockerClient() (*flockerclient.Client, error) {
 	return c, err
 }
 
-func (b *flockerMounter) getMetaDir() string {
-	return path.Join(
-		b.plugin.host.GetPodPluginDir(
-			b.flocker.pod.UID, strings.EscapeQualifiedNameForDisk(flockerPluginName),
-		),
-		b.datasetName,
-	)
-}
-
 /*
 SetUpAt will setup a Flocker volume following this flow of calls to the Flocker
 control service:
@@ -186,10 +175,6 @@ control service:
 5. Wait until the Primary UUID was updated or timeout.
 */
 func (b flockerMounter) SetUpAt(dir string, fsGroup *int64) error {
-	if volumeutil.IsReady(b.getMetaDir()) {
-		return nil
-	}
-
 	if b.client == nil {
 		c, err := b.newFlockerClient()
 		if err != nil {
@@ -226,7 +211,6 @@ func (b flockerMounter) SetUpAt(dir string, fsGroup *int64) error {
 		b.flocker.path = s.Path
 	}
 
-	volumeutil.SetReady(b.getMetaDir())
 	return nil
 }
 
