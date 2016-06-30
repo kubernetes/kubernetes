@@ -960,6 +960,20 @@ __EOF__
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
 
+  ### Test retrieval of non-existing POD with json output flag specified
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}" -o json)
+  # Post-condition: POD abc should error since it doesn't exist
+  kube::test::if_has_string "${output_message}" 'pods "abc" not found'
+  # Post-condition: make sure we don't display an empty List
+  if kube::test::if_has_string "${output_message}" 'List'; then
+    echo 'Unexpected List output'
+    echo "${LINENO} $(basename $0)"
+    exit 1
+  fi
+
   #####################################
   # Third Party Resources             #
   #####################################

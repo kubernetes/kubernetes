@@ -229,6 +229,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		singular := false
 		infos, err := r.IntoSingular(&singular).Infos()
 		if err != nil {
+			if singular {
+				return err
+			}
 			allErrs = append(allErrs, err)
 		}
 
