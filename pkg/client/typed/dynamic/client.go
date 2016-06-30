@@ -69,13 +69,6 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 
-	if conf.QPS == 0.0 {
-		conf.QPS = 5.0
-	}
-	if conf.Burst == 0 {
-		conf.Burst = 10
-	}
-
 	cl, err := restclient.RESTClientFor(conf)
 	if err != nil {
 		return nil, err

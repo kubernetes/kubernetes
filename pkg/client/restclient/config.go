@@ -37,6 +37,11 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+const (
+	DefaultQPS   float32 = 5.0
+	DefaultBurst int     = 10
+)
+
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
@@ -93,10 +98,12 @@ type Config struct {
 	// on top of the returned RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
-	// QPS indicates the maximum QPS to the master from this client.  If zero, QPS is unlimited.
+	// QPS indicates the maximum QPS to the master from this client.
+	// If it's zero, the created RESTClient will use DefaultQPS: 5
 	QPS float32
 
-	// Maximum burst for throttle
+	// Maximum burst for throttle.
+	// If it's zero, the created RESTClient will use DefaultBurst: 10.
 	Burst int
 
 	// Rate limiter for limiting connections to the master from this client. If present overwrites QPS/Burst
@@ -158,6 +165,14 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	if config.NegotiatedSerializer == nil {
 		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
+	qps := config.QPS
+	if config.QPS == 0.0 {
+		qps = DefaultQPS
+	}
+	burst := config.Burst
+	if config.Burst == 0 {
+		burst = DefaultBurst
+	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
@@ -174,7 +189,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		httpClient = &http.Client{Transport: transport}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -213,12 +228,6 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 func SetKubernetesDefaults(config *Config) error {
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
-	}
-	if config.QPS == 0.0 {
-		config.QPS = 5.0
-	}
-	if config.Burst == 0 {
-		config.Burst = 10
 	}
 	return nil
 }
