@@ -2477,6 +2477,13 @@ message Secret {
   // Described in https://tools.ietf.org/html/rfc4648#section-4
   map<string, bytes> data = 2;
 
+  // stringData allows specifying non-binary secret data in string form.
+  // It is provided as a write-only convenience method.
+  // All keys and values are merged into the data field on write, overwriting any existing values.
+  // It is never output when reading from the API.
+  // +genconversion=false
+  map<string, string> stringData = 4;
+
   // Used to facilitate programmatic handling of secret data.
   optional string type = 3;
 }
