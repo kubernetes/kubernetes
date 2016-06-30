@@ -201,6 +201,7 @@ func NewMainKubelet(
 	imageGCPolicy ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
+	autoDetectCloudProvider bool,
 	nodeLabels map[string]string,
 	nodeStatusUpdateFrequency time.Duration,
 	osInterface kubecontainer.OSInterface,
@@ -331,9 +332,10 @@ func NewMainKubelet(
 		cadvisor:                       cadvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          cloud,
-		nodeRef:                        nodeRef,
-		nodeLabels:                     nodeLabels,
-		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
+		autoDetectCloudProvider:   autoDetectCloudProvider,
+		nodeRef:                   nodeRef,
+		nodeLabels:                nodeLabels,
+		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		os:                         osInterface,
 		oomWatcher:                 oomWatcher,
 		cgroupRoot:                 cgroupRoot,
@@ -688,7 +690,8 @@ type Kubelet struct {
 	volumeManager kubeletvolume.VolumeManager
 
 	// Cloud provider interface.
-	cloud cloudprovider.Interface
+	cloud                   cloudprovider.Interface
+	autoDetectCloudProvider bool
 
 	// Reference to this node.
 	nodeRef *api.ObjectReference
@@ -1115,10 +1118,12 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		}
 	} else {
 		node.Spec.ExternalID = kl.hostname
-		// If no cloud provider is defined - use the one detected by cadvisor
-		info, err := kl.GetCachedMachineInfo()
-		if err == nil {
-			kl.updateCloudProviderFromMachineInfo(node, info)
+		if kl.autoDetectCloudProvider {
+			// If no cloud provider is defined - use the one detected by cadvisor
+			info, err := kl.GetCachedMachineInfo()
+			if err == nil {
+				kl.updateCloudProviderFromMachineInfo(node, info)
+			}
 		}
 	}
 	if err := kl.setNodeStatus(node); err != nil {
