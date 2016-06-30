@@ -44,6 +44,11 @@ type QuotaAccessor interface {
 	GetQuotas(namespace string) ([]api.ResourceQuota, error)
 }
 
+const (
+	maxTries         = 20
+	timeBetweenTries = 100 * time.Millisecond
+)
+
 type quotaAccessor struct {
 	client clientset.Interface
 
@@ -134,46 +139,68 @@ func (e *quotaAccessor) checkCache(quota *api.ResourceQuota) *api.ResourceQuota 
 }
 
 func (e *quotaAccessor) GetQuotas(namespace string) ([]api.ResourceQuota, error) {
-	// determine if there are any quotas in this namespace
-	// if there are no quotas, we don't need to do anything
-	items, err := e.indexer.Index("namespace", &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: ""}})
-	if err != nil {
-		return nil, fmt.Errorf("Error resolving quota.")
-	}
+	numTries := 0
+	for {
+		numTries = numTries + 1
 
-	// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.
-	if len(items) == 0 {
-		lruItemObj, ok := e.liveLookupCache.Get(namespace)
-		if !ok || lruItemObj.(liveLookupEntry).expiry.Before(time.Now()) {
-			// TODO: If there are multiple operations at the same time and cache has just expired,
-			// this may cause multiple List operations being issued at the same time.
-			// If there is already in-flight List() for a given namespace, we should wait until
-			// it is finished and cache is updated instead of doing the same, also to avoid
-			// throttling - see #22422 for details.
-			liveList, err := e.client.Core().ResourceQuotas(namespace).List(api.ListOptions{})
-			if err != nil {
-				return nil, err
-			}
-			newEntry := liveLookupEntry{expiry: time.Now().Add(e.liveTTL)}
-			for i := range liveList.Items {
-				newEntry.items = append(newEntry.items, &liveList.Items[i])
-			}
-			e.liveLookupCache.Add(namespace, newEntry)
-			lruItemObj = newEntry
+		// determine if there are any quotas in this namespace
+		// if there are no quotas, we don't need to do anything
+		items, err := e.indexer.Index("namespace", &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: ""}})
+		if err != nil {
+			return nil, fmt.Errorf("Error resolving quota.")
 		}
-		lruEntry := lruItemObj.(liveLookupEntry)
-		for i := range lruEntry.items {
-			items = append(items, lruEntry.items[i])
+
+		// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.
+		if len(items) == 0 {
+			lruItemObj, ok := e.liveLookupCache.Get(namespace)
+			if !ok || lruItemObj.(liveLookupEntry).expiry.Before(time.Now()) {
+				// TODO: If there are multiple operations at the same time and cache has just expired,
+				// this may cause multiple List operations being issued at the same time.
+				// If there is already in-flight List() for a given namespace, we should wait until
+				// it is finished and cache is updated instead of doing the same, also to avoid
+				// throttling - see #22422 for details.
+				liveList, err := e.client.Core().ResourceQuotas(namespace).List(api.ListOptions{})
+				if err != nil {
+					return nil, err
+				}
+				newEntry := liveLookupEntry{expiry: time.Now().Add(e.liveTTL)}
+				for i := range liveList.Items {
+					newEntry.items = append(newEntry.items, &liveList.Items[i])
+				}
+				e.liveLookupCache.Add(namespace, newEntry)
+				lruItemObj = newEntry
+			}
+			lruEntry := lruItemObj.(liveLookupEntry)
+			for i := range lruEntry.items {
+				items = append(items, lruEntry.items[i])
+			}
 		}
+
+		// Check to see if our resource quotas have usage stats.  If they don't, the computation will fail.  Rather than
+		// fail there, we can wait here for a little while to see if they populated by the controller.  Usually this is a short
+		// race with the controller.
+		haveUsageStats := true
+		resourceQuotas := []api.ResourceQuota{}
+		for i := range items {
+			quota := items[i].(*api.ResourceQuota)
+			quota = e.checkCache(quota)
+			// always make a copy.  We're going to muck around with this and we should never mutate the originals
+			resourceQuotas = append(resourceQuotas, *quota)
+
+			haveUsageStats = haveUsageStats && hasUsageStats(quota)
+		}
+
+		// if we expended retries, return what we've got
+		if numTries > maxTries {
+			return resourceQuotas, err
+		}
+
+		if haveUsageStats {
+			return resourceQuotas, nil
+		}
+
+		time.Sleep(timeBetweenTries)
 	}
 
-	resourceQuotas := []api.ResourceQuota{}
-	for i := range items {
-		quota := items[i].(*api.ResourceQuota)
-		quota = e.checkCache(quota)
-		// always make a copy.  We're going to muck around with this and we should never mutate the originals
-		resourceQuotas = append(resourceQuotas, *quota)
-	}
-
-	return resourceQuotas, nil
+	return nil, fmt.Errorf("you should never get here")
 }
