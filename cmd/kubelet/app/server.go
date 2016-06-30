@@ -355,7 +355,7 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	}
 
 	if kcfg.ContainerManager == nil {
-		if kcfg.SystemCgroups != "" && kcfg.CgroupRoot == "" {
+		if kcfg.SystemCgroups != "" && kcfg.CgroupRoot == "/" {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
 
@@ -557,7 +557,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		Address:                      net.ParseIP(address),
 		CAdvisorInterface:            cadvisorInterface,
 		VolumeStatsAggPeriod:         time.Minute,
-		CgroupRoot:                   "",
+		CgroupRoot:                   "/",
 		Cloud:                        cloud,
 		ClusterDNS:                   clusterDNS,
 		ConfigFile:                   configFilePath,
