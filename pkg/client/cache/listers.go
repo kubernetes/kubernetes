@@ -693,3 +693,20 @@ func (s *StoreToCertificateRequestLister) List() (csrs certificates.CertificateS
 	}
 	return csrs, nil
 }
+
+// IndexerToNamespaceLister gives an Indexer List method
+type IndexerToNamespaceLister struct {
+	Indexer
+}
+
+// List returns a list of namespaces
+func (i *IndexerToNamespaceLister) List(selector labels.Selector) (namespaces []*api.Namespace, err error) {
+	for _, m := range i.Indexer.List() {
+		namespace := m.(*api.Namespace)
+		if selector.Matches(labels.Set(namespace.Labels)) {
+			namespaces = append(namespaces, namespace)
+		}
+	}
+
+	return namespaces, nil
+}

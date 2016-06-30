@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
 func init() {
@@ -39,11 +39,11 @@ func init() {
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
 	*admission.Handler
-	client   clientset.Interface
-	informer framework.SharedIndexInformer
+	client          clientset.Interface
+	informerFactory informers.SharedInformerFactory
 }
 
-var _ = admission.WantsNamespaceInformer(&exists{})
+var _ = admission.WantsInformerFactory(&exists{})
 
 func (e *exists) Admit(a admission.Attributes) (err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -60,7 +60,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := e.informer.GetStore().Get(namespace)
+	_, exists, err := e.informerFactory.Namespaces().Informer().GetStore().Get(namespace)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
@@ -88,12 +88,12 @@ func NewExists(c clientset.Interface) admission.Interface {
 	}
 }
 
-func (e *exists) SetNamespaceInformer(c framework.SharedIndexInformer) {
-	e.informer = c
+func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
+	e.informerFactory = f
 }
 
 func (e *exists) Validate() error {
-	if e.informer == nil {
+	if e.informerFactory == nil {
 		return fmt.Errorf("namespace exists plugin needs a namespace informer")
 	}
 	return nil

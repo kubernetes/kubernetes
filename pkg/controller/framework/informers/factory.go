@@ -17,6 +17,8 @@ limitations under the License.
 package informers
 
 import (
+	"reflect"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,6 +28,70 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
+
+// SharedInformerFactory provides interface which holds unique informers for pods, nodes, namespaces, persistent volume
+// claims and persistent volumes
+type SharedInformerFactory interface {
+	// Start starts informers that can start AFTER the API server and controllers have started
+	Start(stopCh <-chan struct{})
+
+	Pods() PodInformer
+	Nodes() NodeInformer
+	Namespaces() NamespaceInformer
+	PersistentVolumeClaims() PVCInformer
+	PersistentVolumes() PVInformer
+}
+
+type sharedInformerFactory struct {
+	client        clientset.Interface
+	lock          sync.Mutex
+	defaultResync time.Duration
+	informers     map[reflect.Type]framework.SharedIndexInformer
+}
+
+// NewSharedInformerFactory constructs a new instance of sharedInformerFactory
+func NewSharedInformerFactory(client clientset.Interface, defaultResync time.Duration) SharedInformerFactory {
+	return &sharedInformerFactory{
+		client:        client,
+		defaultResync: defaultResync,
+		informers:     make(map[reflect.Type]framework.SharedIndexInformer),
+	}
+}
+
+// Start initializes all requested informers.
+func (s *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for _, informer := range s.informers {
+		go informer.Run(stopCh)
+	}
+}
+
+// Pods returns a SharedIndexInformer that lists and watches all pods
+func (f *sharedInformerFactory) Pods() PodInformer {
+	return &podInformer{sharedInformerFactory: f}
+}
+
+// Nodes returns a SharedIndexInformer that lists and watches all nodes
+func (f *sharedInformerFactory) Nodes() NodeInformer {
+	return &nodeInformer{sharedInformerFactory: f}
+}
+
+// Namespaces returns a SharedIndexInformer that lists and watches all namespaces
+func (f *sharedInformerFactory) Namespaces() NamespaceInformer {
+	return &namespaceInformer{sharedInformerFactory: f}
+}
+
+// PersistentVolumeClaims returns a SharedIndexInformer that lists and watches all persistent volume claims
+func (f *sharedInformerFactory) PersistentVolumeClaims() PVCInformer {
+	return &pvcInformer{sharedInformerFactory: f}
+}
+
+// PersistentVolumes returns a SharedIndexInformer that lists and watches all persistent volumes
+func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
+	return &pvInformer{sharedInformerFactory: f}
+}
 
 // CreateSharedPodInformer returns a SharedIndexInformer that lists and watches all pods
 func CreateSharedPodInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {

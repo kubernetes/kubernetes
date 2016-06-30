@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -245,14 +246,12 @@ func Run(s *options.APIServer) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
 
-	namespaceInformer := informers.CreateSharedNamespaceIndexInformer(client, 5*time.Minute)
-	pluginInit := admission.NewPluginInitializer()
-	pluginInit.SetNamespaceInformer(namespaceInformer)
-
-	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInit)
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
-		glog.Errorf("Failed to initialize plugins: %v", err)
+		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
@@ -288,6 +287,7 @@ func Run(s *options.APIServer) error {
 		return err
 	}
 
+	sharedInformers.Start(wait.NeverStop)
 	m.Run(s.ServerRunOptions)
 	return nil
 }
