@@ -27,11 +27,11 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Ingress L4 Proposal
+# Ingress L4 Proposal - TCP
 
 ## Abstract
 
-A proposal to add support for TCP and UDP to the Ingress Resource.
+A proposal to add support for TCP to the Ingress Resource.
 
 Existing issue regarding Ingress and TCP
 * Ingress and TCP [#23291](https://github.com/kubernetes/kubernetes/issues/23291)
@@ -78,7 +78,7 @@ termination is lacking in several Cloud Providers.
 
 (1) GCE has TLS as an alpha service
 
-### TCP and UDP support
+### TCP support
 
 ```yaml
 apiVersion: extensions/v1beta1
@@ -92,17 +92,11 @@ spec:
       backend:
         serviceName: testdns
         servicePort: 53
-    - udp:
-        port: 53
-      backend:
-        serviceName: testdns
-        servicePort: 53
 ```
 
-While HTTP rules have host specifiers, in TCP and UDP rules they would not be
-allowed as hostname handling is specific to L5 or higher layer protocol being
-used over TCP or UDP.  TCP and UDP as protocol specifiers should be agnostic to
-higher layer protocols.
+While HTTP rules have host specifiers, in TCP rules hostnames would not be
+as hostname handling is specific to L5 or higher layer protocol being used over
+TCP.  TCP as a protocol specifier should be agnostic to higher layer protocols.
 
 ### Ingress type specifier
 
@@ -118,8 +112,6 @@ metadata:
 spec:
     rules:
     - tcp:
-        port: 3306
-      udp:
         port: 3306
       host: www.foo.com
       tls:
@@ -154,12 +146,6 @@ spec:
         serviceName: testmysql
         servicePort: 3306
 
-    - protocol: udp
-      port: 3306
-      backend:
-        serviceName: testmysql
-        servicePort: 3306
-
     - protocol: tls
       host: www.foo.com
       tls:
@@ -183,7 +169,7 @@ for Ingress in a manner that would work for all cloud providers.
 
  - Add a protocol specifier for rules to explicitly declare the desired protocol
    for Ingress
- - Add TCP and UDP protocol types to allow definition of TCP and UDP Ingress
+ - Add TCP protocol type to allow definition of TCP Ingress
 
 ```yaml
 apiVersion: extensions/v1beta1
@@ -193,12 +179,6 @@ metadata:
 spec:
     rules:
     - protocol: tcp
-      port: 3306
-      backend:
-        serviceName: testmysql
-        servicePort: 3306
-
-    - protocol: udp
       port: 3306
       backend:
         serviceName: testmysql
@@ -236,12 +216,6 @@ metadata:
 spec:
     rules:
     - protocol: tcp
-      port: 3306
-      backend:
-        serviceName: testmysql
-        servicePort: 3306
-
-    - protocol: udp
       port: 3306
       backend:
         serviceName: testmysql
