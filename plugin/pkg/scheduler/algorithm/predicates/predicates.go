@@ -169,6 +169,10 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 				return nil
 			}
 
+			if pvc == nil {
+				return fmt.Errorf("PersistentVolumeClaim not found: %q", pvcName)
+			}
+
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
 				return fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
@@ -184,6 +188,10 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 				generatedID := "missingPV" + strconv.Itoa(rand.New(source).Intn(1000000))
 				filteredVolumes[generatedID] = true
 				return nil
+			}
+
+			if pv == nil {
+				return fmt.Errorf("PersistentVolume not found: %q", pvName)
 			}
 
 			if id, ok := c.filter.FilterPersistentVolume(pv); ok {
