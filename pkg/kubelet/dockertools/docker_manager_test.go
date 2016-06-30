@@ -2062,8 +2062,8 @@ func TestCheckVersionCompatibility(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	expectedVersion := "1.8.1"
-	expectedAPIVersion := "1.20"
+	expectedVersion := "1.10.3"
+	expectedAPIVersion := "1.10.4-28.gitf476348.fc23"
 	dm, _ := newTestDockerManagerWithVersion(expectedVersion, expectedAPIVersion)
 	version, err := dm.Version()
 	if err != nil {
@@ -2080,6 +2080,14 @@ func TestVersion(t *testing.T) {
 	if e, a := expectedAPIVersion, apiVersion.String(); e != a {
 		t.Errorf("expect docker api version %q, got %q", e, a)
 	}
+
+	t.Logf("Prunning Version: %q, APIVersion: %q", pruneSemver(expectedVersion), pruneSemver(expectedAPIVersion))
+
+	comparison, _ := version.Compare(expectedAPIVersion)
+	if comparison != -1 {
+		t.Errorf("expected %q < %q, got otherwise", expectedVersion, expectedAPIVersion)
+	}
+
 }
 
 func TestGetPodStatusNoSuchContainer(t *testing.T) {

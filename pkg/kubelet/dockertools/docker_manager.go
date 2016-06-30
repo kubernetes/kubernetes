@@ -922,10 +922,19 @@ func (v dockerVersion) String() string {
 	return string(v)
 }
 
+func pruneSemver(semver string) string {
+	// prune strings like 1.10.4-28.gitf476348.fc23 to 1.10.4
+	parts := strings.SplitN(semver, "-", 2)
+	return parts[0]
+}
+
 func (v dockerVersion) Compare(other string) (int, error) {
-	if dockerversion.LessThan(string(v), other) {
+	v1 := pruneSemver(string(v))
+	v2 := pruneSemver(other)
+
+	if dockerversion.LessThan(v1, v2) {
 		return -1, nil
-	} else if dockerversion.GreaterThan(string(v), other) {
+	} else if dockerversion.GreaterThan(v1, v2) {
 		return 1, nil
 	}
 	return 0, nil
