@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -126,7 +128,7 @@ func (m *concurrentUIDToNode) Delete(uid types.UID) {
 }
 
 type Propagator struct {
-	eventQueue *workqueue.Type
+	eventQueue *workqueue.TimedWorkQueue
 	// uidToNode doesn't require a lock to protect, because only the
 	// single-threaded Propagator.processEvent() reads/writes it.
 	uidToNode *concurrentUIDToNode
@@ -309,7 +311,7 @@ func (gc *GarbageCollector) removeOrphanFinalizer(owner *node) error {
 // the "Orphan" finalizer. The node is add back into the orphanQueue if any of
 // these steps fail.
 func (gc *GarbageCollector) orphanFinalizer() {
-	key, quit := gc.orphanQueue.Get()
+	key, start, quit := gc.orphanQueue.Get()
 	if quit {
 		return
 	}
@@ -329,20 +331,21 @@ func (gc *GarbageCollector) orphanFinalizer() {
 	err := gc.orhpanDependents(owner.identity, dependents)
 	if err != nil {
 		glog.V(6).Infof("orphanDependents for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(owner)
+		gc.orphanQueue.AddWithTimestamp(owner, start)
 		return
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeOrphanFinalizer(owner)
 	if err != nil {
 		glog.V(6).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(owner)
+		gc.orphanQueue.AddWithTimestamp(owner, start)
 	}
+	OrphanProcessingLatency.Observe(sinceInMicroseconds(gc.clock, start))
 }
 
 // Dequeueing an event from eventQueue, updating graph, populating dirty_queue.
 func (p *Propagator) processEvent() {
-	key, quit := p.eventQueue.Get()
+	key, start, quit := p.eventQueue.Get()
 	if quit {
 		return
 	}
@@ -420,6 +423,7 @@ func (p *Propagator) processEvent() {
 			p.gc.dirtyQueue.Add(dep)
 		}
 	}
+	EventProcessingLatency.Observe(sinceInMicroseconds(p.gc.clock, start))
 }
 
 // GarbageCollector is responsible for carrying out cascading deletion, and
@@ -428,10 +432,11 @@ func (p *Propagator) processEvent() {
 type GarbageCollector struct {
 	restMapper  meta.RESTMapper
 	clientPool  dynamic.ClientPool
-	dirtyQueue  *workqueue.Type
-	orphanQueue *workqueue.Type
+	dirtyQueue  *workqueue.TimedWorkQueue
+	orphanQueue *workqueue.TimedWorkQueue
 	monitors    []monitor
 	propagator  *Propagator
+	clock       clock.Clock
 }
 
 // TODO: make special List and Watch function that removes fields other than
@@ -461,13 +466,16 @@ func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionReso
 	}
 }
 
-func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (monitor, error) {
+func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource) (monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
 	var monitor monitor
-	client, err := clientPool.ClientForGroupVersion(resource.GroupVersion())
+	client, err := gc.clientPool.ClientForGroupVersion(resource.GroupVersion())
 	if err != nil {
 		return monitor, err
+	}
+	if rateLimiter := client.GetRateLimiter(); rateLimiter != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage(fmt.Sprintf("garbage_collector_monitoring_%s_%s_%s", resource.Group, resource.Version, resource.Resource), rateLimiter)
 	}
 	monitor.store, monitor.controller = framework.NewInformer(
 		gcListWatcher(client, resource),
@@ -480,11 +488,11 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 					eventType: addEvent,
 					obj:       obj,
 				}
-				p.eventQueue.Add(event)
+				gc.propagator.eventQueue.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				event := event{updateEvent, newObj, oldObj}
-				p.eventQueue.Add(event)
+				gc.propagator.eventQueue.Add(event)
 			},
 			DeleteFunc: func(obj interface{}) {
 				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
@@ -495,7 +503,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 					eventType: deleteEvent,
 					obj:       obj,
 				}
-				p.eventQueue.Add(event)
+				gc.propagator.eventQueue.Add(event)
 			},
 		},
 	)
@@ -512,15 +520,17 @@ var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
 }
 
 func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
+	clock := clock.RealClock{}
 	gc := &GarbageCollector{
-		clientPool:  clientPool,
-		dirtyQueue:  workqueue.New(),
-		orphanQueue: workqueue.New(),
+		clientPool: clientPool,
 		// TODO: should use a dynamic RESTMapper built from the discovery results.
-		restMapper: registered.RESTMapper(),
+		restMapper:  registered.RESTMapper(),
+		clock:       clock,
+		dirtyQueue:  workqueue.NewTimedWorkQueue(clock),
+		orphanQueue: workqueue.NewTimedWorkQueue(clock),
 	}
 	gc.propagator = &Propagator{
-		eventQueue: workqueue.New(),
+		eventQueue: workqueue.NewTimedWorkQueue(gc.clock),
 		uidToNode: &concurrentUIDToNode{
 			RWMutex:   &sync.RWMutex{},
 			uidToNode: make(map[types.UID]*node),
@@ -532,7 +542,7 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 			glog.V(6).Infof("ignore resource %#v", resource)
 			continue
 		}
-		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource)
+		monitor, err := gc.monitorFor(resource)
 		if err != nil {
 			return nil, err
 		}
@@ -542,7 +552,7 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 }
 
 func (gc *GarbageCollector) worker() {
-	key, quit := gc.dirtyQueue.Get()
+	key, start, quit := gc.dirtyQueue.Get()
 	if quit {
 		return
 	}
@@ -551,6 +561,7 @@ func (gc *GarbageCollector) worker() {
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %v: %v", key, err))
 	}
+	DirtyProcessingLatency.Observe(sinceInMicroseconds(gc.clock, start))
 }
 
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
@@ -710,6 +721,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(gc.worker, 0, stopCh)
 		go wait.Until(gc.orphanFinalizer, 0, stopCh)
 	}
+	Register()
 	<-stopCh
 	glog.Infof("Garbage Collector: Shutting down")
 	gc.dirtyQueue.ShutDown()

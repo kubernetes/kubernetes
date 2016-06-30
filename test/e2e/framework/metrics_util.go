@@ -57,6 +57,10 @@ func (m *MetricsForE2E) filterMetrics() {
 	for _, metric := range InterestingApiServerMetrics {
 		interestingApiServerMetrics[metric] = (*m).ApiServerMetrics[metric]
 	}
+	interestingControllerManagerMetrics := make(metrics.ControllerManagerMetrics)
+	for _, metric := range InterestingControllerManagerMetrics {
+		interestingControllerManagerMetrics[metric] = (*m).ControllerManagerMetrics[metric]
+	}
 	interestingKubeletMetrics := make(map[string]metrics.KubeletMetrics)
 	for kubelet, grabbed := range (*m).KubeletMetrics {
 		interestingKubeletMetrics[kubelet] = make(metrics.KubeletMetrics)
@@ -65,6 +69,7 @@ func (m *MetricsForE2E) filterMetrics() {
 		}
 	}
 	(*m).ApiServerMetrics = interestingApiServerMetrics
+	(*m).ControllerManagerMetrics = interestingControllerManagerMetrics
 	(*m).KubeletMetrics = interestingKubeletMetrics
 }
 
@@ -73,6 +78,12 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 	for _, interestingMetric := range InterestingApiServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		}
+	}
+	for _, interestingMetric := range InterestingControllerManagerMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
 			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
 		}
 	}
@@ -102,6 +113,12 @@ var InterestingApiServerMetrics = []string{
 	"etcd_request_cache_add_latencies_summary",
 	"etcd_request_cache_get_latencies_summary",
 	"etcd_request_latencies_summary",
+}
+
+var InterestingControllerManagerMetrics = []string{
+	"garbage_collector_event_processing_latency_microseconds",
+	"garbage_collector_dirty_processing_latency_microseconds",
+	"garbage_collector_orphan_processing_latency_microseconds",
 }
 
 var InterestingKubeletMetrics = []string{
