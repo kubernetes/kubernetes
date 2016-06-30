@@ -27,15 +27,19 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // TestAdmission verifies a namespace is created on create requests for namespace managed resources
 func TestAdmission(t *testing.T) {
 	namespace := "test"
 	mockClient := &fake.Clientset{}
+	informerFactory := informers.NewSharedInformerFactory(mockClient, 5*time.Minute)
+	informerFactory.Namespaces()
+	informerFactory.Start(wait.NeverStop)
 	handler := &provision{
-		client:   mockClient,
-		informer: informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute),
+		client:          mockClient,
+		informerFactory: informerFactory,
 	}
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
@@ -61,13 +65,14 @@ func TestAdmission(t *testing.T) {
 func TestAdmissionNamespaceExists(t *testing.T) {
 	namespace := "test"
 	mockClient := &fake.Clientset{}
-	informer := informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute)
-	informer.GetStore().Add(&api.Namespace{
+	informerFactory := informers.NewSharedInformerFactory(mockClient, 5*time.Minute)
+	informerFactory.Namespaces().Informer().GetStore().Add(&api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: namespace},
 	})
+	informerFactory.Start(wait.NeverStop)
 	handler := &provision{
-		client:   mockClient,
-		informer: informer,
+		client:          mockClient,
+		informerFactory: informerFactory,
 	}
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
@@ -113,10 +118,12 @@ func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 	mockClient.AddReactor("create", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.NewAlreadyExists(api.Resource("namespaces"), namespace)
 	})
-
+	informerFactory := informers.NewSharedInformerFactory(mockClient, 5*time.Minute)
+	informerFactory.Namespaces()
+	informerFactory.Start(wait.NeverStop)
 	handler := &provision{
-		client:   mockClient,
-		informer: informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute),
+		client:          mockClient,
+		informerFactory: informerFactory,
 	}
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
@@ -134,11 +141,11 @@ func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 // TestAdmissionNamespaceValidate
 func TestAdmissionNamespaceValidate(t *testing.T) {
 	mockClient := &fake.Clientset{}
-	informer := informers.CreateSharedNamespaceIndexInformer(mockClient, 5*time.Minute)
+	informerFactory := informers.NewSharedInformerFactory(mockClient, 5*time.Minute)
 	handler := &provision{
 		client: mockClient,
 	}
-	handler.SetNamespaceInformer(informer)
+	handler.SetInformerFactory(informerFactory)
 	err := handler.Validate()
 	if err != nil {
 		t.Errorf("Failed to initialize informer")

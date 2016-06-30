@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
 func init() {
@@ -39,11 +39,11 @@ func init() {
 // It is useful in deployments that do not want to restrict creation of a namespace prior to its usage.
 type provision struct {
 	*admission.Handler
-	client   clientset.Interface
-	informer framework.SharedIndexInformer
+	client          clientset.Interface
+	informerFactory informers.SharedInformerFactory
 }
 
-var _ = admission.WantsNamespaceInformer(&provision{})
+var _ = admission.WantsInformerFactory(&provision{})
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -60,7 +60,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := p.informer.GetStore().Get(namespace)
+	_, exists, err := p.informerFactory.Namespaces().Informer().GetStore().Get(namespace)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -82,13 +82,13 @@ func NewProvision(c clientset.Interface) admission.Interface {
 	}
 }
 
-func (p *provision) SetNamespaceInformer(c framework.SharedIndexInformer) {
-	p.informer = c
+func (p *provision) SetInformerFactory(f informers.SharedInformerFactory) {
+	p.informerFactory = f
 }
 
 func (p *provision) Validate() error {
-	if p.informer == nil {
-		return fmt.Errorf("namespace autoprovision plugin needs a namespace informer")
+	if p.informerFactory == nil {
+		return fmt.Errorf("namespace autoprovision plugin needs SharedInformerFactory")
 	}
 	return nil
 }

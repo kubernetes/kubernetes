@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,41 +17,33 @@ limitations under the License.
 package admission
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"reflect"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
-// PluginInitializer is used for Initialization of shareable resources between admission plugins
-// After Initialization the resources have to be set separately
+// PluginInitializer is used for initialization of shareable resources between admission plugins.
+// After initialization the resources have to be set separately
 type PluginInitializer interface {
 	Initialize(plugins []Interface)
-	SetNamespaceInformer(namespaceInformer framework.SharedIndexInformer)
 }
 
 type pluginInitializer struct {
-	informers map[reflect.Type]framework.SharedIndexInformer
+	informers informers.SharedInformerFactory
 }
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer() PluginInitializer {
+func NewPluginInitializer(sharedInformers informers.SharedInformerFactory) PluginInitializer {
 	plugInit := &pluginInitializer{
-		informers: make(map[reflect.Type]framework.SharedIndexInformer),
+		informers: sharedInformers,
 	}
 	return plugInit
 }
 
-// SetNamespaceInformer sets unique namespaceInformer for instance of PluginInitializer
-func (i *pluginInitializer) SetNamespaceInformer(namespaceInformer framework.SharedIndexInformer) {
-	i.informers[reflect.TypeOf(&api.Namespace{})] = namespaceInformer
-}
-
-// Initialize will check the initialization interfaces implemented by each plugin
+// Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
 func (i *pluginInitializer) Initialize(plugins []Interface) {
 	for _, plugin := range plugins {
-		if wantsNamespaceInformer, ok := plugin.(WantsNamespaceInformer); ok {
-			wantsNamespaceInformer.SetNamespaceInformer(i.informers[reflect.TypeOf(&api.Namespace{})])
+		if wantsInformerFactory, ok := plugin.(WantsInformerFactory); ok {
+			wantsInformerFactory.SetInformerFactory(i.informers)
 		}
 	}
 }

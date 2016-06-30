@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@ limitations under the License.
 
 package admission
 
-import "k8s.io/kubernetes/pkg/controller/framework"
+import (
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
+)
 
 // Validator holds Validate functions, which are responsible for validation of initialized shared resources
 // and should be implemented on admission plugins
@@ -24,7 +26,8 @@ type Validator interface {
 	Validate() error
 }
 
-// WantsNamespaceInformer defines a function witch sets NamespaceInformer for admission plugins that need it
-type WantsNamespaceInformer interface {
-	SetNamespaceInformer(framework.SharedIndexInformer)
+// WantsNamespaceInformer defines a function which sets NamespaceInformer for admission plugins that need it
+type WantsInformerFactory interface {
+	SetInformerFactory(informers.SharedInformerFactory)
+	Validator
 }

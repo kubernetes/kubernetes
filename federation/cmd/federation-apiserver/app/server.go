@@ -37,6 +37,7 @@ import (
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -121,13 +122,12 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
-	namespaceInformer := informers.CreateSharedNamespaceIndexInformer(client, 5*time.Minute)
-	pluginInit := admission.NewPluginInitializer()
-	pluginInit.SetNamespaceInformer(namespaceInformer)
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
 
-	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInit)
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
-		glog.Errorf("Failed to initialize plugins: %v", err)
+		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}
 	genericConfig := genericapiserver.NewConfig(s)
 	// TODO: Move the following to generic api server as well.
@@ -154,6 +154,7 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	installCoreAPIs(s, m, storageFactory)
 	installExtensionsAPIs(s, m, storageFactory)
 
+	sharedInformers.Start(wait.NeverStop)
 	m.Run(s)
 	return nil
 }

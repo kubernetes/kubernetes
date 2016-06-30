@@ -19,14 +19,17 @@ package lifecycle
 import (
 	"fmt"
 	"io"
+	"time"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const PluginName = "NamespaceLifecycle"
@@ -42,11 +45,9 @@ func init() {
 type lifecycle struct {
 	*admission.Handler
 	client             clientset.Interface
-	informer           framework.SharedIndexInformer
+	store              cache.Store
 	immortalNamespaces sets.String
 }
-
-var _ = admission.WantsNamespaceInformer(&lifecycle{})
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	// prevent deletion of immortal namespaces
@@ -64,7 +65,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		// this will cause a live lookup of the namespace to get its latest state even
 		// before the watch notification is received.
 		if a.GetOperation() == admission.Delete {
-			l.informer.GetStore().Delete(&api.Namespace{
+			l.store.Delete(&api.Namespace{
 				ObjectMeta: api.ObjectMeta{
 					Name: a.GetName(),
 				},
@@ -73,7 +74,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	namespaceObj, exists, err := l.informer.GetStore().Get(&api.Namespace{
+	namespaceObj, exists, err := l.store.Get(&api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),
 			Namespace: "",
@@ -111,19 +112,25 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 
 // NewLifecycle creates a new namespace lifecycle admission control handler
 func NewLifecycle(c clientset.Interface, immortalNamespaces sets.String) admission.Interface {
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	reflector := cache.NewReflector(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return c.Core().Namespaces().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return c.Core().Namespaces().Watch(options)
+			},
+		},
+		&api.Namespace{},
+		store,
+		5*time.Minute,
+	)
+	reflector.Run()
 	return &lifecycle{
 		Handler:            admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		client:             c,
+		store:              store,
 		immortalNamespaces: immortalNamespaces,
 	}
-}
-func (l *lifecycle) SetNamespaceInformer(c framework.SharedIndexInformer) {
-	l.informer = c
-}
-
-func (l *lifecycle) Validate() error {
-	if l.informer == nil {
-		return fmt.Errorf("namespace lifecycle plugin needs a namespace informer")
-	}
-	return nil
 }
