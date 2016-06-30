@@ -382,12 +382,6 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 		}
 	}
 
-	err = lockFile(filename)
-	if err != nil {
-		return err
-	}
-	defer unlockFile(filename)
-
 	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
 		return err
 	}
