@@ -16,7 +16,11 @@ limitations under the License.
 
 package validation
 
-import "k8s.io/kubernetes/pkg/apis/rbac"
+import (
+	"strings"
+
+	"k8s.io/kubernetes/pkg/apis/rbac"
+)
 
 // Covers determines whether or not the ownerRules cover the servantRules in terms of allowed actions.
 // It returns whether or not the ownerRules cover and a list of the rules that the ownerRules do not cover.
@@ -101,6 +105,29 @@ func hasAll(set, contains []string) bool {
 	return true
 }
 
+func nonResourceURLsCoversAll(set, covers []string) bool {
+	for _, path := range covers {
+		covered := false
+		for _, owner := range set {
+			if nonResourceURLCovers(owner, path) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return false
+		}
+	}
+	return true
+}
+
+func nonResourceURLCovers(ownerPath, subPath string) bool {
+	if ownerPath == subPath {
+		return true
+	}
+	return strings.HasSuffix(ownerPath, "*") && strings.HasPrefix(subPath, strings.TrimRight(ownerPath, "*"))
+}
+
 // ruleCovers determines whether the ownerRule (which may have multiple verbs, resources, and resourceNames) covers
 // the subrule (which may only contain at most one verb, resource, and resourceName)
 func ruleCovers(ownerRule, subRule rbac.PolicyRule) bool {
@@ -108,7 +135,7 @@ func ruleCovers(ownerRule, subRule rbac.PolicyRule) bool {
 	verbMatches := has(ownerRule.Verbs, rbac.VerbAll) || hasAll(ownerRule.Verbs, subRule.Verbs)
 	groupMatches := has(ownerRule.APIGroups, rbac.APIGroupAll) || hasAll(ownerRule.APIGroups, subRule.APIGroups)
 	resourceMatches := has(ownerRule.Resources, rbac.ResourceAll) || hasAll(ownerRule.Resources, subRule.Resources)
-	nonResourceURLMatches := has(ownerRule.NonResourceURLs, rbac.NonResourceAll) || hasAll(ownerRule.NonResourceURLs, subRule.NonResourceURLs)
+	nonResourceURLMatches := nonResourceURLsCoversAll(ownerRule.NonResourceURLs, subRule.NonResourceURLs)
 
 	resourceNameMatches := false
 
