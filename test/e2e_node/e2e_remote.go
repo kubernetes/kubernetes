@@ -40,7 +40,12 @@ var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify a
 
 var sshOptionsMap map[string]string
 
-const archiveName = "e2e_node_test.tar.gz"
+const (
+	archiveName = "e2e_node_test.tar.gz"
+	CNI_RELEASE = "c864f0e1ea73719b8f4582402b0847064f9883b0"
+)
+
+var CNI_URL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNI_RELEASE)
 
 var hostnameIpOverrides = struct {
 	sync.RWMutex
@@ -150,6 +155,14 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 		if err != nil {
 			return "", false, fmt.Errorf("instance %s not running docker daemon - Command failed: %s", host, output)
 		}
+	}
+
+	// Install the cni plugin. Note that /opt/cni does not get cleaned up after
+	// the test completes.
+	if _, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c",
+		getSshCommand(" ; ", "sudo mkdir -p /opt/cni", fmt.Sprintf("sudo wget -O - %s | sudo tar -xz -C /opt/cni", CNI_URL))); err != nil {
+		// Exit failure with the error
+		return "", false, err
 	}
 
 	// Create the temp staging directory

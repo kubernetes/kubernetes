@@ -62,6 +62,25 @@ if [ $? -ne 0 ]; then
   rm -r etcd-v2.2.5-linux-amd64*
 fi
 
+# Install nsenter for ubuntu images
+cat /etc/*-release | grep "ID=ubuntu"
+if [ $? -eq 0 ]; then
+  if ! which nsenter > /dev/null; then
+     echo "Do not find nsenter. Install it."
+     mkdir -p /tmp/nsenter-install
+     cd /tmp/nsenter-install
+     curl https://www.kernel.org/pub/linux/utils/util-linux/v2.24/util-linux-2.24.tar.gz | tar -zxf-
+     sudo apt-get update
+     sudo apt-get --yes install make
+     sudo apt-get --yes install gcc
+     cd util-linux-2.24
+     ./configure --without-ncurses
+     make nsenter
+     sudo cp nsenter /usr/local/bin
+     rm -rf /tmp/nsenter-install
+   fi
+fi
+
 # Install docker
 hash docker 2>/dev/null
 if [ $? -ne 0 ]; then
