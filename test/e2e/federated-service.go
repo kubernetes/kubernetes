@@ -322,17 +322,18 @@ func waitForServiceOrFail(clientset *release_1_3.Clientset, namespace string, se
 	var clusterService *v1.Service
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterService, err := clientset.Services(namespace).Get(service.Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return false, err
+		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
+			By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is absent", service.Name, namespace))
+			return true, nil // Success
 		}
-		if (clusterService != nil && err == nil && present) || (clusterService == nil && errors.IsNotFound(err) && !present) {
-			By(fmt.Sprintf("Success: federated service shard of service %q in namespace %q in cluster: %v", service.Name, namespace, present))
-			return true, nil
+		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
+			By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is present", service.Name, namespace))
+			return true, nil // Success
 		}
-		By(fmt.Sprintf("Service found: %v, waiting for service found: %v, trying again in %s", clusterService != nil, present, framework.Poll))
+		By(fmt.Sprintf("Service %q in namespace %q in cluster.  Found: %v, waiting for Found: %v, trying again in %s (err=%v)", service.Name, namespace, clusterService != nil && err == nil, present, framework.Poll, err))
 		return false, nil
 	})
-	framework.ExpectNoError(err, "Failed to get service %q in namespace %q", service.Name, namespace)
+	framework.ExpectNoError(err, "Failed to verify service %q in namespace %q in cluster: Present=%v", service.Name, namespace, present)
 
 	if present && clusterService != nil {
 		Expect(equivalent(*clusterService, *service))
