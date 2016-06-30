@@ -176,11 +176,15 @@ Applied changes:
 * https://github.com/opencontainers/runc/pull/303
 *
 
-### Rocket support for sysctl
+### Rkt support for sysctl
+
+The only sysctl support in rkt is through a [CNI plugin](https://github.com/containernetworking/cni/blob/master/Documentation/tuning.md) plugin. The Kubernetes network plugin `kubenet` can easily be extended to call this with a given list of sysctls during pod launch.
+
+The default network plugin for rkt is `no-op` though. This mode leaves all network initialization to rkt itself. Rkt in turn uses the static CNI plugin configuration in `/etc/rkt/net.d`. This does not allow to customize the sysctls for a pod. Hence, in order to implement this proposal in `no-op` mode additional changes in rkt are necessary.
 
 Supported sysctls (whitelist):
 
-- network namespace: `net.*` via a [CNI plugin](https://github.com/containernetworking/cni/blob/master/Documentation/tuning.md)
+- network namespace: `net.*`
 
 Applied changes:
 
