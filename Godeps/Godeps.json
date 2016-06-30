@@ -1319,7 +1319,7 @@
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
-			"Rev": "c2b278e70f35902fd68b54b69238cd10bb1b7451"
+			"Rev": "5d001d020961ae1c184f9f8152fdc73810481677"
 		},
 		{
 			"ImportPath": "github.com/mistifyio/go-zfs",
@@ -1802,28 +1802,28 @@
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/cache",
-			"Comment": "2.5.3a-32-gf7b6fb7",
-			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+			"Comment": "2.5.3a-41-g00ade30",
+			"Rev": "00ade3024f047d26130abf161900e0adb72a06f1"
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/metrics",
-			"Comment": "2.5.3a-32-gf7b6fb7",
-			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+			"Comment": "2.5.3a-41-g00ade30",
+			"Rev": "00ade3024f047d26130abf161900e0adb72a06f1"
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",
-			"Comment": "2.5.3a-32-gf7b6fb7",
-			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+			"Comment": "2.5.3a-41-g00ade30",
+			"Rev": "00ade3024f047d26130abf161900e0adb72a06f1"
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/server",
-			"Comment": "2.5.3a-32-gf7b6fb7",
-			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+			"Comment": "2.5.3a-41-g00ade30",
+			"Rev": "00ade3024f047d26130abf161900e0adb72a06f1"
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/singleflight",
-			"Comment": "2.5.3a-32-gf7b6fb7",
-			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+			"Comment": "2.5.3a-41-g00ade30",
+			"Rev": "00ade3024f047d26130abf161900e0adb72a06f1"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
