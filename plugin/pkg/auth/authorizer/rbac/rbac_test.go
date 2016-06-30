@@ -25,13 +25,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
-func newRule(verbs, apiGroups, resources string) rbac.PolicyRule {
+func newRule(verbs, apiGroups, resources, nonResourceURLs string) rbac.PolicyRule {
 	return rbac.PolicyRule{
-		Verbs:     strings.Split(verbs, ","),
-		APIGroups: strings.Split(apiGroups, ","),
-		Resources: strings.Split(resources, ","),
+		Verbs:           strings.Split(verbs, ","),
+		APIGroups:       strings.Split(apiGroups, ","),
+		Resources:       strings.Split(resources, ","),
+		NonResourceURLs: strings.Split(nonResourceURLs, ","),
 	}
 }
 
@@ -47,6 +49,23 @@ const (
 	bindToRole        uint16 = 0x0
 	bindToClusterRole uint16 = 0x1
 )
+
+func newClusterRoleBinding(roleName string, subjects ...string) rbac.ClusterRoleBinding {
+	r := rbac.ClusterRoleBinding{
+		ObjectMeta: api.ObjectMeta{},
+		RoleRef: api.ObjectReference{
+			Kind: "ClusterRole", // ClusterRoleBindings can only refer to ClusterRole
+			Name: roleName,
+		},
+	}
+
+	r.Subjects = make([]rbac.Subject, len(subjects))
+	for i, subject := range subjects {
+		split := strings.SplitN(subject, ":", 2)
+		r.Subjects[i].Kind, r.Subjects[i].Name = split[0], split[1]
+	}
+	return r
+}
 
 func newRoleBinding(namespace, roleName string, bindType uint16, subjects ...string) rbac.RoleBinding {
 	r := rbac.RoleBinding{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
@@ -107,7 +126,7 @@ func TestAuthorizer(t *testing.T) {
 	}{
 		{
 			clusterRoles: []rbac.ClusterRole{
-				newClusterRole("admin", newRule("*", "*", "*")),
+				newClusterRole("admin", newRule("*", "*", "*", "*")),
 			},
 			roleBindings: []rbac.RoleBinding{
 				newRoleBinding("ns1", "admin", bindToClusterRole, "User:admin", "Group:admins"),
@@ -124,6 +143,36 @@ func TestAuthorizer(t *testing.T) {
 				&defaultAttributes{"admin", "", "GET", "Nodes", "", ""},
 				&defaultAttributes{"admin", "admins", "GET", "Pods", "ns2", ""},
 				&defaultAttributes{"admin", "admins", "GET", "Nodes", "", ""},
+			},
+		},
+		{
+			// Non-resource-url tests
+			clusterRoles: []rbac.ClusterRole{
+				newClusterRole("non-resource-url-getter", newRule("get", "", "", "/apis")),
+				newClusterRole("non-resource-url", newRule("*", "", "", "/apis")),
+			},
+			clusterRoleBindings: []rbac.ClusterRoleBinding{
+				newClusterRoleBinding("non-resource-url-getter", "User:foo", "Group:bar"),
+				newClusterRoleBinding("non-resource-url", "User:admin", "Group:admin"),
+			},
+			shouldPass: []authorizer.Attributes{
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "get", Path: "/apis"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "get", Path: "/apis"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "get", Path: "/apis"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/apis"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "watch", Path: "/apis"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "watch", Path: "/apis"},
+			},
+			shouldFail: []authorizer.Attributes{
+				// wrong verb
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "watch", Path: "/apis"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "watch", Path: "/apis"},
+
+				// wrong path
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "get", Path: "/api/v1"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "get", Path: "/api/v1"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "get", Path: "/api/v1"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/api/v1"},
 			},
 		},
 	}

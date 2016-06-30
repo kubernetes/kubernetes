@@ -333,7 +333,7 @@ func TestCoversNonResourceURLsWithOtherFieldsFailure(t *testing.T) {
 		},
 
 		expectedCovered:        false,
-		expectedUncoveredRules: []rbac.PolicyRule{{NonResourceURLs: []string{"/apis"}}},
+		expectedUncoveredRules: []rbac.PolicyRule{{NonResourceURLs: []string{"/apis"}, Verbs: []string{"get"}}},
 	}.test(t)
 }
 
