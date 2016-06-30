@@ -150,10 +150,12 @@ func TestAuthorizer(t *testing.T) {
 			clusterRoles: []rbac.ClusterRole{
 				newClusterRole("non-resource-url-getter", newRule("get", "", "", "/apis")),
 				newClusterRole("non-resource-url", newRule("*", "", "", "/apis")),
+				newClusterRole("non-resource-url-prefix", newRule("get", "", "", "/apis/*")),
 			},
 			clusterRoleBindings: []rbac.ClusterRoleBinding{
 				newClusterRoleBinding("non-resource-url-getter", "User:foo", "Group:bar"),
 				newClusterRoleBinding("non-resource-url", "User:admin", "Group:admin"),
+				newClusterRoleBinding("non-resource-url-prefix", "User:prefixed", "Group:prefixed"),
 			},
 			shouldPass: []authorizer.Attributes{
 				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "get", Path: "/apis"},
@@ -162,6 +164,11 @@ func TestAuthorizer(t *testing.T) {
 				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/apis"},
 				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "watch", Path: "/apis"},
 				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "watch", Path: "/apis"},
+
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/apis/v1"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/apis/v1"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/apis/v1/foobar"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/apis/v1/foorbar"},
 			},
 			shouldFail: []authorizer.Attributes{
 				// wrong verb
@@ -173,6 +180,10 @@ func TestAuthorizer(t *testing.T) {
 				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "get", Path: "/api/v1"},
 				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "get", Path: "/api/v1"},
 				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/api/v1"},
+
+				// not covered by prefix
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/api/v1"},
+				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/api/v1"},
 			},
 		},
 	}
