@@ -69,9 +69,11 @@ func breakdownRule(rule rbac.PolicyRule) []rbac.PolicyRule {
 		}
 	}
 
-	// Non-resource URLs are unique because they don't combine with other policy rule fields.
+	// Non-resource URLs are unique because they only combine with verbs.
 	for _, nonResourceURL := range rule.NonResourceURLs {
-		subrules = append(subrules, rbac.PolicyRule{NonResourceURLs: []string{nonResourceURL}})
+		for _, verb := range rule.Verbs {
+			subrules = append(subrules, rbac.PolicyRule{NonResourceURLs: []string{nonResourceURL}, Verbs: []string{verb}})
+		}
 	}
 
 	return subrules

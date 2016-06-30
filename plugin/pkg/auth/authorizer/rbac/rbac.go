@@ -58,6 +58,7 @@ func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) error {
 		}
 	} else {
 		requestedRule = rbac.PolicyRule{
+			Verbs:           []string{attr.GetVerb()},
 			NonResourceURLs: []string{attr.GetPath()},
 		}
 	}
