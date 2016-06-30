@@ -76,6 +76,7 @@ func Run(s *options.SchedulerServer) error {
 	}
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
+		glog.Errorf("unable to build config from flags: %v", err)
 		return err
 	}
 
@@ -134,6 +135,7 @@ func Run(s *options.SchedulerServer) error {
 
 	id, err := os.Hostname()
 	if err != nil {
+		glog.Errorf("unable to get hostname: %v", err)
 		return err
 	}
 
