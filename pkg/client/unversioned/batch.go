@@ -104,11 +104,5 @@ func setBatchDefaults(config *restclient.Config, gv *unversioned.GroupVersion) e
 
 	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	config.NegotiatedSerializer = api.Codecs
-	if config.QPS == 0 {
-		config.QPS = 5
-	}
-	if config.Burst == 0 {
-		config.Burst = 10
-	}
 	return nil
 }
