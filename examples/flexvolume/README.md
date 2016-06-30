@@ -15,7 +15,7 @@ It allows for vendors to develop their own drivers to mount volumes on nodes.
 
 Install the vendor driver on all nodes in the kubelet plugin path. Path for installing the plugin: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/\<vendor~driver\>/\<driver\>
 
-For example to add a 'cifs' driver, by vendor 'foo' install the driver at: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/\<foo~cifs\>/cifs
+For example to add a 'cifs' driver, by vendor 'foo' install the driver at: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/foo~cifs/cifs
 
 ## Plugin details
 
