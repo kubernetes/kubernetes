@@ -710,7 +710,7 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
-  kube::release::package_build_image_tarball &
+#  kube::release::package_build_image_tarball &
   kube::release::package_client_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
@@ -1041,6 +1041,7 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
 
+  kube::version::get_version_vars
   echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 
   kube::release::clean_cruft
