@@ -43,6 +43,7 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1_Pod_To_api_Pod,
 		Convert_v1_PodSpec_To_api_PodSpec,
 		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
+		Convert_v1_Secret_To_api_Secret,
 		Convert_v1_ServiceSpec_To_api_ServiceSpec,
 		Convert_v1_ResourceList_To_api_ResourceList,
 	)
@@ -595,6 +596,24 @@ func Convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Service
 	}
 	// Publish both externalIPs and deprecatedPublicIPs fields in v1.
 	out.DeprecatedPublicIPs = in.ExternalIPs
+	return nil
+}
+
+func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
+	if err := autoConvert_v1_Secret_To_api_Secret(in, out, s); err != nil {
+		return err
+	}
+
+	// StringData overwrites Data
+	if len(in.StringData) > 0 {
+		if out.Data == nil {
+			out.Data = map[string][]byte{}
+		}
+		for k, v := range in.StringData {
+			out.Data[k] = []byte(v)
+		}
+	}
+
 	return nil
 }
 
