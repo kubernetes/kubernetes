@@ -75,7 +75,7 @@ func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFun
 			},
 		},
 		&api.Pod{},
-		resyncPeriod(),
+		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{},
 		// We don't need to build a index for podStore here actually, but build one for consistency.
 		// It will ensure that if people start making use of the podStore in more specific ways,

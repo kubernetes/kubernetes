@@ -48,15 +48,6 @@ import (
 )
 
 const (
-	// We'll attempt to recompute the required replicas of all replication controllers
-	// that have fulfilled their expectations at least this often. This recomputation
-	// happens based on contents in local pod storage.
-	// Full Resync shouldn't be needed at all in a healthy system. This is a protection
-	// against disappearing objects and watch notification, that we believe should not
-	// happen at all.
-	// TODO: We should get rid of it completely in the fullness of time.
-	FullControllerResyncPeriod = 10 * time.Minute
-
 	// Realistic value of the burstReplica field for the replication manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
@@ -157,8 +148,7 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer frame
 			},
 		},
 		&api.ReplicationController{},
-		// TODO: Can we have much longer period here?
-		FullControllerResyncPeriod,
+		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    rm.enqueueController,
 			UpdateFunc: rm.updateRC,

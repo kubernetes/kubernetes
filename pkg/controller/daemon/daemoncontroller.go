@@ -48,9 +48,6 @@ import (
 )
 
 const (
-	// Daemon sets will periodically check that their daemon pods are running as expected.
-	FullDaemonSetResyncPeriod = 30 * time.Second // TODO: Figure out if this time seems reasonable.
-
 	// Realistic value of the burstReplica field for the replication manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
@@ -138,8 +135,7 @@ func NewDaemonSetsController(podInformer framework.SharedIndexInformer, kubeClie
 			},
 		},
 		&extensions.DaemonSet{},
-		// TODO: Can we have much longer period here?
-		FullDaemonSetResyncPeriod,
+		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				ds := obj.(*extensions.DaemonSet)
@@ -205,7 +201,7 @@ func NewDaemonSetsController(podInformer framework.SharedIndexInformer, kubeClie
 }
 
 func NewDaemonSetsControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *DaemonSetsController {
-	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
+	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, controller.NoResyncPeriodFunc())
 	dsc := NewDaemonSetsController(podInformer, kubeClient, resyncPeriod, lookupCacheSize)
 	dsc.internalPodInformer = podInformer
 
