@@ -549,7 +549,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 }
 
 func printControllers(annotation map[string]string) string {
-	value, ok := annotation["kubernetes.io/created-by"]
+	value, ok := annotation[api.CreatedByAnnotation]
 	if ok {
 		var r api.SerializedReference
 		err := json.Unmarshal([]byte(value), &r)
