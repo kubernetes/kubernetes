@@ -479,6 +479,10 @@ func markAsDeleting(obj runtime.Object) (err error) {
 		return kerr
 	}
 	now := unversioned.NewTime(time.Now())
+	// This handles Generation bump for resources that don't support graceful deletion. For resources that support graceful deletion is handle in pkg/api/rest/delete.go
+	if objectMeta.DeletionTimestamp == nil && objectMeta.Generation > 0 {
+		objectMeta.Generation++
+	}
 	objectMeta.DeletionTimestamp = &now
 	var zero int64 = 0
 	objectMeta.DeletionGracePeriodSeconds = &zero
