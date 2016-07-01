@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 
 func TestQuotaGenerate(t *testing.T) {
 	hard := "cpu=10,memory=5G,pods=10,services=7"
-	resourceQuotaSpecList, err := generateResourceQuotaSpecList(hard)
+	resourceQuotaSpecList, err := populateResourceList(hard)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -54,28 +54,61 @@ func TestQuotaGenerate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"test-valid-scopes": {
+			params: map[string]interface{}{
+				"name":   "foo",
+				"hard":   hard,
+				"scopes": "BestEffort,NotTerminating",
+			},
+			expected: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: resourceQuotaSpecList,
+					Scopes: []api.ResourceQuotaScope{
+						api.ResourceQuotaScopeBestEffort,
+						api.ResourceQuotaScopeNotTerminating,
+					},
+				},
+			},
+			expectErr: false,
+		},
+		"test-empty-scopes": {
+			params: map[string]interface{}{
+				"name":   "foo",
+				"hard":   hard,
+				"scopes": "",
+			},
+			expected: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.ResourceQuotaSpec{Hard: resourceQuotaSpecList},
+			},
+			expectErr: false,
+		},
+		"test-invalid-scopes": {
+			params: map[string]interface{}{
+				"name":   "foo",
+				"hard":   hard,
+				"scopes": "abc,",
+			},
+			expectErr: true,
+		},
 	}
 
 	generator := ResourceQuotaGeneratorV1{}
-	for _, test := range tests {
+	for name, test := range tests {
 		obj, err := generator.Generate(test.params)
 		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("%s: unexpected error: %v", name, err)
 		}
 		if test.expectErr && err != nil {
 			continue
 		}
 		if !reflect.DeepEqual(obj.(*api.ResourceQuota), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.ResourceQuota))
+			t.Errorf("%s:\nexpected:\n%#v\nsaw:\n%#v", name, test.expected, obj.(*api.ResourceQuota))
 		}
-	}
-}
-
-func TestGenerateResourceQuotaSpecList(t *testing.T) {
-	hardInvalidValue := "cpu=23foo,memory=5G,pods=10bar,services=7"
-
-	resourceList, err := generateResourceQuotaSpecList(hardInvalidValue)
-	if err != nil && resourceList != nil {
-		t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", nil, resourceList)
 	}
 }
