@@ -374,7 +374,7 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
 		jm.recorder.Event(&job, api.EventTypeNormal, "DeadlineExceeded", "Job was active longer than specified deadline")
 	} else {
-		if jobNeedsSync {
+		if jobNeedsSync && job.DeletionTimestamp == nil {
 			active = jm.manageJob(activePods, succeeded, &job)
 		}
 		completions := succeeded
