@@ -1648,13 +1648,21 @@ func podsRunning(c *client.Client, pods *api.PodList) []error {
 	// are running so non-running pods cause a timeout for this test.
 	By("ensuring each pod is running")
 	e := []error{}
+	error_chan := make(chan error)
+
 	for _, pod := range pods.Items {
-		// TODO: make waiting parallel.
-		err := WaitForPodRunningInNamespace(c, pod.Name, pod.Namespace)
+		go func(p api.Pod) {
+			error_chan <- WaitForPodRunningInNamespace(c, p.Name, p.Namespace)
+		}(pod)
+	}
+
+	for range pods.Items {
+		err := <-error_chan
 		if err != nil {
 			e = append(e, err)
 		}
 	}
+
 	return e
 }
 
