@@ -429,42 +429,6 @@ func getResourceRequest(pod *api.Pod) *resourceRequest {
 	return &result
 }
 
-func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingNvidiaGPU []*api.Pod) {
-	totalMilliCPU := allocatable.Cpu().MilliValue()
-	totalMemory := allocatable.Memory().Value()
-	totalNvidiaGPU := allocatable.NvidiaGPU().Value()
-	milliCPURequested := int64(0)
-	memoryRequested := int64(0)
-	nvidiaGPURequested := int64(0)
-	for _, pod := range pods {
-		podRequest := getResourceRequest(pod)
-		fitsCPU := (totalMilliCPU - milliCPURequested) >= podRequest.milliCPU
-		fitsMemory := (totalMemory - memoryRequested) >= podRequest.memory
-		fitsNVidiaGPU := (totalNvidiaGPU - nvidiaGPURequested) >= podRequest.nvidiaGPU
-		if !fitsCPU {
-			// the pod doesn't fit due to CPU request
-			notFittingCPU = append(notFittingCPU, pod)
-			continue
-		}
-		if !fitsMemory {
-			// the pod doesn't fit due to Memory request
-			notFittingMemory = append(notFittingMemory, pod)
-			continue
-		}
-		if !fitsNVidiaGPU {
-			// the pod doesn't fit due to NvidiaGPU request
-			notFittingNvidiaGPU = append(notFittingNvidiaGPU, pod)
-			continue
-		}
-		// the pod fits
-		milliCPURequested += podRequest.milliCPU
-		memoryRequested += podRequest.memory
-		nvidiaGPURequested += podRequest.nvidiaGPU
-		fitting = append(fitting, pod)
-	}
-	return
-}
-
 func podName(pod *api.Pod) string {
 	return pod.Namespace + "/" + pod.Name
 }

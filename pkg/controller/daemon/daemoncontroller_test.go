@@ -90,6 +90,9 @@ func newNode(name string, label map[string]string) *api.Node {
 			Conditions: []api.NodeCondition{
 				{Type: api.NodeReady, Status: api.ConditionTrue},
 			},
+			Allocatable: api.ResourceList{
+				api.ResourcePods: resource.MustParse("100"),
+			},
 		},
 	}
 }
@@ -201,10 +204,8 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("not-ready", nil)
-	node.Status = api.NodeStatus{
-		Conditions: []api.NodeCondition{
-			{Type: api.NodeReady, Status: api.ConditionFalse},
-		},
+	node.Status.Conditions = []api.NodeCondition{
+		{Type: api.NodeReady, Status: api.ConditionFalse},
 	}
 	manager.nodeStore.Add(node)
 	ds := newDaemonSet("foo")
@@ -238,6 +239,7 @@ func allocatableResources(memory, cpu string) api.ResourceList {
 	return api.ResourceList{
 		api.ResourceMemory: resource.MustParse(memory),
 		api.ResourceCPU:    resource.MustParse(cpu),
+		api.ResourcePods:   resource.MustParse("100"),
 	}
 }
 
@@ -557,4 +559,27 @@ func TestDSManagerNotReady(t *testing.T) {
 
 	manager.podStoreSynced = alwaysReady
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// Daemon with node affinity should launch pods on nodes matching affinity.
+func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
+	manager, podControl := newTestController()
+	addNodes(manager.nodeStore.Store, 0, 4, nil)
+	addNodes(manager.nodeStore.Store, 4, 3, simpleNodeLabel)
+	daemon := newDaemonSet("foo")
+	affinity := map[string]string{
+		api.AffinityAnnotationKey: fmt.Sprintf(`
+			{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+				"nodeSelectorTerms": [{
+					"matchExpressions": [{
+						"key": "color",
+						"operator": "In",
+						"values": ["%s"]
+				}]
+			}]
+		}}}`, simpleNodeLabel["color"]),
+	}
+	daemon.Spec.Template.ObjectMeta.Annotations = affinity
+	manager.dsStore.Add(daemon)
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
 }

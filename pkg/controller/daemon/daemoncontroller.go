@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -41,12 +40,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (
@@ -670,25 +668,22 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 }
 
 func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *extensions.DaemonSet) bool {
-	// Check if the node satisfies the daemon set's node selector.
-	nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
-	if !nodeSelector.Matches(labels.Set(node.Labels)) {
-		return false
-	}
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
 		return false
 	}
 
+	// TODO: Move it to the predicates
 	for _, c := range node.Status.Conditions {
 		if c.Type == api.NodeOutOfDisk && c.Status == api.ConditionTrue {
 			return false
 		}
 	}
 
-	newPod := &api.Pod{Spec: ds.Spec.Template.Spec}
+	newPod := &api.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
 	newPod.Spec.NodeName = node.Name
-	pods := []*api.Pod{newPod}
+
+	pods := []*api.Pod{}
 
 	for _, m := range dsc.podStore.Indexer.List() {
 		pod := m.(*api.Pod)
@@ -705,19 +700,23 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 		}
 		pods = append(pods, pod)
 	}
-	_, notFittingCPU, notFittingMemory, notFittingNvidiaGPU := predicates.CheckPodsExceedingFreeResources(pods, node.Status.Allocatable)
-	if len(notFittingCPU)+len(notFittingMemory)+len(notFittingNvidiaGPU) != 0 {
-		dsc.eventRecorder.Eventf(ds, api.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: insufficent free resources", node.ObjectMeta.Name)
-		return false
-	}
-	ports := sets.String{}
-	for _, pod := range pods {
-		if errs := validation.AccumulateUniqueHostPorts(pod.Spec.Containers, &ports, field.NewPath("spec", "containers")); len(errs) > 0 {
-			dsc.eventRecorder.Eventf(ds, api.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: host port conflict", node.ObjectMeta.Name)
-			return false
+
+	nodeInfo := schedulercache.NewNodeInfo(pods...)
+	nodeInfo.SetNode(node)
+	fit, err := predicates.GeneralPredicates(newPod, nil, nodeInfo)
+	if err != nil {
+		if re, ok := err.(*predicates.PredicateFailureError); ok {
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
 		}
+		if re, ok := err.(*predicates.InsufficientResourceError); ok {
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
+		}
+		message := fmt.Sprintf("GeneralPredicates failed due to %v.", err)
+		glog.Warningf("Predicate failed on Pod %s - %s", newPod.Name, message)
 	}
-	return true
+	return fit
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
