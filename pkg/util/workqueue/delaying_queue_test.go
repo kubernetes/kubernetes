@@ -68,6 +68,65 @@ func TestSimpleQueue(t *testing.T) {
 	}
 }
 
+func TestDeduping(t *testing.T) {
+	fakeClock := util.NewFakeClock(time.Now())
+	q := newDelayingQueue(fakeClock)
+
+	first := "foo"
+
+	q.AddAfter(first, 50*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	q.AddAfter(first, 70*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	// step past the first block, we should receive now
+	fakeClock.Step(60 * time.Millisecond)
+	if err := waitForAdded(t, q, 1); err != nil {
+		t.Errorf("should have added")
+	}
+	item, _ := q.Get()
+	q.Done(item)
+
+	// step past the second add
+	fakeClock.Step(20 * time.Millisecond)
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	// test again, but this time the earlier should override
+	q.AddAfter(first, 50*time.Millisecond)
+	q.AddAfter(first, 30*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	fakeClock.Step(40 * time.Millisecond)
+	if err := waitForAdded(t, q, 1); err != nil {
+		t.Errorf("should have added")
+	}
+	item, _ = q.Get()
+	q.Done(item)
+
+	// step past the second add
+	fakeClock.Step(20 * time.Millisecond)
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+}
+
 func TestAddTwoFireEarly(t *testing.T) {
 	fakeClock := util.NewFakeClock(time.Now())
 	q := newDelayingQueue(fakeClock)
