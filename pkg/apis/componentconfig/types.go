@@ -570,6 +570,9 @@ type KubeControllerManagerConfiguration struct {
 	// corresponding flag of the kube-apiserver. WARNING: the generic garbage
 	// collector is an alpha feature.
 	EnableGarbageCollector bool `json:"enableGarbageCollector"`
+	// concurrentGCSyncs is the number of garbage collector workers that are
+	// allowed to sync concurrently.
+	ConcurrentGCSyncs int32 `json:"concurrentGCSyncs"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
