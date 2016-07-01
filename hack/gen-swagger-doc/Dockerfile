@@ -28,12 +28,12 @@ COPY build.gradle build/
 COPY gen-swagger-docs.sh build/
 
 #run the script once to download the dependent java libraries into the image
-RUN mkdir /output
-RUN mkdir /swagger-source
+RUN mkdir /output /swagger-source
 RUN wget https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1.json -O /swagger-source/v1.json
-RUN build/gen-swagger-docs.sh v1 https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/pkg/api/v1/register.go
-RUN rm /output/*
-RUN rm /swagger-source/*
+RUN wget https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/pkg/api/v1/register.go -O /register.go
+RUN build/gen-swagger-docs.sh v1
+RUN rm /output/* /swagger-source/* /register.go
+
 RUN chmod -R 777 build/
 RUN chmod -R 777 gradle-cache/
 

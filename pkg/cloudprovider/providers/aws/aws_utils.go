@@ -25,7 +25,7 @@ func stringSetToPointers(in sets.String) []*string {
 	if in == nil {
 		return nil
 	}
-	out := make([]*string, len(in))
+	out := make([]*string, 0, len(in))
 	for k := range in {
 		out = append(out, aws.String(k))
 	}
