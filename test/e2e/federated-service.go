@@ -75,7 +75,7 @@ type cluster struct {
 
 var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-service")
-	var clusters map[string]cluster
+	var clusters map[string]*cluster
 	var federationName string
 	var primaryClusterName string // The name of the "primary" cluster
 
@@ -118,7 +118,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.Logf("%d clusters are Ready", len(contexts))
 
 			// clusters = make([]cluster, len(clusterList.Items))
-			clusters = map[string]cluster{}
+			clusters = map[string]*cluster{}
 			primaryClusterName = clusterList.Items[0].Name
 			By(fmt.Sprintf("Labeling %q as the first cluster", primaryClusterName))
 			for i, c := range clusterList.Items {
@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				cfg.QPS = KubeAPIQPS
 				cfg.Burst = KubeAPIBurst
 				clset := release_1_3.NewForConfigOrDie(restclient.AddUserAgent(cfg, UserAgentName))
-				clusters[c.Name] = cluster{c.Name, clset, false, nil}
+				clusters[c.Name] = &cluster{c.Name, clset, false, nil}
 			}
 
 			for name, c := range clusters {
@@ -350,7 +350,7 @@ func waitForServiceOrFail(clientset *release_1_3.Clientset, namespace string, se
 /*
    waitForServiceShardsOrFail waits for the service to appear in all clusters
 */
-func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters map[string]cluster) {
+func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters map[string]*cluster) {
 	framework.Logf("Waiting for service %q in %d clusters", service.Name, len(clusters))
 	for _, c := range clusters {
 		waitForServiceOrFail(c.Clientset, namespace, service, true, FederatedServiceTimeout)
@@ -480,7 +480,7 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 createBackendPodsOrFail creates one pod in each cluster, and returns the created pods (in the same order as clusterClientSets).
 If creation of any pod fails, the test fails (possibly with a partially created set of pods). No retries are attempted.
 */
-func createBackendPodsOrFail(clusters map[string]cluster, namespace string, name string) {
+func createBackendPodsOrFail(clusters map[string]*cluster, namespace string, name string) {
 	pod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
@@ -510,8 +510,9 @@ func createBackendPodsOrFail(clusters map[string]cluster, namespace string, name
 deletes exactly one backend pod which must not be nil
 The test fails if there are any errors.
 */
-func deleteOneBackendPodOrFail(c cluster) {
+func deleteOneBackendPodOrFail(c *cluster) {
 	pod := c.backendPod
+	Expect(pod).ToNot(BeNil())
 	err := c.Clientset.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
 	if errors.IsNotFound(err) {
 		By(fmt.Sprintf("Pod %q in namespace %q in cluster %q does not exist.  No need to delete it.", pod.Name, pod.Namespace, c.name))
@@ -525,7 +526,7 @@ func deleteOneBackendPodOrFail(c cluster) {
 deleteBackendPodsOrFail deletes one pod from each cluster that has one.
 If deletion of any pod fails, the test fails (possibly with a partially deleted set of pods). No retries are attempted.
 */
-func deleteBackendPodsOrFail(clusters map[string]cluster, namespace string) {
+func deleteBackendPodsOrFail(clusters map[string]*cluster, namespace string) {
 	for name, c := range clusters {
 		if c.backendPod != nil {
 			deleteOneBackendPodOrFail(c)
