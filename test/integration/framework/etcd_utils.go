@@ -24,10 +24,6 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/pkg/util/env"
 )
 
@@ -53,41 +49,6 @@ func NewEtcdClient() etcd.Client {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)
 	}
 	return client
-}
-
-func NewAutoscalingEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-}
-
-func NewBatchEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-}
-
-func NewAppsEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Apps.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-}
-
-func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-}
-
-func NewRbacEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Rbac.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 }
 
 func RequireEtcd() {
