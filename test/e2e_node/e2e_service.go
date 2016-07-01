@@ -307,7 +307,10 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 }
 
 func (es *e2eService) stopService(cmd *killCmd) error {
-	return cmd.Kill()
+	if cmd != nil {
+		return cmd.Kill()
+	}
+	return fmt.Errorf("can not stop a nil service")
 }
 
 // killCmd is a struct to kill a given cmd. The cmd member specifies a command
