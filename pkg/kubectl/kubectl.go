@@ -164,6 +164,19 @@ var shortForms = map[string]string{
 	"svc":    "services",
 }
 
+// Look-up for resource short forms by value
+func ResourceShortFormFor(resource string) (string, bool) {
+	var alias string
+	exists := false
+	for k, val := range shortForms {
+		if val == resource {
+			alias = k
+			exists = true
+		}
+	}
+	return alias, exists
+}
+
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.
