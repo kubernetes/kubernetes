@@ -887,7 +887,28 @@ func describeContainers(label string, containers []api.Container, containerStatu
 			probe := DescribeProbe(container.ReadinessProbe)
 			fmt.Fprintf(out, "    Readiness:\t%s\n", probe)
 		}
+
 		none := ""
+		if len(container.VolumeMounts) == 0 {
+			none = "\t<none>"
+		}
+
+		fmt.Fprintf(out, "    Volume Mounts:%s\n", none)
+		sort.Sort(SortableVolumeMounts(container.VolumeMounts))
+		for _, mount := range container.VolumeMounts {
+			flags := []string{}
+			switch {
+			case mount.ReadOnly:
+				flags = append(flags, "ro")
+			case !mount.ReadOnly:
+				flags = append(flags, "rw")
+			case len(mount.SubPath) > 0:
+				flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
+			}
+			fmt.Fprintf(out, "      %s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
+		}
+
+		none = ""
 		if len(container.Env) == 0 {
 			none = "\t<none>"
 		}
