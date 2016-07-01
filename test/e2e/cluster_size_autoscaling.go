@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating new node-pool with one n1-standard-4 machine")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4")
+		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
@@ -156,7 +156,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating new node-pool with one n1-standard-4 machine")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4")
+		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
@@ -225,7 +225,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating new node-pool with one n1-standard-4 machine")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4")
+		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
@@ -251,6 +251,32 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		By("Some node should be removed")
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size < increasedSize }, scaleDownTimeout))
+	})
+
+	It("should correctly scale down after a node is not needed when there is non autoscaled pool[Feature:ClusterSizeAutoscalingScaleDown]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		By("Manually increase cluster size")
+		increasedSize := 0
+		newSizes := make(map[string]int)
+		for key, val := range originalSizes {
+			newSizes[key] = val + 2
+			increasedSize += val + 2
+		}
+		setMigSizes(newSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
+
+		const extraPoolName = "extra-pool"
+		addNodePool(extraPoolName, "n1-standard-1", 3)
+		defer deleteNodePool(extraPoolName)
+
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= increasedSize+3 }, scaleUpTimeout))
+
+		By("Some node should be removed")
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size < increasedSize+3 }, scaleDownTimeout))
 	})
 })
 
@@ -378,10 +404,10 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	return fmt.Errorf("autoscaler still enabled")
 }
 
-func addNodePool(name string, machineType string) {
+func addNodePool(name string, machineType string, numNodes int) {
 	output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", name, "--quiet",
 		"--machine-type="+machineType,
-		"--num-nodes=1",
+		"--num-nodes="+strconv.Itoa(numNodes),
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
 		"--zone="+framework.TestContext.CloudConfig.Zone,
 		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
