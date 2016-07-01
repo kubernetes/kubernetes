@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1196,6 +1197,76 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
 			}
 
+		})
+	})
+
+	framework.KubeDescribe("Kubectl create quota", func() {
+		It("should create a quota without scopes", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			quotaName := "million"
+
+			By("calling kubectl quota")
+			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000,services=1000000", nsFlag)
+
+			By("verifying that the quota was created")
+			quota, err := c.ResourceQuotas(ns).Get(quotaName)
+			if err != nil {
+				framework.Failf("Failed getting quota %s: %v", quotaName, err)
+			}
+
+			if len(quota.Spec.Scopes) != 0 {
+				framework.Failf("Expected empty scopes, got %v", quota.Spec.Scopes)
+			}
+			if len(quota.Spec.Hard) != 2 {
+				framework.Failf("Expected two resources, got %v", quota.Spec.Hard)
+			}
+			r, found := quota.Spec.Hard[api.ResourcePods]
+			if expected := resource.MustParse("1000000"); !found || (&r).Cmp(expected) != 0 {
+				framework.Failf("Expected pods=1000000, got %v", r)
+			}
+			r, found = quota.Spec.Hard[api.ResourceServices]
+			if expected := resource.MustParse("1000000"); !found || (&r).Cmp(expected) != 0 {
+				framework.Failf("Expected services=1000000, got %v", r)
+			}
+		})
+
+		It("should create a quota with scopes", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			quotaName := "scopes"
+
+			By("calling kubectl quota")
+			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000", "--scopes=BestEffort,NotTerminating", nsFlag)
+
+			By("verifying that the quota was created")
+			quota, err := c.ResourceQuotas(ns).Get(quotaName)
+			if err != nil {
+				framework.Failf("Failed getting quota %s: %v", quotaName, err)
+			}
+
+			if len(quota.Spec.Scopes) != 2 {
+				framework.Failf("Expected two scopes, got %v", quota.Spec.Scopes)
+			}
+			scopes := make(map[api.ResourceQuotaScope]struct{})
+			for _, scope := range quota.Spec.Scopes {
+				scopes[scope] = struct{}{}
+			}
+			if _, found := scopes[api.ResourceQuotaScopeBestEffort]; !found {
+				framework.Failf("Expected BestEffort scope, got %v", quota.Spec.Scopes)
+			}
+			if _, found := scopes[api.ResourceQuotaScopeNotTerminating]; !found {
+				framework.Failf("Expected NotTerminating scope, got %v", quota.Spec.Scopes)
+			}
+		})
+
+		It("should reject quota with invalid scopes", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			quotaName := "scopes"
+
+			By("calling kubectl quota")
+			out, err := framework.RunKubectl("create", "quota", quotaName, "--hard=hard=pods=1000000", "--scopes=Foo", nsFlag)
+			if err == nil {
+				framework.Failf("Expected kubectl to fail, but it succeeded: %s", out)
+			}
 		})
 	})
 })

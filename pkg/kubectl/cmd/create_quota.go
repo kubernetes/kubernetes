@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,16 +28,19 @@ import (
 
 const (
 	quotaLong = `
-Create a resourcequota with the specified name and hard limits`
+Create a resourcequota with the specified name, hard limits and optional scopes`
 
 	quotaExample = `  // Create a new resourcequota named my-quota
-  $ kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10`
+  $ kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
+
+  // Create a new resourcequota named best-effort
+  $ kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`
 )
 
 // NewCmdCreateQuota is a macro command to create a new quota
 func NewCmdCreateQuota(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "quota NAME [--hard=key1=value1,key2=value2] [--dry-run=bool]",
+		Use:     "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
 		Aliases: []string{"q"},
 		Short:   "Create a quota with the specified name.",
 		Long:    quotaLong,
@@ -50,9 +53,10 @@ func NewCmdCreateQuota(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ResourceQuotaV1GeneratorName)
-	cmd.Flags().String("hard", "", "Specify multiple key/value pair to insert in resourcequota (i.e. --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10)")
-	cmd.MarkFlagRequired("hard")
+	cmd.Flags().String("hard", "", "A comma-delimited set of resource=quantity pairs that define a hard limit.")
+	cmd.Flags().String("scopes", "", "A comma-delimited set of quota scopes that must all match each object tracked by the quota.")
 	return cmd
 }
 
@@ -62,18 +66,13 @@ func CreateQuota(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	requiredFlags := []string{"hard"}
-	for _, requiredFlag := range requiredFlags {
-		if value := cmdutil.GetFlagString(cmd, requiredFlag); len(value) == 0 {
-			return cmdutil.UsageError(cmd, "flag %s is required", requiredFlag)
-		}
-	}
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ResourceQuotaV1GeneratorName:
 		generator = &kubectl.ResourceQuotaGeneratorV1{
-			Name: name,
-			Hard: cmdutil.GetFlagString(cmd, "hard"),
+			Name:   name,
+			Hard:   cmdutil.GetFlagString(cmd, "hard"),
+			Scopes: cmdutil.GetFlagString(cmd, "scopes"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))

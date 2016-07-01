@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,17 +18,22 @@ package kubectl
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	"strings"
 )
 
-// ResourceQuotaGeneratorV1 supports stable generation of a namespace
+// ResourceQuotaGeneratorV1 supports stable generation of a resource quota
 type ResourceQuotaGeneratorV1 struct {
+	// The name of a quota object.
 	Name string
+
+	// The hard resource limit string before parsing.
 	Hard string
+
+	// The scopes of a quota object before parsing.
+	Scopes string
 }
 
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
@@ -36,6 +41,7 @@ func (g ResourceQuotaGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"hard", true},
+		{"scopes", false},
 	}
 }
 
@@ -63,6 +69,7 @@ func (g ResourceQuotaGeneratorV1) Generate(genericParams map[string]interface{})
 	delegate := &ResourceQuotaGeneratorV1{}
 	delegate.Name = params["name"]
 	delegate.Hard = params["hard"]
+	delegate.Scopes = params["scopes"]
 	return delegate.StructuredGenerate()
 }
 
@@ -72,36 +79,21 @@ func (g *ResourceQuotaGeneratorV1) StructuredGenerate() (runtime.Object, error) 
 		return nil, err
 	}
 
-	resourceQuotaSpec, err := generateResourceQuotaSpecList(g.Hard)
+	resourceList, err := populateResourceList(g.Hard)
+	if err != nil {
+		return nil, err
+	}
+
+	scopes, err := parseScopes(g.Scopes)
 	if err != nil {
 		return nil, err
 	}
 
 	resourceQuota := &api.ResourceQuota{}
 	resourceQuota.Name = g.Name
-	resourceQuota.Spec.Hard = resourceQuotaSpec
+	resourceQuota.Spec.Hard = resourceList
+	resourceQuota.Spec.Scopes = scopes
 	return resourceQuota, nil
-}
-
-func generateResourceQuotaSpecList(hard string) (resourceList api.ResourceList, err error) {
-
-	defer func() {
-		if p := recover(); p != nil {
-			resourceList = nil
-			err = fmt.Errorf("Invalid input %v", p)
-		}
-	}()
-
-	resourceList = make(api.ResourceList)
-	for _, keyValue := range strings.Split(hard, ",") {
-		items := strings.Split(keyValue, "=")
-		if len(items) != 2 {
-			return nil, fmt.Errorf("invalid input %v, expected key=value", keyValue)
-		}
-
-		resourceList[api.ResourceName(items[0])] = resource.MustParse(items[1])
-	}
-	return
 }
 
 // validate validates required fields are set to support structured generation
@@ -110,4 +102,24 @@ func (r *ResourceQuotaGeneratorV1) validate() error {
 		return fmt.Errorf("name must be specified")
 	}
 	return nil
+}
+
+func parseScopes(spec string) ([]api.ResourceQuotaScope, error) {
+	// empty input gets a nil response to preserve generator test expected behaviors
+	if spec == "" {
+		return nil, nil
+	}
+
+	scopes := strings.Split(spec, ",")
+	result := make([]api.ResourceQuotaScope, 0, len(scopes))
+	for _, scope := range scopes {
+		// intentionally do not verify the scope against the valid scope list. This is done by the apiserver anyway.
+
+		if scope == "" {
+			return nil, fmt.Errorf("invalid resource quota scope \"\"")
+		}
+
+		result = append(result, api.ResourceQuotaScope(scope))
+	}
+	return result, nil
 }

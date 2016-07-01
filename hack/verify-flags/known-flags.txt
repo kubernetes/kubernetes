@@ -419,6 +419,7 @@ save-config
 scheduler-config
 scheduler-name
 schema-cache-dir
+scopes
 seccomp-profile-root
 secure-port
 serialize-image-pulls

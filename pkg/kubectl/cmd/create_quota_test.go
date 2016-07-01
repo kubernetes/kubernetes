@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,14 +28,14 @@ import (
 func TestCreateQuota(t *testing.T) {
 	resourceQuotaObject := &api.ResourceQuota{}
 	resourceQuotaObject.Name = "my-quota"
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/resourcequotas" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, resourceQuotaObject)}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, resourceQuotaObject)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -43,13 +43,37 @@ func TestCreateQuota(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateQuota(f, buf)
-	cmd.Flags().Set("hard", "cpu=1")
-	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{resourceQuotaObject.Name})
-	expectedOutput := "resourcequota/" + resourceQuotaObject.Name + "\n"
-	if buf.String() != expectedOutput {
-		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
+
+	tests := map[string]struct {
+		flags          map[string]string
+		expectedOutput string
+	}{
+		"single resource": {
+			flags:          map[string]string{"hard": "cpu=1", "output": "name"},
+			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+		},
+		"single resource with a scope": {
+			flags:          map[string]string{"hard": "cpu=1", "output": "name", "scopes": "BestEffort"},
+			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+		},
+		"multiple resources": {
+			flags:          map[string]string{"hard": "cpu=1,pods=42", "output": "name", "scopes": "BestEffort"},
+			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+		},
+		"single resource with multiple scopes": {
+			flags:          map[string]string{"hard": "cpu=1", "output": "name", "scopes": "BestEffort,NotTerminating"},
+			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+		},
+	}
+	for name, test := range tests {
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdCreateQuota(f, buf)
+		cmd.Flags().Set("hard", "cpu=1")
+		cmd.Flags().Set("output", "name")
+		cmd.Run(cmd, []string{resourceQuotaObject.Name})
+
+		if buf.String() != test.expectedOutput {
+			t.Errorf("%s: expected output: %s, but got: %s", name, test.expectedOutput, buf.String())
+		}
 	}
 }
