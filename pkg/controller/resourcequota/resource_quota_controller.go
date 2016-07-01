@@ -275,12 +275,22 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 	// if this is our first sync, it will be dirty by default, since we need track usage
 	dirty = dirty || (resourceQuota.Status.Hard == nil || resourceQuota.Status.Used == nil)
 
+	used := api.ResourceList{}
+	if resourceQuota.Status.Used != nil {
+		used = quota.Add(api.ResourceList{}, resourceQuota.Status.Used)
+	}
+	hardLimits := quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard)
+
+	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry)
+	if err != nil {
+		return err
+	}
+	for key, value := range newUsage {
+		used[key] = value
+	}
+
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
-	previousUsed := api.ResourceList{}
-	if resourceQuota.Status.Used != nil {
-		previousUsed = quota.Add(api.ResourceList{}, resourceQuota.Status.Used)
-	}
 	usage := api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{
 			Name:            resourceQuota.Name,
@@ -289,43 +299,9 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 			Labels:          resourceQuota.Labels,
 			Annotations:     resourceQuota.Annotations},
 		Status: api.ResourceQuotaStatus{
-			Hard: quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard),
-			Used: previousUsed,
+			Hard: hardLimits,
+			Used: used,
 		},
-	}
-
-	// find the intersection between the hard resources on the quota
-	// and the resources this controller can track to know what we can
-	// look to measure updated usage stats for
-	hardResources := quota.ResourceNames(usage.Status.Hard)
-	potentialResources := []api.ResourceName{}
-	evaluators := rq.registry.Evaluators()
-	for _, evaluator := range evaluators {
-		potentialResources = append(potentialResources, evaluator.MatchesResources()...)
-	}
-	matchedResources := quota.Intersection(hardResources, potentialResources)
-
-	// sum the observed usage from each evaluator
-	newUsage := api.ResourceList{}
-	usageStatsOptions := quota.UsageStatsOptions{Namespace: resourceQuota.Namespace, Scopes: resourceQuota.Spec.Scopes}
-	for _, evaluator := range evaluators {
-		// only trigger the evaluator if it matches a resource in the quota, otherwise, skip calculating anything
-		if intersection := quota.Intersection(evaluator.MatchesResources(), matchedResources); len(intersection) == 0 {
-			continue
-		}
-		stats, err := evaluator.UsageStats(usageStatsOptions)
-		if err != nil {
-			return err
-		}
-		newUsage = quota.Add(newUsage, stats.Used)
-	}
-
-	// mask the observed usage to only the set of resources tracked by this quota
-	// merge our observed usage with the quota usage status
-	// if the new usage is different than the last usage, we will need to do an update
-	newUsage = quota.Mask(newUsage, matchedResources)
-	for key, value := range newUsage {
-		usage.Status.Used[key] = value
 	}
 
 	dirty = dirty || !quota.Equals(usage.Status.Used, resourceQuota.Status.Used)
