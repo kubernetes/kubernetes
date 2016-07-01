@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/fields"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -240,7 +239,7 @@ func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, 
 }
 
 func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, error) {
-	creatorRef, found := pod.ObjectMeta.Annotations[controller.CreatedByAnnotation]
+	creatorRef, found := pod.ObjectMeta.Annotations[api.CreatedByAnnotation]
 	if !found {
 		return nil, nil
 	}

@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -219,7 +218,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	rc_anno := make(map[string]string)
-	rc_anno[controller.CreatedByAnnotation] = refJson(t, &rc)
+	rc_anno[api.CreatedByAnnotation] = refJson(t, &rc)
 
 	rc_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -247,7 +246,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	ds_anno := make(map[string]string)
-	ds_anno[controller.CreatedByAnnotation] = refJson(t, &ds)
+	ds_anno[api.CreatedByAnnotation] = refJson(t, &ds)
 
 	ds_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -280,7 +279,7 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			Labels:            labels,
-			Annotations:       map[string]string{controller.CreatedByAnnotation: refJson(t, &job)},
+			Annotations:       map[string]string{api.CreatedByAnnotation: refJson(t, &job)},
 		},
 	}
 
@@ -298,7 +297,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	rs_anno := make(map[string]string)
-	rs_anno[controller.CreatedByAnnotation] = refJson(t, &rs)
+	rs_anno[api.CreatedByAnnotation] = refJson(t, &rs)
 
 	rs_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
