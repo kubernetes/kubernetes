@@ -62,14 +62,18 @@ var FederatedServiceLabels = map[string]string{
 	"foo": "bar",
 }
 
+/*
+type cluster keeps track of the assorted objects and state related to each
+cluster in the federation
+*/
 type cluster struct {
 	*release_1_3.Clientset
+	namespaceCreated bool // Did we need to create a new namespace in this cluster?  If so, we should delete it.
 }
 
 var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-service")
 	var clusters []cluster
-	var clusterNamespaceCreated []bool // Did we need to create a new namespace in each of the above clusters?  If so, we should delete it.
 	var federationName string
 
 	var _ = Describe("Federated Services", func() {
@@ -133,7 +137,6 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				clusters[i].Clientset = clset
 			}
 
-			clusterNamespaceCreated = make([]bool, len(clusters))
 			for i, c := range clusters {
 				// The e2e Framework created the required namespace in one of the clusters, but we need to create it in all the others, if it doesn't yet exist.
 				if _, err := c.Clientset.Core().Namespaces().Get(f.Namespace.Name); errors.IsNotFound(err) {
@@ -144,7 +147,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 					}
 					_, err := c.Clientset.Core().Namespaces().Create(ns)
 					if err == nil {
-						clusterNamespaceCreated[i] = true
+						c.namespaceCreated = true
 					}
 					framework.ExpectNoError(err, "Couldn't create the namespace %s in cluster [%d]", f.Namespace.Name, i)
 					framework.Logf("Namespace %s created in cluster [%d]", f.Namespace.Name, i)
@@ -156,7 +159,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 		AfterEach(func() {
 			for i, c := range clusters {
-				if clusterNamespaceCreated[i] {
+				if c.namespaceCreated {
 					if _, err := c.Clientset.Core().Namespaces().Get(f.Namespace.Name); !errors.IsNotFound(err) {
 						err := c.Clientset.Core().Namespaces().Delete(f.Namespace.Name, &api.DeleteOptions{})
 						framework.ExpectNoError(err, "Couldn't delete the namespace %s in cluster [%d]: %v", f.Namespace.Name, i, err)
@@ -261,7 +264,8 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 					framework.SkipUnlessFederated(f.Client)
 
 					// Delete all the backend pods from the shard which is local to the discovery pod.
-					deleteBackendPodsOrFail([]cluster{{f.Clientset_1_3}}, f.Namespace.Name, []*v1.Pod{backendPods[0]})
+					// FIXME(mml): Use a function that deletes backends only in one cluster.
+					deleteBackendPodsOrFail([]cluster{{f.Clientset_1_3, false}}, f.Namespace.Name, []*v1.Pod{backendPods[0]})
 
 				})
 
