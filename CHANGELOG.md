@@ -1,5 +1,13 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
+- [v1.3.0](#v130)
+  - [Downloads](#downloads)
+  - [Major Themes](#major-themes)
+  - [Other notable improvements](#other-notable-improvements)
+  - [Known Issues](#known-issues)
+  - [Provider-specific Notes](#provider-specific-notes)
+  - [Changelog since v1.3.0-beta.3](#changelog-since-v130-beta3)
+    - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
 - [v1.3.0-beta.3](#v130-beta3)
   - [Downloads](#downloads)
   - [Changelog since v1.3.0-beta.2](#changelog-since-v130-beta2)
@@ -78,6 +86,47 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.3.0
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
+
+## Downloads
+
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0/kubernetes.tar.gz) | `88249c443d438666928379aa7fe865b389ed72ea` | `9270f001aef8c03ff5db63456ca9eecc`
+
+## Major Themes
+
+* TBD
+
+## Other notable improvements
+
+* TBD
+
+## Known Issues
+
+* TBD
+
+## Provider-specific Notes
+
+* TBD
+
+## Changelog since v1.3.0-beta.3
+
+
+### Previous Releases Included in v1.3.0
+
+- [v1.3.0-beta.2](CHANGELOG.md#v130-beta2)
+- [v1.3.0-beta.1](CHANGELOG.md#v130-beta1)
+- [v1.3.0-alpha.5](CHANGELOG.md#v130-alpha5)
+- [v1.3.0-alpha.4](CHANGELOG.md#v130-alpha4)
+- [v1.3.0-alpha.3](CHANGELOG.md#v130-alpha3)
+- [v1.3.0-alpha.2](CHANGELOG.md#v130-alpha2)
+- [v1.3.0-alpha.1](CHANGELOG.md#v130-alpha1)
+
 
 
 # v1.3.0-beta.3
