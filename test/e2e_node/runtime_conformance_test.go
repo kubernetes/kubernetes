@@ -255,14 +255,22 @@ while true; do sleep 1; done
 					container.Create()
 					defer container.Delete()
 
-					By("check the pod phase")
-					Eventually(container.GetPhase, retryTimeout, pollInterval).Should(Equal(testCase.phase))
-					Consistently(container.GetPhase, consistentCheckTimeout, pollInterval).Should(Equal(testCase.phase))
-
+					// We need to check container state first. The default pod status is pending, If we check
+					// pod phase first, and the expected pod phase is Pending, the container status may not
+					// even show up when we check it.
 					By("check the container state")
-					status, err := container.GetStatus()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(GetContainerState(status.State)).To(Equal(testCase.state))
+					getState := func() (ContainerState, error) {
+						status, err := container.GetStatus()
+						if err != nil {
+							return ContainerStateUnknown, err
+						}
+						return GetContainerState(status.State), nil
+					}
+					Eventually(getState, retryTimeout, pollInterval).Should(Equal(testCase.state))
+					Consistently(getState, consistentCheckTimeout, pollInterval).Should(Equal(testCase.state))
+
+					By("check the pod phase")
+					Expect(container.GetPhase()).To(Equal(testCase.phase))
 
 					By("it should be possible to delete")
 					Expect(container.Delete()).To(Succeed())
