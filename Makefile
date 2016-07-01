@@ -62,6 +62,10 @@ GOLDFLAGS ?=
 KUBE_GOLDFLAGS = $(GOLDFLAGS)
 export KUBE_GOLDFLAGS GOLDFLAGS
 
+GOGCFLAGS ?=
+KUBE_GOGCFLAGS = $(GOGCFLAGS)
+export KUBE_GOGCFLAGS GOGCFLAGS
+
 # Build code.
 #
 # Args:
@@ -69,12 +73,17 @@ export KUBE_GOLDFLAGS GOLDFLAGS
 #     package, the build will produce executable files under $(OUT_DIR)/go/bin.
 #     If not specified, "everything" will be built.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
-#   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
+#   GOLDFLAGS: Extra linking flags passed to 'go' when building.
+#   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
 #
 # Example:
 #   make
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
+#   make all GOGCFLAGS="-N -l"
+#     Note: Use the -N -l options to disable compiler optimizations an inlining.
+#           Using these build options allows you to subsequently use source
+#           debugging tools like delve.
 .PHONY: all
 all: generated_files
 	hack/make-rules/build.sh $(WHAT)
@@ -107,6 +116,7 @@ verify:
 #   TESTS: Same as WHAT.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
+#   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
 #
 # Example:
 #   make check

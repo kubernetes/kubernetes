@@ -426,6 +426,7 @@ kube::golang::build_kube_toolchain() {
 
   kube::log::status "Building the toolchain targets:" "${binaries[@]}"
   go install "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${binaries[@]:+${binaries[@]}}"
 }
@@ -482,6 +483,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       CGO_ENABLED=0 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
@@ -490,6 +492,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
@@ -499,11 +502,13 @@ kube::golang::build_binaries_for_platform() {
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
       go install "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
       CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
     fi
@@ -536,12 +541,14 @@ kube::golang::build_binaries_for_platform() {
     # returns true (always stale). And that's why we need to install the
     # test package.
     go install "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${testpkg}"
 
     mkdir -p "$(dirname ${outfile})"
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
+      -gcflags "${gogcflags}" \
       -ldflags "${goldflags}" \
       -o "${outfile}" \
       "${testpkg}"
@@ -595,9 +602,10 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     # Use eval to preserve embedded quoted strings.
-    local goflags goldflags
+    local goflags goldflags gogcflags
     eval "goflags=(${KUBE_GOFLAGS:-})"
     goldflags="${KUBE_GOLDFLAGS:-} $(kube::version::ldflags)"
+    gogcflags="${KUBE_GOGCFLAGS:-}"
 
     local use_go_build
     local -a targets=()
