@@ -233,7 +233,7 @@ all known to be namespaced by the kernel. These two lists are defined under `pkg
 
 The initial whitelists will be:
 
-```golang
+```go
 var whitelist = map[string]struct{}{
        "kernel.msgmax":          {},
        "kernel.msgmnb":          {},
@@ -254,7 +254,8 @@ var whitelistPrefixes = []string{
 In addition to the whitelisting, the general format of the sysctl name will be checked:
 - 253 characters in length
 - it matches `sysctlRegexp`:
-```golang
+
+```go
 const SysctlSegmentFmt string = "[a-z0-9]([_a-z0-9]*[a-z0-9])?"
 const SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
 var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
