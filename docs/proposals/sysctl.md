@@ -222,9 +222,47 @@ type PodSecurityContext struct {
 
 Note that sysctls must be on the pod level because containers in a pod share IPC and network namespaces (if pod.spec.hostIPC and pod.spec.hostNetwork is false) and therefore cannot have conflicting sysctl values. Moreover, note that all namespaced sysctl supported by Docker/RunC are either in the IPC or network namespace.
 
+### Validation
+
+The name of each sysctl in `PodSecurityContext.Name` is validated against a static list of
+
+- specific sysctls
+- and a list of sysctl prefixes,
+
+all known to be namespaced by the kernel. These two lists are defined under `pkg/kubelet` and to be maintained by the nodes team.
+
+The initial whitelists will be:
+
+```golang
+var whitelist = map[string]struct{}{
+       "kernel.msgmax":          {},
+       "kernel.msgmnb":          {},
+       "kernel.msgmni":          {},
+       "kernel.sem":             {},
+       "kernel.shmall":          {},
+       "kernel.shmmax":          {},
+       "kernel.shmmni":          {},
+       "kernel.shm_rmid_forced": {},
+}
+
+var whitelistPrefixes = []string{
+       "net.",
+       "fs.mqueue.",
+}
+```
+
+In addition to the whitelisting, the general format of the sysctl name will be checked:
+- 253 characters in length
+- it matches `sysctlRegexp`:
+```golang
+const SysctlSegmentFmt string = "[a-z0-9]([_a-z0-9]*[a-z0-9])?"
+const SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
+var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
+```
+
 ### Error behaviour
 
-Pods with specified sysctls are either launched with the given sysctl values or fail to launch.
+Pods with specified sysctls are either launched with the given sysctl values or fail to launch, creating an event which is verbose enough to tell the user what happened.
 
 ### Scheduling
 
@@ -248,6 +286,8 @@ type PodSecurityPolicySpec struct {
 ```
 
 The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.Sysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
+
+The default policy will be `*`, i.e. all whitelisted (and therefore known-to-be-namespaced) sysctls are allowed.
 
 ### Application of the given Sysctls
 
