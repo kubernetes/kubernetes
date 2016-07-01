@@ -423,6 +423,7 @@ session-affinity
 setup-node
 show-all
 show-events
+show-kind
 show-labels
 shutdown-fd
 shutdown-fifo
