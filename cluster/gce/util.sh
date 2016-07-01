@@ -898,7 +898,7 @@ function kube-down {
   # Get the name of the managed instance group template before we delete the
   # managed instance group. (The name of the managed instance group template may
   # change during a cluster upgrade.)
-  local template=$(get-template "${PROJECT}")
+  local templates=$(get-template "${PROJECT}")
 
   # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
@@ -925,12 +925,14 @@ function kube-down {
     fi
   done
 
-  if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-    gcloud compute instance-templates delete \
-      --project "${PROJECT}" \
-      --quiet \
-      "${template}"
-  fi
+  for template in ${templates[@]:-}; do
+    if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
+      gcloud compute instance-templates delete \
+        --project "${PROJECT}" \
+        --quiet \
+        "${template}"
+    fi
+  done
 
   # First delete the master (if it exists).
   if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
@@ -1038,11 +1040,8 @@ function kube-down {
 # $1: project
 # $2: zone
 function get-template {
-  local template=""
-  if [[ -n $(gcloud compute instance-templates list "${NODE_INSTANCE_PREFIX}"-template --project="${1}" | grep template) ]]; then
-    template="${NODE_INSTANCE_PREFIX}"-template
-  fi
-  echo "${template}"
+  gcloud compute instance-templates list -r "${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?" \
+    --project="${1}" --format='value(name)'
 }
 
 
