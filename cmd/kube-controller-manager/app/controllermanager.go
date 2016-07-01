@@ -296,7 +296,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			return true, nil
 		}
 		glog.Errorf("Failed to get api versions from server: %v", err)
-		return false, nil
+		return false, err
 	})
 	if err != nil {
 		glog.Fatalf("Failed to get api versions from server: %v", err)
