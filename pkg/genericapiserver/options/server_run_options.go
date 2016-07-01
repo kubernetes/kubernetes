@@ -133,6 +133,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MinRequestTimeout:       1800,
 		RuntimeConfig:           make(config.ConfigurationMap),
 		SecurePort:              6443,
+		ServiceNodePortRange:    utilnet.PortRange{Base: 30000, Size: 2768},
 		StorageVersions:         registered.AllPreferredGroupVersions(),
 	}
 }
