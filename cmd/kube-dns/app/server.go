@@ -26,12 +26,15 @@ import (
 	"github.com/golang/glog"
 	"github.com/skynetservices/skydns/metrics"
 	"github.com/skynetservices/skydns/server"
+	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type KubeDNSServer struct {
@@ -94,6 +97,10 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 }
 
 func (server *KubeDNSServer) Run() {
+	glog.Infof("%+v", version.Get())
+	pflag.VisitAll(func(flag *pflag.Flag) {
+		glog.Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+	})
 	setupSignalHandlers()
 	server.startSkyDNSServer()
 	server.kd.Start()
