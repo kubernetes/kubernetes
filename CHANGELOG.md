@@ -114,11 +114,10 @@ binary | sha1 hash | md5 hash
 
 * TBD
 
-## Changelog since v1.3.0-beta.3
-
 
 ### Previous Releases Included in v1.3.0
 
+- [v1.3.0-beta.3](CHANGELOG.md#v130-beta3)
 - [v1.3.0-beta.2](CHANGELOG.md#v130-beta2)
 - [v1.3.0-beta.1](CHANGELOG.md#v130-beta1)
 - [v1.3.0-alpha.5](CHANGELOG.md#v130-alpha5)
