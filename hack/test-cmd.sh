@@ -1355,6 +1355,30 @@ __EOF__
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
+  # Create a secret using stringData
+  kubectl create --namespace=test-secrets -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Secret",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "secret-string-data"
+  },
+  "data": {
+    "k1":"djE=",
+    "k2":""
+  },
+  "stringData": {
+    "k2":"v2"
+  }
+}
+__EOF__
+  # Post-condition: secret-string-data secret is created with expected data, merged/overridden data from stringData, and a cleared stringData field
+  kube::test::get_object_assert 'secret/secret-string-data --namespace=test-secrets ' '{{.data}}' '.*k1:djE=.*'
+  kube::test::get_object_assert 'secret/secret-string-data --namespace=test-secrets ' '{{.data}}' '.*k2:djI=.*'
+  kube::test::get_object_assert 'secret/secret-string-data --namespace=test-secrets ' '{{.stringData}}' '<no value>'
+  # Clean up
+  kubectl delete secret secret-string-data --namespace=test-secrets
+
   ### Create a secret using output flags
   # Pre-condition: no secret exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
