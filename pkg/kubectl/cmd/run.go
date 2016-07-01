@@ -326,7 +326,6 @@ func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) (status ap
 		}
 		fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: %v\n", pod.Namespace, pod.Name, pod.Status.Phase, ready)
 		time.Sleep(2 * time.Second)
-		continue
 	}
 }
 
