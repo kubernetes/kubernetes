@@ -235,20 +235,22 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			allErrs = append(allErrs, err)
 		}
 
-		// the outermost object will be converted to the output-version, but inner
-		// objects can use their mappings
-		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
-		if err != nil {
-			return err
-		}
+		if len(infos) > 0 {
+			// the outermost object will be converted to the output-version, but inner
+			// objects can use their mappings
+			version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
+			if err != nil {
+				return err
+			}
 
-		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
-		if err != nil {
-			return err
-		}
+			obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
+			if err != nil {
+				return err
+			}
 
-		if err := printer.PrintObj(obj, out); err != nil {
-			allErrs = append(allErrs, err)
+			if err := printer.PrintObj(obj, out); err != nil {
+				allErrs = append(allErrs, err)
+			}
 		}
 		return utilerrors.NewAggregate(allErrs)
 	}
