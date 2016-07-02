@@ -1554,7 +1554,7 @@ function kube::release::docker::release() {
     docker_push_cmd=("gcloud" "docker")
   fi
 
-  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/google_containers" ]]; then
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.kubernetes.io" ]]; then
     # Activate credentials for the k8s.production.user@gmail.com
     gcloud config set account k8s.production.user@gmail.com
   fi
@@ -1581,7 +1581,7 @@ function kube::release::docker::release() {
       fi
     done
   done
-  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/google_containers" ]]; then
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.kubernetes.io" ]]; then
     # Activate default account
     gcloud config set account ${USER}@google.com
   fi

@@ -15,7 +15,7 @@
 all: serve_hostname
 
 TAG = v1.4
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.kubernetes.io
 TEST_PREFIX = b.gcr.io/k8s_authenticated_test
 
 serve_hostname: serve_hostname.go

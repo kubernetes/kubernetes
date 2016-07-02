@@ -117,12 +117,12 @@ function ensure-hyperkube() {
     official_image_tag="gcr.kubernetes.io/${hyperkube}:${KUBE_GIT_VERSION}"
 
     if repo-contains-image "gcr.io" "google_containers" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
-        echo "${hyperkube}:${KUBE_GIT_VERSION} was found in the gcr.io/google_containers repository"
+        echo "${hyperkube}:${KUBE_GIT_VERSION} was found in the gcr.kubernetes.io repository"
         export AZURE_HYPERKUBE_SPEC="${official_image_tag}"
         return 0
     fi
 
-    echo "${hyperkube}:${KUBE_GIT_VERSION} was not found in the gcr.io/google_containers repository"
+    echo "${hyperkube}:${KUBE_GIT_VERSION} was not found in the gcr.kubernetes.io repository"
     if [[ -z "${AZURE_DOCKER_REGISTRY:-}" || -z "${AZURE_DOCKER_REPO:-}" ]]; then
         echo "AZURE_DOCKER_REGISTRY and AZURE_DOCKER_REPO must be set in order to push ${hyperkube}:${KUBE_GIT_VERSION}"
         return 1
@@ -141,7 +141,7 @@ function ensure-hyperkube() {
     # and then the existing code can re-tag that for the user's repo and then push
     if ! docker inspect "${user_image_tag}" ; then
         if ! docker inspect "${official_image_tag}" ; then
-            REGISTRY="gcr.io/google_containers" \
+            REGISTRY="gcr.kubernetes.io" \
             VERSION="${KUBE_GIT_VERSION}" \
             make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
         fi

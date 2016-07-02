@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = 1.9
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.kubernetes.io
 
 all: push
 

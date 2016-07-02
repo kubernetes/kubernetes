@@ -15,7 +15,7 @@
 .PHONY: all image push clean
 
 TAG = 1.2
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.kubernetes.io
 
 
 all: push

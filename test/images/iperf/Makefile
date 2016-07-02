@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = e2e
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.kubernetes.io
 IMAGE = iperf
 
 all: push

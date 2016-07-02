@@ -14,7 +14,7 @@
 
 # This image does not tag
 #TAG =
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.kubernetes.io
 
 all: push
 

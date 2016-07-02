@@ -15,7 +15,7 @@
 .PHONY:	all image push clean
 
 TAG = 0.1
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.kubernetes.io
 IMAGE = fakegitserver
 ARCH = amd64
 

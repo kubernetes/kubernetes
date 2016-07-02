@@ -15,9 +15,9 @@
 # Build the hyperkube image.
 #
 # Usage:
-#   [ARCH=amd64] [REGISTRY="gcr.io/google_containers"] make (build|push) VERSION={some_version_number e.g. v1.2.0}
+#   [ARCH=amd64] [REGISTRY="gcr.kubernetes.io"] make (build|push) VERSION={some_version_number e.g. v1.2.0}
 
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=gcr.kubernetes.io
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 CNI_RELEASE=c864f0e1ea73719b8f4582402b0847064f9883b0

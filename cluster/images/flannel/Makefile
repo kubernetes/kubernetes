@@ -15,11 +15,11 @@
 # Build the flannel image
 #
 # Usage:
-# 	[TAG=0.5.5] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] make build
+# 	[TAG=0.5.5] [REGISTRY=gcr.kubernetes.io] [ARCH=amd64] make build
 
 TAG?=0.5.5
 ARCH?=amd64
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=gcr.kubernetes.io
 KUBE_CROSS_TAG=$(shell cat ../../../build-image/cross/VERSION)
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)

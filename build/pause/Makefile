@@ -14,7 +14,7 @@
 
 .PHONY: all push push-legacy container clean
 
-REGISTRY ?= gcr.io/google_containers
+REGISTRY ?= gcr.kubernetes.io
 IMAGE = $(REGISTRY)/pause-$(ARCH)
 LEGACY_AMD64_IMAGE = $(REGISTRY)/pause
 

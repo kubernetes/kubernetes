@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = beta4
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.kubernetes.io
 
 all: clean consumer
 
