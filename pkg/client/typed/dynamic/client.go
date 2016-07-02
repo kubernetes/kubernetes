@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -54,13 +53,8 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	codec := dynamicCodec{}
-
 	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
 	conf.ContentType = runtime.ContentTypeJSON
-	conf.AcceptContentTypes = runtime.ContentTypeJSON
-	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo)
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"
@@ -226,11 +220,11 @@ func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*ru
 	return result, err
 }
 
-// dynamicCodec is a codec that wraps the standard unstructured codec
+// Codec is a codec that wraps the standard unstructured codec
 // with special handling for Status objects.
-type dynamicCodec struct{}
+type Codec struct{}
 
-func (dynamicCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (Codec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	obj, gvk, err := runtime.UnstructuredJSONScheme.Decode(data, gvk, obj)
 	if err != nil {
 		return nil, nil, err
@@ -247,7 +241,7 @@ func (dynamicCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj r
 	return obj, gvk, nil
 }
 
-func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
+func (Codec) Encode(obj runtime.Object, w io.Writer) error {
 	return runtime.UnstructuredJSONScheme.Encode(obj, w)
 }
 

@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Note that the types provided in this file are not versioned and are intended to be
@@ -511,4 +512,22 @@ type VersionedObjects struct {
 	// other objects may be present. The right most object is the same as would be returned
 	// by a normal Decode call.
 	Objects []Object
+}
+
+var metaKeys = sets.NewString("apiVersion", "kind", "metadata")
+
+// ExtractMeta only saves apiVersion, kind, and metadata
+func (u *Unstructured) ExtractMeta() {
+	for key := range u.Object {
+		if !metaKeys.Has(key) {
+			delete(u.Object, key)
+		}
+	}
+}
+
+// ExtractMeta only saves apiVersion, kind, and metadata of Items.
+func (u *UnstructuredList) ExtractMeta() {
+	for _, item := range u.Items {
+		item.ExtractMeta()
+	}
 }

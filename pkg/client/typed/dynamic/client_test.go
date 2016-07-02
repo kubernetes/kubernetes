@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/watch/versioned"
@@ -59,9 +60,14 @@ func getObject(version, kind, name string) *runtime.Unstructured {
 
 func getClientServer(gv *unversioned.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
+	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+	negotiatedSerializer := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: Codec{}}, streamingInfo)
 	cl, err := NewClient(&restclient.Config{
-		Host:          srv.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
+		Host: srv.URL,
+		ContentConfig: restclient.ContentConfig{
+			GroupVersion:         gv,
+			NegotiatedSerializer: negotiatedSerializer,
+		},
 	})
 	if err != nil {
 		srv.Close()
@@ -457,7 +463,7 @@ func TestWatch(t *testing.T) {
 				t.Errorf("Watch(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
-			enc := versioned.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
+			enc := versioned.NewEncoder(streaming.NewEncoder(w, Codec{}), Codec{})
 			for _, e := range tc.events {
 				enc.Encode(&e)
 			}

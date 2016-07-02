@@ -39,9 +39,10 @@ import (
 )
 
 func TestNewGarbageCollector(t *testing.T) {
-	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc)
+	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, NewCompressingCodec())
+	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, nil)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(clientPool, podResource)
+	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,8 +142,9 @@ func TestProcessItem(t *testing.T) {
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
-	gc, err := NewGarbageCollector(clientPool, podResource)
+	compressingClientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, NewCompressingCodec())
+	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, nil)
+	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,9 +295,10 @@ func TestProcessEvent(t *testing.T) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
-	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc)
+	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, NewCompressingCodec())
+	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, nil)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(clientPool, podResource)
+	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +327,7 @@ func TestGCListWatcher(t *testing.T) {
 	testHandler := &fakeActionHandler{}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, nil)
 	podResource := unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
 	client, err := clientPool.ClientForGroupVersion(podResource.GroupVersion())
 	if err != nil {

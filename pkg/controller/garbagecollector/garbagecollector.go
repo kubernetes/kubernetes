@@ -426,7 +426,12 @@ func (p *Propagator) processEvent() {
 // removing ownerReferences from the dependents if the owner is deleted with
 // DeleteOptions.OrphanDependents=true.
 type GarbageCollector struct {
-	restMapper  meta.RESTMapper
+	restMapper meta.RESTMapper
+	// compressingClientPool uses the compressing codec, which removes fields
+	// except for apiVersion, kind, and metadata when decode.
+	compressingClientPool dynamic.ClientPool
+	// clientPool uses the regular dynamic.Codec. We need it to update
+	// finalizers. It can be removed if we support patching finalizers.
 	clientPool  dynamic.ClientPool
 	dirtyQueue  *workqueue.Type
 	orphanQueue *workqueue.Type
@@ -509,11 +514,12 @@ var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
 	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                {},
 }
 
-func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
+func NewGarbageCollector(compressingClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
-		clientPool:  clientPool,
-		dirtyQueue:  workqueue.New(),
-		orphanQueue: workqueue.New(),
+		compressingClientPool: compressingClientPool,
+		clientPool:            clientPool,
+		dirtyQueue:            workqueue.New(),
+		orphanQueue:           workqueue.New(),
 		// TODO: should use a dynamic RESTMapper built from the discovery results.
 		restMapper: registered.RESTMapper(),
 	}

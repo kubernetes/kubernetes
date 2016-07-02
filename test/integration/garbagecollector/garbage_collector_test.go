@@ -127,8 +127,9 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	if err != nil {
 		t.Fatalf("Failed to get supported resources from server: %v", err)
 	}
-	clientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc)
-	gc, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
+	compressingClientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc, garbagecollector.NewCompressingCodec())
+	clientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc, nil)
+	gc, err := garbagecollector.NewGarbageCollector(compressingClientPool, clientPool, groupVersionResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}
