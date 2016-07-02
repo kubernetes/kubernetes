@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/volume/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
