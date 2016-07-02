@@ -1911,6 +1911,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
+	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
@@ -2700,6 +2701,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -2769,6 +2771,7 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
+	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -2827,6 +2830,7 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
+	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}

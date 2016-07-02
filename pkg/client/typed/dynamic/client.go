@@ -54,13 +54,9 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	codec := dynamicCodec{}
-
 	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
 	conf.ContentType = runtime.ContentTypeJSON
 	conf.AcceptContentTypes = runtime.ContentTypeJSON
-	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo)
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"
@@ -68,6 +64,10 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
+	}
+	if conf.NegotiatedSerializer == nil {
+		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
 	}
 
 	cl, err := restclient.RESTClientFor(conf)
@@ -119,19 +119,17 @@ type ResourceClient struct {
 }
 
 // List returns a list of objects for this resource.
-func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, error) {
-	result := new(runtime.UnstructuredList)
+func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
 	}
-	err := rc.cl.Get().
+	return rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(opts, parameterEncoder).
 		Do().
-		Into(result)
-	return result, err
+		Get()
 }
 
 // Get gets the resource with the specified name.
