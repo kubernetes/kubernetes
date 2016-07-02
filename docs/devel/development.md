@@ -230,9 +230,9 @@ separate dependency updates from other changes._
 
 ```sh
 export KPATH=$HOME/code/kubernetes
-mkdir -p $KPATH/src/k8s.io/kubernetes
-cd $KPATH/src/k8s.io/kubernetes
-git clone https://path/to/your/fork .
+mkdir -p $KPATH/src/k8s.io
+cd $KPATH/src/k8s.io
+git clone https://path/to/your/kubernetes/fork # assumes your fork is 'kubernetes'
 # Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
 ```
 
