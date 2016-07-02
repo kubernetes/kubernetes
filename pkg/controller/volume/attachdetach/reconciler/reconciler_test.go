@@ -22,9 +22,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
-	"k8s.io/kubernetes/pkg/controller/volume/cache"
-	"k8s.io/kubernetes/pkg/controller/volume/statusupdater"
-	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/testing"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
+	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	"k8s.io/kubernetes/pkg/util/wait"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
