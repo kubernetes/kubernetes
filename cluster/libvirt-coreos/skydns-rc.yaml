@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: gcr.io/google_containers/etcd-amd64:2.2.1
+        image: gcr.kubernetes.io/etcd-amd64:2.2.1
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -47,7 +47,7 @@ spec:
         - name: etcd-storage
           mountPath: /var/etcd/data
       - name: kube2sky
-        image: gcr.io/google_containers/kube2sky:1.14
+        image: gcr.kubernetes.io/kube2sky:1.14
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -82,7 +82,7 @@ spec:
         # command = "/kube2sky"
         - --domain=${DNS_DOMAIN}
       - name: skydns
-        image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
+        image: gcr.kubernetes.io/skydns:2015-10-13-8c72f8c
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -108,7 +108,7 @@ spec:
           name: dns-tcp
           protocol: TCP
       - name: healthz
-        image: gcr.io/google_containers/exechealthz:1.0
+        image: gcr.kubernetes.io/exechealthz:1.0
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:

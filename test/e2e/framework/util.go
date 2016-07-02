@@ -136,7 +136,7 @@ const (
 	ClaimProvisionTimeout = 5 * time.Minute
 
 	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
+	currentPodInfraContainerImageName    = "gcr.kubernetes.io/pause"
 	currentPodInfraContainerImageVersion = "3.0"
 
 	// How long each node is given during a process that restarts all nodes
@@ -3509,7 +3509,7 @@ func NewHostExecPodSpec(ns, name string) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:            "hostexec",
-					Image:           "gcr.io/google_containers/hostexec:1.2",
+					Image:           "gcr.kubernetes.io/hostexec:1.2",
 					ImagePullPolicy: api.PullIfNotPresent,
 				},
 			},
@@ -4324,7 +4324,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 			Containers: []api.Container{
 				{
 					Name:  containerName,
-					Image: "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+					Image: "gcr.kubernetes.io/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
 					Env:   []api.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
 					Ports: []api.ContainerPort{{ContainerPort: int32(port)}},
 				},
@@ -4360,7 +4360,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 			Containers: []api.Container{
 				{
 					Name:    contName,
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.kubernetes.io/busybox:1.24",
 					Command: []string{"wget", fmt.Sprintf("--timeout=%d", timeout), "-s", host},
 				},
 			},

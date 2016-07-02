@@ -18,10 +18,10 @@ server: server.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./server.go
 
 container: server
-	docker build -t gcr.io/google_containers/liveness .
+	docker build -t gcr.kubernetes.io/liveness .
 
 push: container
-	gcloud docker push gcr.io/google_containers/liveness
+	gcloud docker push gcr.kubernetes.io/liveness
 
 clean:
 	rm -f server

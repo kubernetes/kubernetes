@@ -196,7 +196,7 @@ metadata:
 spec:
   containers:
     - name: test-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.kubernetes.io/busybox
       command: [ "/bin/sh","-c", "env" ]
       resources:
         requests:
@@ -220,7 +220,7 @@ metadata:
 spec:
   containers:
     - name: client-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.kubernetes.io/busybox
       command: ["sh", "-c", "while true; do if [[ -e /etc/labels ]]; then cat /etc/labels; fi; if [[ -e /etc/annotations ]]; then cat /etc/annotations; fi;sleep 5; done"]
       resources:
         requests:
@@ -342,7 +342,7 @@ metadata:
 spec:
   containers:
     - name: test-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.kubernetes.io/busybox
       command: [ "/bin/sh","-c", "env" ]
       resources:
         requests:
@@ -366,7 +366,7 @@ metadata:
 spec:
   containers:
     - name: client-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.kubernetes.io/busybox
       command: ["sh", "-c", "while true; do if [[ -e /etc/labels ]]; then cat /etc/labels; fi; if [[ -e /etc/annotations ]]; then cat /etc/annotations; fi; sleep 5; done"]
       resources:
         requests:
@@ -504,7 +504,7 @@ metadata:
 spec:
   containers:
     - name: test-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.kubernetes.io/busybox
       command: [ "/bin/sh","-c", "env" ]
       resources:
         requests:
@@ -535,7 +535,7 @@ metadata:
 spec:
   containers:
     - name: client-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.kubernetes.io/busybox
       command: ["sh", "-c","while true; do if [[ -e /etc/labels ]]; then cat /etc/labels; fi; if [[ -e /etc/annotations ]]; then cat /etc/annotations; fi; sleep 5; done"]
       resources:
         requests:
@@ -620,7 +620,7 @@ metadata:
 spec:
   containers:
     - name: test-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.kubernetes.io/busybox
       command: [ "/bin/sh","-c", "env" ]
       resources:
         requests:

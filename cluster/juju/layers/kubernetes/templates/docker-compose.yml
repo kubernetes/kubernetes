@@ -13,13 +13,13 @@
 #     --pid=host \
 #     --privileged=true \
 #     -ti \
-#     gcr.io/google_containers/hyperkube:v1.0.6 \
+#     gcr.kubernetes.io/hyperkube:v1.0.6 \
 #     /hyperkube kubelet --containerized --hostname-override="127.0.0.1" \
 #     --address="0.0.0.0" --api-servers=http://localhost:8080 \
 #     --config=/etc/kubernetes/manifests
 
 kubelet:
-  image: gcr.io/google_containers/hyperkube:{{version}}
+  image: gcr.kubernetes.io/hyperkube:{{version}}
   net: host
   pid: host
   privileged: true
@@ -41,12 +41,12 @@ kubelet:
     --tls-cert-file="/srv/kubernetes/server.crt"
     --tls-private-key-file="/srv/kubernetes/server.key"
 
-# docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 \
+# docker run --net=host -d gcr.kubernetes.io/etcd:2.0.12 \
 #   /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 \
 #   --data-dir=/var/etcd/data
 etcd:
   net: host
-  image: gcr.io/google_containers/etcd:2.0.12
+  image: gcr.kubernetes.io/etcd:2.0.12
   command: |
     /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001
     --data-dir=/var/etcd/data
@@ -55,13 +55,13 @@ etcd:
 #     -d \
 #     --net=host \
 #     --privileged \
-#     gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+#     gcr.kubernetes.io/hyperkube:v${K8S_VERSION} \
 #     /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 proxy:
   net: host
   privileged: true
   restart: always
-  image: gcr.io/google_containers/hyperkube:{{version}}
+  image: gcr.kubernetes.io/hyperkube:{{version}}
   command: /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 
 # cAdvisor (Container Advisor) provides container users an understanding of

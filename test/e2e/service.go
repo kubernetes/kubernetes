@@ -1108,7 +1108,7 @@ func createExecPodOrFail(c *client.Client, ns, generateName string) string {
 			Containers: []api.Container{
 				{
 					Name:    "exec",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.kubernetes.io/busybox:1.24",
 					Command: []string{"sh", "-c", "while true; do sleep 5; done"},
 				},
 			},
@@ -1359,7 +1359,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	maxContainerFailures := 0
 	config := framework.RCConfig{
 		Client:               c,
-		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
+		Image:                "gcr.kubernetes.io/serve_hostname:v1.4",
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,
@@ -1780,7 +1780,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *api.ReplicationControl
 					Containers: []api.Container{
 						{
 							Name:  "netexec",
-							Image: "gcr.io/google_containers/netexec:1.4",
+							Image: "gcr.kubernetes.io/netexec:1.4",
 							Args:  []string{"--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &api.Probe{
 								PeriodSeconds: 3,
@@ -1888,7 +1888,7 @@ func NewServerTest(client *client.Client, namespace string, serviceName string) 
 	t.services = make(map[string]bool)
 
 	t.name = "webserver"
-	t.image = "gcr.io/google_containers/test-webserver:e2e"
+	t.image = "gcr.kubernetes.io/test-webserver:e2e"
 
 	return t
 }

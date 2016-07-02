@@ -197,7 +197,7 @@ while true; do sleep 1; done
 				},
 				{
 					description: "should not be able to pull non-existing image from gcr.io",
-					image:       "gcr.io/google_containers/invalid-image:invalid-tag",
+					image:       "gcr.kubernetes.io/invalid-image:invalid-tag",
 					phase:       api.PodPending,
 					state:       ContainerStateWaiting,
 				},

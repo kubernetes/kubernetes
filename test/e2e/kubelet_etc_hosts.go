@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	kubeletEtcHostsImageName          = "gcr.io/google_containers/netexec:1.4"
+	kubeletEtcHostsImageName          = "gcr.kubernetes.io/netexec:1.4"
 	kubeletEtcHostsPodName            = "test-pod"
 	kubeletEtcHostsHostNetworkPodName = "test-host-network-pod"
 	etcHostsPartialContent            = "# Kubernetes-managed hosts file."

@@ -18,7 +18,7 @@ spec:
       hostNetwork: true
       containers:
       - name: node-problem-detector
-        image: gcr.io/google_containers/node-problem-detector:v0.1
+        image: gcr.kubernetes.io/node-problem-detector:v0.1
         env:
         # Config the host ip and port of apiserver.
         - name: "KUBERNETES_SERVICE_HOST"

@@ -12,7 +12,7 @@ spec:
       --master=127.0.0.1:8080
       --v=2
       1>>/var/log/kube-scheduler.log 2>&1
-    image: gcr.io/google_containers/kube-scheduler:${KUBE_SCHEDULER_DOCKER_TAG}
+    image: gcr.kubernetes.io/kube-scheduler:${KUBE_SCHEDULER_DOCKER_TAG}
     imagePullPolicy: IfNotPresent
     livenessProbe:
       httpGet:

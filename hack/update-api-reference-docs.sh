@@ -72,7 +72,7 @@ for ver in $VERSIONS; do
     -v "${SWAGGER_PATH}":/swagger-source:z \
     -v "${REGISTER_FILE}":/register.go:z \
     --net=host -e "https_proxy=${KUBERNETES_HTTPS_PROXY:-}" \
-    gcr.io/google_containers/gen-swagger-docs:v6 \
+    gcr.kubernetes.io/gen-swagger-docs:v6 \
     "${SWAGGER_JSON_NAME}"
 done
 

@@ -200,7 +200,7 @@ func main() {
 						Containers: []api.Container{
 							{
 								Name:  "serve-hostname",
-								Image: "gcr.io/google_containers/serve_hostname:v1.4",
+								Image: "gcr.kubernetes.io/serve_hostname:v1.4",
 								Ports: []api.ContainerPort{{ContainerPort: 9376}},
 							},
 						},

@@ -114,7 +114,7 @@ function repo-contains-image() {
 
 function ensure-hyperkube() {
     hyperkube="hyperkube-amd64"
-    official_image_tag="gcr.io/google_containers/${hyperkube}:${KUBE_GIT_VERSION}"
+    official_image_tag="gcr.kubernetes.io/${hyperkube}:${KUBE_GIT_VERSION}"
 
     if repo-contains-image "gcr.io" "google_containers" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
         echo "${hyperkube}:${KUBE_GIT_VERSION} was found in the gcr.io/google_containers repository"

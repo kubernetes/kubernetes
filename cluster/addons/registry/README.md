@@ -188,7 +188,7 @@ metadata:
 spec:
   containers:
   - name: kube-registry-proxy
-    image: gcr.io/google_containers/kube-registry-proxy:0.3
+    image: gcr.kubernetes.io/kube-registry-proxy:0.3
     resources:
       limits:
         cpu: 100m

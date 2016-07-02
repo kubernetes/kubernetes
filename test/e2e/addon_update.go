@@ -58,7 +58,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: gcr.kubernetes.io/serve_hostname:v1.4
         name: addon-test
         ports:
         - containerPort: 9376
@@ -88,7 +88,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: gcr.kubernetes.io/serve_hostname:v1.4
         name: addon-test
         ports:
         - containerPort: 9376
@@ -156,7 +156,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: gcr.kubernetes.io/serve_hostname:v1.4
         name: invalid-addon-test
         ports:
         - containerPort: 9376

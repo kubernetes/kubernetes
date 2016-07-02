@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the Docker image gcr.io/google_containers/kubedns-<ARCH>
+# Makefile for the Docker image gcr.kubernetes.io/kubedns-<ARCH>
 # MAINTAINER: Tim Hockin <thockin@google.com>
 # If you update this image please bump the tag value before pushing.
 #

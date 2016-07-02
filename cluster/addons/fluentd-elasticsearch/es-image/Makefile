@@ -19,10 +19,10 @@
 TAG = 1.9
 
 build:	elasticsearch_logging_discovery
-	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .
+	docker build -t gcr.kubernetes.io/elasticsearch:$(TAG) .
 
 push:
-	gcloud docker push gcr.io/google_containers/elasticsearch:$(TAG)
+	gcloud docker push gcr.kubernetes.io/elasticsearch:$(TAG)
 
 elasticsearch_logging_discovery:
 	go build elasticsearch_logging_discovery.go

@@ -212,7 +212,7 @@ This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni
     ```console
     $ kubectl get rc
     CONTROLLER            CONTAINER(S)         IMAGE(S)                               SELECTOR                  REPLICAS
-    guestbook             guestbook            gcr.io/google_containers/guestbook:v3  app=guestbook             3
+    guestbook             guestbook            gcr.kubernetes.io/guestbook:v3  app=guestbook             3
     redis-master          redis-master         redis                                  app=redis,role=master     1
     redis-slave           redis-slave          kubernetes/redis-slave:v2              app=redis,role=slave      2
     ...

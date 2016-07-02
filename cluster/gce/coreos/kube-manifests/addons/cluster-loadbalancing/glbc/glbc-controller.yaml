@@ -28,7 +28,7 @@ spec:
         # Any image is permissible as long as:
         # 1. It serves a 404 page at /
         # 2. It serves 200 on a /healthz endpoint
-        image: gcr.io/google_containers/defaultbackend:1.0
+        image: gcr.kubernetes.io/defaultbackend:1.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -45,7 +45,7 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
-      - image: gcr.io/google_containers/glbc:0.6.0
+      - image: gcr.kubernetes.io/glbc:0.6.0
         livenessProbe:
           httpGet:
             path: /healthz

@@ -8,7 +8,7 @@ instantiate and run containerized applications.
 This charm is an encapsulation of the
 [Running Kubernetes locally via
 Docker](http://kubernetes.io/docs/getting-started-guides/docker)
-document. The released hyperkube image (`gcr.io/google_containers/hyperkube`)
+document. The released hyperkube image (`gcr.kubernetes.io/hyperkube`)
 is currently pulled from a [Google owned container repository
 repository](https://cloud.google.com/container-registry/).  For this charm to
 work it will need access to the repository to `docker pull` the images.

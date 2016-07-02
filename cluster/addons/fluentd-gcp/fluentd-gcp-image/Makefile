@@ -19,12 +19,12 @@
 # Procedure for change:
 # 1. Bump the tag number.
 # 2. Create an image for the kubernetes user on Dockerhub and push there: make kbuild kpush
-# 3. Temporarily adjust any config files etc. that reference gcr.io/google_containers/fluentd-gcp:$(TAG)
+# 3. Temporarily adjust any config files etc. that reference gcr.kubernetes.io/fluentd-gcp:$(TAG)
 #    to use kubernetes/fluentd-gcp:$(TAG) instead.
 # 4. Test etc.
 # 5. Issue PR.
 # 6. When PR is approved make the gcr.io version of the image: make build push
-# 7. Revert the referendes to kubernetes/fluentd-gcp:$(TAG) to gcr.io/google_containers/fluentd-gcp:$(TAG) 
+# 7. Revert the referendes to kubernetes/fluentd-gcp:$(TAG) to gcr.kubernetes.io/fluentd-gcp:$(TAG) 
 
 .PHONY:	kbuild kpush
 
@@ -43,8 +43,8 @@ kpush:
 # Rules for building the real image for deployment to gcr.io
 
 build:
-	docker build -t gcr.io/google_containers/fluentd-gcp:$(TAG) .
+	docker build -t gcr.kubernetes.io/fluentd-gcp:$(TAG) .
 
 
 push:
-	gcloud docker push gcr.io/google_containers/fluentd-gcp:$(TAG)
+	gcloud docker push gcr.kubernetes.io/fluentd-gcp:$(TAG)

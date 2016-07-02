@@ -34,4 +34,4 @@ metadata:
 spec:
   containers:
   - name: with-newlabels
-    image: gcr.io/google_containers/pause:2.0
+    image: gcr.kubernetes.io/pause:2.0

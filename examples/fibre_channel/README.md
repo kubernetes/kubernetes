@@ -70,7 +70,7 @@ If you ssh to that machine, you can run `docker ps` to see the actual pod.
 CONTAINER ID        IMAGE                                  COMMAND             CREATED             STATUS              PORTS               NAMES
 090ac457ddc2        kubernetes/pause                       "/pause"            12 minutes ago      Up 12 minutes                           k8s_fcpd-rw.aae720ec_fcpd_default_4024318f-4121-11e5-a294-e839352ddd54_99eb5415   
 5e2629cf3e7b        kubernetes/pause                       "/pause"            12 minutes ago      Up 12 minutes                           k8s_fcpd-ro.857720dc_fcpd_default_4024318f-4121-11e5-a294-e839352ddd54_c0175742   
-2948683253f7        gcr.io/google_containers/pause:0.8.0   "/pause"            12 minutes ago      Up 12 minutes                           k8s_POD.7be6d81d_fcpd_default_4024318f-4121-11e5-a294-e839352ddd54_8d9dd7bf       
+2948683253f7        gcr.kubernetes.io/pause:0.8.0   "/pause"            12 minutes ago      Up 12 minutes                           k8s_POD.7be6d81d_fcpd_default_4024318f-4121-11e5-a294-e839352ddd54_8d9dd7bf       
 ```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

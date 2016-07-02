@@ -48,7 +48,7 @@ const (
 	nodeHttpPort            = 32080
 	nodeUdpPort             = 32081
 	loadBalancerHttpPort    = 100
-	netexecImageName        = "gcr.io/google_containers/netexec:1.5"
+	netexecImageName        = "gcr.kubernetes.io/netexec:1.5"
 	testPodName             = "test-container-pod"
 	hostTestPodName         = "host-test-container-pod"
 	nodePortServiceName     = "node-port-service"

@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4"},
+		{podsPerNode: 30, image: "gcr.kubernetes.io/serve_hostname:v1.4"},
 	}
 
 	for _, testArg := range loadTests {

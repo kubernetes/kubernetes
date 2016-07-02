@@ -26,7 +26,7 @@ ARCH ?= amd64
 ALL_ARCH = amd64 arm arm64 ppc64le
 
 CFLAGS = -Os -Wall -static
-KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
+KUBE_CROSS_IMAGE ?= gcr.kubernetes.io/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 BIN = pause

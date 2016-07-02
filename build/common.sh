@@ -97,7 +97,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v3
+          kube-proxy,gcr.kubernetes.io/debian-iptables-amd64:v3
           federation-apiserver,busybox
           federation-controller-manager,busybox
         );;
@@ -106,7 +106,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v3
+          kube-proxy,gcr.kubernetes.io/debian-iptables-arm:v3
           federation-apiserver,armel/busybox
           federation-controller-manager,armel/busybox
         );;
@@ -115,7 +115,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v3
+          kube-proxy,gcr.kubernetes.io/debian-iptables-arm64:v3
           federation-apiserver,aarch64/busybox
           federation-controller-manager,aarch64/busybox
         );;
@@ -124,7 +124,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v3
+          kube-proxy,gcr.kubernetes.io/debian-iptables-ppc64le:v3
           federation-apiserver,ppc64le/busybox
           federation-controller-manager,ppc64le/busybox
         );;
@@ -861,10 +861,10 @@ function kube::release::create_docker_images_for_server() {
 
         if [[ ${arch} == "amd64" ]]; then
           # If we are building a amd64 docker image, preserve the original image name
-          local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
+          local docker_image_tag=gcr.kubernetes.io/${binary_name}:${md5_sum}
         else
           # If we are building a docker image for another architecture, append the arch in the image tag
-          local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
+          local docker_image_tag=gcr.kubernetes.io/${binary_name}-${arch}:${md5_sum}
         fi
 
         "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null

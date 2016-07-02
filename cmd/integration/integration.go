@@ -427,7 +427,7 @@ const (
 			"containers": [
 				{
 					"name": "redis",
-					"image": "gcr.io/google_containers/redis:e2e",
+					"image": "gcr.kubernetes.io/redis:e2e",
 					"volumeMounts": [{
 						"name": "redis-data",
 						"mountPath": "/data"

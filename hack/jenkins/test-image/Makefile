@@ -19,11 +19,11 @@ all: push
 TAG = go1.6.2-docker1.9.1-rev2
 
 container:
-	docker build -t gcr.io/google_containers/kubekins-test .
-	docker tag gcr.io/google_containers/kubekins-test gcr.io/google_containers/kubekins-test:$(TAG)
+	docker build -t gcr.kubernetes.io/kubekins-test .
+	docker tag gcr.kubernetes.io/kubekins-test gcr.kubernetes.io/kubekins-test:$(TAG)
 
 push: container
-	gcloud docker push gcr.io/google_containers/kubekins-test # Push image tagged as latest to repository
-	gcloud docker push gcr.io/google_containers/kubekins-test:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
+	gcloud docker push gcr.kubernetes.io/kubekins-test # Push image tagged as latest to repository
+	gcloud docker push gcr.kubernetes.io/kubekins-test:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
 
 clean:

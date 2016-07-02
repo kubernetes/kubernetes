@@ -387,7 +387,7 @@ function start_kubelet {
         --privileged=true \
         -i \
         --cidfile=$KUBELET_CIDFILE \
-        gcr.io/google_containers/kubelet \
+        gcr.kubernetes.io/kubelet \
         /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
     fi
 }

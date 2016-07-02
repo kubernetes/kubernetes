@@ -282,7 +282,7 @@ metadata:
 spec:
   containers:
     - name: explorer
-      image: gcr.io/google_containers/explorer:1.0
+      image: gcr.kubernetes.io/explorer:1.0
       args: ["-port=8080"]
       ports:
         - containerPort: 8080

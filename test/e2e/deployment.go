@@ -43,7 +43,7 @@ import (
 const (
 	// nginxImage defined in kubectl.go
 	nginxImageName = "nginx"
-	redisImage     = "gcr.io/google_containers/redis:e2e"
+	redisImage     = "gcr.kubernetes.io/redis:e2e"
 	redisImageName = "redis"
 )
 
