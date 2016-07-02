@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volume
+package attachdetach
 
 import (
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
-	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/testing"
+	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 )
 
 func Test_NewAttachDetachController_Positive(t *testing.T) {
