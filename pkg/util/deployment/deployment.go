@@ -354,14 +354,15 @@ func GetAvailablePodsForDeployment(c clientset.Interface, deployment *extensions
 func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
 	availablePodCount := int32(0)
 	for _, pod := range pods {
-		if IsPodAvailable(&pod, minReadySeconds) {
+		// TODO: Make the time.Now() as argument to allow unit test this.
+		if IsPodAvailable(&pod, minReadySeconds, time.Now()) {
 			availablePodCount++
 		}
 	}
 	return availablePodCount
 }
 
-func IsPodAvailable(pod *api.Pod, minReadySeconds int32) bool {
+func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 	if !controller.IsPodActive(*pod) {
 		return false
 	}
@@ -374,7 +375,7 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32) bool {
 			// 1. minReadySeconds == 0, or
 			// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
 			minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-			if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
+			if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now) {
 				return true
 			}
 		}
