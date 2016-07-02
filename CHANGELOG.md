@@ -98,22 +98,62 @@ binary | sha1 hash | md5 hash
 ------ | --------- | --------
 [kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0/kubernetes.tar.gz) | `88249c443d438666928379aa7fe865b389ed72ea` | `9270f001aef8c03ff5db63456ca9eecc`
 
-## Major Themes
+## Highlights
 
-* TBD
+* Authorization:
+  * **Alpha** RBAC authorization API group
+* Federation 
+  * federation api group is now **beta**
+  * Services from all federated clusters are now registered in Cloud DNS (AWS and GCP).
+* Stateful Apps:
+  * **alpha** PetSets manage stateful apps
+  * **alpha** Init containers provide one-time setup for stateful containers
+* Updating:
+  * Retry Pod/RC updates in kubectl rolling-update.
+  * Stop 'kubectl drain' deleting pods with local storage.
+  * Add `kubectl rollout status`
+* Security/Auth
+  * L7 LB controller and disk attach controllers run on master, so nodes do not need those privileges.
+  * Setting TLS1.2 minimum
+  * `kubectl create secret tls` command
+  * Webhook Token Authenticator
+  * **beta** PodSecurityPolicy objects limits use of security-sensitive features by pods.
+* Kubectl
+  * Display line number on JSON errors
+  * Add flag -t as shorthand for --tty
+* Resources
+  * **alpha**: NVIDIA GPU support ([#24836](https://github.com/kubernetes/kubernetes/pull/24836), [@therc](https://github.com/therc))
+  * Adding loadBalancer services and nodeports services to quota system
 
-## Other notable improvements
+## Known Issues and Important Steps before Upgrading
 
-* TBD
-
-## Known Issues
-
-* TBD
+* *Instructions coming soon*
 
 ## Provider-specific Notes
 
-* TBD
-
+* AWS
+  * Support for ap-northeast-2 region (Seoul)
+  * Allow cross-region image pulling with ECR
+  * More reliable kube-up/kube-down
+  * Enable ICMP Type 3 Code 4 for ELBs
+  * ARP caching fix
+  * Use /dev/xvdXX names
+  * ELB:
+    * ELB proxy protocol support 
+    * mixed plaintext/encrypted ports support in ELBs
+    * SSL support for ELB listeners
+  * Allow VPC CIDR to be specified (experimental)
+  * Fix problems with >2 security groups
+* GCP:
+  * Enable using gcr.io as a Docker registry mirror.
+  * Make bigger master root disks in GCE for large clusters.
+  * Change default clusterCIDRs from /16 to /14 allowing 1000 Node clusters by default.
+  * Allow Debian Jessie on GCE.
+  * Node problem detector addon pod detects and reports kernel deadlocks.
+* OpenStack
+  * Provider added.
+* VSphere:
+  * Provider updated.
 
 ### Previous Releases Included in v1.3.0
 
