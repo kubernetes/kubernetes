@@ -124,13 +124,15 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 		Fs: &stats.FsStats{
 			AvailableBytes: &sb.rootFsInfo.Available,
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
-			UsedBytes:      &sb.rootFsInfo.Usage},
+			UsedBytes:      &sb.rootFsInfo.Usage,
+			InodesFree:     &sb.rootFsInfo.InodesFree},
 		StartTime: rootStats.StartTime,
 		Runtime: &stats.RuntimeStats{
 			ImageFs: &stats.FsStats{
 				AvailableBytes: &sb.imageFsInfo.Available,
 				CapacityBytes:  &sb.imageFsInfo.Capacity,
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
+				InodesFree:     &sb.imageFsInfo.InodesFree,
 			},
 		},
 	}
