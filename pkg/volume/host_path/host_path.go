@@ -112,8 +112,12 @@ func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 	}}, nil
 }
 
-func (plugin *hostPathPlugin) NewRecycler(pvName string, spec *volume.Spec) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
+func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec) error {
+	recycler, err := plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
+	if err != nil {
+		return err
+	}
+	return recycler.Recycle()
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {

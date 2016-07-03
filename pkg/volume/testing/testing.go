@@ -273,8 +273,9 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
-func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler, error) {
-	return &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}, nil
+func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *Spec) error {
+	recycler := &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}
+	return recycler.Recycle()
 }
 
 func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {

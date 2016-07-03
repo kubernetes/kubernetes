@@ -91,14 +91,7 @@ func TestRecycler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	recycler, err := plug.NewRecycler("pv-name", spec)
-	if err != nil {
-		t.Errorf("Failed to make a new Recyler: %v", err)
-	}
-	if recycler.GetPath() != spec.PersistentVolume.Spec.NFS.Path {
-		t.Errorf("Expected %s but got %s", spec.PersistentVolume.Spec.NFS.Path, recycler.GetPath())
-	}
-	if err := recycler.Recycle(); err != nil {
+	if err := plug.Recycle("pv-name", spec); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
 }

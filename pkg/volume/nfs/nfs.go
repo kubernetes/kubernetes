@@ -132,8 +132,12 @@ func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	}}, nil
 }
 
-func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
+func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec) error {
+	recycler, err := plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
+	if err != nil {
+		return err
+	}
+	return recycler.Recycle()
 }
 
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
