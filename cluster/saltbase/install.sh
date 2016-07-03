@@ -93,7 +93,7 @@ readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.kubernetes.io}"
 if [[ "${kube_addon_registry}" != "gcr.kubernetes.io" ]]; then
   find /srv/salt-new -name \*.yaml -or -name \*.yaml.in | \
     xargs sed -ri "s@(image:\s.*)gcr.kubernetes.io@\1${kube_addon_registry}@"
-  # All the legacy .manifest files with hardcoded gcr.io are JSON.
+  # All the legacy .manifest files with hardcoded gcr are JSON.
   find /srv/salt-new -name \*.manifest -or -name \*.json | \
     xargs sed -ri "s@(image\":\s+\")gcr.kubernetes.io@\1${kube_addon_registry}@"
 fi

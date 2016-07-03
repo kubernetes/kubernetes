@@ -21,7 +21,7 @@ container: server
 	docker build -t gcr.kubernetes.io/liveness .
 
 push: container
-	gcloud docker push gcr.kubernetes.io/liveness
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/liveness
 
 clean:
 	rm -f server

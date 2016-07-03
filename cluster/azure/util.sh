@@ -95,12 +95,18 @@ function repo-contains-image() {
     version="$4"
 
     prefix="${registry}"
+    if [[ -n "${repo}" ]]; then
+        image="${repo}/${image}"
+    fi
     if [[ "${prefix}" == "docker.io" ]]; then
         prefix="registry.hub.docker.com/v2/repositories"
-        tags_json=$(curl "https://registry.hub.docker.com/v2/repositories/${repo}/${image}/tags/${version}/" 2>/dev/null)
+        tags_json=$(curl "https://registry.hub.docker.com/v2/repositories/${image}/tags/${version}/" 2>/dev/null)
         tags_found="$(echo "${tags_json}" | jq ".v2?")"
+    elif [[ "${prefix}" == "gcr.kubernetes.io" ]]; then
+        tags_json=$(curl "https://gcr.kubernetes.io/v2/${image}/tags/list" 2>/dev/null)
+        tags_found="$(echo "${tags_json}" | jq ".tags | indices([\"${version}\"]) | any")"
     elif [[ "${prefix}" == "gcr.io" ]]; then
-        tags_json=$(curl "https://gcr.io/v2/${repo}/${image}/tags/list" 2>/dev/null)
+        tags_json=$(curl "https://gcr.io/v2/${image}/tags/list" 2>/dev/null)
         tags_found="$(echo "${tags_json}" | jq ".tags | indices([\"${version}\"]) | any")"
     fi
 
@@ -116,7 +122,7 @@ function ensure-hyperkube() {
     hyperkube="hyperkube-amd64"
     official_image_tag="gcr.kubernetes.io/${hyperkube}:${KUBE_GIT_VERSION}"
 
-    if repo-contains-image "gcr.io" "google_containers" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
+    if repo-contains-image "gcr.kubernetes.io" "" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
         echo "${hyperkube}:${KUBE_GIT_VERSION} was found in the gcr.kubernetes.io repository"
         export AZURE_HYPERKUBE_SPEC="${official_image_tag}"
         return 0
@@ -136,9 +142,10 @@ function ensure-hyperkube() {
         return 0
     fi
 
-    # should these steps tell them to just immediately tag it with the final user-specified repo?
-    # for now just stick with the assumption that `make release` will eventually tag a hyperkube image on gcr.io
-    # and then the existing code can re-tag that for the user's repo and then push
+    # should these steps tell them to just immediately tag it with the final
+    # user-specified repo?  for now just stick with the assumption that `make
+    # release` will eventually tag a hyperkube image on gcr.kubernetes.io and
+    # then the existing code can re-tag that for the user's repo and then push
     if ! docker inspect "${user_image_tag}" ; then
         if ! docker inspect "${official_image_tag}" ; then
             REGISTRY="gcr.kubernetes.io" \

@@ -24,7 +24,7 @@ container: explorer
 	docker build -t gcr.kubernetes.io/explorer:$(TAG) .
 
 push: container
-	gcloud docker push gcr.kubernetes.io/explorer:$(TAG)
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/explorer:$(TAG)
 
 clean:
 	rm -f explorer

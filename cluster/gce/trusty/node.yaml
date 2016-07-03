@@ -194,7 +194,7 @@ script
 	# may break this upstart job.
 	sed -i "/^ *{%/d" ${tmp_file}
 	kubeconfig="--kubeconfig=\/var\/lib\/kube-proxy\/kubeconfig"
-	kube_docker_registry="gcr.io\/google_containers"
+	kube_docker_registry="gcr.kubernetes.io"
 	if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
 		kube_docker_registry=${KUBE_DOCKER_REGISTRY}
 	fi

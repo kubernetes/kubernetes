@@ -20,4 +20,4 @@ build:
 	docker build -t gcr.kubernetes.io/kibana:$(TAG) .
 
 push:
-	gcloud docker push gcr.kubernetes.io/kibana:$(TAG)
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/kibana:$(TAG)

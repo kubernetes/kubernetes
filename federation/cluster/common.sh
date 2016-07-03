@@ -259,7 +259,8 @@ function push-federation-images {
 	docker tag -f "$srcImageName" "$dstImageName"
 
 	echo "Push: $dstImageName"
-	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]];then
+	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* \
+	    || "${FEDERATION_PUSH_REPO_BASE}" == "gcr.kubernetes.io/"* ]]; then
 	    echo " -> GCR repository detected. Using gcloud"
 	    gcloud docker push "$dstImageName"
 	else

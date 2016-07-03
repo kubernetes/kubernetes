@@ -40,7 +40,7 @@ container:
 
 push: container
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' to see a suggestion))
-	gcloud docker push gcr.kubernetes.io/kubectl:$(TAG)
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/kubectl:$(TAG)
 
 clean:
 	rm -f kubectl

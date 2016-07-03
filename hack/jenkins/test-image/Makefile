@@ -23,7 +23,7 @@ container:
 	docker tag gcr.kubernetes.io/kubekins-test gcr.kubernetes.io/kubekins-test:$(TAG)
 
 push: container
-	gcloud docker push gcr.kubernetes.io/kubekins-test # Push image tagged as latest to repository
-	gcloud docker push gcr.kubernetes.io/kubekins-test:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/kubekins-test # Push image tagged as latest to repository
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/kubekins-test:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
 
 clean:

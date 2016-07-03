@@ -25,7 +25,7 @@ LOCAL_OUTPUT_DIR=../../../_output/local
 release: clean
 	curl -O https://storage.googleapis.com/kubernetes-release/release/${VERSION}/${BIN_DIR}/kubelet
 	docker build -t gcr.kubernetes.io/kubelet:${VERSION} .
-	gcloud docker push gcr.kubernetes.io/kubelet:${VERSION}
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/kubelet:${VERSION}
 
 local: clean
 	cp ${LOCAL_OUTPUT_DIR}/${BIN_DIR}/kubelet .

@@ -442,7 +442,8 @@ function stage-images() {
 
   local docker_cmd=("docker")
 
-  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* \
+      || "${KUBE_DOCKER_REGISTRY}" == "gcr.kubernetes.io/"* ]]; then
     local docker_push_cmd=("gcloud" "docker")
   fi
 

@@ -21,4 +21,4 @@ build:
 	docker build -t gcr.kubernetes.io/$(IMAGE):$(TAG) .
 
 push:	
-	gcloud docker --server=gcr.io push gcr.kubernetes.io/$(IMAGE):$(TAG)
+	gcloud docker --server=gcr.kubernetes.io push gcr.kubernetes.io/$(IMAGE):$(TAG)

@@ -1550,7 +1550,8 @@ function kube::release::docker::release() {
   )
 
   local docker_push_cmd=("${DOCKER[@]}")
-  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* \
+      || "${KUBE_DOCKER_REGISTRY}" == "gcr.kubernetes.io/"* ]]; then
     docker_push_cmd=("gcloud" "docker")
   fi
 
