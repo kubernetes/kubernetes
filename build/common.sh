@@ -559,16 +559,6 @@ function kube::build::clean_images() {
 }
 
 function kube::build::ensure_data_container() {
-  # This is temporary, while last remnants of _workspace are obliterated.  If
-  # the data container exists it might be from before the change from
-  # Godeps/_workspace/ to vendor/, and thereby still have a Godeps/_workspace/
-  # directory in it, which trips up godep (yay godep!).  Once we are confident
-  # that this has run ~everywhere we care about, we can remove this.
-  # TODO(thockin): remove this after v1.3 is cut.
-  if "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" \
-      | grep -q "Godeps/_workspace/pkg"; then
-    docker rm -f "${KUBE_BUILD_DATA_CONTAINER_NAME}"
-  fi
   if ! "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1; then
     kube::log::status "Creating data container"
     local -ra docker_cmd=(
