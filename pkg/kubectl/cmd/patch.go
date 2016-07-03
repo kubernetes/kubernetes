@@ -197,7 +197,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if err != nil {
 			return err
 		}
-		originalObjJS, err := runtime.Encode(api.Codecs.LegacyCodec(), info.VersionedObject.(runtime.Object))
+		originalObjJS, err := runtime.Encode(api.Codecs.LegacyCodec(mapping.GroupVersionKind.GroupVersion()), info.VersionedObject.(runtime.Object))
 		if err != nil {
 			return err
 		}
