@@ -118,10 +118,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// avoid having to make a reflection call.
 			canInlineTypeFn := func(c *generator.Context, t *types.Type) bool {
 				// types must be public structs or have a custom DeepCopy_<method> already defined
-				if !copyableWithinPackage(t, explicitInputs.Has(t.Name.Package)) && !publicCopyFunctionDefined(c, t) {
+				if publicCopyFunctionDefined(c, t) {
+					return true
+				}
+				if !copyableWithinPackage(t, explicitInputs.Has(t.Name.Package)) {
 					return false
 				}
-
 				// only packages within the restricted range can be inlined
 				for _, s := range restrictRange {
 					if strings.HasPrefix(t.Name.Package, s) {
