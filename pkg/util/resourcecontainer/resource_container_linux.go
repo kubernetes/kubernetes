@@ -20,7 +20,6 @@ package resourcecontainer
 
 import (
 	"os"
-	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
