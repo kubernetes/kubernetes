@@ -1,7 +1,7 @@
-// +build !linux
+// +build linux
 
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourcecontainer
+package rlimit
 
 import (
-	"errors"
+	"syscall"
 )
 
-func RunInResourceContainer(containerName string) error {
-	return errors.New("resource-only containers unsupported in this platform")
+func RlimitNumFiles(maxOpenFiles uint64) {
+	syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{Max: maxOpenFiles, Cur: maxOpenFiles})
 }
