@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+all: container
 
 TAG = e2e
 PREFIX = gcr.io/google_containers/redis-install-3.2.0
