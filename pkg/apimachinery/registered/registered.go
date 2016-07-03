@@ -22,6 +22,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 
@@ -207,11 +208,7 @@ func AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion) []unversione
 	}
 	RegisterVersions(filteredGVs)
 	EnableVersions(filteredGVs...)
-	next := make([]unversioned.GroupVersion, len(gvs))
-	for ix := range filteredGVs {
-		next[ix] = filteredGVs[ix]
-	}
-	thirdPartyGroupVersions = next
+	thirdPartyGroupVersions = append(thirdPartyGroupVersions, filteredGVs...)
 
 	return skippedGVs
 }
