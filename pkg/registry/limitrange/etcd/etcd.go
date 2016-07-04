@@ -18,8 +18,6 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -51,9 +49,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.LimitRange).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return limitrange.MatchLimitRange(label, field)
-		},
+		PredicateFunc:           limitrange.MatchLimitRange,
 		QualifiedResource:       api.Resource("limitranges"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 

@@ -20,8 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/daemonset"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -62,9 +60,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 			return obj.(*extensions.DaemonSet).Name, nil
 		},
 		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return daemonset.MatchDaemonSet(label, field)
-		},
+		PredicateFunc:           daemonset.MatchDaemonSet,
 		QualifiedResource:       extensions.Resource("daemonsets"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 

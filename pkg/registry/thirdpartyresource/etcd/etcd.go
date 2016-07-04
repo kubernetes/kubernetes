@@ -19,8 +19,6 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresource"
@@ -51,9 +49,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.ThirdPartyResource).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return thirdpartyresource.Matcher(label, field)
-		},
+		PredicateFunc:           thirdpartyresource.Matcher,
 		QualifiedResource:       extensions.Resource("thirdpartyresources"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 		CreateStrategy:          thirdpartyresource.Strategy,

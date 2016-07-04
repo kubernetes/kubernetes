@@ -20,8 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -60,9 +58,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 			return obj.(*autoscaling.HorizontalPodAutoscaler).Name, nil
 		},
 		// Used to match objects based on labels/fields for list
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return horizontalpodautoscaler.MatchAutoscaler(label, field)
-		},
+		PredicateFunc:           horizontalpodautoscaler.MatchAutoscaler,
 		QualifiedResource:       autoscaling.Resource("horizontalpodautoscalers"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
