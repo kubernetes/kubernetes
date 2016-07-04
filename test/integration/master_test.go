@@ -42,7 +42,7 @@ import (
 )
 
 func testPrefix(t *testing.T, prefix string) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	resp, err := http.Get(s.URL + prefix)
@@ -71,7 +71,7 @@ func TestExtensionsPrefix(t *testing.T) {
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	resp, err := http.Get(s.URL + "/api/v1/namespaces?watch=1")
@@ -118,7 +118,7 @@ func extensionsPath(resource, namespace, name string) string {
 }
 
 func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 	transport := http.DefaultTransport
 
@@ -261,7 +261,7 @@ func TestBatchGroupBackwardCompatibility(t *testing.T) {
 	if *testapi.Batch.GroupVersion() == v2alpha1.SchemeGroupVersion {
 		t.Skip("Shared job storage is not required for batch/v2alpha1.")
 	}
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 	transport := http.DefaultTransport
 
@@ -314,7 +314,7 @@ func TestBatchGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAccept(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	resp, err := http.Get(s.URL + "/api/")
