@@ -719,7 +719,7 @@ func TestPodFitsSelector(t *testing.T) {
 								"matchExpressions": [{
 									"key": "kernel-version",
 									"operator": "Gt",
-									"values": ["2.4"]
+									"values": ["0204"]
 								}]
 							}]
 						}}}`,
@@ -727,7 +727,8 @@ func TestPodFitsSelector(t *testing.T) {
 				},
 			},
 			labels: map[string]string{
-				"kernel-version": "2.6",
+				// We use two digit to denote major version and two digit for minior version.
+				"kernel-version": "0206",
 			},
 			fits: true,
 			test: "Pod with matchExpressions using Gt operator that matches the existing node",
