@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
@@ -186,12 +187,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	namer := &testNamer{namespace, name}
 	copier := runtime.ObjectCopier(api.Scheme)
 	resource := unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-
-	versionedObj, err := api.Scheme.ConvertToVersion(&api.Pod{}, unversioned.GroupVersion{Version: "v1"})
-	if err != nil {
-		t.Errorf("%s: unexpected error: %v", tc.name, err)
-		return
-	}
+	versionedObj := &v1.Pod{}
 
 	for _, patchType := range []api.PatchType{api.JSONPatchType, api.MergePatchType, api.StrategicMergePatchType} {
 		// TODO SUPPORT THIS!

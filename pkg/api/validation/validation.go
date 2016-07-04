@@ -1960,6 +1960,23 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 	return allErrs
 }
 
+func validateContainerUpdates(newContainers, oldContainers []api.Container, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
+	allErrs = field.ErrorList{}
+	if len(newContainers) != len(oldContainers) {
+		//TODO: Pinpoint the specific container that causes the invalid error after we have strategic merge diff
+		allErrs = append(allErrs, field.Forbidden(fldPath, "pod updates may not add or remove containers"))
+		return allErrs, true
+	}
+
+	// validate updated container images
+	for i, ctr := range newContainers {
+		if len(ctr.Image) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("image"), ""))
+		}
+	}
+	return allErrs, false
+}
+
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
 func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
@@ -1967,21 +1984,21 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newPod.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
 	specPath := field.NewPath("spec")
-	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
-		//TODO: Pinpoint the specific container that causes the invalid error after we have strategic merge diff
-		allErrs = append(allErrs, field.Forbidden(specPath.Child("containers"), "pod updates may not add or remove containers"))
-		return allErrs
-	}
 
 	// validate updateable fields:
 	// 1.  containers[*].image
-	// 2.  spec.activeDeadlineSeconds
+	// 2.  initContainers[*].image
+	// 3.  spec.activeDeadlineSeconds
 
-	// validate updated container images
-	for i, ctr := range newPod.Spec.Containers {
-		if len(ctr.Image) == 0 {
-			allErrs = append(allErrs, field.Required(specPath.Child("containers").Index(i).Child("image"), ""))
-		}
+	containerErrs, stop := validateContainerUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, specPath.Child("containers"))
+	allErrs = append(allErrs, containerErrs...)
+	if stop {
+		return allErrs
+	}
+	containerErrs, stop = validateContainerUpdates(newPod.Spec.InitContainers, oldPod.Spec.InitContainers, specPath.Child("initContainers"))
+	allErrs = append(allErrs, containerErrs...)
+	if stop {
+		return allErrs
 	}
 
 	// validate updated spec.activeDeadlineSeconds.  two types of updates are allowed:
@@ -2013,6 +2030,13 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 		newContainers = append(newContainers, container)
 	}
 	mungedPod.Spec.Containers = newContainers
+	// munge initContainers[*].image
+	var newInitContainers []api.Container
+	for ix, container := range mungedPod.Spec.InitContainers {
+		container.Image = oldPod.Spec.InitContainers[ix].Image
+		newInitContainers = append(newInitContainers, container)
+	}
+	mungedPod.Spec.InitContainers = newInitContainers
 	// munge spec.activeDeadlineSeconds
 	mungedPod.Spec.ActiveDeadlineSeconds = nil
 	if oldPod.Spec.ActiveDeadlineSeconds != nil {
