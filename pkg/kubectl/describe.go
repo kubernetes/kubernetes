@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ import (
 	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
-	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
@@ -540,7 +540,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, out, "")
-		fmt.Fprintf(out, "QoS Tier:\t%s\n", qosutil.GetPodQos(pod))
+		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -549,7 +549,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 }
 
 func printControllers(annotation map[string]string) string {
-	value, ok := annotation["kubernetes.io/created-by"]
+	value, ok := annotation[api.CreatedByAnnotation]
 	if ok {
 		var r api.SerializedReference
 		err := json.Unmarshal([]byte(value), &r)
@@ -887,7 +887,28 @@ func describeContainers(label string, containers []api.Container, containerStatu
 			probe := DescribeProbe(container.ReadinessProbe)
 			fmt.Fprintf(out, "    Readiness:\t%s\n", probe)
 		}
+
 		none := ""
+		if len(container.VolumeMounts) == 0 {
+			none = "\t<none>"
+		}
+
+		fmt.Fprintf(out, "    Volume Mounts:%s\n", none)
+		sort.Sort(SortableVolumeMounts(container.VolumeMounts))
+		for _, mount := range container.VolumeMounts {
+			flags := []string{}
+			switch {
+			case mount.ReadOnly:
+				flags = append(flags, "ro")
+			case !mount.ReadOnly:
+				flags = append(flags, "rw")
+			case len(mount.SubPath) > 0:
+				flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
+			}
+			fmt.Fprintf(out, "      %s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
+		}
+
+		none = ""
 		if len(container.Env) == 0 {
 			none = "\t<none>"
 		}
@@ -1846,7 +1867,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ------------\t----------\t---------------\t-------------\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	if err != nil {
@@ -2114,22 +2135,6 @@ func describeCluster(cluster *federation.Cluster) (string, error) {
 					c.LastTransitionTime.Time.Format(time.RFC1123Z),
 					c.Reason,
 					c.Message)
-			}
-		}
-
-		fmt.Fprintf(out, "Version:\t%s\n", cluster.Status.Version)
-
-		if len(cluster.Status.Capacity) > 0 {
-			fmt.Fprintf(out, "Capacity:\n")
-			for resource, value := range cluster.Status.Capacity {
-				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
-			}
-		}
-
-		if len(cluster.Status.Allocatable) > 0 {
-			fmt.Fprintf(out, "Allocatable:\n")
-			for resource, value := range cluster.Status.Allocatable {
-				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
 			}
 		}
 		return nil

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -114,37 +113,6 @@ type Cacher struct {
 // Create a new Cacher responsible from service WATCH and LIST requests from its
 // internal cache and updating its cache in the background based on the given
 // configuration.
-func NewCacher(
-	storage Interface,
-	capacity int,
-	versioner Versioner,
-	objectType runtime.Object,
-	resourcePrefix string,
-	scopeStrategy rest.NamespaceScopedStrategy,
-	newListFunc func() runtime.Object) Interface {
-	config := CacherConfig{
-		CacheCapacity:  capacity,
-		Storage:        storage,
-		Versioner:      versioner,
-		Type:           objectType,
-		ResourcePrefix: resourcePrefix,
-		NewListFunc:    newListFunc,
-	}
-	if scopeStrategy.NamespaceScoped() {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
-			return NamespaceKeyFunc(resourcePrefix, obj)
-		}
-	} else {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
-			return NoNamespaceKeyFunc(resourcePrefix, obj)
-		}
-	}
-	return NewCacherFromConfig(config)
-}
-
-// Create a new Cacher responsible from service WATCH and LIST requests from its
-// internal cache and updating its cache in the background based on the given
-// configuration.
 func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
@@ -158,22 +126,18 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	}
 
 	cacher := &Cacher{
-		usable:     sync.RWMutex{},
 		storage:    config.Storage,
 		watchCache: watchCache,
 		reflector:  cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
-		watcherIdx: 0,
 		watchers:   make(map[int]*cacheWatcher),
 		versioner:  config.Versioner,
 		keyFunc:    config.KeyFunc,
-		stopped:    false,
 		// We need to (potentially) stop both:
 		// - wait.Until go-routine
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
 		stopCh: make(chan struct{}),
-		stopWg: sync.WaitGroup{},
 	}
 	// See startCaching method for explanation and where this is unlocked.
 	cacher.usable.Lock()

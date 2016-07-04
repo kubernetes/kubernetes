@@ -75,7 +75,9 @@ The `kubelet` will support the ability to trigger eviction decisions on the foll
 |------------------|---------------------------------------------------------------------------------|
 | memory.available | memory.available := node.status.capacity[memory] - node.stats.memory.workingSet |
 | nodefs.available   | nodefs.available := node.stats.fs.available |
+| nodefs.inodesFree | nodefs.inodesFree := node.fs.inodesFree |
 | imagefs.available | imagefs.available := node.stats.runtime.imagefs.available |
+| imagefs.inodesFree | imagefs.inodesFree := node.runtime.imageFs.inodesFree |
 
 `kubelet` supports only two filesystem partitions.
 
@@ -166,7 +168,7 @@ The following node conditions are defined that correspond to the specified evict
 | Node Condition | Eviction Signal  | Description                                                      |
 |----------------|------------------|------------------------------------------------------------------|
 | MemoryPressure | memory.available | Available memory on the node has satisfied an eviction threshold |
-| DiskPressure | nodefs.available (or) imagefs.available | Available disk space on either the node's root filesytem or image filesystem has satisfied an eviction threshold |
+| DiskPressure | nodefs.available, nodefs.inodesFree, imagefs.available, or imagefs.inodesFree | Available disk space and inodes on either the node's root filesytem or image filesystem has satisfied an eviction threshold |
 
 The `kubelet` will continue to report node status updates at the frequency specified by
 `--node-status-update-frequency` which defaults to `10s`.
@@ -217,20 +219,24 @@ reclaim the resource that has met its eviction threshold.
 Let's assume the operator started the `kubelet` with the following:
 
 ```
---eviction-hard="nodefs.available<1Gi,imagefs.available<10Gi"
---eviction-soft="nodefs.available<1.5Gi,imagefs.available<20Gi"
+--eviction-hard="nodefs.available<1Gi,nodefs.inodesFree<1,imagefs.available<10Gi,imagefs.inodesFree<10"
+--eviction-soft="nodefs.available<1.5Gi,nodefs.inodesFree<10,imagefs.available<20Gi,imagefs.inodesFree<100"
 --eviction-soft-grace-period="nodefs.available=1m,imagefs.available=2m"
 ```
 
 The `kubelet` will run a sync loop that looks at the available disk
 on the node's supported partitions as reported from `cAdvisor`.
-If available disk space on the node's primary filesystem is observed to drop below 1Gi,
+If available disk space on the node's primary filesystem is observed to drop below 1Gi
+or the free inodes on the node's primary filesystem is less than 1,
 the `kubelet` will immediately initiate eviction.
-If available disk space on the node's image filesystem is observed to drop below 10Gi,
+If available disk space on the node's image filesystem is observed to drop below 10Gi
+or the free inodes on the node's primary image filesystem is less than 10,
 the `kubelet` will immediately initiate eviction.
 
 If available disk space on the node's primary filesystem is observed as falling below `1.5Gi`,
+or if the free inodes on the node's primary filesystem is less than 10,
 or if available disk space on the node's image filesystem is observed as falling below `20Gi`,
+or if the free inodes on the node's image filesystem is less than 100,
 it will record when that signal was observed internally in a cache.  If at the next
 sync, that criterion was no longer satisfied, the cache is cleared for that
 signal.  If that signal is observed as being satisfied for longer than the

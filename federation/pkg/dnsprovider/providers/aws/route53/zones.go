@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,7 +48,8 @@ func (zones Zones) List() ([]dnsprovider.Zone, error) {
 
 func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {
 	dnsName := zone.Name()
-	input := route53.CreateHostedZoneInput{Name: &dnsName}
+	callerReference := string(util.NewUUID())
+	input := route53.CreateHostedZoneInput{Name: &dnsName, CallerReference: &callerReference}
 	output, err := zones.interface_.service.CreateHostedZone(&input)
 	if err != nil {
 		return nil, err
@@ -56,6 +57,15 @@ func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {
 	return &Zone{output.HostedZone, &zones}, nil
 }
 
+func (zones Zones) Remove(zone dnsprovider.Zone) error {
+	zoneId := zone.(*Zone).impl.Id
+	input := route53.DeleteHostedZoneInput{Id: zoneId}
+	_, err := zones.interface_.service.DeleteHostedZone(&input)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (zones Zones) New(name string) (dnsprovider.Zone, error) {
 	id := string(util.NewUUID())
 	managedZone := route53.HostedZone{Id: &id, Name: &name}

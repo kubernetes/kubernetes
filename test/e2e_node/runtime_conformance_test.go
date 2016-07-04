@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -97,14 +97,12 @@ while true; do sleep 1; done
 					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
+						Framework:     f,
 						Container:     testContainer,
-						Client:        f.Client,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
-						NodeName:      *nodeName,
-						Namespace:     f.Namespace.Name,
 					}
-					Expect(terminateContainer.Create()).To(Succeed())
+					terminateContainer.Create()
 					defer terminateContainer.Delete()
 
 					By("it should get the expected 'RestartCount'")
@@ -136,6 +134,7 @@ while true; do sleep 1; done
 				terminationMessage := "DONE"
 				terminationMessagePath := "/dev/termination-log"
 				c := ConformanceContainer{
+					Framework: f,
 					Container: api.Container{
 						Image:   ImageRegistry[busyBoxImage],
 						Name:    name,
@@ -143,14 +142,11 @@ while true; do sleep 1; done
 						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
 						TerminationMessagePath: terminationMessagePath,
 					},
-					Client:        f.Client,
 					RestartPolicy: api.RestartPolicyNever,
-					NodeName:      *nodeName,
-					Namespace:     f.Namespace.Name,
 				}
 
 				By("create the container")
-				Expect(c.Create()).To(Succeed())
+				c.Create()
 				defer c.Delete()
 
 				By("wait for the container to succeed")
@@ -236,6 +232,7 @@ while true; do sleep 1; done
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{
+						Framework: f,
 						Container: api.Container{
 							Name:    name,
 							Image:   testCase.image,
@@ -243,10 +240,7 @@ while true; do sleep 1; done
 							// PullAlways makes sure that the image will always be pulled even if it is present before the test.
 							ImagePullPolicy: api.PullAlways,
 						},
-						Client:        f.Client,
 						RestartPolicy: api.RestartPolicyNever,
-						NodeName:      *nodeName,
-						Namespace:     f.Namespace.Name,
 					}
 					if testCase.secret {
 						secret.Name = "image-pull-secret-" + string(util.NewUUID())
@@ -258,17 +252,25 @@ while true; do sleep 1; done
 					}
 
 					By("create the container")
-					Expect(container.Create()).To(Succeed())
+					container.Create()
 					defer container.Delete()
 
-					By("check the pod phase")
-					Eventually(container.GetPhase, retryTimeout, pollInterval).Should(Equal(testCase.phase))
-					Consistently(container.GetPhase, consistentCheckTimeout, pollInterval).Should(Equal(testCase.phase))
-
+					// We need to check container state first. The default pod status is pending, If we check
+					// pod phase first, and the expected pod phase is Pending, the container status may not
+					// even show up when we check it.
 					By("check the container state")
-					status, err := container.GetStatus()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(GetContainerState(status.State)).To(Equal(testCase.state))
+					getState := func() (ContainerState, error) {
+						status, err := container.GetStatus()
+						if err != nil {
+							return ContainerStateUnknown, err
+						}
+						return GetContainerState(status.State), nil
+					}
+					Eventually(getState, retryTimeout, pollInterval).Should(Equal(testCase.state))
+					Consistently(getState, consistentCheckTimeout, pollInterval).Should(Equal(testCase.state))
+
+					By("check the pod phase")
+					Expect(container.GetPhase()).To(Equal(testCase.phase))
 
 					By("it should be possible to delete")
 					Expect(container.Delete()).To(Succeed())

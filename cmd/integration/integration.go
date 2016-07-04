@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -295,66 +295,6 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 	}
 }
 
-func runSchedulerNoPhantomPodsTest(client *client.Client) {
-	pod := &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:  "c1",
-					Image: e2e.GetPauseImageName(client),
-					Ports: []api.ContainerPort{
-						{ContainerPort: 1234, HostPort: 9999},
-					},
-					ImagePullPolicy: api.PullIfNotPresent,
-				},
-			},
-		},
-	}
-
-	// Assuming we only have two kubelets, the third pod here won't schedule
-	// if the scheduler doesn't correctly handle the delete for the second
-	// pod.
-	pod.ObjectMeta.Name = "phantom.foo"
-	foo, err := client.Pods(api.NamespaceDefault).Create(pod)
-	if err != nil {
-		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
-	}
-	if err := wait.Poll(time.Second, longTestTimeout, podRunning(client, foo.Namespace, foo.Name)); err != nil {
-		glog.Fatalf("FAILED: pod never started running %v", err)
-	}
-
-	pod.ObjectMeta.Name = "phantom.bar"
-	bar, err := client.Pods(api.NamespaceDefault).Create(pod)
-	if err != nil {
-		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
-	}
-	if err := wait.Poll(time.Second, longTestTimeout, podRunning(client, bar.Namespace, bar.Name)); err != nil {
-		glog.Fatalf("FAILED: pod never started running %v", err)
-	}
-
-	// Delete a pod to free up room.
-	glog.Infof("Deleting pod %v", bar.Name)
-	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, api.NewDeleteOptions(0))
-	if err != nil {
-		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
-	}
-
-	pod.ObjectMeta.Name = "phantom.baz"
-	baz, err := client.Pods(api.NamespaceDefault).Create(pod)
-	if err != nil {
-		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
-	}
-	if err := wait.Poll(time.Second, longTestTimeout, podRunning(client, baz.Namespace, baz.Name)); err != nil {
-		if pod, perr := client.Pods(api.NamespaceDefault).Get("phantom.bar"); perr == nil {
-			glog.Fatalf("FAILED: 'phantom.bar' was never deleted: %#v, err: %v", pod, err)
-		} else {
-			glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: err: %v, perr: %v", err, perr)
-		}
-	}
-
-	glog.Info("Scheduler doesn't make phantom pods: test passed.")
-}
-
 type testFunc func(*client.Client)
 
 func addFlags(fs *pflag.FlagSet) {
@@ -456,11 +396,6 @@ func main() {
 		glog.Fatalf("Expected 6 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
-
-	// This test doesn't run with the others because it can't run in
-	// parallel and also it schedules extra pods which would change the
-	// above pod counting logic.
-	runSchedulerNoPhantomPodsTest(kubeClient)
 
 	glog.Infof("\n\nLogging high latency metrics from the 10250 kubelet")
 	e2e.HighLatencyKubeletOperations(nil, 1*time.Second, "localhost:10250")

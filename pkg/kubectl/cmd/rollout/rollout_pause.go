@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package rollout
 import (
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -42,17 +43,19 @@ type PauseConfig struct {
 	Recursive bool
 }
 
-const (
-	pause_long = `Mark the provided resource as paused
+var (
+	pause_long = dedent.Dedent(`
+		Mark the provided resource as paused
 
-Paused resources will not be reconciled by a controller.
-Use \"kubectl rollout resume\" to resume a paused resource.
-Currently only deployments support being paused.`
+		Paused resources will not be reconciled by a controller.
+		Use \"kubectl rollout resume\" to resume a paused resource.
+		Currently only deployments support being paused.`)
 
-	pause_example = `# Mark the nginx deployment as paused. Any current state of
-# the deployment will continue its function, new updates to the deployment will not
-# have an effect as long as the deployment is paused.
-kubectl rollout pause deployment/nginx`
+	pause_example = dedent.Dedent(`
+		# Mark the nginx deployment as paused. Any current state of
+		# the deployment will continue its function, new updates to the deployment will not
+		# have an effect as long as the deployment is paused.
+		kubectl rollout pause deployment/nginx`)
 )
 
 func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {

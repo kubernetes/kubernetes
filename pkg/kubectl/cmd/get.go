@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -37,36 +38,38 @@ type GetOptions struct {
 	Recursive bool
 }
 
-const (
-	get_long = `Display one or many resources.
+var (
+	get_long = dedent.Dedent(`
+		Display one or many resources.
 
-` + kubectl.PossibleResourceTypes + `
+		`) + kubectl.PossibleResourceTypes + dedent.Dedent(`
 
-By specifying the output as 'template' and providing a Go template as the value
-of the --template flag, you can filter the attributes of the fetched resource(s).`
-	get_example = `# List all pods in ps output format.
-kubectl get pods
+		By specifying the output as 'template' and providing a Go template as the value
+		of the --template flag, you can filter the attributes of the fetched resource(s).`)
+	get_example = dedent.Dedent(`
+		# List all pods in ps output format.
+		kubectl get pods
 
-# List all pods in ps output format with more information (such as node name).
-kubectl get pods -o wide
+		# List all pods in ps output format with more information (such as node name).
+		kubectl get pods -o wide
 
-# List a single replication controller with specified NAME in ps output format.
-kubectl get replicationcontroller web
+		# List a single replication controller with specified NAME in ps output format.
+		kubectl get replicationcontroller web
 
-# List a single pod in JSON output format.
-kubectl get -o json pod web-pod-13je7
+		# List a single pod in JSON output format.
+		kubectl get -o json pod web-pod-13je7
 
-# List a pod identified by type and name specified in "pod.yaml" in JSON output format.
-kubectl get -f pod.yaml -o json
+		# List a pod identified by type and name specified in "pod.yaml" in JSON output format.
+		kubectl get -f pod.yaml -o json
 
-# Return only the phase value of the specified pod.
-kubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}
+		# Return only the phase value of the specified pod.
+		kubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}
 
-# List all replication controllers and services together in ps output format.
-kubectl get rc,services
+		# List all replication controllers and services together in ps output format.
+		kubectl get rc,services
 
-# List one or more resources by their type and names.
-kubectl get rc/web service/frontend pods/web-pod-13je7`
+		# List one or more resources by their type and names.
+		kubectl get rc/web service/frontend pods/web-pod-13je7`)
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which
@@ -100,6 +103,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag statements like -L label1 -L label2...")
 	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
@@ -115,6 +119,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
+	allKinds := cmdutil.GetFlagBool(cmd, "show-kind")
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -229,6 +234,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		singular := false
 		infos, err := r.IntoSingular(&singular).Infos()
 		if err != nil {
+			if singular {
+				return err
+			}
 			allErrs = append(allErrs, err)
 		}
 
@@ -291,8 +299,28 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	// use the default printer for each object
 	printer = nil
 	var lastMapping *meta.RESTMapping
+	var withKind bool = allKinds
 	w := kubectl.GetNewTabWriter(out)
 	defer w.Flush()
+
+	// determine if printing multiple kinds of
+	// objects and enforce "show-kinds" flag if so
+	for ix := range objs {
+		var mapping *meta.RESTMapping
+		if sorter != nil {
+			mapping = infos[sorter.OriginalPosition(ix)].Mapping
+		} else {
+			mapping = infos[ix].Mapping
+		}
+
+		// display "kind" column only if we have mixed resources
+		if lastMapping != nil && mapping.Resource != lastMapping.Resource {
+			withKind = true
+		}
+		lastMapping = mapping
+	}
+
+	lastMapping = nil
 
 	for ix := range objs {
 		var mapping *meta.RESTMapping
@@ -312,7 +340,16 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			}
 			lastMapping = mapping
 		}
-		if _, found := printer.(*kubectl.HumanReadablePrinter); found {
+		if resourcePrinter, found := printer.(*kubectl.HumanReadablePrinter); found {
+			resourceName := mapping.Resource
+			if alias, ok := kubectl.ResourceShortFormFor(mapping.Resource); ok {
+				resourceName = alias
+			} else if resourceName == "" {
+				resourceName = "none"
+			}
+
+			resourcePrinter.Options.WithKind = withKind
+			resourcePrinter.Options.KindName = resourceName
 			if err := printer.PrintObj(original, w); err != nil {
 				allErrs = append(allErrs, err)
 			}

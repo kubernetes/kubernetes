@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -98,6 +98,9 @@ func (cache *TreeCache) setSubCache(key string, subCache *TreeCache, path ...str
 
 func (cache *TreeCache) getEntry(key string, path ...string) (interface{}, bool) {
 	childNode := cache.getSubCache(path...)
+	if childNode == nil {
+		return nil, false
+	}
 	val, ok := childNode.Entries[key]
 	return val, ok
 }

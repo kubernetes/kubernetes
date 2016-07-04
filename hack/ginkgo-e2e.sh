@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   detect-node-instance-groups
-  NODE_INSTANCE_GROUP=$(kube::util::join , NODE_INSTANCE_GROUPS)
+  NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUPS[@]}")
 fi
 
 ginkgo_args=()
@@ -120,6 +120,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
   ${OS_DISTRIBUTION:+"--os-distro=${OS_DISTRIBUTION}"} \
+  ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
   ${E2E_CLEAN_START:+"--clean-start=true"} \
   ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} \

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -137,7 +137,7 @@ func removeLabelOffNode(c *client.Client, nodeName string, labelKey string) {
 	framework.ExpectNoError(err)
 
 	By("verifying the node doesn't have the label " + labelKey)
-	if nodeUpdated.Labels == nil || len(nodeUpdated.Labels[labelKey]) != 0 {
+	if nodeUpdated.Labels != nil && len(nodeUpdated.Labels[labelKey]) != 0 {
 		framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
 	}
 }
@@ -222,7 +222,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, false)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -252,24 +252,29 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
 
-		framework.StartPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
-			TypeMeta: unversioned.TypeMeta{
-				Kind: "Pod",
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name:   "",
-				Labels: map[string]string{"name": ""},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "",
-						Image: framework.GetPauseImageName(f.Client),
+		// As the pods are distributed randomly among nodes,
+		// it can easily happen that all nodes are satured
+		// and there is no need to create additional pods.
+		// StartPods requires at least one pod to replicate.
+		if podsNeededForSaturation > 0 {
+			framework.StartPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:   "",
+					Labels: map[string]string{"name": ""},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "",
+							Image: framework.GetPauseImageName(f.Client),
+						},
 					},
 				},
-			},
-		}, true)
-
+			}, true)
+		}
 		podName := "additional-pod"
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -329,32 +334,37 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
 
-		framework.StartPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
-			TypeMeta: unversioned.TypeMeta{
-				Kind: "Pod",
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name:   "",
-				Labels: map[string]string{"name": ""},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "",
-						Image: framework.GetPauseImageName(f.Client),
-						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
-							},
-							Requests: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+		// As the pods are distributed randomly among nodes,
+		// it can easily happen that all nodes are saturated
+		// and there is no need to create additional pods.
+		// StartPods requires at least one pod to replicate.
+		if podsNeededForSaturation > 0 {
+			framework.StartPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:   "",
+					Labels: map[string]string{"name": ""},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "",
+							Image: framework.GetPauseImageName(f.Client),
+							Resources: api.ResourceRequirements{
+								Limits: api.ResourceList{
+									"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+								},
+								Requests: api.ResourceList{
+									"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+								},
 							},
 						},
 					},
 				},
-			},
-		}, true)
-
+			}, true)
+		}
 		podName := "additional-pod"
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{

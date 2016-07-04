@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -568,7 +568,7 @@ func TestDescribeCluster(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "foo") || !strings.Contains(out, "Version:") {
+	if !strings.Contains(out, "foo") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -578,6 +578,9 @@ func TestDescribeEvents(t *testing.T) {
 	events := &api.EventList{
 		Items: []api.Event{
 			{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "foo",
+				},
 				Source:         api.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
 				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),

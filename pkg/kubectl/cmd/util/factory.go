@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -253,14 +254,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		// have been dynamically added to the apiserver
 		Object: func(discoverDynamicAPIs bool) (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
-			CheckErr(err)
+			checkErrWithPrefix("failed to get client config: ", err)
 			cmdApiVersion := unversioned.GroupVersion{}
 			if cfg.GroupVersion != nil {
 				cmdApiVersion = *cfg.GroupVersion
 			}
 			if discoverDynamicAPIs {
 				client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
-				CheckErr(err)
+				checkErrWithPrefix("failed to find client for version v1: ", err)
 
 				var versions []unversioned.GroupVersion
 				var gvks []unversioned.GroupVersionKind
@@ -274,7 +275,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 						break
 					}
 				}
-				CheckErr(err)
+				checkErrWithPrefix("failed to get third-party group versions: ", err)
 				if len(versions) > 0 {
 					priorityMapper, ok := mapper.RESTMapper.(meta.PriorityRESTMapper)
 					if !ok {
@@ -294,7 +295,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 						preferredExternalVersion := versionList[0]
 
 						thirdPartyMapper, err := kubectl.NewThirdPartyResourceMapper(versionList, getGroupVersionKinds(gvks, group))
-						CheckErr(err)
+						checkErrWithPrefix("failed to create third party resource mapper: ", err)
 						accessor := meta.NewAccessor()
 						groupMeta := apimachinery.GroupMeta{
 							GroupVersion:  preferredExternalVersion,
@@ -304,7 +305,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 							InterfacesFor: makeInterfacesFor(versionList),
 						}
 
-						CheckErr(registered.RegisterGroup(groupMeta))
+						checkErrWithPrefix("failed to register group: ", registered.RegisterGroup(groupMeta))
 						registered.AddThirdPartyAPIGroupVersions(versionList...)
 						multiMapper = append(meta.MultiRESTMapper{thirdPartyMapper}, multiMapper...)
 					}
@@ -366,6 +367,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return clients.FederationClientForVersion(&mappingVersion)
 			case rbac.GroupName:
 				return c.RbacClient.RESTClient, nil
+			case certificates.GroupName:
+				return c.CertificatesClient.RESTClient, nil
 			default:
 				if !registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 					return nil, fmt.Errorf("unknown api group/version: %s", gvk.String())
@@ -520,7 +523,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, errors.New("provided options object is not a PodLogOptions")
 				}
 				selector := labels.SelectorFromSet(t.Spec.Selector)
-				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) }
+				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
 				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
@@ -540,7 +543,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
-				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) }
+				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
 				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
@@ -800,7 +803,7 @@ See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more d
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client client.Interface, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
+func GetFirstPod(client client.PodsNamespacer, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
 	options := api.ListOptions{LabelSelector: selector}
 
 	podList, err := client.Pods(namespace).List(options)
@@ -1103,6 +1106,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 			return errors.New("unable to validate: no federation client")
 		}
 		return getSchemaAndValidate(c.fedc, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+	}
+	if gvk.Group == certificates.GroupName {
+		if c.c.CertificatesClient == nil {
+			return errors.New("unable to validate: no certificates client")
+		}
+		return getSchemaAndValidate(c.c.CertificatesClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
 	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
 }

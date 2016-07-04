@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ type RoleBindingInterface interface {
 	Get(name string) (*rbac.RoleBinding, error)
 	List(opts api.ListOptions) (*rbac.RoleBindingList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *rbac.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
@@ -133,4 +134,17 @@ func (c *roleBindings) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("rolebindings").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched roleBinding.
+func (c *roleBindings) Patch(name string, pt api.PatchType, data []byte) (result *rbac.RoleBinding, err error) {
+	result = &rbac.RoleBinding{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("rolebindings").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

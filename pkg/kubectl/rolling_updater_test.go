@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -810,7 +811,7 @@ Scaling foo-v2 up to 2
 			},
 		}
 		// Set up a mock readiness check which handles the test assertions.
-		updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
+		updater.getReadyPods = func(oldRc, newRc *api.ReplicationController, minReadySecondsDeadline int32) (int32, int32, error) {
 			// Return simulated readiness, and throw an error if this call has no
 			// expectations defined.
 			oldReady := next(&oldReady)
@@ -860,7 +861,7 @@ func TestUpdate_progressTimeout(t *testing.T) {
 			return nil
 		},
 	}
-	updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
+	updater.getReadyPods = func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error) {
 		// Coerce a timeout by pods never becoming ready.
 		return 0, 0, nil
 	}
@@ -913,7 +914,7 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		cleanup: func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error {
 			return nil
 		},
-		getReadyPods: func(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
+		getReadyPods: func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error) {
 			return 1, 1, nil
 		},
 	}
@@ -1555,7 +1556,8 @@ func TestAddDeploymentHash(t *testing.T) {
 }
 
 func TestRollingUpdater_readyPods(t *testing.T) {
-	mkpod := func(owner *api.ReplicationController, ready bool) *api.Pod {
+	now := unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC)
+	mkpod := func(owner *api.ReplicationController, ready bool, readyTime unversioned.Time) *api.Pod {
 		labels := map[string]string{}
 		for k, v := range owner.Spec.Selector {
 			labels[k] = v
@@ -1572,8 +1574,9 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 			Status: api.PodStatus{
 				Conditions: []api.PodCondition{
 					{
-						Type:   api.PodReady,
-						Status: status,
+						Type:               api.PodReady,
+						Status:             status,
+						LastTransitionTime: readyTime,
 					},
 				},
 			},
@@ -1589,6 +1592,11 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		// pods owned by the rcs; indicate whether they're ready
 		oldPods []bool
 		newPods []bool
+		// specify additional time to wait for deployment to wait on top of the
+		// pod ready time
+		minReadySeconds int32
+		podReadyTimeFn  func() unversioned.Time
+		nowFn           func() unversioned.Time
 	}{
 		{
 			oldRc:    oldRc(4, 4),
@@ -1632,25 +1640,61 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 				false,
 			},
 		},
+		{
+			oldRc:    oldRc(4, 4),
+			newRc:    newRc(4, 4),
+			oldReady: 0,
+			newReady: 0,
+			oldPods: []bool{
+				true,
+			},
+			newPods: []bool{
+				true,
+			},
+			minReadySeconds: 5,
+			nowFn:           func() unversioned.Time { return now },
+		},
+		{
+			oldRc:    oldRc(4, 4),
+			newRc:    newRc(4, 4),
+			oldReady: 1,
+			newReady: 1,
+			oldPods: []bool{
+				true,
+			},
+			newPods: []bool{
+				true,
+			},
+			minReadySeconds: 5,
+			nowFn:           func() unversioned.Time { return unversioned.Time{Time: now.Add(time.Duration(6 * time.Second))} },
+			podReadyTimeFn:  func() unversioned.Time { return now },
+		},
 	}
 
 	for i, test := range tests {
 		t.Logf("evaluating test %d", i)
+		if test.nowFn == nil {
+			test.nowFn = func() unversioned.Time { return now }
+		}
+		if test.podReadyTimeFn == nil {
+			test.podReadyTimeFn = test.nowFn
+		}
 		// Populate the fake client with pods associated with their owners.
 		pods := []runtime.Object{}
 		for _, ready := range test.oldPods {
-			pods = append(pods, mkpod(test.oldRc, ready))
+			pods = append(pods, mkpod(test.oldRc, ready, test.podReadyTimeFn()))
 		}
 		for _, ready := range test.newPods {
-			pods = append(pods, mkpod(test.newRc, ready))
+			pods = append(pods, mkpod(test.newRc, ready, test.podReadyTimeFn()))
 		}
 		client := testclient.NewSimpleFake(pods...)
 
 		updater := &RollingUpdater{
-			ns: "default",
-			c:  client,
+			ns:    "default",
+			c:     client,
+			nowFn: test.nowFn,
 		}
-		oldReady, newReady, err := updater.readyPods(test.oldRc, test.newRc)
+		oldReady, newReady, err := updater.readyPods(test.oldRc, test.newRc, test.minReadySeconds)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

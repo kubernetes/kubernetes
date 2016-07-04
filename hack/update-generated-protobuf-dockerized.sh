@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,4 +43,5 @@ gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 PATH="${KUBE_ROOT}/_output/local/go/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
-  --proto-import="${KUBE_ROOT}/third_party/protobuf"
+  --proto-import="${KUBE_ROOT}/third_party/protobuf" \
+  $@

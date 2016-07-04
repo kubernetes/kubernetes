@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -183,6 +183,14 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			if err := f.WaitForPodRunning(pod.Name); err != nil {
 				framework.Failf("Pod did not start running: %v", err)
 			}
+			defer func() {
+				logs, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
+				if err != nil {
+					framework.Logf("Error getting pod log: %v", err)
+				} else {
+					framework.Logf("Pod log:\n%s", logs)
+				}
+			}()
 
 			By("Running 'kubectl port-forward'")
 			cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -198,20 +206,15 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			conn.Close()
 
 			By("Waiting for the target pod to stop running")
-			waitErr := f.WaitForPodNoLongerRunning(pod.Name)
-
-			By("Retrieving logs from the target pod")
-			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
-			if err != nil {
-				framework.Failf("Error retrieving logs: %v", err)
-			}
-
-			if waitErr != nil {
-				framework.Logf("Pod log:\n%s", logOutput)
-				framework.Failf("Pod did not stop running: %v", waitErr)
+			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
+				framework.Failf("Pod did not stop running: %v", err)
 			}
 
 			By("Verifying logs")
+			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
+			if err != nil {
+				framework.Failf("Error retrieving pod logs: %v", err)
+			}
 			verifyLogMessage(logOutput, "Accepted client connection")
 			verifyLogMessage(logOutput, "Expected to read 3 bytes from client, but got 0 instead")
 		})
@@ -225,6 +228,14 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			if err := f.WaitForPodRunning(pod.Name); err != nil {
 				framework.Failf("Pod did not start running: %v", err)
 			}
+			defer func() {
+				logs, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
+				if err != nil {
+					framework.Logf("Error getting pod log: %v", err)
+				} else {
+					framework.Logf("Pod log:\n%s", logs)
+				}
+			}()
 
 			By("Running 'kubectl port-forward'")
 			cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -261,20 +272,15 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			waitErr := f.WaitForPodNoLongerRunning(pod.Name)
-
-			By("Retrieving logs from the target pod")
-			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
-			if err != nil {
-				framework.Failf("Error retrieving logs: %v", err)
-			}
-
-			if waitErr != nil {
-				framework.Logf("Pod log:\n%s", logOutput)
-				framework.Failf("Pod did not stop running: %v", waitErr)
+			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
+				framework.Failf("Pod did not stop running: %v", err)
 			}
 
 			By("Verifying logs")
+			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
+			if err != nil {
+				framework.Failf("Error retrieving pod logs: %v", err)
+			}
 			verifyLogMessage(logOutput, "^Accepted client connection$")
 			verifyLogMessage(logOutput, "^Received expected client data$")
 			verifyLogMessage(logOutput, "^Done$")
@@ -290,6 +296,14 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			if err := f.WaitForPodRunning(pod.Name); err != nil {
 				framework.Failf("Pod did not start running: %v", err)
 			}
+			defer func() {
+				logs, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
+				if err != nil {
+					framework.Logf("Error getting pod log: %v", err)
+				} else {
+					framework.Logf("Pod log:\n%s", logs)
+				}
+			}()
 
 			By("Running 'kubectl port-forward'")
 			cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -316,20 +330,15 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			waitErr := f.WaitForPodNoLongerRunning(pod.Name)
-
-			By("Retrieving logs from the target pod")
-			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
-			if err != nil {
-				framework.Failf("Error retrieving logs: %v", err)
-			}
-
-			if waitErr != nil {
-				framework.Logf("Pod log:\n%s", logOutput)
-				framework.Failf("Pod did not stop running: %v", waitErr)
+			if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
+				framework.Failf("Pod did not stop running: %v", err)
 			}
 
 			By("Verifying logs")
+			logOutput, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
+			if err != nil {
+				framework.Failf("Error retrieving pod logs: %v", err)
+			}
 			verifyLogMessage(logOutput, "Accepted client connection")
 			verifyLogMessage(logOutput, "Done")
 		})

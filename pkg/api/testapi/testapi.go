@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -43,6 +44,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
+	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
@@ -50,15 +52,16 @@ import (
 )
 
 var (
-	Groups      = make(map[string]TestGroup)
-	Default     TestGroup
-	Autoscaling TestGroup
-	Batch       TestGroup
-	Extensions  TestGroup
-	Apps        TestGroup
-	Policy      TestGroup
-	Federation  TestGroup
-	Rbac        TestGroup
+	Groups       = make(map[string]TestGroup)
+	Default      TestGroup
+	Autoscaling  TestGroup
+	Batch        TestGroup
+	Extensions   TestGroup
+	Apps         TestGroup
+	Policy       TestGroup
+	Federation   TestGroup
+	Rbac         TestGroup
+	Certificates TestGroup
 
 	serializer        runtime.SerializerInfo
 	storageSerializer runtime.SerializerInfo
@@ -190,12 +193,20 @@ func init() {
 			internalTypes:        api.Scheme.KnownTypes(rbac.SchemeGroupVersion),
 		}
 	}
+	if _, ok := Groups[certificates.GroupName]; !ok {
+		Groups[certificates.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{Group: certificates.GroupName, Version: registered.GroupOrDie(certificates.GroupName).GroupVersion.Version},
+			internalGroupVersion: certificates.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(certificates.SchemeGroupVersion),
+		}
+	}
 
 	Default = Groups[api.GroupName]
 	Autoscaling = Groups[autoscaling.GroupName]
 	Batch = Groups[batch.GroupName]
 	Apps = Groups[apps.GroupName]
 	Policy = Groups[policy.GroupName]
+	Certificates = Groups[certificates.GroupName]
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
 	Rbac = Groups[rbac.GroupName]

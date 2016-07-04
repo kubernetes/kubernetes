@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -93,6 +95,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), unversioned.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), unversioned.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(rbac.GroupName, *testapi.Rbac.GroupVersion(), unversioned.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), unversioned.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := genericapiserver.NewDefaultStorageFactory(storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
 	config.StorageFactory = storageFactory
@@ -237,6 +240,12 @@ func TestFindExternalAddress(t *testing.T) {
 	assert.Error(err, "expected findExternalAddress to fail on a node with missing ip information")
 }
 
+type fakeEndpointReconciler struct{}
+
+func (*fakeEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+	return nil
+}
+
 // TestNewBootstrapController verifies master fields are properly copied into controller
 func TestNewBootstrapController(t *testing.T) {
 	// Tests a subset of inputs to ensure they are set properly in the controller
@@ -254,14 +263,24 @@ func TestNewBootstrapController(t *testing.T) {
 	master.ServiceReadWritePort = 1000
 	master.PublicReadWritePort = 1010
 
-	controller := master.NewBootstrapController()
+	// test with an empty EndpointReconcilerConfig to ensure the defaults are applied
+	controller := master.NewBootstrapController(EndpointReconcilerConfig{})
 
 	assert.Equal(controller.NamespaceRegistry, master.namespaceRegistry)
 	assert.Equal(controller.EndpointReconciler, NewMasterCountEndpointReconciler(master.MasterCount, master.endpointRegistry))
+	assert.Equal(controller.EndpointInterval, DefaultEndpointReconcilerInterval)
 	assert.Equal(controller.ServiceRegistry, master.serviceRegistry)
 	assert.Equal(controller.ServiceNodePortRange, portRange)
 	assert.Equal(controller.ServicePort, master.ServiceReadWritePort)
 	assert.Equal(controller.PublicServicePort, master.PublicReadWritePort)
+
+	// test with a filled-in EndpointReconcilerConfig to make sure its values are used
+	controller = master.NewBootstrapController(EndpointReconcilerConfig{
+		Reconciler: &fakeEndpointReconciler{},
+		Interval:   5 * time.Second,
+	})
+	assert.Equal(controller.EndpointReconciler, &fakeEndpointReconciler{})
+	assert.Equal(controller.EndpointInterval, 5*time.Second)
 }
 
 // TestControllerServicePorts verifies master extraServicePorts are
@@ -289,7 +308,7 @@ func TestControllerServicePorts(t *testing.T) {
 		},
 	}
 
-	controller := master.NewBootstrapController()
+	controller := master.NewBootstrapController(EndpointReconcilerConfig{})
 
 	assert.Equal(int32(1000), controller.ExtraServicePorts[0].Port)
 	assert.Equal(int32(1010), controller.ExtraServicePorts[1].Port)

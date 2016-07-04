@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 # FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
 # ONLY the last version is tested in each group.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,autoscaling/v1,batch/v1,batch/v2alpha1,extensions/v1beta1,apps/v1alpha1,federation/v1alpha1,policy/v1alpha1,rbac.authorization.k8s.io/v1alpha1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,autoscaling/v1,batch/v1,batch/v2alpha1,extensions/v1beta1,apps/v1alpha1,federation/v1beta1,policy/v1alpha1,rbac.authorization.k8s.io/v1alpha1,certificates/v1alpha1"}
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
@@ -74,7 +74,6 @@ usage: $0 [OPTIONS] [TARGETS]
 
 OPTIONS:
   -p <number>   : number of parallel workers, must be >= 1
-  -i <number>   : number of times to run each test per worker, must be >= 1
 EOF
 }
 
@@ -82,7 +81,6 @@ isnum() {
   [[ "$1" =~ ^[0-9]+$ ]]
 }
 
-iterations=1
 parallel=1
 while getopts "hp:i:" opt ; do
   case $opt in
@@ -99,12 +97,9 @@ while getopts "hp:i:" opt ; do
       fi
       ;;
     i)
-      iterations="$OPTARG"
-      if ! isnum "${iterations}" || [[ "${iterations}" -le 0 ]]; then
-        kube::log::usage "'$0': argument to -i must be numeric and greater than 0"
-        kube::test::usage
-        exit 1
-      fi
+      kube::log::usage "'$0': use GOFLAGS='-count <num-iterations>'"
+      kube::test::usage
+      exit 1
       ;;
     ?)
       kube::test::usage
@@ -180,50 +175,7 @@ produceJUnitXMLReport() {
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
-runTestIterations() {
-  local worker=$1
-  shift
-  kube::log::status "Worker ${worker}: Running ${iterations} times"
-  for arg; do
-    trap 'exit 1' SIGINT
-    local pkg=${KUBE_GO_PACKAGE}/${arg}
-    kube::log::status "${pkg}"
-    # keep going, even if there are failures
-    local pass=0
-    local count=0
-    for i in $(seq 1 ${iterations}); do
-      if go test "${goflags[@]:+${goflags[@]}}" \
-          ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}" \
-          "${testargs[@]:+${testargs[@]}}"; then
-        pass=$((pass + 1))
-      else
-        ITERATION_FAILURES=$((ITERATION_FAILURES + 1))
-      fi
-      count=$((count + 1))
-    done 2>&1
-    kube::log::status "Worker ${worker}: ${pass} / ${count} passed"
-  done
-  return 0
-}
-
 runTests() {
-  # TODO: this should probably be refactored to avoid code duplication with the
-  # coverage version.
-  if [[ $iterations -gt 1 ]]; then
-    ITERATION_FAILURES=0 # purposely non-local
-    if [[ $# -eq 0 ]]; then
-      set -- $(kube::test::find_dirs)
-    fi
-    for p in $(seq 1 ${parallel}); do
-      runTestIterations ${p} "$@" &
-    done
-    wait
-    if [[ ${ITERATION_FAILURES} -gt 0 ]]; then
-      return 1
-    fi
-    return 0
-  fi
-
   local junit_filename_prefix
   junit_filename_prefix=$(junitFilenamePrefix)
 
@@ -255,7 +207,9 @@ runTests() {
   # must make sure the output from parallel runs is not mixed. To achieve this,
   # we spawn a subshell for each parallel process, redirecting the output to
   # separate files.
-  printf "%s\n" "${@}" | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
+  # cmd/libs/go2idl/generator is fragile when run under coverage, so ignore it for now.
+  # see: https://github.com/kubernetes/kubernetes/issues/24967
+  printf "%s\n" "${@}" | grep -v "cmd/libs/go2idl/generator"| xargs -I{} -n1 -P${KUBE_COVERPROCS} \
     bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
         go test ${goflags[@]:+${goflags[@]}} \
           ${KUBE_RACE} \

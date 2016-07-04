@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -106,6 +106,8 @@ set +e
 
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
+API_HOST_IP=${API_HOST_IP:-${API_HOST}}
+API_BIND_ADDR=${API_HOST_IP:-"0.0.0.0"}
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
@@ -122,7 +124,7 @@ CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s defaul
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
-    curl $API_HOST:$API_PORT
+    curl -g $API_HOST:$API_PORT
     if [ ! $? -eq 0 ]; then
         echo "API SERVER port is free, proceeding..."
     else
@@ -276,9 +278,10 @@ function start_apiserver {
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
-      --insecure-bind-address="${API_HOST}" \
+      --bind-address="${API_BIND_ADDR}" \
+      --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
-      --advertise-address="${API_HOST}" \
+      --advertise-address="${API_HOST_IP}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cloud-provider="${CLOUD_PROVIDER}" \
@@ -321,7 +324,7 @@ function start_kubelet {
          which chcon > /dev/null ; then
          if [[ ! $(ls -Zd /var/lib/kubelet) =~ system_u:object_r:svirt_sandbox_file_t:s0 ]] ; then
             echo "Applying SELinux label to /var/lib/kubelet directory."
-            if ! chcon -R system_u:object_r:svirt_sandbox_file_t:s0 /var/lib/kubelet; then
+            if ! sudo chcon -Rt svirt_sandbox_file_t /var/lib/kubelet; then
                echo "Failed to apply selinux label to /var/lib/kubelet."
             fi
          fi
@@ -409,6 +412,19 @@ function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
         sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/saltbase/salt/kube-dns/skydns-rc.yaml.in" >| skydns-rc.yaml
+        if [[ "${FEDERATION:-}" == "true" ]]; then
+          FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
+          if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+            FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+          fi
+          if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" skydns-rc.yaml
+          else
+            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+          fi
+        else
+          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+        fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/saltbase/salt/kube-dns/skydns-svc.yaml.in" >| skydns-svc.yaml
         cat <<EOF >namespace.yaml
 apiVersion: v1
@@ -441,6 +457,8 @@ Logs:
   ${KUBELET_LOG}
 
 To start using your cluster, open up another terminal/tab and run:
+
+  export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true
   cluster/kubectl.sh config set-context local --cluster=local

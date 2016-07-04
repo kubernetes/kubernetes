@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -110,7 +110,11 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		if err != nil {
 			return nil, err
 		}
-		if (len(rcList.Items) + len(deploymentList.Items)) != 1 {
+		psList, err := c.Apps().PetSets(api.NamespaceSystem).List(options)
+		if err != nil {
+			return nil, err
+		}
+		if (len(rcList.Items) + len(deploymentList.Items) + len(psList.Items)) != 1 {
 			return nil, fmt.Errorf("expected to find one replica for RC or deployment with label %s but got %d",
 				rcLabel, len(rcList.Items))
 		}
@@ -132,6 +136,21 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		// Do the same for all deployments.
 		for _, rc := range deploymentList.Items {
 			selector := labels.Set(rc.Spec.Selector.MatchLabels).AsSelector()
+			options := api.ListOptions{LabelSelector: selector}
+			podList, err := c.Pods(api.NamespaceSystem).List(options)
+			if err != nil {
+				return nil, err
+			}
+			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
+				expectedPods = append(expectedPods, string(pod.UID))
+			}
+		}
+		// And for pet sets.
+		for _, ps := range psList.Items {
+			selector := labels.Set(ps.Spec.Selector.MatchLabels).AsSelector()
 			options := api.ListOptions{LabelSelector: selector}
 			podList, err := c.Pods(api.NamespaceSystem).List(options)
 			if err != nil {

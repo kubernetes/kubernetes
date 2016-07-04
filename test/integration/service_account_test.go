@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -337,7 +337,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 // It is the responsibility of the caller to ensure the returned stopFunc is called
 func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func()) {
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// Listener
 	var m *master.Master
@@ -415,15 +415,16 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	}
 
 	// Start the service account and service account token controllers
+	stopCh := make(chan struct{})
 	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
-	tokenController.Run()
+	go tokenController.Run(1, stopCh)
 	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
 	serviceAccountController.Run()
 	// Start the admission plugin reflectors
 	serviceAccountAdmission.Run()
 
 	stop := func() {
-		tokenController.Stop()
+		close(stopCh)
 		serviceAccountController.Stop()
 		serviceAccountAdmission.Stop()
 		apiServer.Close()

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,20 +49,6 @@ func withEtcdKey(f func(string)) {
 	prefix := fmt.Sprintf("/test-%d", rand.Int63())
 	defer etcd.NewKeysAPI(newEtcdClient()).Delete(context.TODO(), prefix, &etcd.DeleteOptions{Recursive: true})
 	f(prefix)
-}
-
-func deleteAllEtcdKeys() {
-	keysAPI := etcd.NewKeysAPI(newEtcdClient())
-	keys, err := keysAPI.Get(context.TODO(), "/", nil)
-	if err != nil {
-		glog.Fatalf("Unable to list root etcd keys: %v", err)
-	}
-	for _, node := range keys.Node.Nodes {
-		if _, err := keysAPI.Delete(context.TODO(), node.Key, &etcd.DeleteOptions{Recursive: true}); err != nil {
-			glog.Fatalf("Unable delete key: %v", err)
-		}
-	}
-
 }
 
 func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -164,6 +164,47 @@ func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx api.Context, oldObj runtime
 	}
 
 	// Allow any configured transformers to update the new object
+	for _, transformer := range i.transformers {
+		newObj, err = transformer(ctx, newObj, oldObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return newObj, nil
+}
+
+// wrappedUpdatedObjectInfo allows wrapping an existing objInfo and
+// chaining additional transformations/checks on the result of UpdatedObject()
+type wrappedUpdatedObjectInfo struct {
+	// obj is the updated object
+	objInfo UpdatedObjectInfo
+
+	// transformers is an optional list of transforming functions that modify or
+	// replace obj using information from the context, old object, or other sources.
+	transformers []TransformFunc
+}
+
+// WrapUpdatedObjectInfo returns an UpdatedObjectInfo impl that delegates to
+// the specified objInfo, then calls the passed transformers
+func WrapUpdatedObjectInfo(objInfo UpdatedObjectInfo, transformers ...TransformFunc) UpdatedObjectInfo {
+	return &wrappedUpdatedObjectInfo{objInfo, transformers}
+}
+
+// Preconditions satisfies the UpdatedObjectInfo interface.
+func (i *wrappedUpdatedObjectInfo) Preconditions() *api.Preconditions {
+	return i.objInfo.Preconditions()
+}
+
+// UpdatedObject satisfies the UpdatedObjectInfo interface.
+// It delegates to the wrapped objInfo and passes the result through any configured transformers.
+func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx api.Context, oldObj runtime.Object) (runtime.Object, error) {
+	newObj, err := i.objInfo.UpdatedObject(ctx, oldObj)
+	if err != nil {
+		return newObj, err
+	}
+
+	// Allow any configured transformers to update the new object or error
 	for _, transformer := range i.transformers {
 		newObj, err = transformer(ctx, newObj, oldObj)
 		if err != nil {

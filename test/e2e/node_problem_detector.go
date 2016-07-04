@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -86,6 +86,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		}
 
 		BeforeEach(func() {
+			framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 			// Randomize the source name to avoid conflict with real node problem detector
 			source = "kernel-monitor-" + uid
 			config = `
@@ -198,8 +199,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Consistently(func() error {
 				return verifyNoEvents(c.Events(eventNamespace), eventListOptions)
 			}, pollConsistent, pollInterval).Should(Succeed())
-			By("Make sure the default node condition is false")
-			Consistently(func() error {
+			By("Make sure the default node condition is generated")
+			Eventually(func() error {
 				return verifyCondition(c.Nodes(), node.Name, condition, api.ConditionFalse, defaultReason, defaultMessage)
 			}, pollConsistent, pollInterval).Should(Succeed())
 

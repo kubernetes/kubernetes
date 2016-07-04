@@ -125,7 +125,7 @@ type ExtenderArgs struct {
 }
 ```
 
-The "filter" call returns a list of nodes (api.NodeList). The "prioritize" call
+The "filter" call returns a list of nodes (schedulerapi.ExtenderFilterResult). The "prioritize" call
 returns priorities for each node (schedulerapi.HostPriorityList).
 
 The "filter" call may prune the set of nodes based on its predicates. Scores

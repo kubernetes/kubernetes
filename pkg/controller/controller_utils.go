@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,8 +40,6 @@ import (
 )
 
 const (
-	CreatedByAnnotation = "kubernetes.io/created-by"
-
 	// If a watch drops a delete event for a pod, it'll take this long
 	// before a dormant controller waiting for those packets is woken up anyway. It is
 	// specifically targeted at the case where some problem prevents an update
@@ -392,7 +390,7 @@ func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) 
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to serialize controller reference: %v", err)
 	}
-	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
+	desiredAnnotations[api.CreatedByAnnotation] = string(createdByRefJson)
 	return desiredAnnotations, nil
 }
 
@@ -525,6 +523,43 @@ func (f *FakePodControl) Clear() {
 	f.Templates = []api.PodTemplateSpec{}
 }
 
+// ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.
+type ByLogging []*api.Pod
+
+func (s ByLogging) Len() int      { return len(s) }
+func (s ByLogging) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s ByLogging) Less(i, j int) bool {
+	// 1. assigned < unassigned
+	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
+		return len(s[i].Spec.NodeName) > 0
+	}
+	// 2. PodRunning < PodUnknown < PodPending
+	m := map[api.PodPhase]int{api.PodRunning: 0, api.PodUnknown: 1, api.PodPending: 2}
+	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
+		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	}
+	// 3. ready < not ready
+	if api.IsPodReady(s[i]) != api.IsPodReady(s[j]) {
+		return api.IsPodReady(s[i])
+	}
+	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
+	//       see https://github.com/kubernetes/kubernetes/issues/22065
+	// 4. Been ready for more time < less time < empty time
+	if api.IsPodReady(s[i]) && api.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
+		return afterOrZero(podReadyTime(s[j]), podReadyTime(s[i]))
+	}
+	// 5. Pods with containers with higher restart counts < lower restart counts
+	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
+		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
+	}
+	// 6. older pods < newer pods < empty timestamp pods
+	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
+		return afterOrZero(s[j].CreationTimestamp, s[i].CreationTimestamp)
+	}
+	return false
+}
+
 // ActivePods type allows custom sorting of pods so a controller can pick the best ones to delete.
 type ActivePods []*api.Pod
 
@@ -619,7 +654,9 @@ func IsPodActive(p api.Pod) bool {
 func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
 	active := []*extensions.ReplicaSet{}
 	for i := range replicaSets {
-		if replicaSets[i].Spec.Replicas > 0 {
+		rs := replicaSets[i]
+
+		if rs != nil && rs.Spec.Replicas > 0 {
 			active = append(active, replicaSets[i])
 		}
 	}
@@ -639,7 +676,6 @@ type ControllersByCreationTimestamp []*api.ReplicationController
 
 func (o ControllersByCreationTimestamp) Len() int      { return len(o) }
 func (o ControllersByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
 func (o ControllersByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
@@ -647,15 +683,40 @@ func (o ControllersByCreationTimestamp) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-// ReplicaSetsByCreationTimestamp sorts a list of ReplicationSets by creation timestamp, using their names as a tie breaker.
+// ReplicaSetsByCreationTimestamp sorts a list of ReplicaSet by creation timestamp, using their names as a tie breaker.
 type ReplicaSetsByCreationTimestamp []*extensions.ReplicaSet
 
 func (o ReplicaSetsByCreationTimestamp) Len() int      { return len(o) }
 func (o ReplicaSetsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
 func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+// ReplicaSetsBySizeOlder sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from old to new replica sets.
+type ReplicaSetsBySizeOlder []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeOlder) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeOlder) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeOlder) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(i, j)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
+}
+
+// ReplicaSetsBySizeNewer sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from new to old replica sets.
+type ReplicaSetsBySizeNewer []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeNewer) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeNewer) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(j, i)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
 }

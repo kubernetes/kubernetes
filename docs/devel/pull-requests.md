@@ -60,7 +60,7 @@ Either the [on call](on-call-rotations.md) manually or the [github "munger"](htt
 There are several requirements for the submit-queue to work:
 * Author must have signed CLA ("cla: yes" label added to PR)
 * No changes can be made since last lgtm label was applied
-* k8s-bot must have reported the GCE E2E build and test steps passed (Travis, Jenkins unit/integration, Jenkins e2e)
+* k8s-bot must have reported the GCE E2E build and test steps passed (Jenkins unit/integration, Jenkins e2e)
 
 Additionally, for infrequent or new contributors, we require the on call to apply the "ok-to-merge" label manually.  This is gated by the [whitelist](https://github.com/kubernetes/contrib/blob/master/mungegithub/whitelist.txt).
 
@@ -95,9 +95,8 @@ label is required for that non-master PR.
 
 ### Reviewing pre-release notes
 
-**NOTE: THIS TOOLING IS NOT YET AVAILABLE, BUT COMING SOON!**
-
 At any time, you can see what the release notes will look like on any branch.
+(NOTE: This only works on Linux for now)
 
 ```
 $ git pull https://github.com/kubernetes/release
@@ -105,7 +104,7 @@ $ RELNOTES=$PWD/release/relnotes
 $ cd /to/your/kubernetes/repo
 $ $RELNOTES -man # for details on how to use the tool
 # Show release notes from the last release on a branch to HEAD
-$ $RELNOTES --raw --branch=master
+$ $RELNOTES --branch=master
 ```
 
 ## Visual overview

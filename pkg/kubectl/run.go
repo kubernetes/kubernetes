@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -835,7 +835,10 @@ func parseEnvs(envArray []string) ([]api.EnvVar, error) {
 		}
 		name := env[:pos]
 		value := env[pos+1:]
-		if len(name) == 0 || !validation.IsCIdentifier(name) || len(value) == 0 {
+		if len(name) == 0 || len(value) == 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		if len(validation.IsCIdentifier(name)) != 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := api.EnvVar{Name: name, Value: value}
@@ -853,7 +856,7 @@ func parseV1Envs(envArray []string) ([]v1.EnvVar, error) {
 		}
 		name := env[:pos]
 		value := env[pos+1:]
-		if len(name) == 0 || !validation.IsCIdentifier(name) || len(value) == 0 {
+		if len(name) == 0 || len(validation.IsCIdentifier(name)) != 0 || len(value) == 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := v1.EnvVar{Name: name, Value: value}

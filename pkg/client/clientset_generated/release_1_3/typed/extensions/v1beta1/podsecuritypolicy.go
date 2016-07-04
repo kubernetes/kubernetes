@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ type PodSecurityPolicyInterface interface {
 	Get(name string) (*v1beta1.PodSecurityPolicy, error)
 	List(opts api.ListOptions) (*v1beta1.PodSecurityPolicyList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.PodSecurityPolicy, err error)
 	PodSecurityPolicyExpansion
 }
 
@@ -124,4 +125,16 @@ func (c *podSecurityPolicies) Watch(opts api.ListOptions) (watch.Interface, erro
 		Resource("podsecuritypolicies").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched podSecurityPolicy.
+func (c *podSecurityPolicies) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.PodSecurityPolicy, err error) {
+	result = &v1beta1.PodSecurityPolicy{}
+	err = c.client.Patch(pt).
+		Resource("podsecuritypolicies").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

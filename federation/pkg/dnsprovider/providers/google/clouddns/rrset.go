@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 package clouddns
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
@@ -28,6 +30,10 @@ var _ dnsprovider.ResourceRecordSet = ResourceRecordSet{}
 type ResourceRecordSet struct {
 	impl   interfaces.ResourceRecordSet
 	rrsets *ResourceRecordSets
+}
+
+func (rrset ResourceRecordSet) String() string {
+	return fmt.Sprintf("<(clouddns) %q type=%s rrdatas=%q ttl=%v>", rrset.Name(), rrset.Type(), rrset.Rrdatas(), rrset.Ttl())
 }
 
 func (rrset ResourceRecordSet) Name() string {

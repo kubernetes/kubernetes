@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,18 +25,28 @@ import (
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
+func comparePods(t *testing.T, expected []*ctest.FakePod, actual []*Pod) {
+	if len(expected) != len(actual) {
+		t.Errorf("expected %d pods, got %d instead", len(expected), len(actual))
+	}
+	for i := range expected {
+		if !reflect.DeepEqual(expected[i].Pod, actual[i]) {
+			t.Errorf("expected %#v, got %#v", expected[i].Pod, actual[i])
+		}
+	}
+}
+
 func TestGetPods(t *testing.T) {
 	runtime := &ctest.FakeRuntime{}
-	expected := []*Pod{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
+	expected := []*ctest.FakePod{{Pod: &Pod{ID: "1111"}}, {Pod: &Pod{ID: "2222"}}, {Pod: &Pod{ID: "3333"}}}
 	runtime.PodList = expected
 	cache := NewTestRuntimeCache(runtime)
 	actual, err := cache.GetPods()
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
-	}
+
+	comparePods(t, expected, actual)
 }
 
 func TestForceUpdateIfOlder(t *testing.T) {
@@ -44,25 +54,21 @@ func TestForceUpdateIfOlder(t *testing.T) {
 	cache := NewTestRuntimeCache(runtime)
 
 	// Cache old pods.
-	oldpods := []*Pod{{ID: "1111"}}
+	oldpods := []*ctest.FakePod{{Pod: &Pod{ID: "1111"}}}
 	runtime.PodList = oldpods
 	cache.UpdateCacheWithLock()
 
 	// Update the runtime to new pods.
-	newpods := []*Pod{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
+	newpods := []*ctest.FakePod{{Pod: &Pod{ID: "1111"}}, {Pod: &Pod{ID: "2222"}}, {Pod: &Pod{ID: "3333"}}}
 	runtime.PodList = newpods
 
 	// An older timestamp should not force an update.
 	cache.ForceUpdateIfOlder(time.Now().Add(-20 * time.Minute))
 	actual := cache.GetCachedPods()
-	if !reflect.DeepEqual(oldpods, actual) {
-		t.Errorf("expected %#v, got %#v", oldpods, actual)
-	}
+	comparePods(t, oldpods, actual)
 
 	// A newer timestamp should force an update.
 	cache.ForceUpdateIfOlder(time.Now().Add(20 * time.Second))
 	actual = cache.GetCachedPods()
-	if !reflect.DeepEqual(newpods, actual) {
-		t.Errorf("expected %#v, got %#v", newpods, actual)
-	}
+	comparePods(t, newpods, actual)
 }
