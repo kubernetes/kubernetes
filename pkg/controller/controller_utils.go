@@ -458,7 +458,7 @@ func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Obje
 	if controllerRef != nil {
 		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
 	}
-	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
+	if err := api.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
 		return nil, fmt.Errorf("unable to convert pod template: %v", err)
 	}
 	return pod, nil

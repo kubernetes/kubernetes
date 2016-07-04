@@ -276,7 +276,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	for _, testCase := range testCases {
 		var versionedPods runtime.Object
-		err := testapi.Default.Converter().Convert(&testCase.pods, &versionedPods)
+		err := testapi.Default.Converter().Convert(&testCase.pods, &versionedPods, nil)
 		if err != nil {
 			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
 		}
