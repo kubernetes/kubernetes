@@ -19,8 +19,6 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -52,9 +50,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.PersistentVolumeClaim).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return persistentvolumeclaim.MatchPersistentVolumeClaim(label, field)
-		},
+		PredicateFunc:           persistentvolumeclaim.MatchPersistentVolumeClaim,
 		QualifiedResource:       api.Resource("persistentvolumeclaims"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
