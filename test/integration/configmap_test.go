@@ -21,44 +21,33 @@ package integration
 // This file tests use of the configMap API resource.
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // TestConfigMap tests apiserver-side behavior of creation of ConfigMaps and pods that consume them.
 func TestConfigMap(t *testing.T) {
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
-	DoTestConfigMap(t, client)
+	ns := framework.CreateTestingNamespace("config-map", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	DoTestConfigMap(t, client, ns)
 }
 
-func DoTestConfigMap(t *testing.T, client *client.Client) {
-	ns := "ns"
+func DoTestConfigMap(t *testing.T, client *client.Client, ns *api.Namespace) {
 	cfg := api.ConfigMap{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "configmap",
-			Namespace: ns,
+			Namespace: ns.Name,
 		},
 		Data: map[string]string{
 			"data-1": "value-1",
@@ -74,7 +63,8 @@ func DoTestConfigMap(t *testing.T, client *client.Client) {
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "XXX",
+			Name:      "XXX",
+			Namespace: ns.Name,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -121,10 +111,10 @@ func DoTestConfigMap(t *testing.T, client *client.Client) {
 	}
 
 	pod.ObjectMeta.Name = "uses-configmap"
-	if _, err := client.Pods(ns).Create(pod); err != nil {
+	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
-	defer deletePodOrErrorf(t, client, ns, pod.Name)
+	defer deletePodOrErrorf(t, client, ns.Name, pod.Name)
 }
 
 func deleteConfigMapOrErrorf(t *testing.T, c *client.Client, ns, name string) {

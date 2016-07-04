@@ -239,6 +239,22 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 	}
 }
 
+func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *api.Namespace {
+	// TODO: Create a namespace with a given basename.
+	// Currently we neither create the namespace nor delete all its contents at the end.
+	// But as long as tests are not using the same namespaces, this should work fine.
+	return &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			// TODO: Once we start creating namespaces, switch to GenerateName.
+			Name: baseName,
+		},
+	}
+}
+
+func DeleteTestingNamespace(ns *api.Namespace, apiserver *httptest.Server, t *testing.T) {
+	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
+}
+
 // RCFromManifest reads a .json file and returns the rc in it.
 func RCFromManifest(fileName string) *api.ReplicationController {
 	data, err := ioutil.ReadFile(fileName)

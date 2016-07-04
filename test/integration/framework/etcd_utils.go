@@ -79,5 +79,4 @@ func DeleteAllEtcdKeys() {
 			glog.Fatalf("Unable delete key: %v", err)
 		}
 	}
-
 }
