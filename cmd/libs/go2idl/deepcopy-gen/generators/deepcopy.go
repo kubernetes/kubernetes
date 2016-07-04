@@ -355,10 +355,17 @@ func (g *genDeepCopy) doBuiltin(t *types.Type, sw *generator.SnippetWriter) {
 func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("*out = make($.|raw$)\n", t)
 	if t.Key.IsAssignable() {
-		sw.Do("for key, val := range in {\n", nil)
-		if t.Elem.IsAssignable() {
+		switch {
+		case t.Elem.IsAnonymousStruct():
+			sw.Do("for key := range in {\n", nil)
+			sw.Do("(*out)[key] = struct{}{}\n", nil)
+			sw.Do("}\n", nil)
+		case t.Elem.IsAssignable():
+			sw.Do("for key, val := range in {\n", nil)
 			sw.Do("(*out)[key] = val\n", nil)
-		} else {
+			sw.Do("}\n", nil)
+		default:
+			sw.Do("for key, val := range in {\n", nil)
 			if g.canInlineTypeFn(g.context, t.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
 				funcName := g.funcNameTmpl(t.Elem)
@@ -373,13 +380,14 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("(*out)[key] = newVal.($.|raw$)\n", t.Elem)
 				sw.Do("}\n", nil)
 			}
+			sw.Do("}\n", nil)
 		}
 	} else {
 		// TODO: Implement it when necessary.
 		sw.Do("for range in {\n", nil)
 		sw.Do("// FIXME: Copying unassignable keys unsupported $.|raw$\n", t.Key)
+		sw.Do("}\n", nil)
 	}
-	sw.Do("}\n", nil)
 }
 
 func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
