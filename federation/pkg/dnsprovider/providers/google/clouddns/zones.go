@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,6 +49,13 @@ func (zones Zones) Add(zone dnsprovider.Zone) (dnsprovider.Zone, error) {
 		return nil, err
 	}
 	return &Zone{response, &zones}, nil
+}
+
+func (zones Zones) Remove(zone dnsprovider.Zone) error {
+	if err := zones.impl.Delete(zones.project(), zone.(*Zone).impl.Name()).Do(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (zones Zones) New(name string) (dnsprovider.Zone, error) {

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -36,11 +37,13 @@ type createContextOptions struct {
 	namespace    util.StringFlag
 }
 
-const (
-	create_context_long = `Sets a context entry in kubeconfig
-Specifying a name that already exists will merge new fields on top of existing values for those fields.`
-	create_context_example = `# Set the user field on the gce context entry without touching other values
-kubectl config set-context gce --user=cluster-admin`
+var (
+	create_context_long = dedent.Dedent(`
+		Sets a context entry in kubeconfig
+		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
+	create_context_example = dedent.Dedent(`
+		# Set the user field on the gce context entry without touching other values
+		kubectl config set-context gce --user=cluster-admin`)
 )
 
 func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

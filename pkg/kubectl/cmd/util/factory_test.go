@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -476,12 +476,12 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) },
+			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:              "pod-2",
+					Name:              "pod-1",
 					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
+					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -498,7 +498,7 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - one unhealthy, one healthy",
 			podList: newPodList(2, -1, 1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) },
+			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-2",

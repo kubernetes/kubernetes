@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,13 +38,13 @@ var _ = framework.KubeDescribe("Ubernetes Lite", func() {
 	var err error
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
 	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.Client)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
 		framework.SkipUnlessAtLeast(zoneCount, 2, "Zone count is %d, only run for multi-zone clusters, skipping test")
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	It("should spread the pods of a service across zones", func() {
@@ -93,6 +93,11 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			},
 		},
 	}
+
+	// Caution: StartPods requires at least one pod to replicate.
+	// Based on the callers, replicas is always positive number: zoneCount >= 0 implies (2*zoneCount)+1 > 0.
+	// Thus, no need to test for it. Once the precondition changes to zero number of replicas,
+	// test for replicaCount > 0. Otherwise, StartPods panics.
 	framework.StartPods(f.Client, replicaCount, f.Namespace.Name, serviceName, *podSpec, false)
 
 	// Wait for all of them to be scheduled

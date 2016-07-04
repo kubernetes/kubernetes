@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,6 +46,8 @@ func main() {
 		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1",
 		"k8s.io/kubernetes/pkg/apis/apps",
 		"k8s.io/kubernetes/pkg/apis/apps/v1alpha1",
+		"k8s.io/kubernetes/pkg/apis/certificates",
+		"k8s.io/kubernetes/pkg/apis/certificates/v1alpha1",
 		"k8s.io/kubernetes/pkg/apis/componentconfig",
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1",
 		"k8s.io/kubernetes/pkg/apis/policy",
@@ -55,7 +57,7 @@ func main() {
 		"k8s.io/kubernetes/pkg/apis/rbac",
 		"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
 		"k8s.io/kubernetes/federation/apis/federation",
-		"k8s.io/kubernetes/federation/apis/federation/v1alpha1",
+		"k8s.io/kubernetes/federation/apis/federation/v1beta1",
 		"k8s.io/kubernetes/pkg/conversion",
 		"k8s.io/kubernetes/pkg/runtime",
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -123,7 +123,7 @@ const (
 	NodeReadyInitialTimeout = 20 * time.Second
 
 	// How long pods have to be "ready" when a test begins.
-	PodReadyBeforeTimeout = 2 * time.Minute
+	PodReadyBeforeTimeout = 5 * time.Minute
 
 	// How long pods have to become scheduled onto nodes
 	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
@@ -367,6 +367,14 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 	}
 }
 
+func SkipIfContainerRuntimeIs(runtimes ...string) {
+	for _, runtime := range runtimes {
+		if runtime == TestContext.ContainerRuntime {
+			Skipf("Not supported under container runtime %s", runtime)
+		}
+	}
+}
+
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
@@ -554,7 +562,7 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 // even if there are minPods pods, some of which are in Running/Ready
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
-func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
+func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string, restartDockerOnFailures bool) error {
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
@@ -566,6 +574,10 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
 		wg.Done()
 	}()
+
+	// We will be restarting all not-ready kubeProxies every 5 minutes,
+	// to workaround #25543 issue.
+	badKubeProxySince := make(map[string]time.Time)
 
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		// We get the new list of pods and replication controllers in every
@@ -597,6 +609,8 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 				if hasReplicationControllersForPod(rcList, pod) {
 					replicaOk++
 				}
+				// If the pod is healthy, remove it from bad ones.
+				delete(badKubeProxySince, pod.Name)
 			} else {
 				if pod.Status.Phase != api.PodFailed {
 					Logf("The status of Pod %s is %s, waiting for it to be either Running or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
@@ -606,6 +620,34 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 					badPods = append(badPods, pod)
 				}
 				//ignore failed pods that are controlled by a replication controller
+			}
+		}
+
+		// Try to repair all KubeProxies that are not-ready long enough by restarting Docker:
+		// see https://github.com/kubernetes/kubernetes/issues/24295#issuecomment-218920357
+		// for exact details.
+		if restartDockerOnFailures {
+			for _, badPod := range badPods {
+				name := badPod.Name
+				if len(name) > 10 && name[:10] == "kube-proxy" {
+					if _, ok := badKubeProxySince[name]; !ok {
+						badKubeProxySince[name] = time.Now()
+					}
+					if time.Since(badKubeProxySince[name]) > 5*time.Minute {
+						node, err := c.Nodes().Get(badPod.Spec.NodeName)
+						if err != nil {
+							Logf("Couldn't get node: %v", err)
+							continue
+						}
+						err = IssueSSHCommand("sudo service docker restart", TestContext.Provider, node)
+						if err != nil {
+							Logf("Couldn't restart docker on %s: %v", name, err)
+							continue
+						}
+						Logf("Docker on %s node restarted", badPod.Spec.NodeName)
+						delete(badKubeProxySince, name)
+					}
+				}
 			}
 		}
 
@@ -1033,15 +1075,22 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 
 	// check for pods that were not deleted
 	remaining := []string{}
+	remainingPods := []api.Pod{}
 	missingTimestamp := false
 	if pods, perr := c.Pods(namespace).List(api.ListOptions{}); perr == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s %s on node %s remains, has deletion timestamp %s", namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-			remaining = append(remaining, pod.Name)
+			remaining = append(remaining, fmt.Sprintf("%s{Reason=%s}", pod.Name, pod.Status.Reason))
+			remainingPods = append(remainingPods, pod)
 			if pod.DeletionTimestamp == nil {
 				missingTimestamp = true
 			}
 		}
+	}
+
+	// log pod status
+	if len(remainingPods) > 0 {
+		logPodStates(remainingPods)
 	}
 
 	// a timeout occurred
@@ -1599,13 +1648,21 @@ func podsRunning(c *client.Client, pods *api.PodList) []error {
 	// are running so non-running pods cause a timeout for this test.
 	By("ensuring each pod is running")
 	e := []error{}
+	error_chan := make(chan error)
+
 	for _, pod := range pods.Items {
-		// TODO: make waiting parallel.
-		err := WaitForPodRunningInNamespace(c, pod.Name, pod.Namespace)
+		go func(p api.Pod) {
+			error_chan <- WaitForPodRunningInNamespace(c, p.Name, p.Namespace)
+		}(pod)
+	}
+
+	for range pods.Items {
+		err := <-error_chan
 		if err != nil {
 			e = append(e, err)
 		}
 	}
+
 	return e
 }
 
@@ -2556,12 +2613,12 @@ func (config *RCConfig) start() error {
 }
 
 // Simplified version of RunRC, that does not create RC, but creates plain Pods.
-// optionally waits for pods to start running (if waitForRunning == true)
+// Optionally waits for pods to start running (if waitForRunning == true).
+// The number of replicas must be non-zero.
 func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix string, pod api.Pod, waitForRunning bool) {
 	// no pod to start
 	if replicas < 1 {
-		Logf("No pod to start, skipping...")
-		return
+		panic("StartPods: number of replicas must be non-zero")
 	}
 	startPodsID := string(util.NewUUID()) // So that we can label and find them
 	for i := 0; i < replicas; i++ {
@@ -3160,7 +3217,7 @@ func WaitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds i
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			if !deploymentutil.IsPodAvailable(&pod, int32(minReadySeconds)) {
+			if !deploymentutil.IsPodAvailable(&pod, int32(minReadySeconds), time.Now()) {
 				return false, nil
 			}
 		}
@@ -3211,7 +3268,7 @@ func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 	if err == nil {
 		for _, pod := range podList.Items {
 			availability := "not available"
-			if deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
+			if deploymentutil.IsPodAvailable(&pod, minReadySeconds, time.Now()) {
 				availability = "available"
 			}
 			Logf("Pod %s is %s: %+v", pod.Name, availability, pod)

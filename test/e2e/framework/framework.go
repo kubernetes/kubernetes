@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -280,6 +280,8 @@ func (f *Framework) AfterEach() {
 		if f.federated {
 			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
 			LogPodsWithLabels(f.Client, "federation", map[string]string{"app": "federated-cluster"})
+			// Print logs of kube-dns pod
+			LogPodsWithLabels(f.Client, "kube-system", map[string]string{"k8s-app": "kube-dns"})
 		}
 	}
 

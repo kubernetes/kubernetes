@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,33 +20,36 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	configMapLong = `Create a configmap based on a file, directory, or specified literal value.
+var (
+	configMapLong = dedent.Dedent(`
+		Create a configmap based on a file, directory, or specified literal value.
 
-A single configmap may package one or more key/value pairs.
+		A single configmap may package one or more key/value pairs.
 
-When creating a configmap based on a file, the key will default to the basename of the file, and the value will
-default to the file content.  If the basename is an invalid key, you may specify an alternate key.
+		When creating a configmap based on a file, the key will default to the basename of the file, and the value will
+		default to the file content.  If the basename is an invalid key, you may specify an alternate key.
 
-When creating a configmap based on a directory, each file whose basename is a valid key in the directory will be
-packaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,
-symlinks, devices, pipes, etc).
-`
+		When creating a configmap based on a directory, each file whose basename is a valid key in the directory will be
+		packaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,
+		symlinks, devices, pipes, etc).
+		`)
 
-	configMapExample = `  # Create a new configmap named my-config with keys for each file in folder bar
-  kubectl create configmap my-config --from-file=path/to/bar
+	configMapExample = dedent.Dedent(`
+		  # Create a new configmap named my-config with keys for each file in folder bar
+		  kubectl create configmap my-config --from-file=path/to/bar
 
-  # Create a new configmap named my-config with specified keys instead of names on disk
-  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt
+		  # Create a new configmap named my-config with specified keys instead of names on disk
+		  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt
 
-  # Create a new configMap named my-config with key1=config1 and key2=config2
-  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2`
+		  # Create a new configMap named my-config with key1=config1 and key2=config2
+		  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2`)
 )
 
 // ConfigMap is a command to ease creating ConfigMaps.

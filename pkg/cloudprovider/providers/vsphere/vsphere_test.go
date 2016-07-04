@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,8 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
 	cfg.Network.PublicNetwork = os.Getenv("VSPHERE_PUBLIC_NETWORK")
 	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
+	cfg.Disk.SCSIControllerType = os.Getenv("VSPHERE_SCSICONTROLLER_TYPE")
+	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
 	if os.Getenv("VSPHERE_INSECURE") != "" {
 		InsecureFlag, err = strconv.ParseBool(os.Getenv("VSPHERE_INSECURE"))
 	} else {

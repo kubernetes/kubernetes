@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ type EventInterface interface {
 	Get(name string) (*api.Event, error)
 	List(opts api.ListOptions) (*api.EventList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *api.Event, err error)
 	EventExpansion
 }
 
@@ -132,4 +133,17 @@ func (c *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("events").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched event.
+func (c *events) Patch(name string, pt api.PatchType, data []byte) (result *api.Event, err error) {
+	result = &api.Event{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("events").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

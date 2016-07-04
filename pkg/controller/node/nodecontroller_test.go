@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -163,6 +163,10 @@ func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*api.Node, 
 }
 
 func (m *FakeNodeHandler) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return nil, nil
+}
+
+func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte) (*api.Node, error) {
 	return nil, nil
 }
 
@@ -1422,8 +1426,25 @@ func newNode(name string) *api.Node {
 }
 
 func newPod(name, host string) *api.Pod {
-	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{NodeName: host},
-		Status: api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}}}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "default",
+			Name:      name,
+		},
+		Spec: api.PodSpec{
+			NodeName: host,
+		},
+		Status: api.PodStatus{
+			Conditions: []api.PodCondition{
+				{
+					Type:   api.PodReady,
+					Status: api.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	return pod
 }
 
 func contains(node *api.Node, nodes []*api.Node) bool {

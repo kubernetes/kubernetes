@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"os/signal"
 
 	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -31,19 +32,19 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	portforward_example = `
-# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
-kubectl port-forward mypod 5000 6000
+var (
+	portforward_example = dedent.Dedent(`
+		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
+		kubectl port-forward mypod 5000 6000
 
-# Listen on port 8888 locally, forwarding to 5000 in the pod
-kubectl port-forward mypod 8888:5000
+		# Listen on port 8888 locally, forwarding to 5000 in the pod
+		kubectl port-forward mypod 8888:5000
 
-# Listen on a random port locally, forwarding to 5000 in the pod
-kubectl port-forward mypod :5000
+		# Listen on a random port locally, forwarding to 5000 in the pod
+		kubectl port-forward mypod :5000
 
-# Listen on a random port locally, forwarding to 5000 in the pod
-kubectl port-forward  mypod 0:5000`
+		# Listen on a random port locally, forwarding to 5000 in the pod
+		kubectl port-forward  mypod 0:5000`)
 )
 
 func NewCmdPortForward(f *cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {

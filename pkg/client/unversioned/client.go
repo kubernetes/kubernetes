@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ type Interface interface {
 	Extensions() ExtensionsInterface
 	Rbac() RbacInterface
 	Discovery() discovery.DiscoveryInterface
+	Certificates() CertificatesInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -124,6 +125,7 @@ type Client struct {
 	*PolicyClient
 	*RbacClient
 	*discovery.DiscoveryClient
+	*CertificatesClient
 }
 
 // IsTimeout tests if this is a timeout error in the underlying transport.
@@ -170,4 +172,8 @@ func (c *Client) Rbac() RbacInterface {
 
 func (c *Client) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
+}
+
+func (c *Client) Certificates() CertificatesInterface {
+	return c.CertificatesClient
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
-	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volume"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
@@ -201,6 +201,7 @@ func NewMainKubelet(
 	imageGCPolicy ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
+	autoDetectCloudProvider bool,
 	nodeLabels map[string]string,
 	nodeStatusUpdateFrequency time.Duration,
 	osInterface kubecontainer.OSInterface,
@@ -331,9 +332,10 @@ func NewMainKubelet(
 		cadvisor:                       cadvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          cloud,
-		nodeRef:                        nodeRef,
-		nodeLabels:                     nodeLabels,
-		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
+		autoDetectCloudProvider:   autoDetectCloudProvider,
+		nodeRef:                   nodeRef,
+		nodeLabels:                nodeLabels,
+		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		os:                         osInterface,
 		oomWatcher:                 oomWatcher,
 		cgroupRoot:                 cgroupRoot,
@@ -499,12 +501,13 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	klet.volumeManager, err = kubeletvolume.NewVolumeManager(
+	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		enableControllerAttachDetach,
 		hostname,
 		klet.podManager,
 		klet.kubeClient,
-		klet.volumePluginMgr)
+		klet.volumePluginMgr,
+		klet.containerRuntime)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -684,10 +687,11 @@ type Kubelet struct {
 	// VolumeManager runs a set of asynchronous loops that figure out which
 	// volumes need to be attached/mounted/unmounted/detached based on the pods
 	// scheduled on this node and makes it so.
-	volumeManager kubeletvolume.VolumeManager
+	volumeManager volumemanager.VolumeManager
 
 	// Cloud provider interface.
-	cloud cloudprovider.Interface
+	cloud                   cloudprovider.Interface
+	autoDetectCloudProvider bool
 
 	// Reference to this node.
 	nodeRef *api.ObjectReference
@@ -1114,10 +1118,12 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		}
 	} else {
 		node.Spec.ExternalID = kl.hostname
-		// If no cloud provider is defined - use the one detected by cadvisor
-		info, err := kl.GetCachedMachineInfo()
-		if err == nil {
-			kl.updateCloudProviderFromMachineInfo(node, info)
+		if kl.autoDetectCloudProvider {
+			// If no cloud provider is defined - use the one detected by cadvisor
+			info, err := kl.GetCachedMachineInfo()
+			if err == nil {
+				kl.updateCloudProviderFromMachineInfo(node, info)
+			}
 		}
 	}
 	if err := kl.setNodeStatus(node); err != nil {
@@ -2378,7 +2384,7 @@ func (kl *Kubelet) matchesNodeSelector(pod *api.Pod) bool {
 	node, err := kl.GetNode()
 	if err != nil {
 		glog.Errorf("error getting node: %v", err)
-		return true
+		return false
 	}
 	return predicates.PodMatchesNodeLabels(pod, node)
 }
@@ -3404,7 +3410,11 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		return err
 	}
 	// Update the current status on the API server
-	_, err = kl.kubeClient.Core().Nodes().UpdateStatus(node)
+	updatedNode, err := kl.kubeClient.Core().Nodes().UpdateStatus(node)
+	if err == nil {
+		kl.volumeManager.MarkVolumesAsReportedInUse(
+			updatedNode.Status.VolumesInUse)
+	}
 	return err
 }
 
@@ -3568,7 +3578,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.P
 	})
 
 	if !kl.standaloneMode {
-		hostIP, err := kl.GetHostIP()
+		hostIP, err := kl.getHostIPAnyWay()
 		if err != nil {
 			glog.V(4).Infof("Cannot get host IP: %v", err)
 		} else {

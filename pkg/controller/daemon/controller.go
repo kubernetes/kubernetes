@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,14 @@ limitations under the License.
 package daemon
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
-	"fmt"
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -239,7 +240,7 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	go dsc.podController.Run(stopCh)
 	go dsc.nodeController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go wait.Until(dsc.worker, time.Second, stopCh)
+		go wait.Until(dsc.runWorker, time.Second, stopCh)
 	}
 
 	if dsc.internalPodInformer != nil {
@@ -251,19 +252,17 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	dsc.queue.ShutDown()
 }
 
-func (dsc *DaemonSetsController) worker() {
+func (dsc *DaemonSetsController) runWorker() {
 	for {
-		func() {
-			dsKey, quit := dsc.queue.Get()
-			if quit {
-				return
-			}
-			defer dsc.queue.Done(dsKey)
-			err := dsc.syncHandler(dsKey.(string))
-			if err != nil {
-				glog.Errorf("Error syncing daemon set with key %s: %v", dsKey.(string), err)
-			}
-		}()
+		dsKey, quit := dsc.queue.Get()
+		if quit {
+			continue
+		}
+		err := dsc.syncHandler(dsKey.(string))
+		if err != nil {
+			glog.Errorf("Error syncing daemon set with key %s: %v", dsKey.(string), err)
+		}
+		dsc.queue.Done(dsKey)
 	}
 }
 
@@ -299,7 +298,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.Daemo
 			glog.Errorf("lookup cache does not retuen a ReplicationController object")
 			return nil
 		}
-		if cached && dsc.isCacheValid(pod, ds) {
+		if dsc.isCacheValid(pod, ds) {
 			return ds
 		}
 	}
@@ -498,17 +497,18 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 
 		daemonPods, isRunning := nodeToDaemonPods[node.Name]
 
-		if shouldRun && !isRunning {
+		switch {
+		case shouldRun && !isRunning:
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
 			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
-		} else if shouldRun && len(daemonPods) > 1 {
+		case shouldRun && len(daemonPods) > 1:
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 			// Sort the daemon pods by creation time, so the the oldest is preserved.
 			sort.Sort(podByCreationTimestamp(daemonPods))
 			for i := 1; i < len(daemonPods); i++ {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)
 			}
-		} else if !shouldRun && isRunning {
+		case !shouldRun && isRunning:
 			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 			for i := range daemonPods {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)

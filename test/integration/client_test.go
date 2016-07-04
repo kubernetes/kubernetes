@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -442,7 +442,7 @@ func TestSingleWatch(t *testing.T) {
 	defer s.Close()
 
 	ns := "blargh"
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	mkEvent := func(i int) *api.Event {

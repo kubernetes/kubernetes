@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,6 +41,14 @@ import (
 const (
 	// The revision annotation of a deployment's replica sets which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
+	// DesiredReplicasAnnotation is the desired replicas for a deployment recorded as an annotation
+	// in its replica sets. Helps in separating scaling events from the rollout process and for
+	// determining if the new replica set for a deployment is really saturated.
+	DesiredReplicasAnnotation = "deployment.kubernetes.io/desired-replicas"
+	// MaxReplicasAnnotation is the maximum replicas a deployment can have at a given point, which
+	// is deployment.spec.replicas + maxSurge. Used by the underlying replica sets to estimate their
+	// proportions in case the deployment has surge replicas.
+	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
 
 	// Here are the possible rollback event reasons
 	RollbackRevisionNotFound  = "DeploymentRollbackRevisionNotFound"
@@ -346,14 +354,15 @@ func GetAvailablePodsForDeployment(c clientset.Interface, deployment *extensions
 func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
 	availablePodCount := int32(0)
 	for _, pod := range pods {
-		if IsPodAvailable(&pod, minReadySeconds) {
+		// TODO: Make the time.Now() as argument to allow unit test this.
+		if IsPodAvailable(&pod, minReadySeconds, time.Now()) {
 			availablePodCount++
 		}
 	}
 	return availablePodCount
 }
 
-func IsPodAvailable(pod *api.Pod, minReadySeconds int32) bool {
+func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 	if !controller.IsPodActive(*pod) {
 		return false
 	}
@@ -366,7 +375,7 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32) bool {
 			// 1. minReadySeconds == 0, or
 			// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
 			minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-			if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
+			if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now) {
 				return true
 			}
 		}
@@ -432,6 +441,21 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 	default:
 		return 0, fmt.Errorf("deployment type %v isn't supported", deployment.Spec.Strategy.Type)
 	}
+}
+
+// IsSaturated checks if the new replica set is saturated by comparing its size with its deployment size.
+// Both the deployment and the replica set have to believe this replica set can own all of the desired
+// replicas in the deployment and the annotation helps in achieving that.
+func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) bool {
+	if rs == nil {
+		return false
+	}
+	desiredString := rs.Annotations[DesiredReplicasAnnotation]
+	desired, err := strconv.Atoi(desiredString)
+	if err != nil {
+		return false
+	}
+	return rs.Spec.Replicas == deployment.Spec.Replicas && int32(desired) == deployment.Spec.Replicas
 }
 
 // Polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.

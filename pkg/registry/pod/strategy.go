@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -246,9 +246,9 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx api.Conte
 }
 
 // getContainerNames returns a formatted string containing the container names
-func getContainerNames(pod *api.Pod) string {
+func getContainerNames(containers []api.Container) string {
 	names := []string{}
-	for _, c := range pod.Spec.Containers {
+	for _, c := range containers {
 		names = append(names, c.Name)
 	}
 	return strings.Join(names, " ")
@@ -278,8 +278,13 @@ func LogLocation(
 		case 0:
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		default:
-			containerNames := getContainerNames(pod)
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames))
+			containerNames := getContainerNames(pod.Spec.Containers)
+			initContainerNames := getContainerNames(pod.Spec.InitContainers)
+			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames)
+			if len(initContainerNames) > 0 {
+				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
+			}
+			return nil, nil, errors.NewBadRequest(err)
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
@@ -424,8 +429,13 @@ func streamLocation(
 		case 0:
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		default:
-			containerNames := getContainerNames(pod)
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames))
+			containerNames := getContainerNames(pod.Spec.Containers)
+			initContainerNames := getContainerNames(pod.Spec.InitContainers)
+			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames)
+			if len(initContainerNames) > 0 {
+				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
+			}
+			return nil, nil, errors.NewBadRequest(err)
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {

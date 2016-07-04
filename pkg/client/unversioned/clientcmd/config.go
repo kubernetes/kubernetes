@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 
 	"github.com/golang/glog"
 
@@ -153,6 +154,17 @@ func NewDefaultPathOptions() *PathOptions {
 // that means that this code will only write into a single file.  If you want to relativizePaths, you must provide a fully qualified path in any
 // modified element.
 func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
+	possibleSources := configAccess.GetLoadingPrecedence()
+	// sort the possible kubeconfig files so we always "lock" in the same order
+	// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
+	sort.Strings(possibleSources)
+	for _, filename := range possibleSources {
+		if err := lockFile(filename); err != nil {
+			return err
+		}
+		defer unlockFile(filename)
+	}
+
 	startingConfig, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
@@ -186,7 +198,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				destinationFile = configAccess.GetDefaultFilename()
 			}
 
-			configToWrite := GetConfigFromFileOrDie(destinationFile)
+			configToWrite, err := getConfigFromFile(destinationFile)
+			if err != nil {
+				return err
+			}
 			t := *cluster
 
 			configToWrite.Clusters[key] = &t
@@ -211,7 +226,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				destinationFile = configAccess.GetDefaultFilename()
 			}
 
-			configToWrite := GetConfigFromFileOrDie(destinationFile)
+			configToWrite, err := getConfigFromFile(destinationFile)
+			if err != nil {
+				return err
+			}
 			configToWrite.Contexts[key] = context
 
 			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
@@ -228,7 +246,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				destinationFile = configAccess.GetDefaultFilename()
 			}
 
-			configToWrite := GetConfigFromFileOrDie(destinationFile)
+			configToWrite, err := getConfigFromFile(destinationFile)
+			if err != nil {
+				return err
+			}
 			t := *authInfo
 			configToWrite.AuthInfos[key] = &t
 			configToWrite.AuthInfos[key].LocationOfOrigin = destinationFile
@@ -251,7 +272,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				destinationFile = configAccess.GetDefaultFilename()
 			}
 
-			configToWrite := GetConfigFromFileOrDie(destinationFile)
+			configToWrite, err := getConfigFromFile(destinationFile)
+			if err != nil {
+				return err
+			}
 			delete(configToWrite.Clusters, key)
 
 			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
@@ -267,7 +291,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				destinationFile = configAccess.GetDefaultFilename()
 			}
 
-			configToWrite := GetConfigFromFileOrDie(destinationFile)
+			configToWrite, err := getConfigFromFile(destinationFile)
+			if err != nil {
+				return err
+			}
 			delete(configToWrite.Contexts, key)
 
 			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
@@ -283,7 +310,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				destinationFile = configAccess.GetDefaultFilename()
 			}
 
-			configToWrite := GetConfigFromFileOrDie(destinationFile)
+			configToWrite, err := getConfigFromFile(destinationFile)
+			if err != nil {
+				return err
+			}
 			delete(configToWrite.AuthInfos, key)
 
 			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
@@ -330,7 +360,10 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 
 	if configAccess.IsExplicitFile() {
 		file := configAccess.GetExplicitFile()
-		currConfig := GetConfigFromFileOrDie(file)
+		currConfig, err := getConfigFromFile(file)
+		if err != nil {
+			return err
+		}
 		currConfig.CurrentContext = newCurrentContext
 		if err := WriteToFile(*currConfig, file); err != nil {
 			return err
@@ -341,7 +374,10 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 
 	if len(newCurrentContext) > 0 {
 		destinationFile := configAccess.GetDefaultFilename()
-		config := GetConfigFromFileOrDie(destinationFile)
+		config, err := getConfigFromFile(destinationFile)
+		if err != nil {
+			return err
+		}
 		config.CurrentContext = newCurrentContext
 
 		if err := WriteToFile(*config, destinationFile); err != nil {
@@ -354,7 +390,10 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 	// we're supposed to be clearing the current context.  We need to find the first spot in the chain that is setting it and clear it
 	for _, file := range configAccess.GetLoadingPrecedence() {
 		if _, err := os.Stat(file); err == nil {
-			currConfig := GetConfigFromFileOrDie(file)
+			currConfig, err := getConfigFromFile(file)
+			if err != nil {
+				return err
+			}
 
 			if len(currConfig.CurrentContext) > 0 {
 				currConfig.CurrentContext = newCurrentContext
@@ -379,7 +418,10 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 
 	if configAccess.IsExplicitFile() {
 		file := configAccess.GetExplicitFile()
-		currConfig := GetConfigFromFileOrDie(file)
+		currConfig, err := getConfigFromFile(file)
+		if err != nil {
+			return err
+		}
 		currConfig.Preferences = newPrefs
 		if err := WriteToFile(*currConfig, file); err != nil {
 			return err
@@ -389,7 +431,10 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 	}
 
 	for _, file := range configAccess.GetLoadingPrecedence() {
-		currConfig := GetConfigFromFileOrDie(file)
+		currConfig, err := getConfigFromFile(file)
+		if err != nil {
+			return err
+		}
 
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
 			currConfig.Preferences = newPrefs
@@ -404,15 +449,23 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 	return errors.New("no config found to write preferences")
 }
 
-// GetConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit.  One exception, missing files result in empty configs, not an exit
-func GetConfigFromFileOrDie(filename string) *clientcmdapi.Config {
+// getConfigFromFile tries to read a kubeconfig file and if it can't, returns an error.  One exception, missing files result in empty configs, not an error.
+func getConfigFromFile(filename string) (*clientcmdapi.Config, error) {
 	config, err := LoadFromFile(filename)
 	if err != nil && !os.IsNotExist(err) {
-		glog.FatalDepth(1, err)
+		return nil, err
 	}
-
 	if config == nil {
-		return clientcmdapi.NewConfig()
+		config = clientcmdapi.NewConfig()
+	}
+	return config, nil
+}
+
+// GetConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit.  One exception, missing files result in empty configs, not an exit
+func GetConfigFromFileOrDie(filename string) *clientcmdapi.Config {
+	config, err := getConfigFromFile(filename)
+	if err != nil {
+		glog.FatalDepth(1, err)
 	}
 
 	return config

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -67,13 +67,6 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-
-	if conf.QPS == 0.0 {
-		conf.QPS = 5.0
-	}
-	if conf.Burst == 0 {
-		conf.Burst = 10
 	}
 
 	cl, err := restclient.RESTClientFor(conf)
@@ -270,3 +263,26 @@ func (parameterCodec) DecodeParameters(parameters url.Values, from unversioned.G
 }
 
 var defaultParameterEncoder runtime.ParameterCodec = parameterCodec{}
+
+type versionedParameterEncoderWithV1Fallback struct{}
+
+func (versionedParameterEncoderWithV1Fallback) EncodeParameters(obj runtime.Object, to unversioned.GroupVersion) (url.Values, error) {
+	ret, err := api.ParameterCodec.EncodeParameters(obj, to)
+	if err != nil && runtime.IsNotRegisteredError(err) {
+		// fallback to v1
+		return api.ParameterCodec.EncodeParameters(obj, v1.SchemeGroupVersion)
+	}
+	return ret, err
+}
+
+func (versionedParameterEncoderWithV1Fallback) DecodeParameters(parameters url.Values, from unversioned.GroupVersion, into runtime.Object) error {
+	return errors.New("DecodeParameters not implemented on versionedParameterEncoderWithV1Fallback")
+}
+
+// VersionedParameterEncoderWithV1Fallback is useful for encoding query
+// parameters for thirdparty resources. It tries to convert object to the
+// specified version before converting it to query parameters, and falls back to
+// converting to v1 if the object is not registered in the specified version.
+// For the record, currently API server always treats query parameters sent to a
+// thirdparty resource endpoint as v1.
+var VersionedParameterEncoderWithV1Fallback runtime.ParameterCodec = versionedParameterEncoderWithV1Fallback{}

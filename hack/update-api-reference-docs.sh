@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ OUTPUT_TMP="${KUBE_ROOT}/${TMP_SUBPATH}"
 
 echo "Generating api reference docs at ${OUTPUT_TMP}"
 
-DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 batch/v1 autoscaling/v1"
+DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 batch/v1 autoscaling/v1 certificates/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 for ver in $VERSIONS; do
   mkdir -p "${OUTPUT_TMP}/${ver}"
@@ -71,6 +71,7 @@ for ver in $VERSIONS; do
     --rm -v "${TMP_IN_HOST}":/output:z \
     -v "${SWAGGER_PATH}":/swagger-source:z \
     -v "${REGISTER_FILE}":/register.go:z \
+    --net=host -e "https_proxy=${KUBERNETES_HTTPS_PROXY:-}" \
     gcr.io/google_containers/gen-swagger-docs:v6 \
     "${SWAGGER_JSON_NAME}"
 done

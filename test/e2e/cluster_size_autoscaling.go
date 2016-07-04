@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ const (
 	scaleDownTimeout = 15 * time.Minute
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
-	gkeUpdateTimeout = 10 * time.Minute
+	gkeUpdateTimeout = 15 * time.Minute
 )
 
 var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
@@ -132,6 +132,37 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
+	It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		By("Creating new node-pool with one n1-standard-4 machine")
+		const extraPoolName = "extra-pool"
+		addNodePool(extraPoolName, "n1-standard-4", 1)
+		defer deleteNodePool(extraPoolName)
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
+
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
+		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
+
+		// Verify, that cluster size is increased
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+	})
+
+	It("should disable node pool autoscaling [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		By("Creating new node-pool with one n1-standard-4 machine")
+		const extraPoolName = "extra-pool"
+		addNodePool(extraPoolName, "n1-standard-4", 1)
+		defer deleteNodePool(extraPoolName)
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
+		framework.ExpectNoError(disableAutoscaler(extraPoolName, 1, 2))
+	})
+
 	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		CreateHostPortPods(f, "host-port", nodeCount+2, false)
 		defer framework.DeleteRC(f.Client, f.Namespace.Name, "host-port")
@@ -194,25 +225,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating new node-pool with one n1-standard-4 machine")
 		const extraPoolName = "extra-pool"
-		output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", extraPoolName, "--quiet",
-			"--machine-type=n1-standard-4",
-			"--num-nodes=1",
-			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone,
-			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
-		defer func() {
-			glog.Infof("Deleting node pool %s", extraPoolName)
-			output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "delete", extraPoolName, "--quiet",
-				"--project="+framework.TestContext.CloudConfig.ProjectID,
-				"--zone="+framework.TestContext.CloudConfig.Zone,
-				"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
-			if err != nil {
-				glog.Infof("Error: %v", err)
-			}
-			glog.Infof("Node-pool deletion output: %s", output)
-		}()
-		framework.ExpectNoError(err)
-		glog.Infof("Creating node-pool: %s", output)
+		addNodePool(extraPoolName, "n1-standard-4", 1)
+		defer deleteNodePool(extraPoolName)
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 
@@ -237,6 +251,32 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		By("Some node should be removed")
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size < increasedSize }, scaleDownTimeout))
+	})
+
+	It("should correctly scale down after a node is not needed when there is non autoscaled pool[Feature:ClusterSizeAutoscalingScaleDown]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		By("Manually increase cluster size")
+		increasedSize := 0
+		newSizes := make(map[string]int)
+		for key, val := range originalSizes {
+			newSizes[key] = val + 2
+			increasedSize += val + 2
+		}
+		setMigSizes(newSizes)
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
+
+		const extraPoolName = "extra-pool"
+		addNodePool(extraPoolName, "n1-standard-1", 3)
+		defer deleteNodePool(extraPoolName)
+
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size >= increasedSize+3 }, scaleUpTimeout))
+
+		By("Some node should be removed")
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
+			func(size int) bool { return size < increasedSize+3 }, scaleDownTimeout))
 	})
 })
 
@@ -273,24 +313,44 @@ func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
 }
 
 func enableAutoscaler(nodePool string, minCount, maxCount int) error {
-	updateRequest := "{" +
-		" \"update\": {" +
-		"  \"desiredNodePoolId\": \"" + nodePool + "\"," +
-		"  \"desiredNodePoolAutoscaling\": {" +
-		"   \"enabled\": \"true\"," +
-		"   \"minNodeCount\": \"" + strconv.Itoa(minCount) + "\"," +
-		"   \"maxNodeCount\": \"" + strconv.Itoa(maxCount) + "\"" +
-		"  }" +
-		" }" +
-		"}"
 
-	url := getGKEClusterUrl()
-	glog.Infof("Using gke api url %s", url)
-	putResult, err := doPut(url, updateRequest)
-	if err != nil {
-		return fmt.Errorf("Failed to put %s: %v", url, err)
+	if nodePool == "default-pool" {
+		glog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
+
+		output, err := exec.Command("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+			"--enable-autoscaling",
+			"--min-nodes="+strconv.Itoa(minCount),
+			"--max-nodes="+strconv.Itoa(maxCount),
+			"--node-pool="+nodePool,
+			"--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone).Output()
+
+		if err != nil {
+			return fmt.Errorf("Failed to enable autoscaling: %v", err)
+		}
+		glog.Infof("Config update result: %s", output)
+
+	} else {
+		glog.Infof("Using direct api access to enable autoscaling for pool %s", nodePool)
+		updateRequest := "{" +
+			" \"update\": {" +
+			"  \"desiredNodePoolId\": \"" + nodePool + "\"," +
+			"  \"desiredNodePoolAutoscaling\": {" +
+			"   \"enabled\": \"true\"," +
+			"   \"minNodeCount\": \"" + strconv.Itoa(minCount) + "\"," +
+			"   \"maxNodeCount\": \"" + strconv.Itoa(maxCount) + "\"" +
+			"  }" +
+			" }" +
+			"}"
+
+		url := getGKEClusterUrl()
+		glog.Infof("Using gke api url %s", url)
+		putResult, err := doPut(url, updateRequest)
+		if err != nil {
+			return fmt.Errorf("Failed to put %s: %v", url, err)
+		}
+		glog.Infof("Config update result: %s", putResult)
 	}
-	glog.Infof("Config update result: %s", putResult)
 
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
 		if val, err := isAutoscalerEnabled(minCount); err == nil && val {
@@ -298,6 +358,73 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 		}
 	}
 	return fmt.Errorf("autoscaler not enabled")
+}
+
+func disableAutoscaler(nodePool string, minCount, maxCount int) error {
+
+	if nodePool == "default-pool" {
+		glog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
+
+		output, err := exec.Command("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+			"--no-enable-autoscaling",
+			"--node-pool="+nodePool,
+			"--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone).Output()
+
+		if err != nil {
+			return fmt.Errorf("Failed to enable autoscaling: %v", err)
+		}
+		glog.Infof("Config update result: %s", output)
+
+	} else {
+		glog.Infof("Using direct api access to disable autoscaling for pool %s", nodePool)
+		updateRequest := "{" +
+			" \"update\": {" +
+			"  \"desiredNodePoolId\": \"" + nodePool + "\"," +
+			"  \"desiredNodePoolAutoscaling\": {" +
+			"   \"enabled\": \"false\"," +
+			"  }" +
+			" }" +
+			"}"
+
+		url := getGKEClusterUrl()
+		glog.Infof("Using gke api url %s", url)
+		putResult, err := doPut(url, updateRequest)
+		if err != nil {
+			return fmt.Errorf("Failed to put %s: %v", url, err)
+		}
+		glog.Infof("Config update result: %s", putResult)
+	}
+
+	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
+		if val, err := isAutoscalerEnabled(minCount); err == nil && !val {
+			return nil
+		}
+	}
+	return fmt.Errorf("autoscaler still enabled")
+}
+
+func addNodePool(name string, machineType string, numNodes int) {
+	output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", name, "--quiet",
+		"--machine-type="+machineType,
+		"--num-nodes="+strconv.Itoa(numNodes),
+		"--project="+framework.TestContext.CloudConfig.ProjectID,
+		"--zone="+framework.TestContext.CloudConfig.Zone,
+		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+	framework.ExpectNoError(err)
+	glog.Infof("Creating node-pool %s: %s", name, output)
+}
+
+func deleteNodePool(name string) {
+	glog.Infof("Deleting node pool %s", name)
+	output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "delete", name, "--quiet",
+		"--project="+framework.TestContext.CloudConfig.ProjectID,
+		"--zone="+framework.TestContext.CloudConfig.Zone,
+		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+	if err != nil {
+		glog.Infof("Error: %v", err)
+	}
+	glog.Infof("Node-pool deletion output: %s", output)
 }
 
 func doPut(url, content string) (string, error) {

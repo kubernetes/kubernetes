@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,13 +53,17 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 
 if [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
   readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
-  readonly KUBE_TEST_PLATFORMS=(linux/amd64)
   if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
+    readonly KUBE_TEST_PLATFORMS=(
+      darwin/amd64
+      linux/amd64
+    )
     readonly KUBE_CLIENT_PLATFORMS=(
       darwin/amd64
       linux/amd64
     )
   else
+    readonly KUBE_TEST_PLATFORMS=(linux/amd64)
     readonly KUBE_CLIENT_PLATFORMS=(linux/amd64)
   fi
 else
@@ -300,26 +304,21 @@ EOF
     return 2
   fi
 
-  # Travis continuous build uses a head go release that doesn't report
-  # a version number, so we skip this check on Travis.  It's unnecessary
-  # there anyway.
-  if [[ "${TRAVIS:-}" != "true" ]]; then
-    local go_version
-    go_version=($(go version))
-    if [[ "${go_version[2]}" < "go1.6" && "${go_version[2]}" != "devel" ]]; then
-      kube::log::usage_from_stdin <<EOF
+  local go_version
+  go_version=($(go version))
+  if [[ "${go_version[2]}" < "go1.6" && "${go_version[2]}" != "devel" ]]; then
+    kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
 Kubernetes requires go version 1.6 or greater.
 Please install Go version 1.6 or later.
 EOF
-      return 2
-    fi
+    return 2
   fi
 }
 
 # kube::golang::setup_env will check that the `go` commands is available in
-# ${PATH}. If not running on Travis, it will also check that the Go version is
-# good enough for the Kubernetes build.
+# ${PATH}. It will also check that the Go version is good enough for the
+# Kubernetes build.
 #
 # Inputs:
 #   KUBE_EXTRA_GOPATH - If set, this is included in created GOPATH

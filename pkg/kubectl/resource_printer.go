@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -322,10 +322,12 @@ type handlerEntry struct {
 type PrintOptions struct {
 	NoHeaders          bool
 	WithNamespace      bool
+	WithKind           bool
 	Wide               bool
 	ShowAll            bool
 	ShowLabels         bool
 	AbsoluteTimestamps bool
+	KindName           string
 	ColumnLabels       []string
 }
 
@@ -335,7 +337,7 @@ type PrintOptions struct {
 // received from watches.
 type HumanReadablePrinter struct {
 	handlerMap map[reflect.Type]*handlerEntry
-	options    PrintOptions
+	Options    PrintOptions
 	lastType   reflect.Type
 }
 
@@ -343,9 +345,11 @@ type HumanReadablePrinter struct {
 func NewHumanReadablePrinter(noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
-		options: PrintOptions{
+		Options: PrintOptions{
 			NoHeaders:          noHeaders,
 			WithNamespace:      withNamespace,
+			WithKind:           false,
+			KindName:           "",
 			Wide:               wide,
 			ShowAll:            showAll,
 			ShowLabels:         showLabels,
@@ -599,6 +603,11 @@ func printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
 func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	name := pod.Name
 	namespace := pod.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	restarts := 0
 	totalContainers := len(pod.Spec.Containers)
@@ -616,6 +625,7 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	initializing := false
 	for i := range pod.Status.InitContainerStatuses {
 		container := pod.Status.InitContainerStatuses[i]
+		restarts += int(container.RestartCount)
 		switch {
 		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
 			continue
@@ -641,6 +651,7 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 		break
 	}
 	if !initializing {
+		restarts = 0
 		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 			container := pod.Status.ContainerStatuses[i]
 
@@ -716,6 +727,11 @@ func printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error
 func printPodTemplate(pod *api.PodTemplate, w io.Writer, options PrintOptions) error {
 	name := pod.Name
 	namespace := pod.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	containers := pod.Template.Spec.Containers
 
@@ -757,6 +773,11 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 	name := controller.Name
 	namespace := controller.Namespace
 	containers := controller.Spec.Template.Spec.Containers
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -806,6 +827,11 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOption
 	name := rs.Name
 	namespace := rs.Namespace
 	containers := rs.Spec.Template.Spec.Containers
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -851,6 +877,11 @@ func printReplicaSetList(list *extensions.ReplicaSetList, w io.Writer, options P
 }
 
 func printCluster(c *federation.Cluster, w io.Writer, options PrintOptions) error {
+	name := c.Name
+	kind := options.KindName
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	var statuses []string
 	for _, condition := range c.Status.Conditions {
 		if condition.Status == api.ConditionTrue {
@@ -863,10 +894,9 @@ func printCluster(c *federation.Cluster, w io.Writer, options PrintOptions) erro
 		statuses = append(statuses, "Unknown")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		c.Name,
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n",
+		name,
 		strings.Join(statuses, ","),
-		c.Status.Version,
 		translateTimestamp(c.CreationTimestamp),
 	); err != nil {
 		return err
@@ -886,6 +916,11 @@ func printJob(job *batch.Job, w io.Writer, options PrintOptions) error {
 	name := job.Name
 	namespace := job.Namespace
 	containers := job.Spec.Template.Spec.Containers
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1004,6 +1039,11 @@ func printService(svc *api.Service, w io.Writer, options PrintOptions) error {
 
 	internalIP := svc.Spec.ClusterIP
 	externalIP := getServiceExternalIP(svc, options.Wide)
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1080,6 +1120,11 @@ func formatPorts(tls []extensions.IngressTLS) string {
 func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions) error {
 	name := ingress.Name
 	namespace := ingress.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1119,6 +1164,11 @@ func printPetSet(ps *apps.PetSet, w io.Writer, options PrintOptions) error {
 	name := ps.Name
 	namespace := ps.Namespace
 	containers := ps.Spec.Template.Spec.Containers
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1165,6 +1215,11 @@ func printPetSetList(petSetList *apps.PetSetList, w io.Writer, options PrintOpti
 func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options PrintOptions) error {
 	name := ds.Name
 	namespace := ds.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	containers := ds.Spec.Template.Spec.Containers
 
@@ -1220,6 +1275,11 @@ func printDaemonSetList(list *extensions.DaemonSetList, w io.Writer, options Pri
 func printEndpoints(endpoints *api.Endpoints, w io.Writer, options PrintOptions) error {
 	name := endpoints.Name
 	namespace := endpoints.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1246,11 +1306,17 @@ func printEndpointsList(list *api.EndpointsList, w io.Writer, options PrintOptio
 }
 
 func printNamespace(item *api.Namespace, w io.Writer, options PrintOptions) error {
+	name := item.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	if options.WithNamespace {
 		return fmt.Errorf("namespace is not namespaced")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", item.Name, item.Status.Phase, translateTimestamp(item.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, item.Status.Phase, translateTimestamp(item.CreationTimestamp)); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, AppendLabels(item.Labels, options.ColumnLabels)); err != nil {
@@ -1272,6 +1338,11 @@ func printNamespaceList(list *api.NamespaceList, w io.Writer, options PrintOptio
 func printSecret(item *api.Secret, w io.Writer, options PrintOptions) error {
 	name := item.Name
 	namespace := item.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1301,6 +1372,11 @@ func printSecretList(list *api.SecretList, w io.Writer, options PrintOptions) er
 func printServiceAccount(item *api.ServiceAccount, w io.Writer, options PrintOptions) error {
 	name := item.Name
 	namespace := item.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1328,6 +1404,12 @@ func printServiceAccountList(list *api.ServiceAccountList, w io.Writer, options 
 }
 
 func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
+	name := node.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	if options.WithNamespace {
 		return fmt.Errorf("node is not namespaced")
 	}
@@ -1354,7 +1436,7 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 		status = append(status, "SchedulingDisabled")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", node.Name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
 		return err
 	}
 	// Display caller specify column labels first.
@@ -1375,10 +1457,15 @@ func printNodeList(list *api.NodeList, w io.Writer, options PrintOptions) error 
 }
 
 func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options PrintOptions) error {
+	name := pv.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	if options.WithNamespace {
 		return fmt.Errorf("persistentVolume is not namespaced")
 	}
-	name := pv.Name
 
 	claimRefUID := ""
 	if pv.Spec.ClaimRef != nil {
@@ -1421,6 +1508,11 @@ func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer, opti
 func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, options PrintOptions) error {
 	name := pvc.Name
 	namespace := pvc.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1458,7 +1550,13 @@ func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Wr
 }
 
 func printEvent(event *api.Event, w io.Writer, options PrintOptions) error {
+	name := event.InvolvedObject.Name
 	namespace := event.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
 			return err
@@ -1480,7 +1578,7 @@ func printEvent(event *api.Event, w io.Writer, options PrintOptions) error {
 		LastTimestamp,
 		FirstTimestamp,
 		event.Count,
-		event.InvolvedObject.Name,
+		name,
 		event.InvolvedObject.Kind,
 		event.InvolvedObject.FieldPath,
 		event.Type,
@@ -1524,6 +1622,12 @@ func printLimitRangeList(list *api.LimitRangeList, w io.Writer, options PrintOpt
 
 // printObjectMeta prints the object metadata of a given resource.
 func printObjectMeta(meta api.ObjectMeta, w io.Writer, options PrintOptions, namespaced bool) error {
+	name := meta.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	if namespaced && options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", meta.Namespace); err != nil {
 			return err
@@ -1532,7 +1636,7 @@ func printObjectMeta(meta api.ObjectMeta, w io.Writer, options PrintOptions, nam
 
 	if _, err := fmt.Fprintf(
 		w, "%s\t%s",
-		meta.Name,
+		name,
 		translateTimestamp(meta.CreationTimestamp),
 	); err != nil {
 		return err
@@ -1615,6 +1719,12 @@ func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, w io.Writer,
 }
 
 func printComponentStatus(item *api.ComponentStatus, w io.Writer, options PrintOptions) error {
+	name := item.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	if options.WithNamespace {
 		return fmt.Errorf("componentStatus is not namespaced")
 	}
@@ -1634,7 +1744,7 @@ func printComponentStatus(item *api.ComponentStatus, w io.Writer, options PrintO
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", item.Name, status, message, error); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, status, message, error); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, AppendLabels(item.Labels, options.ColumnLabels)); err != nil {
@@ -1655,13 +1765,20 @@ func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, option
 }
 
 func printThirdPartyResource(rsrc *extensions.ThirdPartyResource, w io.Writer, options PrintOptions) error {
+	name := rsrc.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
+
 	versions := make([]string, len(rsrc.Versions))
 	for ix := range rsrc.Versions {
 		version := &rsrc.Versions[ix]
 		versions[ix] = fmt.Sprintf("%s", version.Name)
 	}
 	versionsString := strings.Join(versions, ",")
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", rsrc.Name, rsrc.Description, versionsString); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", name, rsrc.Description, versionsString); err != nil {
 		return err
 	}
 	return nil
@@ -1685,12 +1802,19 @@ func truncate(str string, maxLen int) string {
 }
 
 func printThirdPartyResourceData(rsrc *extensions.ThirdPartyResourceData, w io.Writer, options PrintOptions) error {
+	name := rsrc.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
+
 	l := labels.FormatLabels(rsrc.Labels)
 	truncateCols := 50
 	if options.Wide {
 		truncateCols = 100
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", rsrc.Name, l, truncate(string(rsrc.Data), truncateCols)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", name, l, truncate(string(rsrc.Data), truncateCols)); err != nil {
 		return err
 	}
 	return nil
@@ -1707,6 +1831,12 @@ func printThirdPartyResourceDataList(list *extensions.ThirdPartyResourceDataList
 }
 
 func printDeployment(deployment *extensions.Deployment, w io.Writer, options PrintOptions) error {
+	name := deployment.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", deployment.Namespace); err != nil {
 			return err
@@ -1718,7 +1848,7 @@ func printDeployment(deployment *extensions.Deployment, w io.Writer, options Pri
 	updatedReplicas := deployment.Status.UpdatedReplicas
 	availableReplicas := deployment.Status.AvailableReplicas
 	age := translateTimestamp(deployment.CreationTimestamp)
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s", deployment.Name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s", name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, AppendLabels(deployment.Labels, options.ColumnLabels)); err != nil {
@@ -1740,6 +1870,11 @@ func printDeploymentList(list *extensions.DeploymentList, w io.Writer, options P
 func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io.Writer, options PrintOptions) error {
 	namespace := hpa.Namespace
 	name := hpa.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 	reference := fmt.Sprintf("%s/%s",
 		hpa.Spec.ScaleTargetRef.Kind,
 		hpa.Spec.ScaleTargetRef.Name)
@@ -1756,6 +1891,7 @@ func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io
 		minPods = fmt.Sprintf("%d", *hpa.Spec.MinReplicas)
 	}
 	maxPods := hpa.Spec.MaxReplicas
+
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
 			return err
@@ -1792,6 +1928,11 @@ func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerL
 func printConfigMap(configMap *api.ConfigMap, w io.Writer, options PrintOptions) error {
 	name := configMap.Name
 	namespace := configMap.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1818,7 +1959,13 @@ func printConfigMapList(list *api.ConfigMapList, w io.Writer, options PrintOptio
 }
 
 func printPodSecurityPolicy(item *extensions.PodSecurityPolicy, w io.Writer, options PrintOptions) error {
-	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%t\t%v\n", item.Name, item.Spec.Privileged,
+	name := item.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
+	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%t\t%v\n", name, item.Spec.Privileged,
 		item.Spec.AllowedCapabilities, item.Spec.SELinux.Rule,
 		item.Spec.RunAsUser.Rule, item.Spec.FSGroup.Rule, item.Spec.SupplementalGroups.Rule, item.Spec.ReadOnlyRootFilesystem, item.Spec.Volumes)
 	return err
@@ -1837,6 +1984,11 @@ func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, w io.Wri
 func printNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, options PrintOptions) error {
 	name := networkPolicy.Name
 	namespace := networkPolicy.Namespace
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1983,18 +2135,18 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	}
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
-		if !h.options.NoHeaders && t != h.lastType {
-			headers := append(handler.columns, formatWideHeaders(h.options.Wide, t)...)
-			headers = append(headers, formatLabelHeaders(h.options.ColumnLabels)...)
+		if !h.Options.NoHeaders && t != h.lastType {
+			headers := append(handler.columns, formatWideHeaders(h.Options.Wide, t)...)
+			headers = append(headers, formatLabelHeaders(h.Options.ColumnLabels)...)
 			// LABELS is always the last column.
-			headers = append(headers, formatShowLabelsHeader(h.options.ShowLabels, t)...)
-			if h.options.WithNamespace {
+			headers = append(headers, formatShowLabelsHeader(h.Options.ShowLabels, t)...)
+			if h.Options.WithNamespace {
 				headers = append(withNamespacePrefixColumns, headers...)
 			}
 			h.printHeader(headers, w)
 			h.lastType = t
 		}
-		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w), reflect.ValueOf(h.options)}
+		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w), reflect.ValueOf(h.Options)}
 		resultValue := handler.printFunc.Call(args)[0]
 		if resultValue.IsNil() {
 			return nil

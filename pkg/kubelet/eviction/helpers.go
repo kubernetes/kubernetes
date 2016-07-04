@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -299,21 +299,21 @@ func (ms *multiSorter) Less(i, j int) bool {
 	return ms.cmp[k](p1, p2) < 0
 }
 
-// qos compares pods by QoS (BestEffort < Burstable < Guaranteed)
-func qos(p1, p2 *api.Pod) int {
-	qosP1 := qosutil.GetPodQos(p1)
-	qosP2 := qosutil.GetPodQos(p2)
+// qosComparator compares pods by QoS (BestEffort < Burstable < Guaranteed)
+func qosComparator(p1, p2 *api.Pod) int {
+	qosP1 := qos.GetPodQOS(p1)
+	qosP2 := qos.GetPodQOS(p2)
 	// its a tie
 	if qosP1 == qosP2 {
 		return 0
 	}
 	// if p1 is best effort, we know p2 is burstable or guaranteed
-	if qosP1 == qosutil.BestEffort {
+	if qosP1 == qos.BestEffort {
 		return -1
 	}
 	// we know p1 and p2 are not besteffort, so if p1 is burstable, p2 must be guaranteed
-	if qosP1 == qosutil.Burstable {
-		if qosP2 == qosutil.Guaranteed {
+	if qosP1 == qos.Burstable {
+		if qosP2 == qos.Guaranteed {
 			return -1
 		}
 		return 1
@@ -397,12 +397,12 @@ func disk(stats statsFunc) cmpFunc {
 
 // rankMemoryPressure orders the input pods for eviction in response to memory pressure.
 func rankMemoryPressure(pods []*api.Pod, stats statsFunc) {
-	orderedBy(qos, memory(stats)).Sort(pods)
+	orderedBy(qosComparator, memory(stats)).Sort(pods)
 }
 
 // rankDiskPressure orders the input pods for eviction in response to disk pressure.
 func rankDiskPressure(pods []*api.Pod, stats statsFunc) {
-	orderedBy(qos, disk(stats)).Sort(pods)
+	orderedBy(qosComparator, disk(stats)).Sort(pods)
 }
 
 // byEvictionPriority implements sort.Interface for []api.ResourceName.

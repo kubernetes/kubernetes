@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,12 +23,12 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/fields"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -66,11 +66,16 @@ const (
 	kLocalStorageWarning = "Deleting pods with local storage"
 	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet (use --force to override)"
 	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet"
-	cordon_long          = `Mark node as unschedulable.
-`
-	cordon_example = `# Mark node "foo" as unschedulable.
-kubectl cordon foo
-`
+)
+
+var (
+	cordon_long = dedent.Dedent(`
+		Mark node as unschedulable.
+		`)
+	cordon_example = dedent.Dedent(`
+		# Mark node "foo" as unschedulable.
+		kubectl cordon foo
+		`)
 )
 
 func NewCmdCordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -89,12 +94,14 @@ func NewCmdCordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-const (
-	uncordon_long = `Mark node as schedulable.
-`
-	uncordon_example = `# Mark node "foo" as schedulable.
-$ kubectl uncordon foo
-`
+var (
+	uncordon_long = dedent.Dedent(`
+		Mark node as schedulable.
+		`)
+	uncordon_example = dedent.Dedent(`
+		# Mark node "foo" as schedulable.
+		$ kubectl uncordon foo
+		`)
 )
 
 func NewCmdUncordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -113,28 +120,33 @@ func NewCmdUncordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-const (
-	drain_long = `Drain node in preparation for maintenance.
+var (
+	drain_long = dedent.Dedent(`
+		Drain node in preparation for maintenance.
 
-The given node will be marked unschedulable to prevent new pods from arriving.
-Then drain deletes all pods except mirror pods (which cannot be deleted through
-the API server).  If there are DaemonSet-managed pods, drain will not proceed
-without --ignore-daemonsets, and regardless it will not delete any
-DaemonSet-managed pods, because those pods would be immediately replaced by the
-DaemonSet controller, which ignores unschedulable markings.  If there are any
-pods that are neither mirror pods nor managed--by ReplicationController,
-ReplicaSet, DaemonSet or Job--, then drain will not delete any pods unless you
-use --force.
+		The given node will be marked unschedulable to prevent new pods from arriving.
+		Then drain deletes all pods except mirror pods (which cannot be deleted through
+		the API server).  If there are DaemonSet-managed pods, drain will not proceed
+		without --ignore-daemonsets, and regardless it will not delete any
+		DaemonSet-managed pods, because those pods would be immediately replaced by the
+		DaemonSet controller, which ignores unschedulable markings.  If there are any
+		pods that are neither mirror pods nor managed--by ReplicationController,
+		ReplicaSet, DaemonSet or Job--, then drain will not delete any pods unless you
+		use --force.
 
-When you are ready to put the node back into service, use kubectl uncordon, which
-will make the node schedulable again.
-`
-	drain_example = `# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet on it.
-$ kubectl drain foo --force
+		When you are ready to put the node back into service, use kubectl uncordon, which
+		will make the node schedulable again.
 
-# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet, and use a grace period of 15 minutes.
-$ kubectl drain foo --grace-period=900
-`
+		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)
+		`)
+
+	drain_example = dedent.Dedent(`
+		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet on it.
+		$ kubectl drain foo --force
+
+		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet, and use a grace period of 15 minutes.
+		$ kubectl drain foo --grace-period=900
+		`)
 )
 
 func NewCmdDrain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -227,7 +239,7 @@ func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, 
 }
 
 func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, error) {
-	creatorRef, found := pod.ObjectMeta.Annotations[controller.CreatedByAnnotation]
+	creatorRef, found := pod.ObjectMeta.Annotations[api.CreatedByAnnotation]
 	if !found {
 		return nil, nil
 	}

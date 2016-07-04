@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -173,6 +173,20 @@ var nonRoundTrippableTypes = sets.NewString(
 	// object.
 	"WatchEvent",
 )
+
+var commonKinds = []string{"ListOptions", "DeleteOptions"}
+
+// verify all external group/versions have the common kinds like the ListOptions, DeleteOptions are registered.
+func TestCommonKindsRegistered(t *testing.T) {
+	for _, kind := range commonKinds {
+		for _, group := range testapi.Groups {
+			gv := group.GroupVersion()
+			if _, err := api.Scheme.New(gv.WithKind(kind)); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+}
 
 var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "ExportOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}

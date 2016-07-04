@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ limitations under the License.
 package vsphere
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
-	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/vmware/govmomi"
@@ -37,12 +37,20 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const ProviderName = "vsphere"
 const ActivePowerState = "poweredOn"
 const DefaultDiskController = "scsi"
-const DefaultSCSIControllerType = "lsilogic"
+const DefaultSCSIControllerType = "lsilogic-sas"
+
+// Controller types that are currently supported for hot attach of disks
+// lsilogic driver type is currently not supported because,when a device gets detached
+// it fails to remove the device from the /dev path (which should be manually done)
+// making the subsequent attaches to the node to fail.
+// TODO: Add support for lsilogic driver type
+var supportedSCSIControllerType = []string{"lsilogic-sas", "pvscsi"}
 
 var ErrNoDiskUUIDFound = errors.New("No disk UUID found")
 var ErrNoDiskIDFound = errors.New("No vSphere disk ID found")
@@ -64,13 +72,13 @@ type VSphereConfig struct {
 		InsecureFlag bool   `gcfg:"insecure-flag"`
 		Datacenter   string `gcfg:"datacenter"`
 		Datastore    string `gcfg:"datastore"`
+		WorkingDir   string `gcfg:"working-dir"`
 	}
 
 	Network struct {
 		PublicNetwork string `gcfg:"public-network"`
 	}
 	Disk struct {
-		DiskController     string `dcfg:"diskcontroller"`
 		SCSIControllerType string `dcfg:"scsicontrollertype"`
 	}
 }
@@ -97,14 +105,12 @@ func init() {
 }
 
 func readInstanceID(cfg *VSphereConfig) (string, error) {
-	cmd := exec.Command("bash", "-c", `dmidecode -t 1 | grep UUID | tr -d ' ' | cut -f 2 -d ':'`)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
+	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", err
 	}
-	if out.Len() == 0 {
+
+	if len(addrs) == 0 {
 		return "", fmt.Errorf("unable to retrieve Instance ID")
 	}
 
@@ -131,7 +137,22 @@ func readInstanceID(cfg *VSphereConfig) (string, error) {
 
 	s := object.NewSearchIndex(c.Client)
 
-	svm, err := s.FindByUuid(ctx, dc, strings.ToLower(strings.TrimSpace(out.String())), true, nil)
+	var svm object.Reference
+	for _, v := range addrs {
+		ip, _, err := net.ParseCIDR(v.String())
+		if err != nil {
+			return "", fmt.Errorf("unable to parse cidr from ip")
+		}
+
+		svm, err = s.FindByIp(ctx, dc, ip.String(), true)
+		if err == nil && svm != nil {
+			break
+		}
+	}
+	if svm == nil {
+		return "", fmt.Errorf("unable to retrieve vm reference from vSphere")
+	}
+
 	var vm mo.VirtualMachine
 	err = s.Properties(ctx, svm.Reference(), []string{"name"}, &vm)
 	if err != nil {
@@ -146,17 +167,29 @@ func newVSphere(cfg VSphereConfig) (*VSphere, error) {
 		return nil, err
 	}
 
-	if cfg.Disk.DiskController == "" {
-		cfg.Disk.DiskController = DefaultDiskController
-	}
 	if cfg.Disk.SCSIControllerType == "" {
 		cfg.Disk.SCSIControllerType = DefaultSCSIControllerType
+	} else if !checkControllerSupported(cfg.Disk.SCSIControllerType) {
+		glog.Errorf("%v is not a supported SCSI Controller type. Please configure 'lsilogic-sas' OR 'pvscsi'", cfg.Disk.SCSIControllerType)
+		return nil, errors.New("Controller type not supported. Please configure 'lsilogic-sas' OR 'pvscsi'")
+	}
+	if cfg.Global.WorkingDir != "" {
+		cfg.Global.WorkingDir = path.Clean(cfg.Global.WorkingDir) + "/"
 	}
 	vs := VSphere{
 		cfg:             &cfg,
 		localInstanceID: id,
 	}
 	return &vs, nil
+}
+
+func checkControllerSupported(ctrlType string) bool {
+	for _, c := range supportedSCSIControllerType {
+		if ctrlType == c {
+			return true
+		}
+	}
+	return false
 }
 
 func vsphereLogin(cfg *VSphereConfig, ctx context.Context) (*govmomi.Client, error) {
@@ -189,9 +222,11 @@ func getVirtualMachineByName(cfg *VSphereConfig, ctx context.Context, c *govmomi
 	}
 	f.SetDatacenter(dc)
 
+	vmRegex := cfg.Global.WorkingDir + name
+
 	// Retrieve vm by name
 	//TODO: also look for vm inside subfolders
-	vm, err := f.VirtualMachine(ctx, name)
+	vm, err := f.VirtualMachine(ctx, vmRegex)
 	if err != nil {
 		return nil, err
 	}
@@ -219,8 +254,10 @@ func getInstances(cfg *VSphereConfig, ctx context.Context, c *govmomi.Client, fi
 
 	f.SetDatacenter(dc)
 
+	vmRegex := cfg.Global.WorkingDir + filter
+
 	//TODO: get all vms inside subfolders
-	vms, err := f.VirtualMachineList(ctx, filter)
+	vms, err := f.VirtualMachineList(ctx, vmRegex)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +311,7 @@ func (i *Instances) List(filter string) ([]string, error) {
 		return nil, err
 	}
 
-	glog.V(3).Infof("found %s instances matching %s: %s",
+	glog.V(3).Infof("Found %s instances matching %s: %s",
 		len(vmList), filter, vmList)
 
 	return vmList, nil
@@ -464,7 +501,9 @@ func getVirtualMachineDevices(cfg *VSphereConfig, ctx context.Context, c *govmom
 		return nil, nil, nil, err
 	}
 
-	vm, err := f.VirtualMachine(ctx, name)
+	vmRegex := cfg.Global.WorkingDir + name
+
+	vm, err := f.VirtualMachine(ctx, vmRegex)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -518,15 +557,18 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 		return "", "", err
 	}
 
-	// find SCSI controller to attach the disk
-	var newSCSICreated bool = false
+	var diskControllerType = vs.cfg.Disk.SCSIControllerType
+	// find SCSI controller of particular type from VM devices
+	var diskController = getSCSIController(vmDevices, diskControllerType)
+
+	var newSCSICreated = false
 	var newSCSIController types.BaseVirtualDevice
-	diskController, err := vmDevices.FindDiskController(vs.cfg.Disk.DiskController)
-	if err != nil {
-		// create a scsi controller if there is not one
-		newSCSIController, err := vmDevices.CreateSCSIController(vs.cfg.Disk.SCSIControllerType)
+	// creating a scsi controller as there is none found of controller type defined
+	if diskController == nil {
+		glog.V(4).Infof("Creating a SCSI controller of %v type", diskControllerType)
+		newSCSIController, err := vmDevices.CreateSCSIController(diskControllerType)
 		if err != nil {
-			glog.V(3).Infof("cannot create new SCSI controller - %v", err)
+			runtime.HandleError(fmt.Errorf("error creating new SCSI controller: %v", err))
 			return "", "", err
 		}
 		configNewSCSIController := newSCSIController.(types.BaseVirtualSCSIController).GetVirtualSCSIController()
@@ -551,8 +593,10 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 			//cannot cleanup if there is no device list
 			return "", "", err
 		}
-		if diskController, err = vmDevices.FindDiskController(vs.cfg.Disk.DiskController); err != nil {
-			glog.V(3).Infof("cannot find disk controller - %v", err)
+
+		diskController = getSCSIController(vmDevices, vs.cfg.Disk.SCSIControllerType)
+		if diskController == nil {
+			glog.Errorf("cannot find SCSI controller in VM - %v", err)
 			// attempt clean up of scsi controller
 			cleanUpController(newSCSIController, vmDevices, vm, ctx)
 			return "", "", err
@@ -567,7 +611,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 	// Attach disk to the VM
 	err = vm.AddDevice(ctx, disk)
 	if err != nil {
-		glog.V(3).Infof("cannot attach disk to the vm - %v", err)
+		glog.Errorf("cannot attach disk to the vm - %v", err)
 		if newSCSICreated {
 			cleanUpController(newSCSIController, vmDevices, vm, ctx)
 		}
@@ -604,6 +648,19 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 	}
 
 	return deviceName, diskUUID, nil
+}
+
+func getSCSIController(vmDevices object.VirtualDeviceList, scsiType string) *types.VirtualController {
+	// get virtual scsi controller of passed argument type
+	for _, device := range vmDevices {
+		devType := vmDevices.Type(device)
+		if devType == scsiType {
+			if c, ok := device.(types.BaseVirtualController); ok {
+				return c.GetVirtualController()
+			}
+		}
+	}
+	return nil
 }
 
 func getVirtualDiskUUID(newDevice types.BaseVirtualDevice) (string, error) {

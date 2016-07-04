@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,12 @@ var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify a
 
 var sshOptionsMap map[string]string
 
-const archiveName = "e2e_node_test.tar.gz"
+const (
+	archiveName = "e2e_node_test.tar.gz"
+	CNI_RELEASE = "c864f0e1ea73719b8f4582402b0847064f9883b0"
+)
+
+var CNI_URL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNI_RELEASE)
 
 var hostnameIpOverrides = struct {
 	sync.RWMutex
@@ -152,6 +157,14 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 		}
 	}
 
+	// Install the cni plugin. Note that /opt/cni does not get cleaned up after
+	// the test completes.
+	if _, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c",
+		getSshCommand(" ; ", "sudo mkdir -p /opt/cni", fmt.Sprintf("sudo wget -O - %s | sudo tar -xz -C /opt/cni", CNI_URL))); err != nil {
+		// Exit failure with the error
+		return "", false, err
+	}
+
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
@@ -213,14 +226,11 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 
 	glog.Infof("Copying test artifacts from %s", host)
 	scpErr := getTestArtifacts(host, tmp)
-	exitOk := true
 	if scpErr != nil {
-		// Only exit non-0 if the scp failed
-		exitOk = false
-		aggErrs = append(aggErrs, err)
+		aggErrs = append(aggErrs, scpErr)
 	}
 
-	return output, exitOk, utilerrors.NewAggregate(aggErrs)
+	return output, len(aggErrs) == 0, utilerrors.NewAggregate(aggErrs)
 }
 
 func getTestArtifacts(host, testDir string) error {

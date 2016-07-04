@@ -19090,6 +19090,10 @@
       "type": "object",
       "description": "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4"
      },
+     "stringData": {
+      "type": "object",
+      "description": "stringData allows specifying non-binary secret data in string form. It is provided as a write-only convenience method. All keys and values are merged into the data field on write, overwriting any existing values. It is never output when reading from the API."
+     },
      "type": {
       "type": "string",
       "description": "Used to facilitate programmatic handling of secret data."
@@ -19226,7 +19230,7 @@
      },
      "selector": {
       "type": "object",
-      "description": "This service will route traffic to pods having labels matching this selector. Label keys and values that must match in order to receive traffic for this service. If empty, all pods are selected, if not specified, endpoints must be manually specified. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview"
+      "description": "This service will route traffic to pods having labels matching this selector. Label keys and values that must match in order to receive traffic for this service. If not specified, endpoints must be manually specified and the system will not automatically manage them. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview"
      },
      "clusterIP": {
       "type": "string",

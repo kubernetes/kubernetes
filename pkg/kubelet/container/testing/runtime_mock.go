@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -131,6 +131,11 @@ func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) err
 func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
 	args := r.Called(containerID)
 	return "", args.Error(0)
+}
+
+func (r *Mock) GetPodContainerID(pod *Pod) (ContainerID, error) {
+	args := r.Called(pod)
+	return ContainerID{}, args.Error(0)
 }
 
 func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {

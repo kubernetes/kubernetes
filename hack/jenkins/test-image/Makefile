@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,9 @@
 
 all: push
 
-TAG = 0.11
+# Tag format: $GO_VERSION-$EMBEDDED_DOCKER_VERSION-$REVISION
+# These versions are specified in the Dockerfile
+TAG = go1.6.2-docker1.9.1-rev2
 
 container:
 	docker build -t gcr.io/google_containers/kubekins-test .

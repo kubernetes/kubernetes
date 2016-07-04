@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1717,6 +1717,39 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 	}
 }
 
+func TestSecurityOptsOperator(t *testing.T) {
+	dm110, _ := newTestDockerManagerWithVersion("1.10.1", "1.22")
+	dm111, _ := newTestDockerManagerWithVersion("1.11.0", "1.23")
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar"},
+			},
+		},
+	}
+	opts, err := dm110.getSecurityOpts(pod, "bar")
+	if err != nil {
+		t.Fatalf("error getting security opts for Docker 1.10: %v", err)
+	}
+	if expected := []string{"seccomp:unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
+		t.Fatalf("security opts for Docker 1.10: expected %v, got: %v", expected, opts)
+	}
+
+	opts, err = dm111.getSecurityOpts(pod, "bar")
+	if err != nil {
+		t.Fatalf("error getting security opts for Docker 1.11: %v", err)
+	}
+	if expected := []string{"seccomp=unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
+		t.Fatalf("security opts for Docker 1.11: expected %v, got: %v", expected, opts)
+	}
+}
+
 func TestSeccompIsUnconfinedByDefaultWithDockerV110(t *testing.T) {
 	dm, fakeDocker := newTestDockerManagerWithVersion("1.10.1", "1.22")
 	pod := &api.Pod{
@@ -1910,7 +1943,7 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dm, fakeDocker := newTestDockerManagerWithVersion("1.10.1", "1.22")
+		dm, fakeDocker := newTestDockerManagerWithVersion("1.11.0", "1.23")
 		_, filename, _, _ := goruntime.Caller(0)
 		dm.seccompProfileRoot = path.Join(path.Dir(filename), "fixtures", "seccomp")
 
@@ -2025,6 +2058,58 @@ func TestCheckVersionCompatibility(t *testing.T) {
 			err := dm.checkVersionCompatibility()
 			assert.NotNil(t, err, testCase+" version error check")
 		}
+	}
+}
+
+func TestNewDockerVersion(t *testing.T) {
+	cases := []struct {
+		value string
+		out   string
+		err   bool
+	}{
+		{value: "1", err: true},
+		{value: "1.8", err: true},
+		{value: "1.8.1", out: "1.8.1"},
+		{value: "1.8.1-fc21.other", out: "1.8.1-fc21.other"},
+		{value: "1.8.1-beta.12", out: "1.8.1-beta.12"},
+	}
+	for _, test := range cases {
+		v, err := newDockerVersion(test.value)
+		switch {
+		case err != nil && test.err:
+			continue
+		case (err != nil) != test.err:
+			t.Errorf("error for %q: expected %t, got %v", test.value, test.err, err)
+			continue
+		}
+		if v.String() != test.out {
+			t.Errorf("unexpected parsed version %q for %q", v, test.value)
+		}
+	}
+}
+
+func TestDockerVersionComparison(t *testing.T) {
+	v, err := newDockerVersion("1.10.3")
+	assert.NoError(t, err)
+	for i, test := range []struct {
+		version string
+		compare int
+		err     bool
+	}{
+		{version: "1.9.2", compare: 1},
+		{version: "1.9.2-rc2", compare: 1},
+		{version: "1.10.3", compare: 0},
+		{version: "1.10.3-rc3", compare: 1},
+		{version: "1.10.4", compare: -1},
+		{version: "1.10.4-rc1", compare: -1},
+		{version: "1.11.1", compare: -1},
+		{version: "1.11.1-rc4", compare: -1},
+		{version: "invalid", compare: -1, err: true},
+	} {
+		testCase := fmt.Sprintf("test case #%d test version %q", i, test.version)
+		res, err := v.Compare(test.version)
+		assert.Equal(t, test.compare, res, testCase)
+		assert.Equal(t, test.err, err != nil, testCase)
 	}
 }
 

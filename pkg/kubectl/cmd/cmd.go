@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,30 +32,35 @@ import (
 
 const (
 	bash_completion_func = `# call kubectl get $1,
-__kubectl_namespace_flag()
+__kubectl_override_flag_list=(kubeconfig cluster user context namespace server)
+__kubectl_override_flags()
 {
-    local ret two_word_ns
-    ret=""
-    two_word_ns=false
+    local ${__kubectl_override_flag_list[*]} two_word_of of
     for w in "${words[@]}"; do
-        if [ "$two_word_ns" = true ]; then
-            ret="--namespace=${w}"
-            two_word_ns=false
+        if [ -n "${two_word_of}" ]; then
+            eval "${two_word_of}=\"--${two_word_of}=\${w}\""
+            two_word_of=
             continue
         fi
-        case "${w}" in
-            --namespace=*)
-                ret=${w}
-                ;;
-            --namespace)
-                two_word_ns=true
-                ;;
-            --all-namespaces)
-                ret=${w}
-                ;;
-        esac
+        for of in "${__kubectl_override_flag_list[@]}"; do
+            case "${w}" in
+                --${of}=*)
+                    eval "${of}=\"--${of}=\${w}\""
+                    ;;
+                --${of})
+                    two_word_of="${of}"
+                    ;;
+            esac
+        done
+        if [ "${w}" == "--all-namespaces" ]; then
+            namespace="--all-namespaces"
+        fi
     done
-    echo $ret
+    for of in "${__kubectl_override_flag_list[@]}"; do
+        if eval "test -n \"\$${of}\""; then
+            eval "echo \${${of}}"
+        fi
+    done
 }
 
 __kubectl_get_namespaces()
@@ -72,7 +77,7 @@ __kubectl_parse_get()
     local template
     template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
     local kubectl_out
-    if kubectl_out=$(kubectl get $(__kubectl_namespace_flag) -o template --template="${template}" "$1" 2>/dev/null); then
+    if kubectl_out=$(kubectl get $(__kubectl_override_flags) -o template --template="${template}" "$1" 2>/dev/null); then
         COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
@@ -192,6 +197,8 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 
 	f.BindFlags(cmds.PersistentFlags())
 	f.BindExternalFlags(cmds.PersistentFlags())
+
+	cmds.SetHelpCommand(NewCmdHelp(f, out))
 
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)

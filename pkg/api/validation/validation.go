@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package validation
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"os"
 	"path"
@@ -51,17 +50,9 @@ var RepairMalformedUpdates bool = true
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = `field is immutable`
-const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNotIntegerErrorMsg string = `must be an integer`
 
-func InclusiveRangeErrorMsg(lo, hi int) string {
-	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
-}
-
-var pdPartitionErrorMsg string = InclusiveRangeErrorMsg(1, 255)
-var PortRangeErrorMsg string = InclusiveRangeErrorMsg(1, 65535)
-var IdRangeErrorMsg string = InclusiveRangeErrorMsg(0, math.MaxInt32)
-var PortNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, validation.IdentifierNoHyphensBeginEndFmt)
+var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
@@ -610,7 +601,7 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, fldPath *field.Path
 		allErrs = append(allErrs, field.Required(fldPath.Child("iqn"), ""))
 	}
 	if iscsi.Lun < 0 || iscsi.Lun > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, InclusiveRangeErrorMsg(0, 255)))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
 	}
 	return allErrs
 }
@@ -625,7 +616,7 @@ func validateFCVolumeSource(fc *api.FCVolumeSource, fldPath *field.Path) field.E
 		allErrs = append(allErrs, field.Required(fldPath.Child("lun"), ""))
 	} else {
 		if *fc.Lun < 0 || *fc.Lun > 255 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, InclusiveRangeErrorMsg(0, 255)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
 		}
 	}
 	return allErrs
@@ -1055,8 +1046,10 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 	for i, port := range ports {
 		idxPath := fldPath.Index(i)
 		if len(port.Name) > 0 {
-			if !validation.IsValidPortName(port.Name) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), port.Name, PortNameErrorMsg))
+			if msgs := validation.IsValidPortName(port.Name); len(msgs) != 0 {
+				for i = range msgs {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), port.Name, msgs[i]))
+				}
 			} else if allNames.Has(port.Name) {
 				allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), port.Name))
 			} else {
@@ -1064,12 +1057,16 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 			}
 		}
 		if port.ContainerPort == 0 {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, PortRangeErrorMsg))
-		} else if !validation.IsValidPortNum(int(port.ContainerPort)) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, PortRangeErrorMsg))
+			allErrs = append(allErrs, field.Required(idxPath.Child("containerPort"), ""))
+		} else {
+			for _, msg := range validation.IsValidPortNum(int(port.ContainerPort)) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, msg))
+			}
 		}
-		if port.HostPort != 0 && !validation.IsValidPortNum(int(port.HostPort)) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("hostPort"), port.HostPort, PortRangeErrorMsg))
+		if port.HostPort != 0 {
+			for _, msg := range validation.IsValidPortNum(int(port.HostPort)) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostPort"), port.HostPort, msg))
+			}
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
@@ -1087,8 +1084,10 @@ func validateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 		idxPath := fldPath.Index(i)
 		if len(ev.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
-		} else if !validation.IsCIdentifier(ev.Name) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, cIdentifierErrorMsg))
+		} else {
+			for _, msg := range validation.IsCIdentifier(ev.Name) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
+			}
 		}
 		allErrs = append(allErrs, validateEnvVarValueFrom(ev, idxPath.Child("valueFrom"))...)
 	}
@@ -1303,36 +1302,43 @@ func validateExecAction(exec *api.ExecAction, fldPath *field.Path) field.ErrorLi
 	return allErrors
 }
 
+var supportedHTTPSchemes = sets.NewString(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
+
 func validateHTTPGetAction(http *api.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("path"), ""))
 	}
-	if http.Port.Type == intstr.Int && !validation.IsValidPortNum(http.Port.IntValue()) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), http.Port, PortRangeErrorMsg))
-	} else if http.Port.Type == intstr.String && !validation.IsValidPortName(http.Port.StrVal) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), http.Port.StrVal, PortNameErrorMsg))
-	}
-	supportedSchemes := sets.NewString(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
-	if !supportedSchemes.Has(string(http.Scheme)) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("scheme"), http.Scheme, fmt.Sprintf("must be one of %v", supportedSchemes.List())))
+	allErrors = append(allErrors, ValidatePortNumOrName(http.Port, fldPath.Child("port"))...)
+	if !supportedHTTPSchemes.Has(string(http.Scheme)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scheme"), http.Scheme, supportedHTTPSchemes.List()))
 	}
 	for _, header := range http.HTTPHeaders {
-		if !validation.IsHTTPHeaderName(header.Name) {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, fmt.Sprintf("name must match %s", validation.HTTPHeaderNameFmt)))
+		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
 		}
 	}
 	return allErrors
 }
 
-func validateTCPSocketAction(tcp *api.TCPSocketAction, fldPath *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	if tcp.Port.Type == intstr.Int && !validation.IsValidPortNum(tcp.Port.IntValue()) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), tcp.Port, PortRangeErrorMsg))
-	} else if tcp.Port.Type == intstr.String && !validation.IsValidPortName(tcp.Port.StrVal) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), tcp.Port.StrVal, PortNameErrorMsg))
+func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if port.Type == intstr.Int {
+		for _, msg := range validation.IsValidPortNum(port.IntValue()) {
+			allErrs = append(allErrs, field.Invalid(fldPath, port.IntValue(), msg))
+		}
+	} else if port.Type == intstr.String {
+		for _, msg := range validation.IsValidPortName(port.StrVal) {
+			allErrs = append(allErrs, field.Invalid(fldPath, port.StrVal, msg))
+		}
+	} else {
+		allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("unknown type: %v", port.Type)))
 	}
-	return allErrors
+	return allErrs
+}
+
+func validateTCPSocketAction(tcp *api.TCPSocketAction, fldPath *field.Path) field.ErrorList {
+	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
 
 func validateHandler(handler *api.Handler, fldPath *field.Path) field.ErrorList {
@@ -1881,16 +1887,19 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 
 	if securityContext != nil {
 		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
-		if securityContext.FSGroup != nil && !validation.IsValidGroupId(*securityContext.FSGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), IdRangeErrorMsg))
+		if securityContext.FSGroup != nil {
+			for _, msg := range validation.IsValidGroupId(*securityContext.FSGroup) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), msg))
+			}
 		}
-		if securityContext.RunAsUser != nil && !validation.IsValidUserId(*securityContext.RunAsUser) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *(securityContext.RunAsUser), IdRangeErrorMsg))
+		if securityContext.RunAsUser != nil {
+			for _, msg := range validation.IsValidUserId(*securityContext.RunAsUser) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *(securityContext.RunAsUser), msg))
+			}
 		}
-		for i, gid := range securityContext.SupplementalGroups {
-			if !validation.IsValidGroupId(gid) {
-				supplementalGroup := fmt.Sprintf(`supplementalGroups[%d]`, i)
-				allErrs = append(allErrs, field.Invalid(fldPath.Child(supplementalGroup), gid, IdRangeErrorMsg))
+		for g, gid := range securityContext.SupplementalGroups {
+			for _, msg := range validation.IsValidGroupId(gid) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
 		}
 	}
@@ -2064,10 +2073,13 @@ func ValidateService(service *api.Service) field.ErrorList {
 	ipPath := specPath.Child("externalIPs")
 	for i, ip := range service.Spec.ExternalIPs {
 		idxPath := ipPath.Index(i)
-		if ip == "0.0.0.0" {
-			allErrs = append(allErrs, field.Invalid(idxPath, ip, "must be a valid IP address"))
+		if msgs := validation.IsValidIP(ip); len(msgs) != 0 {
+			for i := range msgs {
+				allErrs = append(allErrs, field.Invalid(idxPath, ip, msgs[i]))
+			}
+		} else {
+			allErrs = append(allErrs, validateNonSpecialIP(ip, idxPath)...)
 		}
-		allErrs = append(allErrs, validateIpIsNotLinkLocalOrLoopback(ip, idxPath)...)
 	}
 
 	if len(service.Spec.Type) == 0 {
@@ -2161,8 +2173,8 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 		}
 	}
 
-	if !validation.IsValidPortNum(int(sp.Port)) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, PortRangeErrorMsg))
+	for _, msg := range validation.IsValidPortNum(int(sp.Port)) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, msg))
 	}
 
 	if len(sp.Protocol) == 0 {
@@ -2171,12 +2183,7 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
 
-	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntValue()) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetPort"), sp.TargetPort, PortRangeErrorMsg))
-	}
-	if sp.TargetPort.Type == intstr.String && !validation.IsValidPortName(sp.TargetPort.StrVal) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetPort"), sp.TargetPort, PortNameErrorMsg))
-	}
+	allErrs = append(allErrs, ValidatePortNumOrName(sp.TargetPort, fldPath.Child("targetPort"))...)
 
 	// in the v1 API, targetPorts on headless services were tolerated.
 	// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
@@ -2442,7 +2449,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 
 // Validate resource names that can go in a resource quota
 // Refer to docs/design/resources.md for more details.
-func validateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
+func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 	if len(strings.Split(value, "/")) == 1 {
 		if !api.IsStandardQuotaResourceName(value) {
@@ -2788,24 +2795,24 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 }
 
 // validateResourceQuotaScopes ensures that each enumerated hard resource constraint is valid for set of scopes
-func validateResourceQuotaScopes(resourceQuota *api.ResourceQuota) field.ErrorList {
+func validateResourceQuotaScopes(resourceQuotaSpec *api.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(resourceQuota.Spec.Scopes) == 0 {
+	if len(resourceQuotaSpec.Scopes) == 0 {
 		return allErrs
 	}
 	hardLimits := sets.NewString()
-	for k := range resourceQuota.Spec.Hard {
+	for k := range resourceQuotaSpec.Hard {
 		hardLimits.Insert(string(k))
 	}
-	fldPath := field.NewPath("spec", "scopes")
+	fldPath := fld.Child("scopes")
 	scopeSet := sets.NewString()
-	for _, scope := range resourceQuota.Spec.Scopes {
+	for _, scope := range resourceQuotaSpec.Scopes {
 		if !api.IsStandardResourceQuotaScope(string(scope)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuota.Spec.Scopes, "unsupported scope"))
+			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "unsupported scope"))
 		}
 		for _, k := range hardLimits.List() {
 			if api.IsStandardQuotaResourceName(k) && !api.IsResourceQuotaScopeValidForResource(scope, k) {
-				allErrs = append(allErrs, field.Invalid(fldPath, resourceQuota.Spec.Scopes, "unsupported scope applied to resource"))
+				allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "unsupported scope applied to resource"))
 			}
 		}
 		scopeSet.Insert(string(scope))
@@ -2816,7 +2823,7 @@ func validateResourceQuotaScopes(resourceQuota *api.ResourceQuota) field.ErrorLi
 	}
 	for _, invalidScopePair := range invalidScopePairs {
 		if scopeSet.HasAll(invalidScopePair.List()...) {
-			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuota.Spec.Scopes, "conflicting scopes"))
+			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "conflicting scopes"))
 		}
 	}
 	return allErrs
@@ -2826,32 +2833,47 @@ func validateResourceQuotaScopes(resourceQuota *api.ResourceQuota) field.ErrorLi
 func ValidateResourceQuota(resourceQuota *api.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMeta(&resourceQuota.ObjectMeta, true, ValidateResourceQuotaName, field.NewPath("metadata"))
 
-	fldPath := field.NewPath("spec", "hard")
-	for k, v := range resourceQuota.Spec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
-	}
-	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuota)...)
+	allErrs = append(allErrs, ValidateResourceQuotaSpec(&resourceQuota.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateResourceQuotaStatus(&resourceQuota.Status, field.NewPath("status"))...)
 
-	fldPath = field.NewPath("status", "hard")
-	for k, v := range resourceQuota.Status.Hard {
+	return allErrs
+}
+
+func ValidateResourceQuotaStatus(status *api.ResourceQuotaStatus, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	fldPath := fld.Child("hard")
+	for k, v := range status.Hard {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
-	fldPath = field.NewPath("status", "used")
-	for k, v := range resourceQuota.Status.Used {
+	fldPath = fld.Child("used")
+	for k, v := range status.Used {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 
 	return allErrs
 }
 
-// validateResourceQuantityValue enforces that specified quantity is valid for specified resource
-func validateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
+func ValidateResourceQuotaSpec(resourceQuotaSpec *api.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	fldPath := fld.Child("hard")
+	for k, v := range resourceQuotaSpec.Hard {
+		resPath := fldPath.Key(string(k))
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+	}
+	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
+
+	return allErrs
+}
+
+// ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
+func ValidateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
 	if api.IsIntegerResourceName(resource) {
@@ -2866,15 +2888,10 @@ func validateResourceQuantityValue(resource string, value resource.Quantity, fld
 // newResourceQuota is updated with fields that cannot be changed.
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
-	fldPath := field.NewPath("spec", "hard")
-	for k, v := range newResourceQuota.Spec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
-	}
+	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, field.NewPath("spec"))...)
 
 	// ensure scopes cannot change, and that resources are still valid for scope
-	fldPath = field.NewPath("spec", "scopes")
+	fldPath := field.NewPath("spec", "scopes")
 	oldScopes := sets.NewString()
 	newScopes := sets.NewString()
 	for _, scope := range newResourceQuota.Spec.Scopes {
@@ -2886,7 +2903,6 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.Resourc
 	if !oldScopes.Equal(newScopes) {
 		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, "field is immutable"))
 	}
-	allErrs = append(allErrs, validateResourceQuotaScopes(newResourceQuota)...)
 
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
@@ -2902,14 +2918,14 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 	fldPath := field.NewPath("status", "hard")
 	for k, v := range newResourceQuota.Status.Hard {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 	fldPath = field.NewPath("status", "used")
 	for k, v := range newResourceQuota.Status.Used {
 		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, validateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 	newResourceQuota.Spec = oldResourceQuota.Spec
 	return allErrs
@@ -3021,8 +3037,8 @@ func validateEndpointSubsets(subsets []api.EndpointSubset, fldPath *field.Path) 
 
 func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validation.IsValidIP(address.IP) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, "must be a valid IP address"))
+	for _, msg := range validation.IsValidIP(address.IP) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
 	}
 	if len(address.Hostname) > 0 {
 		for _, msg := range validation.IsDNS1123Label(address.Hostname) {
@@ -3032,17 +3048,23 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) 
 	if len(allErrs) > 0 {
 		return allErrs
 	}
-	return validateIpIsNotLinkLocalOrLoopback(address.IP, fldPath.Child("ip"))
+	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
+	return allErrs
 }
 
-func validateIpIsNotLinkLocalOrLoopback(ipAddress string, fldPath *field.Path) field.ErrorList {
-	// We disallow some IPs as endpoints or external-ips.  Specifically, loopback addresses are
-	// nonsensical and link-local addresses tend to be used for node-centric purposes (e.g. metadata service).
+func validateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList {
+	// We disallow some IPs as endpoints or external-ips.  Specifically,
+	// unspecified and loopback addresses are nonsensical and link-local
+	// addresses tend to be used for node-centric purposes (e.g. metadata
+	// service).
 	allErrs := field.ErrorList{}
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "must be a valid IP address"))
 		return allErrs
+	}
+	if ip.IsUnspecified() {
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be unspecified (0.0.0.0)"))
 	}
 	if ip.IsLoopback() {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the loopback range (127.0.0.0/8)"))
@@ -3065,8 +3087,8 @@ func validateEndpointPort(port *api.EndpointPort, requireName bool, fldPath *fie
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), port.Name, msg))
 		}
 	}
-	if !validation.IsValidPortNum(int(port.Port)) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, PortRangeErrorMsg))
+	for _, msg := range validation.IsValidPortNum(int(port.Port)) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg))
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))

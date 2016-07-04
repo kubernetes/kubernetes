@@ -162,8 +162,8 @@ func (t *Transfer) inIxfr(id uint16, c chan *Envelope) {
 //
 //	ch := make(chan *dns.Envelope)
 //	tr := new(dns.Transfer)
-//	tr.Out(w, r, ch)
-//	c <- &dns.Envelope{RR: []dns.RR{soa, rr1, rr2, rr3, soa}}
+//	go tr.Out(w, r, ch)
+//	ch <- &dns.Envelope{RR: []dns.RR{soa, rr1, rr2, rr3, soa}}
 //	close(ch)
 //	w.Hijack()
 //	// w.Close() // Client closes connection

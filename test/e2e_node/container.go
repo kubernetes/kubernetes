@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,24 +21,23 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // One pod one container
+// TODO: This should be migrated to the e2e framework.
 type ConformanceContainer struct {
+	Framework        *framework.Framework
 	Container        api.Container
-	Client           *client.Client
 	RestartPolicy    api.RestartPolicy
 	Volumes          []api.Volume
 	ImagePullSecrets []string
-	NodeName         string
-	Namespace        string
 
 	podName string
 }
 
-func (cc *ConformanceContainer) Create() error {
+func (cc *ConformanceContainer) Create() {
 	cc.podName = cc.Container.Name + string(util.NewUUID())
 	imagePullSecrets := []api.LocalObjectReference{}
 	for _, s := range cc.ImagePullSecrets {
@@ -46,11 +45,9 @@ func (cc *ConformanceContainer) Create() error {
 	}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      cc.podName,
-			Namespace: cc.Namespace,
+			Name: cc.podName,
 		},
 		Spec: api.PodSpec{
-			NodeName:      cc.NodeName,
 			RestartPolicy: cc.RestartPolicy,
 			Containers: []api.Container{
 				cc.Container,
@@ -59,17 +56,15 @@ func (cc *ConformanceContainer) Create() error {
 			ImagePullSecrets: imagePullSecrets,
 		},
 	}
-
-	_, err := cc.Client.Pods(cc.Namespace).Create(pod)
-	return err
+	cc.Framework.CreatePodAsync(pod)
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, api.NewDeleteOptions(0))
+	return cc.Framework.PodClient().Delete(cc.podName, api.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	pod, err := cc.Framework.PodClient().Get(cc.podName)
 	if err != nil {
 		return false, err
 	}
@@ -77,7 +72,7 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 }
 
 func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	pod, err := cc.Framework.PodClient().Get(cc.podName)
 	if err != nil {
 		return api.PodUnknown, err
 	}
@@ -85,7 +80,7 @@ func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
 }
 
 func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	pod, err := cc.Framework.PodClient().Get(cc.podName)
 	if err != nil {
 		return api.ContainerStatus{}, err
 	}
@@ -97,7 +92,7 @@ func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	_, err := cc.Framework.PodClient().Get(cc.podName)
 	if err == nil {
 		return true, nil
 	}

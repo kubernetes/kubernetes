@@ -1,5 +1,22 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
+- [v1.3.0](#v130)
+  - [Downloads](#downloads)
+  - [Major Themes](#major-themes)
+  - [Other notable improvements](#other-notable-improvements)
+  - [Known Issues](#known-issues)
+  - [Provider-specific Notes](#provider-specific-notes)
+  - [Changelog since v1.3.0-beta.3](#changelog-since-v130-beta3)
+    - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
+- [v1.3.0-beta.3](#v130-beta3)
+  - [Downloads](#downloads)
+  - [Changelog since v1.3.0-beta.2](#changelog-since-v130-beta2)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes)
+- [v1.2.5](#v125)
+  - [Downloads](#downloads)
+  - [Changes since v1.2.4](#changes-since-v124)
+    - [Other notable changes](#other-notable-changes)
 - [v1.3.0-beta.2](#v130-beta2)
   - [Downloads](#downloads)
   - [Changes since v1.3.0-beta.1](#changes-since-v130-beta1)
@@ -69,6 +86,156 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.3.0
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
+
+## Downloads
+
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0/kubernetes.tar.gz) | `88249c443d438666928379aa7fe865b389ed72ea` | `9270f001aef8c03ff5db63456ca9eecc`
+
+## Highlights
+
+* Authorization:
+  * **Alpha** RBAC authorization API group
+* Federation 
+  * federation api group is now **beta**
+  * Services from all federated clusters are now registered in Cloud DNS (AWS and GCP).
+* Stateful Apps:
+  * **alpha** PetSets manage stateful apps
+  * **alpha** Init containers provide one-time setup for stateful containers
+* Updating:
+  * Retry Pod/RC updates in kubectl rolling-update.
+  * Stop 'kubectl drain' deleting pods with local storage.
+  * Add `kubectl rollout status`
+* Security/Auth
+  * L7 LB controller and disk attach controllers run on master, so nodes do not need those privileges.
+  * Setting TLS1.2 minimum
+  * `kubectl create secret tls` command
+  * Webhook Token Authenticator
+  * **beta** PodSecurityPolicy objects limits use of security-sensitive features by pods.
+* Kubectl
+  * Display line number on JSON errors
+  * Add flag -t as shorthand for --tty
+* Resources
+  * **alpha**: NVIDIA GPU support ([#24836](https://github.com/kubernetes/kubernetes/pull/24836), [@therc](https://github.com/therc))
+  * Adding loadBalancer services and nodeports services to quota system
+
+## Known Issues and Important Steps before Upgrading
+
+* *Instructions coming soon*
+
+## Provider-specific Notes
+
+* AWS
+  * Support for ap-northeast-2 region (Seoul)
+  * Allow cross-region image pulling with ECR
+  * More reliable kube-up/kube-down
+  * Enable ICMP Type 3 Code 4 for ELBs
+  * ARP caching fix
+  * Use /dev/xvdXX names
+  * ELB:
+    * ELB proxy protocol support 
+    * mixed plaintext/encrypted ports support in ELBs
+    * SSL support for ELB listeners
+  * Allow VPC CIDR to be specified (experimental)
+  * Fix problems with >2 security groups
+* GCP:
+  * Enable using gcr.io as a Docker registry mirror.
+  * Make bigger master root disks in GCE for large clusters.
+  * Change default clusterCIDRs from /16 to /14 allowing 1000 Node clusters by default.
+  * Allow Debian Jessie on GCE.
+  * Node problem detector addon pod detects and reports kernel deadlocks.
+* OpenStack
+  * Provider added.
+* VSphere:
+  * Provider updated.
+
+### Previous Releases Included in v1.3.0
+
+- [v1.3.0-beta.3](CHANGELOG.md#v130-beta3)
+- [v1.3.0-beta.2](CHANGELOG.md#v130-beta2)
+- [v1.3.0-beta.1](CHANGELOG.md#v130-beta1)
+- [v1.3.0-alpha.5](CHANGELOG.md#v130-alpha5)
+- [v1.3.0-alpha.4](CHANGELOG.md#v130-alpha4)
+- [v1.3.0-alpha.3](CHANGELOG.md#v130-alpha3)
+- [v1.3.0-alpha.2](CHANGELOG.md#v130-alpha2)
+- [v1.3.0-alpha.1](CHANGELOG.md#v130-alpha1)
+
+
+
+# v1.3.0-beta.3
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
+
+## Downloads
+
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0-beta.3/kubernetes.tar.gz) | `9d18964a294f356bfdc841957dcad8ff35ed909c` | `ee5fcdf86645135ed132663967876dd6`
+
+## Changelog since v1.3.0-beta.2
+
+### Action Required
+
+* [kubelet] Allow opting out of automatic cloud provider detection in kubelet. By default kubelet will auto-detect cloud providers ([#28258](https://github.com/kubernetes/kubernetes/pull/28258), [@vishh](https://github.com/vishh))
+* If you use one of the kube-dns replication controller manifest in `cluster/saltbase/salt/kube-dns`, i.e. `cluster/saltbase/salt/kube-dns/{skydns-rc.yaml.base,skydns-rc.yaml.in}`, either substitute one of `__PILLAR__FEDERATIONS__DOMAIN__MAP__` or `{{ pillar['federations_domain_map'] }}` with the corresponding federation name to domain name value or remove them if you do not support cluster federation at this time. If you plan to substitute the parameter with its value, here is an example for `{{ pillar['federations_domain_map'] }` ([#28132](https://github.com/kubernetes/kubernetes/pull/28132), [@madhusudancs](https://github.com/madhusudancs))
+    * pillar['federations_domain_map'] = "- --federations=myfederation=federation.test"
+    * where `myfederation` is the name of the federation and `federation.test` is the domain name registered for the federation.
+* federation: Upgrading the groupversion to v1beta1 ([#28186](https://github.com/kubernetes/kubernetes/pull/28186), [@nikhiljindal](https://github.com/nikhiljindal))
+* Set Dashboard UI version to v1.1.0 ([#27869](https://github.com/kubernetes/kubernetes/pull/27869), [@bryk](https://github.com/bryk))
+
+### Other notable changes
+
+* Build: Add KUBE_GCS_RELEASE_BUCKET_MIRROR option to push-ci-build.sh ([#28172](https://github.com/kubernetes/kubernetes/pull/28172), [@zmerlynn](https://github.com/zmerlynn))
+* Image GC logic should compensate for reserved blocks ([#27996](https://github.com/kubernetes/kubernetes/pull/27996), [@ronnielai](https://github.com/ronnielai))
+* Bump minimum API version for docker to 1.21 ([#27208](https://github.com/kubernetes/kubernetes/pull/27208), [@yujuhong](https://github.com/yujuhong))
+* Adding lock files for kubeconfig updating ([#28034](https://github.com/kubernetes/kubernetes/pull/28034), [@krousey](https://github.com/krousey))
+* federation service controller: fixing the logic to update DNS records ([#27999](https://github.com/kubernetes/kubernetes/pull/27999), [@quinton-hoole](https://github.com/quinton-hoole))
+* federation: Updating KubeDNS to try finding a local service first for federation query ([#27708](https://github.com/kubernetes/kubernetes/pull/27708), [@nikhiljindal](https://github.com/nikhiljindal))
+* Support journal logs in fluentd-gcp on GCI ([#27981](https://github.com/kubernetes/kubernetes/pull/27981), [@a-robinson](https://github.com/a-robinson))
+* Copy and display source location prominently on Kubernetes instances ([#27985](https://github.com/kubernetes/kubernetes/pull/27985), [@maisem](https://github.com/maisem))
+* Federation e2e support for AWS ([#27791](https://github.com/kubernetes/kubernetes/pull/27791), [@colhom](https://github.com/colhom))
+* Copy and display source location prominently on Kubernetes instances ([#27840](https://github.com/kubernetes/kubernetes/pull/27840), [@zmerlynn](https://github.com/zmerlynn))
+* AWS/GCE: Spread PetSet volume creation across zones, create GCE volumes in non-master zones ([#27553](https://github.com/kubernetes/kubernetes/pull/27553), [@justinsb](https://github.com/justinsb))
+* GCE provider: Create TargetPool with 200 instances, then update with rest ([#27829](https://github.com/kubernetes/kubernetes/pull/27829), [@zmerlynn](https://github.com/zmerlynn))
+* Add sources to server tarballs. ([#27830](https://github.com/kubernetes/kubernetes/pull/27830), [@david-mcmahon](https://github.com/david-mcmahon))
+* Retry Pod/RC updates in kubectl rolling-update ([#27509](https://github.com/kubernetes/kubernetes/pull/27509), [@janetkuo](https://github.com/janetkuo))
+* AWS kube-up: Authorize route53 in the IAM policy ([#27794](https://github.com/kubernetes/kubernetes/pull/27794), [@justinsb](https://github.com/justinsb))
+* Allow conformance tests to run on non-GCE providers ([#26932](https://github.com/kubernetes/kubernetes/pull/26932), [@aaronlevy](https://github.com/aaronlevy))
+* AWS kube-up: move to Docker 1.11.2 ([#27676](https://github.com/kubernetes/kubernetes/pull/27676), [@justinsb](https://github.com/justinsb))
+* Fixed an issue that Deployment may be scaled down further than allowed by maxUnavailable when minReadySeconds is set. ([#27728](https://github.com/kubernetes/kubernetes/pull/27728), [@janetkuo](https://github.com/janetkuo))
+
+
+
+# v1.2.5
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
+
+## Downloads
+
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.5/kubernetes.tar.gz) | `ddf12d7f37dfef25308798d71ad547761d0785ac` | `69d770df8fa4eceb57167e34df3962ca`
+
+## Changes since v1.2.4
+
+### Other notable changes
+
+* Retry Pod/RC updates in kubectl rolling-update ([#27509](https://github.com/kubernetes/kubernetes/pull/27509), [@janetkuo](https://github.com/janetkuo))
+* GCE provider: Create TargetPool with 200 instances, then update with rest ([#27865](https://github.com/kubernetes/kubernetes/pull/27865), [@zmerlynn](https://github.com/zmerlynn))
+* GCE provider: Limit Filter calls to regexps rather than large blobs ([#27741](https://github.com/kubernetes/kubernetes/pull/27741), [@zmerlynn](https://github.com/zmerlynn))
+* Fix strategic merge diff list diff bug ([#26418](https://github.com/kubernetes/kubernetes/pull/26418), [@AdoHe](https://github.com/AdoHe))
+* AWS: Fix long-standing bug in stringSetToPointers ([#26331](https://github.com/kubernetes/kubernetes/pull/26331), [@therc](https://github.com/therc))
+* AWS kube-up: Increase timeout waiting for docker start ([#25405](https://github.com/kubernetes/kubernetes/pull/25405), [@justinsb](https://github.com/justinsb))
+* Fix hyperkube flag parsing ([#25512](https://github.com/kubernetes/kubernetes/pull/25512), [@colhom](https://github.com/colhom))
+* kubectl rolling-update support for same image ([#24645](https://github.com/kubernetes/kubernetes/pull/24645), [@jlowdermilk](https://github.com/jlowdermilk))
+* Return "410 Gone" errors via watch stream when using watch cache ([#25369](https://github.com/kubernetes/kubernetes/pull/25369), [@liggitt](https://github.com/liggitt))
+
 
 
 # v1.3.0-beta.2

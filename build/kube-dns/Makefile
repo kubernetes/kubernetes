@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@
 # If you update this image please bump the tag value before pushing.
 #
 # Usage:
-#   [ARCH=amd64] [TAG=1.3] [REGISTRY=gcr.io/google_containers] [BASEIMAGE=busybox] make (container|push)
+#   [ARCH=amd64] [TAG=1.6] [REGISTRY=gcr.io/google_containers] [BASEIMAGE=busybox] make (container|push)
 
 # Default registry, arch and tag. This can be overwritten by arguments to make
 PLATFORM?=linux
 ARCH?=amd64
-TAG?=1.3
+TAG?=1.6
 REGISTRY?=gcr.io/google_containers
 
 GOLANG_VERSION=1.6

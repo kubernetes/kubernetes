@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -424,6 +424,10 @@ const (
 	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
 	// to one container of a pod.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
+
+	// CreatedByAnnotation represents the key used to store the spec(json)
+	// used to create the resource.
+	CreatedByAnnotation = "kubernetes.io/created-by"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
