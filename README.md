@@ -36,7 +36,7 @@ With the [1.0.1 release](https://github.com/kubernetes/kubernetes/releases/tag/v
 
 ### Kubernetes can run anywhere!
 
-You can run Kubernetes on your local workstation under Vagrant, cloud providers (e.g. GCE, AWS, Azure), and physical hardware. Essentially, anywhere Linux runs you can run Kubernetes. Checkout the [Getting Started Guides](http://kubernetes.io/docs/getting-started-guides/) for details.
+You can run Kubernetes on your local workstation under vagrant, cloud providers (e.g. GCE, AWS, Azure), and physical hardware. Essentially, anywhere Linux runs you can run Kubernetes. Checkout the [Getting Started Guides](http://kubernetes.io/docs/getting-started-guides/) for details.
 
 ## Concepts
 
