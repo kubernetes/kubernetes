@@ -188,7 +188,7 @@ func TestSchedulerExtender(t *testing.T) {
 	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})

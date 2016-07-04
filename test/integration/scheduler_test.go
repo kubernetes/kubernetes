@@ -53,7 +53,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
@@ -292,7 +292,7 @@ func TestMultiScheduler(t *testing.T) {
 	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	// TODO: Uncomment when fix #19254
 	// This seems to be a different issue - it still doesn't work.
 	// defer s.Close()
@@ -473,7 +473,7 @@ func createPod(client *client.Client, name string, annotation map[string]string)
 func TestAllocatable(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	// 1. create and start default-scheduler

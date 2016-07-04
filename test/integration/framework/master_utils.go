@@ -347,21 +347,12 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	}
 }
 
-// TODO: Merge this into startMasterOrDie.
-func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	masterConfig := NewMasterConfig()
-	masterConfig.EnableProfiling = true
-	m, err := master.New(masterConfig)
-	if err != nil {
-		// TODO: Return error.
-		glog.Fatalf("error in bringing up the master: %v", err)
+func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) {
+	if masterConfig == nil {
+		masterConfig = NewMasterConfig()
+		masterConfig.EnableProfiling = true
 	}
-
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-
-	return m, s
+	return startMasterOrDie(masterConfig)
 }
 
 // Task is a function passed to worker goroutines by RunParallel.
