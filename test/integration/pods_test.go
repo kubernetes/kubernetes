@@ -20,33 +20,22 @@ package integration
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	ns := "pod-activedeadline-update"
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
+	ns := framework.CreateTestingNamespace("pod-activedeadline-update", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	var (
@@ -140,39 +129,31 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		pod.Spec.ActiveDeadlineSeconds = tc.original
 		pod.ObjectMeta.Name = fmt.Sprintf("activedeadlineseconds-test-%v", i)
 
-		if _, err := client.Pods(ns).Create(pod); err != nil {
+		if _, err := client.Pods(ns.Name).Create(pod); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		pod.Spec.ActiveDeadlineSeconds = tc.update
 
-		_, err := client.Pods(ns).Update(pod)
+		_, err := client.Pods(ns.Name).Update(pod)
 		if tc.valid && err != nil {
 			t.Errorf("%v: failed to update pod: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
 			t.Errorf("%v: unexpected allowed update to pod", tc.name)
 		}
 
-		deletePodOrErrorf(t, client, ns, pod.Name)
+		deletePodOrErrorf(t, client, ns.Name, pod.Name)
 	}
 }
 
 func TestPodReadOnlyFilesystem(t *testing.T) {
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	isReadOnly := true
-	ns := "pod-readonly-root"
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
+	ns := framework.CreateTestingNamespace("pod-readonly-root", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	pod := &api.Pod{
@@ -192,9 +173,9 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 		},
 	}
 
-	if _, err := client.Pods(ns).Create(pod); err != nil {
+	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 
-	deletePodOrErrorf(t, client, ns, pod.Name)
+	deletePodOrErrorf(t, client, ns.Name, pod.Name)
 }

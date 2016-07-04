@@ -47,9 +47,10 @@ func TestClient(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	ns := api.NamespaceDefault
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	ns := framework.CreateTestingNamespace("client", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	info, err := client.Discovery().ServerVersion()
 	if err != nil {
@@ -59,7 +60,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.Pods(ns).List(api.ListOptions{})
+	pods, err := client.Pods(ns.Name).List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,6 +72,7 @@ func TestClient(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "test",
+			Namespace:    ns.Name,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -81,14 +83,14 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	got, err := client.Pods(ns).Create(pod)
+	got, err := client.Pods(ns.Name).Create(pod)
 	if err == nil {
 		t.Fatalf("unexpected non-error: %v", got)
 	}
 
 	// get a created pod
 	pod.Spec.Containers[0].Image = "an-image"
-	got, err = client.Pods(ns).Create(pod)
+	got, err = client.Pods(ns.Name).Create(pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -97,7 +99,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.Pods(ns).List(api.ListOptions{})
+	pods, err = client.Pods(ns.Name).List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -117,15 +119,18 @@ func TestAtomicPut(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	ns := framework.CreateTestingNamespace("atomic-put", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	rcBody := api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			APIVersion: c.APIVersion().String(),
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name: "atomicrc",
+			Name:      "atomicrc",
+			Namespace: ns.Name,
 			Labels: map[string]string{
 				"name": "atomicrc",
 			},
@@ -149,7 +154,7 @@ func TestAtomicPut(t *testing.T) {
 			},
 		},
 	}
-	rcs := c.ReplicationControllers(api.NamespaceDefault)
+	rcs := c.ReplicationControllers(ns.Name)
 	rc, err := rcs.Create(&rcBody)
 	if err != nil {
 		t.Fatalf("Failed creating atomicRC: %v", err)
@@ -206,8 +211,10 @@ func TestPatch(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	ns := framework.CreateTestingNamespace("patch", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	name := "patchpod"
 	resource := "pods"
@@ -216,8 +223,9 @@ func TestPatch(t *testing.T) {
 			APIVersion: c.APIVersion().String(),
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{},
+			Name:      name,
+			Namespace: ns.Name,
+			Labels:    map[string]string{},
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -225,7 +233,7 @@ func TestPatch(t *testing.T) {
 			},
 		},
 	}
-	pods := c.Pods(api.NamespaceDefault)
+	pods := c.Pods(ns.Name)
 	pod, err := pods.Create(&podBody)
 	if err != nil {
 		t.Fatalf("Failed creating patchpods: %v", err)
@@ -260,7 +268,7 @@ func TestPatch(t *testing.T) {
 	execPatch := func(pt api.PatchType, body []byte) error {
 		return c.Patch(pt).
 			Resource(resource).
-			Namespace(api.NamespaceDefault).
+			Namespace(ns.Name).
 			Name(name).
 			Body(body).
 			Do().
@@ -312,11 +320,16 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
+	ns := framework.CreateTestingNamespace("patch-with-create", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	endpointTemplate := &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Name: "patchendpoint"},
+		ObjectMeta: api.ObjectMeta{
+			Name:      "patchendpoint",
+			Namespace: ns.Name,
+		},
 		Subsets: []api.EndpointSubset{
 			{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
@@ -326,7 +339,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	patchEndpoint := func(json []byte) (runtime.Object, error) {
-		return c.Patch(api.MergePatchType).Resource("endpoints").Namespace(api.NamespaceDefault).Name("patchendpoint").Body(json).Do().Get()
+		return c.Patch(api.MergePatchType).Resource("endpoints").Namespace(ns.Name).Name("patchendpoint").Body(json).Do().Get()
 	}
 
 	// Make sure patch doesn't get to CreateOnUpdate
@@ -341,7 +354,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
-	createdEndpoint, err := c.Endpoints(api.NamespaceDefault).Update(endpointTemplate)
+	createdEndpoint, err := c.Endpoints(ns.Name).Update(endpointTemplate)
 	if err != nil {
 		t.Fatalf("Failed creating endpoint: %v", err)
 	}
@@ -418,7 +431,6 @@ func TestAPIVersions(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	clientVersion := c.APIVersion().String()
@@ -441,19 +453,20 @@ func TestSingleWatch(t *testing.T) {
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	ns := "blargh"
-	framework.DeleteAllEtcdKeys()
+	ns := framework.CreateTestingNamespace("single-watch", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	mkEvent := func(i int) *api.Event {
 		name := fmt.Sprintf("event-%v", i)
 		return &api.Event{
 			ObjectMeta: api.ObjectMeta{
-				Namespace: ns,
+				Namespace: ns.Name,
 				Name:      name,
 			},
 			InvolvedObject: api.ObjectReference{
-				Namespace: ns,
+				Namespace: ns.Name,
 				Name:      name,
 			},
 			Reason: fmt.Sprintf("event %v", i),
@@ -463,7 +476,7 @@ func TestSingleWatch(t *testing.T) {
 	rv1 := ""
 	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
-		got, err := client.Events(ns).Create(event)
+		got, err := client.Events(ns.Name).Create(event)
 		if err != nil {
 			t.Fatalf("Failed creating event %#q: %v", event, err)
 		}
@@ -478,7 +491,7 @@ func TestSingleWatch(t *testing.T) {
 
 	w, err := client.Get().
 		Prefix("watch").
-		NamespaceIfScoped(ns, len(ns) > 0).
+		Namespace(ns.Name).
 		Resource("events").
 		Name("event-9").
 		Param("resourceVersion", rv1).
@@ -518,15 +531,16 @@ func TestMultiWatch(t *testing.T) {
 	// Disable this test as long as it demonstrates a problem.
 	// TODO: Reenable this test when we get #6059 resolved.
 	return
+
 	const watcherCount = 50
 	rt.GOMAXPROCS(watcherCount)
 
-	framework.DeleteAllEtcdKeys()
-	defer framework.DeleteAllEtcdKeys()
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	ns := api.NamespaceDefault
+	ns := framework.CreateTestingNamespace("multi-watch", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	dummyEvent := func(i int) *api.Event {
@@ -534,11 +548,11 @@ func TestMultiWatch(t *testing.T) {
 		return &api.Event{
 			ObjectMeta: api.ObjectMeta{
 				Name:      fmt.Sprintf("%v.%x", name, time.Now().UnixNano()),
-				Namespace: ns,
+				Namespace: ns.Name,
 			},
 			InvolvedObject: api.ObjectReference{
 				Name:      name,
-				Namespace: ns,
+				Namespace: ns.Name,
 			},
 			Reason: fmt.Sprintf("unrelated change %v", i),
 		}
@@ -556,7 +570,7 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		watchesStarted.Add(1)
 		name := fmt.Sprintf("multi-watch-%v", i)
-		got, err := client.Pods(ns).Create(&api.Pod{
+		got, err := client.Pods(ns.Name).Create(&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   name,
 				Labels: labels.Set{"watchlabel": name},
@@ -577,7 +591,7 @@ func TestMultiWatch(t *testing.T) {
 				LabelSelector:   labels.Set{"watchlabel": name}.AsSelector(),
 				ResourceVersion: rv,
 			}
-			w, err := client.Pods(ns).Watch(options)
+			w, err := client.Pods(ns.Name).Watch(options)
 			if err != nil {
 				panic(fmt.Sprintf("watch error for %v: %v", name, err))
 			}
@@ -626,7 +640,7 @@ func TestMultiWatch(t *testing.T) {
 					if !ok {
 						return
 					}
-					if _, err := client.Events(ns).Create(dummyEvent(i)); err != nil {
+					if _, err := client.Events(ns.Name).Create(dummyEvent(i)); err != nil {
 						panic(fmt.Sprintf("couldn't make an event: %v", err))
 					}
 					changeMade <- i
@@ -663,7 +677,7 @@ func TestMultiWatch(t *testing.T) {
 						return
 					}
 					name := fmt.Sprintf("unrelated-%v", i)
-					_, err := client.Pods(ns).Create(&api.Pod{
+					_, err := client.Pods(ns.Name).Create(&api.Pod{
 						ObjectMeta: api.ObjectMeta{
 							Name: name,
 						},
@@ -697,13 +711,13 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		go func(i int) {
 			name := fmt.Sprintf("multi-watch-%v", i)
-			pod, err := client.Pods(ns).Get(name)
+			pod, err := client.Pods(ns.Name).Get(name)
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}
 			pod.Spec.Containers[0].Image = e2e.GetPauseImageName(client)
 			sentTimes <- timePair{time.Now(), name}
-			if _, err := client.Pods(ns).Update(pod); err != nil {
+			if _, err := client.Pods(ns.Name).Update(pod); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))
 			}
 		}(i)
@@ -777,10 +791,12 @@ func runSelfLinkTestOnNamespace(t *testing.T, c *client.Client, namespace string
 }
 
 func TestSelfLinkOnNamespace(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	runSelfLinkTestOnNamespace(t, c, api.NamespaceDefault)

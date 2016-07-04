@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -186,19 +185,11 @@ func machine_3_Prioritizer(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.Hos
 }
 
 func TestSchedulerExtender(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
-
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
 
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 

@@ -22,8 +22,6 @@ package integration
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -36,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -53,19 +50,11 @@ type nodeStateManager struct {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
-
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
 
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -300,20 +289,13 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 }
 
 func TestMultiScheduler(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	// TODO: Uncomment when fix #19254
+	// This seems to be a different issue - it still doesn't work.
 	// defer s.Close()
-
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
 
 	/*
 		This integration tests the multi-scheduler feature in the following way:
@@ -491,17 +473,8 @@ func createPod(client *client.Client, name string, annotation map[string]string)
 func TestAllocatable(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
-
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
 
 	// 1. create and start default-scheduler
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})

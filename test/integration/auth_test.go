@@ -412,6 +412,7 @@ func getTestRequests() []struct {
 //
 // TODO(etune): write a fuzz test of the REST API.
 func TestAuthModeAlwaysAllow(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
@@ -517,6 +518,7 @@ func getPreviousResourceVersionKey(url, id string) string {
 }
 
 func TestAuthModeAlwaysDeny(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
@@ -571,7 +573,7 @@ func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
 // TestAliceNotForbiddenOrUnauthorized tests a user who is known to
 // the authentication system and authorized to do any actions.
 func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
-
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
@@ -652,6 +654,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 // the authentication system but not authorized to do any actions
 // should receive "Forbidden".
 func TestBobIsForbidden(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
@@ -701,6 +704,7 @@ func TestBobIsForbidden(t *testing.T) {
 // An authorization module is installed in this scenario for integration
 // test purposes, but requests aren't expected to reach it.
 func TestUnknownUserIsUnauthorized(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
@@ -772,6 +776,7 @@ func (impersonateAuthorizer) Authorize(a authorizer.Attributes) error {
 }
 
 func TestImpersonateIsForbidden(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
@@ -923,6 +928,7 @@ func (a *trackingAuthorizer) Authorize(attributes authorizer.Attributes) error {
 
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly
 func TestAuthorizationAttributeDetermination(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	trackingAuthorizer := &trackingAuthorizer{}
@@ -993,6 +999,7 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 // TestNamespaceAuthorization tests that authorization can be controlled
 // by namespace.
 func TestNamespaceAuthorization(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
@@ -1096,6 +1103,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 // TestKindAuthorization tests that authorization can be controlled
 // by namespace.
 func TestKindAuthorization(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
@@ -1189,6 +1197,7 @@ func TestKindAuthorization(t *testing.T) {
 // TestReadOnlyAuthorization tests that authorization can be controlled
 // by namespace.
 func TestReadOnlyAuthorization(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
@@ -1253,6 +1262,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 // authenticator to call out to a remote web server for authentication
 // decisions.
 func TestWebhookTokenAuthenticator(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master

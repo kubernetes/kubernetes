@@ -392,6 +392,9 @@ func countEndpoints(eps *api.Endpoints) int {
 }
 
 func TestMasterService(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	m, err := master.New(framework.NewIntegrationTestMasterConfig())
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -401,7 +404,6 @@ func TestMasterService(t *testing.T) {
 	}))
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	err = wait.Poll(time.Second, time.Minute, func() (bool, error) {
