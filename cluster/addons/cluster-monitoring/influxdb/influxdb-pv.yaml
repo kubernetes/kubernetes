@@ -5,7 +5,6 @@ kind: PersistentVolume
 apiVersion: v1
 metadata:
   name: influxdb-pv
-  namespace: kube-system
   labels:
     kubernetes.io/cluster-service: "true"
 spec:
