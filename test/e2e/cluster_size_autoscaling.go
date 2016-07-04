@@ -233,7 +233,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
 		ReserveMemory(f, "memory-reservation", 2, 2*memCapacityMb, false)
 		defer framework.DeleteRC(f.Client, f.Namespace.Name, "memory-reservation")
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+2, scaleUpTimeout))
+
+		// Apparently GKE master is restarted couple minutes after the node pool is added
+		// reseting all the timers in scale down code. Adding 5 extra minutes to workaround
+		// this issue.
+		// TODO: Remove the extra time when GKE restart is fixed.
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+2, scaleUpTimeout+5*time.Minute))
 	})
 
 	It("should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]", func() {
@@ -275,8 +280,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size >= increasedSize+3 }, scaleUpTimeout))
 
 		By("Some node should be removed")
+		// Apparently GKE master is restarted couple minutes after the node pool is added
+		// reseting all the timers in scale down code. Adding 10 extra minutes to workaround
+		// this issue.
+		// TODO: Remove the extra time when GKE restart is fixed.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
-			func(size int) bool { return size < increasedSize+3 }, scaleDownTimeout))
+			func(size int) bool { return size < increasedSize+3 }, scaleDownTimeout+10*time.Minute))
 	})
 })
 
