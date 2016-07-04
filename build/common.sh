@@ -61,6 +61,7 @@ readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.2-2"
 readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/${OUT_DIR:-_output}"
 readonly LOCAL_OUTPUT_SUBPATH="${LOCAL_OUTPUT_ROOT}/dockerized"
 readonly LOCAL_OUTPUT_BINPATH="${LOCAL_OUTPUT_SUBPATH}/bin"
+readonly LOCAL_OUTPUT_GOPATH="${LOCAL_OUTPUT_SUBPATH}/go"
 readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 
 readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
@@ -68,16 +69,11 @@ readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
+readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
 readonly DOCKER_MOUNT_ARGS_BASE=(
   --volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}"
   --volume /etc/localtime:/etc/localtime:ro
-)
-
-# We create a Docker data container to cache incremental build artifacts.
-readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
-readonly DOCKER_DATA_MOUNT_ARGS=(
-  --volume "${REMOTE_OUTPUT_GOPATH}"
 )
 
 # This is where the final release artifacts are created locally
@@ -313,11 +309,11 @@ function kube::build::clean_output() {
       kube::log::error "Build image not built.  Cannot clean via docker build image."
     fi
 
-    kube::log::status "Removing data container"
+    kube::log::status "Removing data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
     "${DOCKER[@]}" rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
   fi
 
-  kube::log::status "Cleaning out local _output directory"
+  kube::log::status "Removing _output directory"
   rm -rf "${LOCAL_OUTPUT_ROOT}"
 }
 
@@ -525,7 +521,7 @@ function kube::build::docker_build() {
   local -r pull="${3:-true}"
   local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${context_dir}")
 
-  kube::log::status "Building Docker image ${image}."
+  kube::log::status "Building Docker image ${image}"
   local docker_output
   docker_output=$("${build_cmd[@]}" 2>&1) || {
     cat <<EOF >&2
@@ -559,14 +555,31 @@ function kube::build::clean_images() {
 }
 
 function kube::build::ensure_data_container() {
-  if ! "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1; then
-    kube::log::status "Creating data container"
+  # If the data container exists AND exited successfully, we can use it.
+  # Otherwise nuke it and start over.
+  local ret=0
+  local code=$(docker inspect \
+      -f '{{.State.ExitCode}}' \
+      "${KUBE_BUILD_DATA_CONTAINER_NAME}" 2>/dev/null || ret=$?)
+  if [[ "${ret}" == 0 && "${code}" != 0 ]]; then
+    kube::build::destroy_container "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    ret=1
+  fi
+  if [[ "${ret}" != 0 ]]; then
+    kube::log::status "Creating data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    # We have to ensure the directory exists, or else the docker run will
+    # create it as root.
+    mkdir -p "${LOCAL_OUTPUT_GOPATH}"
+    # We want this to run as root to be able to chown, so non-root users can
+    # later use the result as a data container.  This run both creates the data
+    # container and chowns the GOPATH.
     local -ra docker_cmd=(
       "${DOCKER[@]}" run
-      "${DOCKER_DATA_MOUNT_ARGS[@]}"
+      --volume "${REMOTE_OUTPUT_GOPATH}"
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+      --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
-      true
+      chown -R $(id -u).$(id -g) "${REMOTE_OUTPUT_GOPATH}"
     )
     "${docker_cmd[@]}"
   fi
@@ -583,6 +596,8 @@ function kube::build::run_build_command() {
 
   local -a docker_run_opts=(
     "--name=${KUBE_BUILD_CONTAINER_NAME}"
+    "--user=$(id -u):$(id -g)"
+    "--hostname=${HOSTNAME}"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 
@@ -635,9 +650,10 @@ function kube::build::copy_output() {
     # Bug: https://github.com/docker/docker/pull/8509
     local -a docker_run_opts=(
       "--name=${KUBE_BUILD_CONTAINER_NAME}"
-       "${DOCKER_MOUNT_ARGS[@]}"
-       -d
-      )
+      "--user=$(id -u):$(id -g)"
+      "${DOCKER_MOUNT_ARGS[@]}"
+      -d
+    )
 
     local -ra docker_cmd=(
       "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}"
