@@ -198,7 +198,7 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 	Expect(rss.Items).Should(HaveLen(0))
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *api.PodList
-	if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
 		pods, err = c.Core().Pods(ns).List(api.ListOptions{})
 		if err != nil {
 			return false, err
