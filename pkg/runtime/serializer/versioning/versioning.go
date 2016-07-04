@@ -102,7 +102,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 			}
 			return into, gvk, nil
 		}
-		if err := c.convertor.Convert(obj, into); err != nil {
+		if err := c.convertor.Convert(obj, into, c.decodeVersion); err != nil {
 			return nil, gvk, err
 		}
 		if isVersioned {

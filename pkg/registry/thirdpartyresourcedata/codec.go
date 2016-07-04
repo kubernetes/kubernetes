@@ -53,8 +53,8 @@ func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersi
 	}
 }
 
-func (t *thirdPartyObjectConverter) Convert(in, out interface{}) error {
-	return t.converter.Convert(in, out)
+func (t *thirdPartyObjectConverter) Convert(in, out, context interface{}) error {
+	return t.converter.Convert(in, out, context)
 }
 
 func (t *thirdPartyObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {

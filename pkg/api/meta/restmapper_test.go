@@ -28,7 +28,7 @@ import (
 
 type fakeConvertor struct{}
 
-func (fakeConvertor) Convert(in, out interface{}) error {
+func (fakeConvertor) Convert(in, out, context interface{}) error {
 	return nil
 }
 

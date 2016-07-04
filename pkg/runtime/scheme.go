@@ -438,11 +438,11 @@ func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 // Convert will attempt to convert in into out. Both must be pointers. For easy
 // testing of conversion functions. Returns an error if the conversion isn't
 // possible. You can call this with types that haven't been registered (for example,
-// a to test conversion of types that are nested within registered types), but in
-// that case, the conversion.Scope object passed to your conversion functions won't
-// have SrcVersion or DestVersion fields set correctly in Meta().
-func (s *Scheme) Convert(in, out interface{}) error {
+// a to test conversion of types that are nested within registered types). The
+// context interface is passed to the convertor.
+func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 	flags, meta := s.generateConvertMeta(in)
+	meta.Context = context
 	if flags == 0 {
 		flags = conversion.AllowDifferentFieldTypeNames
 	}

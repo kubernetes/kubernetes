@@ -298,7 +298,7 @@ type checkConvertor struct {
 	directConvert bool
 }
 
-func (c *checkConvertor) Convert(in, out interface{}) error {
+func (c *checkConvertor) Convert(in, out, context interface{}) error {
 	if !c.directConvert {
 		return fmt.Errorf("unexpected call to Convert")
 	}
