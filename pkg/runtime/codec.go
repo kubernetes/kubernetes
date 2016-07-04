@@ -145,16 +145,16 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 	}
 	targetGVK := targetGVKs[0]
 	if targetGVK.GroupVersion() == from {
-		return c.convertor.Convert(&parameters, into)
+		return c.convertor.Convert(&parameters, into, nil)
 	}
 	input, err := c.creator.New(from.WithKind(targetGVK.Kind))
 	if err != nil {
 		return err
 	}
-	if err := c.convertor.Convert(&parameters, input); err != nil {
+	if err := c.convertor.Convert(&parameters, input, nil); err != nil {
 		return err
 	}
-	return c.convertor.Convert(input, into)
+	return c.convertor.Convert(input, into, nil)
 }
 
 // EncodeParameters converts the provided object into the to version, then converts that object to url.Values.

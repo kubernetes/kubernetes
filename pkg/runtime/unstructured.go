@@ -168,7 +168,7 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 // sane implementation for APIs that require an object converter.
 type UnstructuredObjectConverter struct{}
 
-func (UnstructuredObjectConverter) Convert(in, out interface{}) error {
+func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 	unstructIn, ok := in.(*Unstructured)
 	if !ok {
 		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
