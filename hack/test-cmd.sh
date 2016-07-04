@@ -940,6 +940,14 @@ __EOF__
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
+  ## kubectl run --dry-run=true should show object info
+  # Pre-Condition: no pods exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kube::test::kubectl_dry_run nginx $IMAGE_NGINX
+  # Post-Condition: no pods exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
   ###############
   # Kubectl get #
   ###############

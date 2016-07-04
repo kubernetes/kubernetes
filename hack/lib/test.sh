@@ -223,3 +223,38 @@ kube::test::if_has_string() {
     return 1
   fi
 }
+
+kube::test::kubectl_dry_run() {
+  local name=$1
+  local image=$2
+
+  out=$(eval kubectl run $name "--image=$image" --dry-run=true "${kube_flags[@]}")
+  if [[ "$out" == $(echo) ]]; then
+    echo ${bold}${red}
+    echo "FAIL!"
+    echo "Run with --dry-run=true"
+    echo "No output found"
+    echo ${reset}${red}
+    caller
+    echo ${reset}
+    return 1
+  fi
+
+  if [[ $(echo "$out" | grep "created") ]]; then
+    echo ${bold}${red}
+    echo "FAIL!"
+    echo "run with --dry-run-true"
+    echo "Deployment created log found in:"
+    echo "$out"
+    echo ${reset}${red}
+    caller
+    echo ${reset}
+    return 1
+  fi
+
+  echo -n ${green}
+  echo "Succesfull run with --dry-run=true"
+  echo "$out"
+  echo -n ${reset}
+  return 0
+}
