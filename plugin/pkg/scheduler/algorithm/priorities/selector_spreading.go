@@ -62,6 +62,11 @@ func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algo
 // pods which match the same service selectors or RC selectors as the pod being scheduled.
 // Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+	nodes, err := nodeLister.List()
+	if err != nil {
+		return nil, err
+	}
+
 	selectors := make([]labels.Selector, 0, 3)
 	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
 		for _, service := range services {
@@ -79,11 +84,6 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 				selectors = append(selectors, selector)
 			}
 		}
-	}
-
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
 	}
 
 	// Count similar pods by node
