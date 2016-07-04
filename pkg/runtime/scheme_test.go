@@ -129,7 +129,7 @@ func TestScheme(t *testing.T) {
 
 	// Test Convert
 	external := &ExternalSimple{}
-	err = scheme.Convert(simple, external)
+	err = scheme.Convert(simple, external, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -894,7 +894,7 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 
 	simple := &InternalSimple{TestString: "foo"}
 	external := &ExternalSimple{}
-	err = s.Convert(simple, external)
+	err = s.Convert(simple, external, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

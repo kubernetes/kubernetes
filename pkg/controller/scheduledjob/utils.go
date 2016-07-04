@@ -209,7 +209,7 @@ func getJobFromTemplate(sj *batch.ScheduledJob, scheduledTime time.Time) (*batch
 			Name:        name,
 		},
 	}
-	if err := api.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec); err != nil {
+	if err := api.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {
 		return nil, fmt.Errorf("unable to convert job template: %v", err)
 	}
 	return job, nil

@@ -106,7 +106,7 @@ func BenchmarkEncodeCodecFromInternalProtobuf(b *testing.B) {
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
-		if err := api.Scheme.Convert(&items[i], &encodable[i]); err != nil {
+		if err := api.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
 			b.Fatal(err)
 		}
 	}
