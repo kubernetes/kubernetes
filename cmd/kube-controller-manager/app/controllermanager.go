@@ -400,6 +400,8 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		s.ClusterName,
 		nil, nil, nil,
 		s.VolumeConfiguration.EnableDynamicProvisioning,
+		s.VolumeConfiguration.EnableNetworkStorageProvisioning,
+		s.VolumeConfiguration.StorageConfigDir,
 	)
 	volumeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))

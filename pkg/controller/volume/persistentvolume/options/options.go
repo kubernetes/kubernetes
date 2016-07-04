@@ -36,6 +36,8 @@ type VolumeConfigFlags struct {
 	PersistentVolumeRecyclerIncrementTimeoutHostPath    int
 	EnableHostPathProvisioning                          bool
 	EnableDynamicProvisioning                           bool
+	EnableNetworkStorageProvisioning                    string
+	StorageConfigDir                                    string
 }
 
 type PersistentVolumeControllerOptions struct {
@@ -55,6 +57,8 @@ func NewPersistentVolumeControllerOptions() PersistentVolumeControllerOptions {
 			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
 			EnableHostPathProvisioning:                       false,
 			EnableDynamicProvisioning:                        true,
+			EnableNetworkStorageProvisioning:                 true,
+			StorageConfigDir:                                 "",
 		},
 	}
 }
@@ -88,4 +92,8 @@ func (o *PersistentVolumeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 			"HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.")
 	fs.BoolVar(&o.VolumeConfigFlags.EnableDynamicProvisioning, "enable-dynamic-provisioning", o.VolumeConfigFlags.EnableDynamicProvisioning,
 		"Enable dynamic provisioning for environments that support it.")
+	fs.BoolVar(&o.VolumeConfigFlags.EnableNetworkStorageProvisioning, "enable-network-storage-provisioner", o.VolumeConfigFlags.EnableNetworkStorageProvisioning,
+		"Enable network storage provisioning for environments that support it.")
+	fs.StringVar(&o.VolumeConfigFlags.StorageConfigDir, "--storage-config", o.VolumeConfigFlags.StorageConfigDir,
+		"Storage configuration directory for network storage provisioning for environments that support it.")
 }
