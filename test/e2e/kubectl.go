@@ -1089,10 +1089,11 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	})
 
 	framework.KubeDescribe("Kubectl run --rm job", func() {
-		nsFlag := fmt.Sprintf("--namespace=%v", ns)
 		jobName := "e2e-test-rm-busybox-job"
 
 		It("should create a job from an image, then delete the job [Conformance]", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
 			// The rkt runtime doesn't support attach, see #23335
 			framework.SkipIfContainerRuntimeIs("rkt")
 			framework.SkipUnlessServerVersionGTE(jobsVersion, c)
