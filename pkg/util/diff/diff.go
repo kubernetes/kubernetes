@@ -177,10 +177,10 @@ func objectReflectDiff(path *field.Path, a, b reflect.Value) []diff {
 			}
 		}
 		var diffs []diff
-		for i := l; l < lA; i++ {
+		for i := l; i < lA; i++ {
 			diffs = append(diffs, diff{path: path.Index(i), a: a.Index(i), b: nil})
 		}
-		for i := l; l < lB; i++ {
+		for i := l; i < lB; i++ {
 			diffs = append(diffs, diff{path: path.Index(i), a: nil, b: b.Index(i)})
 		}
 		return diffs
