@@ -54,9 +54,6 @@ func init() {
 // 	quota_test.go:100: Took 4.196205966s to scale up without quota
 // 	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	initializationCh := make(chan struct{})
 	// Set up a master
 	var m *master.Master
@@ -81,6 +78,11 @@ func TestQuota(t *testing.T) {
 	}
 	close(initializationCh)
 
+	ns := framework.CreateTestingNamespace("quotaed", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns2 := framework.CreateTestingNamespace("non-quotaed", s, t)
+	defer framework.DeleteTestingNamespace(ns2, s, t)
+
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
@@ -102,12 +104,15 @@ func TestQuota(t *testing.T) {
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
 
 	startTime := time.Now()
-	scale(t, api.NamespaceDefault, clientset)
+	scale(t, ns2.Name, clientset)
 	endTime := time.Now()
 	t.Logf("Took %v to scale up without quota", endTime.Sub(startTime))
 
 	quota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "quota"},
+		ObjectMeta: api.ObjectMeta{
+			Name:      "quota",
+			Namespace: ns.Name,
+		},
 		Spec: api.ResourceQuotaSpec{
 			Hard: api.ResourceList{
 				api.ResourcePods: resource.MustParse("1000"),
@@ -128,7 +133,7 @@ func waitForQuota(t *testing.T, quota *api.ResourceQuota, clientset *clientset.C
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := clientset.Core().ResourceQuotas("quotaed").Create(quota); err != nil {
+	if _, err := clientset.Core().ResourceQuotas(quota.Namespace).Create(quota); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

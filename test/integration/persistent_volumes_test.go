@@ -104,23 +104,27 @@ func testSleep() {
 }
 
 func TestPersistentVolumeRecycler(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	glog.V(2).Infof("TestPersistentVolumeRecycler started")
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("pv-recycler", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, ctrl, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	ctrl.Run()
 	defer ctrl.Stop()
 
 	// This PV will be claimed, released, and recycled.
 	pv := createPV("fake-pv-recycler", "/tmp/foo", "10G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRecycle)
-	pvc := createPVC("fake-pvc-recycler", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pvc := createPVC("fake-pvc-recycler", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 
 	_, err := testClient.PersistentVolumes().Create(pv)
 	if err != nil {
@@ -128,7 +132,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	}
 	glog.V(2).Infof("TestPersistentVolumeRecycler pvc created")
 
-	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumeClaims(ns.Name).Create(pvc)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
 	}
@@ -137,11 +141,11 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	// wait until the controller pairs the volume and claim
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
 	glog.V(2).Infof("TestPersistentVolumeRecycler pv bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
 	glog.V(2).Infof("TestPersistentVolumeRecycler pvc bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
-	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
+	if err := testClient.PersistentVolumeClaims(ns.Name).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	glog.V(2).Infof("TestPersistentVolumeRecycler pvc deleted")
@@ -150,45 +154,48 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	glog.V(2).Infof("TestPersistentVolumeRecycler pv released")
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeAvailable)
 	glog.V(2).Infof("TestPersistentVolumeRecycler pv available")
-
 }
 
 func TestPersistentVolumeDeleter(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	glog.V(2).Infof("TestPersistentVolumeDeleter started")
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("pv-deleter", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, ctrl, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	ctrl.Run()
 	defer ctrl.Stop()
 
 	// This PV will be claimed, released, and deleted.
 	pv := createPV("fake-pv-deleter", "/tmp/foo", "10G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimDelete)
-	pvc := createPVC("fake-pvc-deleter", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pvc := createPVC("fake-pvc-deleter", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 
 	_, err := testClient.PersistentVolumes().Create(pv)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolume: %v", err)
 	}
 	glog.V(2).Infof("TestPersistentVolumeDeleter pv created")
-	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumeClaims(ns.Name).Create(pvc)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
 	}
 	glog.V(2).Infof("TestPersistentVolumeDeleter pvc created")
 	waitForPersistentVolumePhase(testClient, pv.Name, watchPV, api.VolumeBound)
 	glog.V(2).Infof("TestPersistentVolumeDeleter pv bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
 	glog.V(2).Infof("TestPersistentVolumeDeleter pvc bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
-	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
+	if err := testClient.PersistentVolumeClaims(ns.Name).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	glog.V(2).Infof("TestPersistentVolumeDeleter pvc deleted")
@@ -206,25 +213,28 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 }
 
 func TestPersistentVolumeBindRace(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// Test a race binding many claims to a PV that is pre-bound to a specific
 	// PVC. Only this specific PVC should get bound.
 	glog.V(2).Infof("TestPersistentVolumeBindRace started")
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, ctrl, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("pv-bind-race", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, ctrl, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	ctrl.Run()
 	defer ctrl.Stop()
 
 	pv := createPV("fake-pv-race", "/tmp/foo", "10G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
-
-	pvc := createPVC("fake-pvc-race", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pvc := createPVC("fake-pvc-race", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 	counter := 0
 	maxClaims := 100
 	claims := []*api.PersistentVolumeClaim{}
@@ -233,7 +243,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 		clone, _ := conversion.NewCloner().DeepCopy(pvc)
 		newPvc, _ := clone.(*api.PersistentVolumeClaim)
 		newPvc.ObjectMeta = api.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
-		claim, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(newPvc)
+		claim, err := testClient.PersistentVolumeClaims(ns.Name).Create(newPvc)
 		if err != nil {
 			t.Fatal("Error creating newPvc: %v", err)
 		}
@@ -276,15 +286,19 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 // TestPersistentVolumeClaimLabelSelector test binding using label selectors
 func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("pvc-label-selector", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, controller, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	controller.Run()
 	defer controller.Stop()
@@ -296,7 +310,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 
 		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
 		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
-		pvc      = createPVC("pvc-ls-1", "1G", modes)
+		pvc      = createPVC("pvc-ls-1", ns.Name, "1G", modes)
 	)
 
 	pv_true.ObjectMeta.SetLabels(map[string]string{"foo": "true"})
@@ -318,7 +332,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 		},
 	}
 
-	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumeClaims(ns.Name).Create(pvc)
 	if err != nil {
 		t.Fatalf("Failed to create PersistentVolumeClaim: %v", err)
 	}
@@ -326,7 +340,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
 	t.Log("claim bound")
 
 	pv, err := testClient.PersistentVolumes().Get("pv-false")
@@ -351,15 +365,19 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 // TestPersistentVolumeClaimLabelSelectorMatchExpressions test binding using
 // MatchExpressions label selectors
 func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("pvc-match-expresssions", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, controller, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	controller.Run()
 	defer controller.Stop()
@@ -371,7 +389,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 
 		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
 		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
-		pvc      = createPVC("pvc-ls-1", "1G", modes)
+		pvc      = createPVC("pvc-ls-1", ns.Name, "1G", modes)
 	)
 
 	pv_true.ObjectMeta.SetLabels(map[string]string{"foo": "valA", "bar": ""})
@@ -412,7 +430,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 		},
 	}
 
-	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumeClaims(ns.Name).Create(pvc)
 	if err != nil {
 		t.Fatalf("Failed to create PersistentVolumeClaim: %v", err)
 	}
@@ -420,7 +438,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
 	t.Log("claim bound")
 
 	pv, err := testClient.PersistentVolumes().Get("pv-false")
@@ -445,15 +463,19 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 // TestPersistentVolumeMultiPVs tests binding of one PVC to 100 PVs with
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("multi-pvs", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, controller, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	controller.Run()
 	defer controller.Stop()
@@ -466,7 +488,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 			[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
 	}
 
-	pvc := createPVC("pvc-2", strconv.Itoa(maxPVs/2)+"G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+	pvc := createPVC("pvc-2", ns.Name, strconv.Itoa(maxPVs/2)+"G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 
 	for i := 0; i < maxPVs; i++ {
 		_, err := testClient.PersistentVolumes().Create(pvs[i])
@@ -477,7 +499,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	}
 	t.Log("volumes created")
 
-	_, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err := testClient.PersistentVolumeClaims(ns.Name).Create(pvc)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
 	}
@@ -486,7 +508,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	// wait until the binder pairs the claim with a volume
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
 	t.Log("claim bound")
 
 	// only one PV is bound
@@ -517,7 +539,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	}
 
 	// deleting a claim releases the volume
-	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
+	if err := testClient.PersistentVolumeClaims(ns.Name).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	t.Log("claim deleted")
@@ -529,15 +551,19 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 // TestPersistentVolumeMultiPVsPVCs tests binding of 100 PVC to 100 PVs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, binder, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("multi-pvs-pvcs", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, binder, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	binder.Run()
 	defer binder.Stop()
@@ -549,7 +575,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 		// This PV will be claimed, released, and deleted
 		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), "1G",
 			[]api.PersistentVolumeAccessMode{api.ReadWriteOnce}, api.PersistentVolumeReclaimRetain)
-		pvcs[i] = createPVC("pvc-"+strconv.Itoa(i), "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+		pvcs[i] = createPVC("pvc-"+strconv.Itoa(i), ns.Name, "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 	}
 
 	// Create PVs first
@@ -573,7 +599,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	// Create the claims, again in a separate goroutine.
 	go func() {
 		for i := 0; i < objCount; i++ {
-			_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvcs[i])
+			_, _ = testClient.PersistentVolumeClaims(ns.Name).Create(pvcs[i])
 		}
 	}()
 
@@ -595,7 +621,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 		}
 		glog.V(2).Infof("PV %q is bound to PVC %q", pv.Name, pv.Spec.ClaimRef.Name)
 
-		pvc, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Get(pvcs[i].Name)
+		pvc, err := testClient.PersistentVolumeClaims(ns.Name).Get(pvcs[i].Name)
 		if err != nil {
 			t.Fatalf("Unexpected error getting pvc: %v", err)
 		}
@@ -610,22 +636,27 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 // TestPersistentVolumeProvisionMultiPVCs tests provisioning of many PVCs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, binder, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("provision-multi-pvs", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, binder, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+
 	binder.Run()
 	defer binder.Stop()
 
 	objCount := getObjectCount()
 	pvcs := make([]*api.PersistentVolumeClaim, objCount)
 	for i := 0; i < objCount; i++ {
-		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
+		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), ns.Name, "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 		pvc.Annotations = map[string]string{
 			"volume.alpha.kubernetes.io/storage-class": "",
 		}
@@ -637,7 +668,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// early. It gets stuck with >3000 claims.
 	go func() {
 		for i := 0; i < objCount; i++ {
-			_, _ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvcs[i])
+			_, _ = testClient.PersistentVolumeClaims(ns.Name).Create(pvcs[i])
 		}
 	}()
 
@@ -666,7 +697,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// Delete the claims
 	for i := 0; i < objCount; i++ {
-		_ = testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvcs[i].Name, nil)
+		_ = testClient.PersistentVolumeClaims(ns.Name).Delete(pvcs[i].Name, nil)
 	}
 
 	// Wait for the PVs to get deleted by listing remaining volumes
@@ -689,15 +720,19 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 // TestPersistentVolumeMultiPVsDiffAccessModes tests binding of one PVC to two
 // PVs with different access modes.
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	testClient, controller, watchPV, watchPVC := createClients(t, s)
+	ns := framework.CreateTestingNamespace("multi-pvs-diff-access", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	testClient, controller, watchPV, watchPVC := createClients(ns, t, s)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (PersistenceVolumes).
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
 
 	controller.Run()
 	defer controller.Stop()
@@ -708,7 +743,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	pv_rwm := createPV("pv-rwm", "/tmp/bar", "10G",
 		[]api.PersistentVolumeAccessMode{api.ReadWriteMany}, api.PersistentVolumeReclaimRetain)
 
-	pvc := createPVC("pvc-rwm", "5G", []api.PersistentVolumeAccessMode{api.ReadWriteMany})
+	pvc := createPVC("pvc-rwm", ns.Name, "5G", []api.PersistentVolumeAccessMode{api.ReadWriteMany})
 
 	_, err := testClient.PersistentVolumes().Create(pv_rwm)
 	if err != nil {
@@ -720,7 +755,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	}
 	t.Log("volumes created")
 
-	_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Create(pvc)
+	_, err = testClient.PersistentVolumeClaims(ns.Name).Create(pvc)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolumeClaim: %v", err)
 	}
@@ -729,7 +764,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	// wait until the controller pairs the volume and claim
 	waitForAnyPersistentVolumePhase(watchPV, api.VolumeBound)
 	t.Log("volume bound")
-	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, watchPVC, api.ClaimBound)
+	waitForPersistentVolumeClaimPhase(testClient, pvc.Name, ns.Name, watchPVC, api.ClaimBound)
 	t.Log("claim bound")
 
 	// only RWM PV is bound
@@ -752,7 +787,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	}
 
 	// deleting a claim releases the volume
-	if err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Delete(pvc.Name, nil); err != nil {
+	if err := testClient.PersistentVolumeClaims(ns.Name).Delete(pvc.Name, nil); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	t.Log("claim deleted")
@@ -782,9 +817,9 @@ func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w 
 	}
 }
 
-func waitForPersistentVolumeClaimPhase(client *clientset.Clientset, claimName string, w watch.Interface, phase api.PersistentVolumeClaimPhase) {
+func waitForPersistentVolumeClaimPhase(client *clientset.Clientset, claimName, namespace string, w watch.Interface, phase api.PersistentVolumeClaimPhase) {
 	// Check if the claim is already in requested phase
-	claim, err := client.Core().PersistentVolumeClaims(api.NamespaceDefault).Get(claimName)
+	claim, err := client.Core().PersistentVolumeClaims(namespace).Get(claimName)
 	if err == nil && claim.Status.Phase == phase {
 		return
 	}
@@ -831,11 +866,21 @@ func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase api.Persisten
 	}
 }
 
-func createClients(t *testing.T, s *httptest.Server) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, watch.Interface, watch.Interface) {
+func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, watch.Interface, watch.Interface) {
 	// Use higher QPS and Burst, there is a test for race conditions which
 	// creates many objects and default values were too low.
-	binderClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000000, Burst: 1000000})
-	testClient := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: 1000000, Burst: 1000000})
+	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
+		Host:          s.URL,
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+		QPS:           1000000,
+		Burst:         1000000,
+	})
+	testClient := clientset.NewForConfigOrDie(&restclient.Config{
+		Host:          s.URL,
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+		QPS:           1000000,
+		Burst:         1000000,
+	})
 
 	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */)
 	plugin := &volumetest.FakeVolumePlugin{
@@ -860,7 +905,7 @@ func createClients(t *testing.T, s *httptest.Server) (*clientset.Clientset, *per
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumes: %v", err)
 	}
-	watchPVC, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Watch(api.ListOptions{})
+	watchPVC, err := testClient.PersistentVolumeClaims(ns.Name).Watch(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumeClaimss: %v", err)
 	}
@@ -880,11 +925,11 @@ func createPV(name, path, cap string, mode []api.PersistentVolumeAccessMode, rec
 	}
 }
 
-func createPVC(name, cap string, mode []api.PersistentVolumeAccessMode) *api.PersistentVolumeClaim {
+func createPVC(name, namespace, cap string, mode []api.PersistentVolumeAccessMode) *api.PersistentVolumeClaim {
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: namespace,
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			Resources:   api.ResourceRequirements{Requests: api.ResourceList{api.ResourceName(api.ResourceStorage): resource.MustParse(cap)}},
