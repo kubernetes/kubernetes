@@ -64,9 +64,6 @@ const (
 	// Rc manifest used to create pods for benchmarks.
 	// TODO: Convert this to a full path?
 	TestRCManifest = "benchmark-controller.json"
-
-	// Test Namspace, for pods and rcs.
-	TestNS = "test"
 )
 
 // MasterComponents is a control struct for all master components started via NewMasterComponents.
@@ -326,22 +323,26 @@ func StartRC(controller *api.ReplicationController, restClient *client.Client) (
 	return ScaleRC(created.Name, created.Namespace, controller.Spec.Replicas, restClient)
 }
 
-// StartPods check for numPods in TestNS. If they exist, it no-ops, otherwise it starts up
+// StartPods check for numPods in namespace. If they exist, it no-ops, otherwise it starts up
 // a temp rc, scales it to match numPods, then deletes the rc leaving behind the pods.
-func StartPods(numPods int, host string, restClient *client.Client) error {
+func StartPods(namespace string, numPods int, host string, restClient *client.Client) error {
 	start := time.Now()
 	defer func() {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
 	hostField := fields.OneTermEqualSelector(api.PodHostField, host)
 	options := api.ListOptions{FieldSelector: hostField}
-	pods, err := restClient.Pods(TestNS).List(options)
+	pods, err := restClient.Pods(namespace).List(options)
 	if err != nil || len(pods.Items) == numPods {
 		return err
 	}
 	glog.Infof("Found %d pods that match host %v, require %d", len(pods.Items), hostField, numPods)
-	// For the sake of simplicity, assume all pods in TestNS have selectors matching TestRCManifest.
+	// For the sake of simplicity, assume all pods in namespace have selectors matching TestRCManifest.
 	controller := RCFromManifest(TestRCManifest)
+
+	// Overwrite namespace
+	controller.ObjectMeta.Namespace = namespace
+	controller.Spec.Template.ObjectMeta.Namespace = namespace
 
 	// Make the rc unique to the given host.
 	controller.Spec.Replicas = int32(numPods)
@@ -355,7 +356,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	} else {
 		// Delete the rc, otherwise when we restart master components for the next benchmark
 		// the rc controller will race with the pods controller in the rc manager.
-		return restClient.ReplicationControllers(TestNS).Delete(rc.Name)
+		return restClient.ReplicationControllers(namespace).Delete(rc.Name)
 	}
 }
 
