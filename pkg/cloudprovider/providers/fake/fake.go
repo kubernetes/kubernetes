@@ -174,7 +174,7 @@ func (f *FakeCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 
 // Implementation of Instances.CurrentNodeName
 func (f *FakeCloud) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+	return hostname, f.Err
 }
 
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.
@@ -195,13 +195,13 @@ func (f *FakeCloud) ExternalID(instance string) (string, error) {
 // InstanceID returns the cloud provider ID of the specified instance.
 func (f *FakeCloud) InstanceID(instance string) (string, error) {
 	f.addCall("instance-id")
-	return f.ExtID[instance], nil
+	return f.ExtID[instance], f.Err
 }
 
 // InstanceType returns the type of the specified instance.
 func (f *FakeCloud) InstanceType(instance string) (string, error) {
 	f.addCall("instance-type")
-	return f.InstanceTypes[instance], nil
+	return f.InstanceTypes[instance], f.Err
 }
 
 // List is a test-spy implementation of Instances.List.
@@ -240,6 +240,9 @@ func (f *FakeCloud) CreateRoute(clusterName string, nameHint string, route *clou
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("create-route")
+	if f.Err != nil {
+		return f.Err
+	}
 	name := clusterName + "-" + nameHint
 	if _, exists := f.RouteMap[name]; exists {
 		f.Err = fmt.Errorf("route %q already exists", name)
@@ -257,6 +260,9 @@ func (f *FakeCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) 
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("delete-route")
+	if f.Err != nil {
+		return f.Err
+	}
 	name := route.Name
 	if _, exists := f.RouteMap[name]; !exists {
 		f.Err = fmt.Errorf("no route found with name %q", name)

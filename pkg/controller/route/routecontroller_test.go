@@ -17,6 +17,7 @@ limitations under the License.
 package route
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -76,6 +77,7 @@ func TestReconcile(t *testing.T) {
 	testCases := []struct {
 		nodes                      []api.Node
 		initialRoutes              []*cloudprovider.Route
+		injectedError              error
 		expectedRoutes             []*cloudprovider.Route
 		expectedNetworkUnavailable []bool
 		clientset                  *fake.Clientset
@@ -94,7 +96,7 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
+			expectedNetworkUnavailable: []bool{false, false},
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, one route already there
@@ -110,7 +112,7 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
+			expectedNetworkUnavailable: []bool{false, false},
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, no routes yet
@@ -124,7 +126,7 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
+			expectedNetworkUnavailable: []bool{false, false},
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, a few too many routes
@@ -143,7 +145,7 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
+			expectedNetworkUnavailable: []bool{false, false},
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, 2 routes, but only 1 is right
@@ -160,7 +162,7 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
+			expectedNetworkUnavailable: []bool{false, false},
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, one node without CIDR assigned.
@@ -173,12 +175,27 @@ func TestReconcile(t *testing.T) {
 			expectedRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, false},
+			expectedNetworkUnavailable: []bool{false, true},
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, nodeNoCidr}}),
+		},
+		// 1 node, no route, CreateRoute returns already exist error.
+		{
+			nodes:                      []api.Node{node1},
+			injectedError:              fmt.Errorf(alreadyExistError),
+			expectedNetworkUnavailable: []bool{false},
+			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1}}),
+		},
+		// 1 node, no route, CreateRoute returns arbitrary error.
+		{
+			nodes:                      []api.Node{node1},
+			injectedError:              fmt.Errorf("arbitrary error"),
+			expectedNetworkUnavailable: []bool{true},
+			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1}}),
 		},
 	}
 	for i, testCase := range testCases {
 		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}
+		cloud.Err = testCase.injectedError
 		for _, route := range testCase.initialRoutes {
 			fakeRoute := &fakecloud.FakeRoute{}
 			fakeRoute.ClusterName = cluster
@@ -194,6 +211,8 @@ func TestReconcile(t *testing.T) {
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
 		}
+		// Clear injected error
+		cloud.Err = nil
 		for _, action := range testCase.clientset.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 				node := action.(core.UpdateAction).GetObject().(*api.Node)
@@ -202,7 +221,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {
 					check := func(index int) bool {
-						return (condition.Status == api.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
+						return (condition.Status != api.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
 					}
 					index := -1
 					for j := range testCase.nodes {
@@ -216,7 +235,7 @@ func TestReconcile(t *testing.T) {
 					}
 					if !check(index) {
 						t.Errorf("%d. Invalid NodeNetworkUnavailable condition for Node %v, expected %v, got %v",
-							i, node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status == api.ConditionFalse))
+							i, node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status != api.ConditionFalse))
 					}
 				}
 			}
