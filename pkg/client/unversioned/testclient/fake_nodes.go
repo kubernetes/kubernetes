@@ -68,6 +68,11 @@ func (c *FakeNodes) Delete(name string) error {
 	return err
 }
 
+func (c *FakeNodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	_, err := c.Fake.Invokes(NewRootDeleteCollectionAction("nodes", listOptions), &api.NodeList{})
+	return err
+}
+
 func (c *FakeNodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", opts))
 }
