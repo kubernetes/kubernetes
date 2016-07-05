@@ -120,9 +120,7 @@ func checkErr(err error, handleErr func(string)) {
 		handleErr(MultilineError(prefix, errs))
 	}
 
-	if meta.IsNoResourceMatchError(err) {
-		noMatch := err.(*meta.NoResourceMatchError)
-
+	if noMatch, ok := err.(*meta.NoResourceMatchError); ok {
 		switch {
 		case len(noMatch.PartialResource.Group) > 0 && len(noMatch.PartialResource.Version) > 0:
 			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Group, noMatch.PartialResource.Version))
