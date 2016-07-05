@@ -15,11 +15,11 @@
 # Build the etcd image
 #
 # Usage:
-# 	[TAG=2.2.1] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[TAG=2.2.1] [REGISTRY=gcr.kubernetes.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
 TAG?=2.2.5
 ARCH?=amd64
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=gcr.kubernetes.io
 GOLANG_VERSION?=1.6.0
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)

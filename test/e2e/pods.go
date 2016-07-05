@@ -281,7 +281,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.kubernetes.io/nginx-slim:0.7",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -428,7 +428,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.kubernetes.io/nginx-slim:0.7",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -514,7 +514,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.kubernetes.io/nginx-slim:0.7",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -589,7 +589,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "srv",
-						Image: "gcr.io/google_containers/serve_hostname:v1.4",
+						Image: "gcr.kubernetes.io/serve_hostname:v1.4",
 						Ports: []api.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -644,7 +644,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "env3cont",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 					},
 				},
@@ -683,19 +683,19 @@ var _ = framework.KubeDescribe("Pods", func() {
 				InitContainers: []api.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 					},
 				},
 				Containers: []api.Container{
 					{
 						Name:    "run1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -748,12 +748,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 				InitContainers: []api.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -818,12 +818,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 				InitContainers: []api.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/false"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -935,19 +935,19 @@ var _ = framework.KubeDescribe("Pods", func() {
 				InitContainers: []api.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/false"},
 					},
 				},
 				Containers: []api.Container{
 					{
 						Name:    "run1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/true"},
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
@@ -1035,7 +1035,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -1062,7 +1062,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -1089,7 +1089,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/liveness:e2e",
+						Image:   "gcr.kubernetes.io/liveness:e2e",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -1118,7 +1118,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/liveness:e2e",
+						Image:   "gcr.kubernetes.io/liveness:e2e",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -1146,7 +1146,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "liveness",
-						Image: "gcr.io/google_containers/nettest:1.7",
+						Image: "gcr.kubernetes.io/nettest:1.7",
 						// These args are garbage but the image will exit if they're not there
 						// we just care about /read serving a 200, which it always does.
 						Args: []string{
@@ -1188,7 +1188,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
 					},
 				},
@@ -1267,7 +1267,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
 					},
 				},
@@ -1332,7 +1332,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},
@@ -1351,7 +1351,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		if err != nil {
 			framework.Failf("failed to get pod: %v", err)
 		}
-		pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
+		pod.Spec.Containers[0].Image = "gcr.kubernetes.io/nginx-slim:0.7"
 		pod, err = podClient.Update(pod)
 		if err != nil {
 			framework.Failf("error updating pod=%s/%s %v", podName, containerName, err)
@@ -1384,7 +1384,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},

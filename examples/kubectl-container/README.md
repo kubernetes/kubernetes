@@ -49,7 +49,7 @@ this is an example of what to do if you want to package `kubectl` into a
 container and use it within a pod.
 
 In the future, we may release consistently versioned groups of containers when
-we cut a release, in which case the source of gcr.io/google_containers/kubectl
+we cut a release, in which case the source of gcr.kubernetes.io/kubectl
 would become that automated process.
 
 [```pod.json```](pod.json) is provided as an example of running `kubectl` as a sidecar

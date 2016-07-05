@@ -197,7 +197,7 @@ For simpler UX we will provide simple bash scripts that will wrap all basic comm
 One disadvantage of using Ansible is that it adds a dependency on a machine which runs deployment scripts. We will workaround
 this by distributing deployment scripts via a docker image so that user will run the following command to create a cluster:
 
-```docker run gcr.io/google_containers/deploy_kubernetes:v1.2 up --num-nodes=3 --provider=aws```
+```docker run gcr.kubernetes.io/deploy_kubernetes:v1.2 up --num-nodes=3 --provider=aws```
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

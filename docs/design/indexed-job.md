@@ -795,7 +795,7 @@ spec:
     spec:
       containers:
         - name: c
-          image: gcr.io/google_containers/busybox
+          image: gcr.kubernetes.io/busybox
           command:
             - 'sh'
             - '-c'

@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 				Containers: []api.Container{
 					{
 						Name:            "git-repo",
-						Image:           "gcr.io/google_containers/fakegitserver:0.1",
+						Image:           "gcr.kubernetes.io/fakegitserver:0.1",
 						ImagePullPolicy: "IfNotPresent",
 						Ports: []api.ContainerPort{
 							{ContainerPort: int32(containerPort)},
@@ -135,7 +135,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 				Containers: []api.Container{
 					{
 						Name:  "secret-test",
-						Image: "gcr.io/google_containers/test-webserver:e2e",
+						Image: "gcr.kubernetes.io/test-webserver:e2e",
 						VolumeMounts: []api.VolumeMount{
 							{
 								Name:      volumeName,

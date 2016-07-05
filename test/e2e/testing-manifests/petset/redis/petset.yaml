@@ -14,7 +14,7 @@ spec:
         pod.alpha.kubernetes.io/init-containers: '[
             {
                 "name": "install",
-                "image": "gcr.io/google_containers/redis-install-3.2.0:e2e",
+                "image": "gcr.kubernetes.io/redis-install-3.2.0:e2e",
                 "imagePullPolicy": "Always",
                 "args": ["--install-into=/opt", "--work-dir=/work-dir"],
                 "volumeMounts": [

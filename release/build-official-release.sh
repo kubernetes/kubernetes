@@ -94,7 +94,7 @@ export KUBE_RELEASE_RUN_TESTS=n
 export KUBE_SKIP_CONFIRMATIONS=y
 # In order to build docker images for a release and tag them appropriately we need
 # to set these two variables.
-export KUBE_DOCKER_REGISTRY="gcr.io/google_containers"
+export KUBE_DOCKER_REGISTRY="gcr.kubernetes.io"
 export KUBE_DOCKER_IMAGE_TAG="${KUBE_RELEASE_VERSION}"
 
 make release

@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the Docker image gcr.io/google_containers/kubedns-<ARCH>
+# Makefile for the Docker image gcr.kubernetes.io/kubedns-<ARCH>
 # MAINTAINER: Tim Hockin <thockin@google.com>
 # If you update this image please bump the tag value before pushing.
 #
 # Usage:
-#   [ARCH=amd64] [TAG=1.6] [REGISTRY=gcr.io/google_containers] [BASEIMAGE=busybox] make (container|push)
+#   [ARCH=amd64] [TAG=1.6] [REGISTRY=gcr.kubernetes.io] [BASEIMAGE=busybox] make (container|push)
 
 # Default registry, arch and tag. This can be overwritten by arguments to make
 PLATFORM?=linux
 ARCH?=amd64
 TAG?=1.6
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=gcr.kubernetes.io
 
 GOLANG_VERSION=1.6
 KUBE_ROOT=$(shell pwd)/../..

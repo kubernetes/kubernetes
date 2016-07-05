@@ -16,7 +16,7 @@
 # KUBE_ROOT: path of the root of the Kubernetes reposiitory
 
 # optional override
-# FEDERATION_IMAGE_REPO_BASE: repo which federated images are tagged under (default gcr.io/google_containers)
+# FEDERATION_IMAGE_REPO_BASE: repo which federated images are tagged under (default gcr.kubernetes.io)
 # FEDERATION_NAMESPACE: name of the namespace will created for the federated components in the underlying cluster.
 # KUBE_PLATFORM
 # KUBE_ARCH
@@ -45,7 +45,7 @@ if [[ -z "${FEDERATION_PUSH_REPO_BASE}" ]]; then
     fi
 fi
 
-FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}
+FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.kubernetes.io'}
 FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation}
 
 KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
@@ -259,7 +259,8 @@ function push-federation-images {
 	docker tag -f "$srcImageName" "$dstImageName"
 
 	echo "Push: $dstImageName"
-	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]];then
+	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* \
+	    || "${FEDERATION_PUSH_REPO_BASE}" == "gcr.kubernetes.io/"* ]]; then
 	    echo " -> GCR repository detected. Using gcloud"
 	    gcloud docker push "$dstImageName"
 	else

@@ -80,7 +80,7 @@ var _ = Describe("Image Container Conformance Test", func() {
 				// nonexistent image registry
 				"foo.com/foo/fooimage",
 				// nonexistent image
-				"gcr.io/google_containers/not_exist",
+				"gcr.kubernetes.io/not_exist",
 				// TODO(random-liu): Add test for image pulling credential
 			}
 			It("should ignore pull failures", func() {

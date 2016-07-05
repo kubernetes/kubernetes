@@ -10,16 +10,16 @@ For other architectures, `flannel` is cross-compiled. The `debian-iptables` imag
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
-# ---> gcr.io/google_containers/flannel-amd64:TAG
+# ---> gcr.kubernetes.io/flannel-amd64:TAG
 
 $ make push ARCH=arm
-# ---> gcr.io/google_containers/flannel-arm:TAG
+# ---> gcr.kubernetes.io/flannel-arm:TAG
 
 $ make push ARCH=arm64
-# ---> gcr.io/google_containers/flannel-arm64:TAG
+# ---> gcr.kubernetes.io/flannel-arm64:TAG
 
 $ make push ARCH=ppc64le
-# ---> gcr.io/google_containers/flannel-ppc64le:TAG
+# ---> gcr.kubernetes.io/flannel-ppc64le:TAG
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

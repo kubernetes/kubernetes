@@ -19,7 +19,7 @@ spec:
       --v=2
       --root-ca-file=/srv/kubernetes/ca.crt
       1>>/var/log/kube-controller-manager.log 2>&1
-    image: gcr.io/google_containers/kube-controller-manager:${KUBE_CONTROLLER_MANAGER_DOCKER_TAG}
+    image: gcr.kubernetes.io/kube-controller-manager:${KUBE_CONTROLLER_MANAGER_DOCKER_TAG}
     imagePullPolicy: IfNotPresent
     livenessProbe:
       httpGet:

@@ -287,7 +287,7 @@ func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name s
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:1.9",
+						Image: "gcr.kubernetes.io/nettest:1.9",
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.

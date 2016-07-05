@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 
 Explorer is a little container for examining the runtime environment kubernetes produces for your pods.
 
-The intended use is to substitute gcr.io/google_containers/explorer for your intended container, and then visit it via the proxy.
+The intended use is to substitute gcr.kubernetes.io/explorer for your intended container, and then visit it via the proxy.
 
 Currently, you can look at:
  * The environment variables to make sure kubernetes is doing what you expect.

@@ -176,12 +176,12 @@ install_kube_binary_config() {
   echo "Downloading k8s manifests tar"
   download_or_bust "${manifests_tar_hash}" "${tmp_manifests_urls}"
   tar xzf "${kube_home}/${manifests_tar}" -C "${dst_dir}" --overwrite
-  readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
-  if [ "${kube_addon_registry}" != "gcr.io/google_containers" ]; then
+  readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.kubernetes.io}"
+  if [ "${kube_addon_registry}" != "gcr.kubernetes.io" ]; then
     find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
-      xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
+      xargs sed -ri "s@(image:\s.*)gcr.kubernetes.io@\1${kube_addon_registry}@"
     find "${dst_dir}" -name \*.manifest -or -name \*.json | \
-      xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
+      xargs sed -ri "s@(image\":\s+\")gcr.kubernetes.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/trusty-configure-helper.sh" /etc/kube-configure-helper.sh
 

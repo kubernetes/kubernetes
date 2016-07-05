@@ -16,7 +16,7 @@ all: push
 
 # 0.0 shouldn't clobber any released builds
 TAG = 1.0
-PREFIX = gcr.io/google_containers/clusterapi-tester
+PREFIX = gcr.kubernetes.io/clusterapi-tester
 
 main: main.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o main ./main.go

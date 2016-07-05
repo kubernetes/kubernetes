@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		config := VolumeTestConfig{
 			namespace:   ns,
 			prefix:      "nfs",
-			serverImage: "gcr.io/google_containers/volume-nfs:0.6",
+			serverImage: "gcr.kubernetes.io/volume-nfs:0.6",
 			serverPorts: []int{2049},
 		}
 
@@ -237,7 +237,7 @@ func makeWritePod(ns string, pvcName string) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:    "write-pod",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.kubernetes.io/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "touch /mnt/SUCCESS && exit 0 || exit 1"},
 					VolumeMounts: []api.VolumeMount{

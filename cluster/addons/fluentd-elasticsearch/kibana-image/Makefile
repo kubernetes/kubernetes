@@ -17,7 +17,7 @@
 TAG = 1.3
 
 build:
-	docker build -t gcr.io/google_containers/kibana:$(TAG) .
+	docker build -t gcr.kubernetes.io/kibana:$(TAG) .
 
 push:
-	gcloud docker push gcr.io/google_containers/kibana:$(TAG)
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/kibana:$(TAG)

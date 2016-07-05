@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				Containers: []api.Container{
 					{
 						Name:  "p",
-						Image: "gcr.io/google_containers/serve_hostname:v1.4",
+						Image: "gcr.kubernetes.io/serve_hostname:v1.4",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 					},
 				},

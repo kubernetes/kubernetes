@@ -453,7 +453,7 @@ compute_master_manifest_variables() {
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
-  DOCKER_REGISTRY="gcr.io/google_containers"
+  DOCKER_REGISTRY="gcr.kubernetes.io"
   if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi

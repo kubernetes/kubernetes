@@ -71,7 +71,7 @@ func etcdFailTest(f *framework.Framework, failCommand, fixCommand string) {
 
 	checkExistingRCRecovers(f)
 
-	ServeImageOrFail(f, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
+	ServeImageOrFail(f, "basic", "gcr.kubernetes.io/serve_hostname:v1.4")
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.

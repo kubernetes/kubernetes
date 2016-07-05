@@ -125,7 +125,7 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
   done
 
   gcloud compute ssh "${EVENT_STORE_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-    --command="sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd \
+    --command="sudo docker run --net=host -d gcr.kubernetes.io/etcd:2.0.12 /usr/local/bin/etcd \
       --listen-peer-urls http://127.0.0.1:2380 \
       --addr=127.0.0.1:4002 \
       --bind-addr=0.0.0.0:4002 \

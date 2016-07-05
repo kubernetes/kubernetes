@@ -44,7 +44,7 @@ func testPreStop(c *client.Client, ns string) {
 			Containers: []api.Container{
 				{
 					Name:  "server",
-					Image: "gcr.io/google_containers/nettest:1.7",
+					Image: "gcr.kubernetes.io/nettest:1.7",
 					Ports: []api.ContainerPort{{ContainerPort: 8080}},
 				},
 			},
@@ -77,7 +77,7 @@ func testPreStop(c *client.Client, ns string) {
 			Containers: []api.Container{
 				{
 					Name:    "tester",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.kubernetes.io/busybox:1.24",
 					Command: []string{"sleep", "600"},
 					Lifecycle: &api.Lifecycle{
 						PreStop: &api.Handler{

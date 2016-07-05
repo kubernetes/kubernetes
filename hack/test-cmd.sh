@@ -144,10 +144,10 @@ KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
 CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
-IMAGE_NGINX="gcr.io/google-containers/nginx:1.7.9"
-IMAGE_DEPLOYMENT_R1="gcr.io/google-containers/nginx:test-cmd"  # deployment-revision1.yaml
+IMAGE_NGINX="gcr.kubernetes.io/nginx:1.7.9"
+IMAGE_DEPLOYMENT_R1="gcr.kubernetes.io/nginx:test-cmd"  # deployment-revision1.yaml
 IMAGE_DEPLOYMENT_R2="$IMAGE_NGINX"  # deployment-revision2.yaml
-IMAGE_PERL="gcr.io/google-containers/perl"
+IMAGE_PERL="gcr.kubernetes.io/perl"
 
 # ensure ~/.kube/config isn't loaded by tests
 HOME="${KUBE_TEMP}"
@@ -660,9 +660,9 @@ runTests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'changed-with-yaml:'
   ## Patch pod from JSON can change image
   # Command
-  kubectl patch "${kube_flags[@]}" -f docs/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "gcr.io/google_containers/pause-amd64:3.0"}]}}'
-  # Post-condition: valid-pod POD has image gcr.io/google_containers/pause-amd64:3.0
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/pause-amd64:3.0:'
+  kubectl patch "${kube_flags[@]}" -f docs/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "gcr.kubernetes.io/pause-amd64:3.0"}]}}'
+  # Post-condition: valid-pod POD has image gcr.kubernetes.io/pause-amd64:3.0
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.kubernetes.io/pause-amd64:3.0:'
 
   ## If resourceVersion is specified in the patch, it will be treated as a precondition, i.e., if the resourceVersion is different from that is stored in the server, the Patch should be rejected
   ERROR_FILE="${KUBE_TEMP}/conflict-error"
@@ -732,13 +732,13 @@ __EOF__
   kubectl delete node node-${version}-test "${kube_flags[@]}"
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
-  echo -e "#!/bin/bash\n$SED -i \"s/nginx/gcr.io\/google_containers\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
+  echo -e "#!/bin/bash\n$SED -i \"s|nginx|gcr.kubernetes.io/serve_hostname|g\" \$1" > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   # Pre-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
   EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod
-  # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/serve_hostname:'
+  # Post-condition: valid-pod POD has image gcr.kubernetes.io/serve_hostname
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.kubernetes.io/serve_hostname:'
   # cleaning
   rm /tmp/tmp-editor.sh
 

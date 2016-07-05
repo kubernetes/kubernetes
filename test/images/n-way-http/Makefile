@@ -16,7 +16,7 @@ all: push
 
 # 0.0 shouldn't clobber any released builds
 TAG = 0.0
-PREFIX = gcr.io/google_containers/n-way-http
+PREFIX = gcr.kubernetes.io/n-way-http
 
 server: server.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o server ./server.go

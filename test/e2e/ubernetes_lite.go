@@ -36,7 +36,7 @@ var _ = framework.KubeDescribe("Ubernetes Lite", func() {
 	f := framework.NewDefaultFramework("ubernetes-lite")
 	var zoneCount int
 	var err error
-	image := "gcr.io/google_containers/serve_hostname:v1.4"
+	image := "gcr.kubernetes.io/serve_hostname:v1.4"
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {

@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:v1.4"
+	serveHostnameImage        = "gcr.kubernetes.io/serve_hostname:v1.4"
 	resizeNodeReadyTimeout    = 2 * time.Minute
 	resizeNodeNotReadyTimeout = 2 * time.Minute
 	nodeReadinessTimeout      = 3 * time.Minute

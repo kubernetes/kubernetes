@@ -109,7 +109,7 @@ func proxyContext(version string) {
 		pods := []*api.Pod{}
 		cfg := framework.RCConfig{
 			Client:       f.Client,
-			Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+			Image:        "gcr.kubernetes.io/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
 			Name:         service.Name,
 			Namespace:    f.Namespace.Name,
 			Replicas:     1,

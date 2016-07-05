@@ -45,18 +45,18 @@ const (
 )
 
 var ImageRegistry = map[int]string{
-	busyBoxImage:  "gcr.io/google_containers/busybox:1.24",
-	hostExecImage: "gcr.io/google_containers/hostexec:1.2",
-	netExecImage:  "gcr.io/google_containers/netexec:1.4",
-	nginxImage:    "gcr.io/google_containers/nginx-slim:0.7",
+	busyBoxImage:  "gcr.kubernetes.io/busybox:1.24",
+	hostExecImage: "gcr.kubernetes.io/hostexec:1.2",
+	netExecImage:  "gcr.kubernetes.io/netexec:1.4",
+	nginxImage:    "gcr.kubernetes.io/nginx-slim:0.7",
 	pauseImage:    framework.GetPauseImageNameForHostArch(),
 }
 
 // These are used by tests that explicitly test the ability to pull images
 var NoPullImageRegistry = map[int]string{
-	pullTestExecHealthz:         "gcr.io/google_containers/exechealthz:1.0",
+	pullTestExecHealthz:         "gcr.kubernetes.io/exechealthz:1.0",
 	pullTestAlpine:              "alpine:3.1",
-	pullTestAlpineWithBash:      "gcr.io/google_containers/alpine-with-bash:1.0",
+	pullTestAlpineWithBash:      "gcr.kubernetes.io/alpine-with-bash:1.0",
 	pullTestAuthenticatedAlpine: "gcr.io/authenticated-image-pulling/alpine:3.1",
 }
 

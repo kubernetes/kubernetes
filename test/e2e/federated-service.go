@@ -451,7 +451,7 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 			Containers: []api.Container{
 				{
 					Name:    "federated-service-discovery-container",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.kubernetes.io/busybox:1.24",
 					Command: command,
 				},
 			},
@@ -495,7 +495,7 @@ func createBackendPodsOrFail(clusterClientSets []*release_1_3.Clientset, namespa
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: "gcr.io/google_containers/echoserver:1.4",
+					Image: "gcr.kubernetes.io/echoserver:1.4",
 				},
 			},
 			RestartPolicy: v1.RestartPolicyAlways,

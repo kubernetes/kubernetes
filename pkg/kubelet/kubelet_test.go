@@ -126,12 +126,12 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 	imageList := []kubecontainer.Image{
 		{
 			ID:       "abc",
-			RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+			RepoTags: []string{"gcr.kubernetes.io:v1", "gcr.kubernetes.io:v2"},
 			Size:     123,
 		},
 		{
 			ID:       "efg",
-			RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+			RepoTags: []string{"gcr.kubernetes.io:v3", "gcr.kubernetes.io:v4"},
 			Size:     456,
 		},
 	}
@@ -172,7 +172,7 @@ func generateImageTags() []string {
 	var tagList []string
 	count := rand.IntnRange(1, maxImageTagsForTest+1)
 	for ; count > 0; count-- {
-		tagList = append(tagList, "gcr.io/google_containers:v"+strconv.Itoa(count))
+		tagList = append(tagList, "gcr.kubernetes.io:v"+strconv.Itoa(count))
 	}
 	return tagList
 }
@@ -3048,11 +3048,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			// images will be sorted from max to min in node status.
 			Images: []api.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					Names:     []string{"gcr.kubernetes.io:v3", "gcr.kubernetes.io:v4"},
 					SizeBytes: 456,
 				},
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					Names:     []string{"gcr.kubernetes.io:v1", "gcr.kubernetes.io:v2"},
 					SizeBytes: 123,
 				},
 			},
@@ -3331,11 +3331,11 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					Names:     []string{"gcr.kubernetes.io:v3", "gcr.kubernetes.io:v4"},
 					SizeBytes: 456,
 				},
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					Names:     []string{"gcr.kubernetes.io:v1", "gcr.kubernetes.io:v2"},
 					SizeBytes: 123,
 				},
 			},

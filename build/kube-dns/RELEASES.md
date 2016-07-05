@@ -25,16 +25,16 @@ make container PREFIX=<your-docker-hub> TAG=rc
 	```console
 	# Build for linux/amd64 (default)
 	$ make push ARCH=amd64
-	# ---> gcr.io/google_containers/kube-dns-amd64:TAG
+	# ---> gcr.kubernetes.io/kube-dns-amd64:TAG
 
 	$ make push ARCH=arm
-	# ---> gcr.io/google_containers/kube-dns-arm:TAG
+	# ---> gcr.kubernetes.io/kube-dns-arm:TAG
 
 	$ make push ARCH=arm64
-	# ---> gcr.io/google_containers/kube-dns-arm64:TAG
+	# ---> gcr.kubernetes.io/kube-dns-arm64:TAG
 
 	$ make push ARCH=ppc64le
-	# ---> gcr.io/google_containers/kube-dns-ppc64le:TAG
+	# ---> gcr.kubernetes.io/kube-dns-ppc64le:TAG
 	```
 
 6. Manually deploy this to your own cluster by updating the replication

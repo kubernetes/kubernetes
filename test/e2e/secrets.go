@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 				Containers: []api.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.7",
+						Image: "gcr.kubernetes.io/mounttest:0.7",
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 				Containers: []api.Container{
 					{
 						Name:    "secret-env-test",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 						Env: []api.EnvVar{
 							{

@@ -15,14 +15,14 @@
 .PHONY:	elasticsearch_logging_discovery build push
 
 # The current value of the tag to be used for building and
-# pushing an image to gcr.io
+# pushing an image to gcr.kubernetes.io
 TAG = 1.9
 
 build:	elasticsearch_logging_discovery
-	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .
+	docker build -t gcr.kubernetes.io/elasticsearch:$(TAG) .
 
 push:
-	gcloud docker push gcr.io/google_containers/elasticsearch:$(TAG)
+	gcloud docker push --server=gcr.kubernetes.io gcr.kubernetes.io/elasticsearch:$(TAG)
 
 elasticsearch_logging_discovery:
 	go build elasticsearch_logging_discovery.go

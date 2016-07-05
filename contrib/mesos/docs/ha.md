@@ -137,7 +137,7 @@ We use podmaster to coordinate leadership selection amongst K8sm masters.
 However, podmaster needs to run in a container (preferably in a pod), and on
 the leader node, its podmaster will instantiate scheduler and controller
 manager also in their separate pods. The podmaster image is pre-built and can
-be obtained from `gcr.io/google_containers/podmaster`. An official image that
+be obtained from `gcr.kubernetes.io/podmaster`. An official image that
 contains the `km` binary to start apiserver, scheduler, and controller
 manager is not yet available. But it can be built fairly easily.
 
@@ -219,7 +219,7 @@ spec:
   hostNetwork: true
   containers:
   - name: scheduler-elector
-    image: gcr.io/google_containers/podmaster:1.1
+    image: gcr.kubernetes.io/podmaster:1.1
     command:
     - /podmaster
     - --etcd-servers=http://${ETCD_IP}:${ETCD_PORT}
@@ -234,7 +234,7 @@ spec:
     - mountPath: /dst/manifests
       name: manifest-dst
   - name: controller-manager-elector
-    image: gcr.io/google_containers/podmaster:1.1
+    image: gcr.kubernetes.io/podmaster:1.1
     command:
     - /podmaster
     - --etcd-servers=http://${ETCD_IP}:${ETCD_PORT}

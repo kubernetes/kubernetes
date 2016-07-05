@@ -140,7 +140,7 @@ func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, e
 			Containers: []api.Container{
 				{
 					Name:    "dapi-container",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.kubernetes.io/busybox:1.24",
 					Command: []string{"sh", "-c", "env"},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{

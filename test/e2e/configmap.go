@@ -111,7 +111,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 				Containers: []api.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/mounttest:0.6",
+						Image:   "gcr.kubernetes.io/mounttest:0.6",
 						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
 						VolumeMounts: []api.VolumeMount{
 							{
@@ -175,7 +175,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 				Containers: []api.Container{
 					{
 						Name:    "env-test",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.kubernetes.io/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 						Env: []api.EnvVar{
 							{
@@ -257,7 +257,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 			Containers: []api.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.6",
+					Image: "gcr.kubernetes.io/mounttest:0.6",
 					Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
 					VolumeMounts: []api.VolumeMount{
 						{
@@ -333,7 +333,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 			Containers: []api.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.6",
+					Image: "gcr.kubernetes.io/mounttest:0.6",
 					Args:  []string{"--file_content=/etc/configmap-volume/path/to/data-2"},
 					VolumeMounts: []api.VolumeMount{
 						{

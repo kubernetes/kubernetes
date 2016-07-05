@@ -18,17 +18,17 @@ The `addon-manager` is built for multiple architectures.
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
-# ---> gcr.io/google-containers/kube-addon-manager-amd64:VERSION
-# ---> gcr.io/google-containers/kube-addon-manager:VERSION (image with backwards-compatible naming)
+# ---> gcr.kubernetes.io/kube-addon-manager-amd64:VERSION
+# ---> gcr.kubernetes.io/kube-addon-manager:VERSION (image with backwards-compatible naming)
 
 $ make push ARCH=arm
-# ---> gcr.io/google-containers/kube-addon-manager-arm:VERSION
+# ---> gcr.kubernetes.io/kube-addon-manager-arm:VERSION
 
 $ make push ARCH=arm64
-# ---> gcr.io/google-containers/kube-addon-manager-arm64:VERSION
+# ---> gcr.kubernetes.io/kube-addon-manager-arm64:VERSION
 
 $ make push ARCH=ppc64le
-# ---> gcr.io/google-containers/kube-addon-manager-ppc64le:VERSION
+# ---> gcr.kubernetes.io/kube-addon-manager-ppc64le:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

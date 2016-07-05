@@ -65,7 +65,7 @@ func runClientServerBandwidthMeasurement(f *framework.Framework, numClient int, 
 				return api.PodSpec{
 					Containers: []api.Container{{
 						Name:  "iperf-server",
-						Image: "gcr.io/google_containers/iperf:e2e",
+						Image: "gcr.kubernetes.io/iperf:e2e",
 						Args: []string{
 							"/bin/sh",
 							"-c",
@@ -93,7 +93,7 @@ func runClientServerBandwidthMeasurement(f *framework.Framework, numClient int, 
 					Containers: []api.Container{
 						{
 							Name:  "iperf-client",
-							Image: "gcr.io/google_containers/iperf:e2e",
+							Image: "gcr.kubernetes.io/iperf:e2e",
 							Args: []string{
 								"/bin/sh",
 								"-c",

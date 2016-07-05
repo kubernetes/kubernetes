@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: gcr.io/google_containers/etcd:2.0.9
+        image: gcr.kubernetes.io/etcd:2.0.9
         resources:
           limits:
             cpu: 100m
@@ -40,7 +40,7 @@ spec:
         - name: etcd-storage
           mountPath: /var/etcd/data
       - name: kube2sky
-        image: gcr.io/google_containers/kube2sky:1.11
+        image: gcr.kubernetes.io/kube2sky:1.11
         resources:
           limits:
             cpu: 100m
@@ -50,7 +50,7 @@ spec:
        {% if dns_domain -%}- -domain={{ dns_domain }} {% else %} - -domain=cluster.local {% endif %}
         - -kube_master_url=http://{{ private_address }}:8080
       - name: skydns
-        image: gcr.io/google_containers/skydns:2015-03-11-001
+        image: gcr.kubernetes.io/skydns:2015-03-11-001
         resources:
           limits:
             cpu: 100m
@@ -75,7 +75,7 @@ spec:
           initialDelaySeconds: 30
           timeoutSeconds: 5
       - name: healthz
-        image: gcr.io/google_containers/exechealthz:1.0
+        image: gcr.kubernetes.io/exechealthz:1.0
         resources:
           limits:
             cpu: 10m

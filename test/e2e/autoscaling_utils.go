@@ -40,8 +40,8 @@ const (
 	timeoutRC                       = 120 * time.Second
 	startServiceTimeout             = time.Minute
 	startServiceInterval            = 5 * time.Second
-	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta4"
-	resourceConsumerControllerImage = "gcr.io/google_containers/resource_consumer/controller:beta4"
+	resourceConsumerImage           = "gcr.kubernetes.io/resource_consumer:beta4"
+	resourceConsumerControllerImage = "gcr.kubernetes.io/resource_consumer/controller:beta4"
 	rcIsNil                         = "ERROR: replicationController = nil"
 	deploymentIsNil                 = "ERROR: deployment = nil"
 	rsIsNil                         = "ERROR: replicaset = nil"

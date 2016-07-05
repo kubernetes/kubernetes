@@ -14,17 +14,17 @@ $ build/run.sh hack/build-cross.sh
 
 # Build for linux/amd64 (default)
 $ make push VERSION={target_version} ARCH=amd64
-# ---> gcr.io/google_containers/hyperkube-amd64:VERSION
-# ---> gcr.io/google_containers/hyperkube:VERSION (image with backwards-compatible naming)
+# ---> gcr.kubernetes.io/hyperkube-amd64:VERSION
+# ---> gcr.kubernetes.io/hyperkube:VERSION (image with backwards-compatible naming)
 
 $ make push VERSION={target_version} ARCH=arm
-# ---> gcr.io/google_containers/hyperkube-arm:VERSION
+# ---> gcr.kubernetes.io/hyperkube-arm:VERSION
 
 $ make push VERSION={target_version} ARCH=arm64
-# ---> gcr.io/google_containers/hyperkube-arm64:VERSION
+# ---> gcr.kubernetes.io/hyperkube-arm64:VERSION
 
 $ make push VERSION={target_version} ARCH=ppc64le
-# ---> gcr.io/google_containers/hyperkube-ppc64le:VERSION
+# ---> gcr.kubernetes.io/hyperkube-ppc64le:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
