@@ -463,49 +463,18 @@ func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, 
 // return an error if the conversion does not result in a valid Object being
 // returned. Passes target down to the conversion methods as the Context on the scope.
 func (s *Scheme) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
-	t := reflect.TypeOf(in)
-	if t.Kind() != reflect.Ptr {
-		return nil, fmt.Errorf("only pointer types may be converted: %v", t)
-	}
-
-	t = t.Elem()
-	if t.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("only pointers to struct types may be converted: %v", t)
-	}
-
-	var kind unversioned.GroupVersionKind
-	if unversionedKind, ok := s.unversionedTypes[t]; ok {
-		kind = unversionedKind
-	} else {
-		kinds, ok := s.typeToGVK[t]
-		if !ok || len(kinds) == 0 {
-			return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, target)
-		}
-		kind, ok = kindForGroupVersioner(kinds, target)
-		if !ok {
-			return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
-		}
-	}
-
-	out, err := s.New(kind)
-	if err != nil {
-		return nil, err
-	}
-
-	flags, meta := s.generateConvertMeta(in)
-	meta.Context = target
-	if err := s.converter.Convert(in, out, flags, meta); err != nil {
-		return nil, err
-	}
-
-	setTargetKind(out, kind)
-	return out, nil
+	return s.convertToVersion(true, in, target)
 }
 
 // UnsafeConvertToVersion will convert in to the provided target if such a conversion is possible,
 // but does not guarantee the output object does not share fields with the input object. It attempts to be as
 // efficient as possible when doing conversion.
 func (s *Scheme) UnsafeConvertToVersion(in Object, target GroupVersioner) (Object, error) {
+	return s.convertToVersion(false, in, target)
+}
+
+// convertToVersion handles conversion with an optional copy.
+func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (Object, error) {
 	// determine the incoming kinds with as few allocations as possible.
 	t := reflect.TypeOf(in)
 	if t.Kind() != reflect.Ptr {
@@ -517,43 +486,48 @@ func (s *Scheme) UnsafeConvertToVersion(in Object, target GroupVersioner) (Objec
 	}
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
-		return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, target)
+		return nil, &notRegisteredErr{t: t}
 	}
 
 	// if the Go type is also registered to the destination kind, no conversion is necessary
 	if gv, ok := PreferredGroupVersion(target); ok {
 		for _, kind := range kinds {
 			if kind.Group == gv.Group && kind.Version == gv.Version {
-				setTargetKind(in, kind)
-				return in, nil
+				return copyAndSetTargetKind(copy, s, in, kind)
 			}
 		}
 	}
 	for _, kind := range kinds {
 		if gv, ok := target.VersionForGroupKind(kind.GroupKind()); ok && kind.Version == gv.Version {
-			setTargetKind(in, kind)
-			return in, nil
+			return copyAndSetTargetKind(copy, s, in, kind)
 		}
 	}
 
 	// type is unversioned, no conversion necessary
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
 		if desiredGV, ok := target.VersionForGroupKind(unversionedKind.GroupKind()); ok {
-			setTargetKind(in, desiredGV.WithKind(unversionedKind.Kind))
-		} else {
-			setTargetKind(in, unversionedKind)
+			return copyAndSetTargetKind(copy, s, in, desiredGV.WithKind(unversionedKind.Kind))
 		}
-		return in, nil
+		return copyAndSetTargetKind(copy, s, in, unversionedKind)
 	}
 
 	// allocate a new object as the target using the target kind
 	kind, ok := kindForGroupVersioner(kinds, target)
 	if !ok {
+		// TODO: should this be a typed error?
 		return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
 	}
 	out, err := s.New(kind)
 	if err != nil {
 		return nil, err
+	}
+
+	if copy {
+		copied, err := s.Copy(in)
+		if err != nil {
+			return nil, err
+		}
+		in = copied
 	}
 
 	flags, meta := s.generateConvertMeta(in)
@@ -569,6 +543,19 @@ func (s *Scheme) UnsafeConvertToVersion(in Object, target GroupVersioner) (Objec
 // generateConvertMeta constructs the meta value we pass to Convert.
 func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
 	return s.converter.DefaultMeta(reflect.TypeOf(in))
+}
+
+// copyAndSetTargetKind performs a conditional copy before returning the object, or an error if copy was not successful.
+func copyAndSetTargetKind(copy bool, copier ObjectCopier, obj Object, kind unversioned.GroupVersionKind) (Object, error) {
+	if copy {
+		copied, err := copier.Copy(obj)
+		if err != nil {
+			return nil, err
+		}
+		obj = copied
+	}
+	setTargetKind(obj, kind)
+	return obj, nil
 }
 
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
