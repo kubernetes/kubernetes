@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import (
 )
 
 // This needs to be updated when we cut a new release series.
-const latestReleaseBranch = "release-1.2"
+const latestReleaseBranch = "release-1.3"
 
 var (
 	verbose   = flag.Bool("verbose", false, "On verification failure, emit pre-munge and post-munge versions.")

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,13 @@ type Interface interface {
 type Zones interface {
 	// List returns the managed Zones, or an error if the list operation failed.
 	List() ([]Zone, error)
+	// Add creates and returns a new managed zone, or an error if the operation failed
+	Add(Zone) (Zone, error)
+	// Remove deletes a managed zone, or returns an error if the operation failed.
+	Remove(Zone) error
+	// New allocates a new Zone, which can then be passed to Add()
+	// Arguments are as per the Zone interface below.
+	New(name string) (Zone, error)
 }
 
 type Zone interface {

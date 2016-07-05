@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,12 +44,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ScheduledJob{},
 		&ScheduledJobList{},
 		&v1.ListOptions{},
+		&v1.DeleteOptions{},
 	)
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
-
-func (obj *Job) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
-func (obj *JobList) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
-func (obj *JobTemplate) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
-func (obj *ScheduledJob) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *ScheduledJobList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

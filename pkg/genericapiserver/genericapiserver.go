@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -572,6 +572,10 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 }
 
 func verifyServiceNodePort(options *options.ServerRunOptions) {
+	if options.KubernetesServiceNodePort < 0 || options.KubernetesServiceNodePort > 65535 {
+		glog.Fatalf("--kubernetes-service-node-port %v must be between 0 and 65535, inclusive. If 0, the Kubernetes master service will be of type ClusterIP.", options.KubernetesServiceNodePort)
+	}
+
 	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
 		glog.Fatalf("Kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort))
 	}
@@ -583,10 +587,25 @@ func verifyEtcdServersList(options *options.ServerRunOptions) {
 	}
 }
 
+func verifySecurePort(options *options.ServerRunOptions) {
+	if options.SecurePort < 0 || options.SecurePort > 65535 {
+		glog.Fatalf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort)
+	}
+}
+
+// TODO: Allow 0 to turn off insecure port.
+func verifyInsecurePort(options *options.ServerRunOptions) {
+	if options.InsecurePort < 1 || options.InsecurePort > 65535 {
+		glog.Fatalf("--insecure-port %v must be between 1 and 65535, inclusive.", options.InsecurePort)
+	}
+}
+
 func ValidateRunOptions(options *options.ServerRunOptions) {
 	verifyClusterIPFlags(options)
 	verifyServiceNodePort(options)
 	verifyEtcdServersList(options)
+	verifySecurePort(options)
+	verifyInsecurePort(options)
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
@@ -696,7 +715,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if shouldGenSelfSignedCerts(options.TLSCertFile, options.TLSPrivateKeyFile) {
+			if crypto.ShouldGenSelfSignedCerts(options.TLSCertFile, options.TLSPrivateKeyFile) {
 				if err := crypto.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 					glog.Errorf("Unable to generate self signed cert: %v", err)
 				} else {
@@ -733,28 +752,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	glog.Fatal(http.ListenAndServe())
-}
-
-// If the file represented by path exists and
-// readable, return true otherwise return false.
-func canReadFile(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-
-	defer f.Close()
-
-	return true
-}
-
-func shouldGenSelfSignedCerts(certPath, keyPath string) bool {
-	if canReadFile(certPath) || canReadFile(keyPath) {
-		glog.Infof("using existing apiserver.crt and apiserver.key files")
-		return false
-	}
-
-	return true
 }
 
 // Exposes the given group version in API.

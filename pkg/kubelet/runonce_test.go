@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,9 +38,12 @@ import (
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestRunOnce(t *testing.T) {
@@ -73,7 +76,6 @@ func TestRunOnce(t *testing.T) {
 		containerRefManager: kubecontainer.NewRefManager(),
 		podManager:          podManager,
 		os:                  &containertest.FakeOS{},
-		volumeManager:       newVolumeManager(),
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
 		reasonCache:         NewReasonCache(),
@@ -83,6 +85,20 @@ func TestRunOnce(t *testing.T) {
 		nodeName:            testKubeletHostname,
 	}
 	kb.containerManager = cm.NewStubContainerManager()
+
+	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	kb.volumePluginMgr, err =
+		NewInitializedVolumePluginMgr(kb, []volume.VolumePlugin{plug})
+	if err != nil {
+		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
+	}
+	kb.volumeManager, err = volumemanager.NewVolumeManager(
+		true,
+		kb.hostname,
+		kb.podManager,
+		kb.kubeClient,
+		kb.volumePluginMgr,
+		fakeRuntime)
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency

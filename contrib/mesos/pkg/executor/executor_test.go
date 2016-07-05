@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -184,7 +184,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 		mockDriver = &MockExecutorDriver{}
 		registry   = newFakeRegistry()
 		executor   = New(Config{
-			Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+			Docker:    dockertools.ConnectToDockerOrDie("fake://", 0),
 			NodeInfos: make(chan NodeInfo, 1),
 			Registry:  registry,
 		})
@@ -387,7 +387,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		kubeletFinished = make(chan struct{})
 		registry        = newFakeRegistry()
 		executor        = New(Config{
-			Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+			Docker:    dockertools.ConnectToDockerOrDie("fake://", 0),
 			NodeInfos: make(chan NodeInfo, 1),
 			ShutdownAlert: func() {
 				close(kubeletFinished)
@@ -584,7 +584,7 @@ func TestExecutorShutdown(t *testing.T) {
 		kubeletFinished = make(chan struct{})
 		exitCalled      = int32(0)
 		executor        = New(Config{
-			Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+			Docker:    dockertools.ConnectToDockerOrDie("fake://", 0),
 			NodeInfos: make(chan NodeInfo, 1),
 			ShutdownAlert: func() {
 				close(kubeletFinished)

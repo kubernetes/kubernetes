@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,14 +24,15 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 type awsElasticBlockStoreAttacher struct {
-	host volume.VolumeHost
+	host       volume.VolumeHost
+	awsVolumes aws.Volumes
 }
 
 var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
@@ -39,65 +40,50 @@ var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
 var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
-	return &awsElasticBlockStoreAttacher{host: plugin.host}, nil
-}
-
-func (plugin *awsElasticBlockStorePlugin) GetDeviceName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an EBS volume type")
-	}
-
-	return volumeSource.VolumeID, nil
-}
-
-func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) error {
-	volumeSource, readOnly := getVolumeSource(spec)
-	volumeID := volumeSource.VolumeID
-
-	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
+	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	attached, err := awsCloud.DiskIsAttached(volumeID, hostName)
-	if err != nil {
-		// Log error and continue with attach
-		glog.Errorf(
-			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
-			volumeID, hostName, err)
-	}
-
-	if err == nil && attached {
-		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, hostName)
-		return nil
-	}
-
-	if _, err = awsCloud.AttachDisk(volumeID, hostName, readOnly); err != nil {
-		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
-		return err
-	}
-	return nil
+	return &awsElasticBlockStoreAttacher{
+		host:       plugin.host,
+		awsVolumes: awsCloud,
+	}, nil
 }
 
-func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, timeout time.Duration) (string, error) {
-	awsCloud, err := getCloudProvider(attacher.host.GetCloudProvider())
+func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
-	volumeSource, _ := getVolumeSource(spec)
+
+	volumeID := volumeSource.VolumeID
+
+	// awsCloud.AttachDisk checks if disk is already attached to node and
+	// succeeds in that case, so no need to do that separately.
+	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, hostName, readOnly)
+	if err != nil {
+		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
+		return "", err
+	}
+
+	return devicePath, nil
+}
+
+func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
 	volumeID := volumeSource.VolumeID
 	partition := ""
 	if volumeSource.Partition != 0 {
 		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
 
-	devicePath := ""
-	if d, err := awsCloud.GetDiskPath(volumeID); err == nil {
-		devicePath = d
-	} else {
-		glog.Errorf("GetDiskPath %q gets error %v", volumeID, err)
+	if devicePath == "" {
+		return "", fmt.Errorf("WaitForAttach failed for AWS Volume %q: devicePath is empty.", volumeID)
 	}
 
 	ticker := time.NewTicker(checkSleepDuration)
@@ -109,13 +95,6 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
-			if devicePath == "" {
-				if d, err := awsCloud.GetDiskPath(volumeID); err == nil {
-					devicePath = d
-				} else {
-					glog.Errorf("GetDiskPath %q gets error %v", volumeID, err)
-				}
-			}
 			if devicePath != "" {
 				devicePaths := getDiskByIdPaths(partition, devicePath)
 				path, err := verifyDevicePath(devicePaths)
@@ -136,13 +115,19 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, t
 	}
 }
 
-func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(spec *volume.Spec) string {
-	volumeSource, _ := getVolumeSource(spec)
-	return makeGlobalPDPath(attacher.host, volumeSource.VolumeID)
+func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
+	spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return makeGlobalPDPath(attacher.host, volumeSource.VolumeID), nil
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
+func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -155,7 +140,10 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		}
 	}
 
-	volumeSource, readOnly := getVolumeSource(spec)
+	volumeSource, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return err
+	}
 
 	options := []string{}
 	if readOnly {
@@ -173,23 +161,28 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 }
 
 type awsElasticBlockStoreDetacher struct {
-	host volume.VolumeHost
+	mounter    mount.Interface
+	awsVolumes aws.Volumes
 }
 
 var _ volume.Detacher = &awsElasticBlockStoreDetacher{}
 
 func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error) {
-	return &awsElasticBlockStoreDetacher{host: plugin.host}, nil
+	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return nil, err
+	}
+
+	return &awsElasticBlockStoreDetacher{
+		mounter:    plugin.host.GetMounter(),
+		awsVolumes: awsCloud,
+	}, nil
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
 	volumeID := path.Base(deviceMountPath)
 
-	awsCloud, err := getCloudProvider(detacher.host.GetCloudProvider())
-	if err != nil {
-		return err
-	}
-	attached, err := awsCloud.DiskIsAttached(volumeID, hostName)
+	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, hostName)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -203,7 +196,7 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hos
 		return nil
 	}
 
-	if _, err = awsCloud.DetachDisk(volumeID, hostName); err != nil {
+	if _, err = detacher.awsVolumes.DetachDisk(volumeID, hostName); err != nil {
 		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
 		return err
 	}
@@ -231,26 +224,11 @@ func (detacher *awsElasticBlockStoreDetacher) WaitForDetach(devicePath string, t
 	}
 }
 
-func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string, mounter mount.Interface) error {
+func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
 	volume := path.Base(deviceMountPath)
-	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, mounter); err != nil {
+	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.mounter); err != nil {
 		glog.Errorf("Error unmounting %q: %v", volume, err)
 	}
 
 	return nil
-}
-
-func getVolumeSource(spec *volume.Spec) (*api.AWSElasticBlockStoreVolumeSource, bool) {
-	var readOnly bool
-	var volumeSource *api.AWSElasticBlockStoreVolumeSource
-
-	if spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil {
-		volumeSource = spec.Volume.AWSElasticBlockStore
-		readOnly = volumeSource.ReadOnly
-	} else {
-		volumeSource = spec.PersistentVolume.Spec.AWSElasticBlockStore
-		readOnly = spec.ReadOnly
-	}
-
-	return volumeSource, readOnly
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ func updateNodeLabels(c *client.Client, nodeNames sets.String, toAdd, toRemove m
 					delete(node.ObjectMeta.Labels, k)
 				}
 			}
-			_, err := c.Nodes().Update(node)
+			_, err = c.Nodes().Update(node)
 			if err != nil {
 				framework.Logf("Error updating node %s: %v", nodeName, err)
 			} else {

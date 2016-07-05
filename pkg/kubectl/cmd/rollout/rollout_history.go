@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -34,13 +35,15 @@ type HistoryOptions struct {
 	Recursive bool
 }
 
-const (
-	history_long    = `View previous rollout revisions and configurations.`
-	history_example = `# View the rollout history of a deployment
-kubectl rollout history deployment/abc
+var (
+	history_long = dedent.Dedent(`
+		View previous rollout revisions and configurations.`)
+	history_example = dedent.Dedent(`
+		# View the rollout history of a deployment
+		kubectl rollout history deployment/abc
 
-# View the details of deployment revision 3
-kubectl rollout history deployment/abc --revision=3`
+		# View the details of deployment revision 3
+		kubectl rollout history deployment/abc --revision=3`)
 )
 
 func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {

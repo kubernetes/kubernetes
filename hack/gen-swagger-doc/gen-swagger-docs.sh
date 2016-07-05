@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,16 +22,6 @@ set -o pipefail
 
 cd /build
 
-# wget doesn't retry on 503, so adding a loop to make it more resilient.
-for i in {1..3}; do
-  if wget "$2" -O register.go; then
-    break
-  fi
-  if [ $i -eq 3 ]; then
-    exit 1
-  fi
-done
-
 # gendocs takes "input.json" as the input swagger spec.
 # $1 is expected to be <group>_<version>
 cp /swagger-source/"$1".json input.json
@@ -40,8 +30,7 @@ cp /swagger-source/"$1".json input.json
 
 #insert a TOC for top level API objects
 buf="== Top Level API Objects\n\n"
-top_level_models=$(grep GetObjectKind ./register.go | sed 's/func (obj \*\(.*\)) GetObjectKind(\(.*\)) .*/\1/g' \
-    | tr -d '()' | tr -d '{}' | tr -d ' ')
+top_level_models=$(grep '&[A-Za-z]*{},' /register.go | sed 's/.*&//;s/{},//')
 
 # check if the top level models exist in the definitions.adoc. If they exist,
 # their name will be <version>.<model_name>

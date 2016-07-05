@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -44,7 +45,9 @@ type createAuthInfoOptions struct {
 	embedCertData     flag.Tristate
 }
 
-var create_authinfo_long = fmt.Sprintf(`Sets a user entry in kubeconfig
+var (
+	create_authinfo_long = fmt.Sprintf(`
+Sets a user entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values.
 
   Client-certificate flags:
@@ -59,15 +62,17 @@ Specifying a name that already exists will merge new fields on top of existing v
   Bearer token and basic auth are mutually exclusive.
 `, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
-const create_authinfo_example = `# Set only the "client-key" field on the "cluster-admin"
-# entry, without touching other values:
-kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
+	create_authinfo_example = dedent.Dedent(`
+		# Set only the "client-key" field on the "cluster-admin"
+		# entry, without touching other values:
+		kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
 
-# Set basic auth for the "cluster-admin" entry
-kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+		# Set basic auth for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
 
-# Embed client certificate data in the "cluster-admin" entry
-kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
+		# Embed client certificate data in the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`)
+)
 
 func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createAuthInfoOptions{configAccess: configAccess}

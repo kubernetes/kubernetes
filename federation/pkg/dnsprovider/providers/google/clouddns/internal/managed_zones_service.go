@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,16 +17,20 @@ limitations under the License.
 package internal
 
 import (
+	"strings"
+
 	dns "google.golang.org/api/dns/v1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
+	"k8s.io/kubernetes/pkg/util"
 )
 
+// Compile time check for interface adeherence
 var _ interfaces.ManagedZonesService = &ManagedZonesService{}
 
 type ManagedZonesService struct{ impl *dns.ManagedZonesService }
 
 func (m *ManagedZonesService) Create(project string, managedzone interfaces.ManagedZone) interfaces.ManagedZonesCreateCall {
-	return &ManagedZonesCreateCall{m.impl.Create(project, managedzone.(ManagedZone).impl)}
+	return &ManagedZonesCreateCall{m.impl.Create(project, managedzone.(*ManagedZone).impl)}
 }
 
 func (m *ManagedZonesService) Delete(project, managedZone string) interfaces.ManagedZonesDeleteCall {
@@ -39,4 +43,9 @@ func (m *ManagedZonesService) Get(project, managedZone string) interfaces.Manage
 
 func (m *ManagedZonesService) List(project string) interfaces.ManagedZonesListCall {
 	return &ManagedZonesListCall{m.impl.List(project)}
+}
+
+func (m *ManagedZonesService) NewManagedZone(dnsName string) interfaces.ManagedZone {
+	name := "x" + strings.Replace(string(util.NewUUID()), "-", "", -1)[0:30] // Unique name, strip out the "-" chars to shorten it, start with a lower case alpha, and truncate to Cloud DNS 32 character limit
+	return &ManagedZone{impl: &dns.ManagedZone{Name: name, Description: "Kubernetes Federated Service", DnsName: dnsName}}
 }

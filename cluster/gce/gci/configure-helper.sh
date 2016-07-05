@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,6 +62,41 @@ function ensure-local-ssds() {
     else
       echo "No local SSD disks found."
     fi
+  done
+}
+
+# Installs logrotate configuration files
+function setup-logrotate() {
+  mkdir -p /etc/logrotate.d/
+  cat >/etc/logrotate.d/docker-containers <<EOF
+/var/lib/docker/containers/*/*-json.log {
+    rotate 5
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize 10M
+    daily
+    create 0644 root root
+}
+EOF
+
+  # Configuration for k8s services that redirect logs to /var/log/<service>.log
+  # files.
+  local logrotate_files=( "kube-scheduler" "kube-proxy" "kube-apiserver" "kube-controller-manager" "kube-addons" )
+  for file in "${logrotate_files[@]}" ; do
+    cat > /etc/logrotate.d/${file} <<EOF
+/var/log/${file}.log {
+    rotate 5
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize 100M
+    daily
+    create 0644 root root
+}
+EOF
   done
 }
 
@@ -156,6 +191,7 @@ EOF
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 node-tags = ${NODE_INSTANCE_PREFIX}
+node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
   fi
   if [[ -n "${MULTIZONE:-}" ]]; then
@@ -268,10 +304,19 @@ EOF
 }
 
 function assemble-docker-flags {
-  local docker_opts="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
+  echo "Assemble docker command line flags"
+  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --debug"
+    docker_opts+=" --log-level=debug"
+  else
+    docker_opts+=" --log-level=warn"
   fi
+  local use_net_plugin="true"
+  if [[ "${NETWORK_PROVIDER:-}" != "kubenet" && "${NETWORK_PROVIDER:-}" != "cni" ]]; then
+    use_net_plugin="false"
+    docker_opts+=" --bridge=cbr0"
+  fi
+
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
@@ -280,6 +325,12 @@ function assemble-docker-flags {
   fi
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  # If using a network plugin, we need to explicitly restart docker daemon, because
+  # kubelet will not do it.
+  if [[ "${use_net_plugin}" == "true" ]]; then
+    echo "Docker command line is updated. Restart docker to pick it up"
+    systemctl restart docker
+  fi
 }
 
 # A helper function for loading a docker image. It keeps trying up to 5 times.
@@ -340,14 +391,15 @@ function start-kubelet {
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
+  local reconcile_cidr="true"
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ ! -z "${KUBELET_APISERVER:-}" && ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
-      flags+=" --reconcile-cidr=false"
       flags+=" --pod-cidr=10.123.45.0/30"
+      reconcile_cidr="false"
     else
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
@@ -359,6 +411,15 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
+  fi
+  # Network plugin
+  if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
+    flags+=" --network-plugin-dir=/home/kubernetes/bin"
+    flags+=" --network-plugin=${NETWORK_PROVIDER}"
+  fi
+  flags+=" --reconcile-cidr=${reconcile_cidr}"
+  if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
+    flag+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
   if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
     flags+=" --manifest-url=${MANIFEST_URL}"
@@ -413,7 +474,7 @@ function start-kube-proxy {
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${src_file}
   sed -i -e "s@{{test_args}}@${KUBEPROXY_TEST_ARGS:-}@g" ${src_file}
-  sed -i -e "s@{{ cpurequest }}@20m@g" ${src_file}
+  sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
   sed -i -e "s@{{log_level}}@${KUBEPROXY_TEST_LOG_LEVEL:-"--v=2"}@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -611,7 +672,9 @@ function start-kube-controller-manager {
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
-  if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
+    params+=" --allocate-node-cidrs=true"
+  elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
     params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
@@ -725,13 +788,20 @@ function start-kube-addons {
     base_metrics_memory="140Mi"
     metrics_memory="${base_metrics_memory}"
     base_eventer_memory="190Mi"
+    base_metrics_cpu="80m"
+    metrics_cpu="${base_metrics_cpu}"
     eventer_memory="${base_eventer_memory}"
+    nanny_memory="90Mi"
     local -r metrics_memory_per_node="4"
+    local -r metrics_cpu_per_node="0.5"
     local -r eventer_memory_per_node="500"
+    local -r nanny_memory_per_node="200"
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then
       num_kube_nodes="$((${NUM_NODES}+1))"
       metrics_memory="$((${num_kube_nodes} * ${metrics_memory_per_node} + 200))Mi"
       eventer_memory="$((${num_kube_nodes} * ${eventer_memory_per_node} + 200 * 1024))Ki"
+      nanny_memory="$((${num_kube_nodes} * ${nanny_memory_per_node} + 90 * 1024))Ki"
+      metrics_cpu=$(echo - | awk "{print ${num_kube_nodes} * ${metrics_cpu_per_node} + 80}")m
     fi
     controller_yaml="${dst_dir}/${file_dir}"
     if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
@@ -742,10 +812,20 @@ function start-kube-addons {
     remove-salt-config-comments "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu *}}@${metrics_cpu}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
+  fi
+  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]]; then
+    pv_yaml="${dst_dir}/${file_dir}/influxdb-pv.yaml"
+    pd_name="${INSTANCE_PREFIX}-influxdb-pd"
+    remove-salt-config-comments "${pv_yaml}"
+    sed -i -e "s@{{ *pd_name *}}@${pd_name}@g" "${pv_yaml}"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
@@ -757,6 +837,20 @@ function start-kube-addons {
     sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
+
+    if [[ "${FEDERATION:-}" == "true" ]]; then
+      FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
+      if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+        FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+      fi
+      if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${FEDERATIONS_DOMAIN_MAP}@g" "${dns_rc_file}"
+      else
+        sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_rc_file}"
+      fi
+    else
+      sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_rc_file}"
+    fi
   fi
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
     setup-addon-manifests "addons" "registry"
@@ -794,7 +888,7 @@ function start-fluentd {
   echo "Start fluentd pod"
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]]; then
     if [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
-      cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-gcp.yaml" /etc/kubernetes/manifests/
+      cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gci/fluentd-gcp.yaml" /etc/kubernetes/manifests/
     elif [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
       # Running fluentd-es on the master is pointless, as it can't communicate
       # with elasticsearch from there in the default configuration.
@@ -813,7 +907,6 @@ function start-lb-controller {
        /etc/kubernetes/manifests/
   fi
 }
-
 
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
@@ -837,7 +930,9 @@ Welcome to Kubernetes ${version}!
 You can find documentation for Kubernetes at:
   http://docs.kubernetes.io/
 
-You can download the build image for this release at:
+The source for this release can be found at:
+  /home/kubernetes/kubernetes-src.tar.gz
+Or you can download it at:
   https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
 
 It is based on the Kubernetes source at:
@@ -863,6 +958,7 @@ source "${KUBE_HOME}/kube-env"
 config-ip-firewall
 create-dirs
 ensure-local-ssds
+setup-logrotate
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-master-auth

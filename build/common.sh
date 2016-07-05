@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@ readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.2-2"
 readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/${OUT_DIR:-_output}"
 readonly LOCAL_OUTPUT_SUBPATH="${LOCAL_OUTPUT_ROOT}/dockerized"
 readonly LOCAL_OUTPUT_BINPATH="${LOCAL_OUTPUT_SUBPATH}/bin"
+readonly LOCAL_OUTPUT_GOPATH="${LOCAL_OUTPUT_SUBPATH}/go"
 readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 
 readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
@@ -68,16 +69,11 @@ readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
+readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
 readonly DOCKER_MOUNT_ARGS_BASE=(
   --volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}"
   --volume /etc/localtime:/etc/localtime:ro
-)
-
-# We create a Docker data container to cache incremental build artifacts.
-readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
-readonly DOCKER_DATA_MOUNT_ARGS=(
-  --volume "${REMOTE_OUTPUT_GOPATH}"
 )
 
 # This is where the final release artifacts are created locally
@@ -126,7 +122,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v3
           federation-apiserver,ppc64le/busybox
-          federation-controller-manager,ppc64lebusybox
+          federation-controller-manager,ppc64le/busybox
         );;
   esac
 
@@ -170,10 +166,14 @@ function kube::build::verify_prereqs() {
 
 function kube::build::docker_available_on_osx() {
   if [[ -z "${DOCKER_HOST}" ]]; then
+    if [[ -S "/var/run/docker.sock" ]]; then
+      kube::log::status "Using Docker for MacOS"
+      return 0
+    fi
+    
     kube::log::status "No docker host is set. Checking options for setting one..."
-
     if [[ -z "$(which docker-machine)" && -z "$(which boot2docker)" ]]; then
-      kube::log::status "It looks like you're running Mac OS X, and neither docker-machine or boot2docker are nowhere to be found."
+      kube::log::status "It looks like you're running Mac OS X, and neither Docker for Mac, docker-machine or boot2docker are nowhere to be found."
       kube::log::status "See: https://docs.docker.com/machine/ for installation instructions."
       return 1
     elif [[ -n "$(which docker-machine)" ]]; then
@@ -266,6 +266,9 @@ function kube::build::ensure_docker_daemon_connectivity {
       echo "    - Set your environment variables using: "
       echo "      - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
       echo "      - \$(boot2docker shellinit)"
+      echo "    - Update your Docker VM"
+      echo "      - Error Message: 'Error response from daemon: client is newer than server (...)' "
+      echo "      - docker-machine upgrade ${DOCKER_MACHINE_NAME}"
       echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
       echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
       echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
@@ -306,11 +309,11 @@ function kube::build::clean_output() {
       kube::log::error "Build image not built.  Cannot clean via docker build image."
     fi
 
-    kube::log::status "Removing data container"
+    kube::log::status "Removing data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
     "${DOCKER[@]}" rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
   fi
 
-  kube::log::status "Cleaning out local _output directory"
+  kube::log::status "Removing _output directory"
   rm -rf "${LOCAL_OUTPUT_ROOT}"
 }
 
@@ -518,7 +521,7 @@ function kube::build::docker_build() {
   local -r pull="${3:-true}"
   local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${context_dir}")
 
-  kube::log::status "Building Docker image ${image}."
+  kube::log::status "Building Docker image ${image}"
   local docker_output
   docker_output=$("${build_cmd[@]}" 2>&1) || {
     cat <<EOF >&2
@@ -552,24 +555,31 @@ function kube::build::clean_images() {
 }
 
 function kube::build::ensure_data_container() {
-  # This is temporary, while last remnants of _workspace are obliterated.  If
-  # the data container exists it might be from before the change from
-  # Godeps/_workspace/ to vendor/, and thereby still have a Godeps/_workspace/
-  # directory in it, which trips up godep (yay godep!).  Once we are confident
-  # that this has run ~everywhere we care about, we can remove this.
-  # TODO(thockin): remove this after v1.3 is cut.
-  if "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" \
-      | grep -q "Godeps/_workspace/pkg"; then
-    docker rm -f "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+  # If the data container exists AND exited successfully, we can use it.
+  # Otherwise nuke it and start over.
+  local ret=0
+  local code=$(docker inspect \
+      -f '{{.State.ExitCode}}' \
+      "${KUBE_BUILD_DATA_CONTAINER_NAME}" 2>/dev/null || ret=$?)
+  if [[ "${ret}" == 0 && "${code}" != 0 ]]; then
+    kube::build::destroy_container "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    ret=1
   fi
-  if ! "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1; then
-    kube::log::status "Creating data container"
+  if [[ "${ret}" != 0 ]]; then
+    kube::log::status "Creating data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    # We have to ensure the directory exists, or else the docker run will
+    # create it as root.
+    mkdir -p "${LOCAL_OUTPUT_GOPATH}"
+    # We want this to run as root to be able to chown, so non-root users can
+    # later use the result as a data container.  This run both creates the data
+    # container and chowns the GOPATH.
     local -ra docker_cmd=(
       "${DOCKER[@]}" run
-      "${DOCKER_DATA_MOUNT_ARGS[@]}"
+      --volume "${REMOTE_OUTPUT_GOPATH}"
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+      --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
-      true
+      chown -R $(id -u).$(id -g) "${REMOTE_OUTPUT_GOPATH}"
     )
     "${docker_cmd[@]}"
   fi
@@ -586,6 +596,8 @@ function kube::build::run_build_command() {
 
   local -a docker_run_opts=(
     "--name=${KUBE_BUILD_CONTAINER_NAME}"
+    "--user=$(id -u):$(id -g)"
+    "--hostname=${HOSTNAME}"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 
@@ -638,9 +650,10 @@ function kube::build::copy_output() {
     # Bug: https://github.com/docker/docker/pull/8509
     local -a docker_run_opts=(
       "--name=${KUBE_BUILD_CONTAINER_NAME}"
-       "${DOCKER_MOUNT_ARGS[@]}"
-       -d
-      )
+      "--user=$(id -u):$(id -g)"
+      "${DOCKER_MOUNT_ARGS[@]}"
+      -d
+    )
 
     local -ra docker_cmd=(
       "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}"
@@ -690,8 +703,11 @@ function kube::release::package_hyperkube() {
   if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
     for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
 
-      kube::log::status "Building hyperkube image for arch: ${arch}"
-      REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
+      # TODO(IBM): Enable hyperkube builds for ppc64le again
+      if [[ ${arch} != "ppc64le" ]]; then
+        kube::log::status "Building hyperkube image for arch: ${arch}"
+        REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
+      fi
     done
   fi
 }
@@ -785,6 +801,8 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+
+    cp "${RELEASE_DIR}/kubernetes-src.tar.gz" "${release_stage}/"
 
     kube::release::clean_cruft
 
@@ -1199,6 +1217,16 @@ function kube::release::gcs::copy_release_artifacts() {
   fi
 
   gsutil ls -lhr "${gcs_destination}" || return 1
+
+  if [[ -n "${KUBE_GCS_RELEASE_BUCKET_MIRROR:-}" ]]; then
+    local -r gcs_mirror="gs://${KUBE_GCS_RELEASE_BUCKET_MIRROR}/${KUBE_GCS_RELEASE_PREFIX}"
+    kube::log::status "Mirroring build to ${gcs_mirror}"
+    gsutil -q -m "${gcs_options[@]+${gcs_options[@]}}" rsync -d -r "${gcs_destination}" "${gcs_mirror}" || return 1
+    if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
+      kube::log::status "Marking all uploaded mirror objects public"
+      gsutil -q -m acl ch -R -g all:R "${gcs_mirror}" >/dev/null 2>&1 || return 1
+    fi
+  fi
 }
 
 # Publish a new ci version, (latest,) but only if the release files actually
@@ -1463,7 +1491,19 @@ function kube::release::gcs::verify_ci_ge() {
 #   If new version is greater than the GCS version
 function kube::release::gcs::publish() {
   local -r publish_file="${1-}"
-  local -r publish_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+
+  kube::release::gcs::publish_to_bucket "${KUBE_GCS_RELEASE_BUCKET}" "${publish_file}" || return 1
+
+  if [[ -n "${KUBE_GCS_RELEASE_BUCKET_MIRROR:-}" ]]; then
+    kube::release::gcs::publish_to_bucket "${KUBE_GCS_RELEASE_BUCKET_MIRROR}" "${publish_file}" || return 1
+  fi
+}
+
+
+function kube::release::gcs::publish_to_bucket() {
+  local -r publish_bucket="${1}"
+  local -r publish_file="${2}"
+  local -r publish_file_dst="gs://${publish_bucket}/${publish_file}"
 
   mkdir -p "${RELEASE_STAGE}/upload" || return 1
   echo "${KUBE_GCS_PUBLISH_VERSION}" > "${RELEASE_STAGE}/upload/latest" || return 1
@@ -1476,7 +1516,7 @@ function kube::release::gcs::publish() {
     gsutil acl ch -R -g all:R "${publish_file_dst}" >/dev/null 2>&1 || return 1
     gsutil setmeta -h "Cache-Control:private, max-age=0" "${publish_file_dst}" >/dev/null 2>&1 || return 1
     # If public, validate public link
-    local -r public_link="https://storage.googleapis.com/${KUBE_GCS_RELEASE_BUCKET}/${publish_file}"
+    local -r public_link="https://storage.googleapis.com/${publish_bucket}/${publish_file}"
     kube::log::status "Validating uploaded version file at ${public_link}"
     contents="$(curl -s "${public_link}")"
   else
@@ -1511,6 +1551,8 @@ function kube::release::docker::release() {
     "kube-scheduler"
     "kube-proxy"
     "hyperkube"
+    "federation-apiserver"
+    "federation-controller-manager"
   )
 
   local docker_push_cmd=("${DOCKER[@]}")
@@ -1526,18 +1568,22 @@ function kube::release::docker::release() {
   for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
     for binary in "${binaries[@]}"; do
 
-      local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-      kube::log::status "Pushing ${binary} to ${docker_target}"
-      "${docker_push_cmd[@]}" push "${docker_target}"
+      # TODO(IBM): Enable hyperkube builds for ppc64le again
+      if [[ ${binary} != "hyperkube" || ${arch} != "ppc64le" ]]; then
 
-      # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
-      if [[ ${arch} == "amd64" ]]; then
-        local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
+        local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+        kube::log::status "Pushing ${binary} to ${docker_target}"
+        "${docker_push_cmd[@]}" push "${docker_target}"
 
-        "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
+        # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
+        if [[ ${arch} == "amd64" ]]; then
+          local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
 
-        kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
-        "${docker_push_cmd[@]}" push "${legacy_docker_target}"
+          "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
+
+          kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
+          "${docker_push_cmd[@]}" push "${legacy_docker_target}"
+        fi
       fi
     done
   done

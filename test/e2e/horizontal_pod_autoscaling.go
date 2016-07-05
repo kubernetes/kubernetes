@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -169,7 +169,7 @@ func scaleDown(name, kind string, checkStability bool, rc *ResourceConsumer, f *
 		maxPods:                     5,
 		firstScale:                  3,
 		firstScaleStasis:            stasis,
-		cpuBurst:                    100,
+		cpuBurst:                    10,
 		secondScale:                 1,
 	}
 	scaleTest.run(name, kind, rc, f)

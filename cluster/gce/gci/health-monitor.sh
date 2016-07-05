@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,8 +38,9 @@ function docker_monitoring {
 }
 
 function kubelet_monitoring {
-  echo "waiting a minute for startup"
-  sleep 60
+  echo "Wait for 2 minutes for kubelet to be fuctional"
+  # TODO(andyzheng0831): replace it with a more reliable method if possible.
+  sleep 120
   local -r max_seconds=10
   while [ 1 ]; do
     if ! curl --insecure -m "${max_seconds}" -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This command checks that the built commands can function together for
-# simple scenarios.  It does not require Docker so it can run in travis.
+# simple scenarios.  It does not require Docker.
 
 set -o errexit
 set -o nounset
@@ -126,8 +126,13 @@ function kubectl-with-retry()
 }
 
 kube::util::trap_add cleanup EXIT SIGINT
-
 kube::util::ensure-temp-dir
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubectl \
+    cmd/kube-apiserver \
+    cmd/kube-controller-manager
+
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -163,6 +168,9 @@ kube::log::status "Running kubectl with no options"
 
 # Only run kubelet on platforms it supports
 if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
+
+"${KUBE_ROOT}/hack/build-go.sh" \
+    cmd/kubelet
 
 kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
@@ -627,6 +635,9 @@ runTests() {
   # Post-condition: valid-pod POD is created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
+  ## Patch can modify a local object
+  kubectl patch --local -f pkg/api/validation/testdata/v1/validPod.yaml --patch='{"spec": {"restartPolicy":"Never"}}' -o jsonpath='{.spec.restartPolicy}' | grep -q "Never"
+
   ## Patch pod can change image
   # Command
   kubectl patch "${kube_flags[@]}" pod valid-pod --record -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
@@ -894,6 +905,18 @@ __EOF__
   kubectl delete hpa frontend "${kube_flags[@]}"
   kubectl delete rc  frontend "${kube_flags[@]}"
 
+  ## kubectl create should not panic on empty string lists in a template
+  ERROR_FILE="${KUBE_TEMP}/validation-error"
+  kubectl create -f hack/testdata/invalid-rc-with-empty-args.yaml "${kube_flags[@]}" 2> "${ERROR_FILE}" || true
+  # Post-condition: should get an error reporting the empty string
+  if grep -q "unexpected nil value for field" "${ERROR_FILE}"; then
+    kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat ${ERROR_FILE})"
+  else
+    kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat ${ERROR_FILE})"
+    exit 1
+  fi
+  rm "${ERROR_FILE}"
+
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -952,6 +975,72 @@ __EOF__
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
 
+  ### Test retrieval of non-existing POD with json output flag specified
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}" -o json)
+  # Post-condition: POD abc should error since it doesn't exist
+  kube::test::if_has_string "${output_message}" 'pods "abc" not found'
+  # Post-condition: make sure we don't display an empty List
+  if kube::test::if_has_string "${output_message}" 'List'; then
+    echo 'Unexpected List output'
+    echo "${LINENO} $(basename $0)"
+    exit 1
+  fi
+
+  #####################################
+  # Third Party Resources             #
+  #####################################
+  create_and_use_new_namespace
+  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "ThirdPartyResource",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "foo.company.com"
+  },
+  "versions": [
+    {
+      "name": "v1"
+    }
+  ]
+}
+__EOF__
+
+  # Post-Condition: assertion object exist
+  kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'foo.company.com:'
+
+  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/apis/company.com/v1" "third party api"
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create a new resource of type Foo
+ kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
+ {
+  "kind": "Foo",
+  "apiVersion": "company.com/v1",
+  "metadata": {
+    "name": "test"
+  },
+  "some-field": "field1",
+  "other-field": "field2"
+}
+__EOF__
+
+  # Test that we can list this new third party resource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete foos test
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # teardown
+  kubectl delete thirdpartyresources foo.company.com "${kube_flags[@]}"
+
   #####################################
   # Recursive Resources via directory #
   #####################################
@@ -965,6 +1054,19 @@ __EOF__
   # Post-condition: busybox0 & busybox1 PODs are created, and since busybox2 is malformed, it should error
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   kube::test::if_has_string "${output_message}" 'error validating data: kind not set'
+
+  ## Edit multiple busybox PODs by updating the image field of multiple PODs recursively from a directory. tmp-editor.sh is a fake editor
+  # Pre-condition: busybox0 & busybox1 PODs exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
+  # Command
+  echo -e '#!/bin/bash\nsed -i "s/image: busybox/image: prom\/busybox/g" $1' > /tmp/tmp-editor.sh
+  chmod +x /tmp/tmp-editor.sh
+  output_message=$(! EDITOR=/tmp/tmp-editor.sh kubectl edit -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}")
+  # Post-condition: busybox0 & busybox1 PODs are edited, and since busybox2 is malformed, it should error
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'prom/busybox:prom/busybox:'
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  # cleaning
+  rm /tmp/tmp-editor.sh
 
   ## Replace multiple busybox PODs recursively from directory of YAML files
   # Pre-condition: busybox0 & busybox1 PODs exist
@@ -1266,6 +1368,30 @@ __EOF__
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
+
+  # Create a secret using stringData
+  kubectl create --namespace=test-secrets -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Secret",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "secret-string-data"
+  },
+  "data": {
+    "k1":"djE=",
+    "k2":""
+  },
+  "stringData": {
+    "k2":"v2"
+  }
+}
+__EOF__
+  # Post-condition: secret-string-data secret is created with expected data, merged/overridden data from stringData, and a cleared stringData field
+  kube::test::get_object_assert 'secret/secret-string-data --namespace=test-secrets ' '{{.data}}' '.*k1:djE=.*'
+  kube::test::get_object_assert 'secret/secret-string-data --namespace=test-secrets ' '{{.data}}' '.*k2:djI=.*'
+  kube::test::get_object_assert 'secret/secret-string-data --namespace=test-secrets ' '{{.stringData}}' '<no value>'
+  # Clean up
+  kubectl delete secret secret-string-data --namespace=test-secrets
 
   ### Create a secret using output flags
   # Pre-condition: no secret exists
@@ -1712,35 +1838,35 @@ __EOF__
   # Command
   # Create a deployment (revision 1)
   kubectl create -f hack/testdata/deployment-revision1.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1 - should be no-op
-  kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Update the deployment (revision 2)
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1
-  kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]}"
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1000000 - should be no-op
-  kubectl rollout undo deployment nginx-deployment --to-revision=1000000 "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to last revision
-  kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx "${kube_flags[@]}"
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Pause the deployment
-  kubectl-with-retry rollout pause deployment nginx-deployment "${kube_flags[@]}"
+  kubectl-with-retry rollout pause deployment nginx "${kube_flags[@]}"
   # A paused deployment cannot be rolled back
-  ! kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  ! kubectl rollout undo deployment nginx "${kube_flags[@]}"
   # Resume the deployment
-  kubectl-with-retry rollout resume deployment nginx-deployment "${kube_flags[@]}"
+  kubectl-with-retry rollout resume deployment nginx "${kube_flags[@]}"
   # The resumed deployment can now be rolled back
-  kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx "${kube_flags[@]}"
   # Clean up
-  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment nginx "${kube_flags[@]}"
 
   ### Set image of a deployment 
   # Pre-condition: no deployment exists
@@ -1971,7 +2097,7 @@ __EOF__
     fi
     kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
-    kubectl replace -f $replace_file --force "${kube_flags[@]}"
+    kubectl replace -f $replace_file --force --cascade "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'replaced'

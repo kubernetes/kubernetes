@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	dockerref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -52,8 +53,8 @@ const (
 	milliCPUToCPU = 1000
 
 	// 100000 is equivalent to 100ms
-	quotaPeriod   = 100000
-	minQuotaPerod = 1000
+	quotaPeriod    = 100000
+	minQuotaPeriod = 1000
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker client.
@@ -311,8 +312,11 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 
 // ConnectToDockerOrDie creates docker client connecting to docker daemon.
 // If the endpoint passed in is "fake://", a fake docker client
-// will be returned. The program exits if error occurs.
-func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
+// will be returned. The program exits if error occurs. The requestTimeout
+// is the timeout for docker requests. If timeout is exceeded, the request
+// will be cancelled and throw out an error. If requestTimeout is 0, a default
+// value will be applied.
+func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout time.Duration) DockerInterface {
 	if dockerEndpoint == "fake://" {
 		return NewFakeDockerClient()
 	}
@@ -320,7 +324,8 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	if err != nil {
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
-	return newKubeDockerClient(client)
+	glog.Infof("Start docker client with request timeout=%v", requestTimeout)
+	return newKubeDockerClient(client, requestTimeout)
 }
 
 // milliCPUToQuota converts milliCPU to CFS quota and period values
@@ -343,8 +348,8 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 	quota = (milliCPU * quotaPeriod) / milliCPUToCPU
 
 	// quota needs to be a minimum of 1ms.
-	if quota < minQuotaPerod {
-		quota = minQuotaPerod
+	if quota < minQuotaPeriod {
+		quota = minQuotaPeriod
 	}
 
 	return

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionK
 	return obj, &gvk, nil
 }
 
-func (unstructuredJSONScheme) EncodeToStream(obj Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+func (unstructuredJSONScheme) Encode(obj Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case *Unstructured:
 		return json.NewEncoder(w).Encode(t.Object)

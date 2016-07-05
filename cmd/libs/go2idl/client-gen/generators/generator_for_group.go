@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -244,12 +244,6 @@ func setConfigDefaults(config *$.Config|raw$) error {
 
 	config.NegotiatedSerializer = $.directCodecFactory|raw${CodecFactory: $.codecs|raw$}
 
-	if config.QPS == 0 {
-		config.QPS = 5
-	}
-	if config.Burst == 0 {
-		config.Burst = 10
-	}
 	return nil
 }
 `

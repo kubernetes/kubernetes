@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,15 @@
 
 # Usage: copy-e2e-image.sh <image-name> <from-project-name> <to-project-name>
 
+# See *.properties for list of images to copy,
+# typically from kubernetes-node-e2e-images
+
 set -e
 set -x
 
 echo "Copying image $1 from project $2 to project $3..."
 gcloud compute --project $3 disks create $1 --image=https://www.googleapis.com/compute/v1/projects/$2/global/images/$1
-gcloud compute --project $3 images create $1 --source-disk=$1
-gcloud compute --project $3 disks delete $1
+gcloud compute --project $3 images create $1 \
+  --source-disk=$1 \
+  --description="Cloned from projects/$2/global/images/$1 by $USER on $(date)"
+gcloud -q compute --project $3 disks delete $1

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -215,6 +215,15 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	node, err := kl.GetNode()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
+	}
+	return nodeutil.GetNodeHostIP(node)
+}
+
+// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or the initialNodeStatus
+func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		return nil, err
 	}
 	return nodeutil.GetNodeHostIP(node)
 }

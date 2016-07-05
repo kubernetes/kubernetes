@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,10 +24,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	"k8s.io/kubernetes/pkg/util/env"
 )
 
 // If you need to start an etcd instance by hand, you also need to insert a key
@@ -37,43 +34,21 @@ func init() {
 	RequireEtcd()
 }
 
+func GetEtcdURLFromEnv() string {
+	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:4001")
+	glog.V(4).Infof("Using KUBE_INTEGRATION_ETCD_URL=%q", url)
+	return url
+}
+
 func NewEtcdClient() etcd.Client {
 	cfg := etcd.Config{
-		Endpoints: []string{"http://127.0.0.1:4001"},
+		Endpoints: []string{GetEtcdURLFromEnv()},
 	}
 	client, err := etcd.New(cfg)
 	if err != nil {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)
 	}
 	return client
-}
-
-func NewAutoscalingEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-}
-
-func NewBatchEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-}
-
-func NewAppsEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Apps.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-}
-
-func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
-	if client == nil {
-		client = NewEtcdClient()
-	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 }
 
 func RequireEtcd() {
@@ -104,5 +79,4 @@ func DeleteAllEtcdKeys() {
 			glog.Fatalf("Unable delete key: %v", err)
 		}
 	}
-
 }

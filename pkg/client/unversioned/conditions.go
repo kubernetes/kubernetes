@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -28,61 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
-
-// DefaultRetry is the recommended retry for a conflict where multiple clients
-// are making changes to the same resource.
-var DefaultRetry = wait.Backoff{
-	Steps:    5,
-	Duration: 10 * time.Millisecond,
-	Factor:   1.0,
-	Jitter:   0.1,
-}
-
-// DefaultBackoff is the recommended backoff for a conflict where a client
-// may be attempting to make an unrelated modification to a resource under
-// active management by one or more controllers.
-var DefaultBackoff = wait.Backoff{
-	Steps:    4,
-	Duration: 10 * time.Millisecond,
-	Factor:   5.0,
-	Jitter:   0.1,
-}
-
-// RetryConflict executes the provided function repeatedly, retrying if the server returns a conflicting
-// write. Callers should preserve previous executions if they wish to retry changes. It performs an
-// exponential backoff.
-//
-//     var pod *api.Pod
-//     err := RetryOnConflict(DefaultBackoff, func() (err error) {
-//       pod, err = c.Pods("mynamespace").UpdateStatus(podStatus)
-//       return
-//     })
-//     if err != nil {
-//       // may be conflict if max retries were hit
-//       return err
-//     }
-//     ...
-//
-// TODO: Make Backoff an interface?
-func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
-	var lastConflictErr error
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err := fn()
-		switch {
-		case err == nil:
-			return true, nil
-		case errors.IsConflict(err):
-			lastConflictErr = err
-			return false, nil
-		default:
-			return false, err
-		}
-	})
-	if err == wait.ErrWaitTimeout {
-		err = lastConflictErr
-	}
-	return err
-}
 
 // ControllerHasDesiredReplicas returns a condition that will be true if and only if
 // the desired replica count for a controller's ReplicaSelector equals the Replicas count.

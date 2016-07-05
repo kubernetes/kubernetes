@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -105,4 +105,14 @@ func (c *FakePersistentVolumes) List(opts api.ListOptions) (result *v1.Persisten
 func (c *FakePersistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(persistentvolumesResource, opts))
+}
+
+// Patch applies the patch and returns the patched persistentVolume.
+func (c *FakePersistentVolumes) Patch(name string, pt api.PatchType, data []byte) (result *v1.PersistentVolume, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(persistentvolumesResource, name, data), &v1.PersistentVolume{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.PersistentVolume), err
 }

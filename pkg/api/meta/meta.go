@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,11 @@ import (
 
 func ListAccessor(obj interface{}) (List, error) {
 	if listMetaAccessor, ok := obj.(ListMetaAccessor); ok {
+		if om := listMetaAccessor.GetListMeta(); om != nil {
+			return om, nil
+		}
+	}
+	if listMetaAccessor, ok := obj.(unversioned.ListMetaAccessor); ok {
 		if om := listMetaAccessor.GetListMeta(); om != nil {
 			return om, nil
 		}

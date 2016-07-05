@@ -69,15 +69,6 @@ func Field(r RR, i int) string {
 				s += " " + Type(d.Index(i).Uint()).String()
 			}
 			return s
-		case `dns:"wks"`:
-			if d.Len() == 0 {
-				return ""
-			}
-			s := strconv.Itoa(int(d.Index(0).Uint()))
-			for i := 0; i < d.Len(); i++ {
-				s += " " + strconv.Itoa(int(d.Index(i).Uint()))
-			}
-			return s
 		default:
 			// if it does not have a tag its a string slice
 			fallthrough

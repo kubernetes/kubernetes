@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ func TestOrderedByQoS(t *testing.T) {
 	})
 
 	pods := []*api.Pod{guaranteed, burstable, bestEffort}
-	orderedBy(qos).Sort(pods)
+	orderedBy(qosComparator).Sort(pods)
 
 	expected := []*api.Pod{bestEffort, burstable, guaranteed}
 	for i := range expected {
@@ -218,7 +218,7 @@ func TestOrderedByMemory(t *testing.T) {
 	}
 }
 
-// TestOrderedByQoSMemory ensures we order by qos and then memory consumption relative to request.
+// TestOrderedByQoSMemory ensures we order by qosComparator and then memory consumption relative to request.
 func TestOrderedByQoSMemory(t *testing.T) {
 	pod1 := newPod("best-effort-high", []api.Container{
 		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
@@ -252,7 +252,7 @@ func TestOrderedByQoSMemory(t *testing.T) {
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
 	expected := []*api.Pod{pod1, pod2, pod4, pod3, pod5, pod6}
-	orderedBy(qos, memory(statsFn)).Sort(pods)
+	orderedBy(qosComparator, memory(statsFn)).Sort(pods)
 	for i := range expected {
 		if pods[i] != expected[i] {
 			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)

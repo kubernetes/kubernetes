@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,20 +80,4 @@ func String(length int) string {
 		b[i] = letters[Intn(numLetters)]
 	}
 	return string(b)
-}
-
-// A type that satisfies the rand.Shufflable interface can be shuffled
-// by Shuffle. Any sort.Interface will satisfy this interface.
-type Shufflable interface {
-	Len() int
-	Swap(i, j int)
-}
-
-func Shuffle(data Shufflable) {
-	rng.Lock()
-	defer rng.Unlock()
-	for i := 0; i < data.Len(); i++ {
-		j := rng.rand.Intn(i + 1)
-		data.Swap(i, j)
-	}
 }

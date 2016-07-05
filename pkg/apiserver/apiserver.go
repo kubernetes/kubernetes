@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -255,9 +255,9 @@ type stripVersionEncoder struct {
 	serializer runtime.Serializer
 }
 
-func (c stripVersionEncoder) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+func (c stripVersionEncoder) Encode(obj runtime.Object, w io.Writer) error {
 	buf := bytes.NewBuffer([]byte{})
-	err := c.encoder.EncodeToStream(obj, buf, overrides...)
+	err := c.encoder.Encode(obj, buf)
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func (c stripVersionEncoder) EncodeToStream(obj runtime.Object, w io.Writer, ove
 	gvk.Group = ""
 	gvk.Version = ""
 	roundTrippedObj.GetObjectKind().SetGroupVersionKind(*gvk)
-	return c.serializer.EncodeToStream(roundTrippedObj, w)
+	return c.serializer.Encode(roundTrippedObj, w)
 }
 
 // StripVersionNegotiatedSerializer will return stripVersionEncoder when
@@ -443,7 +443,7 @@ func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion
 	w.WriteHeader(statusCode)
 
 	encoder := s.EncoderForVersion(serializer, gv)
-	if err := encoder.EncodeToStream(object, w); err != nil {
+	if err := encoder.Encode(object, w); err != nil {
 		errorJSONFatal(err, encoder, w)
 	}
 }

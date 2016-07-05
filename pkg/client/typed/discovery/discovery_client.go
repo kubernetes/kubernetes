@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,6 +81,8 @@ type SwaggerSchemaInterface interface {
 // versions and resources.
 type DiscoveryClient struct {
 	*restclient.RESTClient
+
+	LegacyPrefix string
 }
 
 // Convert unversioned.APIVersions to unversioned.APIGroup. APIVersions is used by legacy v1, so
@@ -105,7 +107,7 @@ func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unver
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
 	v := &unversioned.APIVersions{}
-	err = d.Get().AbsPath("/api").Do().Into(v)
+	err = d.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
 	apiGroup := unversioned.APIGroup{}
 	if err == nil {
 		apiGroup = apiVersionsToAPIGroup(v)
@@ -135,8 +137,9 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	url := url.URL{}
 	if len(groupVersion) == 0 {
 		return nil, fmt.Errorf("groupVersion shouldn't be empty")
-	} else if groupVersion == "v1" {
-		url.Path = "/api/" + groupVersion
+	}
+	if len(d.LegacyPrefix) > 0 && groupVersion == "v1" {
+		url.Path = d.LegacyPrefix + "/" + groupVersion
 	} else {
 		url.Path = "/apis/" + groupVersion
 	}
@@ -245,8 +248,8 @@ func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swag
 		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)
 	}
 	var path string
-	if version == v1.SchemeGroupVersion {
-		path = "/swaggerapi/api/" + version.Version
+	if len(d.LegacyPrefix) > 0 && version == v1.SchemeGroupVersion {
+		path = "/swaggerapi" + d.LegacyPrefix + "/" + version.Version
 	} else {
 		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
 	}
@@ -285,7 +288,7 @@ func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error)
 		return nil, err
 	}
 	client, err := restclient.UnversionedRESTClientFor(&config)
-	return &DiscoveryClient{client}, err
+	return &DiscoveryClient{RESTClient: client, LegacyPrefix: "/api"}, err
 }
 
 // NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. If
@@ -301,7 +304,7 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 
 // New creates a new DiscoveryClient for the given RESTClient.
 func NewDiscoveryClient(c *restclient.RESTClient) *DiscoveryClient {
-	return &DiscoveryClient{c}
+	return &DiscoveryClient{RESTClient: c, LegacyPrefix: "/api"}
 }
 
 func stringDoesntExistIn(str string, slice []string) bool {

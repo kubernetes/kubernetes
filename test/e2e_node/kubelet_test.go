@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,19 +38,15 @@ import (
 )
 
 var _ = framework.KubeDescribe("Kubelet", func() {
+	f := NewDefaultFramework("kubelet-test")
 	Context("when scheduling a busybox command in a pod", func() {
-		// Setup the framework
-		f := NewDefaultFramework("pod-scheduling")
 		podName := "busybox-scheduling-" + string(util.NewUUID())
 		It("it should print the output to logs", func() {
-			podClient := f.Client.Pods(f.Namespace.Name)
-			pod := &api.Pod{
+			f.CreatePod(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
 				},
 				Spec: api.PodSpec{
-					// Force the Pod to schedule to the node without a scheduler running
-					NodeName: *nodeName,
 					// Don't restart the Pod since it is expected to exit
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
@@ -61,14 +57,10 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 						},
 					},
 				},
-			}
-			defer podClient.Delete(pod.Name, nil)
-			_, err := podClient.Create(pod)
-			Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
-			framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+			})
 			Eventually(func() string {
 				sinceTime := apiUnversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
+				rc, err := f.PodClient().GetLogs(podName, &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
 				if err != nil {
 					return ""
 				}
@@ -81,18 +73,14 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 
 	Context("when scheduling a read only busybox container", func() {
-		f := NewDefaultFramework("pod-scheduling")
 		podName := "busybox-readonly-fs" + string(util.NewUUID())
 		It("it should not write to root filesystem", func() {
-			podClient := f.Client.Pods(f.Namespace.Name)
 			isReadOnly := true
-			pod := &api.Pod{
+			f.CreatePod(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
 				},
 				Spec: api.PodSpec{
-					// Force the Pod to schedule to the node without a scheduler running
-					NodeName: *nodeName,
 					// Don't restart the Pod since it is expected to exit
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
@@ -106,12 +94,9 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 						},
 					},
 				},
-			}
-			defer podClient.Delete(pod.Name, nil)
-			_, err := podClient.Create(pod)
-			Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+			})
 			Eventually(func() string {
-				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{}).Stream()
+				rc, err := f.PodClient().GetLogs(podName, &api.PodLogOptions{}).Stream()
 				if err != nil {
 					return ""
 				}
@@ -123,8 +108,6 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 	})
 	Describe("metrics api", func() {
-		// Setup the framework
-		f := NewDefaultFramework("kubelet-metrics-api")
 		Context("when querying /stats/summary", func() {
 			It("it should report resource usage through the stats api", func() {
 				podNamePrefix := "stats-busybox-" + string(util.NewUUID())
@@ -176,44 +159,36 @@ func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count i
 		podNames.Insert(fmt.Sprintf("%s%v", podNamePrefix, i))
 	}
 
+	var pods []*api.Pod
 	for _, podName := range podNames.List() {
-		createPod(f, podName, []api.Container{
-			{
-				Image:   ImageRegistry[busyBoxImage],
-				Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee ~/file | tee /test-empty-dir-mnt ; sleep 1; done"},
-				Name:    podName + containerSuffix,
-				VolumeMounts: []api.VolumeMount{
-					{MountPath: "/test-empty-dir-mnt", Name: volumeNamePrefix},
+		pods = append(pods, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				// Don't restart the Pod since it is expected to exit
+				RestartPolicy: api.RestartPolicyNever,
+				Containers: []api.Container{
+					{
+						Image:   ImageRegistry[busyBoxImage],
+						Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee /test-empty-dir-mnt/file ; sleep 1; done"},
+						Name:    podName + containerSuffix,
+						VolumeMounts: []api.VolumeMount{
+							{MountPath: "/test-empty-dir-mnt", Name: volumeNamePrefix},
+						},
+					},
+				},
+				Volumes: []api.Volume{
+					// TODO: Test secret volumes
+					// TODO: Test hostpath volumes
+					{Name: volumeNamePrefix, VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 			},
-		}, []api.Volume{
-			// TODO: Test secret volumes
-			// TODO: Test hostpath volumes
-			{Name: volumeNamePrefix, VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 		})
 	}
+	f.CreatePods(pods)
 
 	return podNames, volumes
-}
-
-func createPod(f *framework.Framework, podName string, containers []api.Container, volumes []api.Volume) {
-	podClient := f.Client.Pods(f.Namespace.Name)
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: podName,
-		},
-		Spec: api.PodSpec{
-			// Force the Pod to schedule to the node without a scheduler running
-			NodeName: *nodeName,
-			// Don't restart the Pod since it is expected to exit
-			RestartPolicy: api.RestartPolicyNever,
-			Containers:    containers,
-			Volumes:       volumes,
-		},
-	}
-	_, err := podClient.Create(pod)
-	Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
-	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 }
 
 // Returns pods missing from summary.
@@ -248,7 +223,7 @@ func testSummaryMetrics(s stats.Summary, podNamePrefix string) error {
 		nonNilValue  = "expected %q to not be nil"
 		nonZeroValue = "expected %q to not be zero"
 	)
-	if s.Node.NodeName != *nodeName {
+	if s.Node.NodeName != framework.TestContext.NodeName {
 		return fmt.Errorf("unexpected node name - %q", s.Node.NodeName)
 	}
 	if s.Node.CPU.UsageCoreNanoSeconds == nil {

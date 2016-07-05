@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"net/url"
 
 	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -35,16 +36,17 @@ import (
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
-const (
-	attach_example = `# Get output from running pod 123456-7890, using the first container by default
-kubectl attach 123456-7890
+var (
+	attach_example = dedent.Dedent(`
+		# Get output from running pod 123456-7890, using the first container by default
+		kubectl attach 123456-7890
 
-# Get output from ruby-container from pod 123456-7890
-kubectl attach 123456-7890 -c ruby-container
+		# Get output from ruby-container from pod 123456-7890
+		kubectl attach 123456-7890 -c ruby-container
 
-# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
-# and sends stdout/stderr from 'bash' back to the client
-kubectl attach 123456-7890 -c ruby-container -i -t`
+		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
+		# and sends stdout/stderr from 'bash' back to the client
+		kubectl attach 123456-7890 -c ruby-container -i -t`)
 )
 
 func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -52,8 +54,6 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 		In:  cmdIn,
 		Out: cmdOut,
 		Err: cmdErr,
-
-		CommandName: "kubectl attach",
 
 		Attach: &DefaultRemoteAttach{},
 	}
@@ -142,6 +142,10 @@ func (p *AttachOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn 
 	}
 	p.Client = client
 
+	if p.CommandName == "" {
+		p.CommandName = cmd.CommandPath()
+	}
+
 	return nil
 }
 
@@ -167,9 +171,11 @@ func (p *AttachOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if pod.Status.Phase != api.PodRunning {
-			return fmt.Errorf("pod %s is not running and cannot be attached to; current phase is %s", p.PodName, pod.Status.Phase)
+
+		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+			return fmt.Errorf("cannot attach a container in a completed pod; current phase is %s", pod.Status.Phase)
 		}
+
 		p.Pod = pod
 		// TODO: convert this to a clean "wait" behavior
 	}
@@ -180,7 +186,10 @@ func (p *AttachOptions) Run() error {
 
 	// check for TTY
 	tty := p.TTY
-	containerToAttach := p.GetContainer(pod)
+	containerToAttach, err := p.containerToAttachTo(pod)
+	if err != nil {
+		return fmt.Errorf("cannot attach to the container: %v", err)
+	}
 	if tty && !containerToAttach.TTY {
 		tty = false
 		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
@@ -225,21 +234,32 @@ func (p *AttachOptions) Run() error {
 	return nil
 }
 
-// GetContainer returns the container to attach to, with a fallback.
-func (p *AttachOptions) GetContainer(pod *api.Pod) api.Container {
+// containerToAttach returns a reference to the container to attach to, given
+// by name or the first container if name is empty.
+func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error) {
 	if len(p.ContainerName) > 0 {
-		for _, container := range pod.Spec.Containers {
-			if container.Name == p.ContainerName {
-				return container
+		for i := range pod.Spec.Containers {
+			if pod.Spec.Containers[i].Name == p.ContainerName {
+				return &pod.Spec.Containers[i], nil
 			}
 		}
+		for i := range pod.Spec.InitContainers {
+			if pod.Spec.InitContainers[i].Name == p.ContainerName {
+				return &pod.Spec.InitContainers[i], nil
+			}
+		}
+		return nil, fmt.Errorf("container not found (%s)", p.ContainerName)
 	}
 
 	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
-	return pod.Spec.Containers[0]
+	return &pod.Spec.Containers[0], nil
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.
-func (p *AttachOptions) GetContainerName(pod *api.Pod) string {
-	return p.GetContainer(pod).Name
+func (p *AttachOptions) GetContainerName(pod *api.Pod) (string, error) {
+	c, err := p.containerToAttachTo(pod)
+	if err != nil {
+		return "", err
+	}
+	return c.Name, nil
 }

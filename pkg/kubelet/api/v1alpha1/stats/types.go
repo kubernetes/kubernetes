@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -173,6 +173,8 @@ type FsStats struct {
 	// This may differ from the total bytes used on the filesystem and may not equal CapacityBytes - AvailableBytes.
 	// e.g. For ContainerStats.Rootfs this is the bytes used by the container rootfs on the filesystem.
 	UsedBytes *uint64 `json:"usedBytes,omitempty"`
+	// InodesFree represents the free inodes in the filesystem.
+	InodesFree *uint64 `json:"inodesFree,omitempty"`
 }
 
 // UserDefinedMetricType defines how the metric should be interpreted by the user.

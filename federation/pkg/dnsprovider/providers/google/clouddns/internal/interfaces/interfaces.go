@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -133,10 +133,11 @@ type (
 
 	ManagedZonesService interface {
 		// NewManagedZonesService(s *Service) *ManagedZonesService // TODO: Add to service if needed
-		Create(project string, managedzone ManagedZone) ManagedZonesCreateCall
+		Create(project string, managedZone ManagedZone) ManagedZonesCreateCall
 		Delete(project string, managedZone string) ManagedZonesDeleteCall
 		Get(project string, managedZone string) ManagedZonesGetCall
 		List(project string) ManagedZonesListCall
+		NewManagedZone(dnsName string) ManagedZone
 	}
 
 	Project interface {

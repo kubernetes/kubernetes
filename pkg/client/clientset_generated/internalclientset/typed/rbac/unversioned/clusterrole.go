@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ type ClusterRoleInterface interface {
 	Get(name string) (*rbac.ClusterRole, error)
 	List(opts api.ListOptions) (*rbac.ClusterRoleList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *rbac.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
@@ -124,4 +125,16 @@ func (c *clusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("clusterroles").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched clusterRole.
+func (c *clusterRoles) Patch(name string, pt api.PatchType, data []byte) (result *rbac.ClusterRole, err error) {
+	result = &rbac.ClusterRole{}
+	err = c.client.Patch(pt).
+		Resource("clusterroles").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

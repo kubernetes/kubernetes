@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -211,7 +212,7 @@ func createPodAndWaitUntilRunning(c *client.Client, pod *api.Pod) *api.Pod {
 func createPodWithSpec(c *client.Client, pod *api.Pod) (*api.Pod, error) {
 	// Manually assign pod to node because we don't run the scheduler in node
 	// e2e tests.
-	assignPodToNode(pod)
+	pod.Spec.NodeName = framework.TestContext.NodeName
 	createdPod, err := c.Pods(pod.Namespace).Create(pod)
 	return createdPod, err
 }

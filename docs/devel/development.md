@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/devel/development.md).
+[here](http://releases.k8s.io/release-1.3/docs/devel/development.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -49,6 +49,14 @@ branch, but release branches of Kubernetes should not change.
 Official releases are built using Docker containers. To build Kubernetes using
 Docker please follow [these
 instructions](http://releases.k8s.io/HEAD/build/README.md).
+
+### Local OS/shell environment
+
+Many of the Kubernetes development helper scripts rely on a fairly up-to-date GNU tools
+environment, so most recent Linux distros should work just fine
+out-of-the-box.  Note that Mac OS X ships with somewhat outdated
+BSD-based tools, some of which may be incompatible in subtle ways, so we recommend
+[replacing those with modern GNU tools](https://www.topbug.net/blog/2013/04/14/install-and-use-gnu-command-line-tools-in-mac-os-x/).
 
 ### Go development environment
 

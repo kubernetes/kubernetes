@@ -7,6 +7,14 @@ Due to a varied preference in templating language choices, the transform
 Makefile in this directory should be enhanced to generate all required
 formats from the base underscore templates.
 
+**NOTE WELL**: Developers, when you add a parameter you should also
+update the various scripts that supply values for your new parameter.
+Here is one way you might find those scripts:
+```
+cd kubernetes
+find [a-zA-Z0-9]* -type f -exec grep skydns-rc.yaml \{\} \; -print -exec echo \;
+```
+
 ## Base Template files
 
 These are the authoritative base templates.

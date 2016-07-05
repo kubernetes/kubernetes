@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,10 +38,10 @@ var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, 
 var reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 
 type e2eService struct {
-	etcdCmd             *killCmd
+	killCmds []*killCmd
+	rmDirs   []string
+
 	etcdDataDir         string
-	apiServerCmd        *killCmd
-	kubeletCmd          *killCmd
 	kubeletStaticPodDir string
 	nodeName            string
 	logFiles            map[string]logFileData
@@ -51,6 +51,11 @@ type logFileData struct {
 	files             []string
 	journalctlCommand []string
 }
+
+const (
+	// This is consistent with the level used in a cluster e2e test.
+	LOG_VERBOSITY_LEVEL = "4"
+)
 
 func newE2eService(nodeName string) *e2eService {
 	// Special log files that need to be collected for additional debugging.
@@ -74,19 +79,21 @@ func (es *e2eService) start() error {
 	if err != nil {
 		return err
 	}
-	es.etcdCmd = cmd
+	es.killCmds = append(es.killCmds, cmd)
+	es.rmDirs = append(es.rmDirs, es.etcdDataDir)
 
 	cmd, err = es.startApiServer()
 	if err != nil {
 		return err
 	}
-	es.apiServerCmd = cmd
+	es.killCmds = append(es.killCmds, cmd)
 
 	cmd, err = es.startKubeletServer()
 	if err != nil {
 		return err
 	}
-	es.kubeletCmd = cmd
+	es.killCmds = append(es.killCmds, cmd)
+	es.rmDirs = append(es.rmDirs, es.kubeletStaticPodDir)
 
 	return nil
 }
@@ -147,25 +154,15 @@ func isJournaldAvailable() bool {
 }
 
 func (es *e2eService) stop() {
-	if err := es.stopService(es.kubeletCmd); err != nil {
-		glog.Errorf("Failed to stop kubelet: %v", err)
-	}
-	if es.kubeletStaticPodDir != "" {
-		err := os.RemoveAll(es.kubeletStaticPodDir)
-		if err != nil {
-			glog.Errorf("Failed to delete kubelet static pod directory %s.\n%v", es.kubeletStaticPodDir, err)
+	for _, k := range es.killCmds {
+		if err := k.Kill(); err != nil {
+			glog.Errorf("Failed to stop %v: %v", k.name, err)
 		}
 	}
-	if err := es.stopService(es.apiServerCmd); err != nil {
-		glog.Errorf("Failed to stop kube-apiserver: %v", err)
-	}
-	if err := es.stopService(es.etcdCmd); err != nil {
-		glog.Errorf("Failed to stop etcd: %v", err)
-	}
-	if es.etcdDataDir != "" {
-		err := os.RemoveAll(es.etcdDataDir)
+	for _, d := range es.rmDirs {
+		err := os.RemoveAll(d)
 		if err != nil {
-			glog.Errorf("Failed to delete etcd data directory %s.\n%v", es.etcdDataDir, err)
+			glog.Errorf("Failed to delete directory %s.\n%v", d, err)
 		}
 	}
 }
@@ -194,7 +191,7 @@ func (es *e2eService) startApiServer() (*killCmd, error) {
 		"--service-cluster-ip-range", "10.0.0.1/24",
 		"--kubelet-port", "10250",
 		"--allow-privileged", "true",
-		"--v", "8", "--logtostderr",
+		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:8080/healthz",
@@ -235,7 +232,9 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--serialize-image-pulls", "false",
 		"--config", es.kubeletStaticPodDir,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
-		"--v", "8", "--logtostderr",
+		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
+		"--network-plugin=kubenet",
+		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 	)
 	cmd := exec.Command("sudo", cmdArgs...)
 	hcc := newHealthCheckCommand(
@@ -299,10 +298,6 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 	return fmt.Errorf("Timeout waiting for service %s", cmd)
 }
 
-func (es *e2eService) stopService(cmd *killCmd) error {
-	return cmd.Kill()
-}
-
 // killCmd is a struct to kill a given cmd. The cmd member specifies a command
 // to find the pid of and attempt to kill.
 // If the override field is set, that will be used instead to kill the command.
@@ -314,13 +309,18 @@ type killCmd struct {
 }
 
 func (k *killCmd) Kill() error {
-	if k.override != nil {
-		return k.override.Run()
-	}
 	name := k.name
 	cmd := k.cmd
 
-	if cmd == nil || cmd.Process == nil {
+	if k.override != nil {
+		return k.override.Run()
+	}
+
+	if cmd == nil {
+		return fmt.Errorf("Could not kill %s because both `override` and `cmd` are nil", name)
+	}
+
+	if cmd.Process == nil {
 		glog.V(2).Infof("%s not running", name)
 		return nil
 	}

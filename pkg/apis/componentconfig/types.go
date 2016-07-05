@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -263,6 +263,9 @@ type KubeletConfiguration struct {
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
+	// runtimeRequestTimeout is the timeout for all runtime requests except long running
+	// requests - pull, logs, exec and attach.
+	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout,omitempty"`
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath,omitempty"`
@@ -468,6 +471,9 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentNamespaceSyncs is the number of namespace objects that are
 	// allowed to sync concurrently.
 	ConcurrentNamespaceSyncs int32 `json:"concurrentNamespaceSyncs"`
+	// concurrentSATokenSyncs is the number of service account token syncing operations
+	// that will be done concurrently.
+	ConcurrentSATokenSyncs int32 `json:"concurrentSATokenSyncs"`
 	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
 	LookupCacheSizeForRC int32 `json:"lookupCacheSizeForRC"`
@@ -577,6 +583,9 @@ type VolumeConfiguration struct {
 	// provisioning is not supported in any way, won't work in a multi-node cluster, and
 	// should not be used for anything other than testing or development.
 	EnableHostPathProvisioning bool `json:"enableHostPathProvisioning"`
+	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
+	// that supports dynamic provisioning. Defaults to true.
+	EnableDynamicProvisioning bool `json:"enableDynamicProvisioning"`
 	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
 	// volumePluginDir is the full path of the directory in which the flex

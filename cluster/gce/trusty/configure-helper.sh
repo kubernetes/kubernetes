@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -334,6 +334,7 @@ EOF
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 node-tags = ${NODE_INSTANCE_PREFIX}
+node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
   fi
   if [ -n "${MULTIZONE:-}" ]; then
@@ -717,13 +718,20 @@ start_kube_addons() {
     base_metrics_memory="140Mi"
     metrics_memory="${base_metrics_memory}"
     base_eventer_memory="190Mi"
+    base_metrics_cpu="80m"
+    metrics_cpu="${base_metrics_cpu}"
     eventer_memory="${base_eventer_memory}"
+    nanny_memory="90Mi"
     readonly metrics_memory_per_node="4"
+    readonly metrics_cpu_per_node="0.5"
     readonly eventer_memory_per_node="500"
+    readonly nanny_memory_per_node="200"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -ge 1 ]; then
       num_kube_nodes="$((${NUM_NODES}+1))"
       metrics_memory="$((${num_kube_nodes} * ${metrics_memory_per_node} + 200))Mi"
       eventer_memory="$((${num_kube_nodes} * ${eventer_memory_per_node} + 200 * 1024))Ki"
+      nanny_memory="$((${num_kube_nodes} * ${nanny_memory_per_node} + 90 * 1024))Ki"
+      metrics_cpu=$(echo - | awk "{print ${num_kube_nodes} * ${metrics_cpu_per_node} + 80}")m
     fi
     controller_yaml="${addon_dst_dir}/${file_dir}"
     if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
@@ -734,10 +742,14 @@ start_kube_addons() {
     remove_salt_config_comments "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu *}}@${metrics_cpu}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
   fi
   if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
     setup_addon_manifests "addons" "cluster-loadbalancing/glbc"
@@ -755,6 +767,20 @@ start_kube_addons() {
     sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
+
+    if [[ "${FEDERATION:-}" == "true" ]]; then
+      FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
+      if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+        FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+      fi
+      if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${FEDERATIONS_DOMAIN_MAP}@g" "${dns_rc_file}"
+      else
+        sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_rc_file}"
+      fi
+    else
+      sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_rc_file}"
+    fi
   fi
   if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
     setup_addon_manifests "addons" "registry"

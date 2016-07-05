@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -117,6 +117,9 @@ func newOwnerRC(name string) *v1.ReplicationController {
 }
 
 func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interface) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -130,7 +133,6 @@ func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interfac
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	framework.DeleteAllEtcdKeys()
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
@@ -180,7 +182,7 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
-	// this pod shouldn't be cascadingly deleted, because it has a valid referenece.
+	// this pod shouldn't be cascadingly deleted, because it has a valid reference.
 	pod = newPod(oneValidOwnerPodName, []v1.OwnerReference{
 		{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName},
 		{UID: remainingRC.ObjectMeta.UID, Name: remainingRCName},
@@ -250,7 +252,7 @@ func TestCascadingDeletion(t *testing.T) {
 
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
-func TestCreateWithNonExisitentOwner(t *testing.T) {
+func TestCreateWithNonExistentOwner(t *testing.T) {
 	gc, clientSet := setup(t)
 	oldEnableGarbageCollector := registry.EnableGarbageCollector
 	registry.EnableGarbageCollector = true

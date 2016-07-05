@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ ${clientgen} -t "$@"
 ${clientgen} --clientset-name="release_1_3" --input="api/v1,extensions/v1beta1,autoscaling/v1,batch/v1"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/" --included-types-overrides="api/Service"   "$@"
-${clientgen} --clientset-name=federation_release_1_3 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1alpha1","api/v1" --included-types-overrides="api/v1/Service"   "$@"
+${clientgen} --clientset-name=federation_release_1_3 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1" --included-types-overrides="api/v1/Service"   "$@"
 ${conversiongen} "$@"
 ${deepcopygen} "$@"
 ${setgen} "$@"

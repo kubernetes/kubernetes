@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -161,7 +161,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 		if t, ok := in.(unversioned.Time); ok {
 			return t.Before(j.Interface().(unversioned.Time)), nil
 		}
-		// fallback to the fields comparision
+		// fallback to the fields comparison
 		for idx := 0; idx < i.NumField(); idx++ {
 			less, err := isLess(i.Field(idx), j.Field(idx))
 			if err != nil || !less {

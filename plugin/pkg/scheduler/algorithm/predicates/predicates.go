@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,17 @@ package predicates
 
 import (
 	"fmt"
+	"math/rand"
+	"strconv"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -55,7 +59,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	}
 
 	if !exists {
-		return nil, fmt.Errorf("node '%v' is not in cache", id)
+		return nil, fmt.Errorf("node '%v' not found", id)
 	}
 
 	return node.(*api.Node), nil
@@ -152,11 +156,21 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 		} else if vol.PersistentVolumeClaim != nil {
 			pvcName := vol.PersistentVolumeClaim.ClaimName
 			if pvcName == "" {
-				return fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+				return fmt.Errorf("PersistentVolumeClaim had no name")
 			}
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil {
-				return err
+				// if the PVC is not found, log the error and count the PV towards the PV limit
+				// generate a random volume ID since its required for de-dup
+				utilruntime.HandleError(fmt.Errorf("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err))
+				source := rand.NewSource(time.Now().UnixNano())
+				generatedID := "missingPVC" + strconv.Itoa(rand.New(source).Intn(1000000))
+				filteredVolumes[generatedID] = true
+				return nil
+			}
+
+			if pvc == nil {
+				return fmt.Errorf("PersistentVolumeClaim not found: %q", pvcName)
 			}
 
 			pvName := pvc.Spec.VolumeName
@@ -166,7 +180,18 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 			if err != nil {
-				return err
+				// if the PV is not found, log the error
+				// and count the PV towards the PV limit
+				// generate a random volume ID since its required for de-dup
+				utilruntime.HandleError(fmt.Errorf("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err))
+				source := rand.NewSource(time.Now().UnixNano())
+				generatedID := "missingPV" + strconv.Itoa(rand.New(source).Intn(1000000))
+				filteredVolumes[generatedID] = true
+				return nil
+			}
+
+			if pv == nil {
+				return fmt.Errorf("PersistentVolume not found: %q", pvName)
 			}
 
 			if id, ok := c.filter.FilterPersistentVolume(pv); ok {
@@ -305,7 +330,7 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, nodeInfo *schedulercache.Nod
 		if volume.PersistentVolumeClaim != nil {
 			pvcName := volume.PersistentVolumeClaim.ClaimName
 			if pvcName == "" {
-				return false, fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+				return false, fmt.Errorf("PersistentVolumeClaim had no name")
 			}
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil {
@@ -1003,7 +1028,7 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 
 // Determine if a pod is scheduled with best-effort QoS
 func isPodBestEffort(pod *api.Pod) bool {
-	return qosutil.GetPodQos(pod) == qosutil.BestEffort
+	return qos.GetPodQOS(pod) == qos.BestEffort
 }
 
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node

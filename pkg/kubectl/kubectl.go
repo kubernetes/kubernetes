@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -162,6 +162,19 @@ var shortForms = map[string]string{
 	"rs":     "replicasets",
 	"sa":     "serviceaccounts",
 	"svc":    "services",
+}
+
+// Look-up for resource short forms by value
+func ResourceShortFormFor(resource string) (string, bool) {
+	var alias string
+	exists := false
+	for k, val := range shortForms {
+		if val == resource {
+			alias = k
+			exists = true
+		}
+	}
+	return alias, exists
 }
 
 // expandResourceShortcut will return the expanded version of resource

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package gce_pd
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -30,9 +31,9 @@ import (
 func TestGetDeviceName_Volume(t *testing.T) {
 	plugin := newPlugin()
 	name := "my-pd-volume"
-	spec := createVSpec(name, false)
+	spec := createVolSpec(name, false)
 
-	deviceName, err := plugin.GetDeviceName(spec)
+	deviceName, err := plugin.GetVolumeName(spec)
 	if err != nil {
 		t.Errorf("GetDeviceName error: %v", err)
 	}
@@ -46,7 +47,7 @@ func TestGetDeviceName_PersistentVolume(t *testing.T) {
 	name := "my-pd-pv"
 	spec := createPVSpec(name, true)
 
-	deviceName, err := plugin.GetDeviceName(spec)
+	deviceName, err := plugin.GetVolumeName(spec)
 	if err != nil {
 		t.Errorf("GetDeviceName error: %v", err)
 	}
@@ -74,7 +75,7 @@ func TestAttachDetach(t *testing.T) {
 	diskName := "disk"
 	instanceID := "instance"
 	readOnly := false
-	spec := createVSpec(diskName, readOnly)
+	spec := createVolSpec(diskName, readOnly)
 	attachError := errors.New("Fake attach error")
 	detachError := errors.New("Fake detach error")
 	diskCheckError := errors.New("Fake DiskIsAttached error")
@@ -86,7 +87,11 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, instanceID, readOnly, nil},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				devicePath, err := attacher.Attach(spec, instanceID)
+				if devicePath != "/dev/disk/by-id/google-disk" {
+					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
+				}
+				return err
 			},
 		},
 
@@ -96,7 +101,11 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, true, nil},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				devicePath, err := attacher.Attach(spec, instanceID)
+				if devicePath != "/dev/disk/by-id/google-disk" {
+					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
+				}
+				return err
 			},
 		},
 
@@ -107,7 +116,11 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, instanceID, readOnly, nil},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				devicePath, err := attacher.Attach(spec, instanceID)
+				if devicePath != "/dev/disk/by-id/google-disk" {
+					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
+				}
+				return err
 			},
 		},
 
@@ -118,7 +131,11 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, instanceID, readOnly, attachError},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, instanceID)
+				devicePath, err := attacher.Attach(spec, instanceID)
+				if devicePath != "" {
+					return fmt.Errorf("devicePath incorrect. Expected<\"\"> Actual: <%q>", devicePath)
+				}
+				return err
 			},
 			expectedReturn: attachError,
 		},
@@ -181,7 +198,11 @@ func TestAttachDetach(t *testing.T) {
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin() *gcePersistentDiskPlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
+	host := volumetest.NewFakeVolumeHost(
+		"/tmp", /* rootDir */
+		nil,    /* kubeClient */
+		nil,    /* plugins */
+		"" /* rootContext */)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
@@ -201,7 +222,7 @@ func newDetacher(testcase *testcase) *gcePersistentDiskDetacher {
 	}
 }
 
-func createVSpec(name string, readOnly bool) *volume.Spec {
+func createVolSpec(name string, readOnly bool) *volume.Spec {
 	return &volume.Spec{
 		Volume: &api.Volume{
 			VolumeSource: api.VolumeSource{
@@ -338,6 +359,6 @@ func (testcase *testcase) DeleteDisk(diskToDelete string) error {
 	return errors.New("Not implemented")
 }
 
-func (testcase *testcase) GetAutoLabelsForPD(name string) (map[string]string, error) {
+func (testcase *testcase) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
 	return map[string]string{}, errors.New("Not implemented")
 }

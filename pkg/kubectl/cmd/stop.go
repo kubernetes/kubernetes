@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -33,25 +34,27 @@ type StopOptions struct {
 	Recursive bool
 }
 
-const (
-	stop_long = `Deprecated: Gracefully shut down a resource by name or filename.
+var (
+	stop_long = dedent.Dedent(`
+		Deprecated: Gracefully shut down a resource by name or filename.
 
-The stop command is deprecated, all its functionalities are covered by delete command.
-See 'kubectl delete --help' for more details.
+		The stop command is deprecated, all its functionalities are covered by delete command.
+		See 'kubectl delete --help' for more details.
 
-Attempts to shut down and delete a resource that supports graceful termination.
-If the resource is scalable it will be scaled to 0 before deletion.`
-	stop_example = `# Shut down foo.
-kubectl stop replicationcontroller foo
+		Attempts to shut down and delete a resource that supports graceful termination.
+		If the resource is scalable it will be scaled to 0 before deletion.`)
+	stop_example = dedent.Dedent(`
+		# Shut down foo.
+		kubectl stop replicationcontroller foo
 
-# Stop pods and services with label name=myLabel.
-kubectl stop pods,services -l name=myLabel
+		# Stop pods and services with label name=myLabel.
+		kubectl stop pods,services -l name=myLabel
 
-# Shut down the service defined in service.json
-kubectl stop -f service.json
+		# Shut down the service defined in service.json
+		kubectl stop -f service.json
 
-# Shut down all resources in the path/to/resources directory
-kubectl stop -f path/to/resources`
+		# Shut down all resources in the path/to/resources directory
+		kubectl stop -f path/to/resources`)
 )
 
 func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {

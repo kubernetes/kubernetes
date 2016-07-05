@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -224,7 +224,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 
 		// Special case for runtime.RawExtension and runtime.Objects because they always fail to validate
 		// This is because the actual values will be of some sub-type (e.g. Deployment) not the expected
-		// super-type (RawExtention)
+		// super-type (RawExtension)
 		if s.isGenericArray(details) {
 			errs := s.validateItems(value)
 			if len(errs) > 0 {
@@ -294,9 +294,13 @@ func (s *SwaggerSchema) isGenericArray(p swagger.ModelProperty) bool {
 }
 
 // This matches type name in the swagger spec, such as "v1.Binding".
-var versionRegexp = regexp.MustCompile(`^v.+\..*`)
+var versionRegexp = regexp.MustCompile(`^(v.+|unversioned)\..*`)
 
 func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) []error {
+	allErrs := []error{}
+	if reflect.TypeOf(value) == nil {
+		return append(allErrs, fmt.Errorf("unexpected nil value for field %v", fieldName))
+	}
 	// TODO: caesarxuchao: because we have multiple group/versions and objects
 	// may reference objects in other group, the commented out way of checking
 	// if a filedType is a type defined by us is outdated. We use a hacky way
@@ -310,7 +314,6 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 		// if strings.HasPrefix(fieldType, apiVersion) {
 		return s.ValidateObject(value, fieldName, fieldType)
 	}
-	allErrs := []error{}
 	switch fieldType {
 	case "string":
 		// Be loose about what we accept for 'string' since we use IntOrString in a couple of places

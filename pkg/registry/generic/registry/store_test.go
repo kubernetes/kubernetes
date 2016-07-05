@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -555,9 +555,10 @@ func TestStoreDelete(t *testing.T) {
 
 func TestStoreHandleFinalizers(t *testing.T) {
 	EnableGarbageCollector = true
+	initialGeneration := int64(1)
 	defer func() { EnableGarbageCollector = false }()
 	podWithFinalizer := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -591,6 +592,9 @@ func TestStoreHandleFinalizers(t *testing.T) {
 	}
 	if podWithFinalizer.ObjectMeta.DeletionGracePeriodSeconds == nil || *podWithFinalizer.ObjectMeta.DeletionGracePeriodSeconds != 0 {
 		t.Errorf("Expect the object to have 0 DeletionGracePeriodSecond, but got %#v", podWithFinalizer.ObjectMeta)
+	}
+	if podWithFinalizer.Generation <= initialGeneration {
+		t.Errorf("Deletion didn't increase Generation.")
 	}
 
 	updatedPodWithFinalizer := &api.Pod{
@@ -629,28 +633,29 @@ func TestStoreHandleFinalizers(t *testing.T) {
 
 func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	EnableGarbageCollector = true
+	initialGeneration := int64(1)
 	defer func() { EnableGarbageCollector = false }()
 	podWithOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"}},
+			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
 	podWithOtherFinalizers := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", "bar.com/y"}},
+			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", "bar.com/y"}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
 	podWithNoFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name},
+			ObjectMeta: api.ObjectMeta{Name: name, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
 	podWithOnlyOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{api.FinalizerOrphan}},
+			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{api.FinalizerOrphan}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
@@ -794,13 +799,16 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 				t.Fatalf("Expect the object to be a pod, but got %#v", obj)
 			}
 			if pod.ObjectMeta.DeletionTimestamp == nil {
-				t.Errorf("Expect the object to have DeletionTimestamp set, but got %#v", pod.ObjectMeta)
+				t.Errorf("%v: Expect the object to have DeletionTimestamp set, but got %#v", pod.Name, pod.ObjectMeta)
 			}
 			if pod.ObjectMeta.DeletionGracePeriodSeconds == nil || *pod.ObjectMeta.DeletionGracePeriodSeconds != 0 {
-				t.Errorf("Expect the object to have 0 DeletionGracePeriodSecond, but got %#v", pod.ObjectMeta)
+				t.Errorf("%v: Expect the object to have 0 DeletionGracePeriodSecond, but got %#v", pod.Name, pod.ObjectMeta)
+			}
+			if pod.Generation <= initialGeneration {
+				t.Errorf("%v: Deletion didn't increase Generation.", pod.Name)
 			}
 			if e, a := tc.updatedFinalizers, pod.ObjectMeta.Finalizers; !reflect.DeepEqual(e, a) {
-				t.Errorf("Expect object %s to have finalizers %v, got %v", pod.ObjectMeta.Name, e, a)
+				t.Errorf("%v: Expect object %s to have finalizers %v, got %v", pod.Name, pod.ObjectMeta.Name, e, a)
 			}
 		}
 	}

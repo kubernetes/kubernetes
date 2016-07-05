@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -185,7 +185,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy
-func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
+func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	// Separate containers by evict units.
 	evictUnits, unidentifiedContainers, err := cgc.evictableContainers(gcPolicy.MinAge)
 	if err != nil {
@@ -201,11 +201,13 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy)
 		}
 	}
 
-	// Remove deleted pod containers.
-	for key, unit := range evictUnits {
-		if cgc.isPodDeleted(key.uid) {
-			cgc.removeOldestN(unit, len(unit)) // Remove all.
-			delete(evictUnits, key)
+	// Remove deleted pod containers if all sources are ready.
+	if allSourcesReady {
+		for key, unit := range evictUnits {
+			if cgc.isPodDeleted(key.uid) {
+				cgc.removeOldestN(unit, len(unit)) // Remove all.
+				delete(evictUnits, key)
+			}
 		}
 	}
 

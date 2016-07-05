@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ func TestReadAWSCloudConfig(t *testing.T) {
 		name string
 
 		reader io.Reader
-		aws    AWSServices
+		aws    Services
 
 		expectError bool
 		zone        string
@@ -198,7 +198,7 @@ func TestNewAWSCloud(t *testing.T) {
 		name string
 
 		reader      io.Reader
-		awsServices AWSServices
+		awsServices Services
 
 		expectError bool
 		region      string
@@ -508,7 +508,7 @@ func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGrou
 	panic("Not implemented")
 }
 
-func mockInstancesResp(selfInstance *ec2.Instance, instances []*ec2.Instance) (*AWSCloud, *FakeAWSServices) {
+func mockInstancesResp(selfInstance *ec2.Instance, instances []*ec2.Instance) (*Cloud, *FakeAWSServices) {
 	awsServices := NewFakeAWSServices()
 	awsServices.instances = instances
 	awsServices.selfInstance = selfInstance
@@ -519,7 +519,7 @@ func mockInstancesResp(selfInstance *ec2.Instance, instances []*ec2.Instance) (*
 	return awsCloud, awsServices
 }
 
-func mockAvailabilityZone(availabilityZone string) *AWSCloud {
+func mockAvailabilityZone(availabilityZone string) *Cloud {
 	awsServices := NewFakeAWSServices().withAz(availabilityZone)
 	awsCloud, err := newAWSCloud(nil, awsServices)
 	if err != nil {

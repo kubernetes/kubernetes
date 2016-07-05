@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,101 +17,54 @@ limitations under the License.
 package e2e_node
 
 import (
-	"errors"
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/onsi/gomega/format"
-	"github.com/onsi/gomega/types"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // One pod one container
+// TODO: This should be migrated to the e2e framework.
 type ConformanceContainer struct {
-	Container     api.Container
-	Client        *client.Client
-	RestartPolicy api.RestartPolicy
-	Volumes       []api.Volume
-	NodeName      string
-	Namespace     string
+	Framework        *framework.Framework
+	Container        api.Container
+	RestartPolicy    api.RestartPolicy
+	Volumes          []api.Volume
+	ImagePullSecrets []string
 
 	podName string
 }
 
-type ConformanceContainerEqualMatcher struct {
-	Expected interface{}
-}
-
-func CContainerEqual(expected interface{}) types.GomegaMatcher {
-	return &ConformanceContainerEqualMatcher{
-		Expected: expected,
-	}
-}
-
-func (matcher *ConformanceContainerEqualMatcher) Match(actual interface{}) (bool, error) {
-	if actual == nil && matcher.Expected == nil {
-		return false, fmt.Errorf("Refusing to compare <nil> to <nil>.\nBe explicit and use BeNil() instead.  This is to avoid mistakes where both sides of an assertion are erroneously uninitialized.")
-	}
-	val := api.Semantic.DeepDerivative(matcher.Expected, actual)
-	return val, nil
-}
-
-func (matcher *ConformanceContainerEqualMatcher) FailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "to equal", matcher.Expected)
-}
-
-func (matcher *ConformanceContainerEqualMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "not to equal", matcher.Expected)
-}
-
-func (cc *ConformanceContainer) Create() error {
+func (cc *ConformanceContainer) Create() {
 	cc.podName = cc.Container.Name + string(util.NewUUID())
+	imagePullSecrets := []api.LocalObjectReference{}
+	for _, s := range cc.ImagePullSecrets {
+		imagePullSecrets = append(imagePullSecrets, api.LocalObjectReference{Name: s})
+	}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      cc.podName,
-			Namespace: cc.Namespace,
+			Name: cc.podName,
 		},
 		Spec: api.PodSpec{
-			NodeName:      cc.NodeName,
 			RestartPolicy: cc.RestartPolicy,
 			Containers: []api.Container{
 				cc.Container,
 			},
-			Volumes: cc.Volumes,
+			Volumes:          cc.Volumes,
+			ImagePullSecrets: imagePullSecrets,
 		},
 	}
-
-	_, err := cc.Client.Pods(cc.Namespace).Create(pod)
-	return err
-}
-
-//Same with 'delete'
-func (cc *ConformanceContainer) Stop() error {
-	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, &api.DeleteOptions{})
+	cc.Framework.CreatePodAsync(pod)
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, &api.DeleteOptions{})
-}
-
-func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
-	if err != nil {
-		return ConformanceContainer{}, err
-	}
-
-	containers := pod.Spec.Containers
-	if containers == nil || len(containers) != 1 {
-		return ConformanceContainer{}, errors.New("Failed to get container")
-	}
-	return ConformanceContainer{containers[0], cc.Client, pod.Spec.RestartPolicy, pod.Spec.Volumes, pod.Spec.NodeName, cc.Namespace, cc.podName}, nil
+	return cc.Framework.PodClient().Delete(cc.podName, api.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	pod, err := cc.Framework.PodClient().Get(cc.podName)
 	if err != nil {
 		return false, err
 	}
@@ -119,7 +72,7 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 }
 
 func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	pod, err := cc.Framework.PodClient().Get(cc.podName)
 	if err != nil {
 		return api.PodUnknown, err
 	}
@@ -127,7 +80,7 @@ func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
 }
 
 func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
-	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	pod, err := cc.Framework.PodClient().Get(cc.podName)
 	if err != nil {
 		return api.ContainerStatus{}, err
 	}
@@ -139,11 +92,11 @@ func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	_, err := cc.Framework.PodClient().Get(cc.podName)
 	if err == nil {
 		return true, nil
 	}
-	if apierrs.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		return false, nil
 	}
 	return false, err

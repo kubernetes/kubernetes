@@ -216,6 +216,9 @@ type FsInfo struct {
 
 	// Labels associated with this filesystem.
 	Labels []string `json:"labels"`
+
+	// Number of available Inodes.
+	InodesFree uint64 `json:"inodes_free"`
 }
 
 type RequestOptions struct {

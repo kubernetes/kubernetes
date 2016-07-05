@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -159,8 +159,8 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 	return obj, actual, nil
 }
 
-// EncodeToStream serializes the provided object to the given writer. Overrides is ignored.
-func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+// Encode serializes the provided object to the given writer.
+func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	if s.yaml {
 		json, err := json.Marshal(obj)
 		if err != nil {

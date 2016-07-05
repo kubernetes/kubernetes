@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -39,13 +40,18 @@ const (
 
 var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	f := framework.NewDefaultFramework("examples")
-	// Customized ForEach wrapper for this test.
-	forEachPod := func(selectorKey string, selectorValue string, fn func(api.Pod)) {
-		f.NewClusterVerification(
+
+	// Reusable cluster state function.  This won't be adversly affected by lazy initialization of framework.
+	clusterState := func(selectorKey string, selectorValue string) *framework.ClusterVerification {
+		return f.NewClusterVerification(
 			framework.PodStateVerification{
 				Selectors:   map[string]string{selectorKey: selectorValue},
 				ValidPhases: []api.PodPhase{api.PodRunning},
-			}).ForEach(fn)
+			})
+	}
+	// Customized ForEach wrapper for this test.
+	forEachPod := func(selectorKey string, selectorValue string, fn func(api.Pod)) {
+		clusterState(selectorKey, selectorValue).ForEach(fn)
 	}
 	var c *client.Client
 	var ns string
@@ -85,20 +91,36 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.RunKubectlOrDie("create", "-f", sentinelServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", sentinelControllerYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
+			label := labels.SelectorFromSet(labels.Set(map[string]string{sentinelRC: "true"}))
+			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
+			label = labels.SelectorFromSet(labels.Set(map[string]string{"name": redisRC}))
+			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling up the deployment")
 			framework.RunKubectlOrDie("scale", "rc", redisRC, "--replicas=3", nsFlag)
 			framework.RunKubectlOrDie("scale", "rc", sentinelRC, "--replicas=3", nsFlag)
+			framework.WaitForRCToStabilize(c, ns, redisRC, framework.PodReadyBeforeTimeout)
+			framework.WaitForRCToStabilize(c, ns, sentinelRC, framework.PodReadyBeforeTimeout)
 
 			By("checking up the services")
 			checkAllLogs := func() {
-				forEachPod("name", "redis", func(pod api.Pod) {
+				selectorKey, selectorValue := "name", redisRC
+				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
 						_, err := framework.LookForStringInLog(ns, pod.Name, "redis", expectedOnServer, serverStartTimeout)
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
-				forEachPod("name", "redis-sentinel", func(pod api.Pod) {
+				selectorKey, selectorValue = sentinelRC, "true"
+				label = labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
 						_, err := framework.LookForStringInLog(ns, pod.Name, "sentinel", expectedOnSentinel, serverStartTimeout)
 						Expect(err).NotTo(HaveOccurred())
@@ -131,15 +153,21 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting rabbitmq")
 			framework.RunKubectlOrDie("create", "-f", rabbitmqServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", rabbitmqControllerYaml, nsFlag)
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "rabbitmq"}))
+			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 			forEachPod("component", "rabbitmq", func(pod api.Pod) {
 				_, err := framework.LookForStringInLog(ns, pod.Name, "rabbitmq", "Server startup complete", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			err := framework.WaitForEndpoint(c, ns, "rabbitmq-service")
+			err = framework.WaitForEndpoint(c, ns, "rabbitmq-service")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("starting celery")
 			framework.RunKubectlOrDie("create", "-f", celeryControllerYaml, nsFlag)
+			label = labels.SelectorFromSet(labels.Set(map[string]string{"component": "celery"}))
+			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 			forEachPod("component", "celery", func(pod api.Pod) {
 				_, err := framework.LookForStringInFile(ns, pod.Name, "celery", "/data/celery.log", " ready.", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -148,9 +176,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting flower")
 			framework.RunKubectlOrDie("create", "-f", flowerServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", flowerControllerYaml, nsFlag)
-			forEachPod("component", "flower", func(pod api.Pod) {
-
-			})
+			label = labels.SelectorFromSet(labels.Set(map[string]string{"component": "flower"}))
+			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 			forEachPod("component", "flower", func(pod api.Pod) {
 				content, err := makeHttpRequestToService(c, ns, "flower-service", "/", framework.EndpointRegisterTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -177,20 +205,23 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				By("starting master")
 				framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
 				framework.RunKubectlOrDie("create", "-f", masterYaml, nsFlag)
+				selectorKey, selectorValue := "component", "spark-master"
+				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
 
 				framework.Logf("Now polling for Master startup...")
-
 				// Only one master pod: But its a natural way to look up pod names.
-				forEachPod("component", "spark-master", func(pod api.Pod) {
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					framework.Logf("Now waiting for master to startup in %v", pod.Name)
 					_, err := framework.LookForStringInLog(ns, pod.Name, "spark-master", "Starting Spark master at", serverStartTimeout)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				By("waiting for master endpoint")
-				err := framework.WaitForEndpoint(c, ns, "spark-master")
+				err = framework.WaitForEndpoint(c, ns, "spark-master")
 				Expect(err).NotTo(HaveOccurred())
-				forEachPod("component", "spark-master", func(pod api.Pod) {
+				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					_, maErr := framework.LookForStringInLog(f.Namespace.Name, pod.Name, "spark-master", "Starting Spark master at", serverStartTimeout)
 					if maErr != nil {
 						framework.Failf("Didn't find target string. error:", maErr)
@@ -201,14 +232,16 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				By("starting workers")
 				framework.Logf("Now starting Workers")
 				framework.RunKubectlOrDie("create", "-f", workerControllerYaml, nsFlag)
+				selectorKey, selectorValue := "component", "spark-worker"
+				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+				err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+				Expect(err).NotTo(HaveOccurred())
 
 				// For now, scaling is orthogonal to the core test.
 				// framework.ScaleRC(c, ns, "spark-worker-controller", 2, true)
 
 				framework.Logf("Now polling for worker startup...")
-				// ScaleRC(c, ns, "spark-worker-controller", 2, true)
-				framework.Logf("Now polling for worker startup...")
-				forEachPod("component", "spark-worker",
+				forEachPod(selectorKey, selectorValue,
 					func(pod api.Pod) {
 						_, slaveErr := framework.LookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
 						Expect(slaveErr).NotTo(HaveOccurred())
@@ -231,14 +264,16 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("Starting the cassandra service")
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
-
 			framework.Logf("wait for service")
-			err := framework.WaitForEndpoint(c, ns, "cassandra")
+			err := framework.WaitForService(c, ns, "cassandra", true, framework.Poll, framework.ServiceRespondingTimeout)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create an RC with n nodes in it.  Each node will then be verified.
 			By("Creating a Cassandra RC")
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
+			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 			forEachPod("app", "cassandra", func(pod api.Pod) {
 				framework.Logf("Verifying pod %v ", pod.Name)
 				_, err = framework.LookForStringInLog(ns, pod.Name, "cassandra", "Listening for thrift clients", serverStartTimeout)
@@ -248,8 +283,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			})
 
 			By("Finding each node in the nodetool status lines")
-			output := framework.RunKubectlOrDie("exec", "cassandra", nsFlag, "--", "nodetool", "status")
 			forEachPod("app", "cassandra", func(pod api.Pod) {
+				output := framework.RunKubectlOrDie("exec", pod.Name, nsFlag, "--", "nodetool", "status")
 				if !strings.Contains(output, pod.Status.PodIP) {
 					framework.Failf("Pod ip %s not found in nodetool status", pod.Status.PodIP)
 				}
@@ -293,6 +328,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("starting workers")
 			framework.RunKubectlOrDie("create", "-f", workerControllerJson, nsFlag)
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "storm-worker"}))
+			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 			forEachPod("name", "storm-worker", func(pod api.Pod) {
 				//do nothing, just wait for the pod to be running
 			})
@@ -419,14 +457,17 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting rethinkdb")
 			framework.RunKubectlOrDie("create", "-f", driverServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", rethinkDbControllerYaml, nsFlag)
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"db": "rethinkdb"}))
+			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 			checkDbInstances := func() {
 				forEachPod("db", "rethinkdb", func(pod api.Pod) {
-					_, err := framework.LookForStringInLog(ns, pod.Name, "rethinkdb", "Server ready", serverStartTimeout)
+					_, err = framework.LookForStringInLog(ns, pod.Name, "rethinkdb", "Server ready", serverStartTimeout)
 					Expect(err).NotTo(HaveOccurred())
 				})
 			}
 			checkDbInstances()
-			err := framework.WaitForEndpoint(c, ns, "rethinkdb-driver")
+			err = framework.WaitForEndpoint(c, ns, "rethinkdb-driver")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling rethinkdb")
@@ -459,6 +500,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting hazelcast")
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "hazelcast"}))
+			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+			Expect(err).NotTo(HaveOccurred())
 			forEachPod("name", "hazelcast", func(pod api.Pod) {
 				_, err := framework.LookForStringInLog(ns, pod.Name, "hazelcast", "Members [1]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -466,7 +510,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			err := framework.WaitForEndpoint(c, ns, "hazelcast")
+			err = framework.WaitForEndpoint(c, ns, "hazelcast")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling hazelcast")

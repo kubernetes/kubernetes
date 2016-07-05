@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/examples/flexvolume/README.md).
+[here](http://releases.k8s.io/release-1.3/examples/flexvolume/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -111,7 +111,7 @@ In addition to the flags specified by the user in the Options field of the FlexV
 
 ### Example of Flexvolume
 
-See nginx.yaml[nginx.yaml] for a quick example on how to use Flexvolume in a pod.
+See [nginx.yaml](nginx.yaml) for a quick example on how to use Flexvolume in a pod.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/flexvolume/README.md?pixel)]()

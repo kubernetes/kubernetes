@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,9 +26,10 @@ import (
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
 
-	"github.com/golang/glog"
 	"reflect"
 	"sort"
+
+	"github.com/golang/glog"
 )
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -44,7 +45,7 @@ func (sc *ServiceController) clusterServiceWorker() {
 					if quit {
 						return
 					}
-					err := sc.clusterCache.syncService(key.(string), clusterName, cache, sc.serviceCache, fedClient)
+					err := sc.clusterCache.syncService(key.(string), clusterName, cache, sc.serviceCache, fedClient, sc)
 					if err != nil {
 						glog.Errorf("Failed to sync service: %+v", err)
 					}
@@ -55,7 +56,7 @@ func (sc *ServiceController) clusterServiceWorker() {
 }
 
 // Whenever there is change on service, the federation service should be updated
-func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface) error {
+func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface, sc *ServiceController) error {
 	// obj holds the latest service info from apiserver, return if there is no federation cache for the service
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
@@ -68,7 +69,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 		clusterCache.serviceQueue.Add(key)
 		return err
 	}
-	var needUpdate bool
+	var needUpdate, isDeletion bool
 	if exists {
 		service, ok := serviceInterface.(*v1.Service)
 		if ok {
@@ -81,13 +82,25 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 			}
 			glog.Infof("Found tombstone for %v", key)
 			needUpdate = cc.processServiceDeletion(cachedService, clusterName)
+			isDeletion = true
 		}
 	} else {
 		glog.Infof("Can not get service %v for cluster %s from serviceStore", key, clusterName)
 		needUpdate = cc.processServiceDeletion(cachedService, clusterName)
+		isDeletion = true
 	}
 
 	if needUpdate {
+		for i := 0; i < clientRetryCount; i++ {
+			err := sc.ensureDnsRecords(clusterName, cachedService)
+			if err == nil {
+				break
+			}
+			glog.V(4).Infof("Error ensuring DNS Records for service %s on cluster %s: %v", key, clusterName, err)
+			time.Sleep(cachedService.nextDNSUpdateDelay())
+			clusterCache.serviceQueue.Add(key)
+			// did not retry here as we still want to persist federation apiserver even ensure dns records fails
+		}
 		err := cc.persistFedServiceUpdate(cachedService, fedClient)
 		if err == nil {
 			cachedService.appliedState = cachedService.lastState
@@ -99,12 +112,21 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 			}
 		}
 	}
+	if isDeletion {
+		// cachedService is not reliable here as
+		// deleting cache is the last step of federation service deletion
+		_, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name)
+		// rebuild service if federation service still exists
+		if err == nil || !errors.IsNotFound(err) {
+			return sc.ensureClusterService(cachedService, clusterName, cachedService.appliedState, clusterCache.clientset)
+		}
+	}
 	return nil
 }
 
 // processServiceDeletion is triggered when a service is delete from underlying k8s cluster
 // the deletion function will wip out the cached ingress info of the service from federation service ingress
-// the function returns a bool to indicate if actual update happend on federation service cache
+// the function returns a bool to indicate if actual update happened on federation service cache
 // and if the federation service cache is updated, the updated info should be post to federation apiserver
 func (cc *clusterClientCache) processServiceDeletion(cachedService *cachedService, clusterName string) bool {
 	cachedService.rwlock.Lock()
@@ -138,7 +160,7 @@ func (cc *clusterClientCache) processServiceDeletion(cachedService *cachedServic
 }
 
 // processServiceUpdate Update ingress info when service updated
-// the function returns a bool to indicate if actual update happend on federation service cache
+// the function returns a bool to indicate if actual update happened on federation service cache
 // and if the federation service cache is updated, the updated info should be post to federation apiserver
 func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService, service *v1.Service, clusterName string) bool {
 	glog.V(4).Infof("Processing service update for %s/%s, cluster %s", service.Namespace, service.Name, clusterName)
@@ -219,7 +241,13 @@ func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedServi
 	glog.V(5).Infof("Persist federation service status %s/%s", service.Namespace, service.Name)
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err := fedClient.Core().Services(service.Namespace).UpdateStatus(service)
+		_, err := fedClient.Core().Services(service.Namespace).Get(service.Name)
+		if errors.IsNotFound(err) {
+			glog.Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
+				service.Namespace, service.Name, err)
+			return nil
+		}
+		_, err = fedClient.Core().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			glog.V(2).Infof("Successfully update service %s/%s to federation apiserver", service.Namespace, service.Name)
 			return nil

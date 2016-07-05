@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/design/horizontal-pod-autoscaler.md).
+[here](http://releases.k8s.io/release-1.3/docs/design/horizontal-pod-autoscaler.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -31,6 +31,8 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
+<h2>Warning! This document might be outdated.</h2>
 
 # Horizontal Pod Autoscaling
 

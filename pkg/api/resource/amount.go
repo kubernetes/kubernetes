@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ var (
 	zeroBytes = []byte("0")
 )
 
-// int64Amount represents a fixed precision numerator and arbitary scale exponent. It is faster
+// int64Amount represents a fixed precision numerator and arbitrary scale exponent. It is faster
 // than operations on inf.Dec for values that can be represented as int64.
 type int64Amount struct {
 	value int64

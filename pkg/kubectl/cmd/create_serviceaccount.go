@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,20 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	serviceAccountLong = `
-Create a service account with the specified name.`
+var (
+	serviceAccountLong = dedent.Dedent(`
+		Create a service account with the specified name.`)
 
-	serviceAccountExample = `  # Create a new service account named my-service-account
-  $ kubectl create serviceaccount my-service-account`
+	serviceAccountExample = dedent.Dedent(`
+		  # Create a new service account named my-service-account
+		  $ kubectl create serviceaccount my-service-account`)
 )
 
 // NewCmdCreateServiceAccount is a macro command to create a new service account
