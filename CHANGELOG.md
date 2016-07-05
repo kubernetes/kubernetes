@@ -2,11 +2,9 @@
 
 - [v1.3.0](#v130)
   - [Downloads](#downloads)
-  - [Major Themes](#major-themes)
-  - [Other notable improvements](#other-notable-improvements)
-  - [Known Issues](#known-issues)
+  - [Highlights](#highlights)
+  - [Known Issues and Important Steps before Upgrading](#known-issues-and-important-steps-before-upgrading)
   - [Provider-specific Notes](#provider-specific-notes)
-  - [Changelog since v1.3.0-beta.3](#changelog-since-v130-beta3)
     - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
 - [v1.3.0-beta.3](#v130-beta3)
   - [Downloads](#downloads)
@@ -102,7 +100,7 @@ binary | sha1 hash | md5 hash
 
 * Authorization:
   * **Alpha** RBAC authorization API group
-* Federation 
+* Federation
   * federation api group is now **beta**
   * Services from all federated clusters are now registered in Cloud DNS (AWS and GCP).
 * Stateful Apps:
@@ -139,7 +137,7 @@ binary | sha1 hash | md5 hash
   * ARP caching fix
   * Use /dev/xvdXX names
   * ELB:
-    * ELB proxy protocol support 
+    * ELB proxy protocol support
     * mixed plaintext/encrypted ports support in ELBs
     * SSL support for ELB listeners
   * Allow VPC CIDR to be specified (experimental)

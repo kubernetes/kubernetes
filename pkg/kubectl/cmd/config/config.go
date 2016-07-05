@@ -57,6 +57,7 @@ The loading order follows these rules:
 	cmd.AddCommand(NewCmdConfigUnset(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigCurrentContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUseContext(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigGetContexts(out, pathOptions))
 
 	return cmd
 }
