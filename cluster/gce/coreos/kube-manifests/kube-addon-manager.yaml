@@ -12,7 +12,9 @@ spec:
     resources:
       requests:
         cpu: 5m
-        memory: 50Mi
+        # TODO(yifan): Figure out what's the memory usage should be here.
+        # See https://github.com/kubernetes/kubernetes/issues/23641.
+        memory: 100Mi
     volumeMounts:
     - mountPath: /etc/kubernetes/
       name: addons

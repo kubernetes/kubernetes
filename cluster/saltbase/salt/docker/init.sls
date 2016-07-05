@@ -47,6 +47,93 @@ docker:
       - pkg: docker-io
 
 {% endif %}
+{% elif grains.cloud is defined and grains.cloud == 'azure-legacy' %}
+
+{% if pillar.get('is_systemd') %}
+
+{{ pillar.get('systemd_system_path') }}/docker.service:
+  file.managed:
+    - source: salt://docker/docker.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - defaults:
+        environment_file: {{ environment_file }}
+
+# The docker service.running block below doesn't work reliably
+# Instead we run our script which e.g. does a systemd daemon-reload
+# But we keep the service block below, so it can be used by dependencies
+# TODO: Fix this
+fix-service-docker:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker.service
+      - file: {{ environment_file }}
+{% endif %}
+
+{{ environment_file }}:
+  file.managed:
+    - source: salt://docker/docker-defaults
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+    - require:
+      - pkg: docker-engine
+
+apt-key:
+  pkgrepo.managed:
+    - humanname: Dotdeb
+    - name: deb https://apt.dockerproject.org/repo ubuntu-trusty main
+    - dist: ubuntu-trusty
+    - file: /etc/apt/sources.list.d/docker.list
+    - keyid: 58118E89F3A912897C070ADBF76221572C52609D
+    - keyserver: hkp://p80.pool.sks-keyservers.net:80
+
+lxc-docker:
+  pkg:
+    - purged
+
+docker-io:
+  pkg:
+    - purged
+
+cbr0:
+  network.managed:
+    - enabled: True
+    - type: bridge
+{% if grains['roles'][0] == 'kubernetes-pool' %}
+    - proto: none
+{% else %}
+    - proto: dhcp
+{% endif %}
+    - ports: none
+    - bridge: cbr0
+{% if grains['roles'][0] == 'kubernetes-pool' %}
+    - ipaddr: {{ grains['cbr-cidr'] }}
+{% endif %}
+    - delay: 0
+    - bypassfirewall: True
+    - require_in:
+      - service: docker
+
+docker-engine:
+   pkg:
+     - installed
+     - require:
+       - pkgrepo: 'apt-key'
+
+docker:
+   service.running:
+     - enable: True
+     - require:
+       - file: {{ environment_file }}
+     - watch:
+       - file: {{ environment_file }}
+
 {% elif grains.cloud is defined and grains.cloud in ['vsphere', 'photon-controller'] and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
 
 {% if pillar.get('is_systemd') %}
@@ -94,13 +181,13 @@ fix-service-docker:
     - require:
       - pkg: docker-engine
 
-'apt-key':
+apt-key:
    cmd.run:
      - name: 'apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D'
      - unless: 'apt-key finger | grep "5811 8E89"'
 
-'apt-update':
-  cmd.wait:
+apt-update:
+  cmd.run:
     - name: '/usr/bin/apt-get update -y'
     - require:
        - cmd : 'apt-key'
@@ -227,10 +314,10 @@ net.ipv4.ip_forward:
    and grains.get('oscodename', '') == 'jessie' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~jessie' %}
-{% set override_deb='docker-engine_1.9.1-0~jessie_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~jessie_amd64.deb' %}
-{% set override_deb_sha1='c58c39008fd6399177f6b2491222e4438f518d78' %}
+{% set override_docker_ver='1.11.2-0~jessie' %}
+{% set override_deb='docker-engine_1.11.2-0~jessie_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~jessie_amd64.deb' %}
+{% set override_deb_sha1='c312f1f6fa0b34df4589bb812e4f7af8e28fd51d' %}
 
 # Ubuntu presents as os_family=Debian, osfullname=Ubuntu
 {% elif grains.get('cloud', '') == 'aws'
@@ -238,30 +325,20 @@ net.ipv4.ip_forward:
    and grains.get('oscodename', '') == 'trusty' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~trusty' %}
-{% set override_deb='docker-engine_1.9.1-0~trusty_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~trusty_amd64.deb' %}
-{% set override_deb_sha1='ce728172ab29f9fdacfffffe2e2f88a144f23875' %}
-
-{% elif grains.get('cloud', '') == 'aws'
-   and grains.get('os_family', '') == 'Debian'
-   and grains.get('oscodename', '') == 'vivid' -%}
-# TODO: Get from google storage?
-{% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~vivid' %}
-{% set override_deb='docker-engine_1.9.1-0~vivid_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~vivid_amd64.deb' %}
-{% set override_deb_sha1='81741f6f16630632de53762c5554238d57b3b9cb' %}
+{% set override_docker_ver='1.11.2-0~trusty' %}
+{% set override_deb='docker-engine_1.11.2-0~trusty_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~trusty_amd64.deb' %}
+{% set override_deb_sha1='022dee31e68c6d572eaac750915786e4a6729d2a' %}
 
 {% elif grains.get('cloud', '') == 'aws'
    and grains.get('os_family', '') == 'Debian'
    and grains.get('oscodename', '') == 'wily' -%}
 # TODO: Get from google storage?
 {% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.9.1-0~wily' %}
-{% set override_deb='docker-engine_1.9.1-0~wily_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.9.1-0~wily_amd64.deb' %}
-{% set override_deb_sha1='a505fd49372cf836f5b9ed953053c50b3381dbfd' %}
+{% set override_docker_ver='1.11.2-0~wily' %}
+{% set override_deb='docker-engine_1.11.2-0~wily_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~wily_amd64.deb' %}
+{% set override_deb_sha1='3e02f51fe18aa777eeb1676c3d9a75e5ea6d96c9' %}
 
 {% else %}
 {% set docker_pkg_name='lxc-docker-1.7.1' %}
@@ -304,6 +381,7 @@ docker-upgrade:
     - name: /opt/kubernetes/helpers/pkg install-no-start {{ docker_pkg_name }} {{ override_docker_ver }} /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
+
 {% endif %} # end override_docker_ver != ''
 
 {% if pillar.get('is_systemd') %}

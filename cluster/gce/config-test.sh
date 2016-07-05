@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,7 +47,9 @@ MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"${MASTER_IMAGE}"}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-"${MASTER_IMAGE_PROJECT}"}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
-RKT_VERSION=${KUBE_RKT_VERSION:-0.5.5}
+GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
+RKT_VERSION=${KUBE_RKT_VERSION:-1.9.1}
+RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
 
 NETWORK=${KUBE_GCE_NETWORK:-e2e}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
@@ -57,12 +59,14 @@ MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.180.0.0/14}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
-NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
 # Extra docker options for nodes.
 EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
+
+# Enable the docker debug mode.
+EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --debug"
 
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
@@ -160,6 +164,9 @@ NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, flannel, k
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
 OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+
+# Network Policy plugin specific settings.
+NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
 
 # How should the kubelet configure hairpin mode?
 HAIRPIN_MODE="${HAIRPIN_MODE:-promiscuous-bridge}" # promiscuous-bridge, hairpin-veth, none

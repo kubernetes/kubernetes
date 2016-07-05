@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ func main() {
 }
 
 func templateYamlFile(params map[string]string, inpath string, out io.Writer) error {
-	if tmpl, err := template.New(path.Base(inpath)).ParseFiles(inpath); err != nil {
+	if tmpl, err := template.New(path.Base(inpath)).Option("missingkey=zero").ParseFiles(inpath); err != nil {
 		return err
 	} else {
 		if err := tmpl.Execute(out, params); err != nil {

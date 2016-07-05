@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,6 +68,7 @@ mkdir -p /srv/salt-new/salt/kube-bins
 mkdir -p /srv/salt-new/salt/kube-docs
 cp -v "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt-new/salt/kube-bins/
 cp -v "${KUBE_TEMP}/kubernetes/LICENSES" /srv/salt-new/salt/kube-docs/
+cp -v "${KUBE_TEMP}/kubernetes/kubernetes-src.tar.gz" /srv/salt-new/salt/kube-docs/
 
 kube_bin_dir="/srv/salt-new/salt/kube-bins";
 docker_images_sls_file="/srv/salt-new/pillar/docker-images.sls";

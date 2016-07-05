@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -632,7 +632,7 @@ func TestValidateDeployment(t *testing.T) {
 			MaxSurge: intstr.FromString("20Percent"),
 		},
 	}
-	errorCases["must be an integer or percentage"] = invalidMaxSurgeDeployment
+	errorCases["must match the regex"] = invalidMaxSurgeDeployment
 
 	// MaxSurge and MaxUnavailable cannot both be zero.
 	invalidRollingUpdateDeployment := validDeployment()
@@ -1682,6 +1682,244 @@ func TestValidatePSPVolumes(t *testing.T) {
 		errs := ValidatePodSecurityPolicy(psp)
 		if len(errs) != 0 {
 			t.Errorf("%s validation expected no errors but received %v", strVolume, errs)
+		}
+	}
+}
+
+func TestValidateNetworkPolicy(t *testing.T) {
+	successCases := []extensions.NetworkPolicy{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []extensions.NetworkPolicyIngressRule{},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						From:  []extensions.NetworkPolicyPeer{},
+						Ports: []extensions.NetworkPolicyPort{},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						From: []extensions.NetworkPolicyPeer{
+							{
+								PodSelector: &unversioned.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						From: []extensions.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &unversioned.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Success cases are expected to pass validation.
+	for k, v := range successCases {
+		if errs := ValidateNetworkPolicy(&v); len(errs) != 0 {
+			t.Errorf("Expected success for %d, got %v", k, errs)
+		}
+	}
+
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	errorCases := map[string]extensions.NetworkPolicy{
+		"namespaceSelector and podSelector": {
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						From: []extensions.NetworkPolicyPeer{
+							{
+								PodSelector: &unversioned.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+								NamespaceSelector: &unversioned.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid spec.podSelector": {
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{
+					MatchLabels: invalidSelector,
+				},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						From: []extensions.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &unversioned.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid ingress.from.podSelector": {
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						From: []extensions.NetworkPolicyPeer{
+							{
+								PodSelector: &unversioned.LabelSelector{
+									MatchLabels: invalidSelector,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid ingress.from.namespaceSelector": {
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						From: []extensions.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &unversioned.LabelSelector{
+									MatchLabels: invalidSelector,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Error cases are not expected to pass validation.
+	for testName, networkPolicy := range errorCases {
+		if errs := ValidateNetworkPolicy(&networkPolicy); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %s", testName)
+		}
+	}
+}
+
+func TestValidateNetworkPolicyUpdate(t *testing.T) {
+	type npUpdateTest struct {
+		old    extensions.NetworkPolicy
+		update extensions.NetworkPolicy
+	}
+	successCases := []npUpdateTest{
+		{
+			old: extensions.NetworkPolicy{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: extensions.NetworkPolicySpec{
+					PodSelector: unversioned.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []extensions.NetworkPolicyIngressRule{},
+				},
+			},
+			update: extensions.NetworkPolicy{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: extensions.NetworkPolicySpec{
+					PodSelector: unversioned.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []extensions.NetworkPolicyIngressRule{},
+				},
+			},
+		},
+	}
+
+	for _, successCase := range successCases {
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := map[string]npUpdateTest{
+		"change name": {
+			old: extensions.NetworkPolicy{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: extensions.NetworkPolicySpec{
+					PodSelector: unversioned.LabelSelector{},
+					Ingress:     []extensions.NetworkPolicyIngressRule{},
+				},
+			},
+			update: extensions.NetworkPolicy{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "bar"},
+				Spec: extensions.NetworkPolicySpec{
+					PodSelector: unversioned.LabelSelector{},
+					Ingress:     []extensions.NetworkPolicyIngressRule{},
+				},
+			},
+		},
+		"change spec": {
+			old: extensions.NetworkPolicy{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: extensions.NetworkPolicySpec{
+					PodSelector: unversioned.LabelSelector{},
+					Ingress:     []extensions.NetworkPolicyIngressRule{},
+				},
+			},
+			update: extensions.NetworkPolicy{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: extensions.NetworkPolicySpec{
+					PodSelector: unversioned.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []extensions.NetworkPolicyIngressRule{},
+				},
+			},
+		},
+	}
+
+	for testName, errorCase := range errorCases {
+		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+			t.Errorf("expected failure: %s", testName)
 		}
 	}
 }

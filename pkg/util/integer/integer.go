@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,20 @@ func IntMin(a, b int) int {
 	return a
 }
 
+func Int32Max(a, b int32) int32 {
+	if b > a {
+		return b
+	}
+	return a
+}
+
+func Int32Min(a, b int32) int32 {
+	if b < a {
+		return b
+	}
+	return a
+}
+
 func Int64Max(a, b int64) int64 {
 	if b > a {
 		return b
@@ -42,4 +56,12 @@ func Int64Min(a, b int64) int64 {
 		return b
 	}
 	return a
+}
+
+// RoundToInt32 rounds floats into integer numbers.
+func RoundToInt32(a float64) int32 {
+	if a < 0 {
+		return int32(a - 0.5)
+	}
+	return int32(a + 0.5)
 }

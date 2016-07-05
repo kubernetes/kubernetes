@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,9 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
 
+// Compile time check for interface adeherence
+var _ dnsprovider.ResourceRecordSets = ResourceRecordSets{}
+
 type ResourceRecordSets struct {
 	zone *Zone
 	impl interfaces.ResourceRecordSetsService
@@ -36,7 +39,7 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	}
 	list := make([]dnsprovider.ResourceRecordSet, len(response.Rrsets()))
 	for i, rrset := range response.Rrsets() {
-		list[i] = &ResourceRecordSet{rrset, &rrsets}
+		list[i] = ResourceRecordSet{rrset, &rrsets}
 	}
 	return list, nil
 }

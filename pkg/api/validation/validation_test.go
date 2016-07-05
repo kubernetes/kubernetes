@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1030,17 +1030,17 @@ func TestValidatePorts(t *testing.T) {
 		"name > 15 characters": {
 			[]api.ContainerPort{{Name: strings.Repeat("a", 16), ContainerPort: 80, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"name", PortNameErrorMsg,
+			"name", "15",
 		},
-		"name not a IANA svc name ": {
+		"name contains invalid characters": {
 			[]api.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"name", PortNameErrorMsg,
+			"name", "alpha-numeric",
 		},
-		"name not a IANA svc name (i.e. a number)": {
+		"name is a number": {
 			[]api.ContainerPort{{Name: "80", ContainerPort: 80, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"name", PortNameErrorMsg,
+			"name", "at least one letter",
 		},
 		"name not unique": {
 			[]api.ContainerPort{
@@ -1052,18 +1052,18 @@ func TestValidatePorts(t *testing.T) {
 		},
 		"zero container port": {
 			[]api.ContainerPort{{ContainerPort: 0, Protocol: "TCP"}},
-			field.ErrorTypeInvalid,
-			"containerPort", PortRangeErrorMsg,
+			field.ErrorTypeRequired,
+			"containerPort", "",
 		},
 		"invalid container port": {
 			[]api.ContainerPort{{ContainerPort: 65536, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"containerPort", PortRangeErrorMsg,
+			"containerPort", "between",
 		},
 		"invalid host port": {
 			[]api.ContainerPort{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"hostPort", PortRangeErrorMsg,
+			"hostPort", "between",
 		},
 		"invalid protocol case": {
 			[]api.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}},
@@ -1155,7 +1155,7 @@ func TestValidateEnv(t *testing.T) {
 		{
 			name:          "name not a C identifier",
 			envs:          []api.EnvVar{{Name: "a.b.c"}},
-			expectedError: `[0].name: Invalid value: "a.b.c": must be a C identifier (matching regex [A-Za-z_][A-Za-z0-9_]*): e.g. "my_name" or "MyName"`,
+			expectedError: `[0].name: Invalid value: "a.b.c": must match the regex`,
 		},
 		{
 			name: "value and valueFrom specified",
@@ -2299,6 +2299,62 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
+		{ // docker default seccomp profile
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: "docker/default",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // unconfined seccomp profile
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: "unconfined",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // localhost seccomp profile
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: "localhost/foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // localhost seccomp profile for a container
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
 	}
 	for _, pod := range successCases {
 		if errs := ValidatePod(&pod); len(errs) != 0 {
@@ -2703,6 +2759,90 @@ func TestValidatePod(t *testing.T) {
 						"value": "bar",
 						"effect": "NoSchedule"
 					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"must be a valid pod seccomp profile": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: "foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"must be a valid container seccomp profile": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"must be a non-empty container name in seccomp annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompContainerAnnotationKeyPrefix: "foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"must be a non-empty container profile in seccomp annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompContainerAnnotationKeyPrefix + "foo": "",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"must be a relative path in a node-local seccomp profile annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: "localhost//foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"must not start with '../'": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SeccompPodAnnotationKey: "localhost/../foo",
 				},
 			},
 			Spec: api.PodSpec{
@@ -3349,9 +3489,16 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid publicIPs",
+			name: "invalid publicIPs unspecified",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.ExternalIPs = []string{"0.0.0.0"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid publicIPs loopback",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.ExternalIPs = []string{"127.0.0.1"}
 			},
 			numErrs: 1,
 		},
@@ -5828,7 +5975,7 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: PortRangeErrorMsg,
+			errorDetail: "between",
 		},
 		"Invalid protocol": {
 			endpoints: api.Endpoints{
@@ -5866,7 +6013,7 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: PortRangeErrorMsg,
+			errorDetail: "between",
 		},
 		"Port missing protocol": {
 			endpoints: api.Endpoints{

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -415,7 +415,7 @@ func (f *ConfigFactory) Run() {
 
 func (f *ConfigFactory) getNextPod() *api.Pod {
 	for {
-		pod := f.PodQueue.Pop().(*api.Pod)
+		pod := cache.Pop(f.PodQueue).(*api.Pod)
 		if f.responsibleForPod(pod) {
 			glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
 			return pod

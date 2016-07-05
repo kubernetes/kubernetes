@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ KUBE_GCS_MAKE_PUBLIC='y'
 KUBE_GCS_UPLOAD_RELEASE='y'
 KUBE_GCS_DELETE_EXISTING='n'
 : ${KUBE_GCS_RELEASE_BUCKET:='kubernetes-release'}
+: ${KUBE_GCS_RELEASE_BUCKET_MIRROR:='kubernetes-release-dev'}
 KUBE_GCS_RELEASE_PREFIX="ci/${LATEST}"
 KUBE_GCS_PUBLISH_VERSION="${LATEST}"
 

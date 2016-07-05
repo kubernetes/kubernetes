@@ -1,4 +1,4 @@
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ if [[ -z "${FEDERATION_PUSH_REPO_BASE}" ]]; then
 fi
 
 FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}
-FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-e2e}
+FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation}
 
 KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 KUBE_ARCH=${KUBE_ARCH:-amd64}
@@ -93,12 +93,14 @@ function create-federation-api-objects {
     #We will use loadbalancer services where we can
     export FEDERATION_API_NODEPORT=32111
     export FEDERATION_NAMESPACE
+    export FEDERATION_NAME="${FEDERATION_NAME:-federation}"
+    export DNS_ZONE_NAME="${DNS_ZONE_NAME:-federation.example}"  # See https://tools.ietf.org/html/rfc2606
 
     template="go run ${KUBE_ROOT}/federation/cluster/template.go"
 
     FEDERATION_KUBECONFIG_PATH="${KUBE_ROOT}/federation/cluster/kubeconfig"
 
-    federation_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --context=federated-cluster --namespace=default"
+    federation_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --context=federation-cluster --namespace=default"
 
     manifests_root="${KUBE_ROOT}/federation/manifests/"
 
@@ -143,15 +145,12 @@ function create-federation-api-objects {
     FEDERATION_API_TOKEN="$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)"
     export FEDERATION_API_KNOWN_TOKENS="${FEDERATION_API_TOKEN},admin,admin"
 
-    $template "${manifests_root}/federation-apiserver-"{deployment,secrets}".yaml" | $host_kubectl create -f -
-    $template "${manifests_root}/federation-controller-manager-deployment.yaml" | $host_kubectl create -f -
-
     # Create a kubeconfig with credentails for federation-apiserver. We will
     # then use this kubeconfig to create a secret which the federation
     # controller manager can use to talk to the federation-apiserver.
     # Note that the file name should be "kubeconfig" so that the secret key gets the same name.
     KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
-    CONTEXT=federated-cluster \
+    CONTEXT=federation-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
            KUBECONFIG="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" \
 	   create-kubeconfig
@@ -160,15 +159,27 @@ function create-federation-api-objects {
     $host_kubectl create secret generic federation-apiserver-secret --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
 
     # Create secrets with all the kubernetes-apiserver's kubeconfigs.
+    # Note: This is used only by the test setup (where kubernetes clusters are
+    # brought up with FEDERATION=true). Users are expected to create this secret
+    # themselves.
     for dir in ${KUBECONFIG_DIR}/federation/kubernetes-apiserver/*; do
       # We create a secret with the same name as the directory name (which is
-      # same as cluster name in kubeconfig)
+      # same as cluster name in kubeconfig).
+      # Massage the name so that it is valid (should not contain "_" and max 253
+      # chars)
       name=$(basename $dir)
+      name=$(echo "$name" | sed -e "s/_/-/g")  # Replace "_" by "-"
+      name=${name:0:252}
+      echo "Creating secret with name: $name"
       $host_kubectl create secret generic ${name} --from-file="${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
     done
 
+    for file in federation-etcd-pvc.yaml federation-apiserver-{deployment,secrets}.yaml federation-controller-manager-deployment.yaml; do
+      $template "${manifests_root}/${file}" | $host_kubectl create -f -
+    done
+
     # Update the users kubeconfig to include federation-apiserver credentials.
-    CONTEXT=federated-cluster \
+    CONTEXT=federation-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
 	   SECONDARY_KUBECONFIG=true \
 	   create-kubeconfig
@@ -245,7 +256,7 @@ function push-federation-images {
 	local dstImageName="${FEDERATION_PUSH_REPO_BASE}/${binary}:${dstImageTag}"
 
 	echo "Tag: ${srcImageName} --> ${dstImageName}"
-	docker tag "$srcImageName" "$dstImageName"
+	docker tag -f "$srcImageName" "$dstImageName"
 
 	echo "Push: $dstImageName"
 	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]];then

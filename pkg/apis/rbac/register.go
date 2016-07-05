@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,13 +62,3 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	)
 	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
-
-func (obj *ClusterRole) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
-func (obj *ClusterRoleBinding) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *ClusterRoleBindingList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *ClusterRoleList) GetObjectKind() unversioned.ObjectKind        { return &obj.TypeMeta }
-
-func (obj *Role) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
-func (obj *RoleBinding) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *RoleBindingList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *RoleList) GetObjectKind() unversioned.ObjectKind        { return &obj.TypeMeta }

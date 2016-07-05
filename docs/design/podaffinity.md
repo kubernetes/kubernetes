@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/design/podaffinity.md).
+[here](http://releases.k8s.io/release-1.3/docs/design/podaffinity.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -430,8 +430,8 @@ foreach node A of {N}
 
 In this section we discuss three issues with RequiredDuringScheduling
 anti-affinity: Denial of Service (DoS), co-existing with daemons, and
-determining which pod(s) to kill. See issue #18265 for additional discussion of
-these topics.
+determining which pod(s) to kill. See issue [#18265](https://github.com/kubernetes/kubernetes/issues/18265)
+for additional discussion of these topics.
 
 ### Denial of Service
 
@@ -501,8 +501,9 @@ A cluster administrator may wish to allow pods that express anti-affinity
 against all pods, to nonetheless co-exist with system daemon pods, such as those
 run by DaemonSet. In principle, we would like the specification for
 RequiredDuringScheduling inter-pod anti-affinity to allow "toleration" of one or
-more other pods (see #18263 for a more detailed explanation of the toleration
-concept). There are at least two ways to accomplish this:
+more other pods (see [#18263](https://github.com/kubernetes/kubernetes/issues/18263)
+for a more detailed explanation of the toleration concept).
+There are at least two ways to accomplish this:
 
 * Scheduler special-cases the namespace(s) where daemons live, in the
   sense that it ignores pods in those namespaces when it is
@@ -562,12 +563,12 @@ that trigger killing of P? More generally, how long should the system wait
 before declaring that P's affinity is violated? (Of course affinity is expressed
 in terms of label selectors, not for a specific pod, but the scenario is easier
 to describe using a concrete pod.) This is closely related to the concept of
-forgiveness (see issue #1574). In theory we could make this time duration be
-configurable by the user on a per-pod basis, but for the first version of this
-feature we will make it a configurable property of whichever component does the
-killing and that applies across all pods using the feature. Making it
-configurable by the user would require a nontrivial change to the API syntax
-(since the field would only apply to
+forgiveness (see issue [#1574](https://github.com/kubernetes/kubernetes/issues/1574)).
+In theory we could make this time duration be configurable by the user on a per-pod
+basis, but for the first version of this feature we will make it a configurable
+property of whichever component does the killing and that applies across all pods
+using the feature. Making it configurable by the user would require a nontrivial
+change to the API syntax (since the field would only apply to
 RequiredDuringSchedulingRequiredDuringExecution affinity).
 
 ## Implementation plan
@@ -602,7 +603,7 @@ Do so in a way that addresses the "determining which pod(s) to kill" issue.
 
 We assume Kubelet publishes labels describing the node's membership in all of
 the relevant scheduling domains (e.g. node name, rack name, availability zone
-name, etc.). See #9044.
+name, etc.). See [#9044](https://github.com/kubernetes/kubernetes/issues/9044).
 
 ## Backward compatibility
 
@@ -612,7 +613,7 @@ Users should not start using `Affinity` until the full implementation has been
 in Kubelet and the master for enough binary versions that we feel comfortable
 that we will not need to roll back either Kubelet or master to a version that
 does not support them. Longer-term we will use a programmatic approach to
-enforcing this (#4855).
+enforcing this ([#4855](https://github.com/kubernetes/kubernetes/issues/4855)).
 
 ## Extensibility
 
@@ -673,23 +674,27 @@ pod to name the data rather than the node.
 
 ## Related issues
 
-The review for this proposal is in #18265.
+The review for this proposal is in [#18265](https://github.com/kubernetes/kubernetes/issues/18265).
 
 The topic of affinity/anti-affinity has generated a lot of discussion. The main
-issue is #367 but #14484/#14485, #9560, #11369, #14543, #11707, #3945, #341,
-
-# 1965, and #2906 all have additional discussion and use cases.
+issue is [#367](https://github.com/kubernetes/kubernetes/issues/367)
+but [#14484](https://github.com/kubernetes/kubernetes/issues/14484)/[#14485](https://github.com/kubernetes/kubernetes/issues/14485),
+[#9560](https://github.com/kubernetes/kubernetes/issues/9560), [#11369](https://github.com/kubernetes/kubernetes/issues/11369),
+[#14543](https://github.com/kubernetes/kubernetes/issues/14543), [#11707](https://github.com/kubernetes/kubernetes/issues/11707),
+[#3945](https://github.com/kubernetes/kubernetes/issues/3945), [#341](https://github.com/kubernetes/kubernetes/issues/341),
+[#1965](https://github.com/kubernetes/kubernetes/issues/1965), and [#2906](https://github.com/kubernetes/kubernetes/issues/2906)
+all have additional discussion and use cases.
 
 As the examples in this document have demonstrated, topological affinity is very
 useful in clusters that are spread across availability zones, e.g. to co-locate
 pods of a service in the same zone to avoid a wide-area network hop, or to
-spread pods across zones for failure tolerance. #17059, #13056, #13063, and
+spread pods across zones for failure tolerance. [#17059](https://github.com/kubernetes/kubernetes/issues/17059),
+[#13056](https://github.com/kubernetes/kubernetes/issues/13056), [#13063](https://github.com/kubernetes/kubernetes/issues/13063),
+and [#4235](https://github.com/kubernetes/kubernetes/issues/4235) are relevant.
 
-# 4235 are relevant.
+Issue [#15675](https://github.com/kubernetes/kubernetes/issues/15675) describes connection affinity, which is vaguely related.
 
-Issue #15675 describes connection affinity, which is vaguely related.
-
-This proposal is to satisfy #14816.
+This proposal is to satisfy [#14816](https://github.com/kubernetes/kubernetes/issues/14816).
 
 ## Related work
 

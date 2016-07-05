@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,14 +48,18 @@ function kubectl_retry() {
 }
 
 ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
+CLUSTER_READY_ADDITIONAL_TIME_SECONDS="${CLUSTER_READY_ADDITIONAL_TIME_SECONDS:-30}"
 
 EXPECTED_NUM_NODES="${NUM_NODES}"
 if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+1))
 fi
+REQUIRED_NUM_NODES=$((EXPECTED_NUM_NODES - ALLOWED_NOTREADY_NODES))
 # Make several attempts to deal with slow cluster birth.
 return_value=0
 attempt=0
+PAUSE_BETWEEN_ITERATIONS_SECONDS=15
+ADDITIONAL_ITERATIONS=$(((CLUSTER_READY_ADDITIONAL_TIME_SECONDS + PAUSE_BETWEEN_ITERATIONS_SECONDS - 1)/PAUSE_BETWEEN_ITERATIONS_SECONDS))
 while true; do
   # Pause between iterations of this large outer loop.
   if [[ ${attempt} -gt 0 ]]; then
@@ -79,17 +83,23 @@ while true; do
   if (( "${found}" == "${EXPECTED_NUM_NODES}" )) && (( "${ready}" == "${EXPECTED_NUM_NODES}")); then
     break
   elif (( "${found}" > "${EXPECTED_NUM_NODES}" )); then
-    echo -e "${color_red}Found ${found} nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
+    if [[ "${KUBE_USE_EXISTING_MASTER:-}" != "true" ]]; then
+      echo -e "${color_red}Found ${found} nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
+    fi
     break
   elif (( "${ready}" > "${EXPECTED_NUM_NODES}")); then
     echo -e "${color_red}Found ${ready} ready nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
     break
   else
+    if [[ "${REQUIRED_NUM_NODES}" -le "${ready}" ]]; then
+      echo -e "${color_green}Found ${REQUIRED_NUM_NODES} Nodes, allowing additional ${ADDITIONAL_ITERATIONS} iterations for other Nodes to join.${color_norm}"
+      last_run="${last_run:-$((attempt + ADDITIONAL_ITERATIONS - 1))}"
+    fi
     # Set the timeout to ~25minutes (100 x 15 second) to avoid timeouts for 1000-node clusters.
-    if (( attempt > 100 )); then
-      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be fully functional.${color_norm}"
+    if [[ "${attempt}" -gt "${last_run:-100}" ]]; then
+      echo -e "${color_yellow}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be fully functional.${color_norm}"
       kubectl_retry get nodes
-      if [ "$((${EXPECTED_NUM_NODES} - ${ready}))" -gt "${ALLOWED_NOTREADY_NODES}" ]; then
+      if [[ "${REQUIRED_NUM_NODES}" -gt "${ready}" ]]; then
         exit 1
       else
         return_value=2

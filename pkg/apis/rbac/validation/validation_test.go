@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -95,15 +95,6 @@ func TestValidateRoleBinding(t *testing.T) {
 			},
 			T: field.ErrorTypeInvalid,
 			F: "subjects[0].name",
-		},
-		"forbidden fields": {
-			A: rbac.RoleBinding{
-				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
-				RoleRef:    api.ObjectReference{Namespace: "master", Name: "valid"},
-				Subjects:   []rbac.Subject{{Name: "subject", Kind: rbac.ServiceAccountKind, APIVersion: "foo"}},
-			},
-			T: field.ErrorTypeForbidden,
-			F: "subjects[0].apiVersion",
 		},
 		"missing subject name": {
 			A: rbac.RoleBinding{

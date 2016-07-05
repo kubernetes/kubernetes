@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,24 +18,29 @@ package util
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"time"
+
 	"github.com/golang/glog"
-	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"net"
-	"os"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
 	KubeAPIQPS              = 20.0
 	KubeAPIBurst            = 30
 	KubeconfigSecretDataKey = "kubeconfig"
+	getSecretTimeout        = 1 * time.Minute
 )
 
-func BuildClusterConfig(c *federation_v1alpha1.Cluster) (*restclient.Config, error) {
+func BuildClusterConfig(c *federation_v1beta1.Cluster) (*restclient.Config, error) {
 	var serverAddress string
 	var clusterConfig *restclient.Config
 	hostIP, err := utilnet.ChooseHostInterface()
@@ -73,7 +78,7 @@ func BuildClusterConfig(c *federation_v1alpha1.Cluster) (*restclient.Config, err
 
 // This is to inject a different kubeconfigGetter in tests.
 // We dont use the standard one which calls NewInCluster in tests to avoid having to setup service accounts and mount files with secret tokens.
-var KubeconfigGetterForCluster = func(c *federation_v1alpha1.Cluster) clientcmd.KubeconfigGetter {
+var KubeconfigGetterForCluster = func(c *federation_v1beta1.Cluster) clientcmd.KubeconfigGetter {
 	return func() (*clientcmdapi.Config, error) {
 		secretRefName := ""
 		if c.Spec.SecretRef != nil {
@@ -101,9 +106,20 @@ var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGett
 				return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
 			}
 			data = []byte{}
-			secret, err := client.Secrets(namespace).Get(secretName)
+			var secret *api.Secret
+			err = wait.PollImmediate(1*time.Second, getSecretTimeout, func() (bool, error) {
+				secret, err = client.Secrets(namespace).Get(secretName)
+				if err == nil {
+					return true, nil
+				}
+				glog.Warningf("error in fetching secret: %s", err)
+				return false, nil
+			})
 			if err != nil {
-				return nil, fmt.Errorf("error in fetching secret: %s", err)
+				return nil, fmt.Errorf("timed out waiting for secret: %s", err)
+			}
+			if secret == nil {
+				return nil, fmt.Errorf("unexpected: received null secret %s", secretName)
 			}
 			ok := false
 			data, ok = secret.Data[KubeconfigSecretDataKey]

@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/devel/e2e-tests.md).
+[here](http://releases.k8s.io/release-1.3/docs/devel/e2e-tests.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -479,6 +479,7 @@ credentials.
 # setup for conformance tests
 export KUBECONFIG=/path/to/kubeconfig
 export KUBERNETES_CONFORMANCE_TEST=y
+export KUBERNETES_PROVIDER=skeleton
 
 # run all conformance tests
 go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Conformance\]"

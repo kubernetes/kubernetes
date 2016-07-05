@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ func NewFakeInterface() (dnsprovider.Interface, error) {
 	interface_ := newInterfaceWithStub("", service)
 	zones := service.ManagedZones_
 	// Add a fake zone to test against.
-	zone := &stubs.ManagedZone{zones, "example.com", []stubs.ResourceRecordSet{}}
+	zone := &stubs.ManagedZone{Service: zones, Name_: "example.com", Rrsets: []stubs.ResourceRecordSet{}}
 	call := zones.Create(interface_.project(), zone)
 	if _, err := call.Do(); err != nil {
 		return nil, err

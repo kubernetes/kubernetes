@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ type SharedInformer interface {
 	GetController() ControllerInterface
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
+	LastSyncResourceVersion() string
 }
 
 type SharedIndexInformer interface {
@@ -159,6 +160,16 @@ func (s *sharedIndexInformer) HasSynced() bool {
 		return false
 	}
 	return s.controller.HasSynced()
+}
+
+func (s *sharedIndexInformer) LastSyncResourceVersion() string {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.controller == nil {
+		return ""
+	}
+	return s.controller.reflector.LastSyncResourceVersion()
 }
 
 func (s *sharedIndexInformer) GetStore() cache.Store {

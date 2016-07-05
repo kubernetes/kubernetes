@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package stats
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 	"time"
 
@@ -53,8 +52,6 @@ var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a new SummaryProvider
 func NewSummaryProvider(statsProvider StatsProvider, fsResourceAnalyzer fsResourceAnalyzerInterface, cruntime container.Runtime) SummaryProvider {
-	stackBuff := []byte{}
-	runtime.Stack(stackBuff, false)
 	return &summaryProviderImpl{statsProvider, fsResourceAnalyzer, cruntime}
 }
 
@@ -127,13 +124,15 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 		Fs: &stats.FsStats{
 			AvailableBytes: &sb.rootFsInfo.Available,
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
-			UsedBytes:      &sb.rootFsInfo.Usage},
+			UsedBytes:      &sb.rootFsInfo.Usage,
+			InodesFree:     &sb.rootFsInfo.InodesFree},
 		StartTime: rootStats.StartTime,
 		Runtime: &stats.RuntimeStats{
 			ImageFs: &stats.FsStats{
 				AvailableBytes: &sb.imageFsInfo.Available,
 				CapacityBytes:  &sb.imageFsInfo.Capacity,
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
+				InodesFree:     &sb.imageFsInfo.InodesFree,
 			},
 		},
 	}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -295,7 +295,10 @@ function kube-up {
    vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
    vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
 
+   # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
+
+   create-kubeconfig-for-federation
   )
 
   verify-cluster

@@ -88,7 +88,11 @@ Supported options:
   debian-LTS team.
 * `wily`: Ubuntu Wily.  Wily is not an LTS release, and OS support is due to
   end in July 2016.
+
+No longer supported as of 1.3:
+
 * `vivid`: Ubuntu Vivid.  Vivid OS support ended in early February 2016.
+  Docker no longer provides packages for vivid.
 
 Given the support situation, we recommend using Debian Jessie.  In Kubernetes
 1.3 Ubuntu should have their next LTS release out, so we should be able to

@@ -15,10 +15,16 @@ base:
     - docker
 {% if pillar.get('network_provider', '').lower() == 'flannel' %}
     - flannel
+{% endif %}
+{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
+    - cni
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
     - cni
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
+{% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
+    - openvpn-client
 {% endif %}
     - helpers
     - kube-client-tools
@@ -44,6 +50,9 @@ base:
 {% endif %}
     - logrotate
     - supervisor
+{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
+    - calico.node
+{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
@@ -78,7 +87,11 @@ base:
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'vsphere', 'photon-controller', 'openstack'] %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
+    - openvpn
+    - nginx
+{% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'vsphere', 'photon-controller', 'openstack', 'azure-legacy'] %}
     - docker
     - kubelet
 {% endif %}
@@ -87,4 +100,7 @@ base:
 {% endif %}
 {% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
     - cluster-autoscaler
+{% endif %}
+{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
+    - calico.master
 {% endif %}

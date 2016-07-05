@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ message ClusterRoleBinding {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
-  repeated Subject subject = 2;
+  repeated Subject subjects = 2;
 
   // RoleRef can only reference a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
@@ -114,7 +114,7 @@ message RoleBinding {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
-  repeated Subject subject = 2;
+  repeated Subject subjects = 2;
 
   // RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
@@ -146,8 +146,7 @@ message Subject {
   // If the Authorizer does not recognized the kind value, the Authorizer should report an error.
   optional string kind = 1;
 
-  // APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-  // expected to be API version of this API group. For example "rbac/v1alpha1".
+  // APIVersion holds the API group and version of the referenced object.
   optional string apiVersion = 2;
 
   // Name of the object being referenced.

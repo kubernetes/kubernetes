@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,10 +34,12 @@ import (
 )
 
 func TestDynamicClient(t *testing.T) {
+	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
+	framework.DeleteAllEtcdKeys()
+
 	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
-	framework.DeleteAllEtcdKeys()
 	gv := testapi.Default.GroupVersion()
 	config := &restclient.Config{
 		Host:          s.URL,

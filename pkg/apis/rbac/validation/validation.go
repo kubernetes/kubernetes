@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -104,9 +104,6 @@ func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	}
-	if len(subject.APIVersion) != 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("apiVersion"), subject.APIVersion))
 	}
 
 	switch subject.Kind {

@@ -1,0 +1,20 @@
+{% set pd_prefix = pillar.get('master_name', '') -%}
+{% set pd_name = pd_prefix + '-influxdb-pd') -%}
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: influxdb-pv
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+    - ReadOnlyMany
+  gcePersistentDisk:
+    pdName: {{ pd_name }}
+    fsType: ext4
+  persistentVolumeReclaimPolicy: Delete

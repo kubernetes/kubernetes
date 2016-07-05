@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,12 +26,15 @@ import (
 	"github.com/golang/glog"
 	"github.com/skynetservices/skydns/metrics"
 	"github.com/skynetservices/skydns/server"
+	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type KubeDNSServer struct {
@@ -53,7 +56,10 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 	}
 	ks.healthzPort = config.HealthzPort
 	ks.dnsPort = config.DNSPort
-	ks.kd = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
+	ks.kd, err = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
+	if err != nil {
+		glog.Fatalf("Failed to start kubeDNS: %v", err)
+	}
 	return &ks
 }
 
@@ -91,6 +97,10 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 }
 
 func (server *KubeDNSServer) Run() {
+	glog.Infof("%+v", version.Get())
+	pflag.VisitAll(func(flag *pflag.Flag) {
+		glog.Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+	})
 	setupSignalHandlers()
 	server.startSkyDNSServer()
 	server.kd.Start()

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -133,6 +133,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MinRequestTimeout:       1800,
 		RuntimeConfig:           make(config.ConfigurationMap),
 		SecurePort:              6443,
+		ServiceNodePortRange:    utilnet.PortRange{Base: 30000, Size: 2768},
 		StorageVersions:         registered.AllPreferredGroupVersions(),
 	}
 }

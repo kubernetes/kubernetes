@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -154,10 +155,10 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
 	config := storagebackend.Config{
-		ServerList: []string{"http://127.0.0.1:4001"},
-		// TODO: this is a quick hack to work around #27179. It
-		// conveniently exercises the prefix code, so maybe it's worth
-		// leaving in.
+		ServerList: []string{GetEtcdURLFromEnv()},
+		// This causes the integration tests to exercise the etcd
+		// prefix code, so please don't change without ensuring
+		// sufficient coverage in other ways.
 		Prefix: uuid.New(),
 	}
 
@@ -192,6 +193,10 @@ func NewMasterConfig() *master.Config {
 		unversioned.GroupResource{Group: rbac.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Rbac.Codec(), runtime.ContentTypeJSON))
+	storageFactory.SetSerializer(
+		unversioned.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
+		"",
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Certificates.Codec(), runtime.ContentTypeJSON))
 
 	return &master.Config{
 		Config: &genericapiserver.Config{
@@ -232,6 +237,22 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 	if apiServer {
 		m.ApiServer.Close()
 	}
+}
+
+func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *api.Namespace {
+	// TODO: Create a namespace with a given basename.
+	// Currently we neither create the namespace nor delete all its contents at the end.
+	// But as long as tests are not using the same namespaces, this should work fine.
+	return &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			// TODO: Once we start creating namespaces, switch to GenerateName.
+			Name: baseName,
+		},
+	}
+}
+
+func DeleteTestingNamespace(ns *api.Namespace, apiserver *httptest.Server, t *testing.T) {
+	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
 }
 
 // RCFromManifest reads a .json file and returns the rc in it.

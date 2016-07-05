@@ -37,6 +37,7 @@ bind-pods-burst
 bind-pods-qps
 build-only
 build-services
+build-tag
 cadvisor-port
 cert-dir
 certificate-authority
@@ -65,6 +66,7 @@ concurrent-namespace-syncs
 concurrent-replicaset-syncs
 concurrent-service-syncs
 concurrent-resource-quota-syncs
+concurrent-serviceaccount-token-syncs
 config-sync-period
 configure-cbr0
 configure-cloud-routes
@@ -119,6 +121,7 @@ enable-controller-attach-detach
 enable-custom-metrics
 enable-debugging-handlers
 enable-garbage-collector
+enable-dynamic-provisioning
 enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
@@ -158,6 +161,7 @@ fake-clientset
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-name
 file-check-frequency
 file-suffix
 file_content_in_loop
@@ -397,6 +401,7 @@ root-dir
 run-proxy
 runtime-cgroups
 runtime-config
+runtime-request-timeout
 save-config
 scheduler-config
 scheduler-name
@@ -419,6 +424,7 @@ session-affinity
 setup-node
 show-all
 show-events
+show-kind
 show-labels
 shutdown-fd
 shutdown-fifo
@@ -445,6 +451,7 @@ suicide-timeout
 sync-frequency
 system-cgroups
 system-container
+system-pods-startup-timeout
 system-reserved
 target-port
 tcp-services
@@ -473,3 +480,4 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
+zone-name

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -37,7 +37,7 @@ const importPrefix = "k8s.io/kubernetes/federation/apis/federation"
 var accessor = meta.NewAccessor()
 
 // availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
+var availableVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
 
 func init() {
 	registered.RegisterVersions(availableVersions)
@@ -101,7 +101,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 // string, or an error if the version is not known.
 func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
-	case v1alpha1.SchemeGroupVersion:
+	case v1beta1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
@@ -122,8 +122,8 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 			continue
 		}
 		switch v {
-		case v1alpha1.SchemeGroupVersion:
-			v1alpha1.AddToScheme(api.Scheme)
+		case v1beta1.SchemeGroupVersion:
+			v1beta1.AddToScheme(api.Scheme)
 		}
 	}
 }

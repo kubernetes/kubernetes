@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ function usage() {
 
   release_stable=$(gsutil cat gs://kubernetes-release/release/stable.txt)
   release_latest=$(gsutil cat gs://kubernetes-release/release/latest.txt)
-  ci_latest=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
+  ci_latest=$(gsutil cat gs://kubernetes-release-dev/ci/latest.txt)
 
   echo "Right now, versions are as follows:"
   echo "  release/stable: ${0} ${release_stable}"
@@ -74,6 +74,7 @@ function upgrade-master() {
   get-kubeconfig-bearertoken
 
   detect-master
+  parse-master-env
 
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
@@ -116,9 +117,9 @@ function wait-for-master() {
 function prepare-upgrade() {
   ensure-temp-dir
   detect-project
+  write-cluster-name
   tars_from_version
 }
-
 
 # Reads kube-env metadata from first node in NODE_NAMES.
 #
@@ -131,15 +132,6 @@ function get-node-env() {
   gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${NODE_NAMES[0]} --command \
     "curl --fail --silent -H 'Metadata-Flavor: Google' \
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
-}
-
-# Using provided node env, extracts value from provided key.
-#
-# Args:
-# $1 node env (kube-env of node; result of calling get-node-env)
-# $2 env key to use
-function get-env-val() {
-  echo "${1}" | grep ${2} | cut -d : -f 2 | cut -d \' -f 2
 }
 
 # Assumed vars:
@@ -210,9 +202,11 @@ function prepare-node-upgrade() {
   # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
   #                 through all create-node-instance-template implementations).
   local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
+  # For master on GCI, we support the hybrid mode with nodes on ContainerVM.
+  if [[  "${OS_DISTRIBUTION}" == "gci" && "${NODE_IMAGE}" == container* ]]; then
+    source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
+  fi
   create-node-instance-template "${template_name}"
-  # The following is echo'd so that callers can get the template name.
-  echo $template_name
   echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
 }
 
@@ -224,8 +218,15 @@ function do-node-upgrade() {
   # NOTE(zmerlynn): If you are changing this gcloud command, update
   #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
   local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
+  local old_templates=()
+  local updates=()
   for group in ${INSTANCE_GROUPS[@]}; do
-    gcloud alpha compute rolling-updates \
+    old_templates+=($(gcloud compute instance-groups managed list \
+        --project="${PROJECT}" \
+        --zone="${ZONE}" \
+        --regexp="${group}" \
+        --format='value(instanceTemplate)' || true))
+    update=$(gcloud alpha compute rolling-updates \
         --project="${PROJECT}" \
         --zone="${ZONE}" \
         start \
@@ -234,10 +235,36 @@ function do-node-upgrade() {
         --instance-startup-timeout=300s \
         --max-num-concurrent-instances=1 \
         --max-num-failed-instances=0 \
-        --min-instance-update-time=0s
+        --min-instance-update-time=0s 2>&1)
+    id=$(echo "${update}" | grep "Started" | cut -d '/' -f 11 | cut -d ']' -f 1)
+    updates+=("${id}")
   done
 
-  # TODO(zmerlynn): Wait for the rolling-update to finish.
+  # Wait until rolling updates are finished.
+  for update in ${updates[@]}; do
+    while true; do
+      result=$(gcloud alpha compute rolling-updates \
+          --project="${PROJECT}" \
+          --zone="${ZONE}" \
+          describe \
+          ${update} \
+          --format='value(status)' || true)
+      if [ $result = "ROLLED_OUT" ]; then
+        echo "Rolling update ${update} is ${result} state and finished."
+        break
+      fi
+      echo "Rolling update ${update} is still in ${result} state."
+      sleep 10
+    done
+  done
+
+  # Remove the old templates.
+  for tmpl in ${old_templates[@]}; do
+    gcloud compute instance-templates delete \
+        --quiet \
+        --project="${PROJECT}" \
+        "${tmpl}" || true
+  done
 
   echo "== Finished upgrading nodes to ${KUBE_VERSION}. ==" >&2
 }

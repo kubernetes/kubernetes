@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ API_REFERENCE_DOCS_ROOT="${KUBE_ROOT}/docs/api-reference"
 OUTPUT_DIR="${KUBE_ROOT}/_tmp/api-reference"
 mkdir -p ${OUTPUT_DIR}
 TMP_ROOT="${KUBE_ROOT}/_tmp"
+trap "rm -rf ${TMP_ROOT}" EXIT SIGINT
 
 # Generate API reference docs in tmp.
 "./hack/update-api-reference-docs.sh" "${OUTPUT_DIR}"
@@ -36,7 +37,6 @@ TMP_ROOT="${KUBE_ROOT}/_tmp"
 echo "diffing ${API_REFERENCE_DOCS_ROOT} against freshly generated docs"
 ret=0
 diff -NauprB -I 'Last update' --exclude=*.md "${API_REFERENCE_DOCS_ROOT}" "${OUTPUT_DIR}" || ret=$?
-rm -rf "${TMP_ROOT}"
 if [[ $ret -eq 0 ]]
 then
   echo "${API_REFERENCE_DOCS_ROOT} up to date."

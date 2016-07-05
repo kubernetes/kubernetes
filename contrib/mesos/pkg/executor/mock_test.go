@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ func (m *MockExecutorDriver) SendFrameworkMessage(msg string) (mesosproto.Status
 
 func NewTestKubernetesExecutor() *Executor {
 	return New(Config{
-		Docker:   dockertools.ConnectToDockerOrDie("fake://"),
+		Docker:   dockertools.ConnectToDockerOrDie("fake://", 0),
 		Registry: newFakeRegistry(),
 	})
 }

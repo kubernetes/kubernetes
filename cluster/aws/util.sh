@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,10 +65,8 @@ case "${OS_DISTRIBUTION}" in
   wily)
     ;;
   vivid)
-    echo "vivid is currently end-of-life and does not get updates." >&2
-    echo "Please consider using wily or jessie instead" >&2
-    echo "(will continue in 10 seconds)" >&2
-    sleep 10
+    echo "vivid is no longer supported by kube-up; please use jessie instead" >&2
+    exit 2
     ;;
   coreos)
     echo "coreos is no longer supported by kube-up; please use jessie instead" >&2
@@ -328,17 +326,8 @@ function detect-security-groups {
 #   AWS_IMAGE
 function detect-image () {
 case "${OS_DISTRIBUTION}" in
-  trusty|coreos)
-    detect-trusty-image
-    ;;
-  vivid)
-    detect-vivid-image
-    ;;
   wily)
     detect-wily-image
-    ;;
-  wheezy)
-    detect-wheezy-image
     ;;
   jessie)
     detect-jessie-image
@@ -348,72 +337,6 @@ case "${OS_DISTRIBUTION}" in
     exit 2
     ;;
 esac
-}
-
-# Detects the AMI to use for trusty (considering the region)
-# Used by CoreOS & Ubuntu
-#
-# Vars set:
-#   AWS_IMAGE
-function detect-trusty-image () {
-  # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
-  # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
-  # This will need to be updated from time to time as amis are deprecated
-  if [[ -z "${AWS_IMAGE-}" ]]; then
-    case "${AWS_REGION}" in
-      ap-northeast-1)
-        AWS_IMAGE=ami-93876e93
-        ;;
-
-      ap-northeast-2)
-        AWS_IMAGE=ami-62ac620c
-        ;;
-
-      ap-southeast-1)
-        AWS_IMAGE=ami-66546234
-        ;;
-
-      eu-central-1)
-        AWS_IMAGE=ami-e2a694ff
-        ;;
-
-      eu-west-1)
-        AWS_IMAGE=ami-d7fd6ea0
-        ;;
-
-      sa-east-1)
-        AWS_IMAGE=ami-a357eebe
-        ;;
-
-      us-east-1)
-        AWS_IMAGE=ami-6089d208
-        ;;
-
-      us-west-1)
-        AWS_IMAGE=ami-cf7d998b
-        ;;
-
-      cn-north-1)
-        AWS_IMAGE=ami-d436a4ed
-        ;;
-
-      us-gov-west-1)
-        AWS_IMAGE=ami-01523322
-        ;;
-
-      ap-southeast-2)
-        AWS_IMAGE=ami-cd4e3ff7
-        ;;
-
-      us-west-2)
-        AWS_IMAGE=ami-3b14370b
-        ;;
-
-      *)
-        echo "Please specify AWS_IMAGE directly (region ${AWS_REGION} not recognized)"
-        exit 1
-    esac
-  fi
 }
 
 # Detects the RootDevice to use in the Block Device Mapping (considering the AMI)
@@ -612,22 +535,24 @@ function ensure-master-ip {
   fi
 }
 
-# Creates a new DHCP option set configured correctly for Kubernetes
+# Creates a new DHCP option set configured correctly for Kubernetes when DHCP_OPTION_SET_ID is not specified
 # Sets DHCP_OPTION_SET_ID
 function create-dhcp-option-set () {
-  case "${AWS_REGION}" in
-    us-east-1)
-      OPTION_SET_DOMAIN=ec2.internal
-      ;;
+  if [[ -z ${DHCP_OPTION_SET_ID-} ]]; then
+    case "${AWS_REGION}" in
+      us-east-1)
+        OPTION_SET_DOMAIN=ec2.internal
+        ;;
 
-    *)
-      OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
-  esac
+      *)
+        OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
+    esac
 
-  DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS --query DhcpOptions.DhcpOptionsId)
+    DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS --query DhcpOptions.DhcpOptionsId)
 
-  add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
-  add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+    add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
+    add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+  fi
 
   $AWS_CMD associate-dhcp-options --dhcp-options-id ${DHCP_OPTION_SET_ID} --vpc-id ${VPC_ID} > $LOG
 
@@ -1301,10 +1226,14 @@ function build-config() {
   export KUBE_CERT="${CERT_DIR}/pki/issued/kubecfg.crt"
   export KUBE_KEY="${CERT_DIR}/pki/private/kubecfg.key"
   export CA_CERT="${CERT_DIR}/pki/ca.crt"
-  export CONTEXT="aws_${INSTANCE_PREFIX}"
+  export CONTEXT="${CONFIG_CONTEXT}"
   (
    umask 077
+
+   # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
+
+   create-kubeconfig-for-federation
   )
 }
 
@@ -1501,6 +1430,16 @@ function kube-down {
 
     echo "Deleting VPC: ${vpc_id}"
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
+  else
+    echo "" >&2
+    echo -e "${color_red}Cluster NOT deleted!${color_norm}" >&2
+    echo "" >&2
+    echo "No VPC was found with tag KubernetesCluster=${CLUSTER_ID}" >&2
+    echo "" >&2
+    echo "If you are trying to delete a cluster in a shared VPC," >&2
+    echo "please consider using one of the methods in the kube-deploy repo." >&2
+    echo "See: https://github.com/kubernetes/kube-deploy/blob/master/docs/delete_cluster.md" >&2
+    exit 1
   fi
 }
 

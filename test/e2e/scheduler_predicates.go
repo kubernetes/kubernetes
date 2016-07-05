@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -125,6 +125,23 @@ func cleanupPods(c *client.Client, ns string) {
 	}
 }
 
+func removeLabelOffNode(c *client.Client, nodeName string, labelKey string) {
+	By("removing the label " + labelKey + " off the node " + nodeName)
+	node, err := c.Nodes().Get(nodeName)
+	framework.ExpectNoError(err)
+	if node.Labels == nil || len(node.Labels[labelKey]) == 0 {
+		return
+	}
+	delete(node.Labels, labelKey)
+	nodeUpdated, err := c.Nodes().Update(node)
+	framework.ExpectNoError(err)
+
+	By("verifying the node doesn't have the label " + labelKey)
+	if nodeUpdated.Labels != nil && len(nodeUpdated.Labels[labelKey]) != 0 {
+		framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
+	}
+}
+
 // Waits until all existing pods are scheduled and returns their amount.
 func waitForStableCluster(c *client.Client) int {
 	timeout := 10 * time.Minute
@@ -205,7 +222,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, false)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -235,24 +252,29 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
 
-		framework.StartPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
-			TypeMeta: unversioned.TypeMeta{
-				Kind: "Pod",
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name:   "",
-				Labels: map[string]string{"name": ""},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "",
-						Image: framework.GetPauseImageName(f.Client),
+		// As the pods are distributed randomly among nodes,
+		// it can easily happen that all nodes are satured
+		// and there is no need to create additional pods.
+		// StartPods requires at least one pod to replicate.
+		if podsNeededForSaturation > 0 {
+			framework.StartPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:   "",
+					Labels: map[string]string{"name": ""},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "",
+							Image: framework.GetPauseImageName(f.Client),
+						},
 					},
 				},
-			},
-		}, true)
-
+			}, true)
+		}
 		podName := "additional-pod"
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -297,7 +319,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
-			if found && pod.Status.Phase == api.PodRunning {
+			if found && pod.Status.Phase != api.PodSucceeded && pod.Status.Phase != api.PodFailed {
 				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
@@ -312,32 +334,37 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
 
-		framework.StartPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
-			TypeMeta: unversioned.TypeMeta{
-				Kind: "Pod",
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name:   "",
-				Labels: map[string]string{"name": ""},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "",
-						Image: framework.GetPauseImageName(f.Client),
-						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
-							},
-							Requests: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+		// As the pods are distributed randomly among nodes,
+		// it can easily happen that all nodes are saturated
+		// and there is no need to create additional pods.
+		// StartPods requires at least one pod to replicate.
+		if podsNeededForSaturation > 0 {
+			framework.StartPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:   "",
+					Labels: map[string]string{"name": ""},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "",
+							Image: framework.GetPauseImageName(f.Client),
+							Resources: api.ResourceRequirements{
+								Limits: api.ResourceList{
+									"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+								},
+								Requests: api.ResourceList{
+									"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+								},
 							},
 						},
 					},
 				},
-			},
-		}, true)
-
+			}, true)
+		}
 		podName := "additional-pod"
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -410,7 +437,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	It("validates that a pod with an invalid NodeAffinity is rejected", func() {
-
 		By("Trying to launch a pod with an invalid Affinity data.")
 		podName := "without-label"
 		_, err := c.Pods(ns).Create(&api.Pod{
@@ -494,6 +520,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -631,6 +658,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -680,6 +708,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
+
 	})
 
 	// Verify that an escaped JSON string of NodeAffinity in a YAML PodSpec works.
@@ -725,6 +754,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-labels"
@@ -889,6 +919,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -980,6 +1011,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity with same Labels.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -1069,6 +1101,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -1169,6 +1202,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
 		labelPodName := "with-podantiaffinity-" + string(util.NewUUID())
@@ -1272,6 +1306,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		node, err := c.Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
+		defer removeLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-newlabels"
@@ -1353,6 +1388,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			{labelKey + "=" + labelValue},
 		}
 		checkOutput(labelOutput, labelOutputRequiredStrings)
+		defer removeLabelOffNode(c, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
@@ -1402,14 +1438,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		output = framework.RunKubectlOrDie("describe", "node", nodeName)
 		if strings.Contains(output, taintName) {
 			framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
-		}
-
-		By("removing the label " + labelKey + " off the node " + nodeName)
-		framework.RunKubectlOrDie("label", "nodes", nodeName, labelKey+"-")
-		By("verifying the node doesn't have the label " + labelKey)
-		output = framework.RunKubectlOrDie("describe", "node", nodeName)
-		if strings.Contains(output, labelKey) {
-			framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
 		}
 	})
 
@@ -1475,6 +1503,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			{labelKey + "=" + labelValue},
 		}
 		checkOutput(labelOutput, labelOutputRequiredStrings)
+		defer removeLabelOffNode(c, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, still no tolerations.")
 		podNameNoTolerations := "still-no-tolerations"
@@ -1527,13 +1556,5 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		deployedPod, err := c.Pods(ns).Get(podNameNoTolerations)
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
-
-		By("removing the label " + labelKey + " off the node " + nodeName)
-		framework.RunKubectlOrDie("label", "nodes", nodeName, labelKey+"-")
-		By("verifying the node doesn't have the label " + labelKey)
-		output = framework.RunKubectlOrDie("describe", "node", nodeName)
-		if strings.Contains(output, labelKey) {
-			framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
-		}
 	})
 })

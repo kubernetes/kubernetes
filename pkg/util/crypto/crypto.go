@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,29 @@ import (
 	"path/filepath"
 	"time"
 )
+
+// ShouldGenSelfSignedCerts returns false if the certificate or key files already exists,
+// otherwise returns true.
+func ShouldGenSelfSignedCerts(certPath, keyPath string) bool {
+	if canReadFile(certPath) || canReadFile(keyPath) {
+		return false
+	}
+
+	return true
+}
+
+// If the file represented by path exists and
+// readable, returns true otherwise returns false.
+func canReadFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+
+	defer f.Close()
+
+	return true
+}
 
 // GenerateSelfSignedCert creates a self-signed certificate and key for the given host.
 // Host may be an IP or a DNS name

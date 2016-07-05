@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -39,15 +40,17 @@ type ViewOptions struct {
 	RawByteData  bool
 }
 
-const (
-	view_long = `Displays merged kubeconfig settings or a specified kubeconfig file.
+var (
+	view_long = dedent.Dedent(`
+		Displays merged kubeconfig settings or a specified kubeconfig file.
 
-You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`
-	view_example = `# Show Merged kubeconfig settings.
-kubectl config view
+		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
+	view_example = dedent.Dedent(`
+		# Show Merged kubeconfig settings.
+		kubectl config view
 
-# Get the password for the e2e user
-kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`
+		# Get the password for the e2e user
+		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
 )
 
 func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {

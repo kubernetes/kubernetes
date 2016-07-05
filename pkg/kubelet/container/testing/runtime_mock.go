@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -133,8 +133,13 @@ func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
 	return "", args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy) error {
-	args := r.Called(gcPolicy)
+func (r *Mock) GetPodContainerID(pod *Pod) (ContainerID, error) {
+	args := r.Called(pod)
+	return ContainerID{}, args.Error(0)
+}
+
+func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
+	args := r.Called(gcPolicy, ready)
 	return args.Error(0)
 }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,5 +21,12 @@ set -o pipefail
 KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
 . ${KUBE_ROOT}/federation/cluster/common.sh
+
+tagfile="${KUBE_ROOT}/federation/manifests/federated-image.tag"
+if [[ ! -f "$tagfile" ]]; then
+    echo "FATAL: tagfile ${tagfile} does not exist. Make sure that you have run build/push-federation-images.sh"
+    exit 1
+fi
+export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
 
 create-federation-api-objects

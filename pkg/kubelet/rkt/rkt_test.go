@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1694,7 +1694,8 @@ func TestGarbageCollect(t *testing.T) {
 			getter.pods[p.UID] = p
 		}
 
-		err := rkt.GarbageCollect(tt.gcPolicy)
+		allSourcesReady := true
+		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady)
 		assert.NoError(t, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.expectedCommands))
@@ -1755,6 +1756,10 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 			out: &appcschema.PodManifest{
 				Annotations: []appctypes.Annotation{
 					{
+						Name:  "io.kubernetes.container.name",
+						Value: "POD",
+					},
+					{
 						Name:  appctypes.ACIdentifier(k8sRktStage1NameAnno),
 						Value: "stage1-override-img",
 					},
@@ -1787,11 +1792,11 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 		hint := fmt.Sprintf("case #%d", i)
 
 		result, err := r.makePodManifest(testCase.in, "", []api.Secret{})
-		assert.Equal(t, err, testCase.outerr, hint)
+		assert.Equal(t, testCase.outerr, err, hint)
 		if err == nil {
 			sort.Sort(annotationsByName(result.Annotations))
 			sort.Sort(annotationsByName(testCase.out.Annotations))
-			assert.Equal(t, result.Annotations, testCase.out.Annotations, hint)
+			assert.Equal(t, testCase.out.Annotations, result.Annotations, hint)
 		}
 	}
 }
@@ -1827,15 +1832,15 @@ func TestPreparePodArgs(t *testing.T) {
 					},
 				},
 			},
-			"stage1-path",
+			"stage1-image0",
 			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-name=stage1-image"},
 		},
 		{
 			appcschema.PodManifest{
 				Annotations: appctypes.Annotations{},
 			},
-			"stage1-path",
-			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-path=stage1-path"},
+			"stage1-image0",
+			[]string{"prepare", "--quiet", "--pod-manifest", "file", "--stage1-name=stage1-image0"},
 		},
 		{
 			appcschema.PodManifest{

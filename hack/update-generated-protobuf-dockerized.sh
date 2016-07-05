@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-hack/build-go.sh cmd/libs/go2idl/go-to-protobuf cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
+hack/build-go.sh \
+    cmd/libs/go2idl/go-to-protobuf \
+    cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
 
 if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3.0."* ]]; then
   echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
@@ -39,8 +41,10 @@ gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 
 # requires the 'proto' tag to build (will remove when ready)
 # searches for the protoc-gen-gogo extension in the output directory
-# satisfies import of github.com/gogo/protobuf/gogoproto/gogo.proto and the core Google protobuf types
+# satisfies import of github.com/gogo/protobuf/gogoproto/gogo.proto and the
+# core Google protobuf types
 PATH="${KUBE_ROOT}/_output/local/go/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
-  --proto-import="${KUBE_ROOT}/third_party/protobuf"
+  --proto-import="${KUBE_ROOT}/third_party/protobuf" \
+  $@

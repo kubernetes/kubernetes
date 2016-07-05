@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -113,4 +113,15 @@ func (c *FakeIngresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(ingressesResource, c.ns, opts))
 
+}
+
+// Patch applies the patch and returns the patched ingress.
+func (c *FakeIngresses) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Ingress, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchAction(ingressesResource, c.ns, name, data), &v1beta1.Ingress{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Ingress), err
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -272,7 +272,7 @@ func (rc *ResourceConsumer) GetReplicas() int {
 }
 
 func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
-	timeout := 10 * time.Minute
+	timeout := 15 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		if desiredReplicas == rc.GetReplicas() {
 			framework.Logf("%s: current replicas number is equal to desired replicas number: %d", rc.kind, desiredReplicas)

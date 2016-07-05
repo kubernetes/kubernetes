@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -135,7 +135,7 @@ func (s *Scheduler) scheduleOne() {
 		}
 
 		bindingStart := time.Now()
-		// If binding succeded then PodScheduled condition will be updated in apiserver so that
+		// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 		// it's atomic with setting host.
 		err := s.config.Binder.Bind(b)
 		if err != nil {

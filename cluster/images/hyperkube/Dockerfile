@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,9 +43,15 @@ COPY static-pods/master.json /etc/kubernetes/manifests/
 COPY static-pods/etcd.json /etc/kubernetes/manifests/
 COPY static-pods/addon-manager.json /etc/kubernetes/manifests/
 
+# TODO: Move out kube-proxy to a DaemonSet again
+COPY static-pods/kube-proxy.json /etc/kubernetes/manifests/
+
 # Manifests for the docker-multinode guide
 COPY static-pods/master-multi.json /etc/kubernetes/manifests-multi/
 COPY static-pods/addon-manager.json /etc/kubernetes/manifests-multi/
+
+# TODO: Move out kube-proxy to a DaemonSet again
+COPY static-pods/kube-proxy.json /etc/kubernetes/manifests-multi/
 
 # Copy over all addons
 COPY addons /etc/kubernetes/addons

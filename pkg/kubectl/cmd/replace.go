@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
@@ -38,25 +39,27 @@ type ReplaceOptions struct {
 	Recursive bool
 }
 
-const (
-	replace_long = `Replace a resource by filename or stdin.
+var (
+	replace_long = dedent.Dedent(`
+		Replace a resource by filename or stdin.
 
-JSON and YAML formats are accepted. If replacing an existing resource, the
-complete resource spec must be provided. This can be obtained by
-$ kubectl get TYPE NAME -o yaml
+		JSON and YAML formats are accepted. If replacing an existing resource, the
+		complete resource spec must be provided. This can be obtained by
+		$ kubectl get TYPE NAME -o yaml
 
-Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`
-	replace_example = `# Replace a pod using the data in pod.json.
-kubectl replace -f ./pod.json
+		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`)
+	replace_example = dedent.Dedent(`
+		# Replace a pod using the data in pod.json.
+		kubectl replace -f ./pod.json
 
-# Replace a pod based on the JSON passed into stdin.
-cat pod.json | kubectl replace -f -
+		# Replace a pod based on the JSON passed into stdin.
+		cat pod.json | kubectl replace -f -
 
-# Update a single-container pod's image version (tag) to v4
-kubectl get pod mypod -o yaml | sed 's/\(image: myimage\):.*$/\1:v4/' | kubectl replace -f -
+		# Update a single-container pod's image version (tag) to v4
+		kubectl get pod mypod -o yaml | sed 's/\(image: myimage\):.*$/\1:v4/' | kubectl replace -f -
 
-# Force replace, delete and then re-create the resource
-kubectl replace --force -f ./pod.json`
+		# Force replace, delete and then re-create the resource
+		kubectl replace --force -f ./pod.json`)
 )
 
 func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {

@@ -1,7 +1,6 @@
 package dns
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net"
 	"strconv"
@@ -35,7 +34,6 @@ const (
 	TypeMG         uint16 = 8
 	TypeMR         uint16 = 9
 	TypeNULL       uint16 = 10
-	TypeWKS        uint16 = 11
 	TypePTR        uint16 = 12
 	TypeHINFO      uint16 = 13
 	TypeMINFO      uint16 = 14
@@ -65,7 +63,6 @@ const (
 	TypeOPT        uint16 = 41 // EDNS
 	TypeDS         uint16 = 43
 	TypeSSHFP      uint16 = 44
-	TypeIPSECKEY   uint16 = 45
 	TypeRRSIG      uint16 = 46
 	TypeNSEC       uint16 = 47
 	TypeDNSKEY     uint16 = 48
@@ -136,6 +133,7 @@ const (
 	RcodeBadName        = 20
 	RcodeBadAlg         = 21
 	RcodeBadTrunc       = 22 // TSIG
+	RcodeBadCookie      = 23 // DNS Cookies
 
 	// Message Opcodes. There is no 3.
 	OpcodeQuery  = 0
@@ -871,57 +869,6 @@ func (rr *SSHFP) String() string {
 		" " + strings.ToUpper(rr.FingerPrint)
 }
 
-type IPSECKEY struct {
-	Hdr        RR_Header
-	Precedence uint8
-	// GatewayType: 1: A record, 2: AAAA record, 3: domainname.
-	// 0 is use for no type and GatewayName should be "." then.
-	GatewayType uint8
-	Algorithm   uint8
-	// Gateway can be an A record, AAAA record or a domain name.
-	GatewayA    net.IP `dns:"a"`
-	GatewayAAAA net.IP `dns:"aaaa"`
-	GatewayName string `dns:"domain-name"`
-	PublicKey   string `dns:"base64"`
-}
-
-func (rr *IPSECKEY) String() string {
-	s := rr.Hdr.String() + strconv.Itoa(int(rr.Precedence)) +
-		" " + strconv.Itoa(int(rr.GatewayType)) +
-		" " + strconv.Itoa(int(rr.Algorithm))
-	switch rr.GatewayType {
-	case 0:
-		fallthrough
-	case 3:
-		s += " " + rr.GatewayName
-	case 1:
-		s += " " + rr.GatewayA.String()
-	case 2:
-		s += " " + rr.GatewayAAAA.String()
-	default:
-		s += " ."
-	}
-	s += " " + rr.PublicKey
-	return s
-}
-
-func (rr *IPSECKEY) len() int {
-	l := rr.Hdr.len() + 3 + 1
-	switch rr.GatewayType {
-	default:
-		fallthrough
-	case 0:
-		fallthrough
-	case 3:
-		l += len(rr.GatewayName)
-	case 1:
-		l += 4
-	case 2:
-		l += 16
-	}
-	return l + base64.StdEncoding.DecodedLen(len(rr.PublicKey))
-}
-
 type KEY struct {
 	DNSKEY
 }
@@ -973,9 +920,9 @@ type NSEC3 struct {
 	Flags      uint8
 	Iterations uint16
 	SaltLength uint8
-	Salt       string `dns:"size-hex"`
+	Salt       string `dns:"size-hex:SaltLength"`
 	HashLength uint8
-	NextDomain string   `dns:"size-base32"`
+	NextDomain string   `dns:"size-base32:HashLength"`
 	TypeBitMap []uint16 `dns:"nsec"`
 }
 
@@ -1105,8 +1052,8 @@ type HIP struct {
 	HitLength          uint8
 	PublicKeyAlgorithm uint8
 	PublicKeyLength    uint16
-	Hit                string   `dns:"hex"`
-	PublicKey          string   `dns:"base64"`
+	Hit                string   `dns:"size-hex:HitLength"`
+	PublicKey          string   `dns:"size-base64:PublicKeyLength"`
 	RendezvousServers  []string `dns:"domain-name"`
 }
 
@@ -1127,31 +1074,6 @@ type NINFO struct {
 }
 
 func (rr *NINFO) String() string { return rr.Hdr.String() + sprintTxt(rr.ZSData) }
-
-type WKS struct {
-	Hdr      RR_Header
-	Address  net.IP `dns:"a"`
-	Protocol uint8
-	BitMap   []uint16 `dns:"wks"`
-}
-
-func (rr *WKS) len() int {
-	// TODO: this is missing something...
-	return rr.Hdr.len() + net.IPv4len + 1
-}
-
-func (rr *WKS) String() (s string) {
-	s = rr.Hdr.String()
-	if rr.Address != nil {
-		s += rr.Address.String()
-	}
-	// TODO(miek): missing protocol here, see /etc/protocols
-	for i := 0; i < len(rr.BitMap); i++ {
-		// should lookup the port
-		s += " " + strconv.Itoa(int(rr.BitMap[i]))
-	}
-	return s
-}
 
 type NID struct {
 	Hdr        RR_Header
@@ -1286,9 +1208,9 @@ func TimeToString(t uint32) string {
 // string values like "20110403154150" to an 32 bit integer.
 // It takes serial arithmetic (RFC 1982) into account.
 func StringToTime(s string) (uint32, error) {
-	t, e := time.Parse("20060102150405", s)
-	if e != nil {
-		return 0, e
+	t, err := time.Parse("20060102150405", s)
+	if err != nil {
+		return 0, err
 	}
 	mod := (t.Unix() / year68) - 1
 	if mod < 0 {

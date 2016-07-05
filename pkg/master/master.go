@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/apis/certificates"
+	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -53,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
+	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/etcd"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/clusterrole/policybased"
@@ -115,17 +118,31 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
 
+const (
+	// DefaultEndpointReconcilerInterval is the default amount of time for how often the endpoints for
+	// the kubernetes Service are reconciled.
+	DefaultEndpointReconcilerInterval = 10 * time.Second
+)
+
 type Config struct {
 	*genericapiserver.Config
 
-	EnableCoreControllers   bool
-	DeleteCollectionWorkers int
-	EventTTL                time.Duration
-	KubeletClient           kubeletclient.KubeletClient
+	EnableCoreControllers    bool
+	EndpointReconcilerConfig EndpointReconcilerConfig
+	DeleteCollectionWorkers  int
+	EventTTL                 time.Duration
+	KubeletClient            kubeletclient.KubeletClient
 	// Used to start and monitor tunneling
 	Tunneler genericapiserver.Tunneler
 
 	disableThirdPartyControllerForTesting bool
+}
+
+// EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
+// used by the master.
+type EndpointReconcilerConfig struct {
+	Reconciler EndpointReconciler
+	Interval   time.Duration
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -193,7 +210,7 @@ func New(c *Config) (*Master, error) {
 
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
-		m.NewBootstrapController().Start()
+		m.NewBootstrapController(c.EndpointReconcilerConfig).Start()
 	}
 
 	return m, nil
@@ -255,9 +272,6 @@ func (m *Master) InstallAPIs(c *Config) {
 		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
 	}
 
-	// allGroups records all supported groups at /apis
-	allGroups := []unversioned.APIGroup{}
-
 	// Install extensions unless disabled.
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
 		var err error
@@ -281,17 +295,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		extensionsGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: extensionsGroupMeta.GroupVersion.String(),
-			Version:      extensionsGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             extensionsGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{extensionsGVForDiscovery},
-			PreferredVersion: extensionsGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
 	}
 
 	// Install autoscaling unless disabled.
@@ -313,17 +316,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		autoscalingGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: autoscalingGroupMeta.GroupVersion.String(),
-			Version:      autoscalingGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             autoscalingGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{autoscalingGVForDiscovery},
-			PreferredVersion: autoscalingGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
 	}
 
 	// Install batch unless disabled.
@@ -349,19 +341,7 @@ func (m *Master) InstallAPIs(c *Config) {
 			batchv2alpha1Resources := m.getBatchResources(c, batchapiv2alpha1.SchemeGroupVersion)
 			apiGroupInfo.VersionedResourcesStorageMap["v2alpha1"] = batchv2alpha1Resources
 		}
-
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		batchGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: batchGroupMeta.GroupVersion.String(),
-			Version:      batchGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             batchGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{batchGVForDiscovery},
-			PreferredVersion: batchGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
 	}
 
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(policyapiv1alpha1.SchemeGroupVersion) {
@@ -382,18 +362,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		policyGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: policyGroupMeta.GroupVersion.String(),
-			Version:      policyGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             policyGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{policyGVForDiscovery},
-			PreferredVersion: policyGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
-
 	}
 
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(appsapi.SchemeGroupVersion) {
@@ -414,18 +382,26 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+	}
 
-		appsGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: appsGroupMeta.GroupVersion.String(),
-			Version:      appsGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             appsGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{appsGVForDiscovery},
-			PreferredVersion: appsGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(certificatesapiv1alpha1.SchemeGroupVersion) {
+		certificateResources := m.getCertificateResources(c)
+		certificatesGroupMeta := registered.GroupOrDie(certificates.GroupName)
 
+		// Hard code preferred group version to certificates/v1alpha1
+		certificatesGroupMeta.GroupVersion = certificatesapiv1alpha1.SchemeGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *certificatesGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1alpha1": certificateResources,
+			},
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(rbacapi.SchemeGroupVersion) {
@@ -446,18 +422,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-
-		rbacGVForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: rbacGroupMeta.GroupVersion.String(),
-			Version:      rbacGroupMeta.GroupVersion.Version,
-		}
-		group := unversioned.APIGroup{
-			Name:             rbacGroupMeta.GroupVersion.Group,
-			Versions:         []unversioned.GroupVersionForDiscovery{rbacGVForDiscovery},
-			PreferredVersion: rbacGVForDiscovery,
-		}
-		allGroups = append(allGroups, group)
-
 	}
 
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
@@ -585,14 +549,27 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	}
 }
 
-// NewBootstrapController returns a controller for watching the core capabilities of the master.
-func (m *Master) NewBootstrapController() *Controller {
+// NewBootstrapController returns a controller for watching the core capabilities of the master.  If
+// endpointReconcilerConfig.Interval is 0, the default value of DefaultEndpointReconcilerInterval
+// will be used instead.  If endpointReconcilerConfig.Reconciler is nil, the default
+// MasterCountEndpointReconciler will be used.
+func (m *Master) NewBootstrapController(endpointReconcilerConfig EndpointReconcilerConfig) *Controller {
+	if endpointReconcilerConfig.Interval == 0 {
+		endpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	}
+
+	if endpointReconcilerConfig.Reconciler == nil {
+		// use a default endpoint	reconciler if nothing is set
+		// m.endpointRegistry is set via m.InstallAPIs -> m.initV1ResourcesStorage
+		endpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(m.MasterCount, m.endpointRegistry)
+	}
+
 	return &Controller{
 		NamespaceRegistry: m.namespaceRegistry,
 		ServiceRegistry:   m.serviceRegistry,
 
-		EndpointReconciler: NewMasterCountEndpointReconciler(m.MasterCount, m.endpointRegistry),
-		EndpointInterval:   10 * time.Second,
+		EndpointReconciler: endpointReconcilerConfig.Reconciler,
+		EndpointInterval:   endpointReconcilerConfig.Interval,
 
 		SystemNamespaces:         []string{api.NamespaceSystem},
 		SystemNamespacesInterval: 1 * time.Minute,
@@ -924,6 +901,28 @@ func (m *Master) getAutoscalingResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
+// getCertificateResources returns the resources for certificates API
+func (m *Master) getCertificateResources(c *Config) map[string]rest.Storage {
+	restOptions := func(resource string) generic.RESTOptions {
+		return m.GetRESTOptionsOrDie(c, certificates.Resource(resource))
+	}
+
+	// TODO update when we support more than one version of this group
+	version := certificatesapiv1alpha1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+
+	csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptions("certificatesigningrequests"))
+
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("certificatesigningrequests")) {
+		storage["certificatesigningrequests"] = csrStorage
+		storage["certificatesigningrequests/status"] = csrStatusStorage
+		storage["certificatesigningrequests/approval"] = csrApprovalStorage
+	}
+
+	return storage
+}
+
 // getBatchResources returns the resources for batch api
 func (m *Master) getBatchResources(c *Config, version unversioned.GroupVersion) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
@@ -1052,7 +1051,7 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, policyapiv1alpha1.SchemeGroupVersion, rbacapi.SchemeGroupVersion)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, policyapiv1alpha1.SchemeGroupVersion, rbacapi.SchemeGroupVersion, certificatesapiv1alpha1.SchemeGroupVersion)
 
 	// all extensions resources except these are disabled by default
 	ret.EnableResources(

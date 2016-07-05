@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,12 +31,14 @@ source "${KUBE_ROOT}/cluster/lib/logging.sh"
 # NOTE This must match the version_regex in build/common.sh
 # kube::release::parse_and_validate_release_version()
 KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
+KUBE_RELEASE_VERSION_DASHED_REGEX="v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)(-(beta|alpha)-(0|[1-9][0-9]*))?"
 
 # KUBE_CI_VERSION_REGEX matches things like "v1.2.3-alpha.4.56+abcdefg" This
 #
 # NOTE This must match the version_regex in build/common.sh
 # kube::release::parse_and_validate_ci_version()
 KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(beta|alpha)-(0|[1-9][0-9]*)(-(0|[1-9][0-9]*)\\+[-0-9a-z]*)?"
 
 # Generate kubeconfig data for the created cluster.
 # Assumed vars:
@@ -152,6 +154,19 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
+# Creates a kubeconfig file with the credentials for only the current-context
+# cluster. This is used by federation to create secrets in test setup.
+function create-kubeconfig-for-federation() {
+  if [[ "${FEDERATION:-}" == "true" ]]; then
+    echo "creating kubeconfig for federation secret"
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
+    KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
+    KUBECONFIG_PATH="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${cc}"
+    mkdir -p "${KUBECONFIG_PATH}"
+    "${kubectl}" config view --minify --flatten > "${KUBECONFIG_PATH}/kubeconfig"
+  fi
+}
 
 function tear_down_alive_resources() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
@@ -277,7 +292,7 @@ function detect-master-from-kubeconfig() {
 
 # Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
 # "v1.2.0-alpha.1.881+376438b69c7612") or a version' publication of the form
-# <bucket>/<version> (e.g. "release/stable",' "ci/latest-1").
+# <path>/<version> (e.g. "release/stable",' "ci/latest-1").
 #
 # See the docs on getting builds for more information about version
 # publication.
@@ -288,7 +303,12 @@ function detect-master-from-kubeconfig() {
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/${1}.txt)
+    IFS='/' read -a path <<< "${1}"
+    if [[ "${path[0]}" == "release" ]]; then
+      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
+    else
+      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
+    fi
   else
     KUBE_VERSION=${1}
   fi
@@ -315,9 +335,15 @@ function tars_from_version() {
   elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+    # TODO: Clean this up.
+    KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} | sha1sum | awk '{print $1}')
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+    # TODO: Clean this up.
+    KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} | sha1sum | awk '{print $1}')
   else
     echo "Version doesn't match regexp" >&2
     exit 1
@@ -454,8 +480,19 @@ function yaml-quote {
 # Builds the RUNTIME_CONFIG var from other feature enable options (such as
 # features in alpha)
 function build-runtime-config() {
-  # There is nothing to do here for now. Just using this function as a placeholder.
-  :
+  # If a policy provider is specified, enable NetworkPolicy API.
+  if [[ -n "${NETWORK_POLICY_PROVIDER}" ]]; then
+    appends="extensions/v1beta1=true,extensions/v1beta1/networkpolicies=true"
+  fi
+
+  # Generate the RUNTIME_CONFIG.
+  if [[ -n ${appends} ]]; then
+    if [[ -n ${RUNTIME_CONFIG} ]]; then
+      RUNTIME_CONFIG="${RUNTIME_CONFIG},${appends}"
+    else
+      RUNTIME_CONFIG="${appends}"
+    fi
+  fi
 }
 
 # Writes the cluster name into a temporary file.
@@ -532,6 +569,7 @@ HAIRPIN_MODE: $(yaml-quote ${HAIRPIN_MODE:-})
 OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
 OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
 OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
+NETWORK_POLICY_PROVIDER: $(yaml-quote ${NETWORK_POLICY_PROVIDER:-})
 E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
 KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
 KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
@@ -666,9 +704,10 @@ EOF
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-docker})
+KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
 RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
 RKT_PATH: $(yaml-quote ${RKT_PATH:-})
+RKT_STAGE1_IMAGE: $(yaml-quote ${RKT_STAGE1_IMAGE:-})
 KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
@@ -676,6 +715,28 @@ EOF
       cat >>$file <<EOF
 ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
+EOF
+  fi
+
+  # Federation specific environment variables.
+  if [[ -n "${FEDERATION:-}" ]]; then
+    cat >>$file <<EOF
+FEDERATION: $(yaml-quote ${FEDERATION})
+EOF
+  fi
+  if [ -n "${FEDERATIONS_DOMAIN_MAP:-}" ]; then
+    cat >>$file <<EOF
+FEDERATIONS_DOMAIN_MAP: $(yaml-quote ${FEDERATIONS_DOMAIN_MAP})
+EOF
+  fi
+  if [ -n "${FEDERATION_NAME:-}" ]; then
+    cat >>$file <<EOF
+FEDERATION_NAME: $(yaml-quote ${FEDERATION_NAME})
+EOF
+  fi
+  if [ -n "${DNS_ZONE_NAME:-}" ]; then
+    cat >>$file <<EOF
+DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})
 EOF
   fi
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -288,6 +288,12 @@ func (t *Type) String() string {
 // IsAssignable returns whether the type is assignable.
 func (t *Type) IsAssignable() bool {
 	return t.Kind == Builtin || (t.Kind == Alias && t.Underlying.Kind == Builtin)
+}
+
+// IsAnonymousStruct returns true if the type is an anonymous struct or an alias
+// to an anonymous struct.
+func (t *Type) IsAnonymousStruct() bool {
+	return (t.Kind == Struct && t.Name.Name == "struct{}") || (t.Kind == Alias && t.Underlying.IsAnonymousStruct())
 }
 
 // A single struct member

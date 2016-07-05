@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,11 +52,8 @@ export LOG_LEVEL=4
 cd /go/src/k8s.io/kubernetes
 rm -rf Godeps/_workspace # Temporary until _workspace is fully obliterated
 
-./hack/build-go.sh
 go install ./cmd/...
 ./hack/install-etcd.sh
-
-./hack/verify-all.sh -v
 
 ./hack/test-go.sh
 ./hack/test-cmd.sh
