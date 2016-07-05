@@ -35,7 +35,7 @@ RUN for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${plat
 
 # Install g++, then download and install protoc for generating protobuf output
 RUN apt-get update \
-  && apt-get install -y g++ rsync apt-utils file \
+  && apt-get install -y --no-install-recommends g++ rsync apt-utils file upx-ucl \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /usr/local/src/protobuf \
@@ -55,8 +55,9 @@ RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.
   && curl -s http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
   && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do dpkg --add-architecture ${platform}; done \
   && apt-get update \
-  && apt-get install -y build-essential \
-  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
+  && apt-get install -y build-essential --no-install-recommends \
+  && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do
+    apt-get install -y --no-install-recommends crossbuild-essential-${platform}; done \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # work around 64MB tmpfs size in Docker 1.6

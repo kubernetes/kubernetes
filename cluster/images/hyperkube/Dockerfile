@@ -19,7 +19,7 @@ FROM BASEIMAGE
 CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get -yy -q install \
+    && DEBIAN_FRONTEND=noninteractive apt-get -yy -q --no-install-recommends install \
     iptables \
     ethtool \
     ca-certificates \
