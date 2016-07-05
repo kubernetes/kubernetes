@@ -105,7 +105,7 @@ and treating this interface as this API - the whole watch mechanisms in
 apiserver will be hidden behind that interface.
 Thanks to it we will get an initial implementation for free and we will just
 need to reimplement few relevant functions (probably just Watch and List).
-Mover, this will not require any changes in other parts of the code.
+Moreover, this will not require any changes in other parts of the code.
 This step is about extracting the interface of tools.EtcdHelper.
 
 2. Create a FIFO cache with a given capacity. In its "rolling history window"
