@@ -81,7 +81,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, nodeInfo *scheduler
 func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
-		return schedulerapi.HostPriorityList{}, err
+		return nil, err
 	}
 
 	list := schedulerapi.HostPriorityList{}
@@ -215,7 +215,7 @@ func calculateScoreFromSize(sumSize int64) int {
 func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
-		return schedulerapi.HostPriorityList{}, err
+		return nil, err
 	}
 
 	list := schedulerapi.HostPriorityList{}
