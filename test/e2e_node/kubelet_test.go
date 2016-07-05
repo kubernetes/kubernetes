@@ -178,6 +178,11 @@ func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count i
 						},
 					},
 				},
+				SecurityContext: &api.PodSecurityContext{
+					SELinuxOptions: &api.SELinuxOptions{
+						Level: "s0",
+					},
+				},
 				Volumes: []api.Volume{
 					// TODO: Test secret volumes
 					// TODO: Test hostpath volumes

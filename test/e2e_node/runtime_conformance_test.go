@@ -18,8 +18,6 @@ package e2e_node
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path"
 	"time"
 
@@ -58,9 +56,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 					{
 						Name: restartCountVolumeName,
 						VolumeSource: api.VolumeSource{
-							HostPath: &api.HostPathVolumeSource{
-								Path: os.TempDir(),
-							},
+							EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory},
 						},
 					},
 				}
@@ -77,9 +73,6 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 					{"terminate-cmd-rpn", api.RestartPolicyNever, api.PodFailed, ContainerStateTerminated, 0, false},
 				}
 				for _, testCase := range testCases {
-					tmpFile, err := ioutil.TempFile("", "restartCount")
-					Expect(err).NotTo(HaveOccurred())
-					defer os.Remove(tmpFile.Name())
 
 					// It failed at the 1st run, then succeeded at 2nd run, then run forever
 					cmdScripts := `
@@ -93,7 +86,7 @@ if [ $count -eq 2 ]; then
 fi
 while true; do sleep 1; done
 `
-					tmpCmd := fmt.Sprintf(cmdScripts, path.Join(restartCountVolumePath, path.Base(tmpFile.Name())))
+					tmpCmd := fmt.Sprintf(cmdScripts, path.Join(restartCountVolumePath, "restartCount"))
 					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
@@ -101,6 +94,11 @@ while true; do sleep 1; done
 						Container:     testContainer,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
+						PodSecurityContext: &api.PodSecurityContext{
+							SELinuxOptions: &api.SELinuxOptions{
+								Level: "s0",
+							},
+						},
 					}
 					terminateContainer.Create()
 					defer terminateContainer.Delete()
@@ -133,6 +131,7 @@ while true; do sleep 1; done
 				name := "termination-message-container"
 				terminationMessage := "DONE"
 				terminationMessagePath := "/dev/termination-log"
+				priv := true
 				c := ConformanceContainer{
 					Framework: f,
 					Container: api.Container{
@@ -141,6 +140,9 @@ while true; do sleep 1; done
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
 						TerminationMessagePath: terminationMessagePath,
+						SecurityContext: &api.SecurityContext{
+							Privileged: &priv,
+						},
 					},
 					RestartPolicy: api.RestartPolicyNever,
 				}
