@@ -195,20 +195,11 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	if len(p.versions) == 0 {
 		return fmt.Errorf("no version specified, object cannot be converted")
 	}
-	for _, version := range p.versions {
-		if version.IsEmpty() {
-			continue
-		}
-		converted, err := p.converter.ConvertToVersion(obj, version)
-		if runtime.IsNotRegisteredError(err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		return p.printer.PrintObj(converted, w)
+	converted, err := p.converter.ConvertToVersion(obj, unversioned.GroupVersions(p.versions))
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.versions)
+	return p.printer.PrintObj(converted, w)
 }
 
 // TODO: implement HandledResources()
