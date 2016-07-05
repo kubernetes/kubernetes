@@ -16,7 +16,7 @@
 
 # Build a Kubernetes release.  This will build the binaries, create the Docker
 # images and other build artifacts.
-# For pushing these artifacts publicly on Google Cloud Storage, see the 
+# For pushing these artifacts publicly on Google Cloud Storage, see the
 # associated build/push-* scripts.
 
 set -o errexit
@@ -45,6 +45,5 @@ if [[ "${FEDERATION:-}" == "true" ]];then
     )
 fi
 
-kube::build::copy_output
 kube::release::package_tarballs
 kube::release::package_hyperkube

@@ -170,16 +170,14 @@ function kube::build::docker_available_on_osx() {
       kube::log::status "Using Docker for MacOS"
       return 0
     fi
-    
+
     kube::log::status "No docker host is set. Checking options for setting one..."
     if [[ -z "$(which docker-machine)" && -z "$(which boot2docker)" ]]; then
-      kube::log::status "It looks like you're running Mac OS X, and neither Docker for Mac, docker-machine or boot2docker are nowhere to be found."
-      kube::log::status "See: https://docs.docker.com/machine/ for installation instructions."
+      kube::log::status "It looks like you're running Mac OS X, and neither Docker for Mac nor docker-machine can be found."
+      kube::log::status "See: https://docs.docker.com/engine/installation/mac/ for installation instructions."
       return 1
     elif [[ -n "$(which docker-machine)" ]]; then
       kube::build::prepare_docker_machine
-    elif [[ -n "$(which boot2docker)" ]]; then
-      kube::build::prepare_boot2docker
     fi
   fi
 }
@@ -215,29 +213,6 @@ function kube::build::prepare_docker_machine() {
   return 0
 }
 
-function kube::build::prepare_boot2docker() {
-  kube::log::status "boot2docker cli has been deprecated in favor of docker-machine."
-  kube::log::status "See: https://github.com/boot2docker/boot2docker-cli for more details."
-  if [[ $(boot2docker status) != "running" ]]; then
-    kube::log::status "boot2docker isn't running. We'll try to start it."
-    boot2docker up || {
-      kube::log::error "Can't start boot2docker."
-      kube::log::error "You may need to 'boot2docker init' to create your VM."
-      return 1
-    }
-  fi
-
-  # Reach over and set the clock. After sleep/resume the clock will skew.
-  kube::log::status "Setting boot2docker clock"
-  boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
-
-  kube::log::status "Setting boot2docker env variables"
-  $(boot2docker shellinit)
-  kube::log::status "boot2docker-vm has been successfully started."
-
-  return 0
-}
-
 function kube::build::is_osx() {
   [[ "$(uname)" == "Darwin" ]]
 }
@@ -266,19 +241,39 @@ function kube::build::ensure_docker_daemon_connectivity {
       echo
       echo "Possible causes:"
       echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
-      echo "    - Create and start your VM using docker-machine or boot2docker: "
+      echo "    - Create and start your VM using docker-machine or docker for Mac: "
       echo "      - docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
-      echo "      - boot2docker init && boot2docker start"
+      echo "      - docker for Mac: check docker icon in menu bar"
       echo "    - Set your environment variables using: "
       echo "      - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
-      echo "      - \$(boot2docker shellinit)"
-      echo "    - Update your Docker VM"
+      echo "      - docker for Mac: ensure that DOCKER_HOST is unset.  See https://docs.docker.com/docker-for-mac/docker-toolbox/#/setting-up-to-run-docker-for-mac"
+      echo "    - Update your Docker VM (docker-machine)"
       echo "      - Error Message: 'Error response from daemon: client is newer than server (...)' "
       echo "      - docker-machine upgrade ${DOCKER_MACHINE_NAME}"
       echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
       echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
       echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
       echo "  - On Linux, Docker daemon hasn't been started or has crashed."
+    } >&2
+    return 1
+  fi
+}
+
+function kube::build::ensure_docker_output_local {
+  rm -f "${LOCAL_OUTPUT_SUBPATH}/test_for_remote"
+  kube::build::run_build_command touch "${REMOTE_OUTPUT_BINPATH}/test_for_remote"
+
+  if [[ ! -e "${LOCAL_OUTPUT_BINPATH}/test_for_remote" ]] ; then
+    {
+      echo "Output from build is not available locally."
+      echo
+      echo "Kubernetes build tooling assumes that the docker daemon is local and"
+      echo "that volume mounts are mapped directly."
+      echo "  - Local Docker on Linux: This should be automatic."
+      echo "  - Docker for Mac: Make sure kubernetes source is under a directory"
+      echo "    listed in the 'File Sharing' tab in preferences."
+      echo "  - Docker Machine: Ensure the machine is a local VM and that"
+      echo "    kubernetes source is under /Users/$USER."
     } >&2
     return 1
   fi
@@ -309,7 +304,6 @@ function kube::build::clean_output() {
   # Clean out the output directory if it exists.
   if kube::build::has_docker ; then
     if kube::build::build_image_built ; then
-      kube::log::status "Cleaning out _output/dockerized/bin/ via docker build image"
       kube::build::run_build_command bash -c "rm -rf '${REMOTE_OUTPUT_BINPATH}'/*"
     else
       kube::log::error "Build image not built.  Cannot clean via docker build image."
@@ -515,6 +509,7 @@ function kube::build::build_image() {
   kube::build::update_dockerfile
 
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
+  kube::build::ensure_docker_output_local || return 1
 }
 
 # Build a docker image from a Dockerfile.
@@ -592,10 +587,10 @@ function kube::build::ensure_data_container() {
 }
 
 # Run a command in the kube-build image.  This assumes that the image has
-# already been built.  This will sync out all output data from the build.
+# already been built.
 function kube::build::run_build_command() {
-  kube::log::status "Running build command...."
   [[ $# != 0 ]] || { echo "Invalid input - please specify a command to run." >&2; return 4; }
+  kube::log::status "Running build command: $*"
 
   kube::build::ensure_data_container
   kube::build::prepare_output
@@ -635,65 +630,6 @@ function kube::build::run_build_command() {
   kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
 }
 
-# Test if the output directory is remote (and can only be accessed through
-# docker) or if it is "local" and we can access the output without going through
-# docker.
-function kube::build::is_output_remote() {
-  rm -f "${LOCAL_OUTPUT_SUBPATH}/test_for_remote"
-  kube::build::run_build_command touch "${REMOTE_OUTPUT_BINPATH}/test_for_remote"
-
-  [[ ! -e "${LOCAL_OUTPUT_BINPATH}/test_for_remote" ]]
-}
-
-# If the Docker server is remote, copy the results back out.
-function kube::build::copy_output() {
-  if kube::build::is_output_remote; then
-    # At time of this code, docker cp does not work when copying from a volume.
-    # As a workaround, the binaries are first copied to a local filesystem,
-    # /tmp, then docker cp'd to the local binaries output directory.
-    # The fix for the volume bug has been accepted and once it's widely
-    # deployed the code below should be simplified to a simple docker cp
-    # Bug: https://github.com/docker/docker/pull/8509
-    local -a docker_run_opts=(
-      "--name=${KUBE_BUILD_CONTAINER_NAME}"
-      "--user=$(id -u):$(id -g)"
-      "${DOCKER_MOUNT_ARGS[@]}"
-      -d
-    )
-
-    local -ra docker_cmd=(
-      "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}"
-    )
-
-    kube::log::status "Syncing back _output/dockerized/bin directory from remote Docker"
-    rm -rf "${LOCAL_OUTPUT_BINPATH}"
-    mkdir -p "${LOCAL_OUTPUT_BINPATH}"
-
-    kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
-    "${docker_cmd[@]}" bash -c "cp -r ${REMOTE_OUTPUT_BINPATH} /tmp/bin;touch /tmp/finished;rm /tmp/bin/test_for_remote;/bin/sleep 600" > /dev/null 2>&1
-
-    # Wait until binaries have finished coppying
-    count=0
-    while true;do
-      if "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/finished" "${LOCAL_OUTPUT_BINPATH}" > /dev/null 2>&1;then
-        "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/bin" "${LOCAL_OUTPUT_SUBPATH}"
-        break;
-      fi
-
-      let count=count+1
-      if [[ $count -eq 60 ]]; then
-        # break after 5m
-        kube::log::error "Timed out waiting for binaries..."
-        break
-      fi
-      sleep 5
-    done
-
-    "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
-  else
-    kube::log::status "Output directory is local.  No need to copy results out."
-  fi
-}
 
 # ---------------------------------------------------------------------------
 # Build final release artifacts
