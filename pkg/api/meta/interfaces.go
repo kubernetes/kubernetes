@@ -173,7 +173,10 @@ type RESTMapper interface {
 	// ResourcesFor takes a partial resource and returns back the list of potential resource in priority order
 	ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error)
 
+	// RESTMapping identifies a preferred resource mapping for the provided group kind.
 	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
+	// RESTMappings returns all resource mappings for the provided group kind.
+	RESTMappings(gk unversioned.GroupKind) ([]*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
