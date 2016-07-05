@@ -152,6 +152,27 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, ver
 	return mapping, nil
 }
 
+func (t *thirdPartyResourceDataMapper) RESTMappings(gk unversioned.GroupKind) ([]*meta.RESTMapping, error) {
+	if gk.Group != t.group {
+		return nil, fmt.Errorf("unknown group %q expected %s", gk.Group, t.group)
+	}
+	if gk.Kind != "ThirdPartyResourceData" {
+		return nil, fmt.Errorf("unknown kind %s expected %s", gk.Kind, t.kind)
+	}
+
+	// TODO figure out why we're doing this rewriting
+	extensionGK := unversioned.GroupKind{Group: extensions.GroupName, Kind: "ThirdPartyResourceData"}
+
+	mappings, err := t.mapper.RESTMappings(extensionGK)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range mappings {
+		m.ObjectConvertor = &thirdPartyObjectConverter{m.ObjectConvertor}
+	}
+	return mappings, nil
+}
+
 func (t *thirdPartyResourceDataMapper) AliasesForResource(resource string) ([]string, bool) {
 	return t.mapper.AliasesForResource(resource)
 }

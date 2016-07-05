@@ -318,18 +318,21 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			outputRESTMapper := kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
 			priorityRESTMapper := meta.PriorityRESTMapper{
 				Delegate: outputRESTMapper,
-				ResourcePriority: []unversioned.GroupVersionResource{
-					{Group: api.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-					{Group: autoscaling.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-					{Group: extensions.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-					{Group: federation.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
-				},
-				KindPriority: []unversioned.GroupVersionKind{
-					{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-					{Group: autoscaling.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-					{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-					{Group: federation.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
-				},
+			}
+			// TODO: this should come from registered versions
+			groups := []string{api.GroupName, autoscaling.GroupName, extensions.GroupName, federation.GroupName, batch.GroupName}
+			// set a preferred version
+			for _, group := range groups {
+				gvs := registered.EnabledVersionsForGroup(group)
+				if len(gvs) == 0 {
+					continue
+				}
+				priorityRESTMapper.ResourcePriority = append(priorityRESTMapper.ResourcePriority, unversioned.GroupVersionResource{Group: group, Version: gvs[0].Version, Resource: meta.AnyResource})
+				priorityRESTMapper.KindPriority = append(priorityRESTMapper.KindPriority, unversioned.GroupVersionKind{Group: group, Version: gvs[0].Version, Kind: meta.AnyKind})
+			}
+			for _, group := range groups {
+				priorityRESTMapper.ResourcePriority = append(priorityRESTMapper.ResourcePriority, unversioned.GroupVersionResource{Group: group, Version: meta.AnyVersion, Resource: meta.AnyResource})
+				priorityRESTMapper.KindPriority = append(priorityRESTMapper.KindPriority, unversioned.GroupVersionKind{Group: group, Version: meta.AnyVersion, Kind: meta.AnyKind})
 			}
 			return priorityRESTMapper, api.Scheme
 		},

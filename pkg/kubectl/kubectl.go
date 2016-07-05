@@ -127,12 +127,16 @@ func (e ShortcutExpander) ResourceFor(resource unversioned.GroupVersionResource)
 	return e.RESTMapper.ResourceFor(expandResourceShortcut(resource))
 }
 
-func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
-}
-
 func (e ShortcutExpander) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	return e.RESTMapper.RESTMapping(gk, versions...)
+}
+
+func (e ShortcutExpander) RESTMappings(gk unversioned.GroupKind) ([]*meta.RESTMapping, error) {
+	return e.RESTMapper.RESTMappings(gk)
+}
+
+func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
+	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
 }
 
 func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
