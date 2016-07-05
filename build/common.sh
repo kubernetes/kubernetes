@@ -29,7 +29,7 @@ readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox
 # This will canonicalize the path
 KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
 
-source hack/lib/init.sh
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Incoming options
 #
