@@ -83,7 +83,7 @@ Documentation for other releases can be found at
 
     * for OpenShift v1 API, because it's currently registered at /oapi/v1, to be backward compatible, OpenShift may set prefix="oapi", group="".
 
-    * for other new third-party API, they should also use the prefix="apis" and choose the group and version. This can be done through the thirdparty API plugin mechanism in [13000](http://pr.k8s.io/13000).
+    * for other new third-party API, they should also use the prefix="apis" and choose the group and version. This can be done through the third-party API plugin mechanism in [13000](http://pr.k8s.io/13000).
 
 2. supporting API discovery:
 
