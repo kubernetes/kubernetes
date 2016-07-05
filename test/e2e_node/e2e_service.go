@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -233,9 +234,17 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--config", es.kubeletStaticPodDir,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
-		"--network-plugin=kubenet",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 	)
+	if !*disableKubenet {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		cmdArgs = append(cmdArgs,
+			"--network-plugin=kubenet",
+			"--network-plugin-dir", filepath.Join(cwd, CNIDirectory, "bin")) // Enable kubenet
+	}
 	cmd := exec.Command("sudo", cmdArgs...)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",
