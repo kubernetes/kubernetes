@@ -20,7 +20,6 @@ package integration
 
 import (
 	"fmt"
-	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -59,7 +57,7 @@ const oneValidOwnerPodName = "test.pod.3"
 const toBeDeletedRCName = "test.rc.1"
 const remainingRCName = "test.rc.2"
 
-func newPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
+func newPod(podName, podNamespace string, ownerReferences []v1.OwnerReference) *v1.Pod {
 	for i := 0; i < len(ownerReferences); i++ {
 		if len(ownerReferences[i].Kind) == 0 {
 			ownerReferences[i].Kind = "ReplicationController"
@@ -73,7 +71,7 @@ func newPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:            podName,
-			Namespace:       framework.TestNS,
+			Namespace:       podNamespace,
 			OwnerReferences: ownerReferences,
 		},
 		Spec: v1.PodSpec{
@@ -87,14 +85,14 @@ func newPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
 	}
 }
 
-func newOwnerRC(name string) *v1.ReplicationController {
+func newOwnerRC(name, namespace string) *v1.ReplicationController {
 	return &v1.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Namespace: framework.TestNS,
+			Namespace: namespace,
 			Name:      name,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -116,22 +114,10 @@ func newOwnerRC(name string) *v1.ReplicationController {
 	}
 }
 
-func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interface) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	// TODO: close the http server
-
+func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.EnableCoreControllers = false
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
 	if err != nil {
@@ -146,23 +132,28 @@ func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interfac
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}
-	return gc, clientSet
+	return s, gc, clientSet
 }
 
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
-	gc, clientSet := setup(t)
+	s, gc, clientSet := setup(t)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("gc-cascading-deletion", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	oldEnableGarbageCollector := registry.EnableGarbageCollector
 	registry.EnableGarbageCollector = true
 	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
-	rcClient := clientSet.Core().ReplicationControllers(framework.TestNS)
-	podClient := clientSet.Core().Pods(framework.TestNS)
+	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	podClient := clientSet.Core().Pods(ns.Name)
 
-	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName))
+	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
-	remainingRC, err := rcClient.Create(newOwnerRC(remainingRCName))
+	remainingRC, err := rcClient.Create(newOwnerRC(remainingRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
@@ -176,14 +167,14 @@ func TestCascadingDeletion(t *testing.T) {
 	}
 
 	// this pod should be cascadingly deleted.
-	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
+	pod := newPod(garbageCollectedPodName, ns.Name, []v1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
 	_, err = podClient.Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
 	// this pod shouldn't be cascadingly deleted, because it has a valid reference.
-	pod = newPod(oneValidOwnerPodName, []v1.OwnerReference{
+	pod = newPod(oneValidOwnerPodName, ns.Name, []v1.OwnerReference{
 		{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName},
 		{UID: remainingRC.ObjectMeta.UID, Name: remainingRCName},
 	})
@@ -193,7 +184,7 @@ func TestCascadingDeletion(t *testing.T) {
 	}
 
 	// this pod shouldn't be cascadingly deleted, because it doesn't have an owner.
-	pod = newPod(independentPodName, []v1.OwnerReference{})
+	pod = newPod(independentPodName, ns.Name, []v1.OwnerReference{})
 	_, err = podClient.Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
@@ -253,13 +244,18 @@ func TestCascadingDeletion(t *testing.T) {
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExistentOwner(t *testing.T) {
-	gc, clientSet := setup(t)
+	s, gc, clientSet := setup(t)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("gc-non-existing-owner", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	oldEnableGarbageCollector := registry.EnableGarbageCollector
 	registry.EnableGarbageCollector = true
 	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
-	podClient := clientSet.Core().Pods(framework.TestNS)
+	podClient := clientSet.Core().Pods(ns.Name)
 
-	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: "doesn't matter", Name: toBeDeletedRCName}})
+	pod := newPod(garbageCollectedPodName, ns.Name, []v1.OwnerReference{{UID: "doesn't matter", Name: toBeDeletedRCName}})
 	_, err := podClient.Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
@@ -288,13 +284,13 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	}
 }
 
-func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix string, initialFinalizers []string, options *api.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
+func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options *api.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
 	defer wg.Done()
-	rcClient := clientSet.Core().ReplicationControllers(framework.TestNS)
-	podClient := clientSet.Core().Pods(framework.TestNS)
+	rcClient := clientSet.Core().ReplicationControllers(namespace)
+	podClient := clientSet.Core().Pods(namespace)
 	// create rc.
 	rcName := "test.rc." + nameSuffix
-	rc := newOwnerRC(rcName)
+	rc := newOwnerRC(rcName, namespace)
 	rc.ObjectMeta.Finalizers = initialFinalizers
 	rc, err := rcClient.Create(rc)
 	if err != nil {
@@ -305,7 +301,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	var podUIDs []types.UID
 	for j := 0; j < 3; j++ {
 		podName := "test.pod." + nameSuffix + "-" + strconv.Itoa(j)
-		pod := newPod(podName, []v1.OwnerReference{{UID: rc.ObjectMeta.UID, Name: rc.ObjectMeta.Name}})
+		pod := newPod(podName, namespace, []v1.OwnerReference{{UID: rc.ObjectMeta.UID, Name: rc.ObjectMeta.Name}})
 		_, err = podClient.Create(pod)
 		if err != nil {
 			t.Fatalf("Failed to create Pod: %v", err)
@@ -325,9 +321,9 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	}
 }
 
-func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.Core().ReplicationControllers(framework.TestNS)
-	podClient := clientSet.Core().Pods(framework.TestNS)
+func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
+	rcClient := clientSet.Core().ReplicationControllers(namespace)
+	podClient := clientSet.Core().Pods(namespace)
 	pods, err := podClient.List(api.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
@@ -353,7 +349,12 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, rcNum, 
 // e2e tests that put more stress.
 func TestStressingCascadingDeletion(t *testing.T) {
 	t.Logf("starts garbage collector stress test")
-	gc, clientSet := setup(t)
+	s, gc, clientSet := setup(t)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("gc-stressing-cascading-deletion", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	oldEnableGarbageCollector := registry.EnableGarbageCollector
 	registry.EnableGarbageCollector = true
 	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
@@ -367,13 +368,13 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	rcUIDs := make(chan types.UID, collections*4)
 	for i := 0; i < collections; i++ {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will be deleted
-		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), []string{}, nil, &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, nil, &wg, rcUIDs)
 		// rc is created with the orphan finalizer, deleted with nil options, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), []string{api.FinalizerOrphan}, nil, &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), ns.Name, []string{api.FinalizerOrphan}, nil, &wg, rcUIDs)
 		// rc is created with the orphan finalizer, deleted with DeleteOptions.OrphanDependents=false, pods will be deleted.
-		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), []string{api.FinalizerOrphan}, getNonOrphanOptions(), &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{api.FinalizerOrphan}, getNonOrphanOptions(), &wg, rcUIDs)
 		// rc is created with empty finalizers, deleted with DeleteOptions.OrphanDependents=true, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection4-"+strconv.Itoa(i), []string{}, getOrphanOptions(), &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection4-"+strconv.Itoa(i), ns.Name, []string{}, getOrphanOptions(), &wg, rcUIDs)
 	}
 	wg.Wait()
 	t.Logf("all pods are created, all replications controllers are created then deleted")
@@ -390,14 +391,14 @@ func TestStressingCascadingDeletion(t *testing.T) {
 		podsInEachCollection := 3
 		// see the comments on the calls to setupRCsPods for details
 		remainingGroups := 2
-		return verifyRemainingObjects(t, clientSet, 0, collections*podsInEachCollection*remainingGroups)
+		return verifyRemainingObjects(t, clientSet, ns.Name, 0, collections*podsInEachCollection*remainingGroups)
 	}); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("number of remaining replication controllers and pods are as expected")
 
 	// verify the remaining pods all have "orphan" in their names.
-	podClient := clientSet.Core().Pods(framework.TestNS)
+	podClient := clientSet.Core().Pods(ns.Name)
 	pods, err := podClient.List(api.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -420,14 +421,19 @@ func TestStressingCascadingDeletion(t *testing.T) {
 }
 
 func TestOrphaning(t *testing.T) {
-	gc, clientSet := setup(t)
+	s, gc, clientSet := setup(t)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("gc-orphaning", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	oldEnableGarbageCollector := registry.EnableGarbageCollector
 	registry.EnableGarbageCollector = true
 	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
-	podClient := clientSet.Core().Pods(framework.TestNS)
-	rcClient := clientSet.Core().ReplicationControllers(framework.TestNS)
+	podClient := clientSet.Core().Pods(ns.Name)
+	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
-	toBeDeletedRC := newOwnerRC(toBeDeletedRCName)
+	toBeDeletedRC := newOwnerRC(toBeDeletedRCName, ns.Name)
 	toBeDeletedRC, err := rcClient.Create(toBeDeletedRC)
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
@@ -438,7 +444,7 @@ func TestOrphaning(t *testing.T) {
 	podsNum := 3
 	for i := 0; i < podsNum; i++ {
 		podName := garbageCollectedPodName + strconv.Itoa(i)
-		pod := newPod(podName, []v1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
+		pod := newPod(podName, ns.Name, []v1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
 		_, err = podClient.Create(pod)
 		if err != nil {
 			t.Fatalf("Failed to create Pod: %v", err)

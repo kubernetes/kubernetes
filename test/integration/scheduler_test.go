@@ -50,11 +50,11 @@ type nodeStateManager struct {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("unschedulable-nodes", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -65,12 +65,12 @@ func TestUnschedulableNodes(t *testing.T) {
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
 	scheduler.New(schedulerConfig).Run()
 
 	defer close(schedulerConfig.StopEverything)
 
-	DoTestUnschedulableNodes(t, restClient, schedulerConfigFactory.NodeLister.Store)
+	DoTestUnschedulableNodes(t, restClient, ns, schedulerConfigFactory.NodeLister.Store)
 }
 
 func podScheduled(c *client.Client, podNamespace, podName string) wait.ConditionFunc {
@@ -119,7 +119,11 @@ func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n 
 	return err
 }
 
-func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore cache.Store) {
+func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, ns *api.Namespace, nodeStore cache.Store) {
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (Nodes).
+	defer restClient.Nodes().DeleteCollection(nil, api.ListOptions{})
+
 	goodCondition := api.NodeCondition{
 		Type:              api.NodeReady,
 		Status:            api.ConditionTrue,
@@ -246,7 +250,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 				Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(restClient)}},
 			},
 		}
-		myPod, err := restClient.Pods(api.NamespaceDefault).Create(pod)
+		myPod, err := restClient.Pods(ns.Name).Create(pod)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -277,7 +281,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 		}
 
-		err = restClient.Pods(api.NamespaceDefault).Delete(myPod.Name, api.NewDeleteOptions(0))
+		err = restClient.Pods(ns.Name).Delete(myPod.Name, api.NewDeleteOptions(0))
 		if err != nil {
 			t.Errorf("Failed to delete pod: %v", err)
 		}
@@ -289,13 +293,13 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 }
 
 func TestMultiScheduler(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	// TODO: Uncomment when fix #19254
 	// This seems to be a different issue - it still doesn't work.
 	// defer s.Close()
+
+	ns := framework.CreateTestingNamespace("multi-scheduler", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	/*
 		This integration tests the multi-scheduler feature in the following way:
@@ -319,6 +323,10 @@ func TestMultiScheduler(t *testing.T) {
 	// 1. create and start default-scheduler
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (Nodes).
+	defer restClient.Nodes().DeleteCollection(nil, api.ListOptions{})
+
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
@@ -326,7 +334,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 
@@ -344,21 +352,21 @@ func TestMultiScheduler(t *testing.T) {
 
 	// 3. create 3 pods for testing
 	podWithNoAnnotation := createPod(restClient, "pod-with-no-annotation", nil)
-	testPodNoAnnotation, err := restClient.Pods(api.NamespaceDefault).Create(podWithNoAnnotation)
+	testPodNoAnnotation, err := restClient.Pods(ns.Name).Create(podWithNoAnnotation)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
 	podWithAnnotationFitsDefault := createPod(restClient, "pod-with-annotation-fits-default", schedulerAnnotationFitsDefault)
-	testPodWithAnnotationFitsDefault, err := restClient.Pods(api.NamespaceDefault).Create(podWithAnnotationFitsDefault)
+	testPodWithAnnotationFitsDefault, err := restClient.Pods(ns.Name).Create(podWithAnnotationFitsDefault)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}
 	podWithAnnotationFitsFoo := createPod(restClient, "pod-with-annotation-fits-foo", schedulerAnnotationFitsFoo)
-	testPodWithAnnotationFitsFoo, err := restClient.Pods(api.NamespaceDefault).Create(podWithAnnotationFitsFoo)
+	testPodWithAnnotationFitsFoo, err := restClient.Pods(ns.Name).Create(podWithAnnotationFitsFoo)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -397,7 +405,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(api.EventSource{Component: "foo-scheduler"})
-	eventBroadcaster2.StartRecordingToSink(restClient2.Events(""))
+	eventBroadcaster2.StartRecordingToSink(restClient2.Events(ns.Name))
 	scheduler.New(schedulerConfig2).Run()
 
 	defer close(schedulerConfig2.StopEverything)
@@ -412,11 +420,11 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	//	7. delete the pods that were scheduled by the default scheduler, and stop the default scheduler
-	err = restClient.Pods(api.NamespaceDefault).Delete(testPodNoAnnotation.Name, api.NewDeleteOptions(0))
+	err = restClient.Pods(ns.Name).Delete(testPodNoAnnotation.Name, api.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
-	err = restClient.Pods(api.NamespaceDefault).Delete(testPodWithAnnotationFitsDefault.Name, api.NewDeleteOptions(0))
+	err = restClient.Pods(ns.Name).Delete(testPodWithAnnotationFitsDefault.Name, api.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
@@ -434,11 +442,11 @@ func TestMultiScheduler(t *testing.T) {
 		//		- note: these two pods belong to default scheduler which no longer exists
 		podWithNoAnnotation2 := createPod("pod-with-no-annotation2", nil)
 		podWithAnnotationFitsDefault2 := createPod("pod-with-annotation-fits-default2", schedulerAnnotationFitsDefault)
-		testPodNoAnnotation2, err := restClient.Pods(api.NamespaceDefault).Create(podWithNoAnnotation2)
+		testPodNoAnnotation2, err := restClient.Pods(ns.Name).Create(podWithNoAnnotation2)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
-		testPodWithAnnotationFitsDefault2, err := restClient.Pods(api.NamespaceDefault).Create(podWithAnnotationFitsDefault2)
+		testPodWithAnnotationFitsDefault2, err := restClient.Pods(ns.Name).Create(podWithAnnotationFitsDefault2)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -471,13 +479,18 @@ func createPod(client *client.Client, name string, annotation map[string]string)
 
 // This test will verify scheduler can work well regardless of whether kubelet is allocatable aware or not.
 func TestAllocatable(t *testing.T) {
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
+	ns := framework.CreateTestingNamespace("allocatable", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	// 1. create and start default-scheduler
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (Nodes).
+	defer restClient.Nodes().DeleteCollection(nil, api.ListOptions{})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -486,7 +499,7 @@ func TestAllocatable(t *testing.T) {
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 	defer close(schedulerConfig.StopEverything)
@@ -528,7 +541,7 @@ func TestAllocatable(t *testing.T) {
 		},
 	}
 
-	testAllocPod, err := restClient.Pods(api.NamespaceDefault).Create(podResource)
+	testAllocPod, err := restClient.Pods(ns.Name).Create(podResource)
 	if err != nil {
 		t.Fatalf("Test allocatable unawareness failed to create pod: %v", err)
 	}
@@ -559,13 +572,13 @@ func TestAllocatable(t *testing.T) {
 		t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 	}
 
-	if err := restClient.Pods(api.NamespaceDefault).Delete(podResource.Name, &api.DeleteOptions{}); err != nil {
+	if err := restClient.Pods(ns.Name).Delete(podResource.Name, &api.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to remove first resource pod: %v", err)
 	}
 
 	// 6. Make another pod with different name, same resource request
 	podResource.ObjectMeta.Name = "pod-test-allocatable2"
-	testAllocPod2, err := restClient.Pods(api.NamespaceDefault).Create(podResource)
+	testAllocPod2, err := restClient.Pods(ns.Name).Create(podResource)
 	if err != nil {
 		t.Fatalf("Test allocatable awareness failed to create pod: %v", err)
 	}

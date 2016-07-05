@@ -64,7 +64,6 @@ func init() {
 	Pods = *pods
 	Workers = *workers
 	Tasks = *tasks
-	framework.DeleteAllEtcdKeys()
 }
 
 // getPods returns the cmd line -pods or b.N if -pods wasn't specified.
@@ -98,7 +97,7 @@ func getIterations(bN int) int {
 }
 
 // startPodsOnNodes creates numPods sharded across numNodes
-func startPodsOnNodes(numPods, numNodes int, restClient *client.Client) {
+func startPodsOnNodes(ns string, numPods, numNodes int, restClient *client.Client) {
 	podsPerNode := numPods / numNodes
 	if podsPerNode < 1 {
 		podsPerNode = 1
@@ -114,6 +113,9 @@ func BenchmarkPodList(b *testing.B) {
 	m := framework.NewMasterComponents(&framework.Config{nil, true, false, 250.0, 500})
 	defer m.Stop(true, true)
 
+	ns := framework.CreateTestingNamespace("benchmark-pod-list", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	numPods, numTasks, iter := getPods(b.N), getTasks(b.N), getIterations(b.N)
 	podsPerNode := numPods / numTasks
 	if podsPerNode < 1 {
@@ -122,7 +124,7 @@ func BenchmarkPodList(b *testing.B) {
 	glog.Infof("Starting benchmark: b.N %d, pods %d, workers %d, podsPerNode %d",
 		b.N, numPods, numTasks, podsPerNode)
 
-	startPodsOnNodes(numPods, numTasks, m.RestClient)
+	startPodsOnNodes(ns.Name, numPods, numTasks, m.RestClient)
 	// Stop the rc manager so it doesn't steal resources
 	m.Stop(false, true)
 
@@ -134,7 +136,7 @@ func BenchmarkPodList(b *testing.B) {
 			defer func() {
 				glog.V(3).Infof("Worker %d: Node %v listing pods took %v", id, host, time.Since(now))
 			}()
-			if pods, err := m.RestClient.Pods(framework.TestNS).List(
+			if pods, err := m.RestClient.Pods(ns.Name).List(
 				labels.Everything(),
 				fields.OneTermEqualSelector(client.PodHost, host)); err != nil {
 				return err
@@ -153,13 +155,16 @@ func BenchmarkPodListEtcd(b *testing.B) {
 	m := framework.NewMasterComponents(&framework.Config{nil, true, false, 250.0, 500})
 	defer m.Stop(true, true)
 
+	ns := framework.CreateTestingNamespace("benchmark-pod-list-etcd", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	numPods, numTasks, iter := getPods(b.N), getTasks(b.N), getIterations(b.N)
 	podsPerNode := numPods / numTasks
 	if podsPerNode < 1 {
 		podsPerNode = 1
 	}
 
-	startPodsOnNodes(numPods, numTasks, m.RestClient)
+	startPodsOnNodes(ns.Name, numPods, numTasks, m.RestClient)
 	// Stop the rc manager so it doesn't steal resources
 	m.Stop(false, true)
 
@@ -173,7 +178,7 @@ func BenchmarkPodListEtcd(b *testing.B) {
 			defer func() {
 				glog.V(3).Infof("Worker %d: listing pods took %v", id, time.Since(now))
 			}()
-			pods, err := m.RestClient.Pods(framework.TestNS).List(labels.Everything(), fields.Everything())
+			pods, err := m.RestClient.Pods(ns.Name).List(labels.Everything(), fields.Everything())
 			if err != nil {
 				return err
 			}

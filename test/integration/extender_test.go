@@ -185,11 +185,11 @@ func machine_3_Prioritizer(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.Hos
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("scheduler-extender", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -240,15 +240,19 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
 	scheduler.New(schedulerConfig).Run()
 
 	defer close(schedulerConfig.StopEverything)
 
-	DoTestPodScheduling(t, restClient)
+	DoTestPodScheduling(ns, t, restClient)
 }
 
-func DoTestPodScheduling(t *testing.T, restClient *client.Client) {
+func DoTestPodScheduling(ns *api.Namespace, t *testing.T, restClient *client.Client) {
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (Nodes).
+	defer restClient.Nodes().DeleteCollection(nil, api.ListOptions{})
+
 	goodCondition := api.NodeCondition{
 		Type:              api.NodeReady,
 		Status:            api.ConditionTrue,
@@ -279,7 +283,7 @@ func DoTestPodScheduling(t *testing.T, restClient *client.Client) {
 		},
 	}
 
-	myPod, err := restClient.Pods(api.NamespaceDefault).Create(pod)
+	myPod, err := restClient.Pods(ns.Name).Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -289,7 +293,7 @@ func DoTestPodScheduling(t *testing.T, restClient *client.Client) {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	if myPod, err := restClient.Pods(api.NamespaceDefault).Get(myPod.Name); err != nil {
+	if myPod, err := restClient.Pods(ns.Name).Get(myPod.Name); err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine3" {
 		t.Fatalf("Failed to schedule using extender, expected machine3, got %v", myPod.Spec.NodeName)

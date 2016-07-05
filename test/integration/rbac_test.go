@@ -26,14 +26,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"net/http/httputil"
 	"strings"
 	"testing"
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -229,12 +227,30 @@ var (
   }
 }
 `
+	podNamespace = `
+{
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "kind": "Namespace",
+  "metadata": {
+	"name": "pod-namespace"%s
+  }
+}
+`
 	jobNamespace = `
 {
   "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "job-namespace"%s
+  }
+}
+`
+	forbiddenNamespace = `
+{
+  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "kind": "Namespace",
+  "metadata": {
+	"name": "forbidden-namespace"%s
   }
 }
 `
@@ -292,16 +308,19 @@ func TestRBAC(t *testing.T) {
 				},
 			},
 			requests: []request{
+				// Create the namespace used later in the test
+				{superUser, "POST", "", "namespaces", "", "", podNamespace, http.StatusCreated},
+
 				{superUser, "GET", "", "pods", "", "", "", http.StatusOK},
-				{superUser, "GET", "", "pods", api.NamespaceDefault, "a", "", http.StatusNotFound},
-				{superUser, "POST", "", "pods", api.NamespaceDefault, "", aPod, http.StatusCreated},
-				{superUser, "GET", "", "pods", api.NamespaceDefault, "a", "", http.StatusOK},
+				{superUser, "GET", "", "pods", "pod-namespace", "a", "", http.StatusNotFound},
+				{superUser, "POST", "", "pods", "pod-namespace", "", aPod, http.StatusCreated},
+				{superUser, "GET", "", "pods", "pod-namespace", "a", "", http.StatusOK},
 
 				{"bob", "GET", "", "pods", "", "", "", http.StatusForbidden},
-				{"bob", "GET", "", "pods", api.NamespaceDefault, "a", "", http.StatusForbidden},
+				{"bob", "GET", "", "pods", "pod-namespace", "a", "", http.StatusForbidden},
 
 				{"pod-reader", "GET", "", "pods", "", "", "", http.StatusOK},
-				{"pod-reader", "POST", "", "pods", api.NamespaceDefault, "", aPod, http.StatusForbidden},
+				{"pod-reader", "POST", "", "pods", "pod-namespace", "", aPod, http.StatusForbidden},
 			},
 		},
 		{
@@ -330,21 +349,22 @@ func TestRBAC(t *testing.T) {
 			requests: []request{
 				// Create the namespace used later in the test
 				{superUser, "POST", "", "namespaces", "", "", jobNamespace, http.StatusCreated},
+				{superUser, "POST", "", "namespaces", "", "", forbiddenNamespace, http.StatusCreated},
 
 				{"user-with-no-permissions", "POST", "batch", "jobs", "job-namespace", "", aJob, http.StatusForbidden},
 				{"user-with-no-permissions", "GET", "batch", "jobs", "job-namespace", "pi", "", http.StatusForbidden},
 
-				// job-writer-namespace cannot write to the "default" namespace
-				{"job-writer-namespace", "GET", "batch", "jobs", "default", "", "", http.StatusForbidden},
-				{"job-writer-namespace", "GET", "batch", "jobs", "default", "pi", "", http.StatusForbidden},
-				{"job-writer-namespace", "POST", "batch", "jobs", "default", "", aJob, http.StatusForbidden},
-				{"job-writer-namespace", "GET", "batch", "jobs", "default", "pi", "", http.StatusForbidden},
+				// job-writer-namespace cannot write to the "forbidden-namespace"
+				{"job-writer-namespace", "GET", "batch", "jobs", "forbidden-namespace", "", "", http.StatusForbidden},
+				{"job-writer-namespace", "GET", "batch", "jobs", "forbidden-namespace", "pi", "", http.StatusForbidden},
+				{"job-writer-namespace", "POST", "batch", "jobs", "forbidden-namespace", "", aJob, http.StatusForbidden},
+				{"job-writer-namespace", "GET", "batch", "jobs", "forbidden-namespace", "pi", "", http.StatusForbidden},
 
 				// job-writer can write to any namespace
-				{"job-writer", "GET", "batch", "jobs", "default", "", "", http.StatusOK},
-				{"job-writer", "GET", "batch", "jobs", "default", "pi", "", http.StatusNotFound},
-				{"job-writer", "POST", "batch", "jobs", "default", "", aJob, http.StatusCreated},
-				{"job-writer", "GET", "batch", "jobs", "default", "pi", "", http.StatusOK},
+				{"job-writer", "GET", "batch", "jobs", "forbidden-namespace", "", "", http.StatusOK},
+				{"job-writer", "GET", "batch", "jobs", "forbidden-namespace", "pi", "", http.StatusNotFound},
+				{"job-writer", "POST", "batch", "jobs", "forbidden-namespace", "", aJob, http.StatusCreated},
+				{"job-writer", "GET", "batch", "jobs", "forbidden-namespace", "pi", "", http.StatusOK},
 
 				{"job-writer-namespace", "GET", "batch", "jobs", "job-namespace", "", "", http.StatusOK},
 				{"job-writer-namespace", "GET", "batch", "jobs", "job-namespace", "pi", "", http.StatusNotFound},
@@ -355,24 +375,13 @@ func TestRBAC(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-		framework.DeleteAllEtcdKeys()
-
-		var m *master.Master
-		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			m.Handler.ServeHTTP(w, r)
-		}))
-		defer s.Close()
-
 		// Create an API Server.
 		masterConfig := framework.NewIntegrationTestMasterConfig()
 		masterConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
 		masterConfig.Authenticator = newFakeAuthenticator()
 		masterConfig.AuthorizerRBACSuperUser = superUser
-		m, err := master.New(masterConfig)
-		if err != nil {
-			t.Fatalf("case %d: error bringing up master: %v", i, err)
-		}
+		_, s := framework.RunAMaster(masterConfig)
+		defer s.Close()
 
 		// Bootstrap the API Server with the test case's initial roles.
 		if err := tc.bootstrapRoles.bootstrap(clientForUser(superUser), s.URL); err != nil {
