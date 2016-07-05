@@ -294,6 +294,14 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			},
 		}
 	}
+	if errors.IsNotFound(err) {
+		// Simply create non-existing endpoints for the service.
+		e.Subsets = []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: ip.String()}},
+			Ports:     endpointPorts,
+		}}
+		return r.endpointRegistry.UpdateEndpoints(ctx, e)
+	}
 
 	// First, determine if the endpoint is in the format we expect (one
 	// subset, ports matching endpointPorts, N IP addresses).
@@ -304,7 +312,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []api.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
+		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
 		return r.endpointRegistry.UpdateEndpoints(ctx, e)
 	}
 	if ipCorrect && portsCorrect {

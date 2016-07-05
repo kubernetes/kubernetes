@@ -791,14 +791,13 @@ func runSelfLinkTestOnNamespace(t *testing.T, c *client.Client, namespace string
 }
 
 func TestSelfLinkOnNamespace(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
+	ns := framework.CreateTestingNamespace("selflink", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
-	runSelfLinkTestOnNamespace(t, c, api.NamespaceDefault)
-	runSelfLinkTestOnNamespace(t, c, "other-namespace")
+	runSelfLinkTestOnNamespace(t, c, ns.Name)
 }
