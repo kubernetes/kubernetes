@@ -76,7 +76,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
+	p, err := f.Printer(nil, nil)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -116,7 +116,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
-	allKinds := cmdutil.GetFlagBool(cmd, "show-kind")
+	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -293,28 +293,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	// use the default printer for each object
 	printer = nil
 	var lastMapping *meta.RESTMapping
-	var withKind bool = allKinds
 	w := kubectl.GetNewTabWriter(out)
 	defer w.Flush()
 
-	// determine if printing multiple kinds of
-	// objects and enforce "show-kinds" flag if so
-	for ix := range objs {
-		var mapping *meta.RESTMapping
-		if sorter != nil {
-			mapping = infos[sorter.OriginalPosition(ix)].Mapping
-		} else {
-			mapping = infos[ix].Mapping
-		}
-
-		// display "kind" column only if we have mixed resources
-		if lastMapping != nil && mapping.Resource != lastMapping.Resource {
-			withKind = true
-		}
-		lastMapping = mapping
+	if mustPrintWithKinds(objs, infos, sorter) {
+		showKind = true
 	}
-
-	lastMapping = nil
 
 	for ix := range objs {
 		var mapping *meta.RESTMapping
@@ -335,15 +319,24 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			lastMapping = mapping
 		}
 		if resourcePrinter, found := printer.(*kubectl.HumanReadablePrinter); found {
-			resourceName := mapping.Resource
-			if alias, ok := kubectl.ResourceShortFormFor(mapping.Resource); ok {
-				resourceName = alias
-			} else if resourceName == "" {
+			resourceName := resourcePrinter.GetResourceName()
+			if mapping != nil {
+				if resourceName == "" {
+					resourceName = mapping.Resource
+				}
+				if alias, ok := kubectl.ResourceShortFormFor(mapping.Resource); ok {
+					resourceName = alias
+				} else if resourceName == "" {
+					resourceName = "none"
+				}
+			} else {
 				resourceName = "none"
 			}
 
-			resourcePrinter.Options.WithKind = withKind
-			resourcePrinter.Options.KindName = resourceName
+			if showKind {
+				resourcePrinter.EnsurePrintWithKind(resourceName)
+			}
+
 			if err := printer.PrintObj(original, w); err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -355,4 +348,29 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+// mustPrintWithKinds determines if printer is dealing
+// with multiple resource kinds, in which case it will
+// return true, indicating resource kind will be
+// included as part of printer output
+func mustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort) bool {
+	var lastMap *meta.RESTMapping
+
+	for ix := range objs {
+		var mapping *meta.RESTMapping
+		if sorter != nil {
+			mapping = infos[sorter.OriginalPosition(ix)].Mapping
+		} else {
+			mapping = infos[ix].Mapping
+		}
+
+		// display "kind" only if we have mixed resources
+		if lastMap != nil && mapping.Resource != lastMap.Resource {
+			return true
+		}
+		lastMap = mapping
+	}
+
+	return false
 }
