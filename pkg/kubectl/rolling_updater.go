@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -206,7 +206,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	}
 	// maxSurge is the maximum scaling increment and maxUnavailable are the maximum pods
 	// that can be unavailable during a rollout.
-	maxSurge, maxUnavailable, err := deployment.ResolveFenceposts(&config.MaxSurge, &config.MaxUnavailable, desired)
+	maxSurge, maxUnavailable, err := deploymentutil.ResolveFenceposts(&config.MaxSurge, &config.MaxUnavailable, desired)
 	if err != nil {
 		return err
 	}
@@ -420,7 +420,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 			return 0, 0, err
 		}
 		for _, pod := range pods.Items {
-			if !deployment.IsPodAvailable(&pod, minReadySeconds, r.nowFn().Time) {
+			if !deploymentutil.IsPodAvailable(&pod, minReadySeconds, r.nowFn().Time) {
 				continue
 			}
 			switch controller.Name {
