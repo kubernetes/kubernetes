@@ -195,6 +195,10 @@ func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
 func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var nsServicePods []*api.Pod
+	nodes, err := nodeLister.List()
+	if err != nil {
+		return nil, err
+	}
 
 	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
 		// just use the first service and get the other pods within the service
@@ -210,11 +214,6 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNa
 				nsServicePods = append(nsServicePods, nsPod)
 			}
 		}
-	}
-
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
 	}
 
 	// separate out the nodes that have the label from the ones that don't
