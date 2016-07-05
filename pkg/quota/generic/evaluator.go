@@ -175,9 +175,9 @@ func (g *GenericEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 	if err != nil {
 		return result, fmt.Errorf("%s: Failed to list %v: %v", g.Name, g.GroupKind(), err)
 	}
-	_, err = meta.Accessor(list)
+	_, err = meta.ListAccessor(list)
 	if err != nil {
-		return result, fmt.Errorf("%s: Unable to understand list result %#v", g.Name, list)
+		return result, fmt.Errorf("%s: Unable to understand list result, does not appear to be a list %#v", g.Name, list)
 	}
 	items, err := meta.ExtractList(list)
 	if err != nil {
