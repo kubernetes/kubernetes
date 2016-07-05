@@ -44,7 +44,7 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
@@ -116,7 +116,7 @@ func TestClient(t *testing.T) {
 }
 
 func TestAtomicPut(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
@@ -208,7 +208,7 @@ func TestAtomicPut(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
@@ -317,7 +317,7 @@ func TestPatch(t *testing.T) {
 }
 
 func TestPatchWithCreateOnUpdate(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
@@ -428,7 +428,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 }
 
 func TestAPIVersions(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
@@ -450,7 +450,7 @@ func TestAPIVersions(t *testing.T) {
 }
 
 func TestSingleWatch(t *testing.T) {
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("single-watch", s, t)
@@ -535,7 +535,7 @@ func TestMultiWatch(t *testing.T) {
 	const watcherCount = 50
 	rt.GOMAXPROCS(watcherCount)
 
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("multi-watch", s, t)
@@ -794,7 +794,7 @@ func TestSelfLinkOnNamespace(t *testing.T) {
 	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
 	framework.DeleteAllEtcdKeys()
 
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
 	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})

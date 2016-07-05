@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 
 	"github.com/pborman/uuid"
@@ -152,6 +153,14 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	return m, s
 }
 
+func parseCIDROrDie(cidr string) *net.IPNet {
+	_, parsed, err := net.ParseCIDR(cidr)
+	if err != nil {
+		glog.Fatalf("error while parsing CIDR: %s", cidr)
+	}
+	return parsed
+}
+
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
 	config := storagebackend.Config{
@@ -208,6 +217,9 @@ func NewMasterConfig() *master.Config {
 			AdmissionControl:        admit.NewAlwaysAdmit(),
 			Serializer:              api.Codecs,
 			EnableWatchCache:        true,
+			// Set those values to avoid annoying warnings in logs.
+			ServiceClusterIPRange: parseCIDROrDie("10.0.0.0/24"),
+			ServiceNodePortRange:  utilnet.PortRange{Base: 30000, Size: 2768},
 		},
 		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
@@ -347,21 +359,12 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	}
 }
 
-// TODO: Merge this into startMasterOrDie.
-func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	masterConfig := NewMasterConfig()
-	masterConfig.EnableProfiling = true
-	m, err := master.New(masterConfig)
-	if err != nil {
-		// TODO: Return error.
-		glog.Fatalf("error in bringing up the master: %v", err)
+func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) {
+	if masterConfig == nil {
+		masterConfig = NewMasterConfig()
+		masterConfig.EnableProfiling = true
 	}
-
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-
-	return m, s
+	return startMasterOrDie(masterConfig)
 }
 
 // Task is a function passed to worker goroutines by RunParallel.
