@@ -188,6 +188,7 @@ func (t *Tester) TestDeleteGraceful(valid runtime.Object, createFn CreateFunc, g
 	t.testDeleteGracefulWithValue(copyOrDie(valid), createFn, getFn, expectedGrace)
 	t.testDeleteGracefulUsesZeroOnNil(copyOrDie(valid), createFn, expectedGrace)
 	t.testDeleteGracefulExtend(copyOrDie(valid), createFn, getFn, expectedGrace)
+	t.testDeleteGracefulShorten(copyOrDie(valid), createFn, getFn, expectedGrace)
 	t.testDeleteGracefulImmediate(copyOrDie(valid), createFn, getFn, expectedGrace)
 }
 
@@ -884,6 +885,47 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 	}
 	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name); !errors.IsNotFound(err) {
 		t.Errorf("unexpected error, object should not exist: %v", err)
+	}
+}
+
+// Regression test for bug discussed in #27539
+func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	t.setObjectMeta(foo, t.namer(6))
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	bigGrace := int64(time.Hour)
+	if expectedGrace > bigGrace {
+		bigGrace = 2 * expectedGrace
+	}
+	objectMeta := t.getObjectMetaOrFail(foo)
+	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(bigGrace))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	object, err := getFn(ctx, foo)
+	if err != nil {
+		t.Fatalf("did not gracefully delete resource: %v", err)
+	}
+	objectMeta = t.getObjectMetaOrFail(object)
+	deletionTimestamp := *objectMeta.DeletionTimestamp
+
+	// second delete duration is ignored
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	object, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	if err != nil {
+		t.Errorf("unexpected error, object should exist: %v", err)
+	}
+	objectMeta = t.getObjectMetaOrFail(object)
+	if objectMeta.DeletionTimestamp == nil || objectMeta.DeletionGracePeriodSeconds == nil ||
+		*objectMeta.DeletionGracePeriodSeconds != expectedGrace || !objectMeta.DeletionTimestamp.Before(deletionTimestamp) {
+		t.Errorf("unexpected deleted meta: %+v", objectMeta)
 	}
 }
 
