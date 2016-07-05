@@ -34,11 +34,11 @@ import (
 )
 
 func TestDynamicClient(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
-	_, s := framework.RunAMaster(t)
+	_, s := framework.RunAMaster(nil)
 	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("dynamic-client", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	gv := testapi.Default.GroupVersion()
 	config := &restclient.Config{
@@ -86,13 +86,13 @@ func TestDynamicClient(t *testing.T) {
 		},
 	}
 
-	actual, err := client.Pods(framework.TestNS).Create(pod)
+	actual, err := client.Pods(ns.Name).Create(pod)
 	if err != nil {
 		t.Fatalf("unexpected error when creating pod: %v", err)
 	}
 
 	// check dynamic list
-	unstructuredList, err := dynamicClient.Resource(&resource, framework.TestNS).List(&v1.ListOptions{})
+	unstructuredList, err := dynamicClient.Resource(&resource, ns.Name).List(&v1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic get
-	unstruct, err := dynamicClient.Resource(&resource, framework.TestNS).Get(actual.Name)
+	unstruct, err := dynamicClient.Resource(&resource, ns.Name).Get(actual.Name)
 	if err != nil {
 		t.Fatalf("unexpected error when getting pod %q: %v", actual.Name, err)
 	}
@@ -126,12 +126,12 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// delete the pod dynamically
-	err = dynamicClient.Resource(&resource, framework.TestNS).Delete(actual.Name, nil)
+	err = dynamicClient.Resource(&resource, ns.Name).Delete(actual.Name, nil)
 	if err != nil {
 		t.Fatalf("unexpected error when deleting pod: %v", err)
 	}
 
-	list, err := client.Pods(framework.TestNS).List(api.ListOptions{})
+	list, err := client.Pods(ns.Name).List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}

@@ -64,8 +64,7 @@ func TestQuota(t *testing.T) {
 		<-initializationCh
 		m.Handler.ServeHTTP(w, req)
 	}))
-	// TODO: https://github.com/kubernetes/kubernetes/issues/25412
-	//defer s.Close()
+	defer s.Close()
 	admissionCh := make(chan struct{})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	admission, err := resourcequota.NewResourceQuota(clientset, quotainstall.NewRegistry(clientset), 5, admissionCh)

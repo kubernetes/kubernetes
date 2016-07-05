@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
@@ -193,7 +192,9 @@ var aNode string = `
   }
 }
 `
-var aEvent string = `
+
+func aEvent(namespace string) string {
+	return `
 {
   "kind": "Event",
   "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
@@ -202,12 +203,13 @@ var aEvent string = `
   },
   "involvedObject": {
     "kind": "Pod",
-    "namespace": "default",
+    "namespace": "` + namespace + `",
     "name": "a",
     "apiVersion": "v1"
   }
 }
 `
+}
 
 var aBinding string = `
 {
@@ -287,7 +289,7 @@ func addTimeoutFlag(URLString string) string {
 	return u.String()
 }
 
-func getTestRequests() []struct {
+func getTestRequests(namespace string) []struct {
 	verb        string
 	URL         string
 	body        string
@@ -301,63 +303,63 @@ func getTestRequests() []struct {
 	}{
 		// Normal methods on pods
 		{"GET", path("pods", "", ""), "", code200},
-		{"GET", path("pods", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201},
-		{"PUT", timeoutPath("pods", api.NamespaceDefault, "a"), aPod, code200},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code200},
+		{"GET", path("pods", namespace, ""), "", code200},
+		{"POST", timeoutPath("pods", namespace, ""), aPod, code201},
+		{"PUT", timeoutPath("pods", namespace, "a"), aPod, code200},
+		{"GET", path("pods", namespace, "a"), "", code200},
 		// GET and POST for /exec should return Bad Request (400) since the pod has not been assigned a node yet.
-		{"GET", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
-		{"POST", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
+		{"GET", path("pods", namespace, "a") + "/exec", "", code400},
+		{"POST", path("pods", namespace, "a") + "/exec", "", code400},
 		// PUT for /exec should return Method Not Allowed (405).
-		{"PUT", path("pods", api.NamespaceDefault, "a") + "/exec", "", code405},
+		{"PUT", path("pods", namespace, "a") + "/exec", "", code405},
 		// GET and POST for /portforward should return Bad Request (400) since the pod has not been assigned a node yet.
-		{"GET", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
-		{"POST", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
+		{"GET", path("pods", namespace, "a") + "/portforward", "", code400},
+		{"POST", path("pods", namespace, "a") + "/portforward", "", code400},
 		// PUT for /portforward should return Method Not Allowed (405).
-		{"PUT", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code405},
-		{"PATCH", path("pods", api.NamespaceDefault, "a"), "{%v}", code200},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), deleteNow, code200},
+		{"PUT", path("pods", namespace, "a") + "/portforward", "", code405},
+		{"PATCH", path("pods", namespace, "a"), "{%v}", code200},
+		{"DELETE", timeoutPath("pods", namespace, "a"), deleteNow, code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"OPTIONS", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"OPTIONS", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"HEAD", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"HEAD", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"TRACE", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"TRACE", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"NOSUCHVERB", path("pods", api.NamespaceDefault, ""), "", code405},
+		{"OPTIONS", path("pods", namespace, ""), "", code405},
+		{"OPTIONS", path("pods", namespace, "a"), "", code405},
+		{"HEAD", path("pods", namespace, ""), "", code405},
+		{"HEAD", path("pods", namespace, "a"), "", code405},
+		{"TRACE", path("pods", namespace, ""), "", code405},
+		{"TRACE", path("pods", namespace, "a"), "", code405},
+		{"NOSUCHVERB", path("pods", namespace, ""), "", code405},
 
 		// Normal methods on services
 		{"GET", path("services", "", ""), "", code200},
-		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
+		{"GET", path("services", namespace, ""), "", code200},
+		{"POST", timeoutPath("services", namespace, ""), aService, code201},
 		// Create an endpoint for the service (this is done automatically by endpoint controller
 		// whenever a service is created, but this test does not run that controller)
-		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), emptyEndpoints, code201},
+		{"POST", timeoutPath("endpoints", namespace, ""), emptyEndpoints, code201},
 		// Should return service unavailable when endpoint.subset is empty.
-		{"GET", pathWithPrefix("proxy", "services", api.NamespaceDefault, "a") + "/", "", code503},
-		{"PUT", timeoutPath("services", api.NamespaceDefault, "a"), aService, code200},
-		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
+		{"GET", pathWithPrefix("proxy", "services", namespace, "a") + "/", "", code503},
+		{"PUT", timeoutPath("services", namespace, "a"), aService, code200},
+		{"GET", path("services", namespace, "a"), "", code200},
+		{"DELETE", timeoutPath("endpoints", namespace, "a"), "", code200},
+		{"DELETE", timeoutPath("services", namespace, "a"), "", code200},
 
 		// Normal methods on replicationControllers
 		{"GET", path("replicationControllers", "", ""), "", code200},
-		{"GET", path("replicationControllers", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("replicationControllers", api.NamespaceDefault, ""), aRC, code201},
-		{"PUT", timeoutPath("replicationControllers", api.NamespaceDefault, "a"), aRC, code200},
-		{"GET", path("replicationControllers", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("replicationControllers", api.NamespaceDefault, "a"), "", code200},
+		{"GET", path("replicationControllers", namespace, ""), "", code200},
+		{"POST", timeoutPath("replicationControllers", namespace, ""), aRC, code201},
+		{"PUT", timeoutPath("replicationControllers", namespace, "a"), aRC, code200},
+		{"GET", path("replicationControllers", namespace, "a"), "", code200},
+		{"DELETE", timeoutPath("replicationControllers", namespace, "a"), "", code200},
 
 		// Normal methods on endpoints
 		{"GET", path("endpoints", "", ""), "", code200},
-		{"GET", path("endpoints", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), aEndpoints, code201},
-		{"PUT", timeoutPath("endpoints", api.NamespaceDefault, "a"), aEndpoints, code200},
-		{"GET", path("endpoints", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
+		{"GET", path("endpoints", namespace, ""), "", code200},
+		{"POST", timeoutPath("endpoints", namespace, ""), aEndpoints, code201},
+		{"PUT", timeoutPath("endpoints", namespace, "a"), aEndpoints, code200},
+		{"GET", path("endpoints", namespace, "a"), "", code200},
+		{"DELETE", timeoutPath("endpoints", namespace, "a"), "", code200},
 
 		// Normal methods on nodes
 		{"GET", path("nodes", "", ""), "", code200},
@@ -368,30 +370,30 @@ func getTestRequests() []struct {
 
 		// Normal methods on events
 		{"GET", path("events", "", ""), "", code200},
-		{"GET", path("events", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("events", api.NamespaceDefault, ""), aEvent, code201},
-		{"PUT", timeoutPath("events", api.NamespaceDefault, "a"), aEvent, code200},
-		{"GET", path("events", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("events", api.NamespaceDefault, "a"), "", code200},
+		{"GET", path("events", namespace, ""), "", code200},
+		{"POST", timeoutPath("events", namespace, ""), aEvent(namespace), code201},
+		{"PUT", timeoutPath("events", namespace, "a"), aEvent(namespace), code200},
+		{"GET", path("events", namespace, "a"), "", code200},
+		{"DELETE", timeoutPath("events", namespace, "a"), "", code200},
 
 		// Normal methods on bindings
-		{"GET", path("bindings", api.NamespaceDefault, ""), "", code405},
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201}, // Need a pod to bind or you get a 404
-		{"POST", timeoutPath("bindings", api.NamespaceDefault, ""), aBinding, code201},
-		{"PUT", timeoutPath("bindings", api.NamespaceDefault, "a"), aBinding, code404},
-		{"GET", path("bindings", api.NamespaceDefault, "a"), "", code404}, // No bindings instances
-		{"DELETE", timeoutPath("bindings", api.NamespaceDefault, "a"), "", code404},
+		{"GET", path("bindings", namespace, ""), "", code405},
+		{"POST", timeoutPath("pods", namespace, ""), aPod, code201}, // Need a pod to bind or you get a 404
+		{"POST", timeoutPath("bindings", namespace, ""), aBinding, code201},
+		{"PUT", timeoutPath("bindings", namespace, "a"), aBinding, code404},
+		{"GET", path("bindings", namespace, "a"), "", code404}, // No bindings instances
+		{"DELETE", timeoutPath("bindings", namespace, "a"), "", code404},
 
 		// Non-existent object type.
 		{"GET", path("foo", "", ""), "", code404},
-		{"POST", path("foo", api.NamespaceDefault, ""), `{"foo": "foo"}`, code404},
-		{"PUT", path("foo", api.NamespaceDefault, "a"), `{"foo": "foo"}`, code404},
-		{"GET", path("foo", api.NamespaceDefault, "a"), "", code404},
-		{"DELETE", timeoutPath("foo", api.NamespaceDefault, ""), "", code404},
+		{"POST", path("foo", namespace, ""), `{"foo": "foo"}`, code404},
+		{"PUT", path("foo", namespace, "a"), `{"foo": "foo"}`, code404},
+		{"GET", path("foo", namespace, "a"), "", code404},
+		{"DELETE", timeoutPath("foo", namespace, ""), "", code404},
 
 		// Special verbs on nodes
-		{"GET", pathWithPrefix("proxy", "nodes", api.NamespaceDefault, "a"), "", code404},
-		{"GET", pathWithPrefix("redirect", "nodes", api.NamespaceDefault, "a"), "", code404},
+		{"GET", pathWithPrefix("proxy", "nodes", namespace, "a"), "", code404},
+		{"GET", pathWithPrefix("redirect", "nodes", namespace, "a"), "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
 		// TODO: figure out how to create a node so that it can successfully proxy/redirect.
 
@@ -412,26 +414,18 @@ func getTestRequests() []struct {
 //
 // TODO(etune): write a fuzz test of the REST API.
 func TestAuthModeAlwaysAllow(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// Set up a master
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	ns := framework.CreateTestingNamespace("auth-always-allow", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 	previousResourceVersion := make(map[string]float64)
 
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		var bodyStr string
 		if r.body != "" {
 			sub := ""
@@ -440,8 +434,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
 				}
-				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", ns.Name)
 			}
 			bodyStr = fmt.Sprintf(r.body, sub)
 		}
@@ -518,26 +511,18 @@ func getPreviousResourceVersionKey(url, id string) string {
 }
 
 func TestAuthModeAlwaysDeny(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// Set up a master
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authorizer = apiserver.NewAlwaysDenyAuthorizer()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-always-deny", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -573,31 +558,23 @@ func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
 // TestAliceNotForbiddenOrUnauthorized tests a user who is known to
 // the authentication system and authorized to do any actions.
 func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// This file has alice and bob in it.
 
 	// Set up a master
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = allowAliceAuthorizer{}
 	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-alice-not-forbidden", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		token := AliceToken
 		var bodyStr string
 		if r.body != "" {
@@ -607,8 +584,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
 				}
-				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", ns.Name)
 			}
 			bodyStr = fmt.Sprintf(r.body, sub)
 		}
@@ -654,27 +630,19 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 // the authentication system but not authorized to do any actions
 // should receive "Forbidden".
 func TestBobIsForbidden(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// This file has alice and bob in it.
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = allowAliceAuthorizer{}
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-bob-forbidden", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -704,29 +672,21 @@ func TestBobIsForbidden(t *testing.T) {
 // An authorization module is installed in this scenario for integration
 // test purposes, but requests aren't expected to reach it.
 func TestUnknownUserIsUnauthorized(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// This file has alice and bob in it.
 
 	// Set up a master
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = allowAliceAuthorizer{}
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-unknown-unauthorized", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		token := UnknownToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -776,27 +736,20 @@ func (impersonateAuthorizer) Authorize(a authorizer.Attributes) error {
 }
 
 func TestImpersonateIsForbidden(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
+	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = impersonateAuthorizer{}
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-impersonate-forbidden", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 
 	// bob can't perform actions himself
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -821,7 +774,7 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	}
 
 	// bob can impersonate alice to do other things
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -846,7 +799,7 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	}
 
 	// alice can't impersonate bob
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		token := AliceToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -872,7 +825,7 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	}
 
 	// alice can impersonate a service account
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -928,24 +881,17 @@ func (a *trackingAuthorizer) Authorize(attributes authorizer.Attributes) error {
 
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly
 func TestAuthorizationAttributeDetermination(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	trackingAuthorizer := &trackingAuthorizer{}
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
+	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = trackingAuthorizer
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-attribute-determination", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 
@@ -999,26 +945,19 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 // TestNamespaceAuthorization tests that authorization can be controlled
 // by namespace.
 func TestNamespaceAuthorization(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// This file has alice and bob in it.
-	a := newAuthorizerWithContents(t, `{"namespace": "foo"}
+	a := newAuthorizerWithContents(t, `{"namespace": "auth-namespace"}
 `)
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
+	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = a
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-namespace", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -1031,15 +970,15 @@ func TestNamespaceAuthorization(t *testing.T) {
 		statusCodes map[int]bool // allowed status codes.
 	}{
 
-		{"POST", timeoutPath("pods", "foo", ""), "foo", aPod, code201},
-		{"GET", path("pods", "foo", ""), "foo", "", code200},
-		{"GET", path("pods", "foo", "a"), "foo", "", code200},
-		{"DELETE", timeoutPath("pods", "foo", "a"), "foo", "", code200},
+		{"POST", timeoutPath("pods", ns.Name, ""), "foo", aPod, code201},
+		{"GET", path("pods", ns.Name, ""), "foo", "", code200},
+		{"GET", path("pods", ns.Name, "a"), "foo", "", code200},
+		{"DELETE", timeoutPath("pods", ns.Name, "a"), "foo", "", code200},
 
-		{"POST", timeoutPath("pods", "bar", ""), "bar", aPod, code403},
-		{"GET", path("pods", "bar", ""), "bar", "", code403},
-		{"GET", path("pods", "bar", "a"), "bar", "", code403},
-		{"DELETE", timeoutPath("pods", "bar", "a"), "bar", "", code403},
+		{"POST", timeoutPath("pods", "foo", ""), "bar", aPod, code403},
+		{"GET", path("pods", "foo", ""), "bar", "", code403},
+		{"GET", path("pods", "foo", "a"), "bar", "", code403},
+		{"DELETE", timeoutPath("pods", "foo", "a"), "bar", "", code403},
 
 		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), "", aPod, code403},
 		{"GET", path("pods", "", ""), "", "", code403},
@@ -1058,6 +997,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
 				}
 				namespace := r.namespace
+				// FIXME: Is that correct?
 				if len(namespace) == 0 {
 					namespace = "default"
 				}
@@ -1103,28 +1043,19 @@ func TestNamespaceAuthorization(t *testing.T) {
 // TestKindAuthorization tests that authorization can be controlled
 // by namespace.
 func TestKindAuthorization(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// This file has alice and bob in it.
-
-	// Set up a master
 	a := newAuthorizerWithContents(t, `{"resource": "services"}
 `)
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
+	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = a
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-kind", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -1135,15 +1066,15 @@ func TestKindAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
-		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
-		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
+		{"POST", timeoutPath("services", ns.Name, ""), aService, code201},
+		{"GET", path("services", ns.Name, ""), "", code200},
+		{"GET", path("services", ns.Name, "a"), "", code200},
+		{"DELETE", timeoutPath("services", ns.Name, "a"), "", code200},
 
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code403},
+		{"POST", timeoutPath("pods", ns.Name, ""), aPod, code403},
 		{"GET", path("pods", "", ""), "", code403},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code403},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", code403},
+		{"GET", path("pods", ns.Name, "a"), "", code403},
+		{"DELETE", timeoutPath("pods", ns.Name, "a"), "", code403},
 	}
 
 	for _, r := range requests {
@@ -1197,28 +1128,18 @@ func TestKindAuthorization(t *testing.T) {
 // TestReadOnlyAuthorization tests that authorization can be controlled
 // by namespace.
 func TestReadOnlyAuthorization(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
 	// This file has alice and bob in it.
-
-	// Set up a master
 	a := newAuthorizerWithContents(t, `{"readonly": true}`)
 
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
+	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
 	masterConfig.Authorizer = a
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
 
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	ns := framework.CreateTestingNamespace("auth-read-only", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 
@@ -1228,8 +1149,8 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", path("pods", "", ""), aPod, code403},
-		{"GET", path("pods", "", ""), "", code200},
+		{"POST", path("pods", ns.Name, ""), aPod, code403},
+		{"GET", path("pods", ns.Name, ""), "", code200},
 		{"GET", path("pods", api.NamespaceDefault, "a"), "", code404},
 	}
 
@@ -1262,15 +1183,6 @@ func TestReadOnlyAuthorization(t *testing.T) {
 // authenticator to call out to a remote web server for authentication
 // decisions.
 func TestWebhookTokenAuthenticator(t *testing.T) {
-	// TODO: Limit the test to a single non-default namespace and clean this up at the end.
-	framework.DeleteAllEtcdKeys()
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	authServer := newTestWebhookTokenAuthServer()
 	defer authServer.Close()
 	authenticator, err := getTestWebhookTokenAuth(authServer.URL)
@@ -1278,17 +1190,19 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 		t.Fatalf("error starting webhook token authenticator server: %v", err)
 	}
 
+	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = authenticator
 	masterConfig.Authorizer = allowAliceAuthorizer{}
-	m, err = master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("auth-webhook-token", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	transport := http.DefaultTransport
 
-	for _, r := range getTestRequests() {
+	for _, r := range getTestRequests(ns.Name) {
 		// Expect Bob's requests to all fail.
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
