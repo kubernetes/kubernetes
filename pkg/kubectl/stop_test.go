@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
-	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 )
 
 func TestReplicationControllerStop(t *testing.T) {

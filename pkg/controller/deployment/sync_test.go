@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -237,7 +238,7 @@ func TestScale(t *testing.T) {
 			if desired, ok := test.desiredReplicasAnnotations[test.newRS.Name]; ok {
 				desiredReplicas = desired
 			}
-			setReplicasAnnotations(test.newRS, desiredReplicas, desiredReplicas+maxSurge(*test.oldDeployment))
+			deploymentutil.SetReplicasAnnotations(test.newRS, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
 		}
 		for i := range test.oldRSs {
 			rs := test.oldRSs[i]
@@ -248,7 +249,7 @@ func TestScale(t *testing.T) {
 			if desired, ok := test.desiredReplicasAnnotations[rs.Name]; ok {
 				desiredReplicas = desired
 			}
-			setReplicasAnnotations(rs, desiredReplicas, desiredReplicas+maxSurge(*test.oldDeployment))
+			deploymentutil.SetReplicasAnnotations(rs, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
 		}
 
 		if err := dc.scale(test.deployment, test.newRS, test.oldRSs); err != nil {
