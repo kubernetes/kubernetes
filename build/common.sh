@@ -201,8 +201,14 @@ function kube::build::prepare_docker_machine() {
   }
   docker-machine start "${DOCKER_MACHINE_NAME}" &> /dev/null
   # it takes `docker-machine env` a few seconds to work if the machine was just started
-  while ! docker-machine env ${DOCKER_MACHINE_NAME} &> /dev/null; do
-    sleep 1
+  local docker_machine_out
+  while ! docker_machine_out=$(docker-machine env "${DOCKER_MACHINE_NAME}" 2>&1); do
+    if [[ ${docker_machine_out} =~ "Error checking TLS connection" ]]; then
+      echo ${docker_machine_out}
+      docker-machine regenerate-certs ${DOCKER_MACHINE_NAME}
+    else
+      sleep 1
+    fi
   done
   eval $(docker-machine env "${DOCKER_MACHINE_NAME}")
   kube::log::status "A Docker host using docker-machine named '${DOCKER_MACHINE_NAME}' is ready to go!"
