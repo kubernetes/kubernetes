@@ -2,16 +2,31 @@
 
 **Author**: Lucas Käldström ([@luxas](https://github.com/luxas))
 
-**Status** (05/06/2016): Most parts are already implemented; still there's room for improvement
+**Status** (17th of June 2016): Most parts are already implemented; still there's room for improvement
 
 ## Abstract
 
-Kubernetes is written in Go, and Go is ported to multiple platforms.
+Kubernetes is written in Go, and Go code is portable across platforms.
 Docker and rkt are also written in Go, and it's already possible to use docker on various platforms.
 When it's possible to run docker containers on a specific architecture, people also want to use Kubernetes to manage the containers.
 
 We obviously want Kubernetes to run on as many platforms as possible.
-This is a proposal that explains what we should do to achieve a cross-platform contiainer management system.
+This is a proposal that explains what already has been done and why, and what's proposed to yet be done.
+
+With this work, we want to achieve a true cross-platform container management system.
+
+### TL; DR;
+
+This is a pretty long proposal with a lot of information and details, but here are the main tasks that are yet to be done:
+
+ - Standardize all Makefiles to build for all platforms
+   - Document in the devel documentation how to do this, and make people actually care about doing it
+ - Help Docker to fully implement the Manifest List, and implement it for all Kubernetes infrastructure images.
+   - To help Docker directly might be a bit out of topic for a Kubernetes proposal, so the first step is to use/build a small utility that is able to build and push Manifest list images.
+ - Make it possible to run a CI (for distributed testing) on other platforms
+ - Port even more addons
+ - Choose a deployment setup that is as "official" as possible, and make it working on multiple platforms
+ - Last but not least, advertise that it is possible to run Kubernetes on non-amd64 platforms already today!
 
 ## Implementation
 
@@ -25,7 +40,7 @@ In this proposal, `platform` is defined as `operating system/architecture`
 served as a way of running Kubernetes on ARM devices easily.
 The 30th of November 2015, a tracking issue about making Kubernetes run on ARM was opened: [#17981](https://github.com/kubernetes/kubernetes/issues/17981). It later shifted focus to how to make Kubernetes a more platform-independent system.
 
-The 27th of April 2016, Kubernetes `v1.3.0-alpha.3` was released, and became the first release that was able to run the [docker getting started guide](http://kubernetes.io/docs/getting-started-guides/docker/) on `linux/amd64`, `linux/arm`, `linux/arm64` and `linux/ppc64le` without any modification.
+The 27th of April 2016, Kubernetes `v1.3.0-alpha.3` was released, and it became the first release that was able to run the [docker getting started guide](http://kubernetes.io/docs/getting-started-guides/docker/) on `linux/amd64`, `linux/arm`, `linux/arm64` and `linux/ppc64le` without any modification.
 
 If there's interest in running Kubernetes on `linux/s390x` too, it won't require many changes to the source now when we've laid the ground for a multi-platform Kubernetes already.
 
@@ -45,19 +60,19 @@ Go 1.5 introduced many changes. To name a few that are relevant to Kubernetes:
  - The `GO15VENDOREXPERIMENT` was started. We switched from `Godeps/_workspace` to the native `vendor/` in [this PR](https://github.com/kubernetes/kubernetes/pull/24242).
  - It's not required to pre-build the whole standard library `std` when cross-compliling. [Details](#prebuilding-the-standard-library-std)
  - Builds are approximately twice as slow as earlier. That affects the CI. [Details](#releasing)
- - The native Go DNS resolver will suffice in the most situations. This makes static linking easier.
+ - The native Go DNS resolver will suffice in the most situations. This makes static linking much easier.
 
 All release notes for Go 1.5 [are here](https://golang.org/doc/go1.5)
 
 Go 1.6 didn't introduce as many changes as Go 1.5 did, but here are some of note:
- - It should perform a little bit better than Go 1.5
- - `linux/mips64` and `linux/mips64le` were added as ports.
+ - It should perform a little bit better than Go 1.5.
+ - `linux/mips64` and `linux/mips64le` were added as new ports.
  - Go < 1.6.2 for `ppc64le` had [bugs in it](https://github.com/kubernetes/kubernetes/issues/24922).
 
 All release notes for Go 1.6 [are here](https://golang.org/doc/go1.6)
 
-In Kubernetes 1.2, the only supported go version was `1.4.2`, so `linux/arm` was the only possible extra architecture: [#19769](https://github.com/kubernetes/kubernetes/pull/19769).
-In Kubernetes 1.3, [we upgraded to Go 1.6](https://github.com/kubernetes/kubernetes/pull/22149), so now it's possible to build Kubernetes for even more multiple architectures [#23931](https://github.com/kubernetes/kubernetes/pull/23931).
+In Kubernetes 1.2, the only supported Go version was `1.4.2`, so `linux/arm` was the only possible extra architecture: [#19769](https://github.com/kubernetes/kubernetes/pull/19769).
+In Kubernetes 1.3, [we upgraded to Go 1.6](https://github.com/kubernetes/kubernetes/pull/22149), which made it possible to build Kubernetes for even more architectures [#23931](https://github.com/kubernetes/kubernetes/pull/23931).
 
 #### The `sync/atomic` bug on 32-bit platforms
 
@@ -123,12 +138,12 @@ A short summary: A manifest list is a list of Docker images with a single name (
 When the image is pulled by a client (`docker pull busybox`), only layers for the target platforms are downloaded.
 Right now we have to write `${ARCH}/busybox` instead, but that leads to extra scripting and unnecessary logic.
 
-When this is working, it's a perfect fit for the `hyperkube` image and the like, but we're quite far away from that right now.
+When this is working, it's a perfect fit for the our infrastructure images that live in `gcr.io`, but we're quite far away from that right now.
 See [image naming](#image-naming) for details how we work around this for the time being.
 
 ## Cross-compilation
 
-## Prebuilding the standard library (`std`)
+## Prebuilding the Go standard library (`std`)
 
 A great blog post [that is describing this](https://medium.com/@rakyll/go-1-5-cross-compilation-488092ba44ec#.5jcd0owem) 
 
@@ -140,7 +155,7 @@ $ cd /usr/src/go/src
 $ for platform in ${PLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
 ```
 
-With Go 1.5+, cross-compiling the whole project isn't required. Go will automatically cross-compile the `std` packages that are being used by the code that is being compiled, _and throw it away after the compilation_.
+With Go 1.5+, cross-compiling the Go repository isn't required anymore. Go will automatically cross-compile the `std` packages that are being used by the code that is being compiled, _and throw it away after the compilation_.
 If you cross-compile multiple times, Go will build parts of `std`, throw it away, compile parts of it again, throw that away and so on.
 
 However, there is an easy way of cross-compiling all `std` packages in advance with Go 1.5+:
@@ -213,7 +228,9 @@ CXX="g++"
 CGO_ENABLED="1"
 ```
 
-See the `CGO_ENABLED=1` at the end? That's where compilation for host and cross-compilation differs. By default, it will compile statically if no `cgo` code is involved. `net` is one of the packages that prefers `cgo`, but doesn't depend on them. When cross-compiling, `CGO_ENABLED` is set to `0` by default.
+See the `CGO_ENABLED=1` at the end? That's where compilation for the host and cross-compilation differs. By default, Go will link statically if no `cgo` code is involved. `net` is one of the packages that prefers `cgo`, but doesn't depend on it. 
+
+When cross-compiling on the other hand, `CGO_ENABLED` is set to `0` by default.
 
 To always be safe, run this when compiling statically:
 
@@ -303,12 +320,14 @@ We've chosen to support the Raspberry Pi 1 as the minimum machine requirement, s
 
 ## Cross-building docker images for linux
 
-After we've cross-compiled some binaries for another architecture, we often want to package it in a docker image.
+After binaries have been cross-compiled, they should be distributed in some manner.
+
+The default and maybe the most intuitive way of doing this is by packaging it in a docker image.
 
 ### Trivial Dockerfile
 
-All `Dockerfile` commands except for `RUN` works without any modification.
-Of course, the base image has to be switched to an arch-specific one, but except from that, an cross-built image is only a `docker build` away.
+All `Dockerfile` commands except for `RUN` works for any architecture without any modification.
+The base image has to be switched to an arch-specific one, but except from that, a cross-built image is only a `docker build` away.
 
 ```Dockerfile
 FROM armel/busybox
@@ -338,8 +357,9 @@ Successfully built 28f50e58c909
 
 ### Complex Dockerfile
 
-However, in many cases, `RUN` statements are needed when building the image.
-The `RUN` statement invokes `/bin/sh` in the container, but in this example, `/bin/sh` is an ARM binary, which can't execute on an `amd64` processor.
+However, in the most cases, `RUN` statements are needed when building the image.
+
+The `RUN` statement invokes `/bin/sh` inside the container, but in this example, `/bin/sh` is an ARM binary, which can't execute on an `amd64` processor.
 
 #### QEMU to the rescue
 
@@ -348,7 +368,8 @@ Here's a way to run ARM Docker images on an amd64 host by using `qemu`:
 # Register other architectures` magic numbers in the binfmt_misc kernel module, so it`s possible to run foreign binaries
 $ docker run --rm --privileged multiarch/qemu-user-static:register --reset
 # Download qemu 2.5.0
-$ curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-arm-static.tar.xz | tar -xJ
+$ curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-arm-static.tar.xz \
+    | tar -xJ
 # Run a foreign docker image, and inject the amd64 qemu binary for translating all syscalls
 $ docker run -it -v $(pwd)/qemu-arm-static:/usr/bin/qemu-arm-static armel/busybox /bin/sh
 
@@ -365,11 +386,16 @@ The multiarch guys have done a great job here, you may find the source for this 
 
 ### The pause image
 
-The `pause` is used for connecting containers into Pods. It's a binary that just sleeps forever. 
+The `pause` is used for connecting containers into Pods. It's a binary that just sleeps forever.
+When Kubernetes starts up a Pod, it first starts a `pause` container, and let's all "real" containers join the same network by setting `--net=${pause_container_id}`.
+
+So in order to start Kubernetes Pods on any other architecture, an ever-sleeping image have to exist.
 
 Fortunately, `kubelet` has the `--pod-infra-container-image` option, and it has been used when running Kubernetes on other platforms.
 
-But relying on the deployment setup to specify the right image for the platform isn't great, kubelet should be smarter than that. This problem has been fixed in [#23059](https://github.com/kubernetes/kubernetes/pull/23059).
+But relying on the deployment setup to specify the right image for the platform isn't great, the kubelet should be smarter than that. 
+
+This specific problem has been fixed in [#23059](https://github.com/kubernetes/kubernetes/pull/23059).
 
 ### Exposing information
 
@@ -415,7 +441,7 @@ kubectl is a static binary with no C code, so it's trivial to cross-compile. If 
 
 To ensure all functionality really is working on an other platform, the community should be able to setup a CI. To be able to do that, all the test-specific images have to be ported to multiple architectures. The test code also have to choose images based on the apiserver's platform.
 
-The first piece in the puzzle is here: [#25972](https://github.com/kubernetes/kubernetes/pull/25972).
+The first piece in the puzzle is here: [#25972](https://github.com/kubernetes/kubernetes/pull/25972), but this issue is far from solved yet.
 
 ## Running Kubernetes
 
