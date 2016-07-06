@@ -225,6 +225,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
 		authenticator := serviceaccount.JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
 
+		// An invalid, non-JWT token should always fail
+		if _, ok, err := authenticator.AuthenticateToken("invalid token"); err != nil || ok {
+			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
+			continue
+		}
+
 		user, ok, err := authenticator.AuthenticateToken(token)
 		if (err != nil) != tc.ExpectedErr {
 			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)

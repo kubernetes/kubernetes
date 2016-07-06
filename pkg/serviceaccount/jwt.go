@@ -135,8 +135,6 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			return key, nil
 		})
 
-		claims, _ := parsedToken.Claims.(jwt.MapClaims)
-
 		if err != nil {
 			switch err := err.(type) {
 			case *jwt.ValidationError:
@@ -159,6 +157,8 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 		}
 
 		// If we get here, we have a token with a recognized signature
+
+		claims, _ := parsedToken.Claims.(jwt.MapClaims)
 
 		// Make sure we issued the token
 		iss, _ := claims[IssuerClaim].(string)
