@@ -488,8 +488,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		gv := scope.Kind.GroupVersion()
 		codec := runtime.NewCodec(
 			scope.Serializer.EncoderForVersion(s, gv),
-			scope.Serializer.DecoderToVersion(s, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
-		)
+			scope.Serializer.DecoderToVersion(s, gv))
 
 		updateAdmit := func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			if admit != nil && admit.Handles(admission.Update) {
@@ -500,7 +499,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return nil
 		}
 
-		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Copier, scope.Resource, codec)
+		targetGV := unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}
+		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Copier, scope.Resource, codec, converter, targetGV)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -532,6 +532,8 @@ func patchResource(
 	copier runtime.ObjectCopier,
 	resource unversioned.GroupVersionResource,
 	codec runtime.Codec,
+	converter runtime.ObjectConvertor,
+	targetGV unversioned.GroupVersion,
 ) (runtime.Object, error) {
 
 	namespace := api.NamespaceValue(ctx)
@@ -576,7 +578,11 @@ func patchResource(
 			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
 				return nil, err
 			}
-			return objToUpdate, nil
+			converted, err := converter.ConvertToVersion(objToUpdate, targetGV)
+			if err != nil {
+				return nil, err
+			}
+			return converted, nil
 
 		default:
 			// on a conflict,
@@ -629,7 +635,11 @@ func patchResource(
 			if err := runtime.DecodeInto(codec, newlyPatchedObjJS, objToUpdate); err != nil {
 				return nil, err
 			}
-			return objToUpdate, nil
+			converted, err := converter.ConvertToVersion(objToUpdate, targetGV)
+			if err != nil {
+				return nil, err
+			}
+			return converted, nil
 		}
 	}
 
