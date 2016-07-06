@@ -92,19 +92,17 @@ type jwtTokenGenerator struct {
 func (j *jwtTokenGenerator) GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
 	token := jwt.New(jwt.SigningMethodRS256)
 
-	claims, _ := token.Claims.(jwt.MapClaims)
-
 	// Identify the issuer
-	claims[IssuerClaim] = Issuer
+	token.Claims[IssuerClaim] = Issuer
 
 	// Username
-	claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
+	token.Claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
 
 	// Persist enough structured info for the authenticator to be able to look up the service account and secret
-	claims[NamespaceClaim] = serviceAccount.Namespace
-	claims[ServiceAccountNameClaim] = serviceAccount.Name
-	claims[ServiceAccountUIDClaim] = serviceAccount.UID
-	claims[SecretNameClaim] = secret.Name
+	token.Claims[NamespaceClaim] = serviceAccount.Namespace
+	token.Claims[ServiceAccountNameClaim] = serviceAccount.Name
+	token.Claims[ServiceAccountUIDClaim] = serviceAccount.UID
+	token.Claims[SecretNameClaim] = secret.Name
 
 	// Sign and get the complete encoded token as a string
 	return token.SignedString(j.key)
@@ -135,8 +133,6 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			return key, nil
 		})
 
-		claims, _ := parsedToken.Claims.(jwt.MapClaims)
-
 		if err != nil {
 			switch err := err.(type) {
 			case *jwt.ValidationError:
@@ -161,29 +157,29 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 		// If we get here, we have a token with a recognized signature
 
 		// Make sure we issued the token
-		iss, _ := claims[IssuerClaim].(string)
+		iss, _ := parsedToken.Claims[IssuerClaim].(string)
 		if iss != Issuer {
 			return nil, false, nil
 		}
 
 		// Make sure the claims we need exist
-		sub, _ := claims[SubjectClaim].(string)
+		sub, _ := parsedToken.Claims[SubjectClaim].(string)
 		if len(sub) == 0 {
 			return nil, false, errors.New("sub claim is missing")
 		}
-		namespace, _ := claims[NamespaceClaim].(string)
+		namespace, _ := parsedToken.Claims[NamespaceClaim].(string)
 		if len(namespace) == 0 {
 			return nil, false, errors.New("namespace claim is missing")
 		}
-		secretName, _ := claims[SecretNameClaim].(string)
+		secretName, _ := parsedToken.Claims[SecretNameClaim].(string)
 		if len(namespace) == 0 {
 			return nil, false, errors.New("secretName claim is missing")
 		}
-		serviceAccountName, _ := claims[ServiceAccountNameClaim].(string)
+		serviceAccountName, _ := parsedToken.Claims[ServiceAccountNameClaim].(string)
 		if len(serviceAccountName) == 0 {
 			return nil, false, errors.New("serviceAccountName claim is missing")
 		}
-		serviceAccountUID, _ := claims[ServiceAccountUIDClaim].(string)
+		serviceAccountUID, _ := parsedToken.Claims[ServiceAccountUIDClaim].(string)
 		if len(serviceAccountUID) == 0 {
 			return nil, false, errors.New("serviceAccountUID claim is missing")
 		}
