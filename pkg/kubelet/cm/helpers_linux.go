@@ -18,11 +18,8 @@ package cm
 
 import (
 	"fmt"
-	"path"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 )
 
 // cgroupSubsystems holds information about the mounted cgroup subsytems
@@ -57,42 +54,5 @@ func getCgroupSubsystems() (*cgroupSubsystems, error) {
 	return &cgroupSubsystems{
 		mounts:      allCgroups,
 		mountPoints: mountPoints,
-	}, nil
-}
-
-// getLibcontainerCgroupManager returns libcontainer's cgroups manager
-// object with the specified cgroup configuration
-func getLibcontainerCgroupManager(cgroupConfig *CgroupConfig, subsystems *cgroupSubsystems) (*cgroupfs.Manager, error) {
-	// get cgroup name
-	name := cgroupConfig.Name
-
-	// Get map of all cgroup paths on the system for the particular cgroup
-	cgroupPaths := make(map[string]string, len(subsystems.mountPoints))
-	for key, val := range subsystems.mountPoints {
-		cgroupPaths[key] = path.Join(val, name)
-	}
-
-	// Extract the cgroup resource parameters
-	resourceConfig := cgroupConfig.ResourceParameters
-	resources := &libcontainerconfigs.Resources{}
-	resources.AllowAllDevices = true
-	if resourceConfig.Memory != nil {
-		resources.Memory = *resourceConfig.Memory
-	}
-	if resourceConfig.CpuShares != nil {
-		resources.CpuShares = *resourceConfig.CpuShares
-	}
-	if resourceConfig.CpuQuota != nil {
-		resources.CpuQuota = *resourceConfig.CpuQuota
-	}
-	// Initialize libcontainer's cgroup config
-	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
-		Name:      path.Base(name),
-		Parent:    path.Dir(name),
-		Resources: resources,
-	}
-	return &cgroupfs.Manager{
-		Cgroups: libcontainerCgroupConfig,
-		Paths:   cgroupPaths,
 	}, nil
 }
