@@ -66,12 +66,14 @@ readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 
 readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
 
-readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
+readonly REMOTE_KUBE_ROOT="/go/src/${KUBE_GO_PACKAGE}"
+readonly REMOTE_OUTPUT_ROOT="${REMOTE_KUBE_ROOT}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
 readonly DOCKER_MOUNT_ARGS_BASE=(
+  --volume "${KUBE_ROOT}:${REMOTE_KUBE_ROOT}:ro"
   --volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}"
   --volume /etc/localtime:/etc/localtime:ro
 )
@@ -323,6 +325,7 @@ function kube::build::prepare_output() {
   # if selinux is enabled, docker run -v /foo:/foo:Z will not autocreate the host dir
   mkdir -p "${LOCAL_OUTPUT_SUBPATH}"
   mkdir -p "${LOCAL_OUTPUT_BINPATH}"
+  mkdir -p "${LOCAL_OUTPUT_GOPATH}"
   # On RHEL/Fedora SELinux is enabled by default and currently breaks docker
   # volume mounts.  We can work around this by explicitly adding a security
   # context to the _output directory.
@@ -366,7 +369,9 @@ function kube::build::docker_image_exists() {
 
   # We cannot just specify the IMAGE here as `docker images` doesn't behave as
   # expected.  See: https://github.com/docker/docker/issues/8048
-  "${DOCKER[@]}" images | grep -Eq "^(\S+/)?${1}\s+${2}\s+"
+  # Also we cannot use the `-q` option on grep as it causes pipefail to trigger.
+  # See http://stackoverflow.com/questions/19120263/why-exit-code-141-with-grep-q
+  "${DOCKER[@]}" images | grep -E "^(\S+/)?${1}\s+${2}\s+" > /dev/null
 }
 
 # Takes $1 and computes a short has for it. Useful for unique tag generation
@@ -465,42 +470,11 @@ function kube::build::build_image_built() {
   kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
 }
 
-# The set of source targets to include in the kube-build image
-function kube::build::source_targets() {
-  local targets=(
-    api
-    build
-    cluster
-    cmd
-    docs
-    examples
-    federation
-    Godeps/Godeps.json
-    hack
-    LICENSE
-    pkg
-    plugin
-    DESIGN.md
-    README.md
-    test
-    third_party
-    vendor
-    contrib/mesos
-  )
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    for contrib in "${KUBERNETES_CONTRIB}"; do
-      targets+=($(eval "kube::contrib::${contrib}::source_targets"))
-    done
-  fi
-  echo "${targets[@]}"
-}
-
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
   kube::build::ensure_tar
 
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
-  "${TAR}" czf "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-source.tar.gz" $(kube::build::source_targets)
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-version-defs"
@@ -574,13 +548,37 @@ function kube::build::ensure_data_container() {
     # We want this to run as root to be able to chown, so non-root users can
     # later use the result as a data container.  This run both creates the data
     # container and chowns the GOPATH.
+    #
+    # The data container creates volumes for all of the directories that store
+    # intermediates for the Go build.  This enables incremental builds across
+    # Docker sessions.  The *_cgo paths are re-compiled versions of the go std
+    # libraries for true static building.
     local -ra docker_cmd=(
       "${DOCKER[@]}" run
       --volume "${REMOTE_OUTPUT_GOPATH}"
+      --volume /usr/local/go/pkg/linux_386_cgo
+      --volume /usr/local/go/pkg/linux_amd64_cgo
+      --volume /usr/local/go/pkg/linux_arm_cgo
+      --volume /usr/local/go/pkg/linux_arm64_cgo
+      --volume /usr/local/go/pkg/linux_ppc64le_cgo
+      --volume /usr/local/go/pkg/darwin_amd64_cgo
+      --volume /usr/local/go/pkg/darwin_386_cgo
+      --volume /usr/local/go/pkg/windows_amd64_cgo
+      --volume /usr/local/go/pkg/windows_386_cgo
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
-      chown -R $(id -u).$(id -g) "${REMOTE_OUTPUT_GOPATH}"
+      chown -R $(id -u).$(id -g)
+        "${REMOTE_OUTPUT_GOPATH}"
+        /usr/local/go/pkg/linux_386_cgo
+        /usr/local/go/pkg/linux_amd64_cgo
+        /usr/local/go/pkg/linux_arm_cgo
+        /usr/local/go/pkg/linux_arm64_cgo
+        /usr/local/go/pkg/linux_ppc64le_cgo
+        /usr/local/go/pkg/darwin_amd64_cgo
+        /usr/local/go/pkg/darwin_386_cgo
+        /usr/local/go/pkg/windows_amd64_cgo
+        /usr/local/go/pkg/windows_386_cgo
     )
     "${docker_cmd[@]}"
   fi

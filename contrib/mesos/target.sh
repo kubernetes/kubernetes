@@ -31,12 +31,3 @@ kube::contrib::mesos::server_targets() {
 kube::contrib::mesos::test_targets() {
   true
 }
-
-# The set of source targets to include in the kube-build image
-# Used by build/common.sh
-kube::contrib::mesos::source_targets() {
-  local -r targets=(
-    contrib/mesos
-  )
-  echo "${targets[@]}"
-}
