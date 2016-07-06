@@ -203,6 +203,20 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+// DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
+// Returns true if open returns errno EBUSY, and false if errno is nil.
+// Returns an error if errno is any error other than EBUSY.
+// Returns with error if pathname is not a device.
+func (n *NsenterMounter) DeviceOpened(pathname string) (bool, error) {
+	return exclusiveOpenFailsOnDevice(pathname)
+}
+
+// PathIsDevice uses FileInfo returned from os.Stat to check if path refers
+// to a device.
+func (n *NsenterMounter) PathIsDevice(pathname string) (bool, error) {
+	return pathIsDevice(pathname)
+}
+
 func (n *NsenterMounter) absHostPath(command string) string {
 	path, ok := n.paths[command]
 	if !ok {

@@ -44,6 +44,19 @@ func (mi *fakeMountInterface) IsLikelyNotMountPoint(file string) (bool, error) {
 	return false, fmt.Errorf("unsupported")
 }
 
+func (mi *fakeMountInterface) DeviceOpened(pathname string) (bool, error) {
+	for _, mp := range mi.mountPoints {
+		if mp.Device == pathname {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{
 		[]mount.MountPoint{
