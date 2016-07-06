@@ -1174,8 +1174,8 @@ func newAWSDisk(aws *Cloud, name string) (*awsDisk, error) {
 	// The original idea of the URL-style name was to put the AZ into the
 	// host, so we could find the AZ immediately from the name without
 	// querying the API.  But it turns out we don't actually need it for
-	// Ubernetes-Lite, as we put the AZ into the labels on the PV instead.
-	// However, if in future we want to support Ubernetes-Lite
+	// multi-AZ clusters, as we put the AZ into the labels on the PV instead.
+	// However, if in future we want to support multi-AZ cluster
 	// volume-awareness without using PersistentVolumes, we likely will
 	// want the AZ in the host.
 

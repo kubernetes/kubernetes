@@ -32,7 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes/Ubernetes Control Plane Resilience
+# Kubernetes and Cluster Federation Control Plane Resilience
 
 ## Long Term Design and Current Status
 
@@ -44,7 +44,7 @@ Documentation for other releases can be found at
 
 Some amount of confusion exists around how we currently, and in future
 want to ensure resilience of the Kubernetes (and by implication
-Ubernetes) control plane.  This document is an attempt to capture that
+Kubernetes Cluster Federation) control plane.  This document is an attempt to capture that
 definitively. It covers areas including self-healing, high
 availability, bootstrapping and recovery.  Most of the information in
 this document already exists in the form of github comments,
