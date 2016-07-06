@@ -27,7 +27,6 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -462,29 +461,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
-		// Standard get, update retry loop
-		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
-			By("updating the pod")
+		By("updating the pod")
+		f.UpdatePod(name, func(pod *api.Pod) {
 			value = strconv.Itoa(time.Now().Nanosecond())
-			if pod == nil { // on retries we need to re-get
-				pod, err = podClient.Get(name)
-				if err != nil {
-					return false, fmt.Errorf("failed to get pod: %v", err)
-				}
-			}
 			pod.Labels["time"] = value
-			pod, err = podClient.Update(pod)
-			if err == nil {
-				framework.Logf("Successfully updated pod")
-				return true, nil
-			}
-			if errors.IsConflict(err) {
-				framework.Logf("Conflicting update to pod, re-get and re-update: %v", err)
-				pod = nil // re-get it when we retry
-				return false, nil
-			}
-			return false, fmt.Errorf("failed to update pod: %v", err)
-		}))
+		})
 
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
@@ -548,30 +529,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
-		// Standard get, update retry loop
-		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
-			By("updating the pod")
-			value = strconv.Itoa(time.Now().Nanosecond())
-			if pod == nil { // on retries we need to re-get
-				pod, err = podClient.Get(name)
-				if err != nil {
-					return false, fmt.Errorf("failed to get pod: %v", err)
-				}
-			}
+		By("updating the pod")
+		f.UpdatePod(name, func(pod *api.Pod) {
 			newDeadline := int64(5)
 			pod.Spec.ActiveDeadlineSeconds = &newDeadline
-			pod, err = podClient.Update(pod)
-			if err == nil {
-				framework.Logf("Successfully updated pod")
-				return true, nil
-			}
-			if errors.IsConflict(err) {
-				framework.Logf("Conflicting update to pod, re-get and re-update: %v", err)
-				pod = nil // re-get it when we retry
-				return false, nil
-			}
-			return false, fmt.Errorf("failed to update pod: %v", err)
-		}))
+		})
 
 		framework.ExpectNoError(f.WaitForPodTerminated(pod.Name, "DeadlineExceeded"))
 	})
@@ -1347,15 +1309,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 		delay1, delay2 := startPodAndGetBackOffs(f, pod, podName, containerName, buildBackOffDuration)
 
 		By("updating the image")
-		pod, err := podClient.Get(pod.Name)
-		if err != nil {
-			framework.Failf("failed to get pod: %v", err)
-		}
-		pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
-		pod, err = podClient.Update(pod)
-		if err != nil {
-			framework.Failf("error updating pod=%s/%s %v", podName, containerName, err)
-		}
+		f.UpdatePod(podName, func(pod *api.Pod) {
+			pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
+		})
+
 		time.Sleep(syncLoopFrequency)
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
