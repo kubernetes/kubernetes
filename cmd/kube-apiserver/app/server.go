@@ -217,6 +217,14 @@ func Run(s *options.APIServer) error {
 		return false
 	}
 
+	authorizationConfig := apiserver.AuthorizationConfig{
+		PolicyFile:                  s.AuthorizationConfig.PolicyFile,
+		WebhookConfigFile:           s.AuthorizationConfig.WebhookConfigFile,
+		WebhookCacheAuthorizedTTL:   s.AuthorizationConfig.WebhookCacheAuthorizedTTL,
+		WebhookCacheUnauthorizedTTL: s.AuthorizationConfig.WebhookCacheUnauthorizedTTL,
+		RBACSuperUser:               s.AuthorizationConfig.RBACSuperUser,
+	}
+
 	if modeEnabled(apiserver.ModeRBAC) {
 		mustGetRESTOptions := func(resource string) generic.RESTOptions {
 			s, err := storageFactory.New(api.Resource(resource))
@@ -227,13 +235,13 @@ func Run(s *options.APIServer) error {
 		}
 
 		// For initial bootstrapping go directly to etcd to avoid privillege escalation check.
-		s.AuthorizationConfig.RBACRoleRegistry = role.NewRegistry(roleetcd.NewREST(mustGetRESTOptions("roles")))
-		s.AuthorizationConfig.RBACRoleBindingRegistry = rolebinding.NewRegistry(rolebindingetcd.NewREST(mustGetRESTOptions("rolebindings")))
-		s.AuthorizationConfig.RBACClusterRoleRegistry = clusterrole.NewRegistry(clusterroleetcd.NewREST(mustGetRESTOptions("clusterroles")))
-		s.AuthorizationConfig.RBACClusterRoleBindingRegistry = clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(mustGetRESTOptions("clusterrolebindings")))
+		authorizationConfig.RBACRoleRegistry = role.NewRegistry(roleetcd.NewREST(mustGetRESTOptions("roles")))
+		authorizationConfig.RBACRoleBindingRegistry = rolebinding.NewRegistry(rolebindingetcd.NewREST(mustGetRESTOptions("rolebindings")))
+		authorizationConfig.RBACClusterRoleRegistry = clusterrole.NewRegistry(clusterroleetcd.NewREST(mustGetRESTOptions("clusterroles")))
+		authorizationConfig.RBACClusterRoleBindingRegistry = clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(mustGetRESTOptions("clusterrolebindings")))
 	}
 
-	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, s.AuthorizationConfig)
+	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}

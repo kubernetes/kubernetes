@@ -108,8 +108,16 @@ func Run(s *genericoptions.ServerRunOptions) error {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
 
+	authorizationConfig := apiserver.AuthorizationConfig{
+		PolicyFile:                  s.AuthorizationConfig.PolicyFile,
+		WebhookConfigFile:           s.AuthorizationConfig.WebhookConfigFile,
+		WebhookCacheAuthorizedTTL:   s.AuthorizationConfig.WebhookCacheAuthorizedTTL,
+		WebhookCacheUnauthorizedTTL: s.AuthorizationConfig.WebhookCacheUnauthorizedTTL,
+		RBACSuperUser:               s.AuthorizationConfig.RBACSuperUser,
+	}
+
 	authorizationModeNames := strings.Split(s.AuthorizationMode, ",")
-	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, s.AuthorizationConfig)
+	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}

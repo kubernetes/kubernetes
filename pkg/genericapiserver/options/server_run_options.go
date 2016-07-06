@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apiserver"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -53,7 +52,7 @@ type ServerRunOptions struct {
 	AdmissionControl           string
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
-	AuthorizationConfig        apiserver.AuthorizationConfig
+	AuthorizationConfig        AuthorizationConfig
 	AuthorizationMode          string
 	BasicAuthFile              string
 	BindAddress                net.IP
@@ -108,7 +107,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		APIPrefix:         "/api",
 		AdmissionControl:  "AlwaysAdmit",
 		AuthorizationMode: "AlwaysAllow",
-		AuthorizationConfig: apiserver.AuthorizationConfig{
+		AuthorizationConfig: AuthorizationConfig{
 			WebhookCacheAuthorizedTTL:   5 * time.Minute,
 			WebhookCacheUnauthorizedTTL: 30 * time.Second,
 		},
@@ -135,6 +134,38 @@ func NewServerRunOptions() *ServerRunOptions {
 		SecurePort:              6443,
 		StorageVersions:         registered.AllPreferredGroupVersions(),
 	}
+}
+
+const (
+	ModeAlwaysAllow string = "AlwaysAllow"
+	ModeAlwaysDeny  string = "AlwaysDeny"
+	ModeABAC        string = "ABAC"
+	ModeWebhook     string = "Webhook"
+	ModeRBAC        string = "RBAC"
+)
+
+// Keep this list in sync with constant list above.
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC}
+
+type AuthorizationConfig struct {
+	// Options for ModeABAC
+
+	// Path to a ABAC policy file.
+	PolicyFile string
+
+	// Options for ModeWebhook
+
+	// Kubeconfig file for Webhook authorization plugin.
+	WebhookConfigFile string
+	// TTL for caching of authorized responses from the webhook server.
+	WebhookCacheAuthorizedTTL time.Duration
+	// TTL for caching of unauthorized responses from the webhook server.
+	WebhookCacheUnauthorizedTTL time.Duration
+
+	// Options for RBAC
+
+	// User which can bootstrap role policies
+	RBACSuperUser string
 }
 
 // StorageGroupsToEncodingVersion returns a map from group name to group version,
@@ -221,7 +252,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
 
-	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
+	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+strings.Join(AuthorizationModeChoices, ","))
 
 	fs.StringVar(&s.AuthorizationConfig.PolicyFile, "authorization-policy-file", s.AuthorizationConfig.PolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
 	fs.StringVar(&s.AuthorizationConfig.WebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationConfig.WebhookConfigFile, "File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. The API server will query the remote service to determine access on the API server's secure port.")
