@@ -46,11 +46,10 @@ type DiskSpacePolicy struct {
 }
 
 type fsInfo struct {
-	Usage      int64
-	Capacity   int64
-	Available  int64
-	Timestamp  time.Time
-	InodesFree int64
+	Usage     int64
+	Capacity  int64
+	Available int64
+	Timestamp time.Time
 }
 
 type realDiskSpaceManager struct {
@@ -79,7 +78,6 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 		fsi.Usage = int64(fs.Usage)
 		fsi.Capacity = int64(fs.Capacity)
 		fsi.Available = int64(fs.Available)
-		fsi.InodesFree = int64(fs.InodesFree)
 		dm.cachedInfo[fsType] = fsi
 	}
 	return fsi, nil
@@ -104,12 +102,9 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 	if fsInfo.Available < 0 {
 		return true, fmt.Errorf("wrong available space for %q: %+v", fsType, fsInfo)
 	}
+
 	if fsInfo.Available < int64(threshold)*mb {
 		glog.Infof("Running out of space on disk for %q: available %d MB, threshold %d MB", fsType, fsInfo.Available/mb, threshold)
-		return false, nil
-	}
-	if fsInfo.InodesFree == 0 {
-		glog.Infof("Running out of inodes for %q", fsType)
 		return false, nil
 	}
 	return true, nil
