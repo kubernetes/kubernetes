@@ -59,7 +59,7 @@ func NewResourceQuota(client clientset.Interface, registry quota.Registry, numEv
 	}
 	go quotaAccessor.Run(stopCh)
 
-	evaluator := NewQuotaEvaluator(quotaAccessor, registry, numEvaluators, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, registry, nil, numEvaluators, stopCh)
 
 	return &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),

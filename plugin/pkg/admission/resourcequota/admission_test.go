@@ -150,7 +150,7 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -194,7 +194,7 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -277,7 +277,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -367,7 +367,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -411,7 +411,7 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -465,7 +465,7 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	quotaAccessor.indexer = indexer
 	quotaAccessor.liveLookupCache = liveLookupCache
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -531,7 +531,7 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -636,7 +636,7 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -728,7 +728,7 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
 	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
@@ -846,7 +846,7 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), 5, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 	evaluator.(*quotaEvaluator).registry = registry
 
 	defer utilruntime.HandleCrash()
