@@ -728,8 +728,12 @@ func (s *ServiceController) lockedUpdateDNSRecords(service *cachedService, clust
 	for key := range s.clusterCache.clientMap {
 		for _, clusterName := range clusterNames {
 			if key == clusterName {
-				s.ensureDnsRecords(clusterName, service)
-				ensuredCount += 1
+				err := s.ensureDnsRecords(clusterName, service)
+				if err != nil {
+					glog.Errorf("Failed to ensure DNS records for service %v in cluster %s due to %v", service, clusterName, err)
+				} else {
+					ensuredCount += 1
+				}
 			}
 		}
 	}
