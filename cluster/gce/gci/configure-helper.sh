@@ -839,12 +839,12 @@ function start-kube-addons {
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
 
     if [[ "${FEDERATION:-}" == "true" ]]; then
-      FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
-      if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-        FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
+      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
       fi
-      if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${FEDERATIONS_DOMAIN_MAP}@g" "${dns_rc_file}"
+      if [[ -n "${federations_domain_map}" ]]; then
+        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${federations_domain_map}@g" "${dns_rc_file}"
       else
         sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_rc_file}"
       fi
