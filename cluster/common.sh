@@ -481,13 +481,13 @@ function yaml-quote {
 # features in alpha)
 function build-runtime-config() {
   # If a policy provider is specified, enable NetworkPolicy API.
-  if [[ -n "${NETWORK_POLICY_PROVIDER}" ]]; then
+  if [[ -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
     appends="extensions/v1beta1=true,extensions/v1beta1/networkpolicies=true"
   fi
 
   # Generate the RUNTIME_CONFIG.
-  if [[ -n ${appends} ]]; then
-    if [[ -n ${RUNTIME_CONFIG} ]]; then
+  if [[ -n ${appends:-} ]]; then
+    if [[ -n ${RUNTIME_CONFIG:-} ]]; then
       RUNTIME_CONFIG="${RUNTIME_CONFIG},${appends}"
     else
       RUNTIME_CONFIG="${appends}"
