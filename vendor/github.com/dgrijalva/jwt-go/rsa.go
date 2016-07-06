@@ -44,8 +44,7 @@ func (m *SigningMethodRSA) Alg() string {
 }
 
 // Implements the Verify method from SigningMethod
-// For this signing method, must be either a PEM encoded PKCS1 or PKCS8 RSA public key as
-// []byte, or an rsa.PublicKey structure.
+// For this signing method, must be an rsa.PublicKey structure.
 func (m *SigningMethodRSA) Verify(signingString, signature string, key interface{}) error {
 	var err error
 
@@ -56,16 +55,10 @@ func (m *SigningMethodRSA) Verify(signingString, signature string, key interface
 	}
 
 	var rsaKey *rsa.PublicKey
+	var ok bool
 
-	switch k := key.(type) {
-	case []byte:
-		if rsaKey, err = ParseRSAPublicKeyFromPEM(k); err != nil {
-			return err
-		}
-	case *rsa.PublicKey:
-		rsaKey = k
-	default:
-		return ErrInvalidKey
+	if rsaKey, ok = key.(*rsa.PublicKey); !ok {
+		return ErrInvalidKeyType
 	}
 
 	// Create hasher
@@ -80,20 +73,13 @@ func (m *SigningMethodRSA) Verify(signingString, signature string, key interface
 }
 
 // Implements the Sign method from SigningMethod
-// For this signing method, must be either a PEM encoded PKCS1 or PKCS8 RSA private key as
-// []byte, or an rsa.PrivateKey structure.
+// For this signing method, must be an rsa.PrivateKey structure.
 func (m *SigningMethodRSA) Sign(signingString string, key interface{}) (string, error) {
-	var err error
 	var rsaKey *rsa.PrivateKey
+	var ok bool
 
-	switch k := key.(type) {
-	case []byte:
-		if rsaKey, err = ParseRSAPrivateKeyFromPEM(k); err != nil {
-			return "", err
-		}
-	case *rsa.PrivateKey:
-		rsaKey = k
-	default:
+	// Validate type of key
+	if rsaKey, ok = key.(*rsa.PrivateKey); !ok {
 		return "", ErrInvalidKey
 	}
 
