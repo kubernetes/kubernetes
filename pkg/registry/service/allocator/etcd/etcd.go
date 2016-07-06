@@ -167,22 +167,6 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 	return storeerr.InterpretUpdateError(err, e.resource, "")
 }
 
-// Refresh reloads the RangeAllocation from etcd.
-func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	existing := &api.RangeAllocation{}
-	if err := e.storage.Get(context.TODO(), e.baseKey, existing, false); err != nil {
-		if storage.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, storeerr.InterpretGetError(err, e.resource, "")
-	}
-
-	return existing, nil
-}
-
 // Get returns an api.RangeAllocation that represents the current state in
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
