@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 const (
@@ -74,10 +75,16 @@ type containerRegistryProvider struct {
 // init registers the various means by which credentials may
 // be resolved on GCP.
 func init() {
+	tr := utilnet.SetTransportDefaults(&http.Transport{})
+	metadataHTTPClientTimeout := time.Second * 10
+	httpClient := &http.Client{
+		Transport: tr,
+		Timeout:   metadataHTTPClientTimeout,
+	}
 	credentialprovider.RegisterCredentialProvider("google-dockercfg",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider: &dockerConfigKeyProvider{
-				metadataProvider{Client: http.DefaultClient},
+				metadataProvider{Client: httpClient},
 			},
 			Lifetime: 60 * time.Second,
 		})
@@ -85,7 +92,7 @@ func init() {
 	credentialprovider.RegisterCredentialProvider("google-dockercfg-url",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider: &dockerConfigUrlKeyProvider{
-				metadataProvider{Client: http.DefaultClient},
+				metadataProvider{Client: httpClient},
 			},
 			Lifetime: 60 * time.Second,
 		})
@@ -94,7 +101,7 @@ func init() {
 		// Never cache this.  The access token is already
 		// cached by the metadata service.
 		&containerRegistryProvider{
-			metadataProvider{Client: http.DefaultClient},
+			metadataProvider{Client: httpClient},
 		})
 }
 
