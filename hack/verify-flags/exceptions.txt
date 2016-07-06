@@ -20,11 +20,11 @@ cluster/gce/gci/configure-helper.sh:  local reconcile_cidr="true"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, cluster_name, public_address,
-cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, context, cluster_name, user)))
 cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
-cluster/juju/layers/kubernetes/templates/master.json:              "--client_ca_file=/srv/kubernetes/ca.crt",
-cluster/juju/layers/kubernetes/templates/skydns-rc.yml:        - -kube_master_url=http://{{ private_address }}:8080
+cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, cluster_name, server, ca)))
+cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, context, cluster_name, user)))
+cluster/juju/layers/kubernetes/reactive/k8s.py:    client_key = '/srv/kubernetes/client.key'
+cluster/juju/layers/kubernetes/reactive/k8s.py:    tlslib.client_key(None, client_key, user='ubuntu', group='ubuntu')
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
 cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
