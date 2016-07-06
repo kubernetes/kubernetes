@@ -121,12 +121,37 @@ binary | sha1 hash | md5 hash
   * Display line number on JSON errors
   * Add flag -t as shorthand for --tty
 * Resources
+  * Improved node stability by *optionally* evicting pods upon memory pressure - [Design Doc](https://github.com/kubernetes/kubernetes/blob/release-1.3/docs/proposals/kubelet-eviction.md) 
   * **alpha**: NVIDIA GPU support ([#24836](https://github.com/kubernetes/kubernetes/pull/24836), [@therc](https://github.com/therc))
   * Adding loadBalancer services and nodeports services to quota system
 
 ## Known Issues and Important Steps before Upgrading
 
-* *Instructions coming soon*
+The following versions of Docker Engine are supported - *[v1.10](https://github.com/kubernetes/kubernetes/issues/19720)*, *[v1.11](https://github.com/kubernetes/kubernetes/issues/23397)*
+Although *v1.9* is still compatible, we recommend upgrading to one of the supported versions.
+All prior versions of docker will not be supported.
+
+#### kubernetes Core Known Issues
+
+- Kube Proxy crashes infrequently due to a docker bug ([#24000](https://github.com/docker/docker/issues/24000))
+  - This issue can be resolved by restarting docker daemon
+- CORS works only in insecure mode ([#24086](https://github.com/kubernetes/kubernetes/issues/24086))
+- Persistent volume claims gets added incorrectly after being deleted under stress. Happens very infrequently. ([#26082](https://github.com/kubernetes/kubernetes/issues/26082))
+ 
+#### Docker runtime Known Issues
+
+- Kernel crash with Aufs storage driver on Debian Jessie ([#27885](https://github.com/kubernetes/kubernetes/issues/27885))
+  - Consider running the *new* [kubernetes node problem detector](https://github.com/kubernetes/node-problem-detector) to identify this (and other) kernel issues automatically.
+
+- File descriptors are leaked in docker v1.11 ([#275](https://github.com/docker/containerd/issues/275))
+- Additional memory overhead per container in docker v1.11 ([#21737](https://github.com/docker/docker/issues/21737))
+- [List of upstream fixes](https://github.com/docker/docker/compare/v1.10.3...runcom:docker-1.10.3-stable) for docker v1.10 identified by RedHat
+
+#### Rkt runtime Known Issues
+
+- A detailed list of known issues can be found [here](https://github.com/kubernetes/kubernetes.github.io/blob/release-1.3/docs/getting-started-guides/rkt/notes.md)
+
+*More Instructions coming soon*
 
 ## Provider-specific Notes
 
