@@ -63,8 +63,8 @@ var FederatedServiceLabels = map[string]string{
 }
 
 /*
-type cluster keeps track of the assorted objects and state related to each
-cluster in the federation
+cluster keeps track of the assorted objects and state related to each cluster
+in the federation
 */
 type cluster struct {
 	name string
@@ -75,7 +75,7 @@ type cluster struct {
 
 var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-service")
-	var clusters map[string]*cluster
+	var clusters map[string]*cluster // All clusters, keyed by cluster name
 	var federationName string
 	var primaryClusterName string // The name of the "primary" cluster
 
@@ -117,7 +117,6 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			}
 			framework.Logf("%d clusters are Ready", len(contexts))
 
-			// clusters = make([]cluster, len(clusterList.Items))
 			clusters = map[string]*cluster{}
 			primaryClusterName = clusterList.Items[0].Name
 			By(fmt.Sprintf("Labeling %q as the first cluster", primaryClusterName))
@@ -507,7 +506,7 @@ func createBackendPodsOrFail(clusters map[string]*cluster, namespace string, nam
 }
 
 /*
-deletes exactly one backend pod which must not be nil
+deleteOneBackendPodOrFail deletes exactly one backend pod which must not be nil
 The test fails if there are any errors.
 */
 func deleteOneBackendPodOrFail(c *cluster) {
