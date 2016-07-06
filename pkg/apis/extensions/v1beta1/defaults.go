@@ -27,7 +27,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		SetDefaults_DaemonSet,
 		SetDefaults_Deployment,
 		SetDefaults_Job,
-		SetDefaults_HorizontalPodAutoscaler,
 		SetDefaults_ReplicaSet,
 		SetDefaults_NetworkPolicy,
 	)
@@ -120,16 +119,6 @@ func SetDefaults_Job(obj *Job) {
 	if obj.Spec.Parallelism == nil {
 		obj.Spec.Parallelism = new(int32)
 		*obj.Spec.Parallelism = 1
-	}
-}
-
-func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
-	if obj.Spec.MinReplicas == nil {
-		minReplicas := int32(1)
-		obj.Spec.MinReplicas = &minReplicas
-	}
-	if obj.Spec.CPUUtilization == nil {
-		obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
 	}
 }
 

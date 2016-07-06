@@ -41,8 +41,6 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&Deployment{},
 		&DeploymentList{},
 		&DeploymentRollback{},
-		&HorizontalPodAutoscaler{},
-		&HorizontalPodAutoscalerList{},
 		&Job{},
 		&JobList{},
 		&ReplicationControllerDummy{},
