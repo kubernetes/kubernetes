@@ -1890,8 +1890,9 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicyAlways,
+			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			InitContainers: []api.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy:  api.RestartPolicyAlways,
 			NodeSelector: map[string]string{
 				"key": "value",
 			},
@@ -1981,6 +1982,12 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers:    []api.Container{{}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad init container": {
+			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			InitContainers: []api.Container{{}},
+			RestartPolicy:  api.RestartPolicyAlways,
+			DNSPolicy:      api.DNSClusterFirst,
 		},
 		"bad DNS policy": {
 			DNSPolicy:     api.DNSPolicy("invalid"),
@@ -3007,6 +3014,35 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Image: "foo:V1",
+						},
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Image: "foo:V2",
+						},
+						{
+							Image: "bar:V2",
+						},
+					},
+				},
+			},
+			false,
+			"more init containers",
+		},
+		{
+			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
@@ -3057,6 +3093,30 @@ func TestValidatePodUpdate(t *testing.T) {
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Image: "foo:V1",
+						},
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Image: "foo:V2",
+						},
+					},
+				},
+			},
+			true,
+			"init container image change",
+		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{},
 					},
@@ -3074,6 +3134,28 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			false,
 			"image change to empty",
+		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{},
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Image: "foo:V2",
+						},
+					},
+				},
+			},
+			false,
+			"init container image change to empty",
 		},
 		{
 			api.Pod{

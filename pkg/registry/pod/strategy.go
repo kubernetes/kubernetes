@@ -66,6 +66,21 @@ func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
+	// TODO: VolumeMounts of init containers currently aren't merged properly
+	// by the PATCH handler because they are stored as a string under
+	// PodInitContainersAnnotationKey (pod.alpha.kubernetes.io/init-containers)
+	// in annotations of v1.PodSpec.
+	// In the existing Pod, VolumeMounts of init containers may be altered by
+	// secrets / config maps mechanisms causing ValidatePodUpdate to fail.
+	// As a workaround, changes in VolumeMounts of init containers are
+	// currently ignored and don't cause validation errors.
+	// Remove this workaround when InitContainers go out of alpha and
+	// PodInitContainersAnnotationKey is removed.
+	if len(oldPod.Spec.InitContainers) == len(newPod.Spec.InitContainers) {
+		for ix := range newPod.Spec.InitContainers {
+			newPod.Spec.InitContainers[ix].VolumeMounts = oldPod.Spec.InitContainers[ix].VolumeMounts
+		}
+	}
 }
 
 // Validate validates a new pod.

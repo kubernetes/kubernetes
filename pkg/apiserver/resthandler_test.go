@@ -523,3 +523,57 @@ func TestHasUID(t *testing.T) {
 		}
 	}
 }
+
+func TestReplaceInitContainerImage(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	uid := types.UID("uid")
+
+	tc := &patchTestCase{
+		name: "TestPatchResourceWithVersionConflict",
+
+		startingPod: &v1.Pod{},
+		changedPod:  &v1.Pod{},
+		updatePod:   &v1.Pod{},
+
+		expectedPod: &api.Pod{},
+	}
+
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
+	tc.startingPod.ResourceVersion = "1"
+	tc.startingPod.APIVersion = "v1"
+	tc.startingPod.Annotations = map[string]string{
+		v1.PodInitContainersAnnotationKey: "[{\"name\":\"fooinit\",\"image\":\"someimage\",\"command\":[\"foobar\"]}]",
+	}
+
+	tc.changedPod.Name = name
+	tc.changedPod.Namespace = namespace
+	tc.changedPod.UID = uid
+	tc.changedPod.ResourceVersion = "1"
+	tc.changedPod.APIVersion = "v1"
+	tc.changedPod.Annotations = map[string]string{
+		v1.PodInitContainersAnnotationKey: "[{\"name\":\"fooinit\",\"image\":\"someimage\",\"command\":[\"foobar\"]}]",
+	}
+
+	tc.updatePod.Name = name
+	tc.updatePod.Namespace = namespace
+	tc.updatePod.UID = uid
+	tc.updatePod.ResourceVersion = "2"
+	tc.updatePod.APIVersion = "v1"
+	tc.updatePod.Annotations = map[string]string{
+		v1.PodInitContainersAnnotationKey: "[{\"name\":\"fooinit\",\"image\":\"otherimage\",\"command\":[\"foobar\"]}]",
+	}
+
+	tc.expectedPod.Name = name
+	tc.expectedPod.Namespace = namespace
+	tc.expectedPod.UID = uid
+	tc.expectedPod.ResourceVersion = "2"
+	tc.expectedPod.Spec.InitContainers = []api.Container{{}}
+	tc.expectedPod.Spec.InitContainers[0].Name = "fooinit"
+	tc.expectedPod.Spec.InitContainers[0].Image = "otherimage"
+	tc.expectedPod.Spec.InitContainers[0].Command = []string{"foobar"}
+
+	tc.Run(t)
+}
