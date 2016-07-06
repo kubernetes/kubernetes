@@ -174,7 +174,7 @@ function kube::build::docker_available_on_osx() {
     fi
 
     kube::log::status "No docker host is set. Checking options for setting one..."
-    if [[ -z "$(which docker-machine)" && -z "$(which boot2docker)" ]]; then
+    if [[ -z "$(which docker-machine)" ]]; then
       kube::log::status "It looks like you're running Mac OS X, and neither Docker for Mac nor docker-machine can be found."
       kube::log::status "See: https://docs.docker.com/engine/installation/mac/ for installation instructions."
       return 1
