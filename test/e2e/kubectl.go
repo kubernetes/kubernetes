@@ -87,6 +87,7 @@ const (
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"
+	podWithInitContFilename  = "pod-with-init-containers.yaml"
 )
 
 var (
@@ -443,6 +444,15 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				ExecOrDie()
 			By("checking the result")
 			forEachReplicationController(c, ns, "app", "redis", validateReplicationControllerConfiguration)
+		})
+		It("should not fail on pods with init containers", func() {
+			podYaml := readTestFileOrDie(podWithInitContFilename)
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("creating a pod with init containers")
+			framework.RunKubectlOrDieInput(string(podYaml), "create", "-f", "-", nsFlag)
+			By("applying the same pod definition")
+			framework.RunKubectlOrDieInput(string(podYaml), "apply", "-f", "-", nsFlag)
 		})
 		It("should reuse nodePort when apply to an existing SVC", func() {
 			serviceJson := readTestFileOrDie(redisServiceFilename)
