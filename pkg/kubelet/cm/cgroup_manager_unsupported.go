@@ -29,6 +29,10 @@ func NewCgroupManager(_ interface{}) CgroupManager {
 	return &unsupportedCgroupManager{}
 }
 
+func (m *unsupportedCgroupManager) Exists(_ string) bool {
+	return false
+}
+
 func (m *unsupportedCgroupManager) Destroy(_ *CgroupConfig) error {
 	return nil
 }
