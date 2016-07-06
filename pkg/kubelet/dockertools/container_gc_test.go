@@ -89,6 +89,28 @@ func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
 	}
 }
 
+func TestDeleteContainerSkipRunningContainer(t *testing.T) {
+	gc, fakeDocker := newTestContainerGC(t)
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer("1876", "foo", "POD", true, makeTime(0)),
+	})
+	addPods(gc.podGetter, "foo")
+
+	assert.Error(t, gc.deleteContainer("1876"))
+	assert.Len(t, fakeDocker.Removed, 0)
+}
+
+func TestDeleteContainerRemoveDeadContainer(t *testing.T) {
+	gc, fakeDocker := newTestContainerGC(t)
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer("1876", "foo", "POD", false, makeTime(0)),
+	})
+	addPods(gc.podGetter, "foo")
+
+	assert.Nil(t, gc.deleteContainer("1876"))
+	assert.Len(t, fakeDocker.Removed, 1)
+}
+
 func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 	gc, fakeDocker := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
