@@ -34,8 +34,9 @@ completion of kubectl commands.
 	completion_example = `
 $ source <(kubectl completion bash)
 
-will load the kubectl completion code for bash. Note that this depends on the bash-completion
-framework. It must be sourced before sourcing the kubectl completion, i.e. on the Mac:
+will load the kubectl completion code for bash. Note that this depends on the
+bash-completion framework. It must be sourced before sourcing the kubectl
+completion, e.g. on the Mac:
 
 $ brew install bash-completion
 $ source $(brew --prefix)/etc/bash_completion
