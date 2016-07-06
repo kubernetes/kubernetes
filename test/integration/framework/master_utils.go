@@ -91,8 +91,6 @@ type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
 	MasterConfig            *master.Config
 	StartReplicationManager bool
-	// If true, all existing etcd keys are purged before starting master components
-	DeleteEtcdKeys bool
 	// Client throttling qps
 	QPS float32
 	// Client burst qps, also burst replicas allowed in rc manager
@@ -105,9 +103,6 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	m, s := startMasterOrDie(c.MasterConfig)
 	// TODO: Allow callers to pipe through a different master url and create a client/start components using it.
 	glog.Infof("Master %+v", s.URL)
-	if c.DeleteEtcdKeys {
-		DeleteAllEtcdKeys()
-	}
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, QPS: c.QPS, Burst: c.Burst})

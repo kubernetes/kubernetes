@@ -67,7 +67,7 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 		if err := proto.UnmarshalText(scanner.Text(), &metric); err != nil {
 			return nil, fmt.Errorf("Failed to unmarshal line of metrics response: %v", err)
 		}
-		glog.Infof("Got metric %q", metric.GetName())
+		glog.V(4).Infof("Got metric %q", metric.GetName())
 		metrics = append(metrics, &metric)
 	}
 	return metrics, nil
