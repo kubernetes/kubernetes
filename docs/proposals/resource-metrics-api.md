@@ -79,10 +79,11 @@ The design of the pipeline for collecting application level metrics should
 be revisited and it's not clear whether application level metrics should be
 available in API server so the use case initially won't be supported.
 
-#### Ubernetes
+#### Cluster Federation
 
-Ubernetes might want to consider cluster-level usage (in addition to cluster-level request)
-of running pods when choosing where to schedule new pods. Although Ubernetes is still in design,
+The Cluster Federation control system might want to consider cluster-level usage (in addition to cluster-level request)
+of running pods when choosing where to schedule new pods. Although
+Cluster Federation is still in design,
 we expect the metrics API described here to be sufficient. Cluster-level usage can be
 obtained by summing over usage of all nodes in the cluster.
 
