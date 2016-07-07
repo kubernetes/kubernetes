@@ -243,7 +243,7 @@ kube::test::kubectl_dry_run() {
   if [[ $(echo "$out" | grep "created") ]]; then
     echo ${bold}${red}
     echo "FAIL!"
-    echo "run with --dry-run-true"
+    echo "run with --dry-run=true"
     echo "Deployment created log found in:"
     echo "$out"
     echo ${reset}${red}
