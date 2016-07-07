@@ -2695,8 +2695,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 // sufficient disk space or it is out of disk, depending on the capacity, availability and
 // threshold values.
 func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb, InodesFree: 5}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb, InodesFree: 5}
+	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb}
+	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb}
 	mockCadvisor.On("ImagesFsInfo").Return(dockerimagesFsInfo, nil)
 	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
 
