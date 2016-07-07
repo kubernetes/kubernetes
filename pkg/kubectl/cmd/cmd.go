@@ -183,8 +183,7 @@ __custom_func() {
 	usage_template = `{{if gt .Aliases 0}}
 
 Aliases:
-  {{.NameAndAliases}}
-{{end}}{{if .HasExample}}
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
 
 Examples:
 {{ .Example }}{{end}}{{ if .HasAvailableSubCommands}}
