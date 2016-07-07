@@ -19,6 +19,7 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -27,7 +28,7 @@ import (
 
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
 func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims}
+	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims, api.ResourceRequestsStorage}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.PersistentVolumeClaim",
 		InternalGroupKind: api.Kind("PersistentVolumeClaim"),
@@ -37,9 +38,23 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Eva
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourcePersistentVolumeClaims),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourcePersistentVolumeClaims),
+		UsageFunc:            PersistentVolumeClaimUsageFunc,
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
 			return kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
 		},
 	}
+}
+
+// PersistentVolumeClaimUsageFunc knows how to measure usage associated with persistent volume claims
+func PersistentVolumeClaimUsageFunc(object runtime.Object) api.ResourceList {
+	pvc, ok := object.(*api.PersistentVolumeClaim)
+	if !ok {
+		return api.ResourceList{}
+	}
+	result := api.ResourceList{}
+	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+	if request, found := pvc.Spec.Resources.Requests[api.ResourceStorage]; found {
+		result[api.ResourceRequestsStorage] = request
+	}
+	return result
 }
