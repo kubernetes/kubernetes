@@ -116,7 +116,7 @@ func NewCmdResources(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
-	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change - may use wildcards")
+	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set resources will NOT contact api-server but run locally")
 	cmdutil.AddRecordFlag(cmd)
 	cmd.Flags().BoolVar(&options.Remove, "remove", false, "If true, set resources will remove resource limit/requests from pod template")
