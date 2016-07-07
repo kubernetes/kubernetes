@@ -214,7 +214,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			},
 		)
 	default:
-		return nil, fmt.Errorf("no replenishment controller available for %s", options.GroupKind)
+		return nil, NewUnhandledGroupKindError(options.GroupKind)
 	}
 	return result, nil
 }
@@ -228,4 +228,39 @@ func ServiceReplenishmentUpdateFunc(options *ReplenishmentControllerOptions) fun
 			options.ReplenishmentFunc(options.GroupKind, newService.Namespace, newService)
 		}
 	}
+}
+
+type unhandledKindErr struct {
+	kind unversioned.GroupKind
+}
+
+func (e unhandledKindErr) Error() string {
+	return fmt.Sprintf("no replenishment controller available for %s", e.kind)
+}
+
+func NewUnhandledGroupKindError(kind unversioned.GroupKind) error {
+	return unhandledKindErr{kind: kind}
+}
+
+func IsUnhandledGroupKindError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(unhandledKindErr)
+	return ok
+}
+
+// UnionReplenishmentControllerFactory iterates through its constituent factories ignoring, UnhandledGroupKindErrors
+// returning the first success or failure it hits.  If there are no hits either way, it return an UnhandledGroupKind error
+type UnionReplenishmentControllerFactory []ReplenishmentControllerFactory
+
+func (f UnionReplenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (framework.ControllerInterface, error) {
+	for _, factory := range f {
+		controller, err := factory.NewController(options)
+		if !IsUnhandledGroupKindError(err) {
+			return controller, err
+		}
+	}
+
+	return nil, NewUnhandledGroupKindError(options.GroupKind)
 }
