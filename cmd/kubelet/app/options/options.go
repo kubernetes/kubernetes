@@ -151,6 +151,7 @@ func NewKubeletServer() *KubeletServer {
 			OutOfDiskTransitionFrequency:     unversioned.Duration{Duration: 5 * time.Minute},
 			HairpinMode:                      componentconfig.PromiscuousBridge,
 			BabysitDaemons:                   false,
+			EvictionHard:                     "memory.available<100Mi",
 			EvictionPressureTransitionPeriod: unversioned.Duration{Duration: 5 * time.Minute},
 			PodsPerCore:                      0,
 		},
