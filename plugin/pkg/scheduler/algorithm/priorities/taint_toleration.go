@@ -83,7 +83,8 @@ func (s *TaintToleration) ComputeTaintTolerationPriority(pod *api.Pod, nodeNameT
 	tolerationList := getAllTolerationPreferNoSchedule(tolerations)
 
 	// calculate the intolerable taints for all the nodes
-	for _, node := range nodes.Items {
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
 		taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
 		if err != nil {
 			return nil, err
