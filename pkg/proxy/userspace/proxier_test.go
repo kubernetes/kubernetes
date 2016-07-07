@@ -276,9 +276,9 @@ func TestUDPProxyTimeout(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 1)
 	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
-	// When connecting to a UDP service endpoint, there shoule be a Conn for proxy.
+	// When connecting to a UDP service endpoint, there should be a Conn for proxy.
 	waitForNumProxyClients(t, svcInfo, 1, time.Second)
-	// If conn has no activity for serviceInfo.timeout since last Read/Write, it shoule be closed because of timeout.
+	// If conn has no activity for serviceInfo.timeout since last Read/Write, it should be closed because of timeout.
 	waitForNumProxyClients(t, svcInfo, 0, 2*time.Second)
 }
 

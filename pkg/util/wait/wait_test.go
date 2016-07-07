@@ -79,7 +79,7 @@ func TestUntilReturnsImmediately(t *testing.T) {
 func TestJitterUntil(t *testing.T) {
 	ch := make(chan struct{})
 	// if a channel is closed JitterUntil never calls function f
-	// and returns imidiatelly
+	// and returns immediately
 	close(ch)
 	JitterUntil(func() {
 		t.Fatal("should not have been invoked")

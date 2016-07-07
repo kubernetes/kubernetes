@@ -771,7 +771,7 @@ func wrapTestWithControllerConfig(operation operationType, expectedOperationCall
 // wrapTestWithInjectedOperation returns a testCall that:
 // - starts the controller and lets it run original testCall until
 //   scheduleOperation() call. It blocks the controller there and calls the
-//   injected function to simulate that something is happenning when the
+//   injected function to simulate that something is happening when the
 //   controller waits for the operation lock. Controller is then resumed and we
 //   check how it behaves.
 func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(ctrl *PersistentVolumeController, reactor *volumeReactor)) testCall {
