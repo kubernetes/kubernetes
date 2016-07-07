@@ -281,7 +281,7 @@ The `selector` attribute contains the controller's selector query. It can be
 explicitly specified, or applied automatically from the labels in the pod
 template if not set, as is done here.
 
-The pod template's label, `app:cassandra`, matches matches the Service selector
+The pod template's label, `app:cassandra`, matches the Service selector
 from Step 1. This is how pods created by this replication controller are picked up
 by the Service."
 
