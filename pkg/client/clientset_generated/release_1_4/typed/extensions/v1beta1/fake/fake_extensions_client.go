@@ -34,10 +34,6 @@ func (c *FakeExtensions) Deployments(namespace string) v1beta1.DeploymentInterfa
 	return &FakeDeployments{c, namespace}
 }
 
-func (c *FakeExtensions) HorizontalPodAutoscalers(namespace string) v1beta1.HorizontalPodAutoscalerInterface {
-	return &FakeHorizontalPodAutoscalers{c, namespace}
-}
-
 func (c *FakeExtensions) Ingresses(namespace string) v1beta1.IngressInterface {
 	return &FakeIngresses{c, namespace}
 }

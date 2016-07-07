@@ -159,7 +159,6 @@ const (
 	ServiceV1GeneratorName                      = "service/v1"
 	ServiceV2GeneratorName                      = "service/v2"
 	ServiceAccountV1GeneratorName               = "serviceaccount/v1"
-	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
 	HorizontalPodAutoscalerV1GeneratorName      = "horizontalpodautoscaler/v1"
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
@@ -186,7 +185,6 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		JobV1GeneratorName:             kubectl.JobV1{},
 	}
 	generators["autoscale"] = map[string]kubectl.Generator{
-		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
 		HorizontalPodAutoscalerV1GeneratorName:      kubectl.HorizontalPodAutoscalerV1{},
 	}
 	generators["namespace"] = map[string]kubectl.Generator{
