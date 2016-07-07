@@ -29,6 +29,7 @@ RUN chmod -R a+rwx ${HOME}
 
 # Propagate the git tree version into the build image
 ADD kube-version-defs /kube-version-defs
+RUN chmod a+r /kube-version-defs
 ENV KUBE_GIT_VERSION_FILE /kube-version-defs
 
 # Make output from the dockerized build go someplace else
