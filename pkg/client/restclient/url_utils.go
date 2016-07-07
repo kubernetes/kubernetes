@@ -36,7 +36,7 @@ func DefaultServerURL(host, apiPath string, groupVersion unversioned.GroupVersio
 	if err != nil {
 		return nil, "", err
 	}
-	if hostURL.Scheme == "" {
+	if hostURL.Scheme == "" || hostURL.Host == "" {
 		scheme := "http://"
 		if defaultTLS {
 			scheme = "https://"
