@@ -266,6 +266,7 @@ func TestGenerateService(t *testing.T) {
 		sawPOST := false
 		f, tf, codec := NewAPIFactory()
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -299,9 +300,9 @@ func TestGenerateService(t *testing.T) {
 			}),
 		}
 		cmd := &cobra.Command{}
-		cmd.Flags().String("output", "", "")
 		cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
 		cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation.")
+		cmdutil.AddPrinterFlags(cmd)
 		cmdutil.AddInclude3rdPartyFlags(cmd)
 		addRunFlags(cmd)
 
