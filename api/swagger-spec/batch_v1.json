@@ -1079,10 +1079,12 @@
      },
      "creationTimestamp": {
       "type": "string",
+      "format": "date-time",
       "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionTimestamp": {
       "type": "string",
+      "format": "date-time",
       "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionGracePeriodSeconds": {
@@ -2475,10 +2477,12 @@
      },
      "startTime": {
       "type": "string",
+      "format": "date-time",
       "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
      },
      "completionTime": {
       "type": "string",
+      "format": "date-time",
       "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
      },
      "active": {
@@ -2516,10 +2520,12 @@
      },
      "lastProbeTime": {
       "type": "string",
+      "format": "date-time",
       "description": "Last time the condition was checked."
      },
      "lastTransitionTime": {
       "type": "string",
+      "format": "date-time",
       "description": "Last time the condition transit from one status to another."
      },
      "reason": {
