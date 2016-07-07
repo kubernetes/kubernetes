@@ -10006,15 +10006,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard list metadata. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -10030,15 +10030,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta1.NetworkPolicySpec",
