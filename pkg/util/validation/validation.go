@@ -85,10 +85,10 @@ func IsValidLabelValue(value string) []string {
 	return errs
 }
 
-const DNS1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
 const DNS1123LabelMaxLength int = 63
 
-var dns1123LabelRegexp = regexp.MustCompile("^" + DNS1123LabelFmt + "$")
+var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
 
 // IsDNS1123Label tests for a string that conforms to the definition of a label in
 // DNS (RFC 1123).
@@ -98,15 +98,15 @@ func IsDNS1123Label(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123LabelMaxLength))
 	}
 	if !dns1123LabelRegexp.MatchString(value) {
-		errs = append(errs, RegexError(DNS1123LabelFmt, "my-name", "123-abc"))
+		errs = append(errs, RegexError(dns1123LabelFmt, "my-name", "123-abc"))
 	}
 	return errs
 }
 
-const DNS1123SubdomainFmt string = DNS1123LabelFmt + "(\\." + DNS1123LabelFmt + ")*"
+const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
 const DNS1123SubdomainMaxLength int = 253
 
-var dns1123SubdomainRegexp = regexp.MustCompile("^" + DNS1123SubdomainFmt + "$")
+var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
 
 // IsDNS1123Subdomain tests for a string that conforms to the definition of a
 // subdomain in DNS (RFC 1123).
@@ -116,15 +116,15 @@ func IsDNS1123Subdomain(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !dns1123SubdomainRegexp.MatchString(value) {
-		errs = append(errs, RegexError(DNS1123SubdomainFmt, "example.com"))
+		errs = append(errs, RegexError(dns1123SubdomainFmt, "example.com"))
 	}
 	return errs
 }
 
-const DNS952LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+const dns952LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 const DNS952LabelMaxLength int = 24
 
-var dns952LabelRegexp = regexp.MustCompile("^" + DNS952LabelFmt + "$")
+var dns952LabelRegexp = regexp.MustCompile("^" + dns952LabelFmt + "$")
 
 // IsDNS952Label tests for a string that conforms to the definition of a label in
 // DNS (RFC 952).
@@ -134,20 +134,20 @@ func IsDNS952Label(value string) []string {
 		errs = append(errs, MaxLenError(DNS952LabelMaxLength))
 	}
 	if !dns952LabelRegexp.MatchString(value) {
-		errs = append(errs, RegexError(DNS952LabelFmt, "my-name", "abc-123"))
+		errs = append(errs, RegexError(dns952LabelFmt, "my-name", "abc-123"))
 	}
 	return errs
 }
 
-const CIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
+const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
 
-var cIdentifierRegexp = regexp.MustCompile("^" + CIdentifierFmt + "$")
+var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
 
 // IsCIdentifier tests for a string that conforms the definition of an identifier
 // in C. This checks the format, but not the length.
 func IsCIdentifier(value string) []string {
 	if !cIdentifierRegexp.MatchString(value) {
-		return []string{RegexError(CIdentifierFmt, "my_name", "MY_NAME", "MyName")}
+		return []string{RegexError(cIdentifierFmt, "my_name", "MY_NAME", "MyName")}
 	}
 	return nil
 }
@@ -245,6 +245,23 @@ func IsHTTPHeaderName(value string) []string {
 		return []string{RegexError(httpHeaderNameFmt, "X-Header-Name")}
 	}
 	return nil
+}
+
+const configMapKeyFmt = "\\.?" + dns1123SubdomainFmt
+
+var configMapKeyRegexp = regexp.MustCompile("^" + configMapKeyFmt + "$")
+
+// IsConfigMapKey tests for a string that conforms to the definition of a
+// subdomain in DNS (RFC 1123), except that a leading dot is allowed
+func IsConfigMapKey(value string) []string {
+	var errs []string
+	if len(value) > DNS1123SubdomainMaxLength {
+		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
+	}
+	if !configMapKeyRegexp.MatchString(value) {
+		errs = append(errs, RegexError(configMapKeyFmt, "key.name"))
+	}
+	return errs
 }
 
 // MaxLenError returns a string explanation of a "string too long" validation
