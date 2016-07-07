@@ -42,17 +42,23 @@ EOF
 sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/controllers_flags"
 }
 
-RUN_FROM_DISTRO=${RUN_FROM_DISTRO:-false}
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
 
-if [ "${RUN_FROM_DISTRO}" == "false" ]; then
-  # Running from repository
+echo "Copying kubemark to ${MAKE_DIR}"
+if [[ -f "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" ]]; then
+  # Running from distro
+  SERVER_TARBALL="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
   cp "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kubemark" "${MAKE_DIR}"
+elif [[ -f "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" ]]; then
+  # Running from an extracted release tarball (kubernetes.tar.gz)
+  SERVER_TARBALL="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  tar \
+    --strip-components=3 \
+    -xzf kubernetes-server-linux-amd64.tar.gz \
+    -C "${MAKE_DIR}" 'kubernetes/server/bin/kubemark' || exit 1
 else
-  cp "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" "."
-  tar -xzf kubernetes-server-linux-amd64.tar.gz
-  cp "kubernetes/server/bin/kubemark" "${MAKE_DIR}"
-  rm -rf "kubernetes-server-linux-amd64.tar.gz" "kubernetes"
+  echo 'Cannot find kubernetes/server/bin/kubemark binary'
+  exit 1
 fi
 
 CURR_DIR=`pwd`
@@ -167,25 +173,14 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
 
 writeEnvironmentFiles
 
-if [ "${RUN_FROM_DISTRO}" == "false" ]; then
-  gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
-    "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" \
-    "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
-    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
-    "${RESOURCE_DIRECTORY}/apiserver_flags" \
-    "${RESOURCE_DIRECTORY}/scheduler_flags" \
-    "${RESOURCE_DIRECTORY}/controllers_flags" \
-    "${MASTER_NAME}":~
-else
-  gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
-    "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" \
-    "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
-    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
-    "${RESOURCE_DIRECTORY}/apiserver_flags" \
-    "${RESOURCE_DIRECTORY}/scheduler_flags" \
-    "${RESOURCE_DIRECTORY}/controllers_flags" \
-    "${MASTER_NAME}":~
-fi
+gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
+  "${SERVER_TARBALL}" \
+  "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
+  "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+  "${RESOURCE_DIRECTORY}/apiserver_flags" \
+  "${RESOURCE_DIRECTORY}/scheduler_flags" \
+  "${RESOURCE_DIRECTORY}/controllers_flags" \
+  "${MASTER_NAME}":~
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
   --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1}"
