@@ -1159,7 +1159,16 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "secret_value",
+			Name: "NODE_NAME",
+			ValueFrom: &api.EnvVarSource{
+				NodeFieldRef: &api.ObjectFieldSelector{
+					APIVersion: testapi.Default.GroupVersion().String(),
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "SECRET_VALUE",
 			ValueFrom: &api.EnvVarSource{
 				SecretKeyRef: &api.SecretKeySelector{
 					LocalObjectReference: api.LocalObjectReference{
@@ -1352,6 +1361,45 @@ func TestValidateEnv(t *testing.T) {
 				},
 			}},
 			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, status.podIP`,
+		},
+		{
+			name: "invalid nodeFieldPath",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					NodeFieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "metadata.whoops",
+						APIVersion: testapi.Default.GroupVersion().String(),
+					},
+				},
+			}},
+			expectedError: `field[0].valueFrom.nodeFieldRef.fieldPath: Invalid value: "metadata.whoops": error converting fieldPath: field label not supported: metadata.whoops`,
+		},
+		{
+			name: "invalid nodeFieldPath labels",
+			envs: []api.EnvVar{{
+				Name: "labels",
+				ValueFrom: &api.EnvVarSource{
+					NodeFieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "metadata.labels",
+						APIVersion: "v1",
+					},
+				},
+			}},
+			expectedError: `field[0].valueFrom.nodeFieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name`,
+		},
+		{
+			name: "invalid nodeFieldPath annotations",
+			envs: []api.EnvVar{{
+				Name: "annotations",
+				ValueFrom: &api.EnvVarSource{
+					NodeFieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "metadata.annotations",
+						APIVersion: "v1",
+					},
+				},
+			}},
+			expectedError: `field[0].valueFrom.nodeFieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name`,
 		},
 	}
 	for _, tc := range errorCases {

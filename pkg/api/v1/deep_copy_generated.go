@@ -828,6 +828,15 @@ func DeepCopy_v1_EnvVarSource(in EnvVarSource, out *EnvVarSource, c *conversion.
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	if in.NodeFieldRef != nil {
+		in, out := in.NodeFieldRef, &out.NodeFieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_v1_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.NodeFieldRef = nil
+	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := in.ConfigMapKeyRef, &out.ConfigMapKeyRef
 		*out = new(ConfigMapKeySelector)

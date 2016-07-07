@@ -945,10 +945,12 @@ type EnvVarSource struct {
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,2,opt,name=resourceFieldRef"`
+	// Selects a field of the node; only name and IP are supported
+	NodeFieldRef *ObjectFieldSelector `json:"nodeFieldRef,omitempty" protobuf:"bytes,3,opt,name=nodeFieldRef"`
 	// Selects a key of a ConfigMap.
-	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`
+	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty" protobuf:"bytes,4,opt,name=configMapKeyRef"`
 	// Selects a key of a secret in the pod's namespace
-	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty" protobuf:"bytes,4,opt,name=secretKeyRef"`
+	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty" protobuf:"bytes,5,opt,name=secretKeyRef"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.

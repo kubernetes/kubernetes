@@ -1223,6 +1223,15 @@ func TestParseResolvConf(t *testing.T) {
 
 func TestDNSConfigurationParams(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	versionInfo := &cadvisorapi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	kubelet := testKubelet.kubelet
 
 	clusterNS := "203.0.113.1"
@@ -1527,6 +1536,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: "NODE_NAME",
+						ValueFrom: &api.EnvVarSource{
+							NodeFieldRef: &api.ObjectFieldSelector{
+								APIVersion: testapi.Default.GroupVersion().String(),
+								FieldPath:  "metadata.name",
+							},
+						},
+					},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -1535,6 +1553,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_NAME", Value: "dapi-test-pod-name"},
 				{Name: "POD_NAMESPACE", Value: "downward-api"},
 				{Name: "POD_IP", Value: "1.2.3.4"},
+				{Name: "NODE_NAME", Value: "127.0.0.1"},
 			},
 		},
 		{
@@ -1672,6 +1691,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 
 	for i, tc := range testCases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+		testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+		testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+		versionInfo := &cadvisorapi.VersionInfo{
+			KernelVersion:      "3.16.0-0.bpo.4-amd64",
+			ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+			DockerVersion:      "1.5.0",
+		}
+		testKubelet.fakeCadvisor.On("VersionInfo").Return(versionInfo, nil)
 		kl := testKubelet.kubelet
 		kl.masterServiceNamespace = tc.masterServiceNs
 		if tc.nilLister {

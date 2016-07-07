@@ -2114,6 +2114,10 @@
       "$ref": "v1.ResourceFieldSelector",
       "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
      },
+     "nodeFieldRef": {
+      "$ref": "v1.ObjectFieldSelector",
+      "description": "Selects a field of the node; only name and IP are supported"
+     },
      "configMapKeyRef": {
       "$ref": "v1.ConfigMapKeySelector",
       "description": "Selects a key of a ConfigMap."
