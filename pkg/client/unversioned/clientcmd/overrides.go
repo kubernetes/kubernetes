@@ -17,6 +17,7 @@ limitations under the License.
 package clientcmd
 
 import (
+	"os"
 	"strconv"
 
 	"github.com/spf13/pflag"
@@ -79,13 +80,22 @@ type FlagInfo struct {
 	Default string
 	// Description is the description for the flag
 	Description string
+	// EnvVar is an optional environment variable name for the flag
+	EnvVar string
 }
 
 // BindStringFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
 func (f FlagInfo) BindStringFlag(flags *pflag.FlagSet, target *string) {
 	// you can't register a flag without a long name
 	if len(f.LongName) > 0 {
-		flags.StringVarP(target, f.LongName, f.ShortName, f.Default, f.Description)
+		def := f.Default
+		if f.EnvVar != "" {
+			if v := os.Getenv(f.EnvVar); v != "" {
+				def = v
+			}
+		}
+
+		flags.StringVarP(target, f.LongName, f.ShortName, def, f.Description)
 	}
 }
 
@@ -93,8 +103,15 @@ func (f FlagInfo) BindStringFlag(flags *pflag.FlagSet, target *string) {
 func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) {
 	// you can't register a flag without a long name
 	if len(f.LongName) > 0 {
+		def := f.Default
+		if f.EnvVar != "" {
+			if v := os.Getenv(f.EnvVar); v != "" {
+				def = v
+			}
+		}
+
 		// try to parse Default as a bool.  If it fails, assume false
-		boolVal, err := strconv.ParseBool(f.Default)
+		boolVal, err := strconv.ParseBool(def)
 		if err != nil {
 			boolVal = false
 		}
@@ -124,22 +141,22 @@ const (
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 	return AuthOverrideFlags{
-		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS."},
-		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS."},
-		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server."},
-		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation."},
-		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server."},
-		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server."},
+		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS.", ""},
+		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS.", ""},
+		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server.", ""},
+		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation.", ""},
+		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server.", ""},
+		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server.", ""},
 	}
 }
 
 // RecommendedClusterOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 	return ClusterOverrideFlags{
-		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
-		APIVersion:            FlagInfo{prefix + FlagAPIVersion, "", "", "DEPRECATED: The API version to use when talking to the server"},
-		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority."},
-		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure."},
+		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server", ""},
+		APIVersion:            FlagInfo{prefix + FlagAPIVersion, "", "", "DEPRECATED: The API version to use when talking to the server", ""},
+		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority.", ""},
+		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.", ""},
 	}
 }
 
@@ -149,16 +166,16 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 		AuthOverrideFlags:    RecommendedAuthOverrideFlags(prefix),
 		ClusterOverrideFlags: RecommendedClusterOverrideFlags(prefix),
 		ContextOverrideFlags: RecommendedContextOverrideFlags(prefix),
-		CurrentContext:       FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
+		CurrentContext:       FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use", "KUBERNETES_CONTEXT"},
 	}
 }
 
 // RecommendedContextOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 	return ContextOverrideFlags{
-		ClusterName:  FlagInfo{prefix + FlagClusterName, "", "", "The name of the kubeconfig cluster to use"},
-		AuthInfoName: FlagInfo{prefix + FlagAuthInfoName, "", "", "The name of the kubeconfig user to use"},
-		Namespace:    FlagInfo{prefix + FlagNamespace, "", "", "If present, the namespace scope for this CLI request."},
+		ClusterName:  FlagInfo{prefix + FlagClusterName, "", "", "The name of the kubeconfig cluster to use", "KUBERNETES_CLUSTER"},
+		AuthInfoName: FlagInfo{prefix + FlagAuthInfoName, "", "", "The name of the kubeconfig user to use", "KUBERNETES_USER"},
+		Namespace:    FlagInfo{prefix + FlagNamespace, "", "", "If present, the namespace scope for this CLI request.", "KUBERNETES_NAMESPACE"},
 	}
 }
 
