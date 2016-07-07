@@ -74,7 +74,7 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
-		Short:   "Print the logs for a container in a pod.",
+		Short:   "Print the logs for a container in a pod",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: logs_example,
 		PreRun: func(cmd *cobra.Command, args []string) {

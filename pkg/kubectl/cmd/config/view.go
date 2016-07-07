@@ -42,7 +42,7 @@ type ViewOptions struct {
 
 var (
 	view_long = dedent.Dedent(`
-		Displays merged kubeconfig settings or a specified kubeconfig file.
+		Display merged kubeconfig settings or a specified kubeconfig file.
 
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
 	view_example = dedent.Dedent(`
@@ -60,7 +60,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "Displays merged kubeconfig settings or a specified kubeconfig file.",
+		Short:   "Display merged kubeconfig settings or a specified kubeconfig file",
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {

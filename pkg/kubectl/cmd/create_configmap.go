@@ -48,7 +48,7 @@ var (
 		  # Create a new configmap named my-config with specified keys instead of names on disk
 		  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt
 
-		  # Create a new configMap named my-config with key1=config1 and key2=config2
+		  # Create a new configmap named my-config with key1=config1 and key2=config2
 		  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2`)
 )
 
@@ -56,7 +56,7 @@ var (
 func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
-		Short:   "Create a configMap from a local file, directory or literal value.",
+		Short:   "Create a configmap from a local file, directory or literal value",
 		Long:    configMapLong,
 		Example: configMapExample,
 		Run: func(cmd *cobra.Command, args []string) {

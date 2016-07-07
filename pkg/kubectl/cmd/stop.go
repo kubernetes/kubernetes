@@ -62,7 +62,7 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:        "stop (-f FILENAME | TYPE (NAME | -l label | --all))",
-		Short:      "Deprecated: Gracefully shut down a resource by name or filename.",
+		Short:      "Deprecated: Gracefully shut down a resource by name or filename",
 		Long:       stop_long,
 		Example:    stop_example,
 		Deprecated: fmt.Sprintf("use %q instead.", "delete"),
