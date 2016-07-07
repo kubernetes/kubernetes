@@ -81,6 +81,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/integer"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -156,6 +157,9 @@ const (
 
 	// maxImagesInStatus is the number of max images we store in image status.
 	maxImagesInNodeStatus = 50
+
+	// Minimum number of dead containers to keep in a pod
+	minDeadContainerInPod = 1
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -481,6 +485,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.containerGC = containerGC
+	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
 	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
@@ -825,6 +830,9 @@ type Kubelet struct {
 	// should manage attachment/detachment of volumes scheduled to this node,
 	// and disable kubelet from executing any attach/detach operations
 	enableControllerAttachDetach bool
+
+	// trigger deleting containers in a pod
+	containerDeletor *podContainerDeletor
 }
 
 // dirExists returns true if the path exists and represents a directory.
@@ -2343,7 +2351,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
-
 		}
 	case e := <-plegCh:
 		if isSyncPodWorthy(e) {
@@ -2356,6 +2363,13 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			}
 			glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
 			handler.HandlePodSyncs([]*api.Pod{pod})
+		}
+		if e.Type == pleg.ContainerDied {
+			if podStatus, err := kl.podCache.Get(e.ID); err == nil {
+				if containerID, ok := e.Data.(string); ok {
+					kl.containerDeletor.deleteContainersInPod(containerID, podStatus)
+				}
+			}
 		}
 	case <-syncCh:
 		// Sync pods waiting for sync
@@ -3576,7 +3590,7 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, kl.containerRuntime)
 }
 
-// Filter out events that are not worthy of pod syncing
+// isSyncPodWorthy filters out events that are not worthy of pod syncing
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	// ContatnerRemoved doesn't affect pod state
 	return event.Type != pleg.ContainerRemoved
