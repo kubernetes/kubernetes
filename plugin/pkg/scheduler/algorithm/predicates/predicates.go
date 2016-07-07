@@ -423,6 +423,9 @@ func getResourceRequest(pod *api.Pod) *resourceRequest {
 		if cpu := requests.Cpu().MilliValue(); cpu > result.milliCPU {
 			result.milliCPU = cpu
 		}
+		if gpu := requests.NvidiaGPU().Value(); gpu > result.nvidiaGPU {
+			result.nvidiaGPU = gpu
+		}
 	}
 	return &result
 }
