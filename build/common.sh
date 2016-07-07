@@ -242,11 +242,15 @@ function kube::build::is_osx() {
   [[ "$(uname)" == "Darwin" ]]
 }
 
+function kube::build::is_gnu_sed() {
+  [[ $(sed --version 2>&1) == *GNU* ]]
+}
+
 function kube::build::update_dockerfile() {
-  if kube::build::is_osx; then
-    sed_opts=(-i '')
-  else
+  if kube::build::is_gnu_sed; then
     sed_opts=(-i)
+  else
+    sed_opts=(-i '')
   fi
   sed "${sed_opts[@]}" "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 }
