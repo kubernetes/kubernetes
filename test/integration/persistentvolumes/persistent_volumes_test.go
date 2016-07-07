@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package persistentvolumes
 
 import (
 	"fmt"
@@ -26,8 +26,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -41,11 +39,14 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+
+	"github.com/golang/glog"
 )
 
 func init() {
-	requireEtcd()
+	integration.RequireEtcd()
 }
 
 // Several tests in this file are configurable by environment variables:

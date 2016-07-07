@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package serviceaccount
 
 // This file tests authentication and (soon) authorization of HTTP requests to a master object.
 // It does not use the client in pkg/client/... because authentication and authorization needs
@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -59,7 +60,7 @@ const (
 )
 
 func init() {
-	requireEtcd()
+	integration.RequireEtcd()
 }
 
 func TestServiceAccountAutoCreate(t *testing.T) {

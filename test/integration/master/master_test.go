@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package master
 
 import (
 	"bytes"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -127,9 +128,9 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 		expectedStatusCodes map[int]bool
 		expectedVersion     string
 	}{
-		{"POST", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), hpaV1, code201, ""},
-		{"GET", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", code200, testapi.Autoscaling.GroupVersion().String()},
-		{"GET", extensionsPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", code200, testapi.Extensions.GroupVersion().String()},
+		{"POST", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), hpaV1, integration.Code201, ""},
+		{"GET", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", integration.Code200, testapi.Autoscaling.GroupVersion().String()},
+		{"GET", extensionsPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
 	}
 
 	for _, r := range requests {
@@ -242,16 +243,6 @@ var jobV1 string = `
 }
 `
 
-var deleteResp string = `
-{
-    "kind": "Status",
-    "apiVersion": "v1",
-    "metadata":{},
-    "status":"Success",
-    "code":200
-}
-`
-
 // TestBatchGroupBackwardCompatibility is testing that batch/v1 and ext/v1beta1
 // Job share storage.  This test can be deleted when Jobs is removed from ext/v1beta1,
 // (expected to happen in 1.4).
@@ -271,15 +262,15 @@ func TestBatchGroupBackwardCompatibility(t *testing.T) {
 		expectedVersion     string
 	}{
 		// Post a v1 and get back both as v1beta1 and as v1.
-		{"POST", batchPath("jobs", api.NamespaceDefault, ""), jobV1, code201, ""},
-		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Batch.GroupVersion().String()},
-		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", batchPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Default.GroupVersion().String()}, // status response
+		{"POST", batchPath("jobs", api.NamespaceDefault, ""), jobV1, integration.Code201, ""},
+		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Batch.GroupVersion().String()},
+		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
+		{"DELETE", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Default.GroupVersion().String()}, // status response
 		// Post a v1beta1 and get back both as v1beta1 and as v1.
-		{"POST", extensionsPath("jobs", api.NamespaceDefault, ""), jobV1beta1, code201, ""},
-		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Batch.GroupVersion().String()},
-		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", code200, testapi.Default.GroupVersion().String()}, //status response
+		{"POST", extensionsPath("jobs", api.NamespaceDefault, ""), jobV1beta1, integration.Code201, ""},
+		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Batch.GroupVersion().String()},
+		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
+		{"DELETE", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Default.GroupVersion().String()}, //status response
 	}
 
 	for _, r := range requests {

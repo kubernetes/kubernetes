@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package auth
 
 // This file tests authentication and (soon) authorization of HTTP requests to a master object.
 // It does not use the client in pkg/client/... because authentication and authorization needs
@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -267,19 +268,6 @@ var deleteNow string = `
 }
 `
 
-// Requests to try.  Each one should be forbidden or not forbidden
-// depending on the authentication and authorization setup of the master.
-var code200 = map[int]bool{200: true}
-var code201 = map[int]bool{201: true}
-var code400 = map[int]bool{400: true}
-var code403 = map[int]bool{403: true}
-var code404 = map[int]bool{404: true}
-var code405 = map[int]bool{405: true}
-var code409 = map[int]bool{409: true}
-var code422 = map[int]bool{422: true}
-var code500 = map[int]bool{500: true}
-var code503 = map[int]bool{503: true}
-
 // To ensure that a POST completes before a dependent GET, set a timeout.
 func addTimeoutFlag(URLString string) string {
 	u, _ := url.Parse(URLString)
@@ -302,107 +290,107 @@ func getTestRequests(namespace string) []struct {
 		statusCodes map[int]bool // Set of expected resp.StatusCode if all goes well.
 	}{
 		// Normal methods on pods
-		{"GET", path("pods", "", ""), "", code200},
-		{"GET", path("pods", namespace, ""), "", code200},
-		{"POST", timeoutPath("pods", namespace, ""), aPod, code201},
-		{"PUT", timeoutPath("pods", namespace, "a"), aPod, code200},
-		{"GET", path("pods", namespace, "a"), "", code200},
+		{"GET", path("pods", "", ""), "", integration.Code200},
+		{"GET", path("pods", namespace, ""), "", integration.Code200},
+		{"POST", timeoutPath("pods", namespace, ""), aPod, integration.Code201},
+		{"PUT", timeoutPath("pods", namespace, "a"), aPod, integration.Code200},
+		{"GET", path("pods", namespace, "a"), "", integration.Code200},
 		// GET and POST for /exec should return Bad Request (400) since the pod has not been assigned a node yet.
-		{"GET", path("pods", namespace, "a") + "/exec", "", code400},
-		{"POST", path("pods", namespace, "a") + "/exec", "", code400},
+		{"GET", path("pods", namespace, "a") + "/exec", "", integration.Code400},
+		{"POST", path("pods", namespace, "a") + "/exec", "", integration.Code400},
 		// PUT for /exec should return Method Not Allowed (405).
-		{"PUT", path("pods", namespace, "a") + "/exec", "", code405},
+		{"PUT", path("pods", namespace, "a") + "/exec", "", integration.Code405},
 		// GET and POST for /portforward should return Bad Request (400) since the pod has not been assigned a node yet.
-		{"GET", path("pods", namespace, "a") + "/portforward", "", code400},
-		{"POST", path("pods", namespace, "a") + "/portforward", "", code400},
+		{"GET", path("pods", namespace, "a") + "/portforward", "", integration.Code400},
+		{"POST", path("pods", namespace, "a") + "/portforward", "", integration.Code400},
 		// PUT for /portforward should return Method Not Allowed (405).
-		{"PUT", path("pods", namespace, "a") + "/portforward", "", code405},
-		{"PATCH", path("pods", namespace, "a"), "{%v}", code200},
-		{"DELETE", timeoutPath("pods", namespace, "a"), deleteNow, code200},
+		{"PUT", path("pods", namespace, "a") + "/portforward", "", integration.Code405},
+		{"PATCH", path("pods", namespace, "a"), "{%v}", integration.Code200},
+		{"DELETE", timeoutPath("pods", namespace, "a"), deleteNow, integration.Code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"OPTIONS", path("pods", namespace, ""), "", code405},
-		{"OPTIONS", path("pods", namespace, "a"), "", code405},
-		{"HEAD", path("pods", namespace, ""), "", code405},
-		{"HEAD", path("pods", namespace, "a"), "", code405},
-		{"TRACE", path("pods", namespace, ""), "", code405},
-		{"TRACE", path("pods", namespace, "a"), "", code405},
-		{"NOSUCHVERB", path("pods", namespace, ""), "", code405},
+		{"OPTIONS", path("pods", namespace, ""), "", integration.Code405},
+		{"OPTIONS", path("pods", namespace, "a"), "", integration.Code405},
+		{"HEAD", path("pods", namespace, ""), "", integration.Code405},
+		{"HEAD", path("pods", namespace, "a"), "", integration.Code405},
+		{"TRACE", path("pods", namespace, ""), "", integration.Code405},
+		{"TRACE", path("pods", namespace, "a"), "", integration.Code405},
+		{"NOSUCHVERB", path("pods", namespace, ""), "", integration.Code405},
 
 		// Normal methods on services
-		{"GET", path("services", "", ""), "", code200},
-		{"GET", path("services", namespace, ""), "", code200},
-		{"POST", timeoutPath("services", namespace, ""), aService, code201},
+		{"GET", path("services", "", ""), "", integration.Code200},
+		{"GET", path("services", namespace, ""), "", integration.Code200},
+		{"POST", timeoutPath("services", namespace, ""), aService, integration.Code201},
 		// Create an endpoint for the service (this is done automatically by endpoint controller
 		// whenever a service is created, but this test does not run that controller)
-		{"POST", timeoutPath("endpoints", namespace, ""), emptyEndpoints, code201},
+		{"POST", timeoutPath("endpoints", namespace, ""), emptyEndpoints, integration.Code201},
 		// Should return service unavailable when endpoint.subset is empty.
-		{"GET", pathWithPrefix("proxy", "services", namespace, "a") + "/", "", code503},
-		{"PUT", timeoutPath("services", namespace, "a"), aService, code200},
-		{"GET", path("services", namespace, "a"), "", code200},
-		{"DELETE", timeoutPath("endpoints", namespace, "a"), "", code200},
-		{"DELETE", timeoutPath("services", namespace, "a"), "", code200},
+		{"GET", pathWithPrefix("proxy", "services", namespace, "a") + "/", "", integration.Code503},
+		{"PUT", timeoutPath("services", namespace, "a"), aService, integration.Code200},
+		{"GET", path("services", namespace, "a"), "", integration.Code200},
+		{"DELETE", timeoutPath("endpoints", namespace, "a"), "", integration.Code200},
+		{"DELETE", timeoutPath("services", namespace, "a"), "", integration.Code200},
 
 		// Normal methods on replicationControllers
-		{"GET", path("replicationControllers", "", ""), "", code200},
-		{"GET", path("replicationControllers", namespace, ""), "", code200},
-		{"POST", timeoutPath("replicationControllers", namespace, ""), aRC, code201},
-		{"PUT", timeoutPath("replicationControllers", namespace, "a"), aRC, code200},
-		{"GET", path("replicationControllers", namespace, "a"), "", code200},
-		{"DELETE", timeoutPath("replicationControllers", namespace, "a"), "", code200},
+		{"GET", path("replicationControllers", "", ""), "", integration.Code200},
+		{"GET", path("replicationControllers", namespace, ""), "", integration.Code200},
+		{"POST", timeoutPath("replicationControllers", namespace, ""), aRC, integration.Code201},
+		{"PUT", timeoutPath("replicationControllers", namespace, "a"), aRC, integration.Code200},
+		{"GET", path("replicationControllers", namespace, "a"), "", integration.Code200},
+		{"DELETE", timeoutPath("replicationControllers", namespace, "a"), "", integration.Code200},
 
 		// Normal methods on endpoints
-		{"GET", path("endpoints", "", ""), "", code200},
-		{"GET", path("endpoints", namespace, ""), "", code200},
-		{"POST", timeoutPath("endpoints", namespace, ""), aEndpoints, code201},
-		{"PUT", timeoutPath("endpoints", namespace, "a"), aEndpoints, code200},
-		{"GET", path("endpoints", namespace, "a"), "", code200},
-		{"DELETE", timeoutPath("endpoints", namespace, "a"), "", code200},
+		{"GET", path("endpoints", "", ""), "", integration.Code200},
+		{"GET", path("endpoints", namespace, ""), "", integration.Code200},
+		{"POST", timeoutPath("endpoints", namespace, ""), aEndpoints, integration.Code201},
+		{"PUT", timeoutPath("endpoints", namespace, "a"), aEndpoints, integration.Code200},
+		{"GET", path("endpoints", namespace, "a"), "", integration.Code200},
+		{"DELETE", timeoutPath("endpoints", namespace, "a"), "", integration.Code200},
 
 		// Normal methods on nodes
-		{"GET", path("nodes", "", ""), "", code200},
-		{"POST", timeoutPath("nodes", "", ""), aNode, code201},
-		{"PUT", timeoutPath("nodes", "", "a"), aNode, code200},
-		{"GET", path("nodes", "", "a"), "", code200},
-		{"DELETE", timeoutPath("nodes", "", "a"), "", code200},
+		{"GET", path("nodes", "", ""), "", integration.Code200},
+		{"POST", timeoutPath("nodes", "", ""), aNode, integration.Code201},
+		{"PUT", timeoutPath("nodes", "", "a"), aNode, integration.Code200},
+		{"GET", path("nodes", "", "a"), "", integration.Code200},
+		{"DELETE", timeoutPath("nodes", "", "a"), "", integration.Code200},
 
 		// Normal methods on events
-		{"GET", path("events", "", ""), "", code200},
-		{"GET", path("events", namespace, ""), "", code200},
-		{"POST", timeoutPath("events", namespace, ""), aEvent(namespace), code201},
-		{"PUT", timeoutPath("events", namespace, "a"), aEvent(namespace), code200},
-		{"GET", path("events", namespace, "a"), "", code200},
-		{"DELETE", timeoutPath("events", namespace, "a"), "", code200},
+		{"GET", path("events", "", ""), "", integration.Code200},
+		{"GET", path("events", namespace, ""), "", integration.Code200},
+		{"POST", timeoutPath("events", namespace, ""), aEvent(namespace), integration.Code201},
+		{"PUT", timeoutPath("events", namespace, "a"), aEvent(namespace), integration.Code200},
+		{"GET", path("events", namespace, "a"), "", integration.Code200},
+		{"DELETE", timeoutPath("events", namespace, "a"), "", integration.Code200},
 
 		// Normal methods on bindings
-		{"GET", path("bindings", namespace, ""), "", code405},
-		{"POST", timeoutPath("pods", namespace, ""), aPod, code201}, // Need a pod to bind or you get a 404
-		{"POST", timeoutPath("bindings", namespace, ""), aBinding, code201},
-		{"PUT", timeoutPath("bindings", namespace, "a"), aBinding, code404},
-		{"GET", path("bindings", namespace, "a"), "", code404}, // No bindings instances
-		{"DELETE", timeoutPath("bindings", namespace, "a"), "", code404},
+		{"GET", path("bindings", namespace, ""), "", integration.Code405},
+		{"POST", timeoutPath("pods", namespace, ""), aPod, integration.Code201}, // Need a pod to bind or you get a 404
+		{"POST", timeoutPath("bindings", namespace, ""), aBinding, integration.Code201},
+		{"PUT", timeoutPath("bindings", namespace, "a"), aBinding, integration.Code404},
+		{"GET", path("bindings", namespace, "a"), "", integration.Code404}, // No bindings instances
+		{"DELETE", timeoutPath("bindings", namespace, "a"), "", integration.Code404},
 
 		// Non-existent object type.
-		{"GET", path("foo", "", ""), "", code404},
-		{"POST", path("foo", namespace, ""), `{"foo": "foo"}`, code404},
-		{"PUT", path("foo", namespace, "a"), `{"foo": "foo"}`, code404},
-		{"GET", path("foo", namespace, "a"), "", code404},
-		{"DELETE", timeoutPath("foo", namespace, ""), "", code404},
+		{"GET", path("foo", "", ""), "", integration.Code404},
+		{"POST", path("foo", namespace, ""), `{"foo": "foo"}`, integration.Code404},
+		{"PUT", path("foo", namespace, "a"), `{"foo": "foo"}`, integration.Code404},
+		{"GET", path("foo", namespace, "a"), "", integration.Code404},
+		{"DELETE", timeoutPath("foo", namespace, ""), "", integration.Code404},
 
 		// Special verbs on nodes
-		{"GET", pathWithPrefix("proxy", "nodes", namespace, "a"), "", code404},
-		{"GET", pathWithPrefix("redirect", "nodes", namespace, "a"), "", code404},
+		{"GET", pathWithPrefix("proxy", "nodes", namespace, "a"), "", integration.Code404},
+		{"GET", pathWithPrefix("redirect", "nodes", namespace, "a"), "", integration.Code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
 		// TODO: figure out how to create a node so that it can successfully proxy/redirect.
 
 		// Non-object endpoints
-		{"GET", "/", "", code200},
-		{"GET", "/api", "", code200},
-		{"GET", "/healthz", "", code200},
-		{"GET", "/version", "", code200},
-		{"GET", "/invalidURL", "", code404},
+		{"GET", "/", "", integration.Code200},
+		{"GET", "/api", "", integration.Code200},
+		{"GET", "/healthz", "", integration.Code200},
+		{"GET", "/version", "", integration.Code200},
+		{"GET", "/invalidURL", "", integration.Code404},
 	}
 	return requests
 }
@@ -970,20 +958,20 @@ func TestNamespaceAuthorization(t *testing.T) {
 		statusCodes map[int]bool // allowed status codes.
 	}{
 
-		{"POST", timeoutPath("pods", ns.Name, ""), "foo", aPod, code201},
-		{"GET", path("pods", ns.Name, ""), "foo", "", code200},
-		{"GET", path("pods", ns.Name, "a"), "foo", "", code200},
-		{"DELETE", timeoutPath("pods", ns.Name, "a"), "foo", "", code200},
+		{"POST", timeoutPath("pods", ns.Name, ""), "foo", aPod, integration.Code201},
+		{"GET", path("pods", ns.Name, ""), "foo", "", integration.Code200},
+		{"GET", path("pods", ns.Name, "a"), "foo", "", integration.Code200},
+		{"DELETE", timeoutPath("pods", ns.Name, "a"), "foo", "", integration.Code200},
 
-		{"POST", timeoutPath("pods", "foo", ""), "bar", aPod, code403},
-		{"GET", path("pods", "foo", ""), "bar", "", code403},
-		{"GET", path("pods", "foo", "a"), "bar", "", code403},
-		{"DELETE", timeoutPath("pods", "foo", "a"), "bar", "", code403},
+		{"POST", timeoutPath("pods", "foo", ""), "bar", aPod, integration.Code403},
+		{"GET", path("pods", "foo", ""), "bar", "", integration.Code403},
+		{"GET", path("pods", "foo", "a"), "bar", "", integration.Code403},
+		{"DELETE", timeoutPath("pods", "foo", "a"), "bar", "", integration.Code403},
 
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), "", aPod, code403},
-		{"GET", path("pods", "", ""), "", "", code403},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", "", code403},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", "", code403},
+		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), "", aPod, integration.Code403},
+		{"GET", path("pods", "", ""), "", "", integration.Code403},
+		{"GET", path("pods", api.NamespaceDefault, "a"), "", "", integration.Code403},
+		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", "", integration.Code403},
 	}
 
 	for _, r := range requests {
@@ -1066,15 +1054,15 @@ func TestKindAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", timeoutPath("services", ns.Name, ""), aService, code201},
-		{"GET", path("services", ns.Name, ""), "", code200},
-		{"GET", path("services", ns.Name, "a"), "", code200},
-		{"DELETE", timeoutPath("services", ns.Name, "a"), "", code200},
+		{"POST", timeoutPath("services", ns.Name, ""), aService, integration.Code201},
+		{"GET", path("services", ns.Name, ""), "", integration.Code200},
+		{"GET", path("services", ns.Name, "a"), "", integration.Code200},
+		{"DELETE", timeoutPath("services", ns.Name, "a"), "", integration.Code200},
 
-		{"POST", timeoutPath("pods", ns.Name, ""), aPod, code403},
-		{"GET", path("pods", "", ""), "", code403},
-		{"GET", path("pods", ns.Name, "a"), "", code403},
-		{"DELETE", timeoutPath("pods", ns.Name, "a"), "", code403},
+		{"POST", timeoutPath("pods", ns.Name, ""), aPod, integration.Code403},
+		{"GET", path("pods", "", ""), "", integration.Code403},
+		{"GET", path("pods", ns.Name, "a"), "", integration.Code403},
+		{"DELETE", timeoutPath("pods", ns.Name, "a"), "", integration.Code403},
 	}
 
 	for _, r := range requests {
@@ -1149,9 +1137,9 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", path("pods", ns.Name, ""), aPod, code403},
-		{"GET", path("pods", ns.Name, ""), "", code200},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code404},
+		{"POST", path("pods", ns.Name, ""), aPod, integration.Code403},
+		{"GET", path("pods", ns.Name, ""), "", integration.Code200},
+		{"GET", path("pods", api.NamespaceDefault, "a"), "", integration.Code404},
 	}
 
 	for _, r := range requests {

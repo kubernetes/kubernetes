@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package configmap
 
 // This file tests use of the configMap API resource.
 
@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -114,7 +115,7 @@ func DoTestConfigMap(t *testing.T, client *client.Client, ns *api.Namespace) {
 	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
-	defer deletePodOrErrorf(t, client, ns.Name, pod.Name)
+	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 }
 
 func deleteConfigMapOrErrorf(t *testing.T, c *client.Client, ns, name string) {
