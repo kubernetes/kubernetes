@@ -226,8 +226,7 @@ hack/test-integration.sh  # Run all integration tests.
 ```
 
 This script runs the golang tests in package
-[`test/integration`](../../test/integration/)
-and a special watch cache test in `cmd/integration/integration.go`.
+[`test/integration`](../../test/integration/).
 
 ### Run a specific integration test
 
