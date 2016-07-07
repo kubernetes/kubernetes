@@ -167,7 +167,6 @@ type ObjectMeta struct {
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md
-	// TODO: replace map[string]string with labels.LabelSet type
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,11,rep,name=labels"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
