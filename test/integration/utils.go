@@ -39,7 +39,7 @@ func newEtcdClient() etcd.Client {
 	return client
 }
 
-func requireEtcd() {
+func RequireEtcd() {
 	if _, err := etcd.NewKeysAPI(newEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for integration testing: %v", err)
 	}
@@ -51,8 +51,21 @@ func withEtcdKey(f func(string)) {
 	f(prefix)
 }
 
-func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
+func DeletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 	if err := c.Pods(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
 }
+
+// Requests to try.  Each one should be forbidden or not forbidden
+// depending on the authentication and authorization setup of the master.
+var Code200 = map[int]bool{200: true}
+var Code201 = map[int]bool{201: true}
+var Code400 = map[int]bool{400: true}
+var Code403 = map[int]bool{403: true}
+var Code404 = map[int]bool{404: true}
+var Code405 = map[int]bool{405: true}
+var Code409 = map[int]bool{409: true}
+var Code422 = map[int]bool{422: true}
+var Code500 = map[int]bool{500: true}
+var Code503 = map[int]bool{503: true}
