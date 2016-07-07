@@ -165,9 +165,6 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 	options := []string{}
 	if readOnly {
 		options = append(options, "ro")
-	} else {
-		// as per https://cloud.google.com/compute/docs/disks/add-persistent-disk#formatting
-		options = append(options, "discard")
 	}
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
