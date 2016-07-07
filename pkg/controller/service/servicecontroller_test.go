@@ -319,7 +319,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 	}
 	pred := getNodeConditionPredicate()
 	for _, test := range tests {
-		accept := pred(test.node)
+		accept := pred(&test.node)
 		if accept != test.expectAccept {
 			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
 		}

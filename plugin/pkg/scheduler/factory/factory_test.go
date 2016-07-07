@@ -464,7 +464,7 @@ func TestNodeConditionPredicate(t *testing.T) {
 
 	nodeNames := []string{}
 	for _, node := range nodeList.Items {
-		if nodeFunc(node) {
+		if nodeFunc(&node) {
 			nodeNames = append(nodeNames, node.Name)
 		}
 	}

@@ -122,7 +122,7 @@ func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
 
 // NodeConditionPredicate is a function that indicates whether the given node's conditions meet
 // some set of criteria defined by the function.
-type NodeConditionPredicate func(node api.Node) bool
+type NodeConditionPredicate func(node *api.Node) bool
 
 // StoreToNodeLister makes a Store have the List method of the client.NodeInterface
 // The Store must contain (only) Nodes.
@@ -153,9 +153,9 @@ type storeToNodeConditionLister struct {
 // List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
 func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 	for _, m := range s.store.List() {
-		node := *m.(*api.Node)
+		node := m.(*api.Node)
 		if s.predicate(node) {
-			nodes.Items = append(nodes.Items, node)
+			nodes.Items = append(nodes.Items, *node)
 		} else {
 			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
 		}
