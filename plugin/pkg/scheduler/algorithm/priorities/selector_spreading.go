@@ -207,7 +207,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 		}
 	}
 
-	result := []schedulerapi.HostPriority{}
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	//score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
 	for i := range nodes.Items {
