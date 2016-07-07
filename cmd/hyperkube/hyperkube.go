@@ -64,7 +64,7 @@ func (hk *HyperKube) FindServer(name string) (*Server, error) {
 	return nil, fmt.Errorf("Server not found: %s", name)
 }
 
-// Servers returns a list of all of the registred servers
+// Servers returns a list of all of the registered servers
 func (hk *HyperKube) Servers() []Server {
 	return hk.servers
 }

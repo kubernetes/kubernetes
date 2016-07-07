@@ -469,7 +469,7 @@ func (l *Lexer) Lex() (tok Token, lit string) {
 	}
 }
 
-// Parser data structure contains the label selector parser data strucutre
+// Parser data structure contains the label selector parser data structure
 type Parser struct {
 	l            *Lexer
 	scannedItems []ScannedItem
