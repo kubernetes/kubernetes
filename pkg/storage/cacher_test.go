@@ -63,9 +63,9 @@ func newTestCacher(s storage.Interface) *storage.Cacher {
 	return storage.NewCacherFromConfig(config)
 }
 
-func makeTestPod(name string) *api.Pod {
+func makeTestPod(ns, name string) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "ns", Name: name},
+		ObjectMeta: api.ObjectMeta{Namespace: ns, Name: name},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 }
@@ -79,7 +79,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 		}
 		return newObj.(*api.Pod), nil, nil
 	}
-	key := etcdtest.AddPrefix("pods/ns/" + obj.Name)
+	key := etcdtest.AddPrefix("pods/" + obj.Namespace + "/" + obj.Name)
 	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -97,16 +97,24 @@ func TestList(t *testing.T) {
 	cacher := newTestCacher(etcdStorage)
 	defer cacher.Stop()
 
-	podFoo := makeTestPod("foo")
-	podBar := makeTestPod("bar")
-	podBaz := makeTestPod("baz")
+	podFoo := makeTestPod("ns", "foo")
+	podBar := makeTestPod("ns", "bar")
+	podBaz := makeTestPod("ns", "baz")
 
-	podFooPrime := makeTestPod("foo")
+	podFooB := makeTestPod("nsb", "foo")
+	podBarB := makeTestPod("nsb", "bar")
+	podBazB := makeTestPod("nsb", "baz")
+
+	podFooPrime := makeTestPod("ns", "foo")
 	podFooPrime.Spec.NodeName = "fakeNode"
 
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 	_ = updatePod(t, etcdStorage, podBar, nil)
 	_ = updatePod(t, etcdStorage, podBaz, nil)
+
+	_ = updatePod(t, etcdStorage, podFooB, nil)
+	_ = updatePod(t, etcdStorage, podBarB, nil)
+	_ = updatePod(t, etcdStorage, podBazB, nil)
 
 	_ = updatePod(t, etcdStorage, podFooPrime, fooCreated)
 
@@ -201,13 +209,15 @@ func TestWatch(t *testing.T) {
 	cacher := newTestCacher(etcdStorage)
 	defer cacher.Stop()
 
-	podFoo := makeTestPod("foo")
-	podBar := makeTestPod("bar")
+	podFoo := makeTestPod("ns", "foo")
+	podBar := makeTestPod("ns", "bar")
+	podFooB := makeTestPod("ns", "foob")
+	podBarB := makeTestPod("ns", "barb")
 
-	podFooPrime := makeTestPod("foo")
+	podFooPrime := makeTestPod("ns", "foo")
 	podFooPrime.Spec.NodeName = "fakeNode"
 
-	podFooBis := makeTestPod("foo")
+	podFooBis := makeTestPod("ns", "foo")
 	podFooBis.Spec.NodeName = "anotherFakeNode"
 
 	// initialVersion is used to initate the watcher at the beginning of the world,
@@ -227,6 +237,10 @@ func TestWatch(t *testing.T) {
 
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 	_ = updatePod(t, etcdStorage, podBar, nil)
+
+	_ = updatePod(t, etcdStorage, podFooB, nil)
+	_ = updatePod(t, etcdStorage, podBarB, nil)
+
 	fooUpdated := updatePod(t, etcdStorage, podFooPrime, fooCreated)
 
 	verifyWatchEvent(t, watcher, watch.Added, podFoo)
@@ -264,6 +278,86 @@ func TestWatch(t *testing.T) {
 	verifyWatchEvent(t, nowWatcher, watch.Modified, podFooBis)
 }
 
+func TestWatchList(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	// Inject one list error to make sure we test the relist case.
+	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
+
+	podFoo := makeTestPod("ns", "foo")
+	podBar := makeTestPod("ns", "bar")
+	podFooB := makeTestPod("nsb", "foo")
+	podBarB := makeTestPod("nsb", "bar")
+
+	podFooPrime := makeTestPod("ns", "foo")
+	podFooPrime.Spec.NodeName = "fakeNode"
+
+	podFooBis := makeTestPod("ns", "foo")
+	podFooBis.Spec.NodeName = "anotherFakeNode"
+
+	// initialVersion is used to initate the watcher at the beginning of the world,
+	// which is not defined precisely in etcd.
+	initialVersion, err := cacher.LastSyncResourceVersion()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	startVersion := strconv.Itoa(int(initialVersion))
+
+	// Set up Watch for object "podFoo".
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns", startVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watcher.Stop()
+
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+	_ = updatePod(t, etcdStorage, podBar, nil)
+
+	_ = updatePod(t, etcdStorage, podFooB, nil)
+	_ = updatePod(t, etcdStorage, podBarB, nil)
+
+	fooUpdated := updatePod(t, etcdStorage, podFooPrime, fooCreated)
+
+	verifyWatchEvent(t, watcher, watch.Added, podFoo)
+	verifyWatchEvent(t, watcher, watch.Added, podBar)
+	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
+
+	// Check whether we get too-old error via the watch channel
+	tooOldWatcher, err := cacher.Watch(context.TODO(), "pods/ns", "1", storage.Everything)
+	if err != nil {
+		t.Fatalf("Expected no direct error, got %v", err)
+	}
+	defer tooOldWatcher.Stop()
+	// Ensure we get a "Gone" error
+	expectedGoneError := errors.NewGone("").ErrStatus
+	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedGoneError)
+
+	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns", fooCreated.ResourceVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer initialWatcher.Stop()
+
+	verifyWatchEvent(t, initialWatcher, watch.Added, podBar)
+	verifyWatchEvent(t, initialWatcher, watch.Modified, podFooPrime)
+
+	// Now test watch from "now".
+	nowWatcher, err := cacher.Watch(context.TODO(), "pods/ns", "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer nowWatcher.Stop()
+
+	verifyWatchEvent(t, nowWatcher, watch.Added, podFooPrime)
+
+	_ = updatePod(t, etcdStorage, podFooBis, fooUpdated)
+
+	verifyWatchEvent(t, nowWatcher, watch.Added, podBar)
+	verifyWatchEvent(t, nowWatcher, watch.Modified, podFooBis)
+}
+
 func TestWatcherTimeout(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
@@ -293,7 +387,7 @@ func TestWatcherTimeout(t *testing.T) {
 	defer readingWatcher.Stop()
 
 	for i := 1; i <= 22; i++ {
-		pod := makeTestPod(strconv.Itoa(i))
+		pod := makeTestPod("ns", strconv.Itoa(i))
 		_ = updatePod(t, etcdStorage, pod, nil)
 		verifyWatchEvent(t, readingWatcher, watch.Added, pod)
 	}
@@ -313,10 +407,10 @@ func TestFiltering(t *testing.T) {
 	}
 	syncWatcher.Stop()
 
-	podFoo := makeTestPod("foo")
+	podFoo := makeTestPod("ns", "foo")
 	podFoo.Labels = map[string]string{"filter": "foo"}
-	podFooFiltered := makeTestPod("foo")
-	podFooPrime := makeTestPod("foo")
+	podFooFiltered := makeTestPod("ns", "foo")
+	podFooPrime := makeTestPod("ns", "foo")
 	podFooPrime.Labels = map[string]string{"filter": "foo"}
 	podFooPrime.Spec.NodeName = "fakeNode"
 
@@ -359,7 +453,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	defer cacher.Stop()
 
 	// add 1 object
-	podFoo := makeTestPod("foo")
+	podFoo := makeTestPod("ns", "foo")
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 
 	// Set up Watch starting at fooCreated.ResourceVersion + 10
@@ -378,7 +472,7 @@ func TestStartingResourceVersion(t *testing.T) {
 
 	lastFoo := fooCreated
 	for i := 0; i < 11; i++ {
-		podFooForUpdate := makeTestPod("foo")
+		podFooForUpdate := makeTestPod("ns", "foo")
 		podFooForUpdate.Labels = map[string]string{"foo": strconv.Itoa(i)}
 		lastFoo = updatePod(t, etcdStorage, podFooForUpdate, lastFoo)
 	}
