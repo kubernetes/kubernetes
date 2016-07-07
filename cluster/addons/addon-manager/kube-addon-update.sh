@@ -41,8 +41,6 @@
 # 3. kubectl prints the output to stderr (the output should be captured and then
 #    logged)
 
-
-
 # global config
 KUBECTL=${TEST_KUBECTL:-}   # substitute for tests
 KUBECTL=${KUBECTL:-${KUBECTL_BIN:-}}
@@ -133,7 +131,7 @@ try:
             try:
                 print "%s/%s" % (y["metadata"]["namespace"], y["metadata"]["name"])
             except Exception, ex:
-                print "default/%s" % y["metadata"]["name"]
+                print "/%s" % y["metadata"]["name"]
 except Exception, ex:
         print "ERROR"
     '''
@@ -198,7 +196,7 @@ function run-until-success() {
 # returns a list of <namespace>/<name> pairs (nsnames)
 function get-addon-nsnames-from-server() {
     local -r obj_type=$1
-    "${KUBECTL}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" -l kubernetes.io/cluster-service=true
+    "${KUBECTL}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" -l kubernetes.io/cluster-service=true | sed 's/<no value>//g'
 }
 
 # returns the characters after the last separator (including)
@@ -262,7 +260,11 @@ function create-object() {
     log INFO "Creating new ${obj_type} from file ${file_path} in namespace ${namespace}, name: ${obj_name}"
     # this will keep on failing if the ${file_path} disappeared in the meantime.
     # Do not use too many retries.
-    run-until-success "${KUBECTL} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    if [[ -n "${namespace}" ]]; then
+        run-until-success "${KUBECTL} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    else
+        run-until-success "${KUBECTL} create -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    fi
 }
 
 function update-object() {
