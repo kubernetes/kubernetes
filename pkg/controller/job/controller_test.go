@@ -110,6 +110,7 @@ func TestControllerSyncJob(t *testing.T) {
 
 		// pod setup
 		podControllerError error
+		pendingPods        int32
 		activePods         int32
 		succeededPods      int32
 		failedPods         int32
@@ -124,82 +125,87 @@ func TestControllerSyncJob(t *testing.T) {
 	}{
 		"job start": {
 			2, 5,
-			nil, 0, 0, 0,
+			nil, 0, 0, 0, 0,
 			2, 0, 2, 0, 0, false,
 		},
 		"WQ job start": {
 			2, -1,
-			nil, 0, 0, 0,
+			nil, 0, 0, 0, 0,
 			2, 0, 2, 0, 0, false,
+		},
+		"pending pods": {
+			2, 5,
+			nil, 2, 0, 0, 0,
+			0, 0, 2, 0, 0, false,
 		},
 		"correct # of pods": {
 			2, 5,
-			nil, 2, 0, 0,
+			nil, 0, 2, 0, 0,
 			0, 0, 2, 0, 0, false,
 		},
 		"WQ job: correct # of pods": {
 			2, -1,
-			nil, 2, 0, 0,
+			nil, 0, 2, 0, 0,
 			0, 0, 2, 0, 0, false,
 		},
 		"too few active pods": {
 			2, 5,
-			nil, 1, 1, 0,
+			nil, 0, 1, 1, 0,
 			1, 0, 2, 1, 0, false,
 		},
 		"too few active pods with a dynamic job": {
 			2, -1,
-			nil, 1, 0, 0,
+			nil, 0, 1, 0, 0,
 			1, 0, 2, 0, 0, false,
 		},
 		"too few active pods, with controller error": {
 			2, 5,
-			fmt.Errorf("Fake error"), 1, 1, 0,
+			fmt.Errorf("Fake error"), 0, 1, 1, 0,
 			0, 0, 1, 1, 0, false,
 		},
 		"too many active pods": {
 			2, 5,
-			nil, 3, 0, 0,
+			nil, 0, 3, 0, 0,
 			0, 1, 2, 0, 0, false,
 		},
 		"too many active pods, with controller error": {
 			2, 5,
-			fmt.Errorf("Fake error"), 3, 0, 0,
+			fmt.Errorf("Fake error"), 0, 3, 0, 0,
 			0, 0, 3, 0, 0, false,
 		},
 		"failed pod": {
 			2, 5,
-			nil, 1, 1, 1,
+			nil, 0, 1, 1, 1,
 			1, 0, 2, 1, 1, false,
 		},
 		"job finish": {
 			2, 5,
-			nil, 0, 5, 0,
+			nil, 0, 0, 5, 0,
 			0, 0, 0, 5, 0, true,
 		},
 		"WQ job finishing": {
 			2, -1,
-			nil, 1, 1, 0,
+			nil, 0, 1, 1, 0,
 			0, 0, 1, 1, 0, false,
 		},
 		"WQ job all finished": {
 			2, -1,
-			nil, 0, 2, 0,
+			nil, 0, 0, 2, 0,
 			0, 0, 0, 2, 0, true,
 		},
 		"WQ job all finished despite one failure": {
 			2, -1,
-			nil, 0, 1, 1,
+			nil, 0, 0, 1, 1,
 			0, 0, 0, 1, 1, true,
 		},
 		"more active pods than completions": {
 			2, 5,
-			nil, 10, 0, 0,
+			nil, 0, 10, 0, 0,
 			0, 8, 2, 0, 0, false,
 		},
 		"status change": {
 			2, 5,
-			nil, 2, 2, 0,
+			nil, 0, 2, 2, 0,
 			0, 0, 2, 2, 0, false,
 		},
 	}
@@ -220,6 +226,9 @@ func TestControllerSyncJob(t *testing.T) {
 		// job & pods setup
 		job := newJob(tc.parallelism, tc.completions)
 		manager.jobStore.Store.Add(job)
+		for _, pod := range newPodList(tc.pendingPods, api.PodPending, job) {
+			manager.podStore.Indexer.Add(&pod)
+		}
 		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
 			manager.podStore.Indexer.Add(&pod)
 		}
