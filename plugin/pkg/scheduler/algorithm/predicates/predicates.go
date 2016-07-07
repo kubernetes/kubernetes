@@ -343,7 +343,7 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, nodeInfo *schedulercache.Nod
 
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
-				return false, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+				return false, fmt.Errorf("PersistentVolumeClaim is not found: %q", pvcName)
 			}
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
