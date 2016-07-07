@@ -17,10 +17,14 @@ limitations under the License.
 package framework
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/gomega"
 )
@@ -69,4 +73,27 @@ func (f *Framework) MungePodSpec(pod *api.Pod) {
 		Expect(pod.Spec.NodeName).To(Or(BeZero(), Equal(TestContext.NodeName)), "Test misconfigured")
 		pod.Spec.NodeName = TestContext.NodeName
 	}
+}
+
+// UpdatePod updates the pod object. It retries if there is a conflict, throw out error if
+// there is any other errors. name is the pod name, updateFn is the function updating the
+// pod object.
+func (f *Framework) UpdatePod(name string, updateFn func(pod *api.Pod)) {
+	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+		pod, err := f.PodClient().Get(name)
+		if err != nil {
+			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
+		}
+		updateFn(pod)
+		_, err = f.PodClient().Update(pod)
+		if err == nil {
+			Logf("Successfully updated pod %q", name)
+			return true, nil
+		}
+		if errors.IsConflict(err) {
+			Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
+	}))
 }

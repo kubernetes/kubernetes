@@ -75,25 +75,20 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 
 		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
 
-		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
-		Expect(err).NotTo(HaveOccurred())
-
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
+			return framework.GetPodLogs(f.Client, f.Namespace.Name, podName, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
-		pod.Labels["key3"] = "value3"
-		pod.ResourceVersion = "" // to force update
-		_, err = f.Client.Pods(f.Namespace.Name).Update(pod)
-		Expect(err).NotTo(HaveOccurred())
+		f.UpdatePod(podName, func(pod *api.Pod) {
+			pod.Labels["key3"] = "value3"
+		})
 
 		Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
-
 	})
 
 	It("should update annotations on modification [Conformance]", func() {
@@ -121,16 +116,14 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
-		pod.Annotations["builder"] = "foo"
-		pod.ResourceVersion = "" // to force update
-		_, err = f.Client.Pods(f.Namespace.Name).Update(pod)
-		Expect(err).NotTo(HaveOccurred())
+		f.UpdatePod(podName, func(pod *api.Pod) {
+			pod.Annotations["builder"] = "foo"
+		})
 
 		Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"foo\"\n"))
-
 	})
 
 	It("should provide container's cpu limit", func() {
