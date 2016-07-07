@@ -552,13 +552,13 @@ autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
 EOF
     fi
     if [[ "${FEDERATION:-}" == "true" ]]; then
-      FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
-      if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-        FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
+      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
       fi
-      if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+      if [[ -n "${federations_domain_map}" ]]; then
         cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: '$(echo "- --federations=${FEDERATIONS_DOMAIN_MAP}" | sed -e "s/'/''/g")'
+federations_domain_map: '$(echo "- --federations=${federations_domain_map}" | sed -e "s/'/''/g")'
 EOF
       else
         cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
