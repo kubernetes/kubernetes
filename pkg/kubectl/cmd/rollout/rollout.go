@@ -26,7 +26,7 @@ import (
 
 var (
 	rollout_long = dedent.Dedent(`
-		Manages a deployment using subcommands like "kubectl rollout undo deployment/abc"`)
+		Manage a deployment using subcommands like "kubectl rollout undo deployment/abc"`)
 	rollout_example = dedent.Dedent(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc`)
@@ -40,7 +40,7 @@ func NewCmdRollout(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "rollout SUBCOMMAND",
-		Short:   "rollout manages a deployment",
+		Short:   "Manage a deployment rollout",
 		Long:    rollout_long,
 		Example: rollout_example,
 		Run: func(cmd *cobra.Command, args []string) {

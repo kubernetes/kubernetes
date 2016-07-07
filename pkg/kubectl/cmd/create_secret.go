@@ -31,7 +31,7 @@ import (
 func NewCmdCreateSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
-		Short: "Create a secret using specified subcommand.",
+		Short: "Create a secret using specified subcommand",
 		Long:  "Create a secret using specified subcommand.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
@@ -73,7 +73,7 @@ var (
 func NewCmdCreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
-		Short:   "Create a secret from a local file, directory or literal value.",
+		Short:   "Create a secret from a local file, directory or literal value",
 		Long:    secretLong,
 		Example: secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -141,7 +141,7 @@ var (
 func NewCmdCreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
-		Short:   "Create a secret for use with a Docker registry.",
+		Short:   "Create a secret for use with a Docker registry",
 		Long:    secretForDockerRegistryLong,
 		Example: secretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -212,7 +212,7 @@ var (
 func NewCmdCreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
-		Short:   "Create a TLS secret.",
+		Short:   "Create a TLS secret",
 		Long:    secretForTLSLong,
 		Example: secretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {
