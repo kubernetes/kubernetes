@@ -1231,7 +1231,7 @@ func TestHasNames(t *testing.T) {
 		{
 			args:            []string{"rc/foo", "bar"},
 			expectedHasName: false,
-			expectedError:   fmt.Errorf("when passing arguments in resource/name form, all arguments must include the resource"),
+			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. 'resource.test get resource/<resource_name>' instead of 'resource.test get resource resource/<resource_name>'"),
 		},
 	}
 	for _, test := range tests {
