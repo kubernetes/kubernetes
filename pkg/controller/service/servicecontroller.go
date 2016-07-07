@@ -641,7 +641,7 @@ func hostsFromNodeList(list *api.NodeList) []string {
 }
 
 func getNodeConditionPredicate() cache.NodeConditionPredicate {
-	return func(node api.Node) bool {
+	return func(node *api.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
 		// the master.
 		// TODO: Use a node annotation to indicate the master
