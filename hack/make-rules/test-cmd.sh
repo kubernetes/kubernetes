@@ -1935,7 +1935,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "100m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "100m:"
   # Set a non-existing container should fail
-  ! kubectl set resources deployment nginx-deployment -c=redis --limit=cpu=100m
+  ! kubectl set resources deployment nginx-deployment -c=redis --limits=cpu=100m
   # Set the limit of a specific container in deployment
   kubectl set resources deployment nginx-deployment -c=nginx --limits=cpu=200m "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
