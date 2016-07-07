@@ -20,11 +20,20 @@
 # typically from kubernetes-node-e2e-images
 
 set -e
-set -x
 
-echo "Copying image $1 from project $2 to project $3..."
-gcloud compute --project $3 disks create $1 --image=https://www.googleapis.com/compute/v1/projects/$2/global/images/$1
-gcloud compute --project $3 images create $1 \
-  --source-disk=$1 \
+print_usage() {
+    echo "This script helps copy a GCE image from a source to a target project"
+    echo -e "\nUsage:\n$0 <from-image-name> <from-project-name> <to-project-name> <to-image-name>\n"
+}
+
+if [  $# -ne 4 ]; then
+    print_usage
+    exit 1
+fi
+
+echo "Copying image $1 from project $2 to project $3 as image $4..."
+gcloud compute --project $3 disks create $4 --image=https://www.googleapis.com/compute/v1/projects/$2/global/images/$1
+gcloud compute --project $3 images create $4 \
+  --source-disk=$4 \
   --description="Cloned from projects/$2/global/images/$1 by $USER on $(date)"
-gcloud -q compute --project $3 disks delete $1
+gcloud -q compute --project $3 disks delete $4
