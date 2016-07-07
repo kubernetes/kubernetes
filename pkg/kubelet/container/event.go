@@ -16,6 +16,8 @@ limitations under the License.
 
 package container
 
+// The following is not exhaustive.
+
 const (
 	// Container event reason list
 	CreatedContainer        = "Created"
@@ -57,8 +59,21 @@ const (
 	// Probe event reason list
 	ContainerUnhealthy = "Unhealthy"
 
+	// Pod lifetime event reason list
+	Scheduled        = "Scheduled"
+	FailedScheduling = "FailedScheduling"
+	FailedCreate     = "FailedCreate"
+	SuccessfulCreate = "SuccessfulCreate"
+	FailedDelete     = "FailedDelete"
+	SuccessfulDelete = "SuccessfulDelete"
+
 	// Pod worker event reason list
 	FailedSync = "FailedSync"
+
+	// Job controller event reason list
+	DeadlineExceeded     = "DeadlineExceeded"
+	TooManyActivePods    = "TooManyActivePods"
+	TooManySucceededPods = "TooManySucceededPods"
 
 	// Config event reason list
 	FailedValidation = "FailedValidation"

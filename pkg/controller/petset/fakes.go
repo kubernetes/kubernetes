@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -166,7 +167,7 @@ func (f *fakePetClient) Delete(p *pcb) error {
 	for i, pet := range f.pets {
 		if p.pod.Name == pet.pod.Name {
 			found = true
-			f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulDelete", "pet: %v", pet.pod.Name)
+			f.recorder.Eventf(pet.parent, api.EventTypeNormal, container.SuccessfulDelete, "pet: %v", pet.pod.Name)
 			continue
 		}
 		pets = append(pets, f.pets[i])
@@ -197,7 +198,7 @@ func (f *fakePetClient) Create(p *pcb) error {
 			return fmt.Errorf("Create failed: pet %v already exists", p.pod.Name)
 		}
 	}
-	f.recorder.Eventf(p.parent, api.EventTypeNormal, "SuccessfulCreate", "pet: %v", p.pod.Name)
+	f.recorder.Eventf(p.parent, api.EventTypeNormal, container.SuccessfulCreate, "pet: %v", p.pod.Name)
 	f.pets = append(f.pets, p)
 	f.petsCreated++
 	return nil
@@ -294,7 +295,7 @@ func (f *fakePetClient) SyncPVCs(pet *pcb) error {
 	for _, remaining := range updateClaims {
 		claimList = append(claimList, remaining)
 		f.claimsCreated++
-		f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulCreate", "pvc: %v", remaining.Name)
+		f.recorder.Eventf(pet.parent, api.EventTypeNormal, container.SuccessfulCreate, "pvc: %v", remaining.Name)
 	}
 	f.claims = claimList
 	return nil
@@ -312,7 +313,7 @@ func (f *fakePetClient) DeletePVCs(pet *pcb) error {
 		if deleteClaimNames.Has(existing.Name) {
 			deleteClaimNames.Delete(existing.Name)
 			f.claimsDeleted++
-			f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulDelete", "pvc: %v", existing.Name)
+			f.recorder.Eventf(pet.parent, api.EventTypeNormal, container.SuccessfulDelete, "pvc: %v", existing.Name)
 			continue
 		}
 		pvcs = append(pvcs, f.claims[i])

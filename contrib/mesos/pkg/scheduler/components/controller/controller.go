@@ -27,13 +27,11 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (
 	recoveryDelay = 100 * time.Millisecond // delay after scheduler plugin crashes, before we resume scheduling
-
-	FailedScheduling = "FailedScheduling"
-	Scheduled        = "Scheduled"
 )
 
 type Controller interface {
@@ -87,7 +85,7 @@ func (s *controller) scheduleOne() {
 	dest, err := s.algorithm.Schedule(pod)
 	if err != nil {
 		log.V(1).Infof("Failed to schedule: %+v", pod)
-		s.recorder.Eventf(pod, api.EventTypeWarning, FailedScheduling, "Error scheduling: %v", err)
+		s.recorder.Eventf(pod, api.EventTypeWarning, container.FailedScheduling, "Error scheduling: %v", err)
 		s.error(pod, err)
 		return
 	}
@@ -100,9 +98,9 @@ func (s *controller) scheduleOne() {
 	}
 	if err := s.binder.Bind(b); err != nil {
 		log.V(1).Infof("Failed to bind pod: %+v", err)
-		s.recorder.Eventf(pod, api.EventTypeWarning, FailedScheduling, "Binding rejected: %v", err)
+		s.recorder.Eventf(pod, api.EventTypeWarning, container.FailedScheduling, "Binding rejected: %v", err)
 		s.error(pod, err)
 		return
 	}
-	s.recorder.Eventf(pod, api.EventTypeNormal, Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
+	s.recorder.Eventf(pod, api.EventTypeNormal, container.Scheduled, "Successfully assigned %v to %v", pod.Name, dest)
 }
