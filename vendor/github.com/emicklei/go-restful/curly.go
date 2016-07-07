@@ -44,16 +44,16 @@ func (c CurlyRouter) SelectRoute(
 }
 
 // selectRoutes return a collection of Route from a WebService that matches the path tokens from the request.
-func (c CurlyRouter) selectRoutes(ws *WebService, requestTokens []string) []Route {
-	candidates := &sortableCurlyRoutes{[]*curlyRoute{}}
+func (c CurlyRouter) selectRoutes(ws *WebService, requestTokens []string) sortableCurlyRoutes {
+	candidates := sortableCurlyRoutes{}
 	for _, each := range ws.routes {
 		matches, paramCount, staticCount := c.matchesRouteByPathTokens(each.pathParts, requestTokens)
 		if matches {
-			candidates.add(&curlyRoute{each, paramCount, staticCount}) // TODO make sure Routes() return pointers?
+			candidates.add(curlyRoute{each, paramCount, staticCount}) // TODO make sure Routes() return pointers?
 		}
 	}
 	sort.Sort(sort.Reverse(candidates))
-	return candidates.routes()
+	return candidates
 }
 
 // matchesRouteByPathTokens computes whether it matches, howmany parameters do match and what the number of static path elements are.
@@ -110,9 +110,9 @@ func (c CurlyRouter) regularMatchesPathToken(routeToken string, colon int, reque
 
 // detectRoute selectes from a list of Route the first match by inspecting both the Accept and Content-Type
 // headers of the Request. See also RouterJSR311 in jsr311.go
-func (c CurlyRouter) detectRoute(candidateRoutes []Route, httpRequest *http.Request) (*Route, error) {
+func (c CurlyRouter) detectRoute(candidateRoutes sortableCurlyRoutes, httpRequest *http.Request) (*Route, error) {
 	// tracing is done inside detectRoute
-	return RouterJSR311{}.detectRoute(candidateRoutes, httpRequest)
+	return RouterJSR311{}.detectRoute(candidateRoutes.routes(), httpRequest)
 }
 
 // detectWebService returns the best matching webService given the list of path tokens.
