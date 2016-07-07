@@ -93,6 +93,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*extensions.Rep
 	if err != nil {
 		return false, fmt.Errorf("could not find available pods: %v", err)
 	}
+	glog.V(4).Infof("New RS %s/%s has %d available pods.", newRS.Namespace, newRS.Name, newRSAvailablePodCount)
 	maxUnavailable := maxUnavailable(*deployment)
 
 	// Check if we can scale down. We can scale down in the following 2 cases:
@@ -172,6 +173,7 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(oldRSs []*extensions.Re
 		if err != nil {
 			return nil, totalScaledDown, fmt.Errorf("could not find available pods: %v", err)
 		}
+		glog.V(4).Infof("Found %d available pods in old RS %s/%s", availablePodCount, targetRS.Namespace, targetRS.Name)
 		if targetRS.Spec.Replicas == availablePodCount {
 			// no unhealthy replicas found, no scaling required.
 			continue
