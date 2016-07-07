@@ -85,7 +85,7 @@ func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulerca
 		return schedulerapi.HostPriorityList{}, err
 	}
 
-	list := schedulerapi.HostPriorityList{}
+	list := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
 		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name]))
@@ -122,7 +122,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, nodeName
 		labeledNodes[node.Name] = (exists && n.presence) || (!exists && !n.presence)
 	}
 
-	result := []schedulerapi.HostPriority{}
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
 	for nodeName, success := range labeledNodes {
@@ -166,7 +166,7 @@ func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercac
 		}
 	}
 
-	result := []schedulerapi.HostPriority{}
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	// score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest.
 	for nodeName, sumSize := range sumSizeMap {
@@ -221,7 +221,7 @@ func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedul
 		return schedulerapi.HostPriorityList{}, err
 	}
 
-	list := schedulerapi.HostPriorityList{}
+	list := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
 		list = append(list, calculateBalancedResourceAllocation(pod, node, nodeNameToInfo[node.Name]))

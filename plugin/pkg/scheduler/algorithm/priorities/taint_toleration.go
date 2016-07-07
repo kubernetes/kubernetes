@@ -100,7 +100,7 @@ func (s *TaintToleration) ComputeTaintTolerationPriority(pod *api.Pod, nodeNameT
 	// The maximum priority value to give to a node
 	// Priority values range from 0 - maxPriority
 	const maxPriority = 10
-	result := []schedulerapi.HostPriority{}
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	for _, node := range nodes.Items {
 		fScore := float64(maxPriority)
 		if maxCount > 0 {
