@@ -18,13 +18,12 @@ package protobuf
 
 import (
 	"fmt"
+	"go/ast"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-
-	"k8s.io/kubernetes/third_party/golang/go/ast"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
