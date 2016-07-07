@@ -139,8 +139,8 @@ func (dc *DeploymentController) syncFailed(deployment *extensions.Deployment) er
 		return nil
 	}
 
-	cond := newCondition(extensions.DeploymentProgressing, api.ConditionFalse, "TimedOut", "Deployment has timed out")
-	setCondition(deployment, *cond)
+	cond := NewCondition(extensions.DeploymentProgressing, api.ConditionFalse, "TimedOut", "Deployment has timed out")
+	SetCondition(deployment, *cond)
 	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
 	return err
 }
@@ -391,13 +391,18 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	if err != nil {
-		return nil, fmt.Errorf("error creating replica set %v: %v", deployment.Name, err)
+		condition := NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Failed to create new replica set %q: %v", createdRS.Name, err))
+		SetCondition(deployment, *condition)
+		_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
+		return nil, err
 	}
 	if newReplicasCount > 0 {
 		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", "up", createdRS.Name, newReplicasCount)
 	}
 
 	setDeploymentRevision(deployment, newRevision)
+	condition := NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Created new replica set %q", createdRS.Name))
+	SetCondition(deployment, *condition)
 	_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
 	return createdRS, err
 }
@@ -633,8 +638,8 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 	newDeployment.Status = newStatus
 
 	if progressing {
-		condition := newCondition(extensions.DeploymentProgressing, api.ConditionTrue, "Progressing", "Deployment is progressing")
-		setCondition(deployment, *condition)
+		condition := NewCondition(extensions.DeploymentProgressing, api.ConditionTrue, "Progressing", "Deployment is progressing")
+		SetCondition(deployment, *condition)
 	}
 
 	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(newDeployment)
