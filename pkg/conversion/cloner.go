@@ -22,20 +22,21 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"os"
 )
 
 // Cloner knows how to copy one type to another.
 type Cloner struct {
 	// Map from the type to a function which can do the deep copy.
 	deepCopyFuncs          map[reflect.Type]reflect.Value
-	generatedDeepCopyFuncs map[reflect.Type]reflect.Value
+	generatedDeepCopyFuncs map[reflect.Type]func(in interface{}, out interface{}, c *Cloner) error
 }
 
 // NewCloner creates a new Cloner object.
 func NewCloner() *Cloner {
 	c := &Cloner{
 		deepCopyFuncs:          map[reflect.Type]reflect.Value{},
-		generatedDeepCopyFuncs: map[reflect.Type]reflect.Value{},
+		generatedDeepCopyFuncs: map[reflect.Type]func(in interface{}, out interface{}, c *Cloner) error{},
 	}
 	builtinDeepCopies := []interface{}{
 		byteSliceDeepCopy,
@@ -128,17 +129,8 @@ func (c *Cloner) RegisterDeepCopyFunc(deepCopyFunc interface{}) error {
 
 // Similar to RegisterDeepCopyFunc, but registers deep copy function that were
 // automatically generated.
-func (c *Cloner) RegisterGeneratedDeepCopyFunc(deepCopyFunc interface{}) error {
-	fv := reflect.ValueOf(deepCopyFunc)
-	ft := fv.Type()
-	if err := verifyDeepCopyFunctionSignature(ft); err != nil {
-		return err
-	}
-	if ft.In(1).Elem().Kind() == reflect.Struct {
-		c.generatedDeepCopyFuncs[ft.In(0).Elem()] = fv
-	} else {
-		c.generatedDeepCopyFuncs[ft.In(0)] = fv
-	}
+func (c *Cloner) RegisterGeneratedDeepCopyFunc(inType reflect.Type, deepCopyFunc func(in interface{}, out interface{}, c *Cloner) error) error {
+	c.generatedDeepCopyFuncs[inType] = deepCopyFunc
 	return nil
 }
 
@@ -151,6 +143,12 @@ func (c *Cloner) DeepCopy(in interface{}) (interface{}, error) {
 	if in == nil {
 		return nil, nil
 	}
+
+	if t, ok := in.(*time.Time); ok {
+		t2 := *t
+		return &t2, nil
+	}
+
 	inValue := reflect.ValueOf(in)
 	outValue, err := c.deepCopy(inValue)
 	if err != nil {
@@ -161,26 +159,37 @@ func (c *Cloner) DeepCopy(in interface{}) (interface{}, error) {
 
 func (c *Cloner) deepCopy(src reflect.Value) (reflect.Value, error) {
 	inType := src.Type()
+	srcKind := src.Kind()
 
-	if src.Kind() == reflect.Struct {
+	if srcKind == reflect.Struct {
 		glog.Warningf("DeepCopy of non-pointer struct %v. THIS IS SLOW. FIX IT!", inType)
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("DeepCopy of non-pointer struct %v. THIS IS SLOW. FIX IT!", inType))
 	}
-	if src.Kind() == reflect.Ptr && src.Elem().Kind() == reflect.Struct {
-		inType = inType.Elem()
+	structPtr := srcKind == reflect.Ptr
+	if structPtr {
+		elemType := inType.Elem()
+		if elemType.Kind() == reflect.Struct {
+			inType = elemType
+		}
 	}
 
 	if fv, ok := c.deepCopyFuncs[inType]; ok {
-		return c.customDeepCopy(src, fv)
+		//fmt.Fprintln(os.Stderr, "deepCopy - found custom function for", inType)
+		return c.customDeepCopy(src, fv, structPtr)
 	}
 	if fv, ok := c.generatedDeepCopyFuncs[inType]; ok {
-		return c.customDeepCopy(src, fv)
+		var outValue reflect.Value
+		outValue = reflect.New(inType)
+		//fmt.Fprintln(os.Stderr, "deepCopy - found generated function for", inType)
+		return outValue, fv(src.Interface(), outValue.Interface(), c)
 	}
+	fmt.Fprintln(os.Stderr, "deepCopy - only default found", inType)
 	return c.defaultDeepCopy(src)
 }
 
-func (c *Cloner) customDeepCopy(src reflect.Value, fv reflect.Value) (reflect.Value, error) {
+func (c *Cloner) customDeepCopy(src reflect.Value, fv reflect.Value, structPtr bool) (reflect.Value, error) {
 	var outValue reflect.Value
-	if src.Kind() == reflect.Ptr || src.Elem().Kind() == reflect.Struct {
+	if structPtr {
 		outValue = reflect.New(src.Type().Elem())
 	} else {
 		outValue = reflect.New(src.Type())
@@ -193,7 +202,7 @@ func (c *Cloner) customDeepCopy(src reflect.Value, fv reflect.Value) (reflect.Va
 	if result != nil {
 		err = result.(error)
 	}
-	if src.Kind() == reflect.Ptr || src.Elem().Kind() == reflect.Struct {
+	if structPtr {
 		return outValue, err
 	} else {
 		return outValue.Elem(), err
@@ -201,6 +210,7 @@ func (c *Cloner) customDeepCopy(src reflect.Value, fv reflect.Value) (reflect.Va
 }
 
 func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
+	fmt.Fprintf(os.Stderr, "defaultDeepCopy for %v\n", src.Type())
 	switch src.Kind() {
 	case reflect.Chan, reflect.Func, reflect.UnsafePointer, reflect.Uintptr:
 		return src, fmt.Errorf("cannot deep copy kind: %s", src.Kind())

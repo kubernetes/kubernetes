@@ -355,11 +355,16 @@ func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
 	return nil
 }
 
+type GeneratedDeepCopyFunc struct{
+	Fn func(in interface{}, out interface{}, c *conversion.Cloner) error
+	InType reflect.Type
+}
+
 // Similar to AddDeepCopyFuncs, but registers deep-copy functions that were
 // automatically generated.
-func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
+func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...GeneratedDeepCopyFunc) error {
 	for _, f := range deepCopyFuncs {
-		if err := s.cloner.RegisterGeneratedDeepCopyFunc(f); err != nil {
+		if err := s.cloner.RegisterGeneratedDeepCopyFunc(f.InType, f.Fn); err != nil {
 			return err
 		}
 	}
