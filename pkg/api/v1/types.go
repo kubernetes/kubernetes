@@ -3250,11 +3250,13 @@ type DownwardAPIVolumeSource struct {
 type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
-	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	// Selects a field of the pod: only annotations, labels, name and namespace are supported.
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,2,opt,name=fieldRef"`
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
+	// Selects a field of the node: only annotations and labels are supported.
+	NodeFieldRef *ObjectFieldSelector `json:"nodeFieldRef,omitempty" protobuf:"bytes,4,opt,name=nodeFieldRef"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.

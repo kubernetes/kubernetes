@@ -80,10 +80,11 @@ func (plugin *downwardAPIPlugin) RequiresRemount() bool {
 	return true
 }
 
-func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, node *api.Node, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName: spec.Name(),
 		items:   spec.Volume.DownwardAPI.Items,
+		node:    node,
 		pod:     pod,
 		podUID:  pod.UID,
 		plugin:  plugin,
@@ -108,6 +109,7 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 type downwardAPIVolume struct {
 	volName string
 	items   []api.DownwardAPIVolumeFile
+	node    *api.Node
 	pod     *api.Pod
 	podUID  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *api.POD and not only types.UID
 	plugin  *downwardAPIPlugin
@@ -196,6 +198,13 @@ func (d *downwardAPIVolume) collectData() (map[string][]byte, error) {
 			containerName := fileInfo.ResourceFieldRef.ContainerName
 			if values, err := fieldpath.ExtractResourceValueByContainerName(fileInfo.ResourceFieldRef, d.pod, containerName); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
+			}
+		} else if fileInfo.NodeFieldRef != nil {
+			if values, err := fieldpath.ExtractFieldPathAsString(d.node, fileInfo.NodeFieldRef.FieldPath); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.NodeFieldRef.FieldPath, err.Error())
 				errlist = append(errlist, err)
 			} else {
 				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))

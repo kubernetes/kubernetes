@@ -74,7 +74,7 @@ type OperationExecutor interface {
 	// * Mount the volume to the pod specific path.
 	// * Update actual state of world to reflect volume is mounted to the pod
 	//   path.
-	MountVolume(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	MountVolume(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, nodeName string, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 
 	// UnmountVolume unmounts the volume from the pod specified in
 	// volumeToUnmount and updates the actual state of the world to reflect that.
@@ -171,6 +171,9 @@ type VolumeToMount struct {
 	// volume was referenced through a persistent volume claim, this contains
 	// the podSpec.Volume[x].Name of the persistent volume claim.
 	OuterVolumeSpecName string
+
+	// Node which the pod is running on. Used to create NewMounter.
+	Node *api.Node
 
 	// Pod to mount the volume to. Used to create NewMounter.
 	Pod *api.Pod
@@ -356,9 +359,10 @@ func (oe *operationExecutor) DetachVolume(
 func (oe *operationExecutor) MountVolume(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
+	nodeName string,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
 	mountFunc, err := oe.generateMountVolumeFunc(
-		waitForAttachTimeout, volumeToMount, actualStateOfWorld)
+		waitForAttachTimeout, volumeToMount, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -575,6 +579,7 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 func (oe *operationExecutor) generateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
+	nodeName string,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error) {
 	// Get mounter plugin
 	volumePlugin, err :=
@@ -589,8 +594,21 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 			err)
 	}
 
+	node, fetchErr := oe.kubeClient.Core().Nodes().Get(nodeName)
+	if fetchErr != nil {
+		// On failure, return error. Caller will log and retry.
+		return nil, fmt.Errorf(
+			"VerifyControllerAttachedVolume failed fetching node from API server. Volume %q (spec.Name: %q) pod %q (UID: %q). Error: %v.",
+			volumeToMount.VolumeName,
+			volumeToMount.VolumeSpec.Name(),
+			volumeToMount.PodName,
+			volumeToMount.Pod.UID,
+			fetchErr)
+	}
+
 	volumeMounter, newMounterErr := volumePlugin.NewMounter(
 		volumeToMount.VolumeSpec,
+		node,
 		volumeToMount.Pod,
 		volume.VolumeOptions{})
 	if newMounterErr != nil {

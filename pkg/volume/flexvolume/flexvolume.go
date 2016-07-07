@@ -105,7 +105,7 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 }
 
 // NewMounter is the mounter routine to build the volume.
-func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, node *api.Node, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	fv, _, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err

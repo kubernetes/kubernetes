@@ -93,11 +93,12 @@ func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *api.P
 	if spec.Volume != nil {
 		spec.Volume.Name = wrapperVolumeName
 	}
+	node := &api.Node{ObjectMeta: api.ObjectMeta{UID: types.UID("nodeuid")}}
 	plug, err := f.pluginMgr.FindPluginBySpec(&spec)
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewMounter(&spec, pod, opts)
+	return plug.NewMounter(&spec, node, pod, opts)
 }
 
 func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error) {
@@ -197,7 +198,7 @@ func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *api.Pod, opts VolumeOptions) (Mounter, error) {
+func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, node *api.Node, pod *api.Pod, opts VolumeOptions) (Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.Mounters)

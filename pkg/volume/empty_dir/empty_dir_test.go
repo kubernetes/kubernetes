@@ -263,8 +263,9 @@ func TestPluginBackCompat(t *testing.T) {
 	spec := &api.Volume{
 		Name: "vol1",
 	}
+	node := &api.Node{ObjectMeta: api.ObjectMeta{UID: types.UID("nodeuid")}}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), node, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -292,8 +293,9 @@ func TestMetrics(t *testing.T) {
 	spec := &api.Volume{
 		Name: "vol1",
 	}
+	node := &api.Node{ObjectMeta: api.ObjectMeta{UID: types.UID("nodeuid")}}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), node, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

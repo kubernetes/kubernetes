@@ -74,7 +74,7 @@ func (plugin *configMapPlugin) RequiresRemount() bool {
 	return true
 }
 
-func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, node *api.Node, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &configMapVolumeMounter{
 		configMapVolume: &configMapVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
 		source:          *spec.Volume.ConfigMap,

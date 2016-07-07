@@ -670,6 +670,15 @@ func DeepCopy_v1_DownwardAPIVolumeFile(in DownwardAPIVolumeFile, out *DownwardAP
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	if in.NodeFieldRef != nil {
+		in, out := in.NodeFieldRef, &out.NodeFieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_v1_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.NodeFieldRef = nil
+	}
 	return nil
 }
 

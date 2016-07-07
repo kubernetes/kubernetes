@@ -132,7 +132,7 @@ func TestNewMounter(t *testing.T) {
 		},
 	}
 
-	_, err = plug.NewMounter(spec, &api.Pod{}, volume.VolumeOptions{})
+	_, err = plug.NewMounter(spec, &api.Node{}, &api.Pod{}, volume.VolumeOptions{})
 	assert.NoError(err)
 }
 
