@@ -147,8 +147,6 @@ const (
 	// container restarts and image pulls.
 	backOffPeriod = time.Second * 10
 
-	// Period for performing container garbage collection.
-	ContainerGCPeriod = time.Minute
 	// Period for performing image garbage collection.
 	ImageGCPeriod = 5 * time.Minute
 
@@ -361,6 +359,7 @@ func NewMainKubelet(
 		enableCustomMetrics:          enableCustomMetrics,
 		babysitDaemons:               babysitDaemons,
 		enableControllerAttachDetach: enableControllerAttachDetach,
+		gcController:                 newGarbageCollectionController(),
 	}
 
 	if klet.flannelExperimentalOverlay {
@@ -843,6 +842,8 @@ type Kubelet struct {
 	// should manage attachment/detachment of volumes scheduled to this node,
 	// and disable kubelet from executing any attach/detach operations
 	enableControllerAttachDetach bool
+
+	gcController garbageCollectionController
 }
 
 // Validate given node IP belongs to the current host
@@ -922,11 +923,11 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
-	go wait.Until(func() {
+	kl.gcController.startContainerGarbageCollection(func() {
 		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
-	}, ContainerGCPeriod, wait.NeverStop)
+	})
 
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
@@ -2551,6 +2552,9 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			glog.Errorf("Kubelet does not support snapshot update")
 		}
 	case e := <-plegCh:
+		if e.Type == pleg.ContainerDied {
+			kl.gcController.triggerContainerGarbageCollection()
+		}
 		// PLEG event for a pod; sync it.
 		pod, ok := kl.podManager.GetPodByUID(e.ID)
 		if !ok {
