@@ -22,7 +22,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"os"
 	"reflect"
 	goruntime "runtime"
@@ -99,16 +98,6 @@ const (
 	minImgSize int64 = 23 * 1024 * 1024
 	maxImgSize int64 = 1000 * 1024 * 1024
 )
-
-type fakeHTTP struct {
-	url string
-	err error
-}
-
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
-	return nil, f.err
-}
 
 type TestKubelet struct {
 	kubelet          *Kubelet
