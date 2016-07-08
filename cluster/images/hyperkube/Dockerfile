@@ -68,6 +68,9 @@ ADD https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz /
 # Copy the cni folder into /opt/
 COPY cni /opt/cni
 
+# Copy overlay configuration to default directory
+COPY cni-conf /etc/cni/net.d
+
 # Create symlinks for each hyperkube server
 # TODO: this is unreliable for now (e.g. running "/kubelet" panics)
 # Also, it doesn't work for other architectures
