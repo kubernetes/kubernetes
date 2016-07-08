@@ -436,13 +436,13 @@ func (kd *KubeDNS) newHeadlessService(service *kapi.Service) error {
 // matching the given name is returned, otherwise all records stored under
 // the subtree matching the name are returned.
 func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, err error) {
-	glog.Infof("Received DNS Request:%s, exact:%v", name, exact)
+	glog.V(2).Infof("Received DNS Request:%s, exact:%v", name, exact)
 	trimmed := strings.TrimRight(name, ".")
 	segments := strings.Split(trimmed, ".")
 	isFederationQuery := false
 	federationSegments := []string{}
 	if !exact && kd.isFederationQuery(segments) {
-		glog.Infof("federation service query: Received federation query. Going to try to find local service first")
+		glog.V(2).Infof("federation service query: Received federation query. Going to try to find local service first")
 		// Try quering the non-federation (local) service first.
 		// Will try the federation one later, if this fails.
 		isFederationQuery = true
@@ -471,7 +471,7 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		if !kd.isHeadlessServiceRecord(&val) {
 			ok, err := kd.serviceWithClusterIPHasEndpoints(&val)
 			if err != nil {
-				glog.Infof("federation service query: unexpected error while trying to find if service has endpoint: %v")
+				glog.V(2).Infof("federation service query: unexpected error while trying to find if service has endpoint: %v")
 				continue
 			}
 			if !ok {
@@ -498,7 +498,7 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 	// If the name query is not an exact query and does not match any records in the local store,
 	// attempt to send a federation redirect (CNAME) response.
 	if !exact {
-		glog.Infof("federation service query: Did not find a local service. Trying federation redirect (CNAME) response")
+		glog.V(2).Infof("federation service query: Did not find a local service. Trying federation redirect (CNAME) response")
 		return kd.federationRecords(reverseArray(federationSegments))
 	}
 
@@ -536,7 +536,7 @@ func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Servic
 	for _, val := range records {
 		retval = append(retval, *val)
 	}
-	glog.Infof("records:%v, retval:%v, path:%v", records, retval, path)
+	glog.V(2).Infof("records:%v, retval:%v, path:%v", records, retval, path)
 	return retval, nil
 }
 
@@ -580,7 +580,7 @@ func (kd *KubeDNS) serviceWithClusterIPHasEndpoints(msg *skymsg.Service) (bool, 
 
 // ReverseRecords performs a reverse lookup for the given name.
 func (kd *KubeDNS) ReverseRecord(name string) (*skymsg.Service, error) {
-	glog.Infof("Received ReverseRecord Request:%s", name)
+	glog.V(2).Infof("Received ReverseRecord Request:%s", name)
 
 	// if portalIP is not a valid IP, the reverseRecordMap lookup will fail
 	portalIP, ok := extractIP(name)
@@ -657,7 +657,7 @@ func newServiceRecord(ip string, port int) *skymsg.Service {
 func getSkyMsg(ip string, port int) (*skymsg.Service, string) {
 	msg := newServiceRecord(ip, port)
 	hash := hashServiceRecord(msg)
-	glog.Infof("DNS Record:%s, hash:%s", fmt.Sprintf("%v", msg), hash)
+	glog.V(2).Infof("DNS Record:%s, hash:%s", fmt.Sprintf("%v", msg), hash)
 	return msg, fmt.Sprintf("%x", hash)
 }
 
