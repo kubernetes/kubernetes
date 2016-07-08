@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -104,6 +105,9 @@ var _ = BeforeSuite(func() {
 	} else {
 		glog.Infof("Running tests without starting services.")
 	}
+
+	// Reference common test to make the import valid.
+	commontest.CurrentSuite = commontest.NodeE2E
 })
 
 // Tear down the kubelet on the node

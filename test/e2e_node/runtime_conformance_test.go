@@ -37,7 +37,7 @@ const (
 )
 
 var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
-	f := NewDefaultFramework("runtime-conformance")
+	f := framework.NewDefaultFramework("runtime-conformance")
 
 	Describe("container runtime conformance blackbox test", func() {
 		Context("when starting a container that exits", func() {
@@ -91,7 +91,7 @@ while true; do sleep 1; done
 					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
-						Framework:     f,
+						PodClient:     f.PodClient(),
 						Container:     testContainer,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
@@ -134,7 +134,7 @@ while true; do sleep 1; done
 				terminationMessagePath := "/dev/termination-log"
 				priv := true
 				c := ConformanceContainer{
-					Framework: f,
+					PodClient: f.PodClient(),
 					Container: api.Container{
 						Image:   ImageRegistry[busyBoxImage],
 						Name:    name,
@@ -235,7 +235,7 @@ while true; do sleep 1; done
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{
-						Framework: f,
+						PodClient: f.PodClient(),
 						Container: api.Container{
 							Name:    name,
 							Image:   testCase.image,

@@ -24,7 +24,6 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -84,29 +83,12 @@ func (config *KubeletManagedHostConfig) setup() {
 
 func (config *KubeletManagedHostConfig) createPodWithoutHostNetwork() {
 	podSpec := config.createPodSpec(kubeletEtcHostsPodName)
-	config.pod = config.createPod(podSpec)
+	config.pod = config.f.PodClient().CreateSync(podSpec)
 }
 
 func (config *KubeletManagedHostConfig) createPodWithHostNetwork() {
 	podSpec := config.createPodSpecWithHostNetwork(kubeletEtcHostsHostNetworkPodName)
-	config.hostNetworkPod = config.createPod(podSpec)
-}
-
-func (config *KubeletManagedHostConfig) createPod(podSpec *api.Pod) *api.Pod {
-	createdPod, err := config.getPodClient().Create(podSpec)
-	if err != nil {
-		framework.Failf("Failed to create %s pod: %v", podSpec.Name, err)
-	}
-	framework.ExpectNoError(config.f.WaitForPodRunning(podSpec.Name))
-	createdPod, err = config.getPodClient().Get(podSpec.Name)
-	if err != nil {
-		framework.Failf("Failed to retrieve %s pod: %v", podSpec.Name, err)
-	}
-	return createdPod
-}
-
-func (config *KubeletManagedHostConfig) getPodClient() client.PodInterface {
-	return config.f.Client.Pods(config.f.Namespace.Name)
+	config.hostNetworkPod = config.f.PodClient().CreateSync(podSpec)
 }
 
 func assertEtcHostsIsKubeletManaged(etcHostsContent string) {
