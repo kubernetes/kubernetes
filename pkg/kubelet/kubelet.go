@@ -1932,12 +1932,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return err
 	}
 	if err := kl.volumeManager.WaitForAttachAndMount(defaultedPod); err != nil {
-		ref, errGetRef := api.GetReference(pod)
-		if errGetRef == nil && ref != nil {
-			kl.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
-			glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
-			return err
-		}
+		kl.recorder.Eventf(pod, api.EventTypeWarning, kubecontainer.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
+		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
+		return err
 	}
 
 	// Fetch the pull secrets for the pod
