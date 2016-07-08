@@ -48,7 +48,7 @@ found at [API Conventions](api-conventions.md).
     - [Edit defaults.go](#edit-defaultsgo)
     - [Edit conversion.go](#edit-conversiongo)
   - [Changing the internal structures](#changing-the-internal-structures)
-    - [Edit types.go](#edit-typesgo)
+    - [Edit types.go](#edit-typesgo-1)
   - [Edit validation.go](#edit-validationgo)
   - [Edit version conversions](#edit-version-conversions)
   - [Generate protobuf objects](#generate-protobuf-objects)

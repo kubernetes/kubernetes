@@ -46,7 +46,7 @@ Documentation for other releases can be found at
     - [Too complex for now: nvidia-docker](#too-complex-for-now-nvidia-docker)
   - [Implementation plan](#implementation-plan)
     - [V0](#v0)
-      - [Scheduling](#scheduling)
+      - [Scheduling](#scheduling-1)
       - [Runtime](#runtime)
       - [Other](#other)
   - [Future work](#future-work)
