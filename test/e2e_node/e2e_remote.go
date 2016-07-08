@@ -41,11 +41,12 @@ var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify a
 var sshOptionsMap map[string]string
 
 const (
-	archiveName = "e2e_node_test.tar.gz"
-	CNI_RELEASE = "c864f0e1ea73719b8f4582402b0847064f9883b0"
+	archiveName  = "e2e_node_test.tar.gz"
+	CNIRelease   = "c864f0e1ea73719b8f4582402b0847064f9883b0"
+	CNIDirectory = "cni"
 )
 
-var CNI_URL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNI_RELEASE)
+var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
 
 var hostnameIpOverrides = struct {
 	sync.RWMutex
@@ -157,14 +158,6 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 		}
 	}
 
-	// Install the cni plugin. Note that /opt/cni does not get cleaned up after
-	// the test completes.
-	if _, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c",
-		getSshCommand(" ; ", "sudo mkdir -p /opt/cni", fmt.Sprintf("sudo wget -O - %s | sudo tar -xz -C /opt/cni", CNI_URL))); err != nil {
-		// Exit failure with the error
-		return "", false, err
-	}
-
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
@@ -180,6 +173,15 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 				glog.Errorf("failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
 			}
 		}()
+	}
+
+	// Install the cni plugin.
+	cniPath := filepath.Join(tmp, CNIDirectory)
+	if _, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c",
+		getSshCommand(" ; ", fmt.Sprintf("sudo mkdir -p %s", cniPath),
+			fmt.Sprintf("sudo wget -O - %s | sudo tar -xz -C %s", CNIURL, cniPath))); err != nil {
+		// Exit failure with the error
+		return "", false, err
 	}
 
 	// Copy the archive to the staging directory

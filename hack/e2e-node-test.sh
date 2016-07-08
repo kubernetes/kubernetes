@@ -129,6 +129,6 @@ else
   # Test using the host the script was run on
   # Provided for backwards compatibility
   "${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} \
-    -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true --start-services=true --stop-services=true
+    -- --alsologtostderr --v 2 --node-name $(hostname) --disable-kubenet=true --build-services=true --start-services=true --stop-services=true
   exit $?
 fi
