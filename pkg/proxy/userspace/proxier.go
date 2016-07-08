@@ -447,6 +447,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			if err != nil {
 				glog.Errorf("Failed to stop service %q: %v", name, err)
 			}
+			proxier.loadBalancer.DeleteService(name)
 		}
 	}
 }
