@@ -2724,10 +2724,9 @@ func TestPodToleratesTaints(t *testing.T) {
 	}
 
 	for _, test := range podTolerateTaintsTests {
-		tolerationMatch := TolerationMatch{FakeNodeInfo(test.node)}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&test.node)
-		fits, err := tolerationMatch.PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod), nodeInfo)
+		fits, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod), nodeInfo)
 		if fits == false && !reflect.DeepEqual(err, ErrTaintsTolerationsNotMatch) {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
 		}

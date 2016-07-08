@@ -25,23 +25,12 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type NodeAffinity struct {
-	nodeLister algorithm.NodeLister
-}
-
-func NewNodeAffinityPriority(nodeLister algorithm.NodeLister) algorithm.PriorityFunction {
-	nodeAffinity := &NodeAffinity{
-		nodeLister: nodeLister,
-	}
-	return nodeAffinity.CalculateNodeAffinityPriority
-}
-
 // CalculateNodeAffinityPriority prioritizes nodes according to node affinity scheduling preferences
 // indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node match a preferredSchedulingTerm,
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.
-func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var maxCount int
 	counts := map[string]int{}
 
