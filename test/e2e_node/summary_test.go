@@ -255,12 +255,14 @@ var (
 				AvailableBytes: val(100 * mb),
 				CapacityBytes:  val(100 * mb),
 				UsedBytes:      val(kb),
+				InodesFree:     val(1E4),
 			},
 			Runtime: &stats.RuntimeStats{
 				ImageFs: &stats.FsStats{
 					AvailableBytes: val(100 * mb),
 					CapacityBytes:  val(100 * mb),
 					UsedBytes:      val(kb),
+					InodesFree:     val(1E4),
 				},
 			},
 		},
@@ -386,12 +388,14 @@ var (
 				AvailableBytes: val(100 * gb),
 				CapacityBytes:  val(100 * gb),
 				UsedBytes:      val(10 * gb),
+				InodesFree:     val(1E6),
 			},
 			Runtime: &stats.RuntimeStats{
 				ImageFs: &stats.FsStats{
 					AvailableBytes: val(100 * gb),
 					CapacityBytes:  val(100 * gb),
 					UsedBytes:      val(10 * gb),
+					InodesFree:     val(1E6),
 				},
 			},
 		},
@@ -422,7 +426,14 @@ func checkSummary(actual, lower, upper stats.Summary) []error {
 	return checkValue("", reflect.ValueOf(actual), reflect.ValueOf(lower), reflect.ValueOf(upper))
 }
 
-func checkValue(name string, actual, lower, upper reflect.Value) []error {
+func checkValue(name string, actual, lower, upper reflect.Value) (errs []error) {
+	// Provide more useful error messages in the case of a panic.
+	defer func() {
+		if err := recover(); err != nil {
+			errs = append(errs, fmt.Errorf("panic checking %s (%v): %v", name, actual, err))
+		}
+	}()
+
 	if !actual.IsValid() {
 		if !lower.IsValid() {
 			// Expected zero-value, ignore it.
@@ -431,7 +442,6 @@ func checkValue(name string, actual, lower, upper reflect.Value) []error {
 		return []error{fmt.Errorf("%s is an unexpected zero-value!", name)}
 	}
 
-	var errs []error
 	switch actual.Kind() {
 
 	case reflect.Struct:
