@@ -203,6 +203,7 @@ http-check-frequency
 http-port
 ignore-daemonsets
 ignore-not-found
+image-config-file
 image-gc-high-threshold
 image-gc-low-threshold
 image-project
