@@ -76,12 +76,12 @@ write_files:
       EOF
 
 coreos:
-  etcd:
-    name: kubernetes-node-INDEX
+  etcd2:
     discovery: https://discovery.etcd.io/DISCOVERY_ID
-    addr: $private_ipv4:4001
-    peer-addr: $private_ipv4:7001
-    peer-bind-addr: $private_ipv4:7001
+    advertise-client-urls: http://$private_ipv4:2379,http://$private_ipv4:4001
+    initial-advertise-peer-urls: http://$private_ipv4:2380
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
 
   flannel:
     ip_masq: true
@@ -92,10 +92,10 @@ coreos:
     metadata: kubernetes_role=minion
 
   update:
-    reboot-strategy: etcd-lock
+    reboot-strategy: off
 
   units:
-    - name: etcd.service
+    - name: etcd2.service
       command: start
     - name: fleet.service
       command: start
@@ -104,8 +104,8 @@ coreos:
         - name: 50-flannel.conf
           content: |
             [Unit]
-            Requires=etcd.service
-            After=etcd.service
+            Requires=etcd2.service
+            After=etcd2.service
 
             [Service]
             ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"KUBE_NETWORK", "Backend": {"Type": "host-gw"}}'
@@ -144,6 +144,8 @@ coreos:
         Requires=docker.service
         After=download-release.service
         Requires=download-release.service
+        After=apiserver-finder.service
+        Requires=apiserver-finder.service
         [Service]
         EnvironmentFile=/run/kubelet/apiservers.env
         ExecStartPre=/run/config-kubelet.sh
@@ -172,6 +174,8 @@ coreos:
         Requires=docker.service
         After=download-release.service
         Requires=download-release.service
+        After=apiserver-finder.service
+        Requires=apiserver-finder.service
         [Service]
         EnvironmentFile=/run/kubelet/apiservers.env
         ExecStartPre=/run/config-kube-proxy.sh
@@ -184,26 +188,6 @@ coreos:
         --master=${FIRST_APISERVER_URL}
         Restart=always
         RestartSec=5
-    - name: kubelet-sighup.path
-      command: start
-      content: |
-        [Path]
-        PathChanged=/run/kubelet/apiservers.env
-    - name: kubelet-sighup.service
-      command: start
-      content: |
-        [Service]
-        ExecStart=/usr/bin/pkill -SIGHUP -f kubelet
-    - name: kube-proxy-sighup.path
-      command: start
-      content: |
-        [Path]
-        PathChanged=/run/kubelet/apiservers.env
-    - name: kube-proxy-sighup.service
-      command: start
-      content: |
-        [Service]
-        ExecStart=/usr/bin/pkill -SIGHUP -f kube-proxy
     - name: apiserver-finder.service
       command: start
       content: |
@@ -211,8 +195,8 @@ coreos:
         Description=Kubernetes Apiserver finder
         After=network-online.target
         Requires=network-online.target
-        After=etcd.service
-        Requires=etcd.service
+        After=etcd2.service
+        Requires=etcd2.service
         [Service]
         ExecStartPre=/opt/bin/regen-apiserver-list.sh
         ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/apiservers -- /opt/bin/regen-apiserver-list.sh
