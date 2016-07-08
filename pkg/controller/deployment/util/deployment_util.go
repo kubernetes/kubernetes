@@ -115,6 +115,20 @@ func filterOutCondition(d *extensions.Deployment, cType extensions.DeploymentCon
 	return newConditions, found
 }
 
+func SetDeploymentRevision(deployment *extensions.Deployment, revision string) bool {
+	updated := false
+
+	if deployment.Annotations == nil {
+		deployment.Annotations = make(map[string]string)
+	}
+	if deployment.Annotations[RevisionAnnotation] != revision {
+		deployment.Annotations[RevisionAnnotation] = revision
+		updated = true
+	}
+
+	return updated
+}
+
 // MaxRevision finds the highest revision in the replica sets
 func MaxRevision(allRSs []*extensions.ReplicaSet) int64 {
 	max := int64(0)

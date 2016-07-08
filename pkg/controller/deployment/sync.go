@@ -69,7 +69,7 @@ func (dc *DeploymentController) hasTimedOut(deployment *extensions.Deployment) (
 	// the timeout.
 	if newRS == nil {
 		// Remove any condition that denotes lack of progress for a new rollout is underway.
-		removed := removeCondition(deployment, extensions.DeploymentProgressing, api.ConditionFalse)
+		removed := deploymentutil.RemoveCondition(deployment, extensions.DeploymentProgressing, api.ConditionFalse)
 		if !removed {
 			return false, nil
 		}
@@ -97,7 +97,7 @@ func (dc *DeploymentController) hasTimedOut(deployment *extensions.Deployment) (
 
 	// Look at the difference in seconds between now and the last time we reported any progress
 	// and compare against progressDeadlineSeconds.
-	condition := getCondition(deployment, extensions.DeploymentProgressing, api.ConditionTrue)
+	condition := deploymentutil.GetCondition(deployment, extensions.DeploymentProgressing, api.ConditionTrue)
 	if condition == nil {
 		return false, nil
 	}
@@ -133,14 +133,14 @@ func (dc *DeploymentController) syncFailed(deployment *extensions.Deployment) er
 		return err
 	}
 
-	condition := getCondition(deployment, extensions.DeploymentProgressing, api.ConditionFalse)
+	condition := deploymentutil.GetCondition(deployment, extensions.DeploymentProgressing, api.ConditionFalse)
 	if condition != nil {
 		// If the timeout condition already exists, we don't need to update the deployment.
 		return nil
 	}
 
-	cond := NewCondition(extensions.DeploymentProgressing, api.ConditionFalse, "TimedOut", "Deployment has timed out")
-	SetCondition(deployment, *cond)
+	cond := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionFalse, "TimedOut", "Deployment has timed out")
+	deploymentutil.SetCondition(deployment, *cond)
 	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
 	return err
 }
@@ -345,7 +345,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			}
 		}
 		// Update deployment with newest revision
-		if setDeploymentRevision(deployment, newRevision) {
+		if deploymentutil.SetDeploymentRevision(deployment, newRevision) {
 			if _, err := dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment); err != nil {
 				return nil, err
 			}
@@ -391,8 +391,8 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	if err != nil {
-		condition := NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Failed to create new replica set %q: %v", createdRS.Name, err))
-		SetCondition(deployment, *condition)
+		condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Failed to create new replica set %q: %v", createdRS.Name, err))
+		deploymentutil.SetCondition(deployment, *condition)
 		_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
 		return nil, err
 	}
@@ -400,25 +400,11 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", "up", createdRS.Name, newReplicasCount)
 	}
 
-	setDeploymentRevision(deployment, newRevision)
-	condition := NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Created new replica set %q", createdRS.Name))
-	SetCondition(deployment, *condition)
+	deploymentutil.SetDeploymentRevision(deployment, newRevision)
+	condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Created new replica set %q", createdRS.Name))
+	deploymentutil.SetCondition(deployment, *condition)
 	_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
 	return createdRS, err
-}
-
-func setDeploymentRevision(deployment *extensions.Deployment, revision string) bool {
-	updated := false
-
-	if deployment.Annotations == nil {
-		deployment.Annotations = make(map[string]string)
-	}
-	if deployment.Annotations[deploymentutil.RevisionAnnotation] != revision {
-		deployment.Annotations[deploymentutil.RevisionAnnotation] = revision
-		updated = true
-	}
-
-	return updated
 }
 
 // scale scales proportionally in order to mitigate risk. Otherwise, scaling up can increase the size
@@ -586,7 +572,7 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 	// won't switch to failed once it is unpaused.
 	removed := false
 	if d.Spec.Paused {
-		removed = removeCondition(d, extensions.DeploymentProgressing, api.ConditionTrue)
+		removed = deploymentutil.RemoveCondition(d, extensions.DeploymentProgressing, api.ConditionTrue)
 	}
 	if !reflect.DeepEqual(d.Status, newStatus) || removed {
 		return dc.updateDeploymentStatus(allRSs, newRS, d)
@@ -638,8 +624,8 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 	newDeployment.Status = newStatus
 
 	if progressing {
-		condition := NewCondition(extensions.DeploymentProgressing, api.ConditionTrue, "Progressing", "Deployment is progressing")
-		SetCondition(deployment, *condition)
+		condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionTrue, "Progressing", "Deployment is progressing")
+		deploymentutil.SetCondition(deployment, *condition)
 	}
 
 	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(newDeployment)
