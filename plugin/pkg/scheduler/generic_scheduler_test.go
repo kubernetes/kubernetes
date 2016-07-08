@@ -33,15 +33,15 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func falsePredicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func falsePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return false, algorithmpredicates.ErrFakePredicate
 }
 
-func truePredicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func truePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return true, nil
 }
 
-func matchesPredicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func matchesPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, fmt.Errorf("node not found")
@@ -52,7 +52,7 @@ func matchesPredicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, er
 	return false, algorithmpredicates.ErrFakePredicate
 }
 
-func hasNoPodsPredicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func hasNoPodsPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	if len(nodeInfo.Pods()) == 0 {
 		return true, nil
 	}
