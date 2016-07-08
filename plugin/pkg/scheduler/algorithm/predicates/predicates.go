@@ -999,19 +999,11 @@ func (checker *PodAffinityChecker) NodeMatchPodAffinityAntiAffinity(pod *api.Pod
 	return true
 }
 
-type TolerationMatch struct {
-	info NodeInfo
-}
-
-func NewTolerationMatchPredicate(info NodeInfo) algorithm.FitPredicate {
-	tolerationMatch := &TolerationMatch{
-		info: info,
-	}
-	return tolerationMatch.PodToleratesNodeTaints
-}
-
-func (t *TolerationMatch) PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	node := nodeInfo.Node()
+	if node == nil {
+		return false, fmt.Errorf("node not found")
+	}
 
 	taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
 	if err != nil {

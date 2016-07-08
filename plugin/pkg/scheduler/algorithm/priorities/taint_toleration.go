@@ -24,19 +24,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// NodeTaints hold the node lister
-type TaintToleration struct {
-	nodeLister algorithm.NodeLister
-}
-
-// NewTaintTolerationPriority
-func NewTaintTolerationPriority(nodeLister algorithm.NodeLister) algorithm.PriorityFunction {
-	taintToleration := &TaintToleration{
-		nodeLister: nodeLister,
-	}
-	return taintToleration.ComputeTaintTolerationPriority
-}
-
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
 func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []api.Toleration) (intolerableTaints int) {
 	for _, taint := range taints {
@@ -63,7 +50,7 @@ func getAllTolerationPreferNoSchedule(tolerations []api.Toleration) (tolerationL
 }
 
 // ComputeTaintTolerationPriority prepares the priority list for all the nodes based on the number of intolerable taints on the node
-func (s *TaintToleration) ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	// counts hold the count of intolerable taints of a pod for a given node
 	counts := make(map[string]int)
 

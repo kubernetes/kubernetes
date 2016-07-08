@@ -212,8 +212,7 @@ func TestTaintAndToleration(t *testing.T) {
 	}
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap([]*api.Pod{{}})
-		taintToleration := TaintToleration{nodeLister: algorithm.FakeNodeLister(api.NodeList{Items: test.nodes})}
-		list, err := taintToleration.ComputeTaintTolerationPriority(
+		list, err := ComputeTaintTolerationPriority(
 			test.pod,
 			nodeNameToInfo,
 			algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
