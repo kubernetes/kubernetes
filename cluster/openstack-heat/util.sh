@@ -108,12 +108,20 @@ function create-stack() {
 function upload-resources() {
   swift post kubernetes --read-acl '.r:*,.rlistings'
 
-  echo "[INFO] Upload ${KUBERNETES_RELEASE_TAR}"
-  swift upload kubernetes ${ROOT}/../../_output/release-tars/${KUBERNETES_RELEASE_TAR} \
+  locations=(
+    "${ROOT}/../../_output/release-tars/${KUBERNETES_RELEASE_TAR}"
+    "${ROOT}/../../server/${KUBERNETES_RELEASE_TAR}"
+  )
+
+  RELEASE_TAR_LOCATION=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  RELEASE_TAR_PATH=$(dirname ${RELEASE_TAR_LOCATION})
+
+  echo "[INFO] Uploading ${KUBERNETES_RELEASE_TAR}"
+  swift upload kubernetes ${RELEASE_TAR_PATH}/${KUBERNETES_RELEASE_TAR} \
     --object-name kubernetes-server.tar.gz
 
-  echo "[INFO] Upload kubernetes-salt.tar.gz"
-  swift upload kubernetes ${ROOT}/../../_output/release-tars/kubernetes-salt.tar.gz \
+  echo "[INFO] Uploading kubernetes-salt.tar.gz"
+  swift upload kubernetes ${RELEASE_TAR_PATH}/kubernetes-salt.tar.gz \
     --object-name kubernetes-salt.tar.gz
 }
 
