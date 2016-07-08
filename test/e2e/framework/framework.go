@@ -32,6 +32,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -53,10 +54,9 @@ const (
 type Framework struct {
 	BaseName string
 
-	ClientConfigGetter ClientConfigGetter
-	Client             *client.Client
-	Clientset_1_2      *release_1_2.Clientset
-	Clientset_1_3      *release_1_3.Clientset
+	Client        *client.Client
+	Clientset_1_2 *release_1_2.Clientset
+	Clientset_1_3 *release_1_3.Clientset
 
 	// TODO(mml): Remove this.  We should generally use the versioned clientset.
 	FederationClientset     *federation_internalclientset.Clientset
@@ -117,16 +117,11 @@ func NewDefaultFederatedFramework(baseName string) *Framework {
 }
 
 func NewFramework(baseName string, options FrameworkOptions, client *client.Client) *Framework {
-	return NewFrameworkWithConfigGetter(baseName, options, client, LoadConfig)
-}
-
-func NewFrameworkWithConfigGetter(baseName string, options FrameworkOptions, client *client.Client, configGetter ClientConfigGetter) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
 		options:                  options,
 		Client:                   client,
-		ClientConfigGetter:       configGetter,
 	}
 
 	BeforeEach(f.BeforeEach)
@@ -142,10 +137,21 @@ func (f *Framework) BeforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.Client == nil {
 		By("Creating a kubernetes client")
-		config, err := f.ClientConfigGetter()
-		Expect(err).NotTo(HaveOccurred())
-		config.QPS = f.options.ClientQPS
-		config.Burst = f.options.ClientBurst
+		var config *restclient.Config
+		if TestContext.NodeName != "" {
+			// This is a node e2e test, apply the node e2e configuration
+			config = &restclient.Config{
+				Host:  TestContext.Host,
+				QPS:   100,
+				Burst: 100,
+			}
+		} else {
+			var err error
+			config, err = LoadConfig()
+			Expect(err).NotTo(HaveOccurred())
+			config.QPS = f.options.ClientQPS
+			config.Burst = f.options.ClientBurst
+		}
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
 		}

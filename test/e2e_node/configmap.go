@@ -30,7 +30,7 @@ import (
 
 var _ = framework.KubeDescribe("ConfigMap", func() {
 
-	f := NewDefaultFramework("configmap")
+	f := framework.NewDefaultFramework("configmap")
 
 	It("should be consumable from pods in volumpe [Conformance]", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0)
@@ -122,7 +122,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		}
 
 		By("Creating the pod")
-		f.CreatePod(pod)
+		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
@@ -179,7 +179,8 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 			},
 		}
 
-		f.MungePodSpec(pod)
+		// TODO(random-liu): Change TestContainerOutput to use PodClient and avoid MungeSpec explicitly
+		f.PodClient().MungeSpec(pod)
 
 		framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
 			"CONFIG_DATA_1=value-1",
@@ -260,7 +261,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
-	f.MungePodSpec(pod)
+	f.PodClient().MungeSpec(pod)
 
 	framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
@@ -333,7 +334,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
-	f.MungePodSpec(pod)
+	f.PodClient().MungeSpec(pod)
 
 	framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
 		"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",

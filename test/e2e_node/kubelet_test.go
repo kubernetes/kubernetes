@@ -38,11 +38,15 @@ import (
 )
 
 var _ = framework.KubeDescribe("Kubelet", func() {
-	f := NewDefaultFramework("kubelet-test")
+	f := framework.NewDefaultFramework("kubelet-test")
+	var podClient *framework.PodClient
+	BeforeEach(func() {
+		podClient = f.PodClient()
+	})
 	Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(util.NewUUID())
 		It("it should print the output to logs", func() {
-			f.CreatePod(&api.Pod{
+			podClient.CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
 				},
@@ -60,7 +64,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 			Eventually(func() string {
 				sinceTime := apiUnversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-				rc, err := f.PodClient().GetLogs(podName, &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
+				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
 				if err != nil {
 					return ""
 				}
@@ -76,7 +80,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-readonly-fs" + string(util.NewUUID())
 		It("it should not write to root filesystem", func() {
 			isReadOnly := true
-			f.CreatePod(&api.Pod{
+			podClient.CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
 				},
@@ -96,7 +100,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 			Eventually(func() string {
-				rc, err := f.PodClient().GetLogs(podName, &api.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{}).Stream()
 				if err != nil {
 					return ""
 				}
@@ -112,7 +116,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			It("it should report resource usage through the stats api", func() {
 				podNamePrefix := "stats-busybox-" + string(util.NewUUID())
 				volumeNamePrefix := "test-empty-dir"
-				podNames, volumes := createSummaryTestPods(f, podNamePrefix, 2, volumeNamePrefix)
+				podNames, volumes := createSummaryTestPods(f.PodClient(), podNamePrefix, 2, volumeNamePrefix)
 				By("Returning stats summary")
 				summary := stats.Summary{}
 				Eventually(func() error {
@@ -152,7 +156,7 @@ const (
 	containerSuffix = "-c"
 )
 
-func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
+func createSummaryTestPods(podClient *framework.PodClient, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
 	podNames := sets.NewString()
 	volumes := sets.NewString(volumeNamePrefix)
 	for i := 0; i < count; i++ {
@@ -191,7 +195,7 @@ func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count i
 			},
 		})
 	}
-	f.CreatePods(pods)
+	podClient.CreateBatch(pods)
 
 	return podNames, volumes
 }

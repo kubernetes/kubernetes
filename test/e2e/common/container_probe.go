@@ -14,17 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -33,36 +31,23 @@ import (
 
 const (
 	probTestContainerName       = "test-webserver"
-	probTestInitialDelaySeconds = 30
+	probTestInitialDelaySeconds = 15
 )
 
 var _ = framework.KubeDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
-	var podClient client.PodInterface
+	var podClient *framework.PodClient
 	probe := webserverProbeBuilder{}
 
 	BeforeEach(func() {
-		podClient = f.Client.Pods(f.Namespace.Name)
+		podClient = f.PodClient()
 	})
 
 	It("with readiness probe should not be ready before initial delay and never restart [Conformance]", func() {
-		p, err := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
-		framework.ExpectNoError(err)
+		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
+		f.WaitForPodReady(p.Name)
 
-		Expect(wait.Poll(framework.Poll, 240*time.Second, func() (bool, error) {
-			p, err := podClient.Get(p.Name)
-			if err != nil {
-				return false, err
-			}
-			ready := api.IsPodReady(p)
-			if !ready {
-				framework.Logf("pod is not yet ready; pod has phase %q.", p.Status.Phase)
-				return false, nil
-			}
-			return true, nil
-		})).NotTo(HaveOccurred(), "pod never became ready")
-
-		p, err = podClient.Get(p.Name)
+		p, err := podClient.Get(p.Name)
 		framework.ExpectNoError(err)
 		isReady, err := framework.PodRunningReady(p)
 		framework.ExpectNoError(err)
@@ -86,21 +71,16 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	It("with readiness probe that fails should never be ready and never restart [Conformance]", func() {
-		p, err := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
-		framework.ExpectNoError(err)
-
-		err = wait.Poll(framework.Poll, 180*time.Second, func() (bool, error) {
+		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
+		Consistently(func() (bool, error) {
 			p, err := podClient.Get(p.Name)
 			if err != nil {
 				return false, err
 			}
 			return api.IsPodReady(p), nil
-		})
-		if err != wait.ErrWaitTimeout {
-			framework.Failf("expecting wait timeout error but got: %v", err)
-		}
+		}, 1*time.Minute, 1*time.Second).ShouldNot(BeTrue(), "pod should not be ready")
 
-		p, err = podClient.Get(p.Name)
+		p, err := podClient.Get(p.Name)
 		framework.ExpectNoError(err)
 
 		isReady, err := framework.PodRunningReady(p)

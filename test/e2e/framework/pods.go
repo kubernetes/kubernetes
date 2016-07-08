@@ -29,43 +29,46 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// TODO: Consolidate pod-specific framework functions here.
-
 // Convenience method for getting a pod client interface in the framework's namespace.
-func (f *Framework) PodClient() unversioned.PodInterface {
-	return f.Client.Pods(f.Namespace.Name)
+func (f *Framework) PodClient() *PodClient {
+	return &PodClient{
+		f:            f,
+		PodInterface: f.Client.Pods(f.Namespace.Name),
+	}
 }
 
-// Create a new pod according to the framework specifications, and wait for it to start.
-// Returns the server's representation of the pod.
-func (f *Framework) CreatePod(pod *api.Pod) *api.Pod {
-	p := f.CreatePodAsync(pod)
-	ExpectNoError(f.WaitForPodRunning(p.Name))
-	return p
+type PodClient struct {
+	f *Framework
+	unversioned.PodInterface
 }
 
-// Create a new pod according to the framework specifications (don't wait for it to start).
-// Returns the server's representation of the pod.
-func (f *Framework) CreatePodAsync(pod *api.Pod) *api.Pod {
-	f.MungePodSpec(pod)
-	p, err := f.PodClient().Create(pod)
+// Create creates a new pod according to the framework specifications (don't wait for it to start).
+func (c *PodClient) Create(pod *api.Pod) *api.Pod {
+	c.MungeSpec(pod)
+	p, err := c.PodInterface.Create(pod)
 	ExpectNoError(err, "Error creating Pod")
 	return p
 }
 
-// Batch version of CreatePod. All pods are created before waiting.
-// Returns a slice, in the same order as pods, containing the server's representations of the pods.
-func (f *Framework) CreatePods(pods []*api.Pod) []*api.Pod {
+// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
+func (c *PodClient) CreateSync(pod *api.Pod) *api.Pod {
+	p := c.Create(pod)
+	ExpectNoError(c.f.WaitForPodRunning(p.Name))
+	return p
+}
+
+// CreateBatch create a batch of pods. All pods are created before waiting.
+func (c *PodClient) CreateBatch(pods []*api.Pod) []*api.Pod {
 	ps := make([]*api.Pod, len(pods))
 	for i, pod := range pods {
-		ps[i] = f.CreatePodAsync(pod)
+		ps[i] = c.Create(pod)
 	}
 	var wg sync.WaitGroup
 	for _, pod := range ps {
 		wg.Add(1)
 		podName := pod.Name
 		go func() {
-			ExpectNoError(f.WaitForPodRunning(podName))
+			ExpectNoError(c.f.WaitForPodRunning(podName))
 			wg.Done()
 		}()
 	}
@@ -73,26 +76,27 @@ func (f *Framework) CreatePods(pods []*api.Pod) []*api.Pod {
 	return ps
 }
 
-// Apply test-suite specific transformations to the pod spec.
-// TODO: figure out a nicer, more generic way to tie this to framework instances.
-func (f *Framework) MungePodSpec(pod *api.Pod) {
+// MungeSpec apply test-suite specific transformations to the pod spec.
+// TODO: Refactor the framework to always use PodClient so that we can completely hide the munge logic
+// in the PodClient.
+func (c *PodClient) MungeSpec(pod *api.Pod) {
 	if TestContext.NodeName != "" {
 		Expect(pod.Spec.NodeName).To(Or(BeZero(), Equal(TestContext.NodeName)), "Test misconfigured")
 		pod.Spec.NodeName = TestContext.NodeName
 	}
 }
 
-// UpdatePod updates the pod object. It retries if there is a conflict, throw out error if
+// Update updates the pod object. It retries if there is a conflict, throw out error if
 // there is any other errors. name is the pod name, updateFn is the function updating the
 // pod object.
-func (f *Framework) UpdatePod(name string, updateFn func(pod *api.Pod)) {
+func (c *PodClient) Update(name string, updateFn func(pod *api.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
-		pod, err := f.PodClient().Get(name)
+		pod, err := c.PodInterface.Get(name)
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
 		}
 		updateFn(pod)
-		_, err = f.PodClient().Update(pod)
+		_, err = c.PodInterface.Update(pod)
 		if err == nil {
 			Logf("Successfully updated pod %q", name)
 			return true, nil
@@ -104,3 +108,5 @@ func (f *Framework) UpdatePod(name string, updateFn func(pod *api.Pod)) {
 		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
 	}))
 }
+
+// TODO(random-liu): Move pod wait function into this file

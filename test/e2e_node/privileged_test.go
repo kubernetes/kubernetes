@@ -54,11 +54,13 @@ type PrivilegedPodTestConfig struct {
 	privilegedPod *api.Pod
 }
 
+// TODO(random-liu): Change the test to use framework and framework pod client.
 var _ = Describe("PrivilegedPod", func() {
 	var c *client.Client
-	restClientConfig := &restclient.Config{Host: *apiServerAddress}
+	var restClientConfig *restclient.Config
 	BeforeEach(func() {
 		// Setup the apiserver client
+		restClientConfig = &restclient.Config{Host: framework.TestContext.Host}
 		c = client.NewOrDie(restClientConfig)
 	})
 	It("should test privileged pod", func() {
