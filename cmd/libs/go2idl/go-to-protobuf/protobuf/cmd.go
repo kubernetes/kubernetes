@@ -125,9 +125,6 @@ func Run(g *Generator) {
 	protobufNames := NewProtobufNamer()
 	outputPackages := generator.Packages{}
 	for _, d := range strings.Split(g.Packages, ",") {
-		if strings.Contains(d, "-") {
-			log.Fatalf("Package names must be valid protobuf package identifiers, which allow only [a-z0-9_]: %s", d)
-		}
 		generateAllTypes, outputPackage := true, true
 		switch {
 		case strings.HasPrefix(d, "+"):
@@ -136,6 +133,9 @@ func Run(g *Generator) {
 		case strings.HasPrefix(d, "-"):
 			d = d[1:]
 			outputPackage = false
+		}
+		if strings.Contains(d, "-") {
+			log.Fatalf("Package names must be valid protobuf package identifiers, which allow only [a-z0-9_]: %s", d)
 		}
 		name := protoSafePackage(d)
 		parts := strings.SplitN(d, "=", 2)
