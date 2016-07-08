@@ -144,9 +144,10 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 	} else {
 		predicateResultLock := sync.Mutex{}
 		errs := []error{}
+		meta := predicates.PredicateMetadata(pod)
 		checkNode := func(i int) {
 			nodeName := nodes.Items[i].Name
-			fits, failedPredicate, err := podFitsOnNode(pod, nodeNameToInfo[nodeName], predicateFuncs)
+			fits, failedPredicate, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs)
 
 			predicateResultLock.Lock()
 			defer predicateResultLock.Unlock()
@@ -182,9 +183,9 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 }
 
 // Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
-func podFitsOnNode(pod *api.Pod, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, string, error) {
+func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, string, error) {
 	for _, predicate := range predicateFuncs {
-		fit, err := predicate(pod, nil, info)
+		fit, err := predicate(pod, meta, info)
 		if err != nil {
 			switch e := err.(type) {
 			case *predicates.InsufficientResourceError:

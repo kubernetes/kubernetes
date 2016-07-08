@@ -68,10 +68,17 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 // podMetadata defines a type, that is an expected type that is passed
 // as metadata for predicate functions
 type predicateMetadata struct {
+	podBestEffort bool
 }
 
 func PredicateMetadata(pod *api.Pod) interface{} {
-	return &predicateMetadata{}
+	if pod == nil {
+		// We cannot compute metadata, just return nil
+		return nil
+	}
+	return &predicateMetadata{
+		podBestEffort: isPodBestEffort(pod),
+	}
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
@@ -1060,8 +1067,18 @@ func CheckNodeMemoryPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *
 		return false, fmt.Errorf("node not found")
 	}
 
+	var podBestEffort bool
+
+	predicateMeta, ok := meta.(*predicateMetadata)
+	if ok {
+		podBestEffort = predicateMeta.podBestEffort
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		podBestEffort = isPodBestEffort(pod)
+	}
+
 	// pod is not BestEffort pod
-	if !isPodBestEffort(pod) {
+	if !podBestEffort {
 		return true, nil
 	}
 
