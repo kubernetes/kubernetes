@@ -1,0 +1,54 @@
+hash: 61574715f6458ef0750d1ed1c99d1a28978177db9b6e60dc2977df5c2bf0823a
+updated: 2016-06-10T12:52:21.800917-05:00
+imports:
+- name: github.com/akutz/goof
+  version: ea06624ca980bae80c1b615b8417723436d235ab
+- name: github.com/akutz/gotil
+  version: 6fa2e80bd3ac40f15788cfc3d12ebba49a0add92
+- name: github.com/BurntSushi/toml
+  version: f0aeabca5a127c4078abb8c8d64298b147264b55
+- name: github.com/go-yaml/yaml
+  version: b4a9f8c4b84c6c4256d669c649837f1441e4b050
+  repo: https://github.com/akutz/yaml.git
+- name: github.com/kardianos/osext
+  version: 29ae4ffbc9a6fe9fb2bc5029050ce6996ea1d3bc
+  repo: https://github.com/kardianos/osext.git
+  vcs: git
+- name: github.com/kr/pretty
+  version: add1dbc86daf0f983cd4a48ceb39deb95c729b67
+- name: github.com/kr/text
+  version: 7cafcd837844e784b526369c9bce262804aebc60
+- name: github.com/magiconair/properties
+  version: c265cfa48dda6474e208715ca93e987829f572f8
+- name: github.com/mitchellh/mapstructure
+  version: d2dd0262208475919e1a362f675cfc0e7c10e905
+- name: github.com/Sirupsen/logrus
+  version: f3cfb454f4c209e6668c95216c4744b8fddb2356
+- name: github.com/spf13/cast
+  version: 27b586b42e29bec072fe7379259cc719e1289da6
+- name: github.com/spf13/cobra
+  version: 363816bb13ce1710460c2345017fd35593cbf5ed
+  repo: https://github.com/akutz/cobra
+- name: github.com/spf13/jwalterweatherman
+  version: 33c24e77fb80341fe7130ee7c594256ff08ccc46
+- name: github.com/spf13/pflag
+  version: b084184666e02084b8ccb9b704bf0d79c466eb1d
+  repo: https://github.com/spf13/pflag
+- name: github.com/spf13/viper
+  version: 317ec73d0d7507658ee3be15866b445d6d921848
+  repo: https://github.com/akutz/viper.git
+- name: github.com/stretchr/testify
+  version: 8d64eb7173c7753d6419fd4a9caf057398611364
+- name: golang.org/x/sys
+  version: b44883b474ffefa37335017174e397412b633a4f
+  subpackages:
+  - unix
+- name: gopkg.in/fsnotify.v1
+  version: 30411dbcefb7a1da7e84f75530ad3abe4011b4f8
+- name: gopkg.in/yaml.v1
+  version: b4a9f8c4b84c6c4256d669c649837f1441e4b050
+  repo: https://github.com/akutz/yaml.git
+- name: gopkg.in/yaml.v2
+  version: b4a9f8c4b84c6c4256d669c649837f1441e4b050
+  repo: https://github.com/akutz/yaml.git
+devImports: []

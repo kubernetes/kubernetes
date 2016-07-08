@@ -1,0 +1,35 @@
+package: github.com/akutz/gofig
+import:
+
+################################################################################
+##                           Framework Dependencies                           ##
+################################################################################
+
+  - package: github.com/akutz/gotil
+    version: v0.1.0
+  - package: github.com/akutz/goof
+    version: v0.1.0
+  - package: github.com/spf13/viper
+    ref:     support/rexray
+    repo:    https://github.com/akutz/viper.git
+  - package: github.com/spf13/pflag
+    ref:     b084184666e02084b8ccb9b704bf0d79c466eb1d
+    repo:    https://github.com/spf13/pflag
+  - package: github.com/spf13/cobra
+    ref:     363816bb13ce1710460c2345017fd35593cbf5ed
+    repo:    https://github.com/akutz/cobra
+  - package: github.com/go-yaml/yaml
+    ref:     b4a9f8c4b84c6c4256d669c649837f1441e4b050
+    repo:    https://github.com/akutz/yaml.git
+  - package: gopkg.in/yaml.v1
+    ref:     b4a9f8c4b84c6c4256d669c649837f1441e4b050
+    repo:    https://github.com/akutz/yaml.git
+  - package: gopkg.in/yaml.v2
+    ref:     b4a9f8c4b84c6c4256d669c649837f1441e4b050
+    repo:    https://github.com/akutz/yaml.git
+
+################################################################################
+##                              Test Dependencies                             ##
+################################################################################
+
+  - package: github.com/stretchr/testify
