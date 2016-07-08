@@ -2770,6 +2770,11 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		if api.IsStandardResourceName(string(resourceName)) {
 			allErrs = append(allErrs, validateBasicResource(quantity, fldPath.Key(string(resourceName)))...)
 		}
+
+		if resourceName == api.ResourceMemory && !IsResourceRequirementsMemoryValid(quantity) {
+			allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), "memory limit must not be configured in millibytes"))
+		}
+
 		// Check that request <= limit.
 		requestQuantity, exists := requirements.Requests[resourceName]
 		if exists {
@@ -2788,8 +2793,20 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		if api.IsStandardResourceName(string(resourceName)) {
 			allErrs = append(allErrs, validateBasicResource(quantity, fldPath.Key(string(resourceName)))...)
 		}
+		if resourceName == api.ResourceMemory && !IsResourceRequirementsMemoryValid(quantity) {
+			allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), "memory request must not be configured in millibytes"))
+		}
 	}
 	return allErrs
+}
+
+// validateResourceRequirementsMemory ensures that memory is not configured in milli value
+func IsResourceRequirementsMemoryValid(quantity resource.Quantity) bool {
+	memStr := quantity.String()
+	if memStr[len(memStr)-1] == 'm' {
+		return false
+	}
+	return true
 }
 
 // validateResourceQuotaScopes ensures that each enumerated hard resource constraint is valid for set of scopes
