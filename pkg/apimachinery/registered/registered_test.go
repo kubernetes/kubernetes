@@ -23,6 +23,78 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 )
 
+func TestAddThirdPartyVersionsBasic(t *testing.T) {
+	clearForTesting()
+
+	registered := []unversioned.GroupVersion{
+		{
+			Group:   "",
+			Version: "v1",
+		},
+	}
+	skipped := registered
+	thirdParty := []unversioned.GroupVersion{
+		{
+			Group:   "company.com",
+			Version: "v1",
+		},
+		{
+			Group:   "company.com",
+			Version: "v2",
+		},
+	}
+	gvs := append(registered, thirdParty...)
+
+	RegisterVersions(registered)
+	wasSkipped := AddThirdPartyAPIGroupVersions(gvs...)
+	if len(wasSkipped) != len(skipped) {
+		t.Errorf("Expected %v, found %v", skipped, wasSkipped)
+	}
+	for ix := range wasSkipped {
+		found := false
+		for _, gv := range skipped {
+			if gv.String() == wasSkipped[ix].String() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Couldn't find %v in %v", wasSkipped[ix], skipped)
+		}
+	}
+	for _, gv := range thirdParty {
+		if !IsThirdPartyAPIGroupVersion(gv) {
+			t.Errorf("Expected %v to be third party.", gv)
+		}
+	}
+}
+
+func TestAddThirdPartyVersionsMultiple(t *testing.T) {
+	clearForTesting()
+
+	thirdParty := []unversioned.GroupVersion{
+		{
+			Group:   "company.com",
+			Version: "v1",
+		},
+		{
+			Group:   "company.com",
+			Version: "v2",
+		},
+	}
+	for _, gv := range thirdParty {
+		wasSkipped := AddThirdPartyAPIGroupVersions(gv)
+		if len(wasSkipped) != 0 {
+			t.Errorf("Expected length 0, found %v", wasSkipped)
+		}
+	}
+	for _, gv := range thirdParty {
+		if !IsThirdPartyAPIGroupVersion(gv) {
+			t.Errorf("Expected %v to be third party.", gv)
+		}
+	}
+}
+
 func TestAllPreferredGroupVersions(t *testing.T) {
 	testCases := []struct {
 		groupMetas []apimachinery.GroupMeta

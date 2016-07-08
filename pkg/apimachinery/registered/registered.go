@@ -22,7 +22,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/golang/glog"
 
@@ -56,6 +55,10 @@ var (
 )
 
 func init() {
+	loadKubeAPIVersions()
+}
+
+func loadKubeAPIVersions() {
 	// Env var KUBE_API_VERSIONS is a comma separated list of API versions that
 	// should be registered in the scheme.
 	kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
@@ -69,6 +72,16 @@ func init() {
 			envRequestedVersions = append(envRequestedVersions, gv)
 		}
 	}
+}
+
+// Resets everything to clean room for the start of a test
+func clearForTesting() {
+	registeredVersions = map[unversioned.GroupVersion]struct{}{}
+	thirdPartyGroupVersions = []unversioned.GroupVersion{}
+	enabledVersions = map[unversioned.GroupVersion]struct{}{}
+	groupMetaMap = map[string]*apimachinery.GroupMeta{}
+	envRequestedVersions = []unversioned.GroupVersion{}
+	loadKubeAPIVersions()
 }
 
 // RegisterVersions adds the given group versions to the list of registered group versions.
@@ -209,7 +222,6 @@ func AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion) []unversione
 	RegisterVersions(filteredGVs)
 	EnableVersions(filteredGVs...)
 	thirdPartyGroupVersions = append(thirdPartyGroupVersions, filteredGVs...)
-
 	return skippedGVs
 }
 
