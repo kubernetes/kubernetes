@@ -50,14 +50,22 @@ type Zone interface {
 type ResourceRecordSets interface {
 	// List returns the ResourceRecordSets of the Zone, or an error if the list operation failed.
 	List() ([]ResourceRecordSet, error)
-	// Add adds and returns a ResourceRecordSet of the Zone, or an error if the add operation failed.
-	Add(ResourceRecordSet) (ResourceRecordSet, error)
-	// Remove removes a ResourceRecordSet from the Zone, or an error if the remove operation failed.
-	// The supplied ResourceRecordSet must match one of the existing zones (obtained via List()) exactly.
-	Remove(ResourceRecordSet) error
-	// New allocates a new ResourceRecordSet, which can then be passed to Add() or Remove()
+	// New allocates a new ResourceRecordSet, which can then be passed to ResourceRecordChangeset Add() or Remove()
 	// Arguments are as per the ResourceRecordSet interface below.
 	New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) ResourceRecordSet
+	// StartChangeset begins a new batch operation of changes against the Zone
+	StartChangeset() ResourceRecordChangeset
+}
+
+// ResourceRecordChangeset accumulates a set of changes, that can then be applied with Apply
+type ResourceRecordChangeset interface {
+	// Add adds the creation of a ResourceRecordSet in the Zone to the changeset
+	Add(ResourceRecordSet) ResourceRecordChangeset
+	// Remove adds the removal of a ResourceRecordSet in the Zone to the changeset
+	// The supplied ResourceRecordSet must match one of the existing recordsets (obtained via List()) exactly.
+	Remove(ResourceRecordSet) ResourceRecordChangeset
+	// Apply applies the accumulated operations to the Zone.
+	Apply() error
 }
 
 type ResourceRecordSet interface {
