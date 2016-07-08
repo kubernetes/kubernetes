@@ -42,10 +42,10 @@ func NewCloner() *Cloner {
 }
 
 // Prevent recursing into every byte...
-func byteSliceDeepCopy(in []byte, out *[]byte, c *Cloner) error {
-	if in != nil {
-		*out = make([]byte, len(in))
-		copy(*out, in)
+func byteSliceDeepCopy(in *[]byte, out *[]byte, c *Cloner) error {
+	if *in != nil {
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
 	} else {
 		*out = nil
 	}
@@ -63,10 +63,10 @@ func verifyDeepCopyFunctionSignature(ft reflect.Type) error {
 	if ft.NumOut() != 1 {
 		return fmt.Errorf("expected one 'out' param, got %v", ft)
 	}
-	if ft.In(1).Kind() != reflect.Ptr {
-		return fmt.Errorf("expected pointer arg for 'in' param 1, got: %v", ft)
+	if ft.In(0).Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
 	}
-	if ft.In(1).Elem() != ft.In(0) {
+	if ft.In(1) != ft.In(0) {
 		return fmt.Errorf("expected 'in' param 0 the same as param 1, got: %v", ft)
 	}
 	var forClonerType Cloner
@@ -135,6 +135,13 @@ func (c *Cloner) DeepCopy(in interface{}) (interface{}, error) {
 func (c *Cloner) deepCopy(src reflect.Value) (reflect.Value, error) {
 	inType := src.Type()
 
+	switch src.Kind() {
+	case reflect.Interface, reflect.Ptr, reflect.Map, reflect.Slice:
+		if src.IsNil() {
+			return src, nil
+		}
+	}
+
 	if fv, ok := c.deepCopyFuncs[inType]; ok {
 		return c.customDeepCopy(src, fv)
 	}
@@ -145,15 +152,15 @@ func (c *Cloner) deepCopy(src reflect.Value) (reflect.Value, error) {
 }
 
 func (c *Cloner) customDeepCopy(src, fv reflect.Value) (reflect.Value, error) {
-	outValue := reflect.New(src.Type())
+	outValue := reflect.New(src.Type().Elem())
 	args := []reflect.Value{src, outValue, reflect.ValueOf(c)}
 	result := fv.Call(args)[0].Interface()
 	// This convolution is necessary because nil interfaces won't convert
 	// to error.
 	if result == nil {
-		return outValue.Elem(), nil
+		return outValue, nil
 	}
-	return outValue.Elem(), result.(error)
+	return outValue, result.(error)
 }
 
 func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
