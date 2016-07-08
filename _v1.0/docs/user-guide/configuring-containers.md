@@ -28,7 +28,7 @@ title: "Kubernetes User Guide: Managing Applications: Configuring and launching 
 
 In addition to the imperative-style commands, such as `kubectl run` and `kubectl expose`, described [elsewhere](quick-start.html), Kubernetes supports declarative configuration. Often times, configuration files are preferable to imperative commands, since they can be checked into version control and changes to the files can be code reviewed, which is especially important for more complex configurations, producing a more robust, reliable and archival system.
 
-In the declarative style, all configuration is stored in YAML or JSON configuration files, using Kubernetes's API resource schemas as the configuration schemas. `kubectl` can create, update, delete, and get API resources. The `apiVersion` (currently “v1”), resource `kind`, and resource `name` are used by `kubectl` to construct the appropriate API path to invoke for the specified operation. 
+In the declarative style, all configuration is stored in YAML or JSON configuration files, using Kubernetes's API resource schemas as the configuration schemas. `kubectl` can create, update, delete, and get API resources. The `apiVersion` (currently “v1”), resource `kind`, and resource `name` are used by `kubectl` to construct the appropriate API path to invoke for the specified operation.
 
 ## Launching a container using a configuration file
 
@@ -45,13 +45,13 @@ spec:  # specification of the pod’s contents
   containers:
   - name: hello
     image: "ubuntu:14.04"
-    command: ["/bin/echo","hello”,”world"]
+    command: ["/bin/echo","hello","world"]
 {% endraw %}
 {% endhighlight %}
 
 The value of `metadata.name`, `hello-world`, will be the name of the pod resource created, and must be unique within the cluster, whereas `containers[0].name` is just a nickname for the container within that pod. `image` is the name of the Docker image, which Kubernetes expects to be able to pull from a registry, the [Docker Hub](https://registry.hub.docker.com/) by default.
 
-`restartPolicy: Never` indicates that we just want to run the container once and then terminate the pod. 
+`restartPolicy: Never` indicates that we just want to run the container once and then terminate the pod.
 
 The [`command`](containers.html#containers-and-commands) overrides the Docker container’s `Entrypoint`. Command arguments (corresponding to Docker’s `Cmd`) may be specified using `args`, as follows:
 
@@ -132,7 +132,7 @@ However, a shell isn’t necessary just to expand environment variables. Kuberne
 
 ## Viewing pod status
 
-You can see the pod you created (actually all of your cluster's pods) using the `get` command. 
+You can see the pod you created (actually all of your cluster's pods) using the `get` command.
 
 If you’re quick, it will look as follows:
 
@@ -201,7 +201,7 @@ pods/hello-world
 {% endraw %}
 {% endhighlight %}
 
-Terminated pods aren’t currently automatically deleted, so that you can observe their final status, so be sure to clean up your dead pods. 
+Terminated pods aren’t currently automatically deleted, so that you can observe their final status, so be sure to clean up your dead pods.
 
 On the other hand, containers and their logs are eventually deleted automatically in order to free up disk space on the nodes.
 
@@ -218,4 +218,3 @@ On the other hand, containers and their logs are eventually deleted automaticall
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/configuring-containers.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
-
