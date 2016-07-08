@@ -591,6 +591,13 @@ type VolumeConfiguration struct {
 	// volumePluginDir is the full path of the directory in which the flex
 	// volume plugin should search for additional third party volume plugins
 	FlexVolumePluginDir string `json:"flexVolumePluginDir"`
+	//EnableLibStorageProvisioning flag will cause the controller to use the
+	//enableLibStorageProvisioning enables dyanmic provisioning of volumes using
+	//libStorage.  Flag enableDynamicProvisioning must also be set to true for this to work.
+	EnableLibStorageProvisioning bool `json:"enableLibStorageProvisioning"`
+	//libStorageOpts is a semi-colon delimited of key/value pairs used to specify
+	//libStorage options (i.e. libstorage.host=tcp://127.0.0.1;libstorage.logLevel=debug;etc).
+	LibStorageOpts string `json:"libStorageOpts"`
 }
 
 type PersistentVolumeRecyclerConfiguration struct {

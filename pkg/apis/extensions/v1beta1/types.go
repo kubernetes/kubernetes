@@ -991,6 +991,7 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	LibStorage            FSType = "libStorage"
 	All                   FSType = "*"
 )
 

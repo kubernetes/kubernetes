@@ -233,6 +233,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// LibStorage represents a volume that is sourced by libStorage
+	LibStorage *LibStorageVolumeSource `json:"libstorage,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -273,6 +275,8 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// LibStorage represents a volume sourced by libStorage
+	LibStorage *LibStorageVolumeSource `json:"libstorage,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -757,6 +761,12 @@ type ConfigMapVolumeSource struct {
 	// the volume setup will error. Paths must be relative and may not contain
 	// the '..' path or start with '..'.
 	Items []KeyToPath `json:"items,omitempty"`
+}
+
+// LibStorageVolumeSource represents volume sourced by libstorage
+type LibStorageVolumeSource struct {
+	VolumeName string `json:"volumeName"`
+	VolumeID   string `json:"volumeID,omitempty"`
 }
 
 // Maps a string key to a path within a volume.

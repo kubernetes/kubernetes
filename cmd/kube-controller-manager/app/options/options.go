@@ -84,7 +84,9 @@ func NewCMServer() *CMServer {
 					MinimumTimeoutHostPath:   60,
 					IncrementTimeoutHostPath: 30,
 				},
-				FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
+				FlexVolumePluginDir:          "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
+				EnableLibStorageProvisioning: false,
+				LibStorageOpts:               "service=kubernetes;host=tcp://127.0.0.1:7981",
 			},
 			ContentType:             "application/vnd.kubernetes.protobuf",
 			KubeAPIQPS:              20.0,
@@ -129,6 +131,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath, "pv-recycler-timeout-increment-hostpath", s.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath, "the increment of time added per Gi to ActiveDeadlineSeconds for a HostPath scrubber pod.  This is for development and testing only and will not work in a multi-node cluster.")
 	fs.BoolVar(&s.VolumeConfiguration.EnableHostPathProvisioning, "enable-hostpath-provisioner", s.VolumeConfiguration.EnableHostPathProvisioning, "Enable HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features.  HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.")
 	fs.BoolVar(&s.VolumeConfiguration.EnableDynamicProvisioning, "enable-dynamic-provisioning", s.VolumeConfiguration.EnableDynamicProvisioning, "Enable dynamic provisioning for environments that support it.")
+	fs.BoolVar(&s.VolumeConfiguration.EnableLibStorageProvisioning, "enable-libstorage-provisioner", s.VolumeConfiguration.EnableLibStorageProvisioning, "Uses the libStorage to provision persistent volumes dynamically. This will override any other provisioner provided by selected cloud.")
+	fs.StringVar(&s.VolumeConfiguration.LibStorageOpts, "libstorage-opts", s.VolumeConfiguration.LibStorageOpts, "A semi-colon delimited of key/value pairs used to configure libStorage client (i.e.: 'service=kubernetes;host=tcp://127.0.0.1;...;etc)")
 	fs.StringVar(&s.VolumeConfiguration.FlexVolumePluginDir, "flex-volume-plugin-dir", s.VolumeConfiguration.FlexVolumePluginDir, "Full path of the directory in which the flex volume plugin should search for additional third party volume plugins.")
 	fs.Int32Var(&s.TerminatedPodGCThreshold, "terminated-pod-gc-threshold", s.TerminatedPodGCThreshold, "Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If <= 0, the terminated pod garbage collector is disabled.")
 	fs.DurationVar(&s.HorizontalPodAutoscalerSyncPeriod.Duration, "horizontal-pod-autoscaler-sync-period", s.HorizontalPodAutoscalerSyncPeriod.Duration, "The period for syncing the number of pods in horizontal pod autoscaler.")

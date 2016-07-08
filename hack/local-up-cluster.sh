@@ -119,6 +119,8 @@ RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
+ENABLE_LIBSTORAGE_PROVISIONER=${ENABLE_LIBSTORAGE_PROVISIONER:-"false"}
+LIBSTORAGE_OPTS=${LIBSTORAGE_OPTS:-"service=kubernetes;host=tcp://127.0.0.1:7981"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 
 function test_apiserver_off {
@@ -305,6 +307,8 @@ function start_controller_manager {
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
+      --enable-libstorage-provisioner="${ENABLE_LIBSTORAGE_PROVISIONER}" \
+      --libstorage-opts="${LIBSTORAGE_OPTS}" \
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
@@ -343,7 +347,7 @@ function start_kubelet {
       if [[ -n "${NET_PLUGIN}" ]]; then
         net_plugin_args="--network-plugin=${NET_PLUGIN}"
       fi
-      
+
       net_plugin_dir_args=""
       if [[ -n "${NET_PLUGIN_DIR}" ]]; then
         net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"

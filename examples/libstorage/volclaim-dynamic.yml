@@ -1,0 +1,13 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvc-0002
+  annotations:
+    volume.experimental.kubernetes.io/provisioning-required: "true"
+    volume.alpha.kubernetes.io/storage-class: kubernetes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

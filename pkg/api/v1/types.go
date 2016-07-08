@@ -277,6 +277,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
+	// LibStorage represents a volume that is sourced by libStorage
+	LibStorage *LibStorageVolumeSource `json:"libstorage,omitempty" protobuf:"bytes,21,opt,name=libstorage"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -339,6 +341,8 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,13,opt,name=azureFile"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
+	// LibStorage represents a volume that is sourced by libStorage
+	LibStorage *LibStorageVolumeSource `json:"libstorage,omitempty" protobuf:"bytes,15,opt,name=libstorage"`
 }
 
 // +genclient=true,nonNamespaced=true
@@ -850,6 +854,12 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+}
+
+// LibStorageVolumeSource represents volume sourced by libstorage
+type LibStorageVolumeSource struct {
+	VolumeName string `json:"volumeName" protobuf:"bytes,1,opt,name=volumeName"`
+	VolumeID   string `json:"volumeID,omitempty" protobuf:"bytes,2,opt,name=volumeID"`
 }
 
 // Adapts a ConfigMap into a volume.

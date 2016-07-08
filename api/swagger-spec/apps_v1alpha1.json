@@ -1413,6 +1413,10 @@
      "vsphereVolume": {
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "libstorage": {
+      "$ref": "v1.LibStorageVolumeSource",
+      "description": "LibStorage represents a volume that is sourced by libStorage"
      }
     }
    },
@@ -1953,6 +1957,21 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.LibStorageVolumeSource": {
+    "id": "v1.LibStorageVolumeSource",
+    "description": "LibStorageVolumeSource represents volume sourced by libstorage",
+    "required": [
+     "volumeName"
+    ],
+    "properties": {
+     "volumeName": {
+      "type": "string"
+     },
+     "volumeID": {
+      "type": "string"
      }
     }
    },

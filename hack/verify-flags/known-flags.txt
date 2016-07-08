@@ -123,6 +123,7 @@ enable-debugging-handlers
 enable-garbage-collector
 enable-dynamic-provisioning
 enable-hostpath-provisioner
+enable-libstorage-provisioner
 enable-server
 enable-swagger-ui
 enable-garbage-collector
@@ -264,6 +265,7 @@ leader-elect-lease-duration
 leader-elect-renew-deadline
 leader-elect-retry-period
 leave-stdin-open
+libstorage-opts
 limit-bytes
 load-balancer-ip
 lock-file

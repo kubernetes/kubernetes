@@ -17239,6 +17239,10 @@
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
      },
+     "libstorage": {
+      "$ref": "v1.LibStorageVolumeSource",
+      "description": "LibStorage represents a volume that is sourced by libStorage"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -17624,6 +17628,21 @@
      }
     }
    },
+   "v1.LibStorageVolumeSource": {
+    "id": "v1.LibStorageVolumeSource",
+    "description": "LibStorageVolumeSource represents volume sourced by libstorage",
+    "required": [
+     "volumeName"
+    ],
+    "properties": {
+     "volumeName": {
+      "type": "string"
+     },
+     "volumeID": {
+      "type": "string"
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -17874,6 +17893,10 @@
      "vsphereVolume": {
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "libstorage": {
+      "$ref": "v1.LibStorageVolumeSource",
+      "description": "LibStorage represents a volume that is sourced by libStorage"
      }
     }
    },

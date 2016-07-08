@@ -600,6 +600,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printRBDVolumeSource(volume.VolumeSource.RBD, out)
 		case volume.VolumeSource.DownwardAPI != nil:
 			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
+		case volume.VolumeSource.LibStorage != nil:
+			printLibStorageVolumeSource(volume.VolumeSource.LibStorage, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -710,6 +712,13 @@ func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer)
 	}
 }
 
+func printLibStorageVolumeSource(rr *api.LibStorageVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tLibStorage (a persistent disk resource in libStorage)\n"+
+		"    VolumeName:\t%v\n"+
+		"    VolumeID:\t%v\n",
+		rr.VolumeName, rr.VolumeID)
+}
+
 type PersistentVolumeDescriber struct {
 	client.Interface
 }
@@ -759,6 +768,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printGlusterfsVolumeSource(pv.Spec.Glusterfs, out)
 		case pv.Spec.RBD != nil:
 			printRBDVolumeSource(pv.Spec.RBD, out)
+		case pv.Spec.LibStorage != nil:
+			printLibStorageVolumeSource(pv.Spec.LibStorage, out)
 		}
 
 		if events != nil {
