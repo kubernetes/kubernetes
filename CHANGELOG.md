@@ -181,7 +181,7 @@ All prior versions of docker will not be supported.
 * VSphere:
   * Provider updated.
 
-### Previous Releases Included in v1.3.0
+## Previous Releases Included in v1.3.0
 
 - [v1.3.0-beta.3](CHANGELOG.md#v130-beta3)
 - [v1.3.0-beta.2](CHANGELOG.md#v130-beta2)
