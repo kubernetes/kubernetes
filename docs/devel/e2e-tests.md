@@ -136,16 +136,16 @@ go run hack/e2e.go -v --pushup
 go run hack/e2e.go -v --test
 
 # Run tests matching the regex "\[Feature:Performance\]"
-go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Feature:Performance\]"
+go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Feature:Performance\]"
 
 # Conversely, exclude tests that match the regex "Pods.*env"
-go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
+go run hack/e2e.go -v --test --test_args="--ginkgo.skip=Pods.*env"
 
 # Run tests in parallel, skip any that must be run serially
 GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.skip=\[Serial\]"
 
 # Flags can be combined, and their actions will take place in this order:
-# --build, --push|--up|--pushup, --test|--tests=..., --down
+# --build, --push|--up|--pushup, --test, --down
 #
 # You can also specify an alternative provider, such as 'aws'
 #
@@ -184,38 +184,38 @@ arguments into Ginkgo using `--test_args` (e.g. see above). For the purposes of
 brevity, we will look at a subset of the options, which are listed below:
 
 ```
--ginkgo.dryRun=false: If set, ginkgo will walk the test hierarchy without
+--ginkgo.dryRun=false: If set, ginkgo will walk the test hierarchy without
 actually running anything. Best paired with -v.
 
--ginkgo.failFast=false: If set, ginkgo will stop running a test suite after a
+--ginkgo.failFast=false: If set, ginkgo will stop running a test suite after a
 failure occurs.
 
--ginkgo.failOnPending=false: If set, ginkgo will mark the test suite as failed
+--ginkgo.failOnPending=false: If set, ginkgo will mark the test suite as failed
 if any specs are pending.
 
--ginkgo.focus="": If set, ginkgo will only run specs that match this regular
+--ginkgo.focus="": If set, ginkgo will only run specs that match this regular
 expression.
 
--ginkgo.skip="": If set, ginkgo will only run specs that do not match this
+--ginkgo.skip="": If set, ginkgo will only run specs that do not match this
 regular expression.
 
--ginkgo.trace=false: If set, default reporter prints out the full stack trace
+--ginkgo.trace=false: If set, default reporter prints out the full stack trace
 when a failure occurs
 
--ginkgo.v=false: If set, default reporter print out all specs as they begin.
+--ginkgo.v=false: If set, default reporter print out all specs as they begin.
 
--host="": The host, or api-server, to connect to
+--host="": The host, or api-server, to connect to
 
--kubeconfig="": Path to kubeconfig containing embedded authinfo.
+--kubeconfig="": Path to kubeconfig containing embedded authinfo.
 
--prom-push-gateway="": The URL to prometheus gateway, so that metrics can be
+--prom-push-gateway="": The URL to prometheus gateway, so that metrics can be
 pushed during e2es and scraped by prometheus. Typically something like
 127.0.0.1:9091.
 
--provider="": The name of the Kubernetes provider (gce, gke, local, vagrant,
+--provider="": The name of the Kubernetes provider (gce, gke, local, vagrant,
 etc.)
 
--repo-root="../../": Root directory of kubernetes repository, for finding test
+--repo-root="../../": Root directory of kubernetes repository, for finding test
 files.
 ```
 
@@ -318,7 +318,7 @@ The following command will create the underlying Kubernetes clusters in each of 
 federation control plane in the cluster occupying the last zone in the `E2E_ZONES` list.
 
 ```sh
-$ go run hack/e2e.go -v -up
+$ go run hack/e2e.go -v --up
 ```
 
 #### Run the Tests
@@ -326,13 +326,13 @@ $ go run hack/e2e.go -v -up
 This will run only the `Feature:Federation` e2e tests. You can omit the `ginkgo.focus` argument to run the entire e2e suite.
 
 ```sh
-$ go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Feature:Federation\]"
+$ go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Feature:Federation\]"
 ```
 
 #### Teardown
 
 ```sh
-$ go run hack/e2e.go -v -down
+$ go run hack/e2e.go -v --down
 ```
 
 #### Shortcuts for test developers
@@ -397,13 +397,13 @@ at a custom host directly:
 
 ```sh
 export KUBECONFIG=/path/to/kubeconfig
-go run hack/e2e.go -v --test_args="--host=http://127.0.0.1:8080"
+go run hack/e2e.go -v --test --check_node_count=false --test_args="--host=http://127.0.0.1:8080"
 ```
 
 To control the tests that are run:
 
 ```sh
-go run hack/e2e.go -v --test_args="--host=http://127.0.0.1:8080" --ginkgo.focus="Secrets"
+go run hack/e2e.go -v --test --check_node_count=false --test_args="--host=http://127.0.0.1:8080" --ginkgo.focus="Secrets"
 ```
 
 ## Kinds of tests
@@ -485,10 +485,10 @@ export KUBERNETES_PROVIDER=skeleton
 go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Conformance\]"
 
 # run all parallel-safe conformance tests in parallel
-GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.focus=\[Conformance\] --ginkgo.skip=\[Serial\]"
+GINKGO_PARALLEL=y go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Conformance\] --ginkgo.skip=\[Serial\]"
 
 # ... and finish up with remaining tests in serial
-go run hack/e2e.go --v --test --test_args="--ginkgo.focus=\[Serial\].*\[Conformance\]"
+go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Serial\].*\[Conformance\]"
 ```
 
 ### Defining Conformance Subset
