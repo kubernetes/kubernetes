@@ -83,7 +83,8 @@ func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInf
 	}
 
 	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes.Items {
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
 		fScore := float64(0)
 		if maxCount > 0 {
 			fScore = 10 * (float64(counts[node.Name]) / float64(maxCount))
