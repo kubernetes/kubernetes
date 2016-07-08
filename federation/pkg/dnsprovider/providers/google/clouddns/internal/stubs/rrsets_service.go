@@ -55,5 +55,5 @@ func (s ResourceRecordSetsService) List(project string, managedZone string) inte
 
 func (service ResourceRecordSetsService) NewResourceRecordSet(name string, rrdatas []string, ttl int64, type_ rrstype.RrsType) interfaces.ResourceRecordSet {
 	rrset := ResourceRecordSet{Name_: name, Rrdatas_: rrdatas, Ttl_: ttl, Type_: string(type_)}
-	return &rrset
+	return rrset
 }
