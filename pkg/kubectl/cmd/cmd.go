@@ -183,13 +183,12 @@ __custom_func() {
 	usage_template = `{{if gt .Aliases 0}}
 
 Aliases:
-  {{.NameAndAliases}}
-{{end}}{{if .HasExample}}
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
 
 Examples:
 {{ .Example }}{{end}}{{ if .HasAvailableSubCommands}}
 
-Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
+Available Sub-commands:{{range .Commands}}{{if .IsAvailableCommand}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasLocalFlags}}
 
 Flags:
