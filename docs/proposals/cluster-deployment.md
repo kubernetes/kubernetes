@@ -123,7 +123,7 @@ controller works - user can create RC object and RC manager can create pods base
 ## Step 4: Deploy nodes
 
 **Objective**: Start kubelet on all nodes and configure kubernetes network.
-Each node can be deployed separately and the implementation should make it ~impossible to change this assumption.
+Each node can be deployed separately and the implementation should make it impossible to change this assumption.
 
 ### Step 4.1: Run kubelet
 
