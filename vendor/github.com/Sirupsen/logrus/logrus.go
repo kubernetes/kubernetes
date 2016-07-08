@@ -3,6 +3,7 @@ package logrus
 import (
 	"fmt"
 	"log"
+	"strings"
 )
 
 // Fields type, used to pass to `WithFields`.
@@ -33,7 +34,7 @@ func (level Level) String() string {
 
 // ParseLevel takes a string level and returns the Logrus log level constant.
 func ParseLevel(lvl string) (Level, error) {
-	switch lvl {
+	switch strings.ToLower(lvl) {
 	case "panic":
 		return PanicLevel, nil
 	case "fatal":
@@ -50,6 +51,16 @@ func ParseLevel(lvl string) (Level, error) {
 
 	var l Level
 	return l, fmt.Errorf("not a valid logrus Level: %q", lvl)
+}
+
+// A constant exposing all logging levels
+var AllLevels = []Level{
+	PanicLevel,
+	FatalLevel,
+	ErrorLevel,
+	WarnLevel,
+	InfoLevel,
+	DebugLevel,
 }
 
 // These are the different logging levels. You can set the logging level to log
@@ -74,7 +85,11 @@ const (
 )
 
 // Won't compile if StdLogger can't be realized by a log.Logger
-var _ StdLogger = &log.Logger{}
+var (
+	_ StdLogger = &log.Logger{}
+	_ StdLogger = &Entry{}
+	_ StdLogger = &Logger{}
+)
 
 // StdLogger is what your logrus-enabled library should take, that way
 // it'll accept a stdlib logger and a logrus logger. There's no standard
@@ -91,4 +106,38 @@ type StdLogger interface {
 	Panic(...interface{})
 	Panicf(string, ...interface{})
 	Panicln(...interface{})
+}
+
+// The FieldLogger interface generalizes the Entry and Logger types
+type FieldLogger interface {
+	WithField(key string, value interface{}) *Entry
+	WithFields(fields Fields) *Entry
+	WithError(err error) *Entry
+
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Printf(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Warningf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Panicf(format string, args ...interface{})
+
+	Debug(args ...interface{})
+	Info(args ...interface{})
+	Print(args ...interface{})
+	Warn(args ...interface{})
+	Warning(args ...interface{})
+	Error(args ...interface{})
+	Fatal(args ...interface{})
+	Panic(args ...interface{})
+
+	Debugln(args ...interface{})
+	Infoln(args ...interface{})
+	Println(args ...interface{})
+	Warnln(args ...interface{})
+	Warningln(args ...interface{})
+	Errorln(args ...interface{})
+	Fatalln(args ...interface{})
+	Panicln(args ...interface{})
 }

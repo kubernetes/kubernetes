@@ -134,6 +134,8 @@ func init() {
 		Convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
 		Convert_v1_KeyToPath_To_api_KeyToPath,
 		Convert_api_KeyToPath_To_v1_KeyToPath,
+		Convert_v1_LibStorageVolumeSource_To_api_LibStorageVolumeSource,
+		Convert_api_LibStorageVolumeSource_To_v1_LibStorageVolumeSource,
 		Convert_v1_Lifecycle_To_api_Lifecycle,
 		Convert_api_Lifecycle_To_v1_Lifecycle,
 		Convert_v1_LimitRange_To_api_LimitRange,
@@ -2388,6 +2390,26 @@ func Convert_api_KeyToPath_To_v1_KeyToPath(in *api.KeyToPath, out *KeyToPath, s 
 	return autoConvert_api_KeyToPath_To_v1_KeyToPath(in, out, s)
 }
 
+func autoConvert_v1_LibStorageVolumeSource_To_api_LibStorageVolumeSource(in *LibStorageVolumeSource, out *api.LibStorageVolumeSource, s conversion.Scope) error {
+	out.VolumeName = in.VolumeName
+	out.VolumeID = in.VolumeID
+	return nil
+}
+
+func Convert_v1_LibStorageVolumeSource_To_api_LibStorageVolumeSource(in *LibStorageVolumeSource, out *api.LibStorageVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_LibStorageVolumeSource_To_api_LibStorageVolumeSource(in, out, s)
+}
+
+func autoConvert_api_LibStorageVolumeSource_To_v1_LibStorageVolumeSource(in *api.LibStorageVolumeSource, out *LibStorageVolumeSource, s conversion.Scope) error {
+	out.VolumeName = in.VolumeName
+	out.VolumeID = in.VolumeID
+	return nil
+}
+
+func Convert_api_LibStorageVolumeSource_To_v1_LibStorageVolumeSource(in *api.LibStorageVolumeSource, out *LibStorageVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_LibStorageVolumeSource_To_v1_LibStorageVolumeSource(in, out, s)
+}
+
 func autoConvert_v1_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *api.Lifecycle, s conversion.Scope) error {
 	if in.PostStart != nil {
 		in, out := &in.PostStart, &out.PostStart
@@ -4138,6 +4160,15 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	} else {
 		out.VsphereVolume = nil
 	}
+	if in.LibStorage != nil {
+		in, out := &in.LibStorage, &out.LibStorage
+		*out = new(api.LibStorageVolumeSource)
+		if err := Convert_v1_LibStorageVolumeSource_To_api_LibStorageVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LibStorage = nil
+	}
 	return nil
 }
 
@@ -4271,6 +4302,15 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.LibStorage != nil {
+		in, out := &in.LibStorage, &out.LibStorage
+		*out = new(LibStorageVolumeSource)
+		if err := Convert_api_LibStorageVolumeSource_To_v1_LibStorageVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LibStorage = nil
 	}
 	return nil
 }
@@ -6496,6 +6536,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.VsphereVolume = nil
 	}
+	if in.LibStorage != nil {
+		in, out := &in.LibStorage, &out.LibStorage
+		*out = new(api.LibStorageVolumeSource)
+		if err := Convert_v1_LibStorageVolumeSource_To_api_LibStorageVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LibStorage = nil
+	}
 	return nil
 }
 
@@ -6683,6 +6732,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.LibStorage != nil {
+		in, out := &in.LibStorage, &out.LibStorage
+		*out = new(LibStorageVolumeSource)
+		if err := Convert_api_LibStorageVolumeSource_To_v1_LibStorageVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LibStorage = nil
 	}
 	return nil
 }

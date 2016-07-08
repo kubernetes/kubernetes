@@ -953,6 +953,15 @@ message KeyToPath {
   optional string path = 2;
 }
 
+// LibStorageVolumeSource represents volume sourced by libstorage
+message LibStorageVolumeSource {
+  // Name identifier of the libStorage volume
+  optional string volumeName = 1;
+
+  // ID of the volume as reported by storage platform to libStorage
+  optional string volumeID = 2;
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -1710,6 +1719,9 @@ message PersistentVolumeSource {
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 14;
+
+  // LibStorage represents a volume that is sourced by libStorage
+  optional LibStorageVolumeSource libstorage = 15;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2906,6 +2918,9 @@ message VolumeSource {
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 20;
+
+  // LibStorage represents a volume that is sourced by libStorage
+  optional LibStorageVolumeSource libstorage = 21;
 }
 
 // Represents a vSphere volume resource.

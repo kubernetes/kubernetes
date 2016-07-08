@@ -370,5 +370,7 @@ func DeepCopy_componentconfig_VolumeConfiguration(in VolumeConfiguration, out *V
 		return err
 	}
 	out.FlexVolumePluginDir = in.FlexVolumePluginDir
+	out.EnableLibStorageProvisioning = in.EnableLibStorageProvisioning
+	out.LibStorageOpts = in.LibStorageOpts
 	return nil
 }

@@ -4,6 +4,9 @@
   - [Downloads](#downloads)
   - [Highlights](#highlights)
   - [Known Issues and Important Steps before Upgrading](#known-issues-and-important-steps-before-upgrading)
+      - [kubernetes Core Known Issues](#kubernetes-core-known-issues)
+      - [Docker runtime Known Issues](#docker-runtime-known-issues)
+      - [Rkt runtime Known Issues](#rkt-runtime-known-issues)
   - [Provider-specific Notes](#provider-specific-notes)
     - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
 - [v1.3.0-beta.3](#v130-beta3)
@@ -60,7 +63,6 @@
 - [v1.2.1](#v121)
   - [Downloads](#downloads)
   - [Changes since v1.2.0](#changes-since-v120)
-    - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes)
 - [v1.3.0-alpha.1](#v130-alpha1)
   - [Downloads](#downloads)
@@ -121,7 +123,7 @@ binary | sha1 hash | md5 hash
   * Display line number on JSON errors
   * Add flag -t as shorthand for --tty
 * Resources
-  * Improved node stability by *optionally* evicting pods upon memory pressure - [Design Doc](https://github.com/kubernetes/kubernetes/blob/release-1.3/docs/proposals/kubelet-eviction.md) 
+  * Improved node stability by *optionally* evicting pods upon memory pressure - [Design Doc](https://github.com/kubernetes/kubernetes/blob/release-1.3/docs/proposals/kubelet-eviction.md)
   * **alpha**: NVIDIA GPU support ([#24836](https://github.com/kubernetes/kubernetes/pull/24836), [@therc](https://github.com/therc))
   * Adding loadBalancer services and nodeports services to quota system
 
@@ -137,7 +139,7 @@ All prior versions of docker will not be supported.
   - This issue can be resolved by restarting docker daemon
 - CORS works only in insecure mode ([#24086](https://github.com/kubernetes/kubernetes/issues/24086))
 - Persistent volume claims gets added incorrectly after being deleted under stress. Happens very infrequently. ([#26082](https://github.com/kubernetes/kubernetes/issues/26082))
- 
+
 #### Docker runtime Known Issues
 
 - Kernel crash with Aufs storage driver on Debian Jessie ([#27885](https://github.com/kubernetes/kubernetes/issues/27885))

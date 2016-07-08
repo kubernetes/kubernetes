@@ -86,6 +86,7 @@ func init() {
 		DeepCopy_api_HostPathVolumeSource,
 		DeepCopy_api_ISCSIVolumeSource,
 		DeepCopy_api_KeyToPath,
+		DeepCopy_api_LibStorageVolumeSource,
 		DeepCopy_api_Lifecycle,
 		DeepCopy_api_LimitRange,
 		DeepCopy_api_LimitRangeItem,
@@ -1095,6 +1096,12 @@ func DeepCopy_api_KeyToPath(in KeyToPath, out *KeyToPath, c *conversion.Cloner) 
 	return nil
 }
 
+func DeepCopy_api_LibStorageVolumeSource(in LibStorageVolumeSource, out *LibStorageVolumeSource, c *conversion.Cloner) error {
+	out.VolumeName = in.VolumeName
+	out.VolumeID = in.VolumeID
+	return nil
+}
+
 func DeepCopy_api_Lifecycle(in Lifecycle, out *Lifecycle, c *conversion.Cloner) error {
 	if in.PostStart != nil {
 		in, out := in.PostStart, &out.PostStart
@@ -2002,6 +2009,15 @@ func DeepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.LibStorage != nil {
+		in, out := in.LibStorage, &out.LibStorage
+		*out = new(LibStorageVolumeSource)
+		if err := DeepCopy_api_LibStorageVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.LibStorage = nil
 	}
 	return nil
 }
@@ -3281,6 +3297,15 @@ func DeepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.LibStorage != nil {
+		in, out := in.LibStorage, &out.LibStorage
+		*out = new(LibStorageVolumeSource)
+		if err := DeepCopy_api_LibStorageVolumeSource(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.LibStorage = nil
 	}
 	return nil
 }

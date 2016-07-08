@@ -1,17 +1,18 @@
-# Logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:"/>&nbsp;[![Build Status](https://travis-ci.org/Sirupsen/logrus.svg?branch=master)](https://travis-ci.org/Sirupsen/logrus)
+# Logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:"/>&nbsp;[![Build Status](https://travis-ci.org/Sirupsen/logrus.svg?branch=master)](https://travis-ci.org/Sirupsen/logrus)&nbsp;[![GoDoc](https://godoc.org/github.com/Sirupsen/logrus?status.svg)](https://godoc.org/github.com/Sirupsen/logrus)
 
 Logrus is a structured logger for Go (golang), completely API compatible with
 the standard library logger. [Godoc][godoc]. **Please note the Logrus API is not
-yet stable (pre 1.0), the core API is unlikely change much but please version
-control your Logrus to make sure you aren't fetching latest `master` on every
-build.**
+yet stable (pre 1.0). Logrus itself is completely stable and has been used in
+many large deployments. The core API is unlikely to change much but please
+version control your Logrus to make sure you aren't fetching latest `master` on
+every build.**
 
 Nicely color-coded in development (when a TTY is attached, otherwise just
 plain text):
 
 ![Colored](http://i.imgur.com/PY7qMwd.png)
 
-With `log.Formatter = new(logrus.JSONFormatter)`, for easy parsing by logstash
+With `log.SetFormatter(&log.JSONFormatter{})`, for easy parsing by logstash
 or Splunk:
 
 ```json
@@ -31,16 +32,18 @@ ocean","size":10,"time":"2014-03-10 19:57:38.562264131 -0400 EDT"}
 "time":"2014-03-10 19:57:38.562543128 -0400 EDT"}
 ```
 
-With the default `log.Formatter = new(logrus.TextFormatter)` when a TTY is not
+With the default `log.SetFormatter(&log.TextFormatter{})` when a TTY is not
 attached, the output is compatible with the
-[l2met](http://r.32k.io/l2met-introduction) format:
+[logfmt](http://godoc.org/github.com/kr/logfmt) format:
 
 ```text
-time="2014-04-20 15:36:23.830442383 -0400 EDT" level="info" msg="A group of walrus emerges from the ocean" animal="walrus" size=10
-time="2014-04-20 15:36:23.830584199 -0400 EDT" level="warning" msg="The group's number increased tremendously!" omg=true number=122
-time="2014-04-20 15:36:23.830596521 -0400 EDT" level="info" msg="A giant walrus appears!" animal="walrus" size=10
-time="2014-04-20 15:36:23.830611837 -0400 EDT" level="info" msg="Tremendously sized cow enters the ocean." animal="walrus" size=9
-time="2014-04-20 15:36:23.830626464 -0400 EDT" level="fatal" msg="The ice breaks!" omg=true number=100
+time="2015-03-26T01:27:38-04:00" level=debug msg="Started observing beach" animal=walrus number=8
+time="2015-03-26T01:27:38-04:00" level=info msg="A group of walrus emerges from the ocean" animal=walrus size=10
+time="2015-03-26T01:27:38-04:00" level=warning msg="The group's number increased tremendously!" number=122 omg=true
+time="2015-03-26T01:27:38-04:00" level=debug msg="Temperature changes" temperature=-4
+time="2015-03-26T01:27:38-04:00" level=panic msg="It's over 9000!" animal=orca size=9009
+time="2015-03-26T01:27:38-04:00" level=fatal msg="The ice breaks!" err=&{0x2082280c0 map[animal:orca size:9009] 2015-03-26 01:27:38.441574009 -0400 EDT panic It's over 9000!} number=100 omg=true
+exit status 1
 ```
 
 #### Example
@@ -72,16 +75,11 @@ package main
 import (
   "os"
   log "github.com/Sirupsen/logrus"
-  "github.com/Sirupsen/logrus/hooks/airbrake"
 )
 
 func init() {
   // Log as JSON instead of the default ASCII formatter.
   log.SetFormatter(&log.JSONFormatter{})
-
-  // Use the Airbrake hook to report errors that have Error severity or above to
-  // an exception tracker. You can create custom hooks, see the Hooks section.
-  log.AddHook(&logrus_airbrake.AirbrakeHook{})
 
   // Output to stderr instead of stdout, could also be a file.
   log.SetOutput(os.Stderr)
@@ -105,6 +103,16 @@ func main() {
     "omg":    true,
     "number": 100,
   }).Fatal("The ice breaks!")
+
+  // A common pattern is to re-use fields between logging statements by re-using
+  // the logrus.Entry returned from WithFields()
+  contextLogger := log.WithFields(log.Fields{
+    "common": "this is a common field",
+    "other": "I also should be logged always",
+  })
+
+  contextLogger.Info("I'll be logged with common and other field")
+  contextLogger.Info("Me too")
 }
 ```
 
@@ -163,54 +171,22 @@ You can add hooks for logging levels. For example to send errors to an exception
 tracking service on `Error`, `Fatal` and `Panic`, info to StatsD or log to
 multiple places simultaneously, e.g. syslog.
 
-```go
-// Not the real implementation of the Airbrake hook. Just a simple sample.
-import (
-  log "github.com/Sirupsen/logrus"
-)
-
-func init() {
-  log.AddHook(new(AirbrakeHook))
-}
-
-type AirbrakeHook struct{}
-
-// `Fire()` takes the entry that the hook is fired for. `entry.Data[]` contains
-// the fields for the entry. See the Fields section of the README.
-func (hook *AirbrakeHook) Fire(entry *logrus.Entry) error {
-  err := airbrake.Notify(entry.Data["error"].(error))
-  if err != nil {
-    log.WithFields(log.Fields{
-      "source":   "airbrake",
-      "endpoint": airbrake.Endpoint,
-    }).Info("Failed to send error to Airbrake")
-  }
-
-  return nil
-}
-
-// `Levels()` returns a slice of `Levels` the hook is fired for.
-func (hook *AirbrakeHook) Levels() []log.Level {
-  return []log.Level{
-    log.ErrorLevel,
-    log.FatalLevel,
-    log.PanicLevel,
-  }
-}
-```
-
-Logrus comes with built-in hooks. Add those, or your custom hook, in `init`:
+Logrus comes with [built-in hooks](hooks/). Add those, or your custom hook, in
+`init`:
 
 ```go
 import (
   log "github.com/Sirupsen/logrus"
-  "github.com/Sirupsen/logrus/hooks/airbrake"
-  "github.com/Sirupsen/logrus/hooks/syslog"
+  "gopkg.in/gemnasium/logrus-airbrake-hook.v2" // the package is named "aibrake"
+  logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
   "log/syslog"
 )
 
 func init() {
-  log.AddHook(new(logrus_airbrake.AirbrakeHook))
+
+  // Use the Airbrake hook to report errors that have Error severity or above to
+  // an exception tracker. You can create custom hooks, see the Hooks section.
+  log.AddHook(airbrake.NewHook(123, "xyz", "production"))
 
   hook, err := logrus_syslog.NewSyslogHook("udp", "localhost:514", syslog.LOG_INFO, "")
   if err != nil {
@@ -220,23 +196,39 @@ func init() {
   }
 }
 ```
+Note: Syslog hook also support connecting to local syslog (Ex. "/dev/log" or "/var/run/syslog" or "/var/run/log"). For the detail, please check the [syslog hook README](hooks/syslog/README.md).
 
-* [`github.com/Sirupsen/logrus/hooks/airbrake`](https://github.com/Sirupsen/logrus/blob/master/hooks/airbrake/airbrake.go)
-  Send errors to an exception tracking service compatible with the Airbrake API.
-  Uses [`airbrake-go`](https://github.com/tobi/airbrake-go) behind the scenes.
-
-* [`github.com/Sirupsen/logrus/hooks/papertrail`](https://github.com/Sirupsen/logrus/blob/master/hooks/papertrail/papertrail.go)
-  Send errors to the Papertrail hosted logging service via UDP.
-
-* [`github.com/Sirupsen/logrus/hooks/syslog`](https://github.com/Sirupsen/logrus/blob/master/hooks/syslog/syslog.go)
-  Send errors to remote syslog server.
-  Uses standard library `log/syslog` behind the scenes.
-
-* [`github.com/nubo/hiprus`](https://github.com/nubo/hiprus)
-  Send errors to a channel in hipchat.
-
-* [`github.com/sebest/logrusly`](https://github.com/sebest/logrusly)
-  Send logs to Loggly (https://www.loggly.com/)
+| Hook  | Description |
+| ----- | ----------- |
+| [Airbrake](https://github.com/gemnasium/logrus-airbrake-hook) | Send errors to the Airbrake API V3. Uses the official [`gobrake`](https://github.com/airbrake/gobrake) behind the scenes. |
+| [Airbrake "legacy"](https://github.com/gemnasium/logrus-airbrake-legacy-hook) | Send errors to an exception tracking service compatible with the Airbrake API V2. Uses [`airbrake-go`](https://github.com/tobi/airbrake-go) behind the scenes. |
+| [Papertrail](https://github.com/polds/logrus-papertrail-hook) | Send errors to the [Papertrail](https://papertrailapp.com) hosted logging service via UDP. |
+| [Syslog](https://github.com/Sirupsen/logrus/blob/master/hooks/syslog/syslog.go) | Send errors to remote syslog server. Uses standard library `log/syslog` behind the scenes. |
+| [Bugsnag](https://github.com/Shopify/logrus-bugsnag/blob/master/bugsnag.go) | Send errors to the Bugsnag exception tracking service. |
+| [Sentry](https://github.com/evalphobia/logrus_sentry) | Send errors to the Sentry error logging and aggregation service. |
+| [Hiprus](https://github.com/nubo/hiprus) | Send errors to a channel in hipchat. |
+| [Logrusly](https://github.com/sebest/logrusly) | Send logs to [Loggly](https://www.loggly.com/) |
+| [Slackrus](https://github.com/johntdyer/slackrus) | Hook for Slack chat. |
+| [Journalhook](https://github.com/wercker/journalhook) | Hook for logging to `systemd-journald` |
+| [Graylog](https://github.com/gemnasium/logrus-graylog-hook) | Hook for logging to [Graylog](http://graylog2.org/) |
+| [Raygun](https://github.com/squirkle/logrus-raygun-hook) | Hook for logging to [Raygun.io](http://raygun.io/) |
+| [LFShook](https://github.com/rifflock/lfshook) | Hook for logging to the local filesystem |
+| [Honeybadger](https://github.com/agonzalezro/logrus_honeybadger) | Hook for sending exceptions to Honeybadger |
+| [Mail](https://github.com/zbindenren/logrus_mail) | Hook for sending exceptions via mail |
+| [Rollrus](https://github.com/heroku/rollrus) | Hook for sending errors to rollbar |
+| [Fluentd](https://github.com/evalphobia/logrus_fluent) | Hook for logging to fluentd |
+| [Mongodb](https://github.com/weekface/mgorus) | Hook for logging to mongodb |
+| [Influxus] (http://github.com/vlad-doru/influxus) | Hook for concurrently logging to [InfluxDB] (http://influxdata.com/) |
+| [InfluxDB](https://github.com/Abramovic/logrus_influxdb) | Hook for logging to influxdb |
+| [Octokit](https://github.com/dorajistyle/logrus-octokit-hook) | Hook for logging to github via octokit |
+| [DeferPanic](https://github.com/deferpanic/dp-logrus) | Hook for logging to DeferPanic |
+| [Redis-Hook](https://github.com/rogierlommers/logrus-redis-hook) | Hook for logging to a ELK stack (through Redis) |
+| [Amqp-Hook](https://github.com/vladoatanasov/logrus_amqp) | Hook for logging to Amqp broker (Like RabbitMQ) |
+| [KafkaLogrus](https://github.com/goibibo/KafkaLogrus) | Hook for logging to kafka |
+| [Typetalk](https://github.com/dragon3/logrus-typetalk-hook) | Hook for logging to [Typetalk](https://www.typetalk.in/) |
+| [ElasticSearch](https://github.com/sohlich/elogrus) | Hook for logging to ElasticSearch|
+| [Sumorus](https://github.com/doublefree/sumorus) | Hook for logging to [SumoLogic](https://www.sumologic.com/)|
+| [Logstash](https://github.com/bshuster-repo/logrus-logstash-hook) | Hook for logging to [Logstash](https://www.elastic.co/products/logstash) |
 
 #### Level logging
 
@@ -292,10 +284,10 @@ init() {
   // do something here to set environment depending on an environment variable
   // or command-line flag
   if Environment == "production" {
-    log.SetFormatter(logrus.JSONFormatter)
+    log.SetFormatter(&log.JSONFormatter{})
   } else {
     // The TextFormatter is default, you don't actually have to do this.
-    log.SetFormatter(logrus.TextFormatter)
+    log.SetFormatter(&log.TextFormatter{})
   }
 }
 ```
@@ -314,10 +306,16 @@ The built-in logging formatters are:
     field to `true`.  To force no colored output even if there is a TTY  set the
     `DisableColors` field to `true`
 * `logrus.JSONFormatter`. Logs fields as JSON.
+* `logrus/formatters/logstash.LogstashFormatter`. Logs fields as [Logstash](http://logstash.net) Events.
+
+    ```go
+      logrus.SetFormatter(&logstash.LogstashFormatter{Type: "application_name"})
+    ```
 
 Third party logging formatters:
 
-* [`zalgo`](https://github.com/aybabtme/logzalgo): invoking the P͉̫o̳̼̊w̖͈̰͎e̬͔̭͂r͚̼̹̲ ̫͓͉̳͈ō̠͕͖̚f̝͍̠ ͕̲̞͖͑Z̖̫̤̫ͪa͉̬͈̗l͖͎g̳̥o̰̥̅!̣͔̲̻͊̄ ̙̘̦̹̦.
+* [`prefixed`](https://github.com/x-cray/logrus-prefixed-formatter). Displays log entry source along with alternative layout.
+* [`zalgo`](https://github.com/aybabtme/logzalgo). Invoking the P͉̫o̳̼̊w̖͈̰͎e̬͔̭͂r͚̼̹̲ ̫͓͉̳͈ō̠͕͖̚f̝͍̠ ͕̲̞͖͑Z̖̫̤̫ͪa͉̬͈̗l͖͎g̳̥o̰̥̅!̣͔̲̻͊̄ ̙̘̦̹̦.
 
 You can define your formatter by implementing the `Formatter` interface,
 requiring a `Format` method. `Format` takes an `*Entry`. `entry.Data` is a
@@ -330,7 +328,7 @@ type MyJSONFormatter struct {
 
 log.SetFormatter(new(MyJSONFormatter))
 
-func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
+func (f *MyJSONFormatter) Format(entry *Entry) ([]byte, error) {
   // Note this doesn't include Time, Level and Message which are available on
   // the Entry. Consult `godoc` on information about those fields or read the
   // source of the official loggers.
@@ -342,11 +340,51 @@ func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
 }
 ```
 
+#### Logger as an `io.Writer`
+
+Logrus can be transformed into an `io.Writer`. That writer is the end of an `io.Pipe` and it is your responsibility to close it.
+
+```go
+w := logger.Writer()
+defer w.Close()
+
+srv := http.Server{
+    // create a stdlib log.Logger that writes to
+    // logrus.Logger.
+    ErrorLog: log.New(w, "", 0),
+}
+```
+
+Each line written to that writer will be printed the usual way, using formatters
+and hooks. The level for those entries is `info`.
+
 #### Rotation
 
 Log rotation is not provided with Logrus. Log rotation should be done by an
-external program (like `logrotated(8)`) that can compress and delete old log
+external program (like `logrotate(8)`) that can compress and delete old log
 entries. It should not be a feature of the application-level logger.
 
+#### Tools
 
-[godoc]: https://godoc.org/github.com/Sirupsen/logrus
+| Tool | Description |
+| ---- | ----------- |
+|[Logrus Mate](https://github.com/gogap/logrus_mate)|Logrus mate is a tool for Logrus to manage loggers, you can initial logger's level, hook and formatter by config file, the logger will generated with different config at different environment.|
+
+#### Testing
+
+Logrus has a built in facility for asserting the presence of log messages. This is implemented through the `test` hook and provides:
+
+* decorators for existing logger (`test.NewLocal` and `test.NewGlobal`) which basically just add the `test` hook
+* a test logger (`test.NewNullLogger`) that just records log messages (and does not output any):
+
+```go
+logger, hook := NewNullLogger()
+logger.Error("Hello error")
+
+assert.Equal(1, len(hook.Entries))
+assert.Equal(logrus.ErrorLevel, hook.LastEntry().Level)
+assert.Equal("Hello error", hook.LastEntry().Message)
+
+hook.Reset()
+assert.Nil(hook.LastEntry())
+```

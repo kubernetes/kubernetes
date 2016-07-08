@@ -858,8 +858,10 @@ type VsphereVirtualDiskVolumeSource struct {
 
 // LibStorageVolumeSource represents volume sourced by libstorage
 type LibStorageVolumeSource struct {
+	// Name identifier of the libStorage volume
 	VolumeName string `json:"volumeName" protobuf:"bytes,1,opt,name=volumeName"`
-	VolumeID   string `json:"volumeID,omitempty" protobuf:"bytes,2,opt,name=volumeID"`
+	// ID of the volume as reported by storage platform to libStorage
+	VolumeID string `json:"volumeID,omitempty" protobuf:"bytes,2,opt,name=volumeID"`
 }
 
 // Adapts a ConfigMap into a volume.

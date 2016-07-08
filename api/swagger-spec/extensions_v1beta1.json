@@ -7800,10 +7800,12 @@
     ],
     "properties": {
      "volumeName": {
-      "type": "string"
+      "type": "string",
+      "description": "Name identifier of the libStorage volume"
      },
      "volumeID": {
-      "type": "string"
+      "type": "string",
+      "description": "ID of the volume as reported by storage platform to libStorage"
      }
     }
    },

@@ -612,6 +612,16 @@ func (KeyToPath) SwaggerDoc() map[string]string {
 	return map_KeyToPath
 }
 
+var map_LibStorageVolumeSource = map[string]string{
+	"":           "LibStorageVolumeSource represents volume sourced by libstorage",
+	"volumeName": "Name identifier of the libStorage volume",
+	"volumeID":   "ID of the volume as reported by storage platform to libStorage",
+}
+
+func (LibStorageVolumeSource) SwaggerDoc() map[string]string {
+	return map_LibStorageVolumeSource
+}
+
 var map_Lifecycle = map[string]string{
 	"":          "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
 	"postStart": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details",
@@ -1067,6 +1077,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
 	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"libstorage":           "LibStorage represents a volume that is sourced by libStorage",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1713,6 +1724,7 @@ var map_VolumeSource = map[string]string{
 	"azureFile":     "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"configMap":     "ConfigMap represents a configMap that should populate this volume",
 	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"libstorage":    "LibStorage represents a volume that is sourced by libStorage",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {
