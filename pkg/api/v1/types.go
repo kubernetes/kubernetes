@@ -341,7 +341,8 @@ type PersistentVolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
@@ -2497,7 +2498,8 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // Node is a worker node in Kubernetes, formerly known as minion.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
@@ -2560,7 +2562,8 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
@@ -3215,7 +3218,8 @@ type ComponentCondition struct {
 	Error string `json:"error,omitempty" protobuf:"bytes,4,opt,name=error"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 type ComponentStatus struct {

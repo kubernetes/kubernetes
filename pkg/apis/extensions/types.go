@@ -51,7 +51,8 @@ type ScaleStatus struct {
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 }
 
-// +genclient=true,noMethods=true
+// +genclient=true
+// +noMethods=true
 
 // represents a scaling request for a resource.
 type Scale struct {
@@ -94,7 +95,8 @@ type CustomMetricCurrentStatusList struct {
 	Items []CustomMetricCurrentStatus `json:"items"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -624,7 +626,8 @@ type ReplicaSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
 // that will be applied to a pod and container.

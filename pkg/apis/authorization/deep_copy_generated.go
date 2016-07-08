@@ -22,7 +22,6 @@ package authorization
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -43,15 +42,11 @@ func init() {
 }
 
 func DeepCopy_authorization_LocalSubjectAccessReview(in LocalSubjectAccessReview, out *LocalSubjectAccessReview, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := DeepCopy_authorization_SubjectAccessReviewSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_authorization_SubjectAccessReviewStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Status = in.Status
 	return nil
 }
 
@@ -73,15 +68,11 @@ func DeepCopy_authorization_ResourceAttributes(in ResourceAttributes, out *Resou
 }
 
 func DeepCopy_authorization_SelfSubjectAccessReview(in SelfSubjectAccessReview, out *SelfSubjectAccessReview, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := DeepCopy_authorization_SelfSubjectAccessReviewSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_authorization_SubjectAccessReviewStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Status = in.Status
 	return nil
 }
 
@@ -89,18 +80,14 @@ func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in SelfSubjectAccessRevi
 	if in.ResourceAttributes != nil {
 		in, out := in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(ResourceAttributes)
-		if err := DeepCopy_authorization_ResourceAttributes(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.ResourceAttributes = nil
 	}
 	if in.NonResourceAttributes != nil {
 		in, out := in.NonResourceAttributes, &out.NonResourceAttributes
 		*out = new(NonResourceAttributes)
-		if err := DeepCopy_authorization_NonResourceAttributes(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.NonResourceAttributes = nil
 	}
@@ -108,15 +95,11 @@ func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in SelfSubjectAccessRevi
 }
 
 func DeepCopy_authorization_SubjectAccessReview(in SubjectAccessReview, out *SubjectAccessReview, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := DeepCopy_authorization_SubjectAccessReviewSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_authorization_SubjectAccessReviewStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Status = in.Status
 	return nil
 }
 
@@ -124,18 +107,14 @@ func DeepCopy_authorization_SubjectAccessReviewSpec(in SubjectAccessReviewSpec, 
 	if in.ResourceAttributes != nil {
 		in, out := in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(ResourceAttributes)
-		if err := DeepCopy_authorization_ResourceAttributes(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.ResourceAttributes = nil
 	}
 	if in.NonResourceAttributes != nil {
 		in, out := in.NonResourceAttributes, &out.NonResourceAttributes
 		*out = new(NonResourceAttributes)
-		if err := DeepCopy_authorization_NonResourceAttributes(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.NonResourceAttributes = nil
 	}

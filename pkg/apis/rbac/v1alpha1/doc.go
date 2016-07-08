@@ -15,5 +15,7 @@ limitations under the License.
 */
 
 // +groupName=rbac.authorization.k8s.io
+// +k8s:deepcopy-gen=package,register
+
 // +genconversion=true
 package v1alpha1

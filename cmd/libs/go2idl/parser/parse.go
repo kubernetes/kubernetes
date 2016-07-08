@@ -129,7 +129,9 @@ func (b *Builder) buildPackage(pkgPath string) (*build.Package, error) {
 	}
 	pkg, err = b.context.Import(pkgPath, cwd, build.ImportComment)
 	if err != nil {
-		return nil, fmt.Errorf("unable to import %q: %v", pkgPath, err)
+		if _, ok := err.(*build.NoGoError); !ok {
+			return nil, fmt.Errorf("unable to import %q: %v", pkgPath, err)
+		}
 	}
 	b.buildInfo[pkgPath] = pkg
 
@@ -350,6 +352,20 @@ func (b *Builder) makePackages() error {
 	return nil
 }
 
+// FindPackages fetches a list of the user-imported packages.
+func (b *Builder) FindPackages() []string {
+	result := []string{}
+	for pkgPath := range b.pkgs {
+		if b.userRequested[pkgPath] {
+			// Since walkType is recursive, all types that are in packages that
+			// were directly mentioned will be included.  We don't need to
+			// include all types in all transitive packages, though.
+			result = append(result, pkgPath)
+		}
+	}
+	return result
+}
+
 // FindTypes finalizes the package imports, and searches through all the
 // packages for types.
 func (b *Builder) FindTypes() (types.Universe, error) {
@@ -370,11 +386,12 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 
 		for _, f := range b.parsed[pkgPath] {
 			if strings.HasSuffix(f.name, "/doc.go") {
+				tp := u.Package(pkgPath)
+				for i := range f.file.Comments {
+					tp.Comments = append(tp.Comments, splitLines(f.file.Comments[i].Text())...)
+				}
 				if f.file.Doc != nil {
-					tp := u.Package(pkgPath)
-					for _, c := range f.file.Doc.List {
-						tp.DocComments = append(tp.DocComments, c.Text)
-					}
+					tp.DocComments = splitLines(f.file.Doc.Text())
 				}
 			}
 		}
@@ -386,11 +403,11 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 			if ok {
 				t := b.walkType(u, nil, tn.Type())
 				c1 := b.priorCommentLines(obj.Pos(), 1)
-				t.CommentLines = c1.Text()
+				t.CommentLines = splitLines(c1.Text())
 				if c1 == nil {
-					t.SecondClosestCommentLines = b.priorCommentLines(obj.Pos(), 2).Text()
+					t.SecondClosestCommentLines = splitLines(b.priorCommentLines(obj.Pos(), 2).Text())
 				} else {
-					t.SecondClosestCommentLines = b.priorCommentLines(c1.List[0].Slash, 2).Text()
+					t.SecondClosestCommentLines = splitLines(b.priorCommentLines(c1.List[0].Slash, 2).Text())
 				}
 			}
 			tf, ok := obj.(*tc.Func)
@@ -416,6 +433,10 @@ func (b *Builder) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup 
 	position := b.fset.Position(pos)
 	key := fileLine{position.Filename, position.Line - lines}
 	return b.endLineToCommentGroup[key]
+}
+
+func splitLines(str string) []string {
+	return strings.Split(strings.TrimRight(str, "\n"), "\n")
 }
 
 func tcFuncNameToName(in string) types.Name {
@@ -494,7 +515,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 				Embedded:     f.Anonymous(),
 				Tags:         t.Tag(i),
 				Type:         b.walkType(u, nil, f.Type()),
-				CommentLines: b.priorCommentLines(f.Pos(), 1).Text(),
+				CommentLines: splitLines(b.priorCommentLines(f.Pos(), 1).Text()),
 			}
 			out.Members = append(out.Members, m)
 		}
@@ -570,7 +591,10 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		out.Kind = types.Interface
 		t.Complete()
 		for i := 0; i < t.NumMethods(); i++ {
-			out.Methods = append(out.Methods, b.walkType(u, nil, t.Method(i).Type()))
+			if out.Methods == nil {
+				out.Methods = map[string]*types.Type{}
+			}
+			out.Methods[t.Method(i).Name()] = b.walkType(u, nil, t.Method(i).Type())
 		}
 		return out
 	case *tc.Named:
@@ -599,7 +623,10 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 				// methods, add them. (Interface types will
 				// have already added methods.)
 				for i := 0; i < t.NumMethods(); i++ {
-					out.Methods = append(out.Methods, b.walkType(u, nil, t.Method(i).Type()))
+					if out.Methods == nil {
+						out.Methods = map[string]*types.Type{}
+					}
+					out.Methods[t.Method(i).Name()] = b.walkType(u, nil, t.Method(i).Type())
 				}
 			}
 			return out

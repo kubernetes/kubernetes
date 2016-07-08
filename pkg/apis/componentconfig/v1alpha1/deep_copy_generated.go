@@ -22,7 +22,6 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -38,9 +37,7 @@ func init() {
 }
 
 func DeepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *KubeProxyConfiguration, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.BindAddress = in.BindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
@@ -53,9 +50,7 @@ func DeepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	} else {
 		out.IPTablesMasqueradeBit = nil
 	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, c); err != nil {
-		return err
-	}
+	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
@@ -69,20 +64,14 @@ func DeepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	out.Mode = in.Mode
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	if err := unversioned.DeepCopy_unversioned_Duration(in.UDPIdleTimeout, &out.UDPIdleTimeout, c); err != nil {
-		return err
-	}
+	out.UDPIdleTimeout = in.UDPIdleTimeout
 	out.ConntrackMax = in.ConntrackMax
-	if err := unversioned.DeepCopy_unversioned_Duration(in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, c); err != nil {
-		return err
-	}
+	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 	return nil
 }
 
 func DeepCopy_v1alpha1_KubeSchedulerConfiguration(in KubeSchedulerConfiguration, out *KubeSchedulerConfiguration, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.Port = in.Port
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
@@ -114,14 +103,8 @@ func DeepCopy_v1alpha1_LeaderElectionConfiguration(in LeaderElectionConfiguratio
 	} else {
 		out.LeaderElect = nil
 	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.LeaseDuration, &out.LeaseDuration, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.RenewDeadline, &out.RenewDeadline, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Duration(in.RetryPeriod, &out.RetryPeriod, c); err != nil {
-		return err
-	}
+	out.LeaseDuration = in.LeaseDuration
+	out.RenewDeadline = in.RenewDeadline
+	out.RetryPeriod = in.RetryPeriod
 	return nil
 }

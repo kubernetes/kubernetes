@@ -468,12 +468,11 @@ regenerate auto-generated ones. To regenerate them run:
 hack/update-codegen.sh
 ```
 
-update-codegen will also generate code to handle deep copy of your versioned
-api objects. The deep copy code resides with each versioned API:
-   - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
-   - `pkg/apis/extensions/<version>/deep_copy_generated.go` containing auto-generated copy functions
+As part of the build, kubernetes will also generate code to handle deep copy of
+your versioned api objects. The deep copy code resides with each versioned API:
+   - `<path_to_versioned_api>/zz_generated.deep_copy.go` containing auto-generated copy functions
 
-If running the above script is impossible due to compile errors, the easiest
+If regeneration is somehow not possible due to compile errors, the easiest
 workaround is to comment out the code causing errors and let the script to
 regenerate it. If the auto-generated conversion methods are not used by the
 manually-written ones, it's fine to just remove the whole file and let the

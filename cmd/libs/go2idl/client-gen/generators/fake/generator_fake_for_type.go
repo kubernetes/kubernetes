@@ -79,7 +79,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
 	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
-	namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 	canonicalGroup := g.group
 	if canonicalGroup == "core" {
 		canonicalGroup = ""
@@ -95,11 +95,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	}
 
 	// allow user to define a group name that's different from the one parsed from the directory.
-	for _, comment := range c.Universe.Package(g.inputPackage).DocComments {
-		comment = strings.TrimLeft(comment, "//")
-		if override, ok := types.ExtractCommentTags("+", comment)["groupName"]; ok {
-			groupName = override
-		}
+	p := c.Universe.Package(g.inputPackage)
+	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+		groupName = override[0]
 	}
 
 	m := map[string]interface{}{
@@ -138,7 +136,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"NewPatchAction":                 c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewPatchAction"}),
 	}
 
-	noMethods := types.ExtractCommentTags("+", t.SecondClosestCommentLines)["noMethods"] == "true"
+	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 
 	if namespaced {
 		sw.Do(structNamespaced, m)

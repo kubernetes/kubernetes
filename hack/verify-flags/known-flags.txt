@@ -35,6 +35,7 @@ bench-workers
 bind-address
 bind-pods-burst
 bind-pods-qps
+bounding-dirs
 build-only
 build-services
 build-tag
@@ -339,6 +340,7 @@ out-version
 outofdisk-transition-frequency
 output-base
 output-directory
+output-file-base
 output-package
 output-print-type
 output-version

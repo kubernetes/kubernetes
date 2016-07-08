@@ -26,31 +26,23 @@ import (
 )
 
 func DeepCopy_unversioned_APIGroup(in APIGroup, out *APIGroup, c *conversion.Cloner) error {
-	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.Name = in.Name
 	if in.Versions != nil {
 		in, out := in.Versions, &out.Versions
 		*out = make([]GroupVersionForDiscovery, len(in))
 		for i := range in {
-			if err := DeepCopy_unversioned_GroupVersionForDiscovery(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Versions = nil
 	}
-	if err := DeepCopy_unversioned_GroupVersionForDiscovery(in.PreferredVersion, &out.PreferredVersion, c); err != nil {
-		return err
-	}
+	out.PreferredVersion = in.PreferredVersion
 	if in.ServerAddressByClientCIDRs != nil {
 		in, out := in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 		*out = make([]ServerAddressByClientCIDR, len(in))
 		for i := range in {
-			if err := DeepCopy_unversioned_ServerAddressByClientCIDR(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.ServerAddressByClientCIDRs = nil
@@ -59,9 +51,7 @@ func DeepCopy_unversioned_APIGroup(in APIGroup, out *APIGroup, c *conversion.Clo
 }
 
 func DeepCopy_unversioned_APIGroupList(in APIGroupList, out *APIGroupList, c *conversion.Cloner) error {
-	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if in.Groups != nil {
 		in, out := in.Groups, &out.Groups
 		*out = make([]APIGroup, len(in))
@@ -84,17 +74,13 @@ func DeepCopy_unversioned_APIResource(in APIResource, out *APIResource, c *conve
 }
 
 func DeepCopy_unversioned_APIResourceList(in APIResourceList, out *APIResourceList, c *conversion.Cloner) error {
-	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.GroupVersion = in.GroupVersion
 	if in.APIResources != nil {
 		in, out := in.APIResources, &out.APIResources
 		*out = make([]APIResource, len(in))
 		for i := range in {
-			if err := DeepCopy_unversioned_APIResource(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.APIResources = nil
@@ -103,9 +89,7 @@ func DeepCopy_unversioned_APIResourceList(in APIResourceList, out *APIResourceLi
 }
 
 func DeepCopy_unversioned_APIVersions(in APIVersions, out *APIVersions, c *conversion.Cloner) error {
-	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if in.Versions != nil {
 		in, out := in.Versions, &out.Versions
 		*out = make([]string, len(in))
@@ -117,9 +101,7 @@ func DeepCopy_unversioned_APIVersions(in APIVersions, out *APIVersions, c *conve
 		in, out := in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 		*out = make([]ServerAddressByClientCIDR, len(in))
 		for i := range in {
-			if err := DeepCopy_unversioned_ServerAddressByClientCIDR(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.ServerAddressByClientCIDRs = nil
@@ -133,9 +115,7 @@ func DeepCopy_unversioned_Duration(in Duration, out *Duration, c *conversion.Clo
 }
 
 func DeepCopy_unversioned_ExportOptions(in ExportOptions, out *ExportOptions, c *conversion.Cloner) error {
-	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.Export = in.Export
 	out.Exact = in.Exact
 	return nil
@@ -244,12 +224,8 @@ func DeepCopy_unversioned_ServerAddressByClientCIDR(in ServerAddressByClientCIDR
 }
 
 func DeepCopy_unversioned_Status(in Status, out *Status, c *conversion.Cloner) error {
-	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	out.Status = in.Status
 	out.Message = in.Message
 	out.Reason = in.Reason
@@ -281,9 +257,7 @@ func DeepCopy_unversioned_StatusDetails(in StatusDetails, out *StatusDetails, c 
 		in, out := in.Causes, &out.Causes
 		*out = make([]StatusCause, len(in))
 		for i := range in {
-			if err := DeepCopy_unversioned_StatusCause(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Causes = nil

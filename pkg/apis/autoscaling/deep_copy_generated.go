@@ -50,9 +50,7 @@ func DeepCopy_autoscaling_CrossVersionObjectReference(in CrossVersionObjectRefer
 }
 
 func DeepCopy_autoscaling_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -66,12 +64,8 @@ func DeepCopy_autoscaling_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, ou
 }
 
 func DeepCopy_autoscaling_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]HorizontalPodAutoscaler, len(in))
@@ -87,9 +81,7 @@ func DeepCopy_autoscaling_HorizontalPodAutoscalerList(in HorizontalPodAutoscaler
 }
 
 func DeepCopy_autoscaling_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, c *conversion.Cloner) error {
-	if err := DeepCopy_autoscaling_CrossVersionObjectReference(in.ScaleTargetRef, &out.ScaleTargetRef, c); err != nil {
-		return err
-	}
+	out.ScaleTargetRef = in.ScaleTargetRef
 	if in.MinReplicas != nil {
 		in, out := in.MinReplicas, &out.MinReplicas
 		*out = new(int32)
@@ -119,9 +111,7 @@ func DeepCopy_autoscaling_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscal
 	if in.LastScaleTime != nil {
 		in, out := in.LastScaleTime, &out.LastScaleTime
 		*out = new(unversioned.Time)
-		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
-			return err
-		}
+		**out = in.DeepCopy()
 	} else {
 		out.LastScaleTime = nil
 	}
@@ -138,18 +128,12 @@ func DeepCopy_autoscaling_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscal
 }
 
 func DeepCopy_autoscaling_Scale(in Scale, out *Scale, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_autoscaling_ScaleSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_autoscaling_ScaleStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Spec = in.Spec
+	out.Status = in.Status
 	return nil
 }
 

@@ -46,9 +46,7 @@ func init() {
 }
 
 func DeepCopy_batch_Job(in Job, out *Job, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -64,24 +62,16 @@ func DeepCopy_batch_Job(in Job, out *Job, c *conversion.Cloner) error {
 func DeepCopy_batch_JobCondition(in JobCondition, out *JobCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
-		return err
-	}
+	out.LastProbeTime = in.LastProbeTime.DeepCopy()
+	out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return nil
 }
 
 func DeepCopy_batch_JobList(in JobList, out *JobList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]Job, len(in))
@@ -155,18 +145,14 @@ func DeepCopy_batch_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner
 	if in.StartTime != nil {
 		in, out := in.StartTime, &out.StartTime
 		*out = new(unversioned.Time)
-		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
-			return err
-		}
+		**out = in.DeepCopy()
 	} else {
 		out.StartTime = nil
 	}
 	if in.CompletionTime != nil {
 		in, out := in.CompletionTime, &out.CompletionTime
 		*out = new(unversioned.Time)
-		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
-			return err
-		}
+		**out = in.DeepCopy()
 	} else {
 		out.CompletionTime = nil
 	}
@@ -177,9 +163,7 @@ func DeepCopy_batch_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner
 }
 
 func DeepCopy_batch_JobTemplate(in JobTemplate, out *JobTemplate, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -200,9 +184,7 @@ func DeepCopy_batch_JobTemplateSpec(in JobTemplateSpec, out *JobTemplateSpec, c 
 }
 
 func DeepCopy_batch_ScheduledJob(in ScheduledJob, out *ScheduledJob, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -216,12 +198,8 @@ func DeepCopy_batch_ScheduledJob(in ScheduledJob, out *ScheduledJob, c *conversi
 }
 
 func DeepCopy_batch_ScheduledJobList(in ScheduledJobList, out *ScheduledJobList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]ScheduledJob, len(in))
@@ -264,9 +242,7 @@ func DeepCopy_batch_ScheduledJobStatus(in ScheduledJobStatus, out *ScheduledJobS
 		in, out := in.Active, &out.Active
 		*out = make([]api.ObjectReference, len(in))
 		for i := range in {
-			if err := api.DeepCopy_api_ObjectReference(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Active = nil
@@ -274,9 +250,7 @@ func DeepCopy_batch_ScheduledJobStatus(in ScheduledJobStatus, out *ScheduledJobS
 	if in.LastScheduleTime != nil {
 		in, out := in.LastScheduleTime, &out.LastScheduleTime
 		*out = new(unversioned.Time)
-		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
-			return err
-		}
+		**out = in.DeepCopy()
 	} else {
 		out.LastScheduleTime = nil
 	}
