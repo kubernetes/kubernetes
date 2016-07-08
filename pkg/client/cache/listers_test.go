@@ -97,7 +97,7 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 		store.Add(n)
 	}
 
-	predicate := func(node api.Node) bool {
+	predicate := func(node *api.Node) bool {
 		for _, cond := range node.Status.Conditions {
 			if cond.Type == api.NodeOutOfDisk && cond.Status == api.ConditionTrue {
 				return false
