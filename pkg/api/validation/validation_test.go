@@ -740,9 +740,14 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		oldClaim          *api.PersistentVolumeClaim
 		newClaim          *api.PersistentVolumeClaim
 	}{
-		"valid-update": {
+		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
+			newClaim:          validUpdateClaim,
+		},
+		"valid-no-op-update": {
+			isExpectedFailure: false,
+			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
 		},
 		"invalid-update-change-resources-on-bound-claim": {

@@ -86,11 +86,7 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.PersistentVolumeClaim)
-			object.Spec.Resources = api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
-				},
-			}
+			object.Spec.VolumeName = "onlyVolumeNameUpdateAllowed"
 			return object
 		},
 	)
