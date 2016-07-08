@@ -360,123 +360,33 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 // The following two PodSpec conversions are done here to support ServiceAccount
 // as an alias for ServiceAccountName.
 func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
-	if in.Volumes != nil {
-		out.Volumes = make([]Volume, len(in.Volumes))
-		for i := range in.Volumes {
-			if err := Convert_api_Volume_To_v1_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Volumes = nil
-	}
-	if in.InitContainers != nil {
-		out.InitContainers = make([]Container, len(in.InitContainers))
-		for i := range in.InitContainers {
-			if err := Convert_api_Container_To_v1_Container(&in.InitContainers[i], &out.InitContainers[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.InitContainers = nil
-	}
-	if in.Containers != nil {
-		out.Containers = make([]Container, len(in.Containers))
-		for i := range in.Containers {
-			if err := Convert_api_Container_To_v1_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
+	if err := autoConvert_api_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
+		return err
 	}
 
-	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
-	out.TerminationGracePeriodSeconds = in.TerminationGracePeriodSeconds
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
-	out.NodeSelector = in.NodeSelector
-
-	out.ServiceAccountName = in.ServiceAccountName
 	// DeprecatedServiceAccount is an alias for ServiceAccountName.
 	out.DeprecatedServiceAccount = in.ServiceAccountName
-	out.NodeName = in.NodeName
-	if in.SecurityContext != nil {
-		out.SecurityContext = new(PodSecurityContext)
-		if err := Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
-			return err
-		}
 
+	if in.SecurityContext != nil {
 		// the host namespace fields have to be handled here for backward compatibility
 		// with v1.0.0
 		out.HostPID = in.SecurityContext.HostPID
 		out.HostNetwork = in.SecurityContext.HostNetwork
 		out.HostIPC = in.SecurityContext.HostIPC
 	}
-	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
-		for i := range in.ImagePullSecrets {
-			if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ImagePullSecrets = nil
-	}
-	out.Hostname = in.Hostname
-	out.Subdomain = in.Subdomain
+
 	return nil
 }
 
 func Convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
-	SetDefaults_PodSpec(in)
-	if in.Volumes != nil {
-		out.Volumes = make([]api.Volume, len(in.Volumes))
-		for i := range in.Volumes {
-			if err := Convert_v1_Volume_To_api_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Volumes = nil
+	if err := autoConvert_v1_PodSpec_To_api_PodSpec(in, out, s); err != nil {
+		return err
 	}
-	if in.InitContainers != nil {
-		out.InitContainers = make([]api.Container, len(in.InitContainers))
-		for i := range in.InitContainers {
-			if err := Convert_v1_Container_To_api_Container(&in.InitContainers[i], &out.InitContainers[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.InitContainers = nil
-	}
-	if in.Containers != nil {
-		out.Containers = make([]api.Container, len(in.Containers))
-		for i := range in.Containers {
-			if err := Convert_v1_Container_To_api_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	out.RestartPolicy = api.RestartPolicy(in.RestartPolicy)
-	out.TerminationGracePeriodSeconds = in.TerminationGracePeriodSeconds
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
-	out.NodeSelector = in.NodeSelector
+
 	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
 	// If both are specified, ServiceAccountName (the new field) wins.
-	out.ServiceAccountName = in.ServiceAccountName
 	if in.ServiceAccountName == "" {
 		out.ServiceAccountName = in.DeprecatedServiceAccount
-	}
-	out.NodeName = in.NodeName
-	if in.SecurityContext != nil {
-		out.SecurityContext = new(api.PodSecurityContext)
-		if err := Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
-			return err
-		}
 	}
 
 	// the host namespace fields have to be handled specially for backward compatibility
@@ -487,18 +397,7 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 	out.SecurityContext.HostNetwork = in.HostNetwork
 	out.SecurityContext.HostPID = in.HostPID
 	out.SecurityContext.HostIPC = in.HostIPC
-	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
-		for i := range in.ImagePullSecrets {
-			if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ImagePullSecrets = nil
-	}
-	out.Hostname = in.Hostname
-	out.Subdomain = in.Subdomain
+
 	return nil
 }
 

@@ -522,9 +522,8 @@ At the moment, you'll have to make a new directory under `pkg/apis/`; copy the
 directory structure from `pkg/apis/extensions`. Add the new group/version to all
 of the `hack/{verify,update}-generated-{deep-copy,conversions,swagger}.sh` files
 in the appropriate places--it should just require adding your new group/version
-to a bash array. You will also need to make sure your new types are imported by
-the generation commands (`cmd/gendeepcopy/` & `cmd/genconversion`). These
-instructions may not be complete and will be updated as we gain experience.
+to a bash array.  See [docs on adding an API group](adding-an-APIGroup.md) for
+more.
 
 Adding API groups outside of the `pkg/apis/` directory is not currently
 supported, but is clearly desirable. The deep copy & conversion generators need

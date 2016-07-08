@@ -45,7 +45,7 @@ type Builder struct {
 	// map of package id to absolute path (to prevent overlap)
 	absPaths map[string]string
 
-	// Set by makePackages, used by importer() and friends.
+	// Set by makePackage(), used by importer() and friends.
 	pkgs map[string]*tc.Package
 
 	// Map of package path to whether the user requested it or it was from
@@ -167,6 +167,7 @@ func (b *Builder) addFile(pkg string, path string, src []byte, userRequested boo
 	} else {
 		b.absPaths[pkg] = dirPath
 	}
+
 	b.parsed[pkg] = append(b.parsed[pkg], parsedFile{path, p})
 	b.userRequested[pkg] = userRequested
 	for _, c := range p.Comments {
@@ -232,6 +233,26 @@ func (b *Builder) AddDirRecursive(dir string) error {
 	return nil
 }
 
+// AddDirTo adds an entire directory to a given Universe. Unlike AddDir, this
+// processes the package immediately, which makes it safe to use from within a
+// generator (rather than just at init time. 'dir' must be a single go package.
+// GOPATH, GOROOT, and the location of your go binary (`which go`) will all be
+// searched if dir doesn't literally resolve.
+func (b *Builder) AddDirTo(dir string, u *types.Universe) error {
+	if _, found := b.parsed[dir]; !found {
+		// We want all types from this package, as if they were directly added
+		// by the user.  They WERE added by the user, in effect.
+		if err := b.addDir(dir, true); err != nil {
+			return err
+		}
+	} else {
+		// We already had this package, but we want it to be considered as if
+		// the user addid it directly.
+		b.userRequested[dir] = true
+	}
+	return b.findTypesIn(dir, u)
+}
+
 // The implementation of AddDir. A flag indicates whether this directory was
 // user-requested or just from following the import graph.
 func (b *Builder) addDir(dir string, userRequested bool) error {
@@ -240,8 +261,10 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 		return err
 	}
 	// Check in case this package was added (maybe dir was not canonical)
-	if _, alreadyAdded := b.parsed[dir]; alreadyAdded {
-		return nil
+	if wasRequested, wasAdded := b.userRequested[dir]; wasAdded {
+		if !userRequested || userRequested == wasRequested {
+			return nil
+		}
 	}
 
 	for _, n := range pkg.GoFiles {
@@ -335,21 +358,33 @@ func (b *Builder) typeCheckPackage(id string) (*tc.Package, error) {
 	return pkg, err
 }
 
-func (b *Builder) makePackages() error {
-	b.pkgs = map[string]*tc.Package{}
+func (b *Builder) makeAllPackages() error {
+	// Take a snapshot to iterate, since this will recursively mutate b.parsed.
+	keys := []string{}
 	for id := range b.parsed {
-		// We have to check here even though we made a new one above,
-		// because typeCheckPackage follows the import graph, which may
-		// cause a package to be filled before we get to it in this
-		// loop.
-		if _, done := b.pkgs[id]; done {
-			continue
-		}
-		if _, err := b.typeCheckPackage(id); err != nil {
+		keys = append(keys, id)
+	}
+	for _, id := range keys {
+		if _, err := b.makePackage(id); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (b *Builder) makePackage(id string) (*tc.Package, error) {
+	if b.pkgs == nil {
+		b.pkgs = map[string]*tc.Package{}
+	}
+
+	// We have to check here even though we made a new one above,
+	// because typeCheckPackage follows the import graph, which may
+	// cause a package to be filled before we get to it in this
+	// loop.
+	if pkg, done := b.pkgs[id]; done {
+		return pkg, nil
+	}
+	return b.typeCheckPackage(id)
 }
 
 // FindPackages fetches a list of the user-imported packages.
@@ -369,63 +404,76 @@ func (b *Builder) FindPackages() []string {
 // FindTypes finalizes the package imports, and searches through all the
 // packages for types.
 func (b *Builder) FindTypes() (types.Universe, error) {
-	if err := b.makePackages(); err != nil {
+	if err := b.makeAllPackages(); err != nil {
 		return nil, err
 	}
 
 	u := types.Universe{}
 
-	for pkgPath, pkg := range b.pkgs {
-		if !b.userRequested[pkgPath] {
-			// Since walkType is recursive, all types that the
-			// packages they asked for depend on will be included.
-			// But we don't need to include all types in all
-			// *packages* they depend on.
-			continue
+	for pkgPath := range b.parsed {
+		if err := b.findTypesIn(pkgPath, &u); err != nil {
+			return nil, err
 		}
-
-		for _, f := range b.parsed[pkgPath] {
-			if strings.HasSuffix(f.name, "/doc.go") {
-				tp := u.Package(pkgPath)
-				for i := range f.file.Comments {
-					tp.Comments = append(tp.Comments, splitLines(f.file.Comments[i].Text())...)
-				}
-				if f.file.Doc != nil {
-					tp.DocComments = splitLines(f.file.Doc.Text())
-				}
-			}
-		}
-
-		s := pkg.Scope()
-		for _, n := range s.Names() {
-			obj := s.Lookup(n)
-			tn, ok := obj.(*tc.TypeName)
-			if ok {
-				t := b.walkType(u, nil, tn.Type())
-				c1 := b.priorCommentLines(obj.Pos(), 1)
-				t.CommentLines = splitLines(c1.Text())
-				if c1 == nil {
-					t.SecondClosestCommentLines = splitLines(b.priorCommentLines(obj.Pos(), 2).Text())
-				} else {
-					t.SecondClosestCommentLines = splitLines(b.priorCommentLines(c1.List[0].Slash, 2).Text())
-				}
-			}
-			tf, ok := obj.(*tc.Func)
-			// We only care about functions, not concrete/abstract methods.
-			if ok && tf.Type() != nil && tf.Type().(*tc.Signature).Recv() == nil {
-				b.addFunction(u, nil, tf)
-			}
-			tv, ok := obj.(*tc.Var)
-			if ok && !tv.IsField() {
-				b.addVariable(u, nil, tv)
-			}
-		}
-		for p := range b.importGraph[pkgPath] {
-			u.AddImports(pkgPath, p)
-		}
-		u.Package(pkgPath).Name = pkg.Name()
 	}
 	return u, nil
+}
+
+// findTypesIn finalizes the package import and searches through the package
+// for types.
+func (b *Builder) findTypesIn(pkgPath string, u *types.Universe) error {
+	pkg, err := b.makePackage(pkgPath)
+	if err != nil {
+		return err
+	}
+	if !b.userRequested[pkgPath] {
+		// Since walkType is recursive, all types that the
+		// packages they asked for depend on will be included.
+		// But we don't need to include all types in all
+		// *packages* they depend on.
+		return nil
+	}
+
+	for _, f := range b.parsed[pkgPath] {
+		if strings.HasSuffix(f.name, "/doc.go") {
+			tp := u.Package(pkgPath)
+			for i := range f.file.Comments {
+				tp.Comments = append(tp.Comments, splitLines(f.file.Comments[i].Text())...)
+			}
+			if f.file.Doc != nil {
+				tp.DocComments = splitLines(f.file.Doc.Text())
+			}
+		}
+	}
+
+	s := pkg.Scope()
+	for _, n := range s.Names() {
+		obj := s.Lookup(n)
+		tn, ok := obj.(*tc.TypeName)
+		if ok {
+			t := b.walkType(*u, nil, tn.Type())
+			c1 := b.priorCommentLines(obj.Pos(), 1)
+			t.CommentLines = splitLines(c1.Text())
+			if c1 == nil {
+				t.SecondClosestCommentLines = splitLines(b.priorCommentLines(obj.Pos(), 2).Text())
+			} else {
+				t.SecondClosestCommentLines = splitLines(b.priorCommentLines(c1.List[0].Slash, 2).Text())
+			}
+		}
+		tf, ok := obj.(*tc.Func)
+		// We only care about functions, not concrete/abstract methods.
+		if ok && tf.Type() != nil && tf.Type().(*tc.Signature).Recv() == nil {
+			b.addFunction(*u, nil, tf)
+		}
+		tv, ok := obj.(*tc.Var)
+		if ok && !tv.IsField() {
+			b.addVariable(*u, nil, tv)
+		}
+	}
+	for p := range b.importGraph[pkgPath] {
+		u.AddImports(pkgPath, p)
+	}
+	u.Package(pkgPath).Name = pkg.Name()
+	return nil
 }
 
 // if there's a comment on the line `lines` before pos, return its text, otherwise "".

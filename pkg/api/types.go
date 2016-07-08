@@ -1479,12 +1479,15 @@ type PodSecurityContext struct {
 	// Use the host's network namespace.  If this option is set, the ports that will be
 	// used must be specified.
 	// Optional: Default to false
+	// +k8s:conversion-gen=false
 	HostNetwork bool `json:"hostNetwork,omitempty"`
 	// Use the host's pid namespace.
 	// Optional: Default to false.
+	// +k8s:conversion-gen=false
 	HostPID bool `json:"hostPID,omitempty"`
 	// Use the host's ipc namespace.
 	// Optional: Default to false.
+	// +k8s:conversion-gen=false
 	HostIPC bool `json:"hostIPC,omitempty"`
 	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
