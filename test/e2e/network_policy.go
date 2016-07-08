@@ -81,7 +81,6 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		}
 	})
 
-
 	It("should isolate containers in the same namespace when NetworkIsolation is enabled [NetworkPolicy]", func() {
 		nsA := f.Namespace
 		runIsolatedToBidirectionalTest(f, nsA, nsA)
