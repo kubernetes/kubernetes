@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -136,9 +137,10 @@ func BenchmarkPodList(b *testing.B) {
 			defer func() {
 				glog.V(3).Infof("Worker %d: Node %v listing pods took %v", id, host, time.Since(now))
 			}()
-			if pods, err := m.RestClient.Pods(ns.Name).List(
-				labels.Everything(),
-				fields.OneTermEqualSelector(client.PodHost, host)); err != nil {
+			if pods, err := m.RestClient.Pods(ns.Name).List(api.ListOptions{
+				LabelSelector: labels.Everything(),
+				FieldSelector: fields.OneTermEqualSelector(api.PodHostField, host),
+			}); err != nil {
 				return err
 			} else if len(pods.Items) < podsPerNode {
 				glog.Fatalf("List retrieved %d pods, which is less than %d", len(pods.Items), podsPerNode)
@@ -178,7 +180,10 @@ func BenchmarkPodListEtcd(b *testing.B) {
 			defer func() {
 				glog.V(3).Infof("Worker %d: listing pods took %v", id, time.Since(now))
 			}()
-			pods, err := m.RestClient.Pods(ns.Name).List(labels.Everything(), fields.Everything())
+			pods, err := m.RestClient.Pods(ns.Name).List(api.ListOptions{
+				LabelSelector: labels.Everything(),
+				FieldSelector: fields.Everything(),
+			})
 			if err != nil {
 				return err
 			}
