@@ -116,11 +116,11 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory.CreateFromConfig(policy)
 }
 
-func PredicateOne(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func PredicateOne(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return true, nil
 }
 
-func PredicateTwo(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func PredicateTwo(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	return true, nil
 }
 
