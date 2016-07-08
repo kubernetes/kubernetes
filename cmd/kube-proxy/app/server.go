@@ -299,8 +299,19 @@ func (s *ProxyServer) Run() error {
 	// Tune conntrack, if requested
 	if s.Conntracker != nil {
 		if s.Config.ConntrackMax > 0 {
-			if err := s.Conntracker.SetMax(int(s.Config.ConntrackMax)); err != nil {
-				return err
+			err := s.Conntracker.SetMax(int(s.Config.ConntrackMax))
+			if err != nil {
+				if err != readOnlySysFSError {
+					return err
+				}
+				// readOnlySysFSError is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
+				// the only remediation we know is to restart the docker daemon.
+				// Here we'll send an node event with specific reason and message, the
+				// administrator should decide whether and how to handle this issue,
+				// whether to drain the node and restart docker.
+				// TODO(random-liu): Remove this when the docker bug is fixed.
+				const message = "DOCKER RESTART NEEDED (docker issue #24000): /sys is read-only: can't raise conntrack limits, problems may arise later."
+				s.Recorder.Eventf(s.Config.NodeRef, api.EventTypeWarning, err.Error(), message)
 			}
 		}
 		if s.Config.ConntrackTCPEstablishedTimeout.Duration > 0 {
