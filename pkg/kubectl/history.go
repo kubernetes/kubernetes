@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
-	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 )
 

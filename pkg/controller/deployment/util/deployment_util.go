@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package deployment
+package util
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -39,7 +41,7 @@ import (
 )
 
 const (
-	// The revision annotation of a deployment's replica sets which records its rollout sequence
+	// RevisionAnnotation is the revision annotation of a deployment's replica sets which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
 	// DesiredReplicasAnnotation is the desired replicas for a deployment recorded as an annotation
 	// in its replica sets. Helps in separating scaling events from the rollout process and for
@@ -50,11 +52,257 @@ const (
 	// proportions in case the deployment has surge replicas.
 	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
 
-	// Here are the possible rollback event reasons
-	RollbackRevisionNotFound  = "DeploymentRollbackRevisionNotFound"
+	// RollbackRevisionNotFound is not found rollback event reason
+	RollbackRevisionNotFound = "DeploymentRollbackRevisionNotFound"
+	// RollbackTemplateUnchanged is the template unchanged rollback event reason
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
-	RollbackDone              = "DeploymentRollback"
+	// RollbackDone is the done rollback event reason
+	RollbackDone = "DeploymentRollback"
 )
+
+// MaxRevision finds the highest revision in the replica sets
+func MaxRevision(allRSs []*extensions.ReplicaSet) int64 {
+	max := int64(0)
+	for _, rs := range allRSs {
+		if v, err := Revision(rs); err != nil {
+			// Skip the replica sets when it failed to parse their revision information
+			glog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
+		} else if v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+// LastRevision finds the second max revision number in all replica sets (the last revision)
+func LastRevision(allRSs []*extensions.ReplicaSet) int64 {
+	max, secMax := int64(0), int64(0)
+	for _, rs := range allRSs {
+		if v, err := Revision(rs); err != nil {
+			// Skip the replica sets when it failed to parse their revision information
+			glog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
+		} else if v >= max {
+			secMax = max
+			max = v
+		} else if v > secMax {
+			secMax = v
+		}
+	}
+	return secMax
+}
+
+// SetNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
+// copying required deployment annotations to it; it returns true if replica set's annotation is changed.
+func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *extensions.ReplicaSet, newRevision string, exists bool) bool {
+	// First, copy deployment's annotations (except for apply and revision annotations)
+	annotationChanged := copyDeploymentAnnotationsToReplicaSet(deployment, newRS)
+	// Then, update replica set's revision annotation
+	if newRS.Annotations == nil {
+		newRS.Annotations = make(map[string]string)
+	}
+	// The newRS's revision should be the greatest among all RSes. Usually, its revision number is newRevision (the max revision number
+	// of all old RSes + 1). However, it's possible that some of the old RSes are deleted after the newRS revision being updated, and
+	// newRevision becomes smaller than newRS's revision. We should only update newRS revision when it's smaller than newRevision.
+	if newRS.Annotations[RevisionAnnotation] < newRevision {
+		newRS.Annotations[RevisionAnnotation] = newRevision
+		annotationChanged = true
+		glog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
+	}
+	if !exists && SetReplicasAnnotations(newRS, deployment.Spec.Replicas, deployment.Spec.Replicas+MaxSurge(*deployment)) {
+		annotationChanged = true
+	}
+	return annotationChanged
+}
+
+var annotationsToSkip = map[string]bool{
+	annotations.LastAppliedConfigAnnotation: true,
+	RevisionAnnotation:                      true,
+	DesiredReplicasAnnotation:               true,
+	MaxReplicasAnnotation:                   true,
+}
+
+// skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
+// TODO: How to decide which annotations should / should not be copied?
+//       See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
+func skipCopyAnnotation(key string) bool {
+	return annotationsToSkip[key]
+}
+
+// copyDeploymentAnnotationsToReplicaSet copies deployment's annotations to replica set's annotations,
+// and returns true if replica set's annotation is changed.
+// Note that apply and revision annotations are not copied.
+func copyDeploymentAnnotationsToReplicaSet(deployment *extensions.Deployment, rs *extensions.ReplicaSet) bool {
+	rsAnnotationsChanged := false
+	if rs.Annotations == nil {
+		rs.Annotations = make(map[string]string)
+	}
+	for k, v := range deployment.Annotations {
+		// newRS revision is updated automatically in getNewReplicaSet, and the deployment's revision number is then updated
+		// by copying its newRS revision number. We should not copy deployment's revision to its newRS, since the update of
+		// deployment revision number may fail (revision becomes stale) and the revision number in newRS is more reliable.
+		if skipCopyAnnotation(k) || rs.Annotations[k] == v {
+			continue
+		}
+		rs.Annotations[k] = v
+		rsAnnotationsChanged = true
+	}
+	return rsAnnotationsChanged
+}
+
+// SetDeploymentAnnotationsTo sets deployment's annotations as given RS's annotations.
+// This action should be done if and only if the deployment is rolling back to this rs.
+// Note that apply and revision annotations are not changed.
+func SetDeploymentAnnotationsTo(deployment *extensions.Deployment, rollbackToRS *extensions.ReplicaSet) {
+	deployment.Annotations = getSkippedAnnotations(deployment.Annotations)
+	for k, v := range rollbackToRS.Annotations {
+		if !skipCopyAnnotation(k) {
+			deployment.Annotations[k] = v
+		}
+	}
+}
+
+func getSkippedAnnotations(annotations map[string]string) map[string]string {
+	skippedAnnotations := make(map[string]string)
+	for k, v := range annotations {
+		if skipCopyAnnotation(k) {
+			skippedAnnotations[k] = v
+		}
+	}
+	return skippedAnnotations
+}
+
+// FindActiveOrLatest returns the only active or the latest replica set in case there is at most one active
+// replica set. If there are more active replica sets, then we should proportionally scale them.
+func FindActiveOrLatest(newRS *extensions.ReplicaSet, oldRSs []*extensions.ReplicaSet) *extensions.ReplicaSet {
+	if newRS == nil && len(oldRSs) == 0 {
+		return nil
+	}
+
+	sort.Sort(sort.Reverse(controller.ReplicaSetsByCreationTimestamp(oldRSs)))
+	allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
+
+	switch len(allRSs) {
+	case 0:
+		// If there is no active replica set then we should return the newest.
+		if newRS != nil {
+			return newRS
+		}
+		return oldRSs[0]
+	case 1:
+		return allRSs[0]
+	default:
+		return nil
+	}
+}
+
+// GetDesiredReplicasAnnotation returns the number of desired replicas
+func GetDesiredReplicasAnnotation(rs *extensions.ReplicaSet) (int32, bool) {
+	return getIntFromAnnotation(rs, DesiredReplicasAnnotation)
+}
+
+func getMaxReplicasAnnotation(rs *extensions.ReplicaSet) (int32, bool) {
+	return getIntFromAnnotation(rs, MaxReplicasAnnotation)
+}
+
+func getIntFromAnnotation(rs *extensions.ReplicaSet, annotationKey string) (int32, bool) {
+	annotationValue, ok := rs.Annotations[annotationKey]
+	if !ok {
+		return int32(0), false
+	}
+	intValue, err := strconv.Atoi(annotationValue)
+	if err != nil {
+		glog.Warningf("Cannot convert the value %q with annotation key %q for the replica set %q",
+			annotationValue, annotationKey, rs.Name)
+		return int32(0), false
+	}
+	return int32(intValue), true
+}
+
+// SetReplicasAnnotations sets the desiredReplicas and maxReplicas into the annotations
+func SetReplicasAnnotations(rs *extensions.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
+	updated := false
+	if rs.Annotations == nil {
+		rs.Annotations = make(map[string]string)
+	}
+	desiredString := fmt.Sprintf("%d", desiredReplicas)
+	if hasString := rs.Annotations[DesiredReplicasAnnotation]; hasString != desiredString {
+		rs.Annotations[DesiredReplicasAnnotation] = desiredString
+		updated = true
+	}
+	maxString := fmt.Sprintf("%d", maxReplicas)
+	if hasString := rs.Annotations[MaxReplicasAnnotation]; hasString != maxString {
+		rs.Annotations[MaxReplicasAnnotation] = maxString
+		updated = true
+	}
+	return updated
+}
+
+// MaxUnavailable returns the maximum unavailable pods a rolling deployment can take.
+func MaxUnavailable(deployment extensions.Deployment) int32 {
+	if !IsRollingUpdate(&deployment) {
+		return int32(0)
+	}
+	// Error caught by validation
+	_, maxUnavailable, _ := ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
+	return maxUnavailable
+}
+
+// MaxSurge returns the maximum surge pods a rolling deployment can take.
+func MaxSurge(deployment extensions.Deployment) int32 {
+	if !IsRollingUpdate(&deployment) {
+		return int32(0)
+	}
+	// Error caught by validation
+	maxSurge, _, _ := ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
+	return maxSurge
+}
+
+// GetProportion will estimate the proportion for the provided replica set using 1. the current size
+// of the parent deployment, 2. the replica count that needs be added on the replica sets of the
+// deployment, and 3. the total replicas added in the replica sets of the deployment so far.
+func GetProportion(rs *extensions.ReplicaSet, d extensions.Deployment, deploymentReplicasToAdd, deploymentReplicasAdded int32) int32 {
+	if rs == nil || rs.Spec.Replicas == 0 || deploymentReplicasToAdd == 0 || deploymentReplicasToAdd == deploymentReplicasAdded {
+		return int32(0)
+	}
+
+	rsFraction := getReplicaSetFraction(*rs, d)
+	allowed := deploymentReplicasToAdd - deploymentReplicasAdded
+
+	if deploymentReplicasToAdd > 0 {
+		// Use the minimum between the replica set fraction and the maximum allowed replicas
+		// when scaling up. This way we ensure we will not scale up more than the allowed
+		// replicas we can add.
+		return integer.Int32Min(rsFraction, allowed)
+	}
+	// Use the maximum between the replica set fraction and the maximum allowed replicas
+	// when scaling down. This way we ensure we will not scale down more than the allowed
+	// replicas we can remove.
+	return integer.Int32Max(rsFraction, allowed)
+}
+
+// getReplicaSetFraction estimates the fraction of replicas a replica set can have in
+// 1. a scaling event during a rollout or 2. when scaling a paused deployment.
+func getReplicaSetFraction(rs extensions.ReplicaSet, d extensions.Deployment) int32 {
+	// If we are scaling down to zero then the fraction of this replica set is its whole size (negative)
+	if d.Spec.Replicas == int32(0) {
+		return -rs.Spec.Replicas
+	}
+
+	deploymentReplicas := d.Spec.Replicas + MaxSurge(d)
+	annotatedReplicas, ok := getMaxReplicasAnnotation(&rs)
+	if !ok {
+		// If we cannot find the annotation then fallback to the current deployment size. Note that this
+		// will not be an accurate proportion estimation in case other replica sets have different values
+		// which means that the deployment was scaled at some point but we at least will stay in limits
+		// due to the min-max comparisons in getProportion.
+		annotatedReplicas = d.Status.Replicas
+	}
+
+	// We should never proportionally scale up from zero which means rs.spec.replicas and annotatedReplicas
+	// will never be zero here.
+	newRSsize := (float64(rs.Spec.Replicas * deploymentReplicas)) / float64(annotatedReplicas)
+	return integer.RoundToInt32(newRSsize) - rs.Spec.Replicas
+}
 
 // GetAllReplicaSets returns the old and new replica sets targeted by the given Deployment. It gets PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
@@ -227,6 +475,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []extensions.R
 	return requiredRSs, allRSs, nil
 }
 
+// WaitForReplicaSetUpdated polls the replica set until it is updated.
 func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
 	return wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
@@ -237,6 +486,7 @@ func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, na
 	})
 }
 
+// WaitForPodsHashPopulated polls the replica set until updated and fully labeled.
 func WaitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
 	return wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
 		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
@@ -277,7 +527,7 @@ func LabelPodsWithHash(podList *api.PodList, rs *extensions.ReplicaSet, c client
 	return allPodsLabeled, nil
 }
 
-// Returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
+// GetNewReplicaSetTemplate returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
 func GetNewReplicaSetTemplate(deployment *extensions.Deployment) api.PodTemplateSpec {
 	// newRS will have the same template as in deployment spec, plus a unique label in some cases.
 	newRSTemplate := api.PodTemplateSpec{
@@ -301,7 +551,7 @@ func SetFromReplicaSetTemplate(deployment *extensions.Deployment, template api.P
 	return deployment
 }
 
-// Returns the sum of Replicas of the given replica sets.
+// GetReplicaCountForReplicaSets returns the sum of Replicas of the given replica sets.
 func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int32 {
 	totalReplicaCount := int32(0)
 	for _, rs := range replicaSets {
@@ -363,6 +613,7 @@ func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
 	return availablePodCount
 }
 
+// IsPodAvailable return true if the pod is available.
 func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 	if !controller.IsPodActive(*pod) {
 		return false
@@ -409,6 +660,7 @@ func Revision(rs *extensions.ReplicaSet) (int64, error) {
 	return strconv.ParseInt(v, 10, 64)
 }
 
+// IsRollingUpdate returns true if the strategy type is a rolling update.
 func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
 }
@@ -459,7 +711,7 @@ func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) b
 	return rs.Spec.Replicas == deployment.Spec.Replicas && int32(desired) == deployment.Spec.Replicas
 }
 
-// Polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
+// WaitForObservedDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
 // Returns error if polling timesout.
 func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	// TODO: This should take clientset.Interface when all code is updated to use clientset. Keeping it this way allows the function to be used by callers who have client.Interface.
