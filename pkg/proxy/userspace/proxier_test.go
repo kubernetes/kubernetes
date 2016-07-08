@@ -536,15 +536,14 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]api.Endpoints{
-		{
-			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
-			}},
-		},
-	})
+	endpoint := api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
+		}},
+	}
+	lb.OnEndpointsUpdate([]api.Endpoints{endpoint})
 
 	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), ipttest.NewFake(), net.ParseIP("127.0.0.1"), nil, time.Minute, udpIdleTimeoutForTest)
 	if err != nil {
@@ -569,6 +568,8 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
+	// need to add endpoint here because it got clean up during service delete
+	lb.OnEndpointsUpdate([]api.Endpoints{endpoint})
 	p.OnServiceUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
@@ -588,15 +589,14 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]api.Endpoints{
-		{
-			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
-			}},
-		},
-	})
+	endpoint := api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
+		}},
+	}
+	lb.OnEndpointsUpdate([]api.Endpoints{endpoint})
 
 	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), ipttest.NewFake(), net.ParseIP("127.0.0.1"), nil, time.Minute, udpIdleTimeoutForTest)
 	if err != nil {
@@ -621,6 +621,8 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
+	// need to add endpoint here because it got clean up during service delete
+	lb.OnEndpointsUpdate([]api.Endpoints{endpoint})
 	p.OnServiceUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
@@ -785,15 +787,14 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 func TestProxyUpdatePortal(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
-	lb.OnEndpointsUpdate([]api.Endpoints{
-		{
-			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-				Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
-			}},
-		},
-	})
+	endpoint := api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+			Ports:     []api.EndpointPort{{Name: "p", Port: tcpServerPort}},
+		}},
+	}
+	lb.OnEndpointsUpdate([]api.Endpoints{endpoint})
 
 	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), ipttest.NewFake(), net.ParseIP("127.0.0.1"), nil, time.Minute, udpIdleTimeoutForTest)
 	if err != nil {
@@ -842,6 +843,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 			Protocol: "TCP",
 		}}},
 	}})
+	lb.OnEndpointsUpdate([]api.Endpoints{endpoint})
 	svcInfo, exists = p.getServiceInfo(service)
 	if !exists {
 		t.Fatalf("service with ClusterIP set not found in the proxy")
