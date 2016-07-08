@@ -65,10 +65,10 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	return node.(*api.Node), nil
 }
 
-// podMetadata defines a type, that is an expected type that is passed
-// as metadata for predicate functions
+// podMetadata is a type that is passed as metadata for predicate functions
 type predicateMetadata struct {
 	podBestEffort bool
+	podRequest    *resourceRequest
 }
 
 func PredicateMetadata(pod *api.Pod) interface{} {
@@ -78,6 +78,7 @@ func PredicateMetadata(pod *api.Pod) interface{} {
 	}
 	return &predicateMetadata{
 		podBestEffort: isPodBestEffort(pod),
+		podRequest:    getResourceRequest(pod),
 	}
 }
 
@@ -405,7 +406,7 @@ type resourceRequest struct {
 	nvidiaGPU int64
 }
 
-func getResourceRequest(pod *api.Pod) resourceRequest {
+func getResourceRequest(pod *api.Pod) *resourceRequest {
 	result := resourceRequest{}
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
@@ -423,7 +424,7 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 			result.milliCPU = cpu
 		}
 	}
-	return result
+	return &result
 }
 
 func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingNvidiaGPU []*api.Pod) {
@@ -477,7 +478,15 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		return false,
 			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), allowedPodNumber)
 	}
-	podRequest := getResourceRequest(pod)
+
+	var podRequest *resourceRequest
+	predicateMeta, ok := meta.(*predicateMetadata)
+	if ok {
+		podRequest = predicateMeta.podRequest
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		podRequest = getResourceRequest(pod)
+	}
 	if podRequest.milliCPU == 0 && podRequest.memory == 0 && podRequest.nvidiaGPU == 0 {
 		return true, nil
 	}
