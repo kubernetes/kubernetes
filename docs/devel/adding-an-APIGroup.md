@@ -79,9 +79,10 @@ cmd/libs/go2idl/ tool.
     2. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
        with the comment `// +k8s:deepcopy-gen=package,register`, to catch the
        attention of our generation tools.
-    3. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
-       with the comment `// +genconversion=true`, to catch the attention of our
-       gen-conversion script.
+    3. Make sure your `pkg/apis/<group>/<version>` directory has a doc.go file
+       with the comment `// +k8s:conversion-gen=<internal-pkg>`, to catch the
+       attention of our generation tools.  For most APIs the only target you
+       need is `k8s.io/kubernetes/pkg/apis/<group>` (your internal API).
     4. Run hack/update-all.sh.
 
 2. Generate files for Ugorji codec:

@@ -118,7 +118,9 @@ func (p *Package) Has(name string) bool {
 	return has
 }
 
-// Get (or add) the given type
+// Type gets the given Type in this Package.  If the Type is not already
+// defined, this will add it and return the new Type value.  The caller is
+// expected to finish initialization.
 func (p *Package) Type(typeName string) *Type {
 	if t, ok := p.Types[typeName]; ok {
 		return t
@@ -135,9 +137,10 @@ func (p *Package) Type(typeName string) *Type {
 	return t
 }
 
-// Get (or add) the given function. If a function is added, it's the caller's
-// responsibility to finish construction of the function by setting Underlying
-// to the correct type.
+// Function gets the given function Type in this Package. If the function is
+// not already defined, this will add it.  If a function is added, it's the
+// caller's responsibility to finish construction of the function by setting
+// Underlying to the correct type.
 func (p *Package) Function(funcName string) *Type {
 	if t, ok := p.Functions[funcName]; ok {
 		return t
@@ -148,7 +151,8 @@ func (p *Package) Function(funcName string) *Type {
 	return t
 }
 
-// Get (or add) the given varaible. If a variable is added, it's the caller's
+// Variable gets the given varaible Type in this Package. If the variable is
+// not already defined, this will add it. If a variable is added, it's the caller's
 // responsibility to finish construction of the variable by setting Underlying
 // to the correct type.
 func (p *Package) Variable(varName string) *Type {
@@ -169,19 +173,20 @@ func (p *Package) HasImport(packageName string) bool {
 }
 
 // Universe is a map of all packages. The key is the package name, but you
-// should use Get() or Package() instead of direct access.
+// should use Package(), Type(), Function(), or Variable() instead of direct
+// access.
 type Universe map[string]*Package
 
-// Get returns the canonical type for the given fully-qualified name. Builtin
+// Type returns the canonical type for the given fully-qualified name. Builtin
 // types will always be found, even if they haven't been explicitly added to
-// the map. If a non-existing type is requested, u will create (a marker for)
+// the map. If a non-existing type is requested, this will create (a marker for)
 // it.
 func (u Universe) Type(n Name) *Type {
 	return u.Package(n.Package).Type(n.Name)
 }
 
 // Function returns the canonical function for the given fully-qualified name.
-// If a non-existing function is requested, u will create (a marker for) it.
+// If a non-existing function is requested, this will create (a marker for) it.
 // If a marker is created, it's the caller's responsibility to finish
 // construction of the function by setting Underlying to the correct type.
 func (u Universe) Function(n Name) *Type {
@@ -189,7 +194,7 @@ func (u Universe) Function(n Name) *Type {
 }
 
 // Variable returns the canonical variable for the given fully-qualified name.
-// If a non-existing variable is requested, u will create (a marker for) it.
+// If a non-existing variable is requested, this will create (a marker for) it.
 // If a marker is created, it's the caller's responsibility to finish
 // construction of the variable by setting Underlying to the correct type.
 func (u Universe) Variable(n Name) *Type {
@@ -205,7 +210,10 @@ func (u Universe) AddImports(packagePath string, importPaths ...string) {
 	}
 }
 
-// Get (create if needed) the package.
+// Package returns the Package for the given path.
+// If a non-existing package is requested, this will create (a marker for) it.
+// If a marker is created, it's the caller's responsibility to finish
+// construction of the package.
 func (u Universe) Package(packagePath string) *Package {
 	if p, ok := u[packagePath]; ok {
 		return p

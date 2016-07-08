@@ -4785,6 +4785,90 @@ func autoConvert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurity
 	return nil
 }
 
+func autoConvert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *PodSecurityContext, s conversion.Scope) error {
+	if in.SELinuxOptions != nil {
+		in, out := &in.SELinuxOptions, &out.SELinuxOptions
+		*out = new(SELinuxOptions)
+		if err := Convert_api_SELinuxOptions_To_v1_SELinuxOptions(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	out.RunAsUser = in.RunAsUser
+	out.RunAsNonRoot = in.RunAsNonRoot
+	out.SupplementalGroups = in.SupplementalGroups
+	out.FSGroup = in.FSGroup
+	return nil
+}
+
+func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
+	SetDefaults_PodSpec(in)
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]api.Volume, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Volume_To_api_Volume(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Volumes = nil
+	}
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]api.Container, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Container_To_api_Container(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainers = nil
+	}
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]api.Container, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Container_To_api_Container(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
+	}
+	out.RestartPolicy = api.RestartPolicy(in.RestartPolicy)
+	out.TerminationGracePeriodSeconds = in.TerminationGracePeriodSeconds
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
+	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
+	out.NodeSelector = in.NodeSelector
+	out.ServiceAccountName = in.ServiceAccountName
+	out.NodeName = in.NodeName
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = new(api.PodSecurityContext)
+		if err := Convert_v1_PodSecurityContext_To_api_PodSecurityContext(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
+	}
+	if in.ImagePullSecrets != nil {
+		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
+		*out = make([]api.LocalObjectReference, len(*in))
+		for i := range *in {
+			if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ImagePullSecrets = nil
+	}
+	out.Hostname = in.Hostname
+	out.Subdomain = in.Subdomain
+	return nil
+}
+
 func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes

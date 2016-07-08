@@ -150,13 +150,14 @@ executor-bindall
 executor-logv
 executor-path
 executor-suicide-timeout
+exit-on-lock-contention
 experimental-flannel-overlay
 experimental-keystone-url
 experimental-nvidia-gpus
 experimental-prefix
 external-hostname
 external-ip
-exit-on-lock-contention
+extra-peer-dirs
 failover-timeout
 failure-domains
 fake-clientset

@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
+// +k8s:conversion-gen=k8s.io/kubernetes/federation/apis/federation
 
-// +genconversion=true
 package v1beta1

@@ -47,7 +47,6 @@ ${clientgen} --clientset-name="release_1_4" --input="api/v1,extensions/v1beta1,a
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/" --included-types-overrides="api/Service"   "$@"
 ${clientgen} --clientset-name=federation_release_1_4 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1" --included-types-overrides="api/v1/Service"   "$@"
-${conversiongen} "$@"
 ${setgen} "$@"
 
 # You may add additional calls of code generators like set-gen above.
@@ -73,9 +72,22 @@ DEEP_COPY_DIRS=$(
         | xargs dirname \
         | sort -u
     )
-INPUTS=$(
+DEEPCOPY_INPUTS=$(
     for d in ${DEEP_COPY_DIRS}; do
         echo k8s.io/kubernetes/$d
     done | paste -sd,
     )
-${deepcopygen} -i ${INPUTS}
+${deepcopygen} -i ${DEEPCOPY_INPUTS}
+
+CONVERSION_DIRS=$(
+    grep '^// *+k8s:conversion-gen=' ${ALL_K8S_TAG_FILES} \
+        | cut -f1 -d:                                     \
+        | xargs dirname                                   \
+        | sort -u                                         \
+    )
+CONVERSION_INPUTS=$(
+     for d in ${CONVERSION_DIRS}; do
+         echo k8s.io/kubernetes/$d
+     done | paste -sd,
+     )
+${conversiongen} -i ${CONVERSION_INPUTS}
