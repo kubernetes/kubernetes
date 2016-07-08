@@ -22,8 +22,8 @@ import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
-func DeepCopy_resource_Quantity(in Quantity, out *Quantity, c *conversion.Cloner) error {
-	*out = in
+func DeepCopy_resource_Quantity(in *Quantity, out *Quantity, c *conversion.Cloner) error {
+	*out = *in
 	if in.d.Dec != nil {
 		tmp := &inf.Dec{}
 		out.d.Dec = tmp.Set(in.d.Dec)
