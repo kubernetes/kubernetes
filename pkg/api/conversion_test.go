@@ -38,15 +38,7 @@ func BenchmarkPodConversion(b *testing.B) {
 	}
 
 	// add a fixed item
-	data, err := ioutil.ReadFile("pod_example.json")
-	if err != nil {
-		b.Fatalf("Unexpected error while reading file: %v", err)
-	}
-	var pod api.Pod
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &pod); err != nil {
-		b.Fatalf("Unexpected error decoding pod: %v", err)
-	}
-	items = append(items, pod)
+	items = append(items, benchmarkPod)
 	width := len(items)
 
 	scheme := api.Scheme
