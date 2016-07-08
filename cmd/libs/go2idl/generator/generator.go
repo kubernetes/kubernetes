@@ -152,6 +152,9 @@ type Context struct {
 	// All the types, in case you want to look up something.
 	Universe types.Universe
 
+	// All the user-specified packages.  This is after recursive expansion.
+	Inputs []string
+
 	// The canonical ordering of the types (will be filtered by both the
 	// Package's and Generator's Filter methods).
 	Order []*types.Type
@@ -168,14 +171,15 @@ type Context struct {
 // NewContext generates a context from the given builder, naming systems, and
 // the naming system you wish to construct the canonical ordering from.
 func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrderName string) (*Context, error) {
-	u, err := b.FindTypes()
+	universe, err := b.FindTypes()
 	if err != nil {
 		return nil, err
 	}
 
 	c := &Context{
 		Namers:   namer.NameSystems{},
-		Universe: u,
+		Universe: universe,
+		Inputs:   b.FindPackages(),
 		FileTypes: map[string]FileType{
 			GolangFileType: NewGolangFile(),
 		},
@@ -185,7 +189,7 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 		c.Namers[name] = systemNamer
 		if name == canonicalOrderName {
 			orderer := namer.Orderer{Namer: systemNamer}
-			c.Order = orderer.OrderUniverse(u)
+			c.Order = orderer.OrderUniverse(universe)
 		}
 	}
 	return c, nil

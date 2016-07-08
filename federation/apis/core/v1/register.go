@@ -34,7 +34,6 @@ func AddToScheme(scheme *runtime.Scheme) {
 	addKnownTypes(scheme)
 	addConversionFuncs(scheme)
 	addDefaultingFuncs(scheme)
-	addDeepCopyFuncs(scheme)
 }
 
 // Adds the list of known types to api.Scheme.

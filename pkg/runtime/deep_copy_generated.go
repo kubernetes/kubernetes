@@ -49,9 +49,7 @@ func DeepCopy_runtime_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner)
 }
 
 func DeepCopy_runtime_Unknown(in Unknown, out *Unknown, c *conversion.Cloner) error {
-	if err := DeepCopy_runtime_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if in.Raw != nil {
 		in, out := in.Raw, &out.Raw
 		*out = make([]byte, len(in))

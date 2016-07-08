@@ -72,7 +72,7 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 			"Group":             namer.IC(g.group),
 			"realClientPackage": filepath.Base(g.realClientPath),
 		}
-		namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {
 			sw.Do(getterImplNamespaced, wrapper)
 		} else {

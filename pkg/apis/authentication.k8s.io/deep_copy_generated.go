@@ -22,7 +22,6 @@ package authentication
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -39,12 +38,8 @@ func init() {
 }
 
 func DeepCopy_authenticationk8sio_TokenReview(in TokenReview, out *TokenReview, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_authenticationk8sio_TokenReviewSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.Spec = in.Spec
 	if err := DeepCopy_authenticationk8sio_TokenReviewStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}

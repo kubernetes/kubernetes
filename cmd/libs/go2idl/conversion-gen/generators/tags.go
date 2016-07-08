@@ -14,19 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resource
+package generators
 
 import (
-	inf "gopkg.in/inf.v0"
-
-	conversion "k8s.io/kubernetes/pkg/conversion"
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 )
 
-func DeepCopy_resource_Quantity(in Quantity, out *Quantity, c *conversion.Cloner) error {
-	*out = in
-	if in.d.Dec != nil {
-		tmp := &inf.Dec{}
-		out.d.Dec = tmp.Set(in.d.Dec)
+// extractBoolTagOrDie gets the comment-tags for the key and asserts that, if
+// it exists, the value is boolean.  If the tag did not exist, it returns
+// defaultVal.
+func extractBoolTagOrDie(key string, defaultVal bool, lines []string) bool {
+	val, err := types.ExtractSingleBoolCommentTag("+", key, defaultVal, lines)
+	if err != nil {
+		glog.Fatalf(err.Error())
 	}
-	return nil
+	return val
 }

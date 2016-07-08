@@ -22,7 +22,6 @@ package extensions
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
@@ -97,9 +96,7 @@ func DeepCopy_extensions_APIVersion(in APIVersion, out *APIVersion, c *conversio
 
 func DeepCopy_extensions_CustomMetricCurrentStatus(in CustomMetricCurrentStatus, out *CustomMetricCurrentStatus, c *conversion.Cloner) error {
 	out.Name = in.Name
-	if err := resource.DeepCopy_resource_Quantity(in.CurrentValue, &out.CurrentValue, c); err != nil {
-		return err
-	}
+	out.CurrentValue = in.CurrentValue.DeepCopy()
 	return nil
 }
 
@@ -120,9 +117,7 @@ func DeepCopy_extensions_CustomMetricCurrentStatusList(in CustomMetricCurrentSta
 
 func DeepCopy_extensions_CustomMetricTarget(in CustomMetricTarget, out *CustomMetricTarget, c *conversion.Cloner) error {
 	out.Name = in.Name
-	if err := resource.DeepCopy_resource_Quantity(in.TargetValue, &out.TargetValue, c); err != nil {
-		return err
-	}
+	out.TargetValue = in.TargetValue.DeepCopy()
 	return nil
 }
 
@@ -142,28 +137,20 @@ func DeepCopy_extensions_CustomMetricTargetList(in CustomMetricTargetList, out *
 }
 
 func DeepCopy_extensions_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
 	if err := DeepCopy_extensions_DaemonSetSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_extensions_DaemonSetStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Status = in.Status
 	return nil
 }
 
 func DeepCopy_extensions_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]DaemonSet, len(in))
@@ -202,28 +189,20 @@ func DeepCopy_extensions_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatu
 }
 
 func DeepCopy_extensions_Deployment(in Deployment, out *Deployment, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
 	if err := DeepCopy_extensions_DeploymentSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_extensions_DeploymentStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Status = in.Status
 	return nil
 }
 
 func DeepCopy_extensions_DeploymentList(in DeploymentList, out *DeploymentList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]Deployment, len(in))
@@ -239,9 +218,7 @@ func DeepCopy_extensions_DeploymentList(in DeploymentList, out *DeploymentList, 
 }
 
 func DeepCopy_extensions_DeploymentRollback(in DeploymentRollback, out *DeploymentRollback, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	out.Name = in.Name
 	if in.UpdatedAnnotations != nil {
 		in, out := in.UpdatedAnnotations, &out.UpdatedAnnotations
@@ -252,9 +229,7 @@ func DeepCopy_extensions_DeploymentRollback(in DeploymentRollback, out *Deployme
 	} else {
 		out.UpdatedAnnotations = nil
 	}
-	if err := DeepCopy_extensions_RollbackConfig(in.RollbackTo, &out.RollbackTo, c); err != nil {
-		return err
-	}
+	out.RollbackTo = in.RollbackTo
 	return nil
 }
 
@@ -287,9 +262,7 @@ func DeepCopy_extensions_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, 
 	if in.RollbackTo != nil {
 		in, out := in.RollbackTo, &out.RollbackTo
 		*out = new(RollbackConfig)
-		if err := DeepCopy_extensions_RollbackConfig(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.RollbackTo = nil
 	}
@@ -310,9 +283,7 @@ func DeepCopy_extensions_DeploymentStrategy(in DeploymentStrategy, out *Deployme
 	if in.RollingUpdate != nil {
 		in, out := in.RollingUpdate, &out.RollingUpdate
 		*out = new(RollingUpdateDeployment)
-		if err := DeepCopy_extensions_RollingUpdateDeployment(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.RollingUpdate = nil
 	}
@@ -325,9 +296,7 @@ func DeepCopy_extensions_FSGroupStrategyOptions(in FSGroupStrategyOptions, out *
 		in, out := in.Ranges, &out.Ranges
 		*out = make([]IDRange, len(in))
 		for i := range in {
-			if err := DeepCopy_extensions_IDRange(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Ranges = nil
@@ -337,9 +306,7 @@ func DeepCopy_extensions_FSGroupStrategyOptions(in FSGroupStrategyOptions, out *
 
 func DeepCopy_extensions_HTTPIngressPath(in HTTPIngressPath, out *HTTPIngressPath, c *conversion.Cloner) error {
 	out.Path = in.Path
-	if err := DeepCopy_extensions_IngressBackend(in.Backend, &out.Backend, c); err != nil {
-		return err
-	}
+	out.Backend = in.Backend
 	return nil
 }
 
@@ -348,9 +315,7 @@ func DeepCopy_extensions_HTTPIngressRuleValue(in HTTPIngressRuleValue, out *HTTP
 		in, out := in.Paths, &out.Paths
 		*out = make([]HTTPIngressPath, len(in))
 		for i := range in {
-			if err := DeepCopy_extensions_HTTPIngressPath(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Paths = nil
@@ -371,9 +336,7 @@ func DeepCopy_extensions_IDRange(in IDRange, out *IDRange, c *conversion.Cloner)
 }
 
 func DeepCopy_extensions_Ingress(in Ingress, out *Ingress, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -388,19 +351,13 @@ func DeepCopy_extensions_Ingress(in Ingress, out *Ingress, c *conversion.Cloner)
 
 func DeepCopy_extensions_IngressBackend(in IngressBackend, out *IngressBackend, c *conversion.Cloner) error {
 	out.ServiceName = in.ServiceName
-	if err := intstr.DeepCopy_intstr_IntOrString(in.ServicePort, &out.ServicePort, c); err != nil {
-		return err
-	}
+	out.ServicePort = in.ServicePort
 	return nil
 }
 
 func DeepCopy_extensions_IngressList(in IngressList, out *IngressList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]Ingress, len(in))
@@ -440,9 +397,7 @@ func DeepCopy_extensions_IngressSpec(in IngressSpec, out *IngressSpec, c *conver
 	if in.Backend != nil {
 		in, out := in.Backend, &out.Backend
 		*out = new(IngressBackend)
-		if err := DeepCopy_extensions_IngressBackend(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.Backend = nil
 	}
@@ -491,9 +446,7 @@ func DeepCopy_extensions_IngressTLS(in IngressTLS, out *IngressTLS, c *conversio
 }
 
 func DeepCopy_extensions_NetworkPolicy(in NetworkPolicy, out *NetworkPolicy, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -530,12 +483,8 @@ func DeepCopy_extensions_NetworkPolicyIngressRule(in NetworkPolicyIngressRule, o
 }
 
 func DeepCopy_extensions_NetworkPolicyList(in NetworkPolicyList, out *NetworkPolicyList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]NetworkPolicy, len(in))
@@ -583,9 +532,7 @@ func DeepCopy_extensions_NetworkPolicyPort(in NetworkPolicyPort, out *NetworkPol
 	if in.Port != nil {
 		in, out := in.Port, &out.Port
 		*out = new(intstr.IntOrString)
-		if err := intstr.DeepCopy_intstr_IntOrString(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.Port = nil
 	}
@@ -611,9 +558,7 @@ func DeepCopy_extensions_NetworkPolicySpec(in NetworkPolicySpec, out *NetworkPol
 }
 
 func DeepCopy_extensions_PodSecurityPolicy(in PodSecurityPolicy, out *PodSecurityPolicy, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -624,12 +569,8 @@ func DeepCopy_extensions_PodSecurityPolicy(in PodSecurityPolicy, out *PodSecurit
 }
 
 func DeepCopy_extensions_PodSecurityPolicyList(in PodSecurityPolicyList, out *PodSecurityPolicyList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]PodSecurityPolicy, len(in))
@@ -687,9 +628,7 @@ func DeepCopy_extensions_PodSecurityPolicySpec(in PodSecurityPolicySpec, out *Po
 		in, out := in.HostPorts, &out.HostPorts
 		*out = make([]HostPortRange, len(in))
 		for i := range in {
-			if err := DeepCopy_extensions_HostPortRange(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.HostPorts = nil
@@ -713,28 +652,20 @@ func DeepCopy_extensions_PodSecurityPolicySpec(in PodSecurityPolicySpec, out *Po
 }
 
 func DeepCopy_extensions_ReplicaSet(in ReplicaSet, out *ReplicaSet, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
 	if err := DeepCopy_extensions_ReplicaSetSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_extensions_ReplicaSetStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
+	out.Status = in.Status
 	return nil
 }
 
 func DeepCopy_extensions_ReplicaSetList(in ReplicaSetList, out *ReplicaSetList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]ReplicaSet, len(in))
@@ -774,9 +705,7 @@ func DeepCopy_extensions_ReplicaSetStatus(in ReplicaSetStatus, out *ReplicaSetSt
 }
 
 func DeepCopy_extensions_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	return nil
 }
 
@@ -786,12 +715,8 @@ func DeepCopy_extensions_RollbackConfig(in RollbackConfig, out *RollbackConfig, 
 }
 
 func DeepCopy_extensions_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
-	if err := intstr.DeepCopy_intstr_IntOrString(in.MaxUnavailable, &out.MaxUnavailable, c); err != nil {
-		return err
-	}
-	if err := intstr.DeepCopy_intstr_IntOrString(in.MaxSurge, &out.MaxSurge, c); err != nil {
-		return err
-	}
+	out.MaxUnavailable = in.MaxUnavailable
+	out.MaxSurge = in.MaxSurge
 	return nil
 }
 
@@ -801,9 +726,7 @@ func DeepCopy_extensions_RunAsUserStrategyOptions(in RunAsUserStrategyOptions, o
 		in, out := in.Ranges, &out.Ranges
 		*out = make([]IDRange, len(in))
 		for i := range in {
-			if err := DeepCopy_extensions_IDRange(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Ranges = nil
@@ -816,9 +739,7 @@ func DeepCopy_extensions_SELinuxStrategyOptions(in SELinuxStrategyOptions, out *
 	if in.SELinuxOptions != nil {
 		in, out := in.SELinuxOptions, &out.SELinuxOptions
 		*out = new(api.SELinuxOptions)
-		if err := api.DeepCopy_api_SELinuxOptions(*in, *out, c); err != nil {
-			return err
-		}
+		**out = *in
 	} else {
 		out.SELinuxOptions = nil
 	}
@@ -826,15 +747,11 @@ func DeepCopy_extensions_SELinuxStrategyOptions(in SELinuxStrategyOptions, out *
 }
 
 func DeepCopy_extensions_Scale(in Scale, out *Scale, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_extensions_ScaleSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
+	out.Spec = in.Spec
 	if err := DeepCopy_extensions_ScaleStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
@@ -866,9 +783,7 @@ func DeepCopy_extensions_SupplementalGroupsStrategyOptions(in SupplementalGroups
 		in, out := in.Ranges, &out.Ranges
 		*out = make([]IDRange, len(in))
 		for i := range in {
-			if err := DeepCopy_extensions_IDRange(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Ranges = nil
@@ -877,9 +792,7 @@ func DeepCopy_extensions_SupplementalGroupsStrategyOptions(in SupplementalGroups
 }
 
 func DeepCopy_extensions_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyResource, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -888,9 +801,7 @@ func DeepCopy_extensions_ThirdPartyResource(in ThirdPartyResource, out *ThirdPar
 		in, out := in.Versions, &out.Versions
 		*out = make([]APIVersion, len(in))
 		for i := range in {
-			if err := DeepCopy_extensions_APIVersion(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+			(*out)[i] = in[i]
 		}
 	} else {
 		out.Versions = nil
@@ -899,9 +810,7 @@ func DeepCopy_extensions_ThirdPartyResource(in ThirdPartyResource, out *ThirdPar
 }
 
 func DeepCopy_extensions_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
@@ -916,12 +825,8 @@ func DeepCopy_extensions_ThirdPartyResourceData(in ThirdPartyResourceData, out *
 }
 
 func DeepCopy_extensions_ThirdPartyResourceDataList(in ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]ThirdPartyResourceData, len(in))
@@ -937,12 +842,8 @@ func DeepCopy_extensions_ThirdPartyResourceDataList(in ThirdPartyResourceDataLis
 }
 
 func DeepCopy_extensions_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := in.Items, &out.Items
 		*out = make([]ThirdPartyResource, len(in))
