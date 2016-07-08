@@ -25,14 +25,14 @@ import (
 type Cloner struct {
 	// Map from the type to a function which can do the deep copy.
 	deepCopyFuncs          map[reflect.Type]reflect.Value
-	generatedDeepCopyFuncs map[reflect.Type]reflect.Value
+	generatedDeepCopyFuncs map[reflect.Type]func(in interface{}, out interface{}, c *Cloner) error
 }
 
 // NewCloner creates a new Cloner object.
 func NewCloner() *Cloner {
 	c := &Cloner{
 		deepCopyFuncs:          map[reflect.Type]reflect.Value{},
-		generatedDeepCopyFuncs: map[reflect.Type]reflect.Value{},
+		generatedDeepCopyFuncs: map[reflect.Type]func(in interface{}, out interface{}, c *Cloner) error{},
 	}
 	if err := c.RegisterDeepCopyFunc(byteSliceDeepCopy); err != nil {
 		// If one of the deep-copy functions is malformed, detect it immediately.
@@ -103,15 +103,17 @@ func (c *Cloner) RegisterDeepCopyFunc(deepCopyFunc interface{}) error {
 	return nil
 }
 
+// GeneratedDeepCopyFunc bundles an untyped generated deep-copy function of a type
+// with a reflection type object used as a key to lookup the deep-copy function.
+type GeneratedDeepCopyFunc struct {
+	Fn     func(in interface{}, out interface{}, c *Cloner) error
+	InType reflect.Type
+}
+
 // Similar to RegisterDeepCopyFunc, but registers deep copy function that were
 // automatically generated.
-func (c *Cloner) RegisterGeneratedDeepCopyFunc(deepCopyFunc interface{}) error {
-	fv := reflect.ValueOf(deepCopyFunc)
-	ft := fv.Type()
-	if err := verifyDeepCopyFunctionSignature(ft); err != nil {
-		return err
-	}
-	c.generatedDeepCopyFuncs[ft.In(0)] = fv
+func (c *Cloner) RegisterGeneratedDeepCopyFunc(fn GeneratedDeepCopyFunc) error {
+	c.generatedDeepCopyFuncs[fn.InType] = fn.Fn
 	return nil
 }
 
@@ -146,7 +148,10 @@ func (c *Cloner) deepCopy(src reflect.Value) (reflect.Value, error) {
 		return c.customDeepCopy(src, fv)
 	}
 	if fv, ok := c.generatedDeepCopyFuncs[inType]; ok {
-		return c.customDeepCopy(src, fv)
+		var outValue reflect.Value
+		outValue = reflect.New(inType.Elem())
+		err := fv(src.Interface(), outValue.Interface(), c)
+		return outValue, err
 	}
 	return c.defaultDeepCopy(src)
 }
