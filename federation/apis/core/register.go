@@ -61,6 +61,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&api.Service{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
+		&api.Secret{},
+		&api.SecretList{},
 	)
 
 	// Register Unversioned types under their own special group

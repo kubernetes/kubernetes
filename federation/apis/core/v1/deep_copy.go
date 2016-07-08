@@ -30,6 +30,8 @@ func addDeepCopyFuncs(scheme *runtime.Scheme) {
 		v1.DeepCopy_v1_ObjectMeta,
 		v1.DeepCopy_v1_ObjectReference,
 		v1.DeepCopy_v1_OwnerReference,
+		v1.DeepCopy_v1_Secret,
+		v1.DeepCopy_v1_SecretList,
 		v1.DeepCopy_v1_Service,
 		v1.DeepCopy_v1_ServiceList,
 		v1.DeepCopy_v1_ServicePort,
