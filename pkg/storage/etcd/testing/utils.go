@@ -113,8 +113,14 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 		t.Fatal(err)
 	}
 
+	// Allow test launches to control where etcd data goes, for space or performance reasons
+	baseDir := os.Getenv("TEST_ETCD_DIR")
+	if len(baseDir) == 0 {
+		baseDir = os.TempDir()
+	}
+
 	if https {
-		m.CertificatesDir, err = ioutil.TempDir(os.TempDir(), "etcd_certificates")
+		m.CertificatesDir, err = ioutil.TempDir(baseDir, "etcd_certificates")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -147,7 +153,7 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 	}
 
 	m.Name = name
-	m.DataDir, err = ioutil.TempDir(os.TempDir(), "etcd")
+	m.DataDir, err = ioutil.TempDir(baseDir, "etcd")
 	if err != nil {
 		t.Fatal(err)
 	}
