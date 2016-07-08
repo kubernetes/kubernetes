@@ -425,7 +425,7 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	funcName := g.funcNameTmpl(t)
-	sw.Do(fmt.Sprintf("func %s(in $.type|raw$, out *$.type|raw$, c *$.Cloner|raw$) error {\n", funcName), g.withGlobals(argsFromType(t)))
+	sw.Do(fmt.Sprintf("func %s(in *$.type|raw$, out *$.type|raw$, c *$.Cloner|raw$) error {\n", funcName), g.withGlobals(argsFromType(t)))
 	g.generateFor(t, sw)
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
@@ -459,7 +459,7 @@ func (g *genDeepCopy) generateFor(t *types.Type, sw *generator.SnippetWriter) {
 }
 
 func (g *genDeepCopy) doBuiltin(t *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("*out = in\n", nil)
+	sw.Do("*out = *in\n", nil)
 }
 
 func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
@@ -467,63 +467,63 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	if t.Key.IsAssignable() {
 		switch {
 		case hasDeepCopyMethod(t.Elem):
-			sw.Do("for key, val := range in {\n", nil)
+			sw.Do("for key, val := range *in {\n", nil)
 			sw.Do("(*out)[key] = val.DeepCopy()\n", nil)
 			sw.Do("}\n", nil)
 		case t.Elem.IsAnonymousStruct():
-			sw.Do("for key := range in {\n", nil)
+			sw.Do("for key := range *in {\n", nil)
 			sw.Do("(*out)[key] = struct{}{}\n", nil)
 			sw.Do("}\n", nil)
 		case t.Elem.IsAssignable():
-			sw.Do("for key, val := range in {\n", nil)
+			sw.Do("for key, val := range *in {\n", nil)
 			sw.Do("(*out)[key] = val\n", nil)
 			sw.Do("}\n", nil)
 		default:
-			sw.Do("for key, val := range in {\n", nil)
+			sw.Do("for key, val := range *in {\n", nil)
 			if g.copyableAndInBounds(t.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
 				funcName := g.funcNameTmpl(t.Elem)
-				sw.Do(fmt.Sprintf("if err := %s(val, newVal, c); err != nil {\n", funcName), argsFromType(t.Elem))
+				sw.Do(fmt.Sprintf("if err := %s(&val, newVal, c); err != nil {\n", funcName), argsFromType(t.Elem))
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 				sw.Do("(*out)[key] = *newVal\n", nil)
 			} else {
-				sw.Do("if newVal, err := c.DeepCopy(val); err != nil {\n", nil)
+				sw.Do("if newVal, err := c.DeepCopy(&val); err != nil {\n", nil)
 				sw.Do("return err\n", nil)
 				sw.Do("} else {\n", nil)
-				sw.Do("(*out)[key] = newVal.($.|raw$)\n", t.Elem)
+				sw.Do("(*out)[key] = *newVal.(*$.|raw$)\n", t.Elem)
 				sw.Do("}\n", nil)
 			}
 			sw.Do("}\n", nil)
 		}
 	} else {
 		// TODO: Implement it when necessary.
-		sw.Do("for range in {\n", nil)
+		sw.Do("for range *in {\n", nil)
 		sw.Do("// FIXME: Copying unassignable keys unsupported $.|raw$\n", t.Key)
 		sw.Do("}\n", nil)
 	}
 }
 
 func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("*out = make($.|raw$, len(in))\n", t)
+	sw.Do("*out = make($.|raw$, len(*in))\n", t)
 	if t.Elem.Kind == types.Builtin {
-		sw.Do("copy(*out, in)\n", nil)
+		sw.Do("copy(*out, *in)\n", nil)
 	} else {
-		sw.Do("for i := range in {\n", nil)
+		sw.Do("for i := range *in {\n", nil)
 		if hasDeepCopyMethod(t.Elem) {
-			sw.Do("(*out)[i] = in[i].DeepCopy()\n", nil)
+			sw.Do("(*out)[i] = (*in)[i].DeepCopy()\n", nil)
 		} else if t.Elem.IsAssignable() {
-			sw.Do("(*out)[i] = in[i]\n", nil)
+			sw.Do("(*out)[i] = (*in)[i]\n", nil)
 		} else if g.copyableAndInBounds(t.Elem) {
 			funcName := g.funcNameTmpl(t.Elem)
-			sw.Do(fmt.Sprintf("if err := %s(in[i], &(*out)[i], c); err != nil {\n", funcName), argsFromType(t.Elem))
+			sw.Do(fmt.Sprintf("if err := %s(&(*in)[i], &(*out)[i], c); err != nil {\n", funcName), argsFromType(t.Elem))
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		} else {
-			sw.Do("if newVal, err := c.DeepCopy(in[i]); err != nil {\n", nil)
+			sw.Do("if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {\n", nil)
 			sw.Do("return err\n", nil)
 			sw.Do("} else {\n", nil)
-			sw.Do("(*out)[i] = newVal.($.|raw$)\n", t.Elem)
+			sw.Do("(*out)[i] = *newVal.(*$.|raw$)\n", t.Elem)
 			sw.Do("}\n", nil)
 		}
 		sw.Do("}\n", nil)
@@ -547,7 +547,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("out.$.name$ = in.$.name$\n", args)
 		case types.Map, types.Slice, types.Pointer:
 			sw.Do("if in.$.name$ != nil {\n", args)
-			sw.Do("in, out := in.$.name$, &out.$.name$\n", args)
+			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
 			g.generateFor(t, sw)
 			sw.Do("} else {\n", nil)
 			sw.Do("out.$.name$ = nil\n", args)
@@ -559,23 +559,23 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 			} else if g.copyableAndInBounds(t) {
 				funcName := g.funcNameTmpl(t)
-				sw.Do(fmt.Sprintf("if err := %s(in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
+				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 			} else {
-				sw.Do("if newVal, err := c.DeepCopy(in.$.name$); err != nil {\n", args)
+				sw.Do("if newVal, err := c.DeepCopy(&in.$.name$); err != nil {\n", args)
 				sw.Do("return err\n", nil)
 				sw.Do("} else {\n", nil)
-				sw.Do("out.$.name$ = newVal.($.type|raw$)\n", args)
+				sw.Do("out.$.name$ = *newVal.(*$.type|raw$)\n", args)
 				sw.Do("}\n", nil)
 			}
 		default:
 			sw.Do("if in.$.name$ == nil {\n", args)
 			sw.Do("out.$.name$ = nil\n", args)
-			sw.Do("} else if newVal, err := c.DeepCopy(in.$.name$); err != nil {\n", args)
+			sw.Do("} else if newVal, err := c.DeepCopy(&in.$.name$); err != nil {\n", args)
 			sw.Do("return err\n", nil)
 			sw.Do("} else {\n", nil)
-			sw.Do("out.$.name$ = newVal.($.type|raw$)\n", args)
+			sw.Do("out.$.name$ = *newVal.(*$.type|raw$)\n", args)
 			sw.Do("}\n", nil)
 		}
 	}
@@ -587,13 +587,15 @@ func (g *genDeepCopy) doInterface(t *types.Type, sw *generator.SnippetWriter) {
 }
 
 func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("*out = new($.Elem|raw$)\n", t)
 	if hasDeepCopyMethod(t.Elem) {
-		sw.Do("**out = in.DeepCopy()\n", nil)
+		sw.Do("*out = new($.Elem|raw$)\n", t)
+		sw.Do("**out = (*in).DeepCopy()\n", nil)
 	} else if t.Elem.IsAssignable() {
-		sw.Do("**out = *in", nil)
+		sw.Do("*out = new($.Elem|raw$)\n", t)
+		sw.Do("**out = **in", nil)
 	} else if g.copyableAndInBounds(t.Elem) {
 		funcName := g.funcNameTmpl(t.Elem)
+		sw.Do("*out = new($.Elem|raw$)\n", t)
 		sw.Do(fmt.Sprintf("if err := %s(*in, *out, c); err != nil {\n", funcName), argsFromType(t.Elem))
 		sw.Do("return err\n", nil)
 		sw.Do("}\n", nil)
@@ -601,7 +603,7 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("if newVal, err := c.DeepCopy(*in); err != nil {\n", nil)
 		sw.Do("return err\n", nil)
 		sw.Do("} else {\n", nil)
-		sw.Do("**out = newVal.($.|raw$)\n", t.Elem)
+		sw.Do("*out = newVal.($.|raw$)\n", t.Elem)
 		sw.Do("}\n", nil)
 	}
 }
