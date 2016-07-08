@@ -666,6 +666,11 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 // - the pod does not have any NodeSelector for L
 // - some other pod from the same service is already scheduled onto a node that has value V for label L
 func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, fmt.Errorf("node not found")
+	}
+
 	var affinitySelector labels.Selector
 
 	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
@@ -723,11 +728,6 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, n
 		affinitySelector = labels.Everything()
 	} else {
 		affinitySelector = labels.Set(affinityLabels).AsSelector()
-	}
-
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, fmt.Errorf("node not found")
 	}
 
 	// check if the node matches the selector
