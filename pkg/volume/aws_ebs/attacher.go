@@ -61,7 +61,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 
 	// awsCloud.AttachDisk checks if disk is already attached to node and
 	// succeeds in that case, so no need to do that separately.
-	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, hostName, readOnly)
+	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, readOnly)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
 		return "", err
@@ -182,7 +182,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
 	volumeID := path.Base(deviceMountPath)
 
-	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, hostName)
+	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -196,7 +196,7 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hos
 		return nil
 	}
 
-	if _, err = detacher.awsVolumes.DetachDisk(volumeID, hostName); err != nil {
+	if _, err = detacher.awsVolumes.DetachDisk(volumeID); err != nil {
 		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
 		return err
 	}
