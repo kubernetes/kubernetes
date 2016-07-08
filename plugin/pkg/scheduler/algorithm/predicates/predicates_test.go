@@ -19,10 +19,13 @@ package predicates
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/parser"
+	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/util/codeinspector"
@@ -1584,8 +1587,26 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 	}
 }
 
+func getPredicateSignature() (*types.Signature, error) {
+	filePath := "./../types.go"
+	pkgName := filepath.Dir(filePath)
+	builder := parser.New()
+	if err := builder.AddDir(pkgName); err != nil {
+		return nil, err
+	}
+	universe, err := builder.FindTypes()
+	if err != nil {
+		return nil, err
+	}
+	result, ok := universe[pkgName].Types["FitPredicate"]
+	if !ok {
+		return nil, fmt.Errorf("FitPredicate type not defined")
+	}
+	return result.Signature, nil
+}
+
 func TestPredicatesRegistered(t *testing.T) {
-	var functionNames []string
+	var functions []*types.Type
 
 	// Files and directories which predicates may be referenced
 	targetFiles := []string{
@@ -1603,27 +1624,42 @@ func TestPredicatesRegistered(t *testing.T) {
 
 	// Get all public predicates in files.
 	for _, filePath := range files {
-		functions, err := codeinspector.GetPublicFunctions(filePath)
+		fileFunctions, err := codeinspector.GetPublicFunctions("k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates", filePath)
 		if err == nil {
-			functionNames = append(functionNames, functions...)
+			functions = append(functions, fileFunctions...)
 		} else {
 			t.Errorf("unexpected error when parsing %s", filePath)
 		}
 	}
 
+	predSignature, err := getPredicateSignature()
+	if err != nil {
+		t.Fatalf("Couldn't get predicates signature")
+	}
+
 	// Check if all public predicates are referenced in target files.
-	for _, functionName := range functionNames {
-		args := []string{"-rl", functionName}
+	for _, function := range functions {
+		// Ignore functions that doesn't match FitPredicate signature.
+		signature := function.Underlying.Signature
+		if len(predSignature.Parameters) != len(signature.Parameters) {
+			continue
+		}
+		if len(predSignature.Results) != len(signature.Results) {
+			continue
+		}
+		// TODO: Check exact types of parameters and results.
+
+		args := []string{"-rl", function.Name.Name}
 		args = append(args, targetFiles...)
 
 		err := exec.Command("grep", args...).Run()
 		if err != nil {
 			switch err.Error() {
 			case "exit status 2":
-				t.Errorf("unexpected error when checking %s", functionName)
+				t.Errorf("unexpected error when checking %s", function.Name)
 			case "exit status 1":
 				t.Errorf("predicate %s is implemented as public but seems not registered or used in any other place",
-					functionName)
+					function.Name)
 			}
 		}
 	}
