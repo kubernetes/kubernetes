@@ -2411,7 +2411,7 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	}
 	nodeInfo := schedulercache.NewNodeInfo(otherPods...)
 	nodeInfo.SetNode(node)
-	fit, err := predicates.GeneralPredicates(pod, nodeInfo)
+	fit, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
 	if !fit {
 		if re, ok := err.(*predicates.PredicateFailureError); ok {
 			reason := re.PredicateName

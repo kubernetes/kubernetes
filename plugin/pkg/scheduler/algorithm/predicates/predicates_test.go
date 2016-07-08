@@ -226,7 +226,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)}}
 		test.nodeInfo.SetNode(&node)
 
-		fits, err := PodFitsResources(test.pod, test.nodeInfo)
+		fits, err := PodFitsResources(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -279,7 +279,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
 		test.nodeInfo.SetNode(&node)
 
-		fits, err := PodFitsResources(test.pod, test.nodeInfo)
+		fits, err := PodFitsResources(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -335,7 +335,7 @@ func TestPodFitsHost(t *testing.T) {
 	for _, test := range tests {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
-		result, err := PodFitsHost(test.pod, nodeInfo)
+		result, err := PodFitsHost(test.pod, PredicateMetadata(test.pod), nodeInfo)
 		if !reflect.DeepEqual(err, ErrPodNotMatchHostName) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -408,7 +408,7 @@ func TestPodFitsHostPorts(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		fits, err := PodFitsHostPorts(test.pod, test.nodeInfo)
+		fits, err := PodFitsHostPorts(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrPodNotFitsHostPorts) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -493,7 +493,7 @@ func TestDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
+		ok, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -545,7 +545,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
+		ok, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -603,7 +603,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
+		ok, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1082,7 +1082,7 @@ func TestPodFitsSelector(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
-		fits, err := PodSelectorMatches(test.pod, nodeInfo)
+		fits, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
 		if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1147,7 +1147,7 @@ func TestNodeLabelPresence(t *testing.T) {
 		nodeInfo.SetNode(&node)
 
 		labelChecker := NodeLabelChecker{test.labels, test.presence}
-		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, nodeInfo)
+		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod), nodeInfo)
 		if !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1292,7 +1292,7 @@ func TestServiceAffinity(t *testing.T) {
 		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
-		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, nodeInfo)
+		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, PredicateMetadata(test.pod), nodeInfo)
 		if !reflect.DeepEqual(err, ErrServiceAffinityViolated) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1573,7 +1573,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
-		fits, err := pred(test.newPod, schedulercache.NewNodeInfo(test.existingPods...))
+		fits, err := pred(test.newPod, PredicateMetadata(test.newPod), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil && !reflect.DeepEqual(err, ErrMaxVolumeCountExceeded) {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1734,7 +1734,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 	}
 	for _, test := range resourceTests {
 		test.nodeInfo.SetNode(test.node)
-		fits, err := GeneralPredicates(test.pod, test.nodeInfo)
+		fits, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -2227,7 +2227,7 @@ func TestInterPodAffinity(t *testing.T) {
 		}
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
-		fits, err := fit.InterPodAffinityMatches(test.pod, nodeInfo)
+		fits, err := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
 		if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
 			t.Errorf("%s: unexpected error %v", test.test, err)
 		}
@@ -2393,7 +2393,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			}
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
-			fits, err := testFit.InterPodAffinityMatches(test.pod, nodeInfo)
+			fits, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
 			if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
 				t.Errorf("%s: unexpected error %v", test.test, err)
 			}
@@ -2404,7 +2404,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			if affinity.NodeAffinity != nil {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
-				fits2, err := PodSelectorMatches(test.pod, nodeInfo)
+				fits2, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
 				if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -2691,7 +2691,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		tolerationMatch := TolerationMatch{FakeNodeInfo(test.node)}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&test.node)
-		fits, err := tolerationMatch.PodToleratesNodeTaints(test.pod, nodeInfo)
+		fits, err := tolerationMatch.PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod), nodeInfo)
 		if fits == false && !reflect.DeepEqual(err, ErrTaintsTolerationsNotMatch) {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
 		}
@@ -2797,7 +2797,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fits, err := CheckNodeMemoryPressurePredicate(test.pod, test.nodeInfo)
+		fits, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
 		}
