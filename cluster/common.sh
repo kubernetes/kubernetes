@@ -480,19 +480,8 @@ function yaml-quote {
 # Builds the RUNTIME_CONFIG var from other feature enable options (such as
 # features in alpha)
 function build-runtime-config() {
-  # If a policy provider is specified, enable NetworkPolicy API.
-  if [[ -n "${NETWORK_POLICY_PROVIDER}" ]]; then
-    appends="extensions/v1beta1=true,extensions/v1beta1/networkpolicies=true"
-  fi
-
-  # Generate the RUNTIME_CONFIG.
-  if [[ -n ${appends} ]]; then
-    if [[ -n ${RUNTIME_CONFIG} ]]; then
-      RUNTIME_CONFIG="${RUNTIME_CONFIG},${appends}"
-    else
-      RUNTIME_CONFIG="${appends}"
-    fi
-  fi
+  # There is nothing to do here for now. Just using this function as a placeholder.
+  :
 }
 
 # Writes the cluster name into a temporary file.
@@ -569,7 +558,6 @@ HAIRPIN_MODE: $(yaml-quote ${HAIRPIN_MODE:-})
 OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
 OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
 OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
-NETWORK_POLICY_PROVIDER: $(yaml-quote ${NETWORK_POLICY_PROVIDER:-})
 E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
 KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
 KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
