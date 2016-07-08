@@ -53,7 +53,8 @@ func calculateResourceOccupancy(pod *api.Pod, node *api.Node, nodeInfo *schedule
 
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
-	for _, container := range pod.Spec.Containers {
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
 		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
 		totalMilliCPU += cpu
 		totalMemory += memory
@@ -156,11 +157,11 @@ func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercac
 		return nil, err
 	}
 
-	for _, container := range pod.Spec.Containers {
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
+	for i := range pod.Spec.Containers {
+		for j := range nodes.Items {
+			node := &nodes.Items[j]
 			// Check if this container's image is present and get its size.
-			imageSize := checkContainerImageOnNode(node, container)
+			imageSize := checkContainerImageOnNode(node, &pod.Spec.Containers[i])
 			// Add this size to the total result of this node.
 			sumSizeMap[node.Name] += imageSize
 		}
@@ -177,7 +178,7 @@ func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercac
 }
 
 // checkContainerImageOnNode checks if a container image is present on a node and returns its size.
-func checkContainerImageOnNode(node *api.Node, container api.Container) int64 {
+func checkContainerImageOnNode(node *api.Node, container *api.Container) int64 {
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
 			if container.Image == name {
@@ -236,7 +237,8 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node *api.Node, nodeInfo 
 	score := int(0)
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
-	for _, container := range pod.Spec.Containers {
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
 		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
 		totalMilliCPU += cpu
 		totalMemory += memory
