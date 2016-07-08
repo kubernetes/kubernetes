@@ -197,11 +197,19 @@ func TestPodFitsResources(t *testing.T) {
 			wErr: nil,
 		},
 		{
+			pod: newResourcePod(resourceRequest{milliCPU: 2, memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 5})),
+			fits: false,
+			test: "one resource memory fits",
+			wErr: newInsufficientResourceError(cpuResourceName, 2, 9, 10),
+		},
+		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			fits: false,
-			test: "one resources fits",
+			test: "one resource cpu fits",
 			wErr: newInsufficientResourceError(memoryResourceName, 2, 19, 20),
 		},
 		{
