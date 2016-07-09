@@ -92,6 +92,9 @@ type sharedIndexInformer struct {
 	// blockDeltas gives a way to stop all event distribution so that a late event handler
 	// can safely join the shared informer.
 	blockDeltas sync.Mutex
+	// stopCh is the channel used to stop the main Run process.  We have to track it so that
+	// late joiners can have a proper stop
+	stopCh <-chan struct{}
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -146,6 +149,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.started = true
 	}()
 
+	s.stopCh = stopCh
 	s.processor.run(stopCh)
 	s.controller.Run(stopCh)
 }
@@ -219,6 +223,9 @@ func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) erro
 
 	listener := newProcessListener(handler)
 	s.processor.listeners = append(s.processor.listeners, listener)
+
+	go listener.run(s.stopCh)
+	go listener.pop(s.stopCh)
 
 	items := s.indexer.List()
 	for i := range items {
