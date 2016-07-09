@@ -1837,6 +1837,10 @@ func podDetailsFromServiceFile(serviceFilePath string) (string, string, string, 
 	return "", "", "", false, fmt.Errorf("failed to parse pod from file %s", serviceFilePath)
 }
 
+func (r *Runtime) DeleteContainer(containerID kubecontainer.ContainerID) error {
+	return fmt.Errorf("unimplemented")
+}
+
 // GarbageCollect collects the pods/containers.
 // After one GC iteration:
 // - The deleted pods will be removed.

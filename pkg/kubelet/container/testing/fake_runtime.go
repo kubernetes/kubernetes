@@ -384,6 +384,14 @@ func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) err
 	return f.Err
 }
 
+func (f *FakeRuntime) DeleteContainer(containerID ContainerID) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "DeleteContainer")
+	return f.Err
+}
+
 func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
 	f.Lock()
 	defer f.Unlock()

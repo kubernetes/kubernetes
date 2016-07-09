@@ -143,6 +143,11 @@ func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
 	return args.Error(0)
 }
 
+func (r *Mock) DeleteContainer(containerID ContainerID) error {
+	args := r.Called(containerID)
+	return args.Error(0)
+}
+
 func (r *Mock) ImageStats() (*ImageStats, error) {
 	args := r.Called()
 	return args.Get(0).(*ImageStats), args.Error(1)
