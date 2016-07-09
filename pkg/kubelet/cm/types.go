@@ -53,4 +53,6 @@ type CgroupManager interface {
 	Destroy(*CgroupConfig) error
 	// Update cgroup configuration.
 	Update(*CgroupConfig) error
+	// Exists checks if the cgroup already exists
+	Exists(string) bool
 }

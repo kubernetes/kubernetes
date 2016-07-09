@@ -18,7 +18,10 @@ package cm
 
 import (
 	"fmt"
+	"path"
 
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 )
 
@@ -42,20 +45,83 @@ func NewCgroupManager(cs *cgroupSubsystems) CgroupManager {
 	}
 }
 
+// Exists checks if all subsystem cgroups already exist
+func (m *cgroupManagerImpl) Exists(name string) bool {
+	// Get map of all cgroup paths on the system for the particular cgroup
+	cgroupPaths := make(map[string]string, len(m.subsystems.mountPoints))
+	for key, val := range m.subsystems.mountPoints {
+		cgroupPaths[key] = path.Join(val, name)
+	}
+
+	// If even one cgroup doesn't exist we go on to create it
+	// @TODO(dubstack) We skip check for systemd until we update
+	// libcontainer in vendor
+	for key, path := range cgroupPaths {
+		if key != "systemd" && !libcontainercgroups.PathExists(path) {
+			return false
+		}
+	}
+	return true
+}
+
 // Destroy destroys the specified cgroup
 func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 	//cgroup name
 	name := cgroupConfig.Name
 
-	// get the fscgroup Manager with the specified cgroup configuration
-	fsCgroupManager, err := getLibcontainerCgroupManager(cgroupConfig, m.subsystems)
-
-	if err != nil {
-		return fmt.Errorf("Unable to destroy cgroup paths for cgroup %v : %v", name, err)
+	// Get map of all cgroup paths on the system for the particular cgroup
+	cgroupPaths := make(map[string]string, len(m.subsystems.mountPoints))
+	for key, val := range m.subsystems.mountPoints {
+		cgroupPaths[key] = path.Join(val, name)
 	}
+
+	// Initialize libcontainer's cgroup config
+	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
+		Name:   path.Base(name),
+		Parent: path.Dir(name),
+	}
+	fsCgroupManager := cgroupfs.Manager{
+		Cgroups: libcontainerCgroupConfig,
+		Paths:   cgroupPaths,
+	}
+
 	// Delete cgroups using libcontainers Managers Destroy() method
 	if err := fsCgroupManager.Destroy(); err != nil {
 		return fmt.Errorf("Unable to destroy cgroup paths for cgroup %v : %v", name, err)
+	}
+	return nil
+}
+
+type subsystem interface {
+	// Name returns the name of the subsystem.
+	Name() string
+	// Set the cgroup represented by cgroup.
+	Set(path string, cgroup *libcontainerconfigs.Cgroup) error
+}
+
+// Cgroup subsystems we currently support
+var supportedSubsystems []subsystem = []subsystem{
+	&cgroupfs.MemoryGroup{},
+	&cgroupfs.CpuGroup{},
+}
+
+// setSupportedSubsytems sets cgroup resource limits only on the supported
+// subsytems. ie. cpu and memory. We don't use libcontainer's cgroup/fs/Set()
+// method as it dosn't allow us to skip updates on the devices cgroup
+// Allowing or denying all devices by writing 'a' to devices.allow or devices.deny is
+// not possible once the device cgroups has children. Once the pod level cgroup are
+// created under the QOS level cgroup we cannot update the QOS level device cgroup.
+// We would like to skip setting any values on the device cgroup in this case
+// but this is not possible with libcontainers Set() method
+// See https://github.com/opencontainers/runc/issues/932
+func setSupportedSubsytems(cgroupConfig *libcontainerconfigs.Cgroup) error {
+	for _, sys := range supportedSubsystems {
+		if _, ok := cgroupConfig.Paths[sys.Name()]; !ok {
+			return fmt.Errorf("Failed to find subsytem mount for subsytem")
+		}
+		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
+			return fmt.Errorf("Failed to set config for supported subsystems : %v", err)
+		}
 	}
 	return nil
 }
@@ -65,36 +131,47 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	//cgroup name
 	name := cgroupConfig.Name
 
-	// get the fscgroup Manager with the specified cgroup configuration
-	fsCgroupManager, err := getLibcontainerCgroupManager(cgroupConfig, m.subsystems)
-	if err != nil {
-		return fmt.Errorf("Failed to update cgroup for %v : %v", name, err)
+	// Extract the cgroup resource parameters
+	resourceConfig := cgroupConfig.ResourceParameters
+	resources := &libcontainerconfigs.Resources{}
+	if resourceConfig.Memory != nil {
+		resources.Memory = *resourceConfig.Memory
 	}
-	// get config object for passing to Set()
-	config := &libcontainerconfigs.Config{
-		Cgroups: fsCgroupManager.Cgroups,
+	if resourceConfig.CpuShares != nil {
+		resources.CpuShares = *resourceConfig.CpuShares
+	}
+	if resourceConfig.CpuQuota != nil {
+		resources.CpuQuota = *resourceConfig.CpuQuota
 	}
 
-	// Update cgroup configuration using libcontainers Managers Set() method
-	if err := fsCgroupManager.Set(config); err != nil {
-		return fmt.Errorf("Failed to update cgroup for %v: %v", name, err)
+	// Initialize libcontainer's cgroup config
+	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
+		Name:      path.Base(name),
+		Parent:    path.Dir(name),
+		Resources: resources,
+	}
+
+	if err := setSupportedSubsytems(libcontainerCgroupConfig); err != nil {
+		return fmt.Errorf("Failed to set supported cgroup subsystems for cgroup %v: %v", name, err)
 	}
 	return nil
 }
 
 // Create creates the specified cgroup
 func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
-	//cgroup name
+	// get cgroup name
 	name := cgroupConfig.Name
 
-	// get the fscgroup Manager with the specified cgroup configuration
-	fsCgroupManager, err := getLibcontainerCgroupManager(cgroupConfig, m.subsystems)
-	if err != nil {
-		return fmt.Errorf("Failed to create cgroup for %v : %v", name, err)
+	// Initialize libcontainer's cgroup config
+	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
+		Name:      path.Base(name),
+		Parent:    path.Dir(name),
+		Resources: &libcontainerconfigs.Resources{},
 	}
-	// get config object for passing to libcontainer's Set() method
-	config := &libcontainerconfigs.Config{
-		Cgroups: fsCgroupManager.Cgroups,
+
+	// get the fscgroup Manager with the specified cgroup configuration
+	fsCgroupManager := &cgroupfs.Manager{
+		Cgroups: libcontainerCgroupConfig,
 	}
 	//Apply(0) is a hack to create the cgroup directories for each resource
 	// subsystem. The function [cgroups.Manager.apply()] applies cgroup
@@ -103,11 +180,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	// in the tasks file. We use the function to create all the required
 	// cgroup files but not attach any "real" pid to the cgroup.
 	if err := fsCgroupManager.Apply(0); err != nil {
-		return fmt.Errorf("Failed to create cgroup for %v: %v", name, err)
-	}
-	// Update cgroup configuration using libcontainers Managers Set() method
-	if err := fsCgroupManager.Set(config); err != nil {
-		return fmt.Errorf("Failed to create cgroup for %v: %v", name, err)
+		return fmt.Errorf("Failed to apply cgroup config for %v: %v", name, err)
 	}
 	return nil
 }
