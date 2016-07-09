@@ -56,10 +56,6 @@ The first run will be slow but things should be fast after that.
 To clean up the docker containers that are created (and other cruft that is left
 around) you can run `make docker-clean`.
 
-If you are using boot2docker and get warnings about clock skew (or if things
-aren't building for some reason) then you can fix that up with
-`make fix-clock-skew`.
-
 ## Automatically rebuild on file changes
 
 If you have the fswatch utility installed, you can have it monitor the file

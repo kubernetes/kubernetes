@@ -26,8 +26,6 @@ if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
 fi
 
 # The set of server targets that we are only building for Linux
-# Note: if you are adding something here, you might need to add it to
-# kube::build::source_targets in build/common.sh as well.
 kube::golang::server_targets() {
   local targets=(
     cmd/kube-dns
@@ -146,12 +144,6 @@ readonly KUBE_TEST_PORTABLE=(
 # Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
-#
-# If you are using boot2docker, the following seems to work (note
-# that 12000 rounds to 11G):
-#   boot2docker down
-#   VBoxManage modifyvm boot2docker-vm --memory 12000
-#   boot2docker up
 readonly KUBE_PARALLEL_BUILD_MEMORY=11
 
 readonly KUBE_ALL_TARGETS=(
