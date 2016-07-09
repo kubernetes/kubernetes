@@ -1001,7 +1001,7 @@ by Kubernetes. Changes were introduced in PR [#13580](https://github.com/kuberne
 or GA.
   * New Flex Volume Plugin enables users to use out-of-process volume plugins that
 are installed to “/usr/libexec/kubernetes/kubelet-plugins/volume/exec/” on
-every node, instead of being compiled into the Kubernetes binary. See [example](examples/flexvolume/README.md) for details.
+every node, instead of being compiled into the Kubernetes binary. See [example](examples/volumes/flexvolume/README.md) for details.
   * vendor volumes into a pod. It expects vendor drivers are installed in the
 volume plugin path on each kubelet node. This is an alpha feature and may
 change in future.
