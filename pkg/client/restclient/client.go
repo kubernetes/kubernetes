@@ -222,7 +222,3 @@ func (c *RESTClient) Delete() *Request {
 func (c *RESTClient) APIVersion() unversioned.GroupVersion {
 	return *c.contentConfig.GroupVersion
 }
-
-func (c *RESTClient) Codec() runtime.Codec {
-	return c.contentConfig.Codec
-}

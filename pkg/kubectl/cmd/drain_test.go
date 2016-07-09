@@ -132,11 +132,11 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		new_node := &api.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
@@ -456,10 +456,10 @@ func TestDrain(t *testing.T) {
 	for _, test := range tests {
 		new_node := &api.Node{}
 		deleted := false
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
@@ -561,7 +561,7 @@ func refJson(t *testing.T, o runtime.Object) string {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, _, codec := NewAPIFactory()
+	_, _, codec, _ := NewAPIFactory()
 	json, err := runtime.Encode(codec, &api.SerializedReference{Reference: *ref})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

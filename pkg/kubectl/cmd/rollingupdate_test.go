@@ -22,7 +22,7 @@ import (
 )
 
 func TestValidateArgs(t *testing.T) {
-	f, _, _ := NewAPIFactory()
+	f, _, _, _ := NewAPIFactory()
 
 	tests := []struct {
 		flags     map[string]string
