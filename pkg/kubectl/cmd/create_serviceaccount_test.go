@@ -28,10 +28,10 @@ import (
 func TestCreateServiceAccount(t *testing.T) {
 	serviceAccountObject := &api.ServiceAccount{}
 	serviceAccountObject.Name = "my-service-account"
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/serviceaccounts" && m == "POST":

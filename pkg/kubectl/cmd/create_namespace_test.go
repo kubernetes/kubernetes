@@ -28,10 +28,10 @@ import (
 func TestCreateNamespace(t *testing.T) {
 	namespaceObject := &api.Namespace{}
 	namespaceObject.Name = "my-namespace"
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces" && m == "POST":
