@@ -44,6 +44,8 @@ type Evaluator interface {
 
 type quotaEvaluator struct {
 	quotaAccessor QuotaAccessor
+	// lockAquisitionFunc acquires any required locks and returns a cleanup method to defer
+	lockAquisitionFunc func([]api.ResourceQuota) func()
 
 	// registry that knows how to measure usage for objects
 	registry quota.Registry
@@ -96,9 +98,10 @@ func newAdmissionWaiter(a admission.Attributes) *admissionWaiter {
 // NewQuotaEvaluator configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, workers int, stopCh <-chan struct{}) Evaluator {
+func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, lockAquisitionFunc func([]api.ResourceQuota) func(), workers int, stopCh <-chan struct{}) Evaluator {
 	return &quotaEvaluator{
-		quotaAccessor: quotaAccessor,
+		quotaAccessor:      quotaAccessor,
+		lockAquisitionFunc: lockAquisitionFunc,
 
 		registry: registry,
 
@@ -167,6 +170,11 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 			admissionAttribute.result = nil
 		}
 		return
+	}
+
+	if e.lockAquisitionFunc != nil {
+		releaseLocks := e.lockAquisitionFunc(quotas)
+		defer releaseLocks()
 	}
 
 	e.checkQuotas(quotas, admissionAttributes, 3)
