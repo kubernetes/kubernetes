@@ -18,6 +18,8 @@ package generator_test
 
 import (
 	"bytes"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -28,8 +30,12 @@ import (
 
 func construct(t *testing.T, files map[string]string) *generator.Context {
 	b := parser.New()
+	dir, err := ioutil.TempDir("", "snippet_writer_test")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for name, src := range files {
-		if err := b.AddFile("/tmp/"+name, name, []byte(src)); err != nil {
+		if err := b.AddFile(filepath.Join(dir, name), name, []byte(src)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -81,7 +87,7 @@ type Blah struct {
 	} else {
 		// Dear reader, I apologize for making the worst change
 		// detection test in the history of ever.
-		if e, a := "snippet_writer_test.go:78", err.Error(); !strings.Contains(a, e) {
+		if e, a := "snippet_writer_test.go:", err.Error(); !strings.Contains(a, e) {
 			t.Errorf("Expected %q but didn't find it in %q", e, a)
 		}
 	}
