@@ -371,7 +371,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
 	options := &LabelOptions{
-		Filenames: []string{"../../../examples/cassandra/cassandra-controller.yaml"},
+		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"},
 	}
 
 	err := RunLabel(f, buf, cmd, []string{"a=b"}, options)

@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Redis", func() {
 		It("should create and stop redis servers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/redis", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/redis", file)
 			}
 			bootstrapYaml := mkpath("redis-master.yaml")
 			sentinelServiceYaml := mkpath("redis-sentinel-service.yaml")
