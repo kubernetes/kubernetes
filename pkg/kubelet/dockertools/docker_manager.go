@@ -2354,6 +2354,10 @@ func getIPCMode(pod *api.Pod) string {
 	return ipcMode
 }
 
+func (dm *DockerManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
+	return dm.containerGC.deleteContainer(containerID.ID)
+}
+
 // GetNetNS returns the network namespace path for the given container
 func (dm *DockerManager) GetNetNS(containerID kubecontainer.ContainerID) (string, error) {
 	inspectResult, err := dm.client.InspectContainer(containerID.ID)
