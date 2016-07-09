@@ -74,14 +74,20 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
-func (cache *schedulerCache) GetNodeNameToInfoMap() (map[string]*NodeInfo, error) {
-	nodeNameToInfo := make(map[string]*NodeInfo)
+func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	for name, info := range cache.nodes {
-		nodeNameToInfo[name] = info.Clone()
+		if current, ok := nodeNameToInfo[name]; !ok || current.generation != info.generation {
+			nodeNameToInfo[name] = info.Clone()
+		}
 	}
-	return nodeNameToInfo, nil
+	for name := range nodeNameToInfo {
+		if _, ok := cache.nodes[name]; !ok {
+			delete(nodeNameToInfo, name)
+		}
+	}
+	return nil
 }
 
 func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) {
