@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"testing"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -887,7 +888,7 @@ func makeImageNode(node string, status api.NodeStatus) api.Node {
 }
 
 func TestPrioritiesRegistered(t *testing.T) {
-	var functionNames []string
+	var functions []*types.Type
 
 	// Files and directories which priorities may be referenced
 	targetFiles := []string{
@@ -904,27 +905,27 @@ func TestPrioritiesRegistered(t *testing.T) {
 
 	// Get all public priorities in files.
 	for _, filePath := range files {
-		functions, err := codeinspector.GetPublicFunctions(filePath)
+		fileFunctions, err := codeinspector.GetPublicFunctions("k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities", filePath)
 		if err == nil {
-			functionNames = append(functionNames, functions...)
+			functions = append(functions, fileFunctions...)
 		} else {
 			t.Errorf("unexpected error when parsing %s", filePath)
 		}
 	}
 
 	// Check if all public priorities are referenced in target files.
-	for _, functionName := range functionNames {
-		args := []string{"-rl", functionName}
+	for _, function := range functions {
+		args := []string{"-rl", function.Name.Name}
 		args = append(args, targetFiles...)
 
 		err := exec.Command("grep", args...).Run()
 		if err != nil {
 			switch err.Error() {
 			case "exit status 2":
-				t.Errorf("unexpected error when checking %s", functionName)
+				t.Errorf("unexpected error when checking %s", function.Name)
 			case "exit status 1":
 				t.Errorf("priority %s is implemented as public but seems not registered or used in any other place",
-					functionName)
+					function.Name)
 			}
 		}
 	}
