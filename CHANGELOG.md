@@ -133,6 +133,21 @@ The following versions of Docker Engine are supported - *[v1.10](https://github.
 Although *v1.9* is still compatible, we recommend upgrading to one of the supported versions.
 All prior versions of docker will not be supported.
 
+#### ThirdPartyResource
+
+If you use ThirdPartyResource objects, they have moved from being namespaced-scoped to be cluster-scoped. Before upgrading to 1.3.0, export and delete any existing ThirdPartyResource objects using a 1.2.x client:
+
+kubectl get thirdpartyresource --all-namespaces -o yaml > tprs.yaml
+kubectl delete -f tprs.yaml
+
+After upgrading to 1.3.0, re-register the third party resource objects at the root scope (using a 1.3 server and client):
+
+kubectl create -f tprs.yaml
+
+#### kubectl
+
+Kubectl flag `--container-port` flag is deprecated: it will be removed in the future, please use `--target-port` instead.
+
 #### kubernetes Core Known Issues
 
 - Kube Proxy crashes infrequently due to a docker bug ([#24000](https://github.com/docker/docker/issues/24000))
