@@ -934,7 +934,7 @@ func parseEnvs(envArray []string) ([]api.EnvVar, error) {
 		}
 		name := env[:pos]
 		value := env[pos+1:]
-		if len(name) == 0 || len(value) == 0 {
+		if len(name) == 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		if len(validation.IsCIdentifier(name)) != 0 {
@@ -955,7 +955,7 @@ func parseV1Envs(envArray []string) ([]v1.EnvVar, error) {
 		}
 		name := env[:pos]
 		value := env[pos+1:]
-		if len(name) == 0 || len(validation.IsCIdentifier(name)) != 0 || len(value) == 0 {
+		if len(name) == 0 || len(validation.IsCIdentifier(name)) != 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := v1.EnvVar{Name: name, Value: value}
