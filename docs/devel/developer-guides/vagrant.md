@@ -429,6 +429,20 @@ environment variables. For example, if running `make quick-release`, use:
 sudo -E make quick-release
 ```
 
+#### I have repository access errors during VM provisioning!
+
+Sometimes VM provisioning may fail with errors that look like this:
+
+```
+Timeout was reached for https://mirrors.fedoraproject.org/metalink?repo=fedora-23&arch=x86_64 [Connection timed out after 120002 milliseconds]
+```
+
+You may use a custom Fedora repository URL to fix this:
+
+```shell
+export CUSTOM_FEDORA_REPOSITORY_URL=https://download.fedoraproject.org/pub/fedora/
+```
+
 #### I ran vagrant suspend and nothing works!
 
 `vagrant suspend` seems to mess up the network. It's not supported at this time.
