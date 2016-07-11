@@ -2018,9 +2018,8 @@ type empty struct{}
 // HandlePodCleanups performs a series of cleanup work, including terminating
 // pod workers, killing unwanted pods, and removing orphaned volumes/pod
 // directories.
-// TODO(yujuhong): This function is executed by the main sync loop, so it
-// should not contain any blocking calls. Re-examine the function and decide
-// whether or not we should move it into a separte goroutine.
+// NOTE: This function is executed by the main sync loop, so it
+// should not contain any blocking calls.
 func (kl *Kubelet) HandlePodCleanups() error {
 	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
