@@ -273,7 +273,6 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	if err != nil {
-		dc.enqueueDeployment(deployment)
 		return nil, fmt.Errorf("error creating replica set %v: %v", deployment.Name, err)
 	}
 	if newReplicasCount > 0 {
@@ -415,9 +414,6 @@ func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newSc
 	rs, err := dc.client.Extensions().ReplicaSets(rs.ObjectMeta.Namespace).Update(rs)
 	if err == nil {
 		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
-	} else {
-		glog.Warningf("Cannot update replica set %q: %v", rs.Name, err)
-		dc.enqueueDeployment(deployment)
 	}
 	return rs, err
 }
