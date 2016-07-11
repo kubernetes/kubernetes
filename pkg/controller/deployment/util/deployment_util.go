@@ -53,6 +53,8 @@ const (
 	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
 	// NoProgressAnnotation on a replica set denotes that it has failed to progress during its deployment.
 	NoProgressAnnotation = "deployment.kubernetes.io/failed"
+	// NoProgressAnnotationValue is a dummy value for the NoProgressAnnotation.
+	NoProgressAnnotationValue = "true"
 
 	// RollbackRevisionNotFound is not found rollback event reason
 	RollbackRevisionNotFound = "DeploymentRollbackRevisionNotFound"
@@ -73,11 +75,14 @@ func NewCondition(conditionType extensions.DeploymentConditionType, status api.C
 	}
 }
 
-// GetCondition returns the deployment condition with the provided type and status.
-func GetCondition(d *extensions.Deployment, cType extensions.DeploymentConditionType, cStatus api.ConditionStatus) *extensions.DeploymentCondition {
-	for _, c := range d.Status.Conditions {
-		if c.Type == cType && c.Status == cStatus {
-			return &c
+// GetCondition returns the first deployment condition it will find with the provided type
+// and status.
+func GetCondition(d *extensions.Deployment, cType extensions.DeploymentConditionType, cStatuses ...api.ConditionStatus) *extensions.DeploymentCondition {
+	for _, cStatus := range cStatuses {
+		for _, c := range d.Status.Conditions {
+			if c.Type == cType && c.Status == cStatus {
+				return &c
+			}
 		}
 	}
 	return nil

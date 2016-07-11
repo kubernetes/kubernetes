@@ -96,8 +96,8 @@ func (dc *DeploymentController) hasTimedOut(deployment *extensions.Deployment) (
 	}
 
 	// Look at the difference in seconds between now and the last time we reported any progress
-	// and compare against progressDeadlineSeconds.
-	condition := deploymentutil.GetCondition(deployment, extensions.DeploymentProgressing, api.ConditionTrue)
+	// (or we tried to create a replica set) and compare against progressDeadlineSeconds.
+	condition := deploymentutil.GetCondition(deployment, extensions.DeploymentProgressing, api.ConditionTrue, api.ConditionUnknown)
 	if condition == nil {
 		return false, nil
 	}
@@ -127,7 +127,7 @@ func (dc *DeploymentController) syncFailed(deployment *extensions.Deployment) er
 	//
 	// TODO: Automatic rollback here. Locate the last successful replica set and scale it up in
 	// place of newRS.
-	newRS.Annotations[deploymentutil.NoProgressAnnotation] = ""
+	newRS.Annotations[deploymentutil.NoProgressAnnotation] = deploymentutil.NoProgressAnnotationValue
 	newRS.Spec.Replicas = 0
 	if _, err = dc.client.Extensions().ReplicaSets(newRS.Namespace).Update(newRS); err != nil {
 		return err
@@ -344,8 +344,15 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 				return nil, err
 			}
 		}
-		// Update deployment with newest revision
-		if deploymentutil.SetDeploymentRevision(deployment, newRevision) {
+		// Update deployment with newest revision and status condition if needed.
+		updatedCondition := false
+		cond := deploymentutil.GetCondition(deployment, extensions.DeploymentProgressing, api.ConditionUnknown)
+		if cond == nil {
+			cond = deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Found new replica set %q", existingNewRS.Name))
+			deploymentutil.SetCondition(deployment, *cond)
+			updatedCondition = true
+		}
+		if deploymentutil.SetDeploymentRevision(deployment, newRevision) || updatedCondition {
 			if _, err := dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment); err != nil {
 				return nil, err
 			}
@@ -391,6 +398,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	if err != nil {
+		glog.Warningf("Cannot create new replica set %q for deployment %q: %v", newRS.Name, deployment.Name, err)
 		condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "NewReplicaSet", fmt.Sprintf("Failed to create new replica set %q: %v", createdRS.Name, err))
 		deploymentutil.SetCondition(deployment, *condition)
 		_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
