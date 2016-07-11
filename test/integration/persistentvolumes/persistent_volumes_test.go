@@ -597,6 +597,73 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	}
 	glog.V(2).Infof("TestPersistentVolumeMultiPVsPVCs: volumes are Available")
 
+	// Start a separate goroutine that randomly modifies PVs and PVCs while the
+	// binder is working. We test that the binder can bind volumes despite
+	// users modifying objects underneath.
+	stopCh := make(chan struct{}, 0)
+	go func() {
+		for {
+			// Roll a dice and decide a PV or PVC to modify
+			if rand.Intn(2) == 0 {
+				// Modify PV
+				i := rand.Intn(objCount)
+				name := "pv-" + strconv.Itoa(i)
+				pv, err := testClient.PersistentVolumes().Get(name)
+				if err != nil {
+					// Silently ignore error, the PV may have be already deleted
+					// or not exists yet.
+					glog.V(4).Infof("Failed to read PV %s: %v", name, err)
+					continue
+				}
+				if pv.Annotations == nil {
+					pv.Annotations = map[string]string{"TestAnnotation": fmt.Sprint(rand.Int())}
+				} else {
+					pv.Annotations["TestAnnotation"] = fmt.Sprint(rand.Int())
+				}
+				_, err = testClient.PersistentVolumes().Update(pv)
+				if err != nil {
+					// Silently ignore error, the PV may have been updated by
+					// the controller.
+					glog.V(4).Infof("Failed to update PV %s: %v", pv.Name, err)
+					continue
+				}
+				glog.V(4).Infof("Updated PV %s", pv.Name)
+			} else {
+				// Modify PVC
+				i := rand.Intn(objCount)
+				name := "pvc-" + strconv.Itoa(i)
+				pvc, err := testClient.PersistentVolumeClaims(api.NamespaceDefault).Get(name)
+				if err != nil {
+					// Silently ignore error, the PVC may have be already
+					// deleted or not exists yet.
+					glog.V(4).Infof("Failed to read PVC %s: %v", name, err)
+					continue
+				}
+				if pvc.Annotations == nil {
+					pvc.Annotations = map[string]string{"TestAnnotation": fmt.Sprint(rand.Int())}
+				} else {
+					pvc.Annotations["TestAnnotation"] = fmt.Sprint(rand.Int())
+				}
+				_, err = testClient.PersistentVolumeClaims(api.NamespaceDefault).Update(pvc)
+				if err != nil {
+					// Silently ignore error, the PVC may have been updated by
+					// the controller.
+					glog.V(4).Infof("Failed to update PVC %s: %v", pvc.Name, err)
+					continue
+				}
+				glog.V(4).Infof("Updated PVC %s", pvc.Name)
+			}
+
+			select {
+			case <-stopCh:
+				break
+			default:
+				continue
+			}
+
+		}
+	}()
+
 	// Create the claims, again in a separate goroutine.
 	go func() {
 		for i := 0; i < objCount; i++ {
@@ -604,12 +671,19 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 		}
 	}()
 
-	// wait until the binder pairs all volumes
+	// wait until the binder pairs all claims
 	for i := 0; i < objCount; i++ {
 		waitForAnyPersistentVolumeClaimPhase(watchPVC, api.ClaimBound)
 		glog.V(1).Infof("%d claims bound", i+1)
 	}
+	// wait until the binder pairs all volumes
+	for i := 0; i < objCount; i++ {
+		waitForPersistentVolumePhase(testClient, pvs[i].Name, watchPV, api.VolumeBound)
+		glog.V(1).Infof("%d claims bound", i+1)
+	}
+
 	glog.V(2).Infof("TestPersistentVolumeMultiPVsPVCs: claims are bound")
+	stopCh <- struct{}{}
 
 	// check that everything is bound to something
 	for i := 0; i < objCount; i++ {
