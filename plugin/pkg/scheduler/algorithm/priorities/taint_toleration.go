@@ -25,7 +25,7 @@ import (
 )
 
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
-func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []api.Toleration) (intolerableTaints int) {
+func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []api.Toleration) (intolerableTaints float64) {
 	for i := range taints {
 		taint := &taints[i]
 		// check only on taints that have effect PreferNoSchedule
@@ -59,9 +59,9 @@ func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*sch
 	}
 
 	// the max value of counts
-	var maxCount int
+	var maxCount float64
 	// counts hold the count of intolerable taints of a pod for a given node
-	counts := make(map[string]int, len(nodes.Items))
+	counts := make(map[string]float64, len(nodes.Items))
 
 	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
 	if err != nil {
@@ -87,15 +87,19 @@ func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*sch
 
 	// The maximum priority value to give to a node
 	// Priority values range from 0 - maxPriority
-	const maxPriority = 10
+	const maxPriority = float64(10)
 	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
-		fScore := float64(maxPriority)
+		fScore := maxPriority
 		if maxCount > 0 {
-			fScore = (1.0 - float64(counts[node.Name])/float64(maxCount)) * 10
+			fScore = (1.0 - counts[node.Name]/maxCount) * 10
 		}
-		glog.V(10).Infof("%v -> %v: Taint Toleration Priority, Score: (%d)", pod.Name, node.Name, int(fScore))
+		if glog.V(10) {
+			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+			// not logged. There is visible performance gain from it.
+			glog.Infof("%v -> %v: Taint Toleration Priority, Score: (%d)", pod.Name, node.Name, int(fScore))
+		}
 
 		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
 	}
