@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -81,6 +82,50 @@ func TestDeltaFIFO_basic(t *testing.T) {
 		default:
 			t.Fatalf("unexpected type %#v", obj)
 		}
+	}
+}
+
+func TestDeltaFIFO_requeueOnPop(t *testing.T) {
+	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
+
+	f.Add(mkFifoObj("foo", 10))
+	_, err := f.Pop(func(obj interface{}) error {
+		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
+			t.Fatalf("unexpected object: %#v", obj)
+		}
+		return ErrRequeue{Err: nil}
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
+		t.Fatalf("object should have been requeued: %t %v", ok, err)
+	}
+
+	_, err = f.Pop(func(obj interface{}) error {
+		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
+			t.Fatalf("unexpected object: %#v", obj)
+		}
+		return ErrRequeue{Err: fmt.Errorf("test error")}
+	})
+	if err == nil || err.Error() != "test error" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
+		t.Fatalf("object should have been requeued: %t %v", ok, err)
+	}
+
+	_, err = f.Pop(func(obj interface{}) error {
+		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
+			t.Fatalf("unexpected object: %#v", obj)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok, err := f.GetByKey("foo"); ok || err != nil {
+		t.Fatalf("object should have been removed: %t %v", ok, err)
 	}
 }
 
