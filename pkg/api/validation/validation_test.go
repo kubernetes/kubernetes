@@ -795,6 +795,10 @@ func TestValidateKeyToPath(t *testing.T) {
 			ok: true,
 		},
 		{
+			kp: api.KeyToPath{Key: "k", Path: "p", Mode: newInt32(0644)},
+			ok: true,
+		},
+		{
 			kp:      api.KeyToPath{Key: "", Path: "p"},
 			ok:      false,
 			errtype: field.ErrorTypeRequired,
@@ -821,6 +825,16 @@ func TestValidateKeyToPath(t *testing.T) {
 		},
 		{
 			kp:      api.KeyToPath{Key: "k", Path: "p/.."},
+			ok:      false,
+			errtype: field.ErrorTypeInvalid,
+		},
+		{
+			kp:      api.KeyToPath{Key: "k", Path: "p", Mode: newInt32(01000)},
+			ok:      false,
+			errtype: field.ErrorTypeInvalid,
+		},
+		{
+			kp:      api.KeyToPath{Key: "k", Path: "p", Mode: newInt32(-1)},
 			ok:      false,
 			errtype: field.ErrorTypeInvalid,
 		},
@@ -1129,7 +1143,19 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "valid Secret with projection",
+			name: "valid Secret with defaultMode",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName:  "my-secret",
+						DefaultMode: newInt32(0644),
+					},
+				},
+			},
+		},
+		{
+			name: "valid Secret with projection and mode",
 			vol: api.Volume{
 				Name: "secret",
 				VolumeSource: api.VolumeSource{
@@ -1138,6 +1164,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []api.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
+							Mode: newInt32(0644),
 						}},
 					},
 				},
@@ -1200,6 +1227,34 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeInvalid,
 			errfield: "secret.items[0].path",
 		},
+		{
+			name: "secret with invalid positive defaultMode",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName:  "s",
+						DefaultMode: newInt32(01000),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "secret.defaultMode",
+		},
+		{
+			name: "secret with invalid negative defaultMode",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName:  "s",
+						DefaultMode: newInt32(-1),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "secret.defaultMode",
+		},
 		// ConfigMap
 		{
 			name: "valid ConfigMap",
@@ -1215,7 +1270,21 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "valid ConfigMap with projection",
+			name: "valid ConfigMap with defaultMode",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "my-cfgmap",
+						},
+						DefaultMode: newInt32(0644),
+					},
+				},
+			},
+		},
+		{
+			name: "valid ConfigMap with projection and mode",
 			vol: api.Volume{
 				Name: "cfgmap",
 				VolumeSource: api.VolumeSource{
@@ -1225,6 +1294,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []api.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
+							Mode: newInt32(0644),
 						}},
 					},
 				},
@@ -1287,6 +1357,34 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errtype:  field.ErrorTypeInvalid,
 			errfield: "configMap.items[0].path",
+		},
+		{
+			name: "configmap with invalid positive defaultMode",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "c"},
+						DefaultMode:          newInt32(01000),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "configMap.defaultMode",
+		},
+		{
+			name: "configmap with invalid negative defaultMode",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "c"},
+						DefaultMode:          newInt32(-1),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "configMap.defaultMode",
 		},
 		// Glusterfs
 		{
@@ -1552,6 +1650,75 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "downapi valid defaultMode",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						DefaultMode: newInt32(0644),
+					},
+				},
+			},
+		},
+		{
+			name: "downapi valid item mode",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Mode: newInt32(0644),
+							Path: "path",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+		},
+		{
+			name: "downapi invalid positive item mode",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Mode: newInt32(01000),
+							Path: "path",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "downwardAPI.mode",
+		},
+		{
+			name: "downapi invalid negative item mode",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Mode: newInt32(-1),
+							Path: "path",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "downwardAPI.mode",
+		},
+		{
 			name: "downapi empty metatada path",
 			vol: api.Volume{
 				Name: "downapi",
@@ -1672,6 +1839,32 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:   field.ErrorTypeInvalid,
 			errfield:  "downwardAPI",
 			errdetail: "fieldRef and resourceFieldRef can not be specified simultaneously",
+		},
+		{
+			name: "downapi invalid positive defaultMode",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						DefaultMode: newInt32(01000),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "downwardAPI.defaultMode",
+		},
+		{
+			name: "downapi invalid negative defaultMode",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						DefaultMode: newInt32(-1),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "downwardAPI.defaultMode",
 		},
 		// FC
 		{

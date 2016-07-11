@@ -242,6 +242,72 @@ func TestSetDefaultService(t *testing.T) {
 	}
 }
 
+func TestSetDefaultSecretVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				Secret: &versioned.SecretVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.Secret.DefaultMode
+	expectedMode := versioned.SecretVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected secret DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
+func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				ConfigMap: &versioned.ConfigMapVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode
+	expectedMode := versioned.ConfigMapVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
+func TestSetDefaultDownwardAPIVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				DownwardAPI: &versioned.DownwardAPIVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode
+	expectedMode := versioned.DownwardAPIVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected DownwardAPI DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
 func TestSetDefaultSecret(t *testing.T) {
 	s := &versioned.Secret{}
 	obj2 := roundTrip(t, runtime.Object(s))
