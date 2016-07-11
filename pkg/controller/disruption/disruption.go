@@ -166,6 +166,7 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 	return dc
 }
 
+// FIXME(mml): Also cover the case where there is a ReplicaSet with no deployment.
 func (dc *DisruptionController) finders() []podControllerFinder {
 	return []podControllerFinder{dc.getPodReplicationControllers, dc.getPodDeployments}
 }
