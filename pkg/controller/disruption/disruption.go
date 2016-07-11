@@ -188,6 +188,7 @@ func (dc *DisruptionController) getPodDeployments(pod *api.Pod) ([]controllerAnd
 			return cas, nil
 		}
 		for _, d := range ds {
+			// FIXME(mml): use ScaleStatus
 			controllerScale[d.UID] = d.Spec.Replicas
 		}
 	}
@@ -204,6 +205,7 @@ func (dc *DisruptionController) getPodReplicationControllers(pod *api.Pod) ([]co
 	rcs, err := dc.rcLister.GetPodControllers(pod)
 	if err == nil {
 		for _, rc := range rcs {
+			// FIXME(mml): use ScaleStatus
 			cas = append(cas, controllerAndScale{UID: rc.UID, scale: rc.Spec.Replicas})
 		}
 	}
@@ -387,6 +389,7 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 	return err
 }
 
+// FIXME(mml): explain *that* and *why* we are using ScaleStatus here, once we are.
 func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*api.Pod) (expectedCount, desiredHealthy int32, err error) {
 	err = nil
 	if pdb.Spec.MinAvailable.Type == intstr.Int {
