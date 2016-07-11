@@ -295,7 +295,7 @@ func (dc *DisruptionController) getPdbForPod(pod *api.Pod) *policy.PodDisruption
 		return nil
 	}
 
-	// TODO(mml): handle n>1 matches
+	// FIXME(mml): when >1 matches, emit an event and log something
 	return &pdbs[0]
 }
 
