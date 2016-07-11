@@ -52,7 +52,7 @@ func AddOutputFlags(cmd *cobra.Command) {
 
 // AddNoHeadersFlags adds no-headers flags to a command.
 func AddNoHeadersFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
+	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers.")
 }
 
 // PrintSuccess prints message after finishing mutating operations
@@ -121,7 +121,7 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 		}
 	}
 
-	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile)
+	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile, GetFlagBool(cmd, "no-headers"))
 	if err != nil {
 		return nil, generic, err
 	}
