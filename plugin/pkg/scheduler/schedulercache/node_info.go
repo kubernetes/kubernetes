@@ -39,6 +39,9 @@ type NodeInfo struct {
 	requestedResource *Resource
 	pods              []*api.Pod
 	nonzeroRequest    *Resource
+	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
+	// explicitly as int, to avoid conversions and improve performance.
+	allowedPodNumber int
 
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
@@ -59,6 +62,7 @@ func NewNodeInfo(pods ...*api.Pod) *NodeInfo {
 	ni := &NodeInfo{
 		requestedResource: &Resource{},
 		nonzeroRequest:    &Resource{},
+		allowedPodNumber:  0,
 		generation:        0,
 	}
 	for _, pod := range pods {
@@ -83,6 +87,13 @@ func (n *NodeInfo) Pods() []*api.Pod {
 	return n.pods
 }
 
+func (n *NodeInfo) AllowedPodNumber() int {
+	if n == nil {
+		return 0
+	}
+	return n.allowedPodNumber
+}
+
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -105,6 +116,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		node:              n.node,
 		requestedResource: &(*n.requestedResource),
 		nonzeroRequest:    &(*n.nonzeroRequest),
+		allowedPodNumber:  n.allowedPodNumber,
 		pods:              pods,
 		generation:        n.generation,
 	}
@@ -181,6 +193,7 @@ func calculateResource(pod *api.Pod) (cpu int64, mem int64, nvidia_gpu int64, no
 // Sets the overall node information.
 func (n *NodeInfo) SetNode(node *api.Node) error {
 	n.node = node
+	n.allowedPodNumber = int(node.Status.Allocatable.Pods().Value())
 	n.generation++
 	return nil
 }
@@ -192,6 +205,7 @@ func (n *NodeInfo) RemoveNode(node *api.Node) error {
 	// and thus can potentially be observed later, even though they happened before
 	// node removal. This is handled correctly in cache.go file.
 	n.node = nil
+	n.allowedPodNumber = 0
 	n.generation++
 	return nil
 }

@@ -470,7 +470,7 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error
 }
 
 // TolerationToleratesTaint checks if the toleration tolerates the taint.
-func TolerationToleratesTaint(toleration Toleration, taint Taint) bool {
+func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
 		return false
 	}
@@ -490,10 +490,10 @@ func TolerationToleratesTaint(toleration Toleration, taint Taint) bool {
 }
 
 // TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
-func TaintToleratedByTolerations(taint Taint, tolerations []Toleration) bool {
+func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
 	tolerated := false
-	for _, toleration := range tolerations {
-		if TolerationToleratesTaint(toleration, taint) {
+	for i := range tolerations {
+		if TolerationToleratesTaint(&tolerations[i], taint) {
 			tolerated = true
 			break
 		}

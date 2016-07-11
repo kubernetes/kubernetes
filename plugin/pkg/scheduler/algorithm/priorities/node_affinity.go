@@ -25,30 +25,19 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type NodeAffinity struct {
-	nodeLister algorithm.NodeLister
-}
-
-func NewNodeAffinityPriority(nodeLister algorithm.NodeLister) algorithm.PriorityFunction {
-	nodeAffinity := &NodeAffinity{
-		nodeLister: nodeLister,
-	}
-	return nodeAffinity.CalculateNodeAffinityPriority
-}
-
 // CalculateNodeAffinityPriority prioritizes nodes according to node affinity scheduling preferences
 // indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node match a preferredSchedulingTerm,
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.
-func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	var maxCount int
-	counts := map[string]int{}
-
+func CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return nil, err
 	}
+
+	var maxCount float64
+	counts := make(map[string]float64, len(nodes.Items))
 
 	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
 	if err != nil {
@@ -72,7 +61,7 @@ func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInf
 
 			for _, node := range nodes.Items {
 				if nodeSelector.Matches(labels.Set(node.Labels)) {
-					counts[node.Name] += int(preferredSchedulingTerm.Weight)
+					counts[node.Name] += float64(preferredSchedulingTerm.Weight)
 				}
 
 				if counts[node.Name] > maxCount {
@@ -82,15 +71,20 @@ func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInf
 		}
 	}
 
-	result := []schedulerapi.HostPriority{}
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
-		fScore := float64(0)
 		if maxCount > 0 {
-			fScore = 10 * (float64(counts[node.Name]) / float64(maxCount))
+			fScore := 10 * (counts[node.Name] / maxCount)
+			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
+			if glog.V(10) {
+				// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+				// not logged. There is visible performance gain from it.
+				glog.Infof("%v -> %v: NodeAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
+			}
+		} else {
+			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 0})
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
-		glog.V(10).Infof("%v -> %v: NodeAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
 	}
 	return result, nil
 }
