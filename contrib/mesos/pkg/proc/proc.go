@@ -84,6 +84,12 @@ func stateRun(ps *processState, a *scheduledAction) stateFn {
 	close(a.errCh) // signal that action was scheduled
 	func() {
 		// we don't trust clients of this package
+		defer func() {
+			if x := recover(); x != nil {
+				// HandleCrash has already logged this, so
+				// nothing to do.
+			}
+		}()
 		defer runtime.HandleCrash()
 		a.action()
 	}()
