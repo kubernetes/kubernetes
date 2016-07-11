@@ -190,13 +190,6 @@ if running_in_docker; then
     fi
 fi
 
-if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
-  echo 'Activating service account...'  # No harm in doing this multiple times.
-  gcloud auth activate-service-account --key-file="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
-elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
-  echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
-fi
-
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 # TODO: figure out how to avoid installing the cloud sdk twice if run inside Docker.
@@ -229,6 +222,16 @@ if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
     export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
   fi
 fi
+
+if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
+  echo 'Activating service account...'  # No harm in doing this multiple times.
+  gcloud auth activate-service-account --key-file="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
+  export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
+  unset KUBEKINS_SERVICE_ACCOUNT_FILE
+elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
+  echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
+fi
+
 
 function e2e_test() {
     local -r ginkgo_test_args="${1}"
