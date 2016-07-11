@@ -52,6 +52,7 @@ const fieldImmutableErrorMsg string = `field is immutable`
 const isNotIntegerErrorMsg string = `must be an integer`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
+var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
@@ -660,6 +661,12 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource, fldPath *f
 	if len(secretSource.SecretName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretName"), ""))
 	}
+
+	secretMode := secretSource.DefaultMode
+	if secretMode != nil && (*secretMode > 0777 || *secretMode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *secretMode, volumeModeErrorMsg))
+	}
+
 	itemsPath := fldPath.Child("items")
 	for i, kp := range secretSource.Items {
 		itemPath := itemsPath.Index(i)
@@ -673,6 +680,12 @@ func validateConfigMapVolumeSource(configMapSource *api.ConfigMapVolumeSource, f
 	if len(configMapSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
+
+	configMapMode := configMapSource.DefaultMode
+	if configMapMode != nil && (*configMapMode > 0777 || *configMapMode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *configMapMode, volumeModeErrorMsg))
+	}
+
 	itemsPath := fldPath.Child("items")
 	for i, kp := range configMapSource.Items {
 		itemPath := itemsPath.Index(i)
@@ -690,6 +703,10 @@ func validateKeyToPath(kp *api.KeyToPath, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 	}
 	allErrs = append(allErrs, validateLocalNonReservedPath(kp.Path, fldPath.Child("path"))...)
+	if kp.Mode != nil && (*kp.Mode > 0777 || *kp.Mode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *kp.Mode, volumeModeErrorMsg))
+	}
+
 	return allErrs
 }
 
@@ -745,6 +762,12 @@ var validDownwardAPIFieldPathExpressions = sets.NewString(
 
 func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	downwardAPIMode := downwardAPIVolume.DefaultMode
+	if downwardAPIMode != nil && (*downwardAPIMode > 0777 || *downwardAPIMode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *downwardAPIMode, volumeModeErrorMsg))
+	}
+
 	for _, file := range downwardAPIVolume.Items {
 		if len(file.Path) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
@@ -759,6 +782,9 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 			allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
 		} else {
 			allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
+		}
+		if file.Mode != nil && (*file.Mode > 0777 || *file.Mode < 0) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, volumeModeErrorMsg))
 		}
 	}
 	return allErrs

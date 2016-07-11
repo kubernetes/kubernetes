@@ -237,12 +237,14 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	}
 
 	// Pod we expect to get created
+	defaultMode := int32(0644)
 	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
 	expectedVolumes := append(protoPod.Spec.Volumes, api.Volume{
 		Name: defaultTokenName,
 		VolumeSource: api.VolumeSource{
 			Secret: &api.SecretVolumeSource{
-				SecretName: defaultTokenName,
+				SecretName:  defaultTokenName,
+				DefaultMode: &defaultMode,
 			},
 		},
 	})

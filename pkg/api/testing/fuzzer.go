@@ -251,15 +251,59 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			policies := []api.RestartPolicy{api.RestartPolicyAlways, api.RestartPolicyNever, api.RestartPolicyOnFailure}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
-		// Only api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
+		// api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
 		// defaulted to a version otherwise roundtrip will fail
-		// For the remaining volume plugins the default fuzzer is enough.
 		func(m *api.DownwardAPIVolumeFile, c fuzz.Continue) {
 			m.Path = c.RandString()
 			versions := []string{"v1"}
 			m.FieldRef = &api.ObjectFieldSelector{}
 			m.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
 			m.FieldRef.FieldPath = c.RandString()
+			c.Fuzz(m.Mode)
+			if m.Mode != nil {
+				*m.Mode &= 0777
+			}
+		},
+		func(s *api.SecretVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			s.DefaultMode = &mode
+		},
+		func(cm *api.ConfigMapVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(cm) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			cm.DefaultMode = &mode
+		},
+		func(d *api.DownwardAPIVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(d) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			d.DefaultMode = &mode
+		},
+		func(k *api.KeyToPath, c fuzz.Continue) {
+			c.FuzzNoCustom(k) // fuzz self without calling this function again
+			k.Key = c.RandString()
+			k.Path = c.RandString()
+
+			// Mode is not mandatory, but if it is set, it should be
+			// a value between 0 and 0777
+			if k.Mode != nil {
+				*k.Mode &= 0777
+			}
 		},
 		func(vs *api.VolumeSource, c fuzz.Continue) {
 			// Exactly one of the fields must be set.
