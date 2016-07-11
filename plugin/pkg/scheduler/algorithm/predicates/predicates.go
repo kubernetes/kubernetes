@@ -65,10 +65,10 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	return node.(*api.Node), nil
 }
 
-// podMetadata defines a type, that is an expected type that is passed
-// as metadata for predicate functions
+// podMetadata is a type that is passed as metadata for predicate functions
 type predicateMetadata struct {
 	podBestEffort bool
+	podRequest    *resourceRequest
 }
 
 func PredicateMetadata(pod *api.Pod) interface{} {
@@ -78,6 +78,7 @@ func PredicateMetadata(pod *api.Pod) interface{} {
 	}
 	return &predicateMetadata{
 		podBestEffort: isPodBestEffort(pod),
+		podRequest:    getResourceRequest(pod),
 	}
 }
 
@@ -405,7 +406,7 @@ type resourceRequest struct {
 	nvidiaGPU int64
 }
 
-func getResourceRequest(pod *api.Pod) resourceRequest {
+func getResourceRequest(pod *api.Pod) *resourceRequest {
 	result := resourceRequest{}
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
@@ -423,7 +424,7 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 			result.milliCPU = cpu
 		}
 	}
-	return result
+	return &result
 }
 
 func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingNvidiaGPU []*api.Pod) {
@@ -471,17 +472,25 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 	if node == nil {
 		return false, fmt.Errorf("node not found")
 	}
-	allocatable := node.Status.Allocatable
-	allowedPodNumber := allocatable.Pods().Value()
-	if int64(len(nodeInfo.Pods()))+1 > allowedPodNumber {
+	allowedPodNumber := nodeInfo.AllowedPodNumber()
+	if len(nodeInfo.Pods())+1 > allowedPodNumber {
 		return false,
-			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), allowedPodNumber)
+			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber))
 	}
-	podRequest := getResourceRequest(pod)
+
+	var podRequest *resourceRequest
+	predicateMeta, ok := meta.(*predicateMetadata)
+	if ok {
+		podRequest = predicateMeta.podRequest
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		podRequest = getResourceRequest(pod)
+	}
 	if podRequest.milliCPU == 0 && podRequest.memory == 0 && podRequest.nvidiaGPU == 0 {
 		return true, nil
 	}
 
+	allocatable := node.Status.Allocatable
 	totalMilliCPU := allocatable.Cpu().MilliValue()
 	totalMemory := allocatable.Memory().Value()
 	totalNvidiaGPU := allocatable.NvidiaGPU().Value()
@@ -498,8 +507,12 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		return false,
 			newInsufficientResourceError(nvidiaGpuResourceName, podRequest.nvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, totalNvidiaGPU)
 	}
-	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
-		podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
+			podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+	}
 	return true, nil
 }
 
@@ -758,8 +771,10 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	// TODO: Aggregate it at the NodeInfo level.
 	ports := make(map[int]bool)
 	for _, pod := range pods {
-		for _, container := range pod.Spec.Containers {
-			for _, podPort := range container.Ports {
+		for j := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[j]
+			for k := range container.Ports {
+				podPort := &container.Ports[k]
 				// "0" is explicitly ignored in PodFitsHostPorts,
 				// which is the only function that uses this value.
 				if podPort.HostPort != 0 {
@@ -999,19 +1014,11 @@ func (checker *PodAffinityChecker) NodeMatchPodAffinityAntiAffinity(pod *api.Pod
 	return true
 }
 
-type TolerationMatch struct {
-	info NodeInfo
-}
-
-func NewTolerationMatchPredicate(info NodeInfo) algorithm.FitPredicate {
-	tolerationMatch := &TolerationMatch{
-		info: info,
-	}
-	return tolerationMatch.PodToleratesNodeTaints
-}
-
-func (t *TolerationMatch) PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	node := nodeInfo.Node()
+	if node == nil {
+		return false, fmt.Errorf("node not found")
+	}
 
 	taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
 	if err != nil {
@@ -1040,7 +1047,8 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 		return false
 	}
 
-	for _, taint := range taints {
+	for i := range taints {
+		taint := &taints[i]
 		// skip taints that have effect PreferNoSchedule, since it is for priorities
 		if taint.Effect == api.TaintEffectPreferNoSchedule {
 			continue

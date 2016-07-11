@@ -24,22 +24,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// NodeTaints hold the node lister
-type TaintToleration struct {
-	nodeLister algorithm.NodeLister
-}
-
-// NewTaintTolerationPriority
-func NewTaintTolerationPriority(nodeLister algorithm.NodeLister) algorithm.PriorityFunction {
-	taintToleration := &TaintToleration{
-		nodeLister: nodeLister,
-	}
-	return taintToleration.ComputeTaintTolerationPriority
-}
-
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
-func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []api.Toleration) (intolerableTaints int) {
-	for _, taint := range taints {
+func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []api.Toleration) (intolerableTaints float64) {
+	for i := range taints {
+		taint := &taints[i]
 		// check only on taints that have effect PreferNoSchedule
 		if taint.Effect != api.TaintEffectPreferNoSchedule {
 			continue
@@ -54,26 +42,26 @@ func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []ap
 
 // getAllTolerationEffectPreferNoSchedule gets the list of all Toleration with Effect PreferNoSchedule
 func getAllTolerationPreferNoSchedule(tolerations []api.Toleration) (tolerationList []api.Toleration) {
-	for _, toleration := range tolerations {
+	for i := range tolerations {
+		toleration := &tolerations[i]
 		if len(toleration.Effect) == 0 || toleration.Effect == api.TaintEffectPreferNoSchedule {
-			tolerationList = append(tolerationList, toleration)
+			tolerationList = append(tolerationList, *toleration)
 		}
 	}
 	return
 }
 
 // ComputeTaintTolerationPriority prepares the priority list for all the nodes based on the number of intolerable taints on the node
-func (s *TaintToleration) ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	// counts hold the count of intolerable taints of a pod for a given node
-	counts := make(map[string]int)
-
-	// the max value of counts
-	var maxCount int
-
+func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return nil, err
 	}
+
+	// the max value of counts
+	var maxCount float64
+	// counts hold the count of intolerable taints of a pod for a given node
+	counts := make(map[string]float64, len(nodes.Items))
 
 	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
 	if err != nil {
@@ -99,14 +87,19 @@ func (s *TaintToleration) ComputeTaintTolerationPriority(pod *api.Pod, nodeNameT
 
 	// The maximum priority value to give to a node
 	// Priority values range from 0 - maxPriority
-	const maxPriority = 10
+	const maxPriority = float64(10)
 	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
-	for _, node := range nodes.Items {
-		fScore := float64(maxPriority)
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		fScore := maxPriority
 		if maxCount > 0 {
-			fScore = (1.0 - float64(counts[node.Name])/float64(maxCount)) * 10
+			fScore = (1.0 - counts[node.Name]/maxCount) * 10
 		}
-		glog.V(10).Infof("%v -> %v: Taint Toleration Priority, Score: (%d)", pod.Name, node.Name, int(fScore))
+		if glog.V(10) {
+			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+			// not logged. There is visible performance gain from it.
+			glog.Infof("%v -> %v: Taint Toleration Priority, Score: (%d)", pod.Name, node.Name, int(fScore))
+		}
 
 		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
 	}
