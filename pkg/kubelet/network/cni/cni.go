@@ -139,7 +139,7 @@ func (plugin *cniNetworkPlugin) setDefaultNetwork(n *cniNetwork) {
 	plugin.defaultNetwork = n
 }
 
-func (plugin *cniNetworkPlugin) Status() error {
+func (plugin *cniNetworkPlugin) checkInitialized() error {
 	if plugin.getDefaultNetwork() == nil {
 		return errors.New("cni config unintialized")
 	}
@@ -151,7 +151,7 @@ func (plugin *cniNetworkPlugin) Name() string {
 }
 
 func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
-	if err := plugin.Status(); err != nil {
+	if err := plugin.checkInitialized(); err != nil {
 		return err
 	}
 	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
@@ -169,7 +169,7 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
-	if err := plugin.Status(); err != nil {
+	if err := plugin.checkInitialized(); err != nil {
 		return err
 	}
 	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
