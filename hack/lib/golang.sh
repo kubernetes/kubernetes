@@ -235,13 +235,10 @@ kube::golang::set_platform_envs() {
     # Dynamic CGO linking for other server architectures than linux/amd64 goes here
     # If you want to include support for more server platforms than these, add arch-specific gcc names here
     if [[ ${platform} == "linux/arm" ]]; then
-      export CGO_ENABLED=1
       export CC=arm-linux-gnueabi-gcc
     elif [[ ${platform} == "linux/arm64" ]]; then
-      export CGO_ENABLED=1
       export CC=aarch64-linux-gnu-gcc
     elif [[ ${platform} == "linux/ppc64le" ]]; then
-      export CGO_ENABLED=1
       export CC=powerpc64le-linux-gnu-gcc
     fi
   fi
@@ -486,7 +483,7 @@ kube::golang::build_binaries_for_platform() {
     done
     for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      go build -o "${outfile}" \
+      CGO_ENABLED=1 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -ldflags "${goldflags}" \
         "${binary}"
@@ -495,15 +492,15 @@ kube::golang::build_binaries_for_platform() {
     kube::log::progress "\n"
   else
     # Use go install.
-    if [[ "${#nonstatics[@]}" != 0 ]]; then
-      go install "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${goldflags}" \
-        "${nonstatics[@]:+${nonstatics[@]}}"
-    fi
     if [[ "${#statics[@]}" != 0 ]]; then
       CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
         -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
+    fi
+    if [[ "${#nonstatics[@]}" != 0 ]]; then
+      CGO_ENABLED=1 go install "${goflags[@]:+${goflags[@]}}" \
+        -ldflags "${goldflags}" \
+        "${nonstatics[@]:+${nonstatics[@]}}"
     fi
   fi
 
