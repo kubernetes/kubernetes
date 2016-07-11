@@ -1022,11 +1022,18 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) field.ErrorLi
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidatePersistentVolumeClaim(newPvc)...)
-	// if a pvc had a bound volume, we should not allow updates to resources or access modes
-	if len(oldPvc.Spec.VolumeName) != 0 {
-		if !api.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "spec is immutable once a claim has been bound to a volume"))
-		}
+	// PVController needs to update PVC.Spec w/ VolumeName.
+	// Claims are immutable in order to enforce quota, range limits, etc. without gaming the system.
+	if len(oldPvc.Spec.VolumeName) == 0 {
+		// volumeName changes are allowed once.
+		// Reset back to empty string after equality check
+		oldPvc.Spec.VolumeName = newPvc.Spec.VolumeName
+		defer func() { oldPvc.Spec.VolumeName = "" }()
+	}
+	// changes to Spec are not allowed, but updates to label/annotations are OK.
+	// no-op updates pass validation.
+	if !api.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
 	}
 	newPvc.Status = oldPvc.Status
 	return allErrs
