@@ -69,25 +69,25 @@ func PrintNodeMetrics(out io.Writer, cli *HeapsterMetricsClient, allNamespaces b
 	if err != nil {
 		return err
 	}
+	w := GetNewTabWriter(out)
+	defer w.Flush()
 
-	metrics := make([]metrics_api.NodeMetrics, 0)
-	err = json.Unmarshal(resultRaw, &metrics)
+	metrics := make([]metrics_api.NodeMetrics, 1)
+	if nodeName == "" {
+		err = json.Unmarshal(resultRaw, &metrics)
+	} else {
+		err = json.Unmarshal(resultRaw, &metrics[0])
+	}
 	if err != nil {
 		fmt.Errorf("failed to unmarshall heapster response: %v", err)
 		return err
 	}
 
-	w := GetNewTabWriter(out)
-	defer w.Flush()
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP")
-
 	for _, m := range metrics {
-		nodeMetrics := CreateResourceMetrics(m.Usage)
-		cpu := nodeMetrics.metrics[v1.ResourceCPU]
-		mem := nodeMetrics.metrics[v1.ResourceMemory]
-		storage := nodeMetrics.metrics[v1.ResourceStorage]
-		fmt.Fprintf(w, "%s\t%vm\t%v Mi\t%v Mi\t%s\n", m.Name, cpu.MilliValue(),
-			mem.Value() / (1024 * 1024), storage.Value() / (1024 * 1024), m.Timestamp)
+		fmt.Fprintf(w, "%s", m.Name)
+		PrintAllResourceUsages(w, CreateResourceMetrics(m.Usage))
+		fmt.Fprintf(w, "\t%v\n", m.Timestamp)
 	}
 	return nil
 }
@@ -98,10 +98,8 @@ func PrintPodMetrics(out io.Writer, cli *HeapsterMetricsClient, allNamespaces bo
 	if err != nil {
 		return err
 	}
-
 	w := GetNewTabWriter(out)
 	defer w.Flush()
-	fmt.Fprintf(w, "\t%s\t%s\t%s\t%s\t%s\t%s\n", "NAMESPACE", "NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP")
 
 	metrics := make([]metrics_api.PodMetrics, 1)
 	if podName == "" {
@@ -114,6 +112,7 @@ func PrintPodMetrics(out io.Writer, cli *HeapsterMetricsClient, allNamespaces bo
 		return err
 	}
 
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", "NAMESPACE", "NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP")
 	for _, m := range metrics {
 		PrintSinglePodMetrics(w, &m, printContainers)
 	}
@@ -136,18 +135,18 @@ func PrintSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 		}
 	}
 
-	fmt.Fprintf(out, "\t%s\t%s", m.Namespace, m.Name)
+	fmt.Fprintf(out, "%s\t%s", m.Namespace, m.Name)
 	PrintAllResourceUsages(out, podMetrics)
 	fmt.Fprintf(out, "\t%v\n", m.Timestamp)
 
 	if printContainers {
-		fmt.Fprintf(out, "Containers:")
+		//fmt.Fprintf(out, "Containers:")
 		for contName := range containers {
-			fmt.Fprintf(out, "\t%s\t%s", "", contName)
+			fmt.Fprintf(out, "%s\t%s", "", contName)
 			PrintAllResourceUsages(out, containers[contName])
 			fmt.Fprintf(out, "\n")
 		}
-		fmt.Fprintf(out, "\t\t\t\t\t\t\n")
+		fmt.Fprintf(out, "\t\t\t\t\t\n")
 	}
 }
 
@@ -156,7 +155,7 @@ func PrintSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quant
 	case v1.ResourceCPU:
 		fmt.Fprintf(out, "%vm", quantity.MilliValue())
 	case v1.ResourceMemory, v1.ResourceStorage:
-		fmt.Fprintf(out, "%v Mb", quantity.Value() / (1024 * 1024))
+		fmt.Fprintf(out, "%v Mi", quantity.Value() / (1024 * 1024))
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
