@@ -2174,19 +2174,6 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	return false
 }
 
-// matchesNodeSelector returns true if pod matches node's labels.
-func (kl *Kubelet) matchesNodeSelector(pod *api.Pod) bool {
-	if kl.standaloneMode {
-		return true
-	}
-	node, err := kl.GetNode()
-	if err != nil {
-		glog.Errorf("error getting node: %v", err)
-		return false
-	}
-	return predicates.PodMatchesNodeLabels(pod, node)
-}
-
 // rejectPod records an event about the pod with the given reason and message,
 // and updates the pod to the failed phase in the status manage.
 func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {

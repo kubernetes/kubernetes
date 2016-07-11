@@ -199,11 +199,6 @@ func (pm *basicManager) GetPodsAndMirrorPods() ([]*api.Pod, []*api.Pod) {
 	return pods, mirrorPods
 }
 
-// Returns all pods (including mirror pods).
-func (pm *basicManager) getAllPods() []*api.Pod {
-	return append(podsMapToPods(pm.podByUID), podsMapToPods(pm.mirrorPodByUID)...)
-}
-
 func (pm *basicManager) GetPodByUID(uid types.UID) (*api.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
