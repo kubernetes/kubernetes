@@ -501,7 +501,7 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
 	pdbClient := dc.kubeClient.Policy().PodDisruptionBudgets(pdb.Namespace)
 
-	// TODO(mml): retry
+	// FIXME(mml): retry
 	_, err := pdbClient.UpdateStatus(pdb)
 	return err
 }
