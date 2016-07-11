@@ -17,14 +17,17 @@ limitations under the License.
 package node
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 func GetHostname(hostnameOverride string) string {
@@ -80,4 +83,22 @@ func GetZoneKey(node *api.Node) string {
 	// (We do assume there's no null characters in a region or failureDomain)
 	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
 	return region + ":\x00:" + failureDomain
+}
+
+// SetNodeCondition updates specific node condition with patch operation.
+func SetNodeCondition(c clientset.Interface, node string, condition api.NodeCondition) error {
+	generatePatch := func(condition api.NodeCondition) ([]byte, error) {
+		raw, err := json.Marshal(&[]api.NodeCondition{condition})
+		if err != nil {
+			return nil, err
+		}
+		return []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw)), nil
+	}
+	condition.LastHeartbeatTime = unversioned.NewTime(time.Now())
+	patch, err := generatePatch(condition)
+	if err != nil {
+		return nil
+	}
+	_, err = c.Core().Nodes().PatchStatus(node, patch)
+	return err
 }
