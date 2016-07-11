@@ -716,6 +716,7 @@ type StoreToPodDisruptionBudgetLister struct {
 	Store
 }
 
+// GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no match PodDisruptionBudgets are found.
 func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
 	var selector labels.Selector
 
