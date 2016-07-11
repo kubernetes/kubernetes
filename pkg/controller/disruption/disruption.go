@@ -68,7 +68,7 @@ type DisruptionController struct {
 }
 
 // This is used to return (controller, scale) pairs from the controller finder
-// functions (see the next type).
+// functions.
 type controllerAndScale struct {
 	types.UID
 	scale int32
