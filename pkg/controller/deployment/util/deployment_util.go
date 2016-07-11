@@ -89,14 +89,21 @@ func GetCondition(d *extensions.Deployment, cType extensions.DeploymentCondition
 }
 
 // SetCondition updates the deployment to include the provided condition. If the condition
-// already exists and overwriteIfExists is true, then the condition will be replaced.
-func SetCondition(d *extensions.Deployment, condition extensions.DeploymentCondition, overwriteIfExists bool) {
+// already exists and overwriteIfExists is true, then the condition will be replaced. True
+// will be returned if there is an update in the deployment conditions.
+func SetCondition(d *extensions.Deployment, condition extensions.DeploymentCondition, overwriteIfExists bool) bool {
 	if overwriteIfExists {
 		newConditions, _ := filterOutCondition(d, condition.Type, condition.Status)
 		d.Status.Conditions = append(newConditions, condition)
-	} else if cond := GetCondition(d, condition.Type, condition.Status); cond == nil {
-		d.Status.Conditions = append(d.Status.Conditions, condition)
+		return true
 	}
+
+	if cond := GetCondition(d, condition.Type, condition.Status); cond == nil {
+		d.Status.Conditions = append(d.Status.Conditions, condition)
+		return true
+	}
+
+	return false
 }
 
 // RemoveCondition removes the deployment condition with the provided type and status from
