@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,8 +69,6 @@ var GetResourcesHandledByTop = func() []string {
 
 func NewCmdTop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TopOptions{}
-
-	// retrieve a list of handled resources as valid args
 	validArgs := GetResourcesHandledByTop()
 	argAliases := kubectl.ResourceAliases(validArgs)
 
@@ -87,7 +85,7 @@ func NewCmdTop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
-	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	// TODO: add support for --all-namespaces
 	cmd.Flags().Bool("containers", false, "If present, print usage of containers within a pod. Ignored if the requested resource type is \"node\".")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
@@ -98,30 +96,20 @@ func RunTop(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		fmt.Fprint(out, "You must specify the type of resource to get.")
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
-
 	selector := cmdutil.GetFlagString(cmd, "selector")
-	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
+	params := map[string]string{"labelSelector": selector}
 	printContainers := cmdutil.GetFlagBool(cmd, "containers")
-
-	if allNamespaces == true {
-		fmt.Fprintf(out, "--all-namespaces not supported yet.\n")
-		return cmdutil.UsageError(cmd, "Flag --all-namespaces is not supported yet.")
-	}
-
 	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-
 	cli, err := f.Client()
 	if err != nil {
 		return err
 	}
 
-	params := map[string]string{"labelSelector": selector}
-
 	// TODO: refactor to builder?
-	err = kubectl.PrintMetrics(out, cli, cmdNamespace, allNamespaces, printContainers, params, args)
+	err = kubectl.PrintMetrics(out, cli, cmdNamespace, false, printContainers, params, args)
 	if err != nil {
 		return err
 	}

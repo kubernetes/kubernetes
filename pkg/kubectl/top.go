@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,12 +33,10 @@ import (
 
 func PrintMetrics(out io.Writer, cli *client.Client, cmdNamespace string, allNamespaces bool,
 		  printContainers bool, params map[string]string, args []string) error {
-
 	resType, err := GetResourceKind(args[0])
 	if err != nil {
 		return err
 	}
-
 	name := ""
 	if len(args) > 1 {
 		name = args[1]
@@ -50,7 +48,7 @@ func PrintMetrics(out io.Writer, cli *client.Client, cmdNamespace string, allNam
 	case api.Kind("Pod"):
 		return PrintPodMetrics(out, DefaultHeapsterMetricsClient(cli), allNamespaces, printContainers, params, cmdNamespace, name)
 	}
-	return errors.New("Resource not supported.")
+	return errors.New("resource not supported")
 }
 
 var GetResourceKind = func(resourceType string) (unversioned.GroupKind, error) {
@@ -61,25 +59,15 @@ var GetResourceKind = func(resourceType string) (unversioned.GroupKind, error) {
 	case "pod", "pods":
 		return api.Kind("Pod"), nil
 	}
-	return unversioned.GroupKind{}, errors.New("Unknown resource requested.")
+	return unversioned.GroupKind{}, errors.New("unknown resource requested")
 }
 
 func PrintNodeMetrics(out io.Writer, cli *HeapsterMetricsClient, allNamespaces bool, params map[string]string, nodeName string) error {
-	resultRaw, err := GetHeapsterMetrics(cli, NodeMetricsUrl(nodeName), params)
-	if err != nil {
-		return err
-	}
 	w := GetNewTabWriter(out)
 	defer w.Flush()
 
-	metrics := make([]metrics_api.NodeMetrics, 1)
-	if nodeName == "" {
-		err = json.Unmarshal(resultRaw, &metrics)
-	} else {
-		err = json.Unmarshal(resultRaw, &metrics[0])
-	}
+	metrics, err := GetNodeMetrics(cli, nodeName, params)
 	if err != nil {
-		fmt.Errorf("failed to unmarshall heapster response: %v", err)
 		return err
 	}
 
@@ -93,22 +81,12 @@ func PrintNodeMetrics(out io.Writer, cli *HeapsterMetricsClient, allNamespaces b
 }
 
 func PrintPodMetrics(out io.Writer, cli *HeapsterMetricsClient, allNamespaces bool, printContainers bool,
-		     params map[string]string, namespace string, podName string) error {
-	resultRaw, err := GetHeapsterMetrics(cli, PodMetricsUrl(namespace, podName), params)
-	if err != nil {
-		return err
-	}
+params map[string]string, namespace string, podName string) error {
 	w := GetNewTabWriter(out)
 	defer w.Flush()
 
-	metrics := make([]metrics_api.PodMetrics, 1)
-	if podName == "" {
-		err = json.Unmarshal(resultRaw, &metrics)
-	} else {
-		err = json.Unmarshal(resultRaw, &metrics[0])
-	}
+	metrics, err := GetPodMetrics(cli, namespace, podName, params)
 	if err != nil {
-		fmt.Errorf("Failed to unmarshall heapster response: %v", err)
 		return err
 	}
 
@@ -117,6 +95,48 @@ func PrintPodMetrics(out io.Writer, cli *HeapsterMetricsClient, allNamespaces bo
 		PrintSinglePodMetrics(w, &m, printContainers)
 	}
 	return nil
+}
+
+func GetNodeMetrics(cli *HeapsterMetricsClient, nodeName string, params map[string]string) ([]metrics_api.NodeMetrics, error) {
+	resultRaw, err := GetHeapsterMetrics(cli, NodeMetricsUrl(nodeName), params)
+	metrics := make([]metrics_api.NodeMetrics, 0)
+	if nodeName == "" {
+		err = json.Unmarshal(resultRaw, &metrics)
+		if err != nil {
+			fmt.Errorf("failed to unmarshall heapster response: %v", err)
+			return []metrics_api.NodeMetrics{}, err
+		}
+	} else {
+		var singleMetric metrics_api.NodeMetrics
+		err = json.Unmarshal(resultRaw, &singleMetric)
+		if err != nil {
+			fmt.Errorf("failed to unmarshall heapster response: %v", err)
+			return []metrics_api.NodeMetrics{}, err
+		}
+		metrics = append(metrics, singleMetric)
+	}
+	return metrics, nil
+}
+
+func GetPodMetrics(cli *HeapsterMetricsClient, namespace string, podName string, params map[string]string) ([]metrics_api.PodMetrics, error) {
+	resultRaw, err := GetHeapsterMetrics(cli, PodMetricsUrl(namespace, podName), params)
+	metrics := make([]metrics_api.PodMetrics, 0)
+	if podName == "" {
+		err = json.Unmarshal(resultRaw, &metrics)
+		if err != nil {
+			fmt.Errorf("failed to unmarshall heapster response: %v", err)
+			return []metrics_api.PodMetrics{}, err
+		}
+	} else {
+		var singleMetric metrics_api.PodMetrics
+		err = json.Unmarshal(resultRaw, &singleMetric)
+		if err != nil {
+			fmt.Errorf("failed to unmarshall heapster response: %v", err)
+			return []metrics_api.PodMetrics{}, err
+		}
+		metrics = append(metrics, singleMetric)
+	}
+	return metrics, nil
 }
 
 func PrintSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContainers bool) {
@@ -140,7 +160,6 @@ func PrintSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 	fmt.Fprintf(out, "\t%v\n", m.Timestamp)
 
 	if printContainers {
-		//fmt.Fprintf(out, "Containers:")
 		for contName := range containers {
 			fmt.Fprintf(out, "%s\t%s", "", contName)
 			PrintAllResourceUsages(out, containers[contName])
