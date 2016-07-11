@@ -164,12 +164,14 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 	cs.Logs = &stats.FsStats{
 		AvailableBytes: &sb.rootFsInfo.Available,
 		CapacityBytes:  &sb.rootFsInfo.Capacity,
+		InodesFree:     &sb.rootFsInfo.InodesFree,
 	}
 
 	// The container rootFs lives on the imageFs devices (which may not be the node root fs)
 	cs.Rootfs = &stats.FsStats{
 		AvailableBytes: &sb.imageFsInfo.Available,
 		CapacityBytes:  &sb.imageFsInfo.Capacity,
+		InodesFree:     &sb.imageFsInfo.InodesFree,
 	}
 	lcs, found := sb.latestContainerStats(info)
 	if !found {
