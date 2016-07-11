@@ -888,6 +888,39 @@ func TestValidateVolumes(t *testing.T) {
 			ContainerName: "test-container",
 			Resource:      "requests.memory"}}},
 	}}
+	// Something greater than 0777 = 511
+	invalidMode := int32(512)
+	downwardAPIInvalidDefaultMode := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{DefaultMode: &invalidMode,
+		Items: []api.DownwardAPIVolumeFile{{Path: "test",
+			FieldRef: &api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels"}}},
+	}}
+	downwardAPIInvalidItemMode := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "test",
+		FieldRef: &api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"},
+		Mode: &invalidMode}},
+	}}
+	secretInvalidDefaultMode := api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "test", DefaultMode: &invalidMode}}
+	secretInvalidItemMode := api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "test",
+		Items: []api.KeyToPath{{
+			Key:  "test",
+			Path: "test",
+			Mode: &invalidMode}},
+	}}
+	configMapInvalidDefaultMode := api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{
+		LocalObjectReference: api.LocalObjectReference{Name: "test"},
+		DefaultMode:          &invalidMode,
+	}}
+	configMapInvalidItemMode := api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{
+		LocalObjectReference: api.LocalObjectReference{Name: "test"},
+		Items: []api.KeyToPath{{
+			Key:  "test",
+			Path: "test",
+			Mode: &invalidMode}},
+	}}
+
 	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{}, Lun: &lun, FSType: "ext4", ReadOnly: false}}
 	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"wwn"}, Lun: nil, FSType: "ext4", ReadOnly: false}}
 	slashInName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "foo/bar"}}
@@ -1028,6 +1061,36 @@ func TestValidateVolumes(t *testing.T) {
 			[]api.Volume{{Name: "testvolume", VolumeSource: fieldRefandResourceFieldRef}},
 			field.ErrorTypeInvalid,
 			"downwardAPI", "fieldRef and resourceFieldRef can not be specified simultaneously",
+		},
+		"invalid defaultMode in downwardAPI": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: downwardAPIInvalidDefaultMode}},
+			field.ErrorTypeInvalid,
+			"downwardAPI", "Mode should be a number between 0 and 0777 (note that these are in octal)",
+		},
+		"invalid (item) Mode in downwardAPI": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: downwardAPIInvalidItemMode}},
+			field.ErrorTypeInvalid,
+			"downwardAPI", "Mode should be a number between 0 and 0777 (note that these are in octal)",
+		},
+		"invalid defaultMode in Secret": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: secretInvalidDefaultMode}},
+			field.ErrorTypeInvalid,
+			"field[0].secret.defaultMode", "Mode should be a number between 0 and 0777 (note that these are in octal)",
+		},
+		"invalid (item) Mode in Secret": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: secretInvalidItemMode}},
+			field.ErrorTypeInvalid,
+			"field[0].secret.mode", "Mode should be a number between 0 and 0777 (note that these are in octal)",
+		},
+		"invalid defaultMode in ConfigMap": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: configMapInvalidDefaultMode}},
+			field.ErrorTypeInvalid,
+			"field[0].configMap.defaultMode", "Mode should be a number between 0 and 0777 (note that these are in octal)",
+		},
+		"invalid (item) Mode in ConfigMap": {
+			[]api.Volume{{Name: "testvolume", VolumeSource: configMapInvalidItemMode}},
+			field.ErrorTypeInvalid,
+			"field[0].configMap.mode", "Mode should be a number between 0 and 0777 (note that these are in octal)",
 		},
 	}
 	for k, v := range errorCases {
