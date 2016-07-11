@@ -86,9 +86,8 @@ func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulerca
 		return schedulerapi.HostPriorityList{}, err
 	}
 
-	list := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
+	list := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	for _, node := range nodes {
 		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name]))
 	}
 	return list, nil
@@ -118,12 +117,12 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, nodeName
 	}
 
 	labeledNodes := map[string]bool{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		exists := labels.Set(node.Labels).Has(n.label)
 		labeledNodes[node.Name] = (exists && n.presence) || (!exists && !n.presence)
 	}
 
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
 	for nodeName, success := range labeledNodes {
@@ -158,8 +157,7 @@ func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercac
 	}
 
 	for i := range pod.Spec.Containers {
-		for j := range nodes.Items {
-			node := &nodes.Items[j]
+		for _, node := range nodes {
 			// Check if this container's image is present and get its size.
 			imageSize := checkContainerImageOnNode(node, &pod.Spec.Containers[i])
 			// Add this size to the total result of this node.
@@ -167,7 +165,7 @@ func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercac
 		}
 	}
 
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	// score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest.
 	for nodeName, sumSize := range sumSizeMap {
@@ -222,9 +220,8 @@ func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedul
 		return schedulerapi.HostPriorityList{}, err
 	}
 
-	list := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
+	list := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	for _, node := range nodes {
 		list = append(list, calculateBalancedResourceAllocation(pod, node, nodeNameToInfo[node.Name]))
 	}
 	return list, nil
