@@ -24,10 +24,12 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -162,32 +164,22 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 	return nil
 }
 
-func updateNetworkingCondition(node *api.Node, routeCreated bool) {
-	_, networkingCondition := api.GetNodeCondition(&node.Status, api.NodeNetworkUnavailable)
-	currentTime := unversioned.Now()
-	if routeCreated {
-		if networkingCondition != nil && networkingCondition.Status != api.ConditionFalse {
-			networkingCondition.Status = api.ConditionFalse
-			networkingCondition.Reason = "RouteCreated"
-			networkingCondition.Message = "RouteController created a route"
-			networkingCondition.LastTransitionTime = currentTime
-		} else if networkingCondition == nil {
-			node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+func (rc *RouteController) updateNetworkingCondition(nodeName string, routeCreated bool) error {
+	var err error
+	for i := 0; i < updateNodeStatusMaxRetries; i++ {
+		// Patch could also fail, even though the chance is very slim. So we still do
+		// patch in the retry loop.
+		currentTime := unversioned.Now()
+		if routeCreated {
+			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, api.NodeCondition{
 				Type:               api.NodeNetworkUnavailable,
 				Status:             api.ConditionFalse,
 				Reason:             "RouteCreated",
 				Message:            "RouteController created a route",
 				LastTransitionTime: currentTime,
 			})
-		}
-	} else {
-		if networkingCondition != nil && networkingCondition.Status != api.ConditionTrue {
-			networkingCondition.Status = api.ConditionTrue
-			networkingCondition.Reason = "NoRouteCreated"
-			networkingCondition.Message = "RouteController failed to create a route"
-			networkingCondition.LastTransitionTime = currentTime
-		} else if networkingCondition == nil {
-			node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+		} else {
+			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, api.NodeCondition{
 				Type:               api.NodeNetworkUnavailable,
 				Status:             api.ConditionTrue,
 				Reason:             "NoRouteCreated",
@@ -195,28 +187,14 @@ func updateNetworkingCondition(node *api.Node, routeCreated bool) {
 				LastTransitionTime: currentTime,
 			})
 		}
-	}
-}
-
-func (rc *RouteController) updateNetworkingCondition(nodeName string, routeCreated bool) error {
-	var err error
-	for i := 0; i < updateNodeStatusMaxRetries; i++ {
-		node, err := rc.kubeClient.Core().Nodes().Get(nodeName)
-		if err != nil {
-			glog.Errorf("Error geting node: %v", err)
-			continue
-		}
-		updateNetworkingCondition(node, routeCreated)
-		// TODO: Use Patch instead once #26381 is merged.
-		// See kubernetes/node-problem-detector#9 for details.
-		if _, err = rc.kubeClient.Core().Nodes().UpdateStatus(node); err == nil {
+		if err == nil {
 			return nil
 		}
-		if i+1 < updateNodeStatusMaxRetries {
-			glog.Errorf("Error updating node %s, retrying: %v", node.Name, err)
-		} else {
-			glog.Errorf("Error updating node %s: %v", node.Name, err)
+		if i == updateNodeStatusMaxRetries || !errors.IsConflict(err) {
+			glog.Errorf("Error updating node %s: %v", nodeName, err)
+			return err
 		}
+		glog.Errorf("Error updating node %s, retrying: %v", nodeName, err)
 	}
 	return err
 }
