@@ -284,6 +284,7 @@ func TestNakedPod(t *testing.T) {
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbLister.Store, pdb)
 	dc.sync(pdbName)
+	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
 	ps.VerifyDisruptionAllowed(t, pdbName, false)
 
 	pod, _ := newPod(t, "naked")

@@ -472,7 +472,13 @@ func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error 
 }
 
 func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, currentHealthy, desiredHealthy, expectedCount int32) error {
-	if pdb.Status.CurrentHealthy == currentHealthy && pdb.Status.DesiredHealthy == desiredHealthy && pdb.Status.ExpectedPods == expectedCount {
+	// We require expectedCount to be > 0 so that PDBs which currently match no
+	// pods are in a safe state when their first pods appear but this controller
+	// has not updated their status yet.  This isn't the only race, but it's a
+	// common one that's easy to detect.
+	disruptionAllowed := currentHealthy >= desiredHealthy && expectedCount > 0
+
+	if pdb.Status.CurrentHealthy == currentHealthy && pdb.Status.DesiredHealthy == desiredHealthy && pdb.Status.ExpectedPods == expectedCount && pdb.Status.PodDisruptionAllowed == disruptionAllowed {
 		return nil
 	}
 
@@ -486,7 +492,7 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 		CurrentHealthy:       currentHealthy,
 		DesiredHealthy:       desiredHealthy,
 		ExpectedPods:         expectedCount,
-		PodDisruptionAllowed: currentHealthy >= desiredHealthy,
+		PodDisruptionAllowed: disruptionAllowed,
 	}
 
 	return dc.getUpdater()(&newPdb)
