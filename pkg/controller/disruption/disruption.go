@@ -393,6 +393,10 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 		desiredHealthy = pdb.Spec.MinAvailable.IntVal
 		expectedCount = int32(len(pods))
 	} else if pdb.Spec.MinAvailable.Type == intstr.String {
+		// When the user specifies a fraction of pods that must be available, we
+		// use as the fraction's denominator the sum of the values of the /scale
+		// subresource for the pods' controllers.
+
 		// A mapping from controllers to their scale.
 		controllerScale := map[types.UID]int32{}
 
