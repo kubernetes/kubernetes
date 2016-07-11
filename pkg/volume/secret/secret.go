@@ -190,7 +190,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		len(secret.Data),
 		totalBytes)
 
-	payload, err := makePayload(b.source.Items, secret)
+	payload, err := makePayload(b.source.Items, secret, b.source.DefaultMode)
 	if err != nil {
 		return err
 	}
@@ -217,25 +217,38 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func makePayload(mappings []api.KeyToPath, secret *api.Secret) (map[string][]byte, error) {
-	payload := make(map[string][]byte, len(secret.Data))
+func makePayload(mappings []api.KeyToPath, secret *api.Secret, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+	if defaultMode == nil {
+		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+	}
+
+	payload := make(map[string]volumeutil.FileProjection, len(secret.Data))
+	var fileProjection volumeutil.FileProjection
 
 	if len(mappings) == 0 {
 		for name, data := range secret.Data {
-			payload[name] = []byte(data)
+			fileProjection.Data = []byte(data)
+			fileProjection.Mode = *defaultMode
+			payload[name] = fileProjection
 		}
 	} else {
 		for _, ktp := range mappings {
 			content, ok := secret.Data[ktp.Key]
 			if !ok {
-				glog.Errorf("references non-existent secret key")
-				return nil, fmt.Errorf("references non-existent secret key")
+				err_msg := "references non-existent secret key"
+				glog.Errorf(err_msg)
+				return nil, fmt.Errorf(err_msg)
 			}
 
-			payload[ktp.Path] = []byte(content)
+			fileProjection.Data = []byte(content)
+			if ktp.Mode != nil {
+				fileProjection.Mode = *ktp.Mode
+			} else {
+				fileProjection.Mode = *defaultMode
+			}
+			payload[ktp.Path] = fileProjection
 		}
 	}
-
 	return payload, nil
 }
 
