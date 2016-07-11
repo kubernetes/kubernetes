@@ -2202,8 +2202,8 @@ func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
-// cannot. "pod" is new pod, while "pods" include all admitted pods plus the
-// new pod. The function returns a boolean value indicating whether the pod
+// cannot. "pod" is new pod, while "pods" are all admitted pods
+// The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
 func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, string) {
@@ -2212,25 +2212,19 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 		glog.Errorf("Cannot get Node info: %v", err)
 		return false, "InvalidNodeInfo", "Kubelet cannot get node info."
 	}
-	otherPods := []*api.Pod{}
-	for _, p := range pods {
-		if p != pod {
-			otherPods = append(otherPods, p)
-		}
-	}
 
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move predicate check into a pod admitter
 	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: otherPods}
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
 	for _, podAdmitHandler := range kl.PodAdmitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			return false, result.Reason, result.Message
 		}
 	}
-	nodeInfo := schedulercache.NewNodeInfo(otherPods...)
+	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
 	fit, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
 	if !fit {
@@ -2447,22 +2441,22 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(podsByCreationTime(pods))
 	for _, pod := range pods {
-		kl.podManager.AddPod(pod)
 		if kubepod.IsMirrorPod(pod) {
+			kl.podManager.AddPod(pod)
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
-		// Note that allPods includes the new pod since we added at the
-		// beginning of the loop.
+		// Note that allPods excludes the new pod.
 		allPods := kl.podManager.GetPods()
 		// We failed pods that we rejected, so activePods include all admitted
-		// pods that are alive and the new pod.
+		// pods that are alive.
 		activePods := kl.filterOutTerminatedPods(allPods)
 		// Check if we can admit the pod; if not, reject it.
 		if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
 			kl.rejectPod(pod, reason, message)
 			continue
 		}
+		kl.podManager.AddPod(pod)
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 		kl.probeManager.AddPod(pod)
