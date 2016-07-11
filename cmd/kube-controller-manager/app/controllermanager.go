@@ -370,7 +370,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 	groupVersion = "policy/v1alpha1"
 	resources, found = resourceMap[groupVersion]
-	glog.Infof("Attempting to start disruption, full resource map %+v", resourceMap)
+	glog.Infof("Attempting to start disruption controller, full resource map %+v", resourceMap)
 	if containsVersion(versions, groupVersion) && found {
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "poddisruptionbudgets") {
