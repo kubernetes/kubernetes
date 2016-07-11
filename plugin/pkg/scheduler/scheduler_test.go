@@ -125,7 +125,7 @@ func TestScheduler(t *testing.T) {
 				},
 			},
 			NodeLister: algorithm.FakeNodeLister(
-				api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
+				[]*api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}},
 			),
 			Algorithm: item.algo,
 			Binder: fakeBinder{func(b *api.Binding) error {
@@ -292,7 +292,7 @@ func setupTestSchedulerWithOnePod(t *testing.T, queuedPodStore *clientcache.FIFO
 	cfg := &Config{
 		SchedulerCache: scache,
 		NodeLister: algorithm.FakeNodeLister(
-			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
+			[]*api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}},
 		),
 		Algorithm: algo,
 		Binder: fakeBinder{func(b *api.Binding) error {

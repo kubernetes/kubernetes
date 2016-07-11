@@ -66,7 +66,7 @@ func numericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.Nod
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %v", err)
 	}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		score, err := strconv.Atoi(node.Name)
 		if err != nil {
 			return nil, err
@@ -102,12 +102,10 @@ func reverseNumericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulerca
 	return reverseResult, nil
 }
 
-func makeNodeList(nodeNames []string) api.NodeList {
-	result := api.NodeList{
-		Items: make([]api.Node, len(nodeNames)),
-	}
-	for ix := range nodeNames {
-		result.Items[ix].Name = nodeNames[ix]
+func makeNodeList(nodeNames []string) []*api.Node {
+	result := make([]*api.Node, 0, len(nodeNames))
+	for _, nodeName := range nodeNames {
+		result = append(result, &api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName}})
 	}
 	return result
 }

@@ -101,12 +101,12 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 	var maxCount int
 	var minCount int
 	counts := map[string]int{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		totalCount := 0
 		// count weights for the weighted pod affinity
 		if affinity.PodAffinity != nil {
 			for _, weightedTerm := range affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-				weightedCount, err := ipa.CountWeightByPodMatchAffinityTerm(pod, allPods, weightedTerm.Weight, weightedTerm.PodAffinityTerm, &node)
+				weightedCount, err := ipa.CountWeightByPodMatchAffinityTerm(pod, allPods, weightedTerm.Weight, weightedTerm.PodAffinityTerm, node)
 				if err != nil {
 					return nil, err
 				}
@@ -117,7 +117,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 		// count weights for the weighted pod anti-affinity
 		if affinity.PodAntiAffinity != nil {
 			for _, weightedTerm := range affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-				weightedCount, err := ipa.CountWeightByPodMatchAffinityTerm(pod, allPods, (0 - weightedTerm.Weight), weightedTerm.PodAffinityTerm, &node)
+				weightedCount, err := ipa.CountWeightByPodMatchAffinityTerm(pod, allPods, (0 - weightedTerm.Weight), weightedTerm.PodAffinityTerm, node)
 				if err != nil {
 					return nil, err
 				}
@@ -146,7 +146,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 					//}
 					for _, epAffinityTerm := range podAffinityTerms {
 						match, err := ipa.failureDomains.CheckIfPodMatchPodAffinityTerm(pod, ep, epAffinityTerm,
-							func(pod *api.Pod) (*api.Node, error) { return &node, nil },
+							func(pod *api.Pod) (*api.Node, error) { return node, nil },
 							func(ep *api.Pod) (*api.Node, error) { return ipa.info.GetNodeInfo(ep.Spec.NodeName) },
 						)
 						if err != nil {
@@ -161,7 +161,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 				// count weight for the weighted pod affinity indicated by the existing pod.
 				for _, epWeightedTerm := range epAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
 					match, err := ipa.failureDomains.CheckIfPodMatchPodAffinityTerm(pod, ep, epWeightedTerm.PodAffinityTerm,
-						func(pod *api.Pod) (*api.Node, error) { return &node, nil },
+						func(pod *api.Pod) (*api.Node, error) { return node, nil },
 						func(ep *api.Pod) (*api.Node, error) { return ipa.info.GetNodeInfo(ep.Spec.NodeName) },
 					)
 					if err != nil {
@@ -177,7 +177,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 			if epAffinity.PodAntiAffinity != nil {
 				for _, epWeightedTerm := range epAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
 					match, err := ipa.failureDomains.CheckIfPodMatchPodAffinityTerm(pod, ep, epWeightedTerm.PodAffinityTerm,
-						func(pod *api.Pod) (*api.Node, error) { return &node, nil },
+						func(pod *api.Pod) (*api.Node, error) { return node, nil },
 						func(ep *api.Pod) (*api.Node, error) { return ipa.info.GetNodeInfo(ep.Spec.NodeName) },
 					)
 					if err != nil {
@@ -201,7 +201,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 
 	// calculate final priority score for each node
 	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		fScore := float64(0)
 		if (maxCount - minCount) > 0 {
 			fScore = 10 * (float64(counts[node.Name]-minCount) / float64(maxCount-minCount))
