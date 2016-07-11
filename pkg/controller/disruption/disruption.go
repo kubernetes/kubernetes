@@ -331,7 +331,7 @@ func (dc *DisruptionController) worker() {
 				return
 			}
 			defer dc.queue.Done(key)
-			glog.Infof("Syncing DB %q", key.(string))
+			glog.Infof("Syncing PodDisruptionBudget %q", key.(string))
 			if err := dc.sync(key.(string)); err != nil {
 				glog.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %v", key.(string), err)
 				// TODO(mml): In order to be safe in the face of a total inability to write state
