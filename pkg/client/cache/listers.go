@@ -739,6 +739,7 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 			return
 		}
 
+		// If a PDB with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
