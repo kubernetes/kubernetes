@@ -718,7 +718,6 @@ type StoreToPodDisruptionBudgetLister struct {
 
 func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
 	var selector labels.Selector
-	var pdb policy.PodDisruptionBudget
 
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no PodDisruptionBudgets found for pod %v because it has no labels", pod.Name)
@@ -726,7 +725,11 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 	}
 
 	for _, m := range s.Store.List() {
-		pdb = *m.(*policy.PodDisruptionBudget)
+		pdb, ok := m.(*policy.PodDisruptionBudget)
+		if !ok {
+			glog.Errorf("Unexpected: %v is not a PodDisruptionBudget", m)
+			continue
+		}
 		if pdb.Namespace != pod.Namespace {
 			continue
 		}
@@ -739,7 +742,7 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
-		pdbList = append(pdbList, pdb)
+		pdbList = append(pdbList, *pdb)
 	}
 	if len(pdbList) == 0 {
 		err = fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
