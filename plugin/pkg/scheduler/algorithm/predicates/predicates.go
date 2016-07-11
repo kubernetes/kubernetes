@@ -472,11 +472,10 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 	if node == nil {
 		return false, fmt.Errorf("node not found")
 	}
-	allocatable := node.Status.Allocatable
-	allowedPodNumber := allocatable.Pods().Value()
-	if int64(len(nodeInfo.Pods()))+1 > allowedPodNumber {
+	allowedPodNumber := nodeInfo.AllowedPodNumber()
+	if len(nodeInfo.Pods())+1 > allowedPodNumber {
 		return false,
-			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), allowedPodNumber)
+			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber))
 	}
 
 	var podRequest *resourceRequest
@@ -491,6 +490,7 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		return true, nil
 	}
 
+	allocatable := node.Status.Allocatable
 	totalMilliCPU := allocatable.Cpu().MilliValue()
 	totalMemory := allocatable.Memory().Value()
 	totalNvidiaGPU := allocatable.NvidiaGPU().Value()
@@ -507,8 +507,12 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		return false,
 			newInsufficientResourceError(nvidiaGpuResourceName, podRequest.nvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, totalNvidiaGPU)
 	}
-	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
-		podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
+			podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+	}
 	return true, nil
 }
 
