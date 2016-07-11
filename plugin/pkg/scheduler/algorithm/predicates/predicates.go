@@ -771,8 +771,10 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	// TODO: Aggregate it at the NodeInfo level.
 	ports := make(map[int]bool)
 	for _, pod := range pods {
-		for _, container := range pod.Spec.Containers {
-			for _, podPort := range container.Ports {
+		for j := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[j]
+			for k := range container.Ports {
+				podPort := &container.Ports[k]
 				// "0" is explicitly ignored in PodFitsHostPorts,
 				// which is the only function that uses this value.
 				if podPort.HostPort != 0 {
@@ -1045,7 +1047,8 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 		return false
 	}
 
-	for _, taint := range taints {
+	for i := range taints {
+		taint := &taints[i]
 		// skip taints that have effect PreferNoSchedule, since it is for priorities
 		if taint.Effect == api.TaintEffectPreferNoSchedule {
 			continue

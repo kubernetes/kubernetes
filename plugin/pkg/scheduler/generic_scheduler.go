@@ -232,7 +232,7 @@ func PrioritizeNodes(
 	nodeLister algorithm.NodeLister,
 	extenders []algorithm.SchedulerExtender,
 ) (schedulerapi.HostPriorityList, error) {
-	result := schedulerapi.HostPriorityList{}
+	result := make(schedulerapi.HostPriorityList, 0, len(nodeNameToInfo))
 
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
@@ -243,7 +243,7 @@ func PrioritizeNodes(
 	var (
 		mu             = sync.Mutex{}
 		wg             = sync.WaitGroup{}
-		combinedScores = map[string]int{}
+		combinedScores = make(map[string]int, len(nodeNameToInfo))
 		errs           []error
 	)
 
