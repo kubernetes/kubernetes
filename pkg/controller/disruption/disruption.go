@@ -236,7 +236,7 @@ func (dc *DisruptionController) updateDb(old, cur interface{}) {
 
 func (dc *DisruptionController) removeDb(obj interface{}) {
 	pdb := obj.(*policy.PodDisruptionBudget)
-	glog.Infof("update DB %q", pdb.Name)
+	glog.Infof("remove DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
 }
 
