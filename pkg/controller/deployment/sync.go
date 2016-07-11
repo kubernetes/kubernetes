@@ -578,13 +578,7 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 	if err != nil {
 		return err
 	}
-	// Remove any condition that denotes progress when a deployment is paused so that it
-	// won't switch to failed once it is unpaused.
-	removed := false
-	if d.Spec.Paused {
-		removed = deploymentutil.RemoveCondition(d, extensions.DeploymentProgressing, api.ConditionTrue)
-	}
-	if !reflect.DeepEqual(d.Status, newStatus) || removed {
+	if !reflect.DeepEqual(d.Status, newStatus) {
 		return dc.updateDeploymentStatus(allRSs, newRS, d)
 	}
 	return nil

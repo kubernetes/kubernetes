@@ -75,17 +75,29 @@ func NewCondition(conditionType extensions.DeploymentConditionType, status api.C
 	}
 }
 
-// GetCondition returns the first deployment condition it will find with the provided type
+// GetCondition returns the latest deployment condition it will find with the provided type
 // and status.
 func GetCondition(d *extensions.Deployment, cType extensions.DeploymentConditionType, cStatuses ...api.ConditionStatus) *extensions.DeploymentCondition {
+	statuses := map[api.ConditionStatus]struct{}{}
 	for _, cStatus := range cStatuses {
-		for _, c := range d.Status.Conditions {
-			if c.Type == cType && c.Status == cStatus {
-				return &c
-			}
+		statuses[cStatus] = struct{}{}
+	}
+
+	conditions := []extensions.DeploymentCondition{}
+	for _, c := range d.Status.Conditions {
+		_, ok := statuses[c.Status]
+		if c.Type == cType && ok {
+			conditions = append(conditions, c)
 		}
 	}
-	return nil
+
+	if len(conditions) == 0 {
+		return nil
+	}
+
+	sort.Sort(ByLastTransitionTime(conditions))
+
+	return &conditions[0]
 }
 
 // SetCondition updates the deployment to include the provided condition. If the condition
@@ -129,6 +141,16 @@ func filterOutCondition(d *extensions.Deployment, cType extensions.DeploymentCon
 	}
 
 	return newConditions, found
+}
+
+// ByLastTransitionTime sorts a list of DeploymentConditions by last transition time (from
+// the latest to the oldest).
+type ByLastTransitionTime []extensions.DeploymentCondition
+
+func (o ByLastTransitionTime) Len() int      { return len(o) }
+func (o ByLastTransitionTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ByLastTransitionTime) Less(i, j int) bool {
+	return o[i].LastTransitionTime.Time.After(o[j].LastTransitionTime.Time)
 }
 
 func SetDeploymentRevision(deployment *extensions.Deployment, revision string) bool {
