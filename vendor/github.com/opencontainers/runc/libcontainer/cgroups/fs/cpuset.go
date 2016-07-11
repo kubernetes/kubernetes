@@ -12,6 +12,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 )
 
 type CpusetGroup struct {
@@ -88,7 +89,7 @@ func (s *CpusetGroup) getSubsystemSettings(parent string) (cpus []byte, mems []b
 // it's parent.
 func (s *CpusetGroup) ensureParent(current, root string) error {
 	parent := filepath.Dir(current)
-	if filepath.Clean(parent) == root {
+	if libcontainerUtils.CleanPath(parent) == root {
 		return nil
 	}
 	// Avoid infinite recursion.

@@ -18,7 +18,7 @@ var namespaceInfo = map[NamespaceType]int{
 }
 
 // CloneFlags parses the container's Namespaces options to set the correct
-// flags on clone, unshare. This functions returns flags only for new namespaces.
+// flags on clone, unshare. This function returns flags only for new namespaces.
 func (n *Namespaces) CloneFlags() uintptr {
 	var flag int
 	for _, v := range *n {
