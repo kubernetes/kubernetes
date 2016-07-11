@@ -117,7 +117,7 @@ func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*pol
 
 	pdbName, err := controller.KeyFunc(pdb)
 	if err != nil {
-		t.Fatalf("Unexpected error naming pdb %q", pdb.Name)
+		t.Fatalf("Unexpected error naming pdb %q: %v", pdb.Name, err)
 	}
 
 	return pdb, pdbName
@@ -144,7 +144,7 @@ func newPod(t *testing.T, name string) (*api.Pod, string) {
 
 	podName, err := controller.KeyFunc(pod)
 	if err != nil {
-		t.Fatalf("Unexpected error naming pod %q", pod.Name)
+		t.Fatalf("Unexpected error naming pod %q: %v", pod.Name, err)
 	}
 
 	return pod, podName
@@ -192,7 +192,7 @@ func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 
 	dName, err := controller.KeyFunc(d)
 	if err != nil {
-		t.Fatalf("Unexpected error naming Deployment %q", d.Name)
+		t.Fatalf("Unexpected error naming Deployment %q: %v", d.Name, err)
 	}
 
 	return d, dName
@@ -216,7 +216,7 @@ func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 
 	rsName, err := controller.KeyFunc(rs)
 	if err != nil {
-		t.Fatalf("Unexpected error naming Deployment %q", rs.Name)
+		t.Fatalf("Unexpected error naming Deployment %q: %v", rs.Name, err)
 	}
 
 	return rs, rsName
@@ -251,6 +251,8 @@ func TestNoSelector(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, false, 0, 3, 0)
 }
 
+// Verify that available/expected counts go up as we add pods, then verify that
+// available count goes down when we make a pod unavailable.
 func TestUnavailable(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
@@ -278,6 +280,8 @@ func TestUnavailable(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, false, 2, 3, 3)
 }
 
+// Create a pod  with no controller, and verify that a PDB with a percentage
+// specified won't allow a disruption.
 func TestNakedPod(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
