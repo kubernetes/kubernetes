@@ -1,3 +1,6 @@
+{% set influxdb_vol_line_1 = 'emptyDir: {}' %}
+{% set influxdb_vol_line_2 = '' %}
+
 apiVersion: apps/v1alpha1
 kind: PetSet
 metadata:
@@ -65,8 +68,10 @@ spec:
             mountPath: /var
       volumes:
       - name: influxdb-persistent-storage
-        persistentVolumeClaim:
-          claimName: influxdb-claim
+        # emptyDir PV is overridden by GCE provider
+        # to use a PersistentVolumeClaim instead
+        {{ influxdb_vol_line_1 }}
+        {{ influxdb_vol_line_2 }}
       - name: grafana-persistent-storage
         emptyDir: {}
   serviceName: monitoring-influxdb
