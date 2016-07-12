@@ -49,11 +49,17 @@ var (
 		  # Show metrics for all nodes in the default namespace
 		  kubectl top node
 
+		  # Show metrics for all nodes in the given namespace
+		  kubectl top node --namespace=NAMESPACE
+
 		  # Show metrics for a given pod in the default namespace
 		  kubectl top pod POD_NAME
 
+		  # Show metrics for a given pod and its containers
+		  kubectl top pod POD_NAME --containers
+
 		  # Show metrics for the pods defined by the selector query
-		  kubectl top pod --selector="key: value"`)
+		  kubectl top pod --selector="KEY: VALUE"`)
 )
 
 var HandledResources []unversioned.GroupKind = []unversioned.GroupKind{

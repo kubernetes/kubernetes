@@ -22,9 +22,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"time"
 )
 
 var (
@@ -41,7 +41,7 @@ type ResourceMetricsInfo struct {
 	Namespace string
 	Name 	  string
 	Metrics   v1.ResourceList
-	Timestamp unversioned.Time
+	Timestamp string
 }
 
 type TopCmdPrinter struct {
@@ -53,6 +53,9 @@ func NewTopCmdPrinter(out io.Writer) (TopCmdPrinter) {
 }
 
 func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics) error {
+	if len(metrics) == 0 {
+		return nil
+	}
 	w := kubectl.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
@@ -61,13 +64,16 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics
 		PrintMetricsLine(w, &ResourceMetricsInfo{
 			Name:      m.Name,
 			Metrics:   m.Usage,
-			Timestamp: m.Timestamp,
+			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
 		}, false)
 	}
 	return nil
 }
 
 func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metrics_api.PodMetrics, printContainers bool) error {
+	if len(metrics) == 0 {
+		return nil
+	}
 	w := kubectl.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
@@ -103,7 +109,7 @@ func PrintSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 		Namespace: m.Namespace,
 		Name:      m.Name,
 		Metrics:   podMetrics,
-		Timestamp: m.Timestamp,
+		Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
 	}, true)
 
 	if printContainers {
@@ -112,7 +118,7 @@ func PrintSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 				Namespace: "",
 				Name:      contName,
 				Metrics:   containers[contName],
-				Timestamp: m.Timestamp,
+				Timestamp: "",
 			}, true)
 		}
 	}
