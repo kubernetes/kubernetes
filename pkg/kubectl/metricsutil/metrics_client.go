@@ -26,7 +26,6 @@ import (
 
 const (
 	MetricsRoot = "/apis/metrics/v1alpha1/"
-
 	DefaultHeapsterNamespace = "kube-system"
 	DefaultHeapsterScheme = "http"
 	DefaultHeapsterService = "heapster"
