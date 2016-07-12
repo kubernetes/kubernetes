@@ -53,7 +53,10 @@ const (
 )
 
 func proxyContext(version string) {
-	f := framework.NewDefaultFramework("proxy")
+	options := framework.FrameworkOptions{
+		ClientQPS: -1.0,
+	}
+	f := framework.NewFramework("proxy", options, nil)
 	prefix := "/api/" + version
 
 	// Port here has to be kept in sync with default kubelet port.
@@ -65,7 +68,10 @@ func proxyContext(version string) {
 	It("should proxy logs on node using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
 	It("should proxy to cadvisor using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
 
+	// using the porter image to serve content, access the content
+	// (of multiple pods?) from multiple (endpoints/services?)
 	It("should proxy through a service and a pod [Conformance]", func() {
+		start := time.Now()
 		labels := map[string]string{"proxy-service-target": "true"}
 		service, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
 			ObjectMeta: api.ObjectMeta{
@@ -105,7 +111,10 @@ func proxyContext(version string) {
 			}
 		}(service.Name)
 
-		// Make an RC with a single pod.
+		// Make an RC with a single pod. The 'porter' image is
+		// a simple server which serves the values of the
+		// environmental variables below.
+		By("starting an echo server on multiple ports")
 		pods := []*api.Pod{}
 		cfg := framework.RCConfig{
 			Client:       f.Client,
@@ -149,6 +158,7 @@ func proxyContext(version string) {
 
 		Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
 
+		// table constructors
 		// Try proxying through the service and directly to through the pod.
 		svcProxyURL := func(scheme, port string) string {
 			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
@@ -162,6 +172,8 @@ func proxyContext(version string) {
 		subresourcePodProxyURL := func(scheme, port string) string {
 			return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
 		}
+
+		// construct the table
 		expectations := map[string]string{
 			svcProxyURL("", "portname1") + "/": "foo",
 			svcProxyURL("", "80") + "/":        "foo",
@@ -218,15 +230,24 @@ func proxyContext(version string) {
 			defer errLock.Unlock()
 			errs = append(errs, s)
 		}
+		d := time.Since(start)
+		framework.Logf("setup took %v, starting test cases", d)
+		numberTestCases := len(expectations)
+		totalAttempts := numberTestCases * proxyAttempts
+		By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
+
 		for i := 0; i < proxyAttempts; i++ {
+			wg.Add(numberTestCases)
 			for path, val := range expectations {
-				wg.Add(1)
 				go func(i int, path, val string) {
 					defer wg.Done()
-					body, status, d, err := doProxy(f, path)
+					// this runs the test case
+					body, status, d, err := doProxy(f, path, i)
+
 					if err != nil {
 						if serr, ok := err.(*errors.StatusError); ok {
-							recordError(fmt.Sprintf("%v: path %v gave status error: %+v", i, path, serr.Status()))
+							recordError(fmt.Sprintf("%v (%v; %v): path %v gave status error: %+v",
+								i, status, d, path, serr.Status()))
 						} else {
 							recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
 						}
@@ -242,11 +263,9 @@ func proxyContext(version string) {
 						recordError(fmt.Sprintf("%v: path %v took %v > %v", i, path, d, proxyHTTPCallTimeout))
 					}
 				}(i, path, val)
-				// default QPS is 5
-				time.Sleep(200 * time.Millisecond)
 			}
+			wg.Wait()
 		}
-		wg.Wait()
 
 		if len(errs) != 0 {
 			body, err := f.Client.Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
@@ -261,7 +280,7 @@ func proxyContext(version string) {
 	})
 }
 
-func doProxy(f *framework.Framework, path string) (body []byte, statusCode int, d time.Duration, err error) {
+func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
 	// About all of the proxy accesses in this file:
 	// * AbsPath is used because it preserves the trailing '/'.
 	// * Do().Raw() is used (instead of DoRaw()) because it will turn an
@@ -272,7 +291,7 @@ func doProxy(f *framework.Framework, path string) (body []byte, statusCode int, 
 	body, err = f.Client.Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
-		framework.Logf("%v: %s (%v; %v)", path, truncate(body, maxDisplayBodyLen), statusCode, d)
+		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
 	} else {
 		framework.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
 	}
@@ -304,7 +323,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
-		_, status, d, err := doProxy(f, prefix+node+nodeDest)
+		_, status, d, err := doProxy(f, prefix+node+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
 			framework.Logf("Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
