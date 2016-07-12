@@ -129,8 +129,9 @@ func newWithBackoff(kubeConfigFile string, authorizedTTL, unauthorizedTTL, initi
 func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 	r := &v1beta1.SubjectAccessReview{
 		Spec: v1beta1.SubjectAccessReviewSpec{
-			User:   attr.GetUserName(),
-			Groups: attr.GetGroups(),
+			User:   attr.GetUser().GetName(),
+			Groups: attr.GetUser().GetGroups(),
+			Extra:  attr.GetUser().GetExtra(),
 		},
 	}
 	if attr.IsResourceRequest() {
