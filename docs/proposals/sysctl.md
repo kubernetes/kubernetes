@@ -196,7 +196,9 @@ Issues:
 
 ## Proposed Design
 
-### Pod API changes
+Sysctls in pods and `PodSecurityPolicy` are first introduced as an alpha feature for Kubernetes 1.4. This means that the following changes apply to the internal unversioned API only. The externally visible v1 API will model these as annotations, with the plan to turn those in first class citizens in a later release.
+
+### (Internal) pod API changes
 
 Container specification must be changed to allow the specification of kernel parameters:
 
@@ -221,6 +223,18 @@ type PodSecurityContext struct {
 ```
 
 Note that sysctls must be on the pod level because containers in a pod share IPC and network namespaces (if pod.spec.hostIPC and pod.spec.hostNetwork is false) and therefore cannot have conflicting sysctl values. Moreover, note that all namespaced sysctl supported by Docker/RunC are either in the IPC or network namespace.
+
+### Annotations for the (external) versioned API
+
+- `sysctls.alpha.kubernetes.io/pod-sysctl-1: kernel.shm_rmid_forced:4`
+- `sysctls.alpha.kubernetes.io/pod-sysctl-2: kernel.msgmax:foo,bar`
+- ...
+
+The same annotation keys are used for pods and `PodSecurityPolicy` objects.
+
+The value is everything behind the colon.
+
+Note that the use of the enumerations for multiple keys is intentional. An alternative would be to encode a list of key/values pairs in one annotation. But as abritrary values are supposed to work, an encoded list is much harder to use. Another alternative would be encode the sysctl name, e.g. `netIpv6Idgen-delay` for `net.ipv6.idgen_delay` (neither dots nor underscore are valid characters in an annotation key). But that does not make it easier either.
 
 ### Validation
 
