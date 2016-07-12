@@ -24,40 +24,52 @@ import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
-func DeepCopy_runtime_RawExtension(in RawExtension, out *RawExtension, c *conversion.Cloner) error {
-	if in.Raw != nil {
-		in, out := in.Raw, &out.Raw
-		*out = make([]byte, len(in))
-		copy(*out, in)
-	} else {
-		out.Raw = nil
+func DeepCopy_runtime_RawExtension(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*RawExtension)
+		out := out.(*RawExtension)
+		if in.Raw != nil {
+			in, out := &in.Raw, &out.Raw
+			*out = make([]byte, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Raw = nil
+		}
+		if in.Object == nil {
+			out.Object = nil
+		} else if newVal, err := c.DeepCopy(&in.Object); err != nil {
+			return err
+		} else {
+			out.Object = *newVal.(*Object)
+		}
+		return nil
 	}
-	if in.Object == nil {
-		out.Object = nil
-	} else if newVal, err := c.DeepCopy(in.Object); err != nil {
-		return err
-	} else {
-		out.Object = newVal.(Object)
-	}
-	return nil
 }
 
-func DeepCopy_runtime_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner) error {
-	out.APIVersion = in.APIVersion
-	out.Kind = in.Kind
-	return nil
+func DeepCopy_runtime_TypeMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*TypeMeta)
+		out := out.(*TypeMeta)
+		out.APIVersion = in.APIVersion
+		out.Kind = in.Kind
+		return nil
+	}
 }
 
-func DeepCopy_runtime_Unknown(in Unknown, out *Unknown, c *conversion.Cloner) error {
-	out.TypeMeta = in.TypeMeta
-	if in.Raw != nil {
-		in, out := in.Raw, &out.Raw
-		*out = make([]byte, len(in))
-		copy(*out, in)
-	} else {
-		out.Raw = nil
+func DeepCopy_runtime_Unknown(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Unknown)
+		out := out.(*Unknown)
+		out.TypeMeta = in.TypeMeta
+		if in.Raw != nil {
+			in, out := &in.Raw, &out.Raw
+			*out = make([]byte, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Raw = nil
+		}
+		out.ContentEncoding = in.ContentEncoding
+		out.ContentType = in.ContentType
+		return nil
 	}
-	out.ContentEncoding = in.ContentEncoding
-	out.ContentType = in.ContentType
-	return nil
 }
