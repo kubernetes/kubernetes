@@ -397,13 +397,13 @@ at a custom host directly:
 
 ```sh
 export KUBECONFIG=/path/to/kubeconfig
-go run hack/e2e.go -v --test --check_node_count=false --test_args="--host=http://127.0.0.1:8080"
+go run hack/e2e.go -v --test --check_node_count=false
 ```
 
 To control the tests that are run:
 
 ```sh
-go run hack/e2e.go -v --test --check_node_count=false --test_args="--host=http://127.0.0.1:8080" --ginkgo.focus="Secrets"
+go run hack/e2e.go -v --test --check_node_count=false --test_args="--ginkgo.focus="Secrets"
 ```
 
 ## Kinds of tests
