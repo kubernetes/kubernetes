@@ -589,6 +589,8 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			return fmt.Errorf("member %q of %q malformed 'protobuf' tag, tag %d should be key=value, got %q\n", m.Name, t.Name, i+4, extra)
 		}
 		switch parts[0] {
+		case "name":
+			protoExtra[parts[0]] = parts[1]
 		case "casttype", "castkey", "castvalue":
 			parts[0] = fmt.Sprintf("(gogoproto.%s)", parts[0])
 			protoExtra[parts[0]] = parts[1]
