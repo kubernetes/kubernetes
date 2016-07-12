@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/appc/cni/libcni"
-	cnitypes "github.com/appc/cni/pkg/types"
+	"github.com/containernetworking/cni/libcni"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"

@@ -19,8 +19,8 @@ limitations under the License.
 package mock_cni
 
 import (
-	"github.com/appc/cni/libcni"
-	"github.com/appc/cni/pkg/types"
+	"github.com/containernetworking/cni/libcni"
+	"github.com/containernetworking/cni/pkg/types"
 	"github.com/stretchr/testify/mock"
 )
 
