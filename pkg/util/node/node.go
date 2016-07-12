@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func GetHostname(hostnameOverride string) string {
@@ -58,4 +59,25 @@ func GetNodeHostIP(node *api.Node) (net.IP, error) {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
+}
+
+// Helper function that builds a string identifier that is unique per failure-zone
+// Returns empty-string for no zone
+func GetZoneKey(node *api.Node) string {
+	labels := node.Labels
+	if labels == nil {
+		return ""
+	}
+
+	region, _ := labels[unversioned.LabelZoneRegion]
+	failureDomain, _ := labels[unversioned.LabelZoneFailureDomain]
+
+	if region == "" && failureDomain == "" {
+		return ""
+	}
+
+	// We include the null character just in case region or failureDomain has a colon
+	// (We do assume there's no null characters in a region or failureDomain)
+	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
+	return region + ":\x00:" + failureDomain
 }

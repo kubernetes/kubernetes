@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -35,6 +34,20 @@ import (
 
 	"github.com/golang/glog"
 )
+
+// This function is expected to get a slice of NodeReadyConditions for all Nodes in a given zone.
+func ComputeZoneState(nodeReadyConditions []*api.NodeCondition) zoneState {
+	seenReady := false
+	for i := range nodeReadyConditions {
+		if nodeReadyConditions[i] != nil && nodeReadyConditions[i].Status == api.ConditionTrue {
+			seenReady = true
+		}
+	}
+	if seenReady {
+		return stateNormal
+	}
+	return stateFullSegmentation
+}
 
 // cleanupOrphanedPods deletes pods that are bound to nodes that don't
 // exist.
@@ -122,16 +135,6 @@ func forcefullyDeleteNode(kubeClient clientset.Interface, nodeName string, force
 		return fmt.Errorf("unable to delete node %q: %v", nodeName, err)
 	}
 	return nil
-}
-
-// forceUpdateAllProbeTimes bumps all observed timestamps in saved nodeStatuses to now. This makes
-// all eviction timer to reset.
-func forceUpdateAllProbeTimes(now unversioned.Time, statusData map[string]nodeStatusData) {
-	for k, v := range statusData {
-		v.probeTimestamp = now
-		v.readyTransitionTimestamp = now
-		statusData[k] = v
-	}
 }
 
 // maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
