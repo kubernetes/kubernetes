@@ -231,6 +231,38 @@ func TestPodFitsResources(t *testing.T) {
 			test: "equal edge case for init container",
 			wErr: nil,
 		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 2}), resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19, nvidiaGPU: 29})),
+			fits: false,
+			test: "too many resources fails due to init container nvidiaGpu",
+			wErr: newInsufficientResourceError(nvidiaGpuResourceName, 2, 29, 30),
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 2}), resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}, resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19, nvidiaGPU: 29})),
+			fits: false,
+			test: "too many resources fails due to highest init container nvidiaGpu",
+			wErr: newInsufficientResourceError(nvidiaGpuResourceName, 2, 29, 30),
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}), resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19, nvidiaGPU: 29})),
+			fits: true,
+			test: "init container fits because it's the max, not sum, of containers and init containers, for all resources",
+			wErr: nil,
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}), resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}, resourceRequest{milliCPU: 1, memory: 1, nvidiaGPU: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19, nvidiaGPU: 29})),
+			fits: true,
+			test: "multiple init containers fit because it's the max, not sum, of containers and init containers, for all resources",
+			wErr: nil,
+		},
 	}
 
 	for _, test := range enoughPodsTests {
