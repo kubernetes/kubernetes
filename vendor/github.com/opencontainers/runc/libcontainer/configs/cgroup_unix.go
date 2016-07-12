@@ -11,15 +11,22 @@ const (
 )
 
 type Cgroup struct {
-	Name string `json:"name"`
+	// Deprecated, use Path instead
+	Name string `json:"name,omitempty"`
 
-	// name of parent cgroup or slice
-	Parent string `json:"parent"`
+	// name of parent of cgroup or slice
+	// Deprecated, use Path instead
+	Parent string `json:"parent,omitempty"`
+
+	// Path specifies the path to cgroups that are created and/or joined by the container.
+	// The path is assumed to be relative to the host system cgroup mountpoint.
+	Path string `json:"path"`
 
 	// ScopePrefix decribes prefix for the scope name
 	ScopePrefix string `json:"scope_prefix"`
 
-	// Paths represent the cgroups paths to join
+	// Paths represent the absolute cgroups paths to join.
+	// This takes precedence over Path.
 	Paths map[string]string
 
 	// Resources contains various cgroups settings to apply
@@ -28,11 +35,14 @@ type Cgroup struct {
 
 type Resources struct {
 	// If this is true allow access to any kind of device within the container.  If false, allow access only to devices explicitly listed in the allowed_devices list.
-	AllowAllDevices bool `json:"allow_all_devices"`
+	// Deprecated
+	AllowAllDevices bool `json:"allow_all_devices,omitempty"`
+	// Deprecated
+	AllowedDevices []*Device `json:"allowed_devices,omitempty"`
+	// Deprecated
+	DeniedDevices []*Device `json:"denied_devices,omitempty"`
 
-	AllowedDevices []*Device `json:"allowed_devices"`
-
-	DeniedDevices []*Device `json:"denied_devices"`
+	Devices []*Device `json:"devices"`
 
 	// Memory limit (in bytes)
 	Memory int64 `json:"memory"`
@@ -45,6 +55,9 @@ type Resources struct {
 
 	// Kernel memory limit (in bytes)
 	KernelMemory int64 `json:"kernel_memory"`
+
+	// Kernel memory limit for TCP use (in bytes)
+	KernelMemoryTCP int64 `json:"kernel_memory_tcp"`
 
 	// CPU shares (relative weight vs. other containers)
 	CpuShares int64 `json:"cpu_shares"`
@@ -101,7 +114,7 @@ type Resources struct {
 	OomKillDisable bool `json:"oom_kill_disable"`
 
 	// Tuning swappiness behaviour per cgroup
-	MemorySwappiness int64 `json:"memory_swappiness"`
+	MemorySwappiness *int64 `json:"memory_swappiness"`
 
 	// Set priority of network traffic for container
 	NetPrioIfpriomap []*IfPrioMap `json:"net_prio_ifpriomap"`
