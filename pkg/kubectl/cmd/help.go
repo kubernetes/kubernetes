@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"os"
 )
 
 const help_long = `Help provides help for any command in the application.
@@ -40,6 +41,11 @@ func NewCmdHelp(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func printUsage(cmd *cobra.Command) {
+	cmd.Root().SetOutput(os.Stdout)
+	cmd.Root().Usage()
+}
+
 func RunHelp(cmd *cobra.Command, args []string) {
 	foundCmd, a, err := cmd.Root().Find(args)
 
@@ -48,7 +54,7 @@ func RunHelp(cmd *cobra.Command, args []string) {
 	//   from github.com/spf13/cobra
 	if foundCmd == nil {
 		cmd.Printf("Unknown help topic %#q.\n", args)
-		cmd.Root().Usage()
+		printUsage(cmd)
 	} else if err != nil {
 		// print error message at first, since it can contain suggestions
 		cmd.Println(err)
@@ -67,11 +73,11 @@ func RunHelp(cmd *cobra.Command, args []string) {
 
 		if !matchedMsgIsPrinted {
 			// if nothing is found, just print usage
-			cmd.Root().Usage()
+			printUsage(cmd)
 		}
 	} else if len(a) == 0 {
 		// help message for help command :)
-		cmd.Root().Usage()
+		printUsage(cmd)
 	} else {
 		helpFunc := foundCmd.HelpFunc()
 		helpFunc(foundCmd, args)
