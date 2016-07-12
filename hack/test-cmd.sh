@@ -318,6 +318,13 @@ runTests() {
   # Passing no arguments to create is an error
   ! kubectl create
 
+  # Stderr should be empty
+  output_message=$(! kubectl help create 2>&1 > /dev/null)
+  if [[ -z  $output_message  ]]; then
+    echo "kubectl help create should print to stdout not stderr"
+    exit 1
+  fi
+
   #######################
   # kubectl config set #
   #######################

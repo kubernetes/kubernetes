@@ -273,6 +273,10 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
 	cmds.AddCommand(NewCmdCompletion(f, out))
+	cmds.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		cmd.SetOutput(out)
+		cmd.Help()
+	})
 
 	if cmds.Flag("namespace") != nil {
 		if cmds.Flag("namespace").Annotations == nil {
