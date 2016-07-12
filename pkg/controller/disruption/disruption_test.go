@@ -216,7 +216,7 @@ func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 
 	rsName, err := controller.KeyFunc(rs)
 	if err != nil {
-		t.Fatalf("Unexpected error naming Deployment %q: %v", rs.Name, err)
+		t.Fatalf("Unexpected error naming ReplicaSet %q: %v", rs.Name, err)
 	}
 
 	return rs, rsName
