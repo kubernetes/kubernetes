@@ -151,13 +151,13 @@ See 'docker run --help'.
 
 Applied changes:
 
-* https://github.com/docker/docker#19265
-* https://github.com/docker/engine-api#38
+* https://github.com/docker/docker/pull/19265
+* https://github.com/docker/engine-api/pull/38
 
-Issues:
+Related issues:
 
-* https://github.com/docker/docker#21126
-* https://github.com/ibm-messaging/mq-docker#13
+* https://github.com/docker/docker/issues/21126
+* https://github.com/ibm-messaging/mq-docker/issues/13
 
 ### Runc support for sysctl
 
