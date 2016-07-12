@@ -48,6 +48,8 @@ import (
 // recommended to set the relist period short and have an auxiliary, longer
 // periodic sync in kubelet as the safety net.
 type GenericPLEG struct {
+	// The lock to protect data structures
+	sync.Mutex
 	// The period for relisting.
 	relistPeriod time.Duration
 	// The container runtime.
@@ -81,6 +83,7 @@ const (
 	// relisting time, which can vary significantly. Set a conservative
 	// threshold to avoid flipping between healthy and unhealthy.
 	relistThreshold       = 3 * time.Minute
+	// number of works to update pod cache in parallel
 	podCacheUpdateWorkers = 2
 )
 
@@ -107,7 +110,7 @@ type podRecord struct {
 
 type podRecords struct {
 	// Lock which guards all internal data structures.
-	lock    sync.RWMutex
+	sync.RWMutex
 	records map[types.UID]*podRecord
 }
 
@@ -210,7 +213,7 @@ func (g *GenericPLEG) relist() {
 
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
-	for pid := range g.podRecords.records {
+	for pid := range g.podRecords.getRecords() {
 		oldPod := g.podRecords.getOld(pid)
 		pod := g.podRecords.getCurrent(pid)
 		// Get all containers in the old and the new pod.
@@ -228,8 +231,10 @@ func (g *GenericPLEG) relist() {
 		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
 	}
 
-	// update PodCache and PodRecords
-	g.updatePodCacheByWorkers(eventsByPodID, needsReinspection)
+	// update PodCache (if cache is enabled) and PodRecords, return pods need re-inspection
+	if podsToReinspect := g.updateCacheAndRecordsByWorkers(eventsByPodID); len(podsToReinspect) != 0 {
+		needsReinspection = podsToReinspect
+	}
 
 	if g.cacheEnabled() {
 		// reinspect any pods that failed inspection during the previous relist
@@ -252,13 +257,15 @@ func (g *GenericPLEG) relist() {
 	g.podsToReinspect = needsReinspection
 }
 
-func (g *GenericPLEG) updatePodCacheByWorkers(eventsByPodID map[types.UID][]*PodLifecycleEvent,
-	needsReinspection map[types.UID]*kubecontainer.Pod) {
+func (g *GenericPLEG) updateCacheAndRecordsByWorkers(eventsByPodID map[types.UID][]*PodLifecycleEvent) map[types.UID]*kubecontainer.Pod {
 	// If there are events associated with a pod, we should update the
 	// podCache.
-	doUpdateCache := func(pid types.UID) {
+	// NOTE: doUpdateCacheAndRecords should be thread safe.
+	doUpdateCacheAndRecords := func(pid types.UID) *kubecontainer.Pod {
 		events := eventsByPodID[pid]
 		pod := g.podRecords.getCurrent(pid)
+
+		// 1. update pod cache if possible
 		if g.cacheEnabled() {
 			// updateCache() will inspect the pod and update the cache. If an
 			// error occurs during the inspection, we want PLEG to retry again
@@ -267,18 +274,18 @@ func (g *GenericPLEG) updatePodCacheByWorkers(eventsByPodID map[types.UID][]*Pod
 			// detect again in the next relist.
 			if err := g.updateCache(pod, pid); err != nil {
 				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
-				// make sure we try to reinspect the pod during the next relisting
-				needsReinspection[pid] = pod
-				return
+				return pod
 			} else if _, found := g.podsToReinspect[pid]; found {
 				// this pod was in the list to reinspect and we did so because it had events, so remove it
 				// from the list (we don't want the reinspection code below to inspect it a second time in
 				// this relist execution)
+				g.Lock()
+				defer g.Unlock()
 				delete(g.podsToReinspect, pid)
 			}
 		}
 
-		// Update the internal storage and send out the events.
+		// 2. update the internal storage and send out the events.
 		g.podRecords.update(pid)
 
 		for i := range events {
@@ -288,10 +295,14 @@ func (g *GenericPLEG) updatePodCacheByWorkers(eventsByPodID map[types.UID][]*Pod
 			}
 			g.eventChannel <- events[i]
 		}
+		return nil
 	}
 
 	// toUpdate records pids of all the events needed to be processed
 	toUpdate := make(chan types.UID, len(eventsByPodID))
+	// reinspectPodMap marks the pods need to be reinspected
+	reinspectPodMap := make(map[types.UID]*kubecontainer.Pod)
+
 	for pid := range eventsByPodID {
 		toUpdate <- pid
 	}
@@ -306,11 +317,19 @@ func (g *GenericPLEG) updatePodCacheByWorkers(eventsByPodID map[types.UID][]*Pod
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
 			for pid := range toUpdate {
-				doUpdateCache(pid)
+				// 1. do pod cache update;
+				// 2. return the pod if its cache update failed
+				if reinspectPod := doUpdateCacheAndRecords(pid); reinspectPod != nil {
+					g.Lock()
+					defer g.Unlock()
+					reinspectPodMap[pid] = reinspectPod
+				}
 			}
 		}()
 	}
 	wg.Wait()
+
+	return reinspectPodMap
 }
 
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
@@ -404,8 +423,8 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 }
 
 func (pr *podRecords) getOld(id types.UID) *kubecontainer.Pod {
-	pr.lock.RLock()
-	defer pr.lock.RUnlock()
+	pr.RLock()
+	defer pr.RUnlock()
 	r, ok := pr.records[id]
 	if !ok {
 		return nil
@@ -414,8 +433,8 @@ func (pr *podRecords) getOld(id types.UID) *kubecontainer.Pod {
 }
 
 func (pr *podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
-	pr.lock.RLock()
-	defer pr.lock.RUnlock()
+	pr.RLock()
+	defer pr.RUnlock()
 	r, ok := pr.records[id]
 	if !ok {
 		return nil
@@ -424,8 +443,8 @@ func (pr *podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
 }
 
 func (pr *podRecords) setCurrent(pods []*kubecontainer.Pod) {
-	pr.lock.Lock()
-	defer pr.lock.Unlock()
+	pr.Lock()
+	defer pr.Unlock()
 	for i := range pr.records {
 		pr.records[i].current = nil
 	}
@@ -439,8 +458,8 @@ func (pr *podRecords) setCurrent(pods []*kubecontainer.Pod) {
 }
 
 func (pr *podRecords) update(id types.UID) {
-	pr.lock.Lock()
-	defer pr.lock.Unlock()
+	pr.Lock()
+	defer pr.Unlock()
 	r, ok := pr.records[id]
 	if !ok {
 		return
@@ -456,4 +475,10 @@ func (pr *podRecords) updateInternal(id types.UID, r *podRecord) {
 	}
 	r.old = r.current
 	r.current = nil
+}
+
+func (pr *podRecords) getRecords() map[types.UID]*podRecord {
+	pr.Lock()
+	defer pr.Unlock()
+	return pr.records
 }
