@@ -99,8 +99,9 @@ func (d *defaultAttributes) String() string {
 		d.user, strings.Split(d.groups, ","), d.verb, d.resource, d.namespace, d.apiGroup)
 }
 
-func (d *defaultAttributes) GetUserName() string     { return d.user }
-func (d *defaultAttributes) GetGroups() []string     { return strings.Split(d.groups, ",") }
+func (d *defaultAttributes) GetUser() user.Info {
+	return &user.DefaultInfo{Name: d.user, Groups: strings.Split(d.groups, ",")}
+}
 func (d *defaultAttributes) GetVerb() string         { return d.verb }
 func (d *defaultAttributes) IsReadOnly() bool        { return d.verb == "get" || d.verb == "watch" }
 func (d *defaultAttributes) GetNamespace() string    { return d.namespace }

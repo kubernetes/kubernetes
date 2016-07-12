@@ -129,12 +129,15 @@ func newWithBackoff(kubeConfigFile string, authorizedTTL, unauthorizedTTL, initi
 //     }
 //
 func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
-	r := &v1beta1.SubjectAccessReview{
-		Spec: v1beta1.SubjectAccessReviewSpec{
-			User:   attr.GetUserName(),
-			Groups: attr.GetGroups(),
-		},
+	r := &v1beta1.SubjectAccessReview{}
+	if user := attr.GetUser(); user != nil {
+		r.Spec = v1beta1.SubjectAccessReviewSpec{
+			User:   user.GetName(),
+			Groups: user.GetGroups(),
+			Extra:  user.GetExtra(),
+		}
 	}
+
 	if attr.IsResourceRequest() {
 		r.Spec.ResourceAttributes = &v1beta1.ResourceAttributes{
 			Namespace:   attr.GetNamespace(),

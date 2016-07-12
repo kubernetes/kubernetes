@@ -133,12 +133,19 @@ func matches(p api.Policy, a authorizer.Attributes) bool {
 func subjectMatches(p api.Policy, a authorizer.Attributes) bool {
 	matched := false
 
+	username := ""
+	groups := []string{}
+	if user := a.GetUser(); user != nil {
+		username = user.GetName()
+		groups = user.GetGroups()
+	}
+
 	// If the policy specified a user, ensure it matches
 	if len(p.Spec.User) > 0 {
 		if p.Spec.User == "*" {
 			matched = true
 		} else {
-			matched = p.Spec.User == a.GetUserName()
+			matched = p.Spec.User == username
 			if !matched {
 				return false
 			}
@@ -151,7 +158,7 @@ func subjectMatches(p api.Policy, a authorizer.Attributes) bool {
 			matched = true
 		} else {
 			matched = false
-			for _, group := range a.GetGroups() {
+			for _, group := range groups {
 				if p.Spec.Group == group {
 					matched = true
 				}
