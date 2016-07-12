@@ -160,7 +160,7 @@ __custom_func() {
    * componentstatuses (aka 'cs')
    * configmaps
    * daemonsets (aka 'ds')
-   * deployments
+   * deployments (aka 'deploy')
    * events (aka 'ev')
    * endpoints (aka 'ep')
    * horizontalpodautoscalers (aka 'hpa')
