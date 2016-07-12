@@ -18,6 +18,36 @@
 			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
 		},
 		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/compute",
+			"Comment": "v3.0.0-beta",
+			"Rev": "2cdbb8553a20830507e4178b4d0803794136dde7"
+		},
+		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
+			"Comment": "v3.0.0-beta",
+			"Rev": "2cdbb8553a20830507e4178b4d0803794136dde7"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest",
+			"Comment": "v7.0.6-31-g2492d97",
+			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
+			"Comment": "v7.0.6-31-g2492d97",
+			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
+			"Comment": "v7.0.6-31-g2492d97",
+			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
+			"Comment": "v7.0.6-31-g2492d97",
+			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
+		},
+		{
 			"ImportPath": "github.com/ClusterHQ/flocker-go",
 			"Rev": "1c0a791b33bdc01d062b376612aa04e27eed7eb3"
 		},
