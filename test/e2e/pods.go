@@ -815,7 +815,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(
-			framework.PodStartTimeout, wr,
+			framework.PodReadyBeforeTimeout, wr,
 			// check for the first container to fail at least once
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
