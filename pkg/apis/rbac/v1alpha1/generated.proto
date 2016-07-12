@@ -30,6 +30,40 @@ import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
+// ClusterProtectedAttribute allows a fine-grained control of who can
+// set or remove certain atributes (e.g. labels/annotations) on
+// resources. In order to set or remove the protected attribute,
+// requester must be a member of a role that has access to that
+// attribute. Applies to all namespaces in the cluster.
+message ClusterProtectedAttribute {
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // AttributeKind is a kind of an attribute this restriction applies to.
+  // Can be "Label" or "Annotation".
+  optional string attributeKind = 2;
+
+  // AttributeName is the name of an attribute this restriction applies to.
+  optional string attributeName = 3;
+
+  // RoleRef references a Role or a ClusterRole that can set or
+  // remove the attribute.
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference roleRef = 4;
+
+  // ProtectedValues is an optional list of values protected by the
+  // role. By default every value is protected, Values allows
+  // narrowing it down to a fixed list.
+  repeated string protectedValues = 5;
+}
+
+// ClusterProtectedAttributeList is a collection of
+// ClusterProtectedAttribute's.
+message ClusterProtectedAttributeList {
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+
+  // Items is a list of ClusterProtectedAttribute's.
+  repeated ClusterProtectedAttribute items = 2;
+}
+
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 message ClusterRole {
   // Standard object's metadata.
@@ -95,6 +129,40 @@ message PolicyRule {
   // This name is intentionally different than the internal type so that the DefaultConvert works nicely and because the ordering may be different.
   // Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
   repeated string nonResourceURLs = 6;
+}
+
+// ProtectedAttribute allows a fine-grained control of who can set or
+// remove certain atributes (e.g. labels/annotations) on resources. In
+// order to set or remove the protected attribute, requester must be a
+// member of a role that has access to that attribute. Applies only to
+// resources in the same namespace as ProtectedAttribute itself.
+message ProtectedAttribute {
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // AttributeKind is a type of an attribute this restriction
+  // applies to.  Can be "Label" or "Annotation".
+  optional string attributeKind = 2;
+
+  // AttributeName is the name of an attribute this restriction
+  // applies to.
+  optional string attributeName = 3;
+
+  // RoleRef references a Role or a ClusterRole that can set or
+  // remove the attribute.
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference roleRef = 4;
+
+  // ProtectedValues is an optional list of values protected by the
+  // role. By default every value is protected, ProtectedValues
+  // allows narrowing it down to a fixed list.
+  repeated string protectedValues = 5;
+}
+
+// ProtectedAttributeList is a collection of ProtectedAttribute's.
+message ProtectedAttributeList {
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+
+  // Items is a list of ProtectedAttribute's.
+  repeated ProtectedAttribute items = 2;
 }
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.

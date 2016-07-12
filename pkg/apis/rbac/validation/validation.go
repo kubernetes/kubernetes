@@ -19,6 +19,7 @@ package validation
 import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -144,5 +145,91 @@ func validateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rb
 		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef"))
 	}
 
+	return allErrs
+}
+
+func ValidateProtectedAttribute(pa *rbac.ProtectedAttribute) field.ErrorList {
+	return validateProtectedAttribute(pa, true)
+}
+
+func ValidateClusterProtectedAttribute(cpa *rbac.ClusterProtectedAttribute) field.ErrorList {
+	return validateProtectedAttribute(toProtectedAttribute(cpa), false)
+}
+
+func validateProtectedAttribute(pa *rbac.ProtectedAttribute, isNamespaced bool) field.ErrorList {
+	allErrs := validation.ValidateObjectMeta(&pa.ObjectMeta, isNamespaced, minimalNameRequirements, field.NewPath("metadata"))
+	kindField := field.NewPath("attributeKind")
+	nameField := field.NewPath("attributeName")
+
+	if len(pa.AttributeKind) == 0 {
+		allErrs = append(allErrs, field.Required(kindField, ""))
+	}
+
+	switch pa.AttributeKind {
+	case rbac.LabelKind:
+	case rbac.AnnotationKind:
+	default:
+		allErrs = append(allErrs, field.NotSupported(kindField, pa.AttributeKind, []string{rbac.LabelKind, rbac.AnnotationKind}))
+	}
+
+	if len(pa.AttributeName) == 0 {
+		allErrs = append(allErrs, field.Required(nameField, ""))
+	}
+
+	for _, msg := range utilvalidation.IsQualifiedName(pa.AttributeName) {
+		allErrs = append(allErrs, field.Invalid(nameField, pa.AttributeName, msg))
+	}
+
+	roleRefField := field.NewPath("roleRef")
+	roleRefKindField := roleRefField.Child("kind")
+	roleRefNamespaceField := roleRefField.Child("namespace")
+	roleRefNameField := roleRefField.Child("name")
+
+	switch pa.RoleRef.Kind {
+	case "Role", "ClusterRole":
+	default:
+		allErrs = append(allErrs, field.Invalid(roleRefKindField, pa.RoleRef.Kind,
+			"invalid role reference kind: valid values are Role and ClusterRole"))
+	}
+
+	if !isNamespaced && pa.RoleRef.Kind != "ClusterRole" {
+		allErrs = append(allErrs, field.Invalid(roleRefKindField, pa.RoleRef.Kind,
+			"invalid role reference kind: ClusterProtectedAttribute can only reference ClusterRole"))
+	}
+
+	// RoleRef.Namespace can be empty when referring to ClusterRole.
+	if len(pa.RoleRef.Namespace) > 0 {
+		for _, msg := range validation.ValidateNamespaceName(pa.RoleRef.Namespace, false) {
+			allErrs = append(allErrs, field.Invalid(roleRefNamespaceField, pa.RoleRef.Namespace, msg))
+		}
+
+		if pa.RoleRef.Namespace != pa.ObjectMeta.Namespace {
+			allErrs = append(allErrs, field.Invalid(roleRefNamespaceField, pa.RoleRef.Namespace,
+				"role reference namespace mismatch"))
+		}
+	}
+
+	if len(pa.RoleRef.Name) == 0 {
+		allErrs = append(allErrs, field.Required(roleRefNameField, ""))
+	} else {
+		for _, msg := range minimalNameRequirements(pa.RoleRef.Name, false) {
+			allErrs = append(allErrs, field.Invalid(roleRefNameField, pa.RoleRef.Name, msg))
+		}
+	}
+
+	return allErrs
+}
+
+func ValidateProtectedAttributeUpdate(newPa *rbac.ProtectedAttribute, oldPa *rbac.ProtectedAttribute) field.ErrorList {
+	return validateProtectedAttributeUpdate(newPa, oldPa, true)
+}
+
+func ValidateClusterProtectedAttributeUpdate(newCpa *rbac.ClusterProtectedAttribute, oldCpa *rbac.ClusterProtectedAttribute) field.ErrorList {
+	return validateProtectedAttributeUpdate(toProtectedAttribute(newCpa), toProtectedAttribute(oldCpa), false)
+}
+
+func validateProtectedAttributeUpdate(newPa *rbac.ProtectedAttribute, oldPa *rbac.ProtectedAttribute, isNamespaced bool) field.ErrorList {
+	allErrs := validateProtectedAttribute(newPa, isNamespaced)
+	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&newPa.ObjectMeta, &oldPa.ObjectMeta, field.NewPath("metadata"))...)
 	return allErrs
 }

@@ -29,6 +29,10 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_ClusterProtectedAttribute_To_rbac_ClusterProtectedAttribute,
+		Convert_rbac_ClusterProtectedAttribute_To_v1alpha1_ClusterProtectedAttribute,
+		Convert_v1alpha1_ClusterProtectedAttributeList_To_rbac_ClusterProtectedAttributeList,
+		Convert_rbac_ClusterProtectedAttributeList_To_v1alpha1_ClusterProtectedAttributeList,
 		Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole,
 		Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole,
 		Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding,
@@ -39,6 +43,10 @@ func init() {
 		Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList,
 		Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule,
 		Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule,
+		Convert_v1alpha1_ProtectedAttribute_To_rbac_ProtectedAttribute,
+		Convert_rbac_ProtectedAttribute_To_v1alpha1_ProtectedAttribute,
+		Convert_v1alpha1_ProtectedAttributeList_To_rbac_ProtectedAttributeList,
+		Convert_rbac_ProtectedAttributeList_To_v1alpha1_ProtectedAttributeList,
 		Convert_v1alpha1_Role_To_rbac_Role,
 		Convert_rbac_Role_To_v1alpha1_Role,
 		Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding,
@@ -53,6 +61,100 @@ func init() {
 		// if one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+}
+
+func autoConvert_v1alpha1_ClusterProtectedAttribute_To_rbac_ClusterProtectedAttribute(in *ClusterProtectedAttribute, out *rbac.ClusterProtectedAttribute, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.RoleRef, &out.RoleRef, 0); err != nil {
+		return err
+	}
+	out.ProtectedValues = in.ProtectedValues
+	return nil
+}
+
+func Convert_v1alpha1_ClusterProtectedAttribute_To_rbac_ClusterProtectedAttribute(in *ClusterProtectedAttribute, out *rbac.ClusterProtectedAttribute, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ClusterProtectedAttribute_To_rbac_ClusterProtectedAttribute(in, out, s)
+}
+
+func autoConvert_rbac_ClusterProtectedAttribute_To_v1alpha1_ClusterProtectedAttribute(in *rbac.ClusterProtectedAttribute, out *ClusterProtectedAttribute, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.RoleRef, &out.RoleRef, 0); err != nil {
+		return err
+	}
+	out.ProtectedValues = in.ProtectedValues
+	return nil
+}
+
+func Convert_rbac_ClusterProtectedAttribute_To_v1alpha1_ClusterProtectedAttribute(in *rbac.ClusterProtectedAttribute, out *ClusterProtectedAttribute, s conversion.Scope) error {
+	return autoConvert_rbac_ClusterProtectedAttribute_To_v1alpha1_ClusterProtectedAttribute(in, out, s)
+}
+
+func autoConvert_v1alpha1_ClusterProtectedAttributeList_To_rbac_ClusterProtectedAttributeList(in *ClusterProtectedAttributeList, out *rbac.ClusterProtectedAttributeList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]rbac.ClusterProtectedAttribute, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_ClusterProtectedAttribute_To_rbac_ClusterProtectedAttribute(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_ClusterProtectedAttributeList_To_rbac_ClusterProtectedAttributeList(in *ClusterProtectedAttributeList, out *rbac.ClusterProtectedAttributeList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ClusterProtectedAttributeList_To_rbac_ClusterProtectedAttributeList(in, out, s)
+}
+
+func autoConvert_rbac_ClusterProtectedAttributeList_To_v1alpha1_ClusterProtectedAttributeList(in *rbac.ClusterProtectedAttributeList, out *ClusterProtectedAttributeList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ClusterProtectedAttribute, len(*in))
+		for i := range *in {
+			if err := Convert_rbac_ClusterProtectedAttribute_To_v1alpha1_ClusterProtectedAttribute(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_rbac_ClusterProtectedAttributeList_To_v1alpha1_ClusterProtectedAttributeList(in *rbac.ClusterProtectedAttributeList, out *ClusterProtectedAttributeList, s conversion.Scope) error {
+	return autoConvert_rbac_ClusterProtectedAttributeList_To_v1alpha1_ClusterProtectedAttributeList(in, out, s)
 }
 
 func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
@@ -297,6 +399,101 @@ func autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out
 
 func Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in *rbac.PolicyRule, out *PolicyRule, s conversion.Scope) error {
 	return autoConvert_rbac_PolicyRule_To_v1alpha1_PolicyRule(in, out, s)
+}
+
+func autoConvert_v1alpha1_ProtectedAttribute_To_rbac_ProtectedAttribute(in *ProtectedAttribute, out *rbac.ProtectedAttribute, s conversion.Scope) error {
+	SetDefaults_ProtectedAttribute(in)
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.RoleRef, &out.RoleRef, 0); err != nil {
+		return err
+	}
+	out.ProtectedValues = in.ProtectedValues
+	return nil
+}
+
+func Convert_v1alpha1_ProtectedAttribute_To_rbac_ProtectedAttribute(in *ProtectedAttribute, out *rbac.ProtectedAttribute, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ProtectedAttribute_To_rbac_ProtectedAttribute(in, out, s)
+}
+
+func autoConvert_rbac_ProtectedAttribute_To_v1alpha1_ProtectedAttribute(in *rbac.ProtectedAttribute, out *ProtectedAttribute, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.RoleRef, &out.RoleRef, 0); err != nil {
+		return err
+	}
+	out.ProtectedValues = in.ProtectedValues
+	return nil
+}
+
+func Convert_rbac_ProtectedAttribute_To_v1alpha1_ProtectedAttribute(in *rbac.ProtectedAttribute, out *ProtectedAttribute, s conversion.Scope) error {
+	return autoConvert_rbac_ProtectedAttribute_To_v1alpha1_ProtectedAttribute(in, out, s)
+}
+
+func autoConvert_v1alpha1_ProtectedAttributeList_To_rbac_ProtectedAttributeList(in *ProtectedAttributeList, out *rbac.ProtectedAttributeList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]rbac.ProtectedAttribute, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_ProtectedAttribute_To_rbac_ProtectedAttribute(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_ProtectedAttributeList_To_rbac_ProtectedAttributeList(in *ProtectedAttributeList, out *rbac.ProtectedAttributeList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ProtectedAttributeList_To_rbac_ProtectedAttributeList(in, out, s)
+}
+
+func autoConvert_rbac_ProtectedAttributeList_To_v1alpha1_ProtectedAttributeList(in *rbac.ProtectedAttributeList, out *ProtectedAttributeList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ProtectedAttribute, len(*in))
+		for i := range *in {
+			if err := Convert_rbac_ProtectedAttribute_To_v1alpha1_ProtectedAttribute(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_rbac_ProtectedAttributeList_To_v1alpha1_ProtectedAttributeList(in *rbac.ProtectedAttributeList, out *ProtectedAttributeList, s conversion.Scope) error {
+	return autoConvert_rbac_ProtectedAttributeList_To_v1alpha1_ProtectedAttributeList(in, out, s)
 }
 
 func autoConvert_v1alpha1_Role_To_rbac_Role(in *Role, out *rbac.Role, s conversion.Scope) error {

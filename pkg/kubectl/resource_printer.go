@@ -454,6 +454,9 @@ var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS",
 var clusterColumns = []string{"NAME", "STATUS", "VERSION", "AGE"}
 var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
 
+var clusterProtectedAttributeColumns = []string{"NAME", "CLUSTER-ROLE", "ATTRIBUTE", "VALUES"}
+var protectedAttributeColumns = []string{"NAME", "ROLE", "ATTRIBUTE", "VALUES"}
+
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, printPod)
@@ -520,6 +523,10 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(clusterRoleColumns, printClusterRoleList)
 	h.Handler(clusterRoleBindingColumns, printClusterRoleBinding)
 	h.Handler(clusterRoleBindingColumns, printClusterRoleBindingList)
+	h.Handler(clusterProtectedAttributeColumns, printClusterProtectedAttribute)
+	h.Handler(clusterProtectedAttributeColumns, printClusterProtectedAttributeList)
+	h.Handler(protectedAttributeColumns, printProtectedAttribute)
+	h.Handler(protectedAttributeColumns, printProtectedAttributeList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -2008,6 +2015,88 @@ func printNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, op
 func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, options PrintOptions) error {
 	for i := range list.Items {
 		if err := printNetworkPolicy(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printClusterProtectedAttribute(cpa *rbac.ClusterProtectedAttribute, w io.Writer, options PrintOptions) error {
+	// {"NAME", "CLUSTER-ROLE", "ATTRIBUTE", "VALUES"}
+	format := "%s\t%s\t%s\t%s\n"
+
+	var attr string
+	switch cpa.AttributeKind {
+	case rbac.LabelKind:
+		attr = "Label: "
+	case rbac.AnnotationKind:
+		attr = "Annotation: "
+	}
+	attr += cpa.AttributeName
+
+	var values string
+	if len(cpa.ProtectedValues) == 0 {
+		values = "<any>"
+	} else {
+		values = strings.Join(cpa.ProtectedValues, ",")
+	}
+
+	_, err := fmt.Fprintf(w, format, cpa.Name, cpa.RoleRef.Name, attr, values)
+
+	return err
+}
+
+func printClusterProtectedAttributeList(cpaList *rbac.ClusterProtectedAttributeList, w io.Writer, options PrintOptions) error {
+	for i := range cpaList.Items {
+		if err := printClusterProtectedAttribute(&cpaList.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printProtectedAttribute(pa *rbac.ProtectedAttribute, w io.Writer, options PrintOptions) error {
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", pa.Namespace); err != nil {
+			return err
+		}
+	}
+
+	// {"NAME", "ROLE", "ATTRIBUTE", "VALUES"}
+	format := "%s\t%s\t%s\t%s\n"
+
+	var attr string
+	switch pa.AttributeKind {
+	case rbac.LabelKind:
+		attr = "Label: "
+	case rbac.AnnotationKind:
+		attr = "Annotation: "
+	}
+	attr += pa.AttributeName
+
+	var values string
+	if len(pa.ProtectedValues) == 0 {
+		values = "<any>"
+	} else {
+		values = strings.Join(pa.ProtectedValues, ",")
+	}
+
+	var role string
+	switch pa.RoleRef.Kind {
+	case "ClusterRole":
+		role = fmt.Sprintf("cluster/%s", pa.RoleRef.Name)
+	default:
+		role = pa.RoleRef.Name
+	}
+
+	_, err := fmt.Fprintf(w, format, pa.Name, role, attr, values)
+
+	return err
+}
+
+func printProtectedAttributeList(paList *rbac.ProtectedAttributeList, w io.Writer, options PrintOptions) error {
+	for i := range paList.Items {
+		if err := printProtectedAttribute(&paList.Items[i], w, options); err != nil {
 			return err
 		}
 	}

@@ -283,3 +283,24 @@ func (r *staticRoles) ListClusterRoleBindings(ctx api.Context, options *api.List
 	copy(clusterRoleBindings.Items, r.clusterRoleBindings)
 	return clusterRoleBindings, nil
 }
+
+// RoleBindingMatches returns true if RoleBinding is applicable to the
+// given user.
+func RoleBindingMatches(roleBinding *rbac.RoleBinding, user user.Info) (bool, error) {
+	for _, subject := range roleBinding.Subjects {
+		ok, err := appliesToUser(user, subject)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// ClusterRoleBindingMatches returns true if ClusterRoleBinding is
+// applicable to the given user.
+func ClusterRoleBindingMatches(clusterRoleBinding *rbac.ClusterRoleBinding, user user.Info) (bool, error) {
+	return RoleBindingMatches(toRoleBinding(clusterRoleBinding), user)
+}

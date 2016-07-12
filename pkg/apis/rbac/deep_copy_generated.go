@@ -28,20 +28,68 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
+		DeepCopy_rbac_ClusterProtectedAttribute,
+		DeepCopy_rbac_ClusterProtectedAttributeList,
 		DeepCopy_rbac_ClusterRole,
 		DeepCopy_rbac_ClusterRoleBinding,
 		DeepCopy_rbac_ClusterRoleBindingList,
 		DeepCopy_rbac_ClusterRoleList,
 		DeepCopy_rbac_PolicyRule,
+		DeepCopy_rbac_ProtectedAttribute,
+		DeepCopy_rbac_ProtectedAttributeList,
 		DeepCopy_rbac_Role,
 		DeepCopy_rbac_RoleBinding,
 		DeepCopy_rbac_RoleBindingList,
 		DeepCopy_rbac_RoleList,
+		DeepCopy_rbac_RoleRestriction,
 		DeepCopy_rbac_Subject,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
+}
+
+func DeepCopy_rbac_ClusterProtectedAttribute(in ClusterProtectedAttribute, out *ClusterProtectedAttribute, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	if err := api.DeepCopy_api_ObjectReference(in.RoleRef, &out.RoleRef, c); err != nil {
+		return err
+	}
+	if in.ProtectedValues != nil {
+		in, out := in.ProtectedValues, &out.ProtectedValues
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.ProtectedValues = nil
+	}
+	return nil
+}
+
+func DeepCopy_rbac_ClusterProtectedAttributeList(in ClusterProtectedAttributeList, out *ClusterProtectedAttributeList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]ClusterProtectedAttribute, len(in))
+		for i := range in {
+			if err := DeepCopy_rbac_ClusterProtectedAttribute(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
 }
 
 func DeepCopy_rbac_ClusterRole(in ClusterRole, out *ClusterRole, c *conversion.Cloner) error {
@@ -161,6 +209,49 @@ func DeepCopy_rbac_PolicyRule(in PolicyRule, out *PolicyRule, c *conversion.Clon
 	return nil
 }
 
+func DeepCopy_rbac_ProtectedAttribute(in ProtectedAttribute, out *ProtectedAttribute, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	if err := api.DeepCopy_api_ObjectReference(in.RoleRef, &out.RoleRef, c); err != nil {
+		return err
+	}
+	if in.ProtectedValues != nil {
+		in, out := in.ProtectedValues, &out.ProtectedValues
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.ProtectedValues = nil
+	}
+	return nil
+}
+
+func DeepCopy_rbac_ProtectedAttributeList(in ProtectedAttributeList, out *ProtectedAttributeList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]ProtectedAttribute, len(in))
+		for i := range in {
+			if err := DeepCopy_rbac_ProtectedAttribute(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func DeepCopy_rbac_Role(in Role, out *Role, c *conversion.Cloner) error {
 	out.TypeMeta = in.TypeMeta
 	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
@@ -228,6 +319,13 @@ func DeepCopy_rbac_RoleList(in RoleList, out *RoleList, c *conversion.Cloner) er
 		}
 	} else {
 		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_rbac_RoleRestriction(in RoleRestriction, out *RoleRestriction, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
 	}
 	return nil
 }

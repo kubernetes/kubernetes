@@ -26,12 +26,20 @@ type FakeRbac struct {
 	*core.Fake
 }
 
+func (c *FakeRbac) ClusterProtectedAttributes() unversioned.ClusterProtectedAttributeInterface {
+	return &FakeClusterProtectedAttributes{c}
+}
+
 func (c *FakeRbac) ClusterRoles() unversioned.ClusterRoleInterface {
 	return &FakeClusterRoles{c}
 }
 
 func (c *FakeRbac) ClusterRoleBindings() unversioned.ClusterRoleBindingInterface {
 	return &FakeClusterRoleBindings{c}
+}
+
+func (c *FakeRbac) ProtectedAttributes(namespace string) unversioned.ProtectedAttributeInterface {
+	return &FakeProtectedAttributes{c, namespace}
 }
 
 func (c *FakeRbac) Roles(namespace string) unversioned.RoleInterface {

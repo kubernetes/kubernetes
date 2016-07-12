@@ -29,11 +29,15 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
+		DeepCopy_v1alpha1_ClusterProtectedAttribute,
+		DeepCopy_v1alpha1_ClusterProtectedAttributeList,
 		DeepCopy_v1alpha1_ClusterRole,
 		DeepCopy_v1alpha1_ClusterRoleBinding,
 		DeepCopy_v1alpha1_ClusterRoleBindingList,
 		DeepCopy_v1alpha1_ClusterRoleList,
 		DeepCopy_v1alpha1_PolicyRule,
+		DeepCopy_v1alpha1_ProtectedAttribute,
+		DeepCopy_v1alpha1_ProtectedAttributeList,
 		DeepCopy_v1alpha1_Role,
 		DeepCopy_v1alpha1_RoleBinding,
 		DeepCopy_v1alpha1_RoleBindingList,
@@ -43,6 +47,49 @@ func init() {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
+}
+
+func DeepCopy_v1alpha1_ClusterProtectedAttribute(in ClusterProtectedAttribute, out *ClusterProtectedAttribute, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	if err := v1.DeepCopy_v1_ObjectReference(in.RoleRef, &out.RoleRef, c); err != nil {
+		return err
+	}
+	if in.ProtectedValues != nil {
+		in, out := in.ProtectedValues, &out.ProtectedValues
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.ProtectedValues = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1alpha1_ClusterProtectedAttributeList(in ClusterProtectedAttributeList, out *ClusterProtectedAttributeList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]ClusterProtectedAttribute, len(in))
+		for i := range in {
+			if err := DeepCopy_v1alpha1_ClusterProtectedAttribute(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
 }
 
 func DeepCopy_v1alpha1_ClusterRole(in ClusterRole, out *ClusterRole, c *conversion.Cloner) error {
@@ -154,6 +201,49 @@ func DeepCopy_v1alpha1_PolicyRule(in PolicyRule, out *PolicyRule, c *conversion.
 		copy(*out, in)
 	} else {
 		out.NonResourceURLs = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1alpha1_ProtectedAttribute(in ProtectedAttribute, out *ProtectedAttribute, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.AttributeKind = in.AttributeKind
+	out.AttributeName = in.AttributeName
+	if err := v1.DeepCopy_v1_ObjectReference(in.RoleRef, &out.RoleRef, c); err != nil {
+		return err
+	}
+	if in.ProtectedValues != nil {
+		in, out := in.ProtectedValues, &out.ProtectedValues
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.ProtectedValues = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1alpha1_ProtectedAttributeList(in ProtectedAttributeList, out *ProtectedAttributeList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]ProtectedAttribute, len(in))
+		for i := range in {
+			if err := DeepCopy_v1alpha1_ProtectedAttribute(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }

@@ -105,3 +105,21 @@ func toRoleBindingList(in *rbac.ClusterRoleBindingList) *rbac.RoleBindingList {
 
 	return ret
 }
+
+func toProtectedAttribute(in *rbac.ClusterProtectedAttribute) *rbac.ProtectedAttribute {
+	if in == nil {
+		return nil
+	}
+
+	ret := &rbac.ProtectedAttribute{}
+	ret.ObjectMeta = in.ObjectMeta
+	ret.AttributeKind = in.AttributeKind
+	ret.AttributeName = in.AttributeName
+	ret.RoleRef = in.RoleRef
+
+	for _, v := range in.ProtectedValues {
+		ret.ProtectedValues = append(ret.ProtectedValues, v)
+	}
+
+	return ret
+}

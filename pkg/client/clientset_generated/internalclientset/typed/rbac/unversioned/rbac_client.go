@@ -24,8 +24,10 @@ import (
 
 type RbacInterface interface {
 	GetRESTClient() *restclient.RESTClient
+	ClusterProtectedAttributesGetter
 	ClusterRolesGetter
 	ClusterRoleBindingsGetter
+	ProtectedAttributesGetter
 	RolesGetter
 	RoleBindingsGetter
 }
@@ -35,12 +37,20 @@ type RbacClient struct {
 	*restclient.RESTClient
 }
 
+func (c *RbacClient) ClusterProtectedAttributes() ClusterProtectedAttributeInterface {
+	return newClusterProtectedAttributes(c)
+}
+
 func (c *RbacClient) ClusterRoles() ClusterRoleInterface {
 	return newClusterRoles(c)
 }
 
 func (c *RbacClient) ClusterRoleBindings() ClusterRoleBindingInterface {
 	return newClusterRoleBindings(c)
+}
+
+func (c *RbacClient) ProtectedAttributes(namespace string) ProtectedAttributeInterface {
+	return newProtectedAttributes(c, namespace)
 }
 
 func (c *RbacClient) Roles(namespace string) RoleInterface {

@@ -91,6 +91,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 	rootScoped := sets.NewString(
 		"ClusterRole",
 		"ClusterRoleBinding",
+		"ClusterProtectedAttribute",
 	)
 
 	ignoredKinds := sets.NewString()
