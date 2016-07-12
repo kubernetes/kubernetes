@@ -117,9 +117,11 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("expose", false, "If true, a public, external service is created for the container(s) which are run")
 	cmd.Flags().String("service-generator", "service/v2", "The name of the generator to use for creating a service.  Only used if --expose is true")
 	cmd.Flags().String("service-overrides", "", "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.")
+	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
 }
 
 func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
+	quiet := cmdutil.GetFlagBool(cmd, "quiet")
 	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
@@ -250,7 +252,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, client, attachablePod, opts)
+		err = handleAttachPod(f, client, attachablePod, opts, quiet)
 		if err != nil {
 			return err
 		}
@@ -302,7 +304,7 @@ func contains(resourcesList map[string]*unversioned.APIResourceList, resource un
 	return false
 }
 
-func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) (status api.PodPhase, err error) {
+func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer, quiet bool) (status api.PodPhase, err error) {
 	for {
 		pod, err := c.Pods(pod.Namespace).Get(pod.Name)
 		if err != nil {
@@ -324,13 +326,15 @@ func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) (status ap
 		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
 			return pod.Status.Phase, nil
 		}
-		fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: %v\n", pod.Namespace, pod.Name, pod.Status.Phase, ready)
+		if !quiet {
+			fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: %v\n", pod.Namespace, pod.Name, pod.Status.Phase, ready)
+		}
 		time.Sleep(2 * time.Second)
 	}
 }
 
-func handleAttachPod(f *cmdutil.Factory, c *client.Client, pod *api.Pod, opts *AttachOptions) error {
-	status, err := waitForPodRunning(c, pod, opts.Out)
+func handleAttachPod(f *cmdutil.Factory, c *client.Client, pod *api.Pod, opts *AttachOptions, quiet bool) error {
+	status, err := waitForPodRunning(c, pod, opts.Out, quiet)
 	if err != nil {
 		return err
 	}
