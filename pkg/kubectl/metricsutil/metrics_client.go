@@ -34,20 +34,20 @@ const (
 )
 
 type HeapsterMetricsClient struct {
-	client            *client.Client
-	heapsterNamespace string
-	heapsterScheme    string
-	heapsterService   string
-	heapsterPort      string
+	Client            *client.Client
+	HeapsterNamespace string
+	HeapsterScheme    string
+	HeapsterService   string
+	HeapsterPort      string
 }
 
 func NewHeapsterMetricsClient(client *client.Client, namespace, scheme, service, port string) *HeapsterMetricsClient {
 	return &HeapsterMetricsClient{
-		client:            client,
-		heapsterNamespace: namespace,
-		heapsterScheme:    scheme,
-		heapsterService:   service,
-		heapsterPort:      port,
+		Client:            client,
+		HeapsterNamespace: namespace,
+		HeapsterScheme:    scheme,
+		HeapsterService:   service,
+		HeapsterPort:      port,
 	}
 }
 
@@ -114,7 +114,7 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 }
 
 func GetHeapsterMetrics(cli *HeapsterMetricsClient, path string, params map[string]string) ([]byte, error) {
-	return cli.client.Services(cli.heapsterNamespace).
-		ProxyGet(cli.heapsterScheme, cli.heapsterService, cli.heapsterPort, path, params).
+	return cli.Client.Services(cli.HeapsterNamespace).
+		ProxyGet(cli.HeapsterScheme, cli.HeapsterService, cli.HeapsterPort, path, params).
 		DoRaw()
 }
