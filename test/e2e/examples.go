@@ -141,7 +141,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Celery-RabbitMQ", func() {
 		It("should create and stop celery+rabbitmq servers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples", "celery-rabbitmq", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/celery-rabbitmq", file)
 			}
 			rabbitmqServiceYaml := mkpath("rabbitmq-service.yaml")
 			rabbitmqControllerYaml := mkpath("rabbitmq-controller.yaml")
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Spark", func() {
 		It("should start spark master, driver and workers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples", "spark", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/spark", file)
 			}
 
 			// TODO: Add Zepplin and Web UI to this example.
@@ -256,7 +256,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Cassandra", func() {
 		It("should create and scale cassandra", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples", "cassandra", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
 			}
 			serviceYaml := mkpath("cassandra-service.yaml")
 			controllerYaml := mkpath("cassandra-controller.yaml")
@@ -295,7 +295,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Storm", func() {
 		It("should create and stop Zookeeper, Nimbus and Storm worker servers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples", "storm", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storm", file)
 			}
 			zookeeperServiceJson := mkpath("zookeeper-service.json")
 			zookeeperPodJson := mkpath("zookeeper.json")
@@ -352,7 +352,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Liveness", func() {
 		It("liveness pods should be automatically restarted", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "docs", "user-guide", "liveness", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/liveness", file)
 			}
 			execYaml := mkpath("exec-liveness.yaml")
 			httpYaml := mkpath("http-liveness.yaml")
@@ -402,7 +402,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Secret", func() {
 		It("should create a pod that reads a secret", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "docs", "user-guide", "secrets", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/secrets", file)
 			}
 			secretYaml := mkpath("secret.yaml")
 			podYaml := mkpath("secret-pod.yaml")
@@ -424,7 +424,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Downward API", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "docs", "user-guide", "downward-api", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/downward-api", file)
 			}
 			podYaml := mkpath("dapi-pod.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -446,7 +446,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("RethinkDB", func() {
 		It("should create and stop rethinkdb servers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples", "rethinkdb", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/rethinkdb", file)
 			}
 			driverServiceYaml := mkpath("driver-service.yaml")
 			rethinkDbControllerYaml := mkpath("rc.yaml")
@@ -491,7 +491,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Hazelcast", func() {
 		It("should create and scale hazelcast", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples", "hazelcast", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/hazelcast", file)
 			}
 			serviceYaml := mkpath("hazelcast-service.yaml")
 			controllerYaml := mkpath("hazelcast-controller.yaml")
