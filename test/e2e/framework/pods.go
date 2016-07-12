@@ -37,25 +37,31 @@ func (f *Framework) PodClient() unversioned.PodInterface {
 }
 
 // Create a new pod according to the framework specifications, and wait for it to start.
-func (f *Framework) CreatePod(pod *api.Pod) {
-	f.CreatePodAsync(pod)
-	ExpectNoError(f.WaitForPodRunning(pod.Name))
+// Returns the server's representation of the pod.
+func (f *Framework) CreatePod(pod *api.Pod) *api.Pod {
+	p := f.CreatePodAsync(pod)
+	ExpectNoError(f.WaitForPodRunning(p.Name))
+	return p
 }
 
 // Create a new pod according to the framework specifications (don't wait for it to start).
-func (f *Framework) CreatePodAsync(pod *api.Pod) {
+// Returns the server's representation of the pod.
+func (f *Framework) CreatePodAsync(pod *api.Pod) *api.Pod {
 	f.MungePodSpec(pod)
-	_, err := f.PodClient().Create(pod)
+	p, err := f.PodClient().Create(pod)
 	ExpectNoError(err, "Error creating Pod")
+	return p
 }
 
 // Batch version of CreatePod. All pods are created before waiting.
-func (f *Framework) CreatePods(pods []*api.Pod) {
-	for _, pod := range pods {
-		f.CreatePodAsync(pod)
+// Returns a slice, in the same order as pods, containing the server's representations of the pods.
+func (f *Framework) CreatePods(pods []*api.Pod) []*api.Pod {
+	ps := make([]*api.Pod, len(pods))
+	for i, pod := range pods {
+		ps[i] = f.CreatePodAsync(pod)
 	}
 	var wg sync.WaitGroup
-	for _, pod := range pods {
+	for _, pod := range ps {
 		wg.Add(1)
 		podName := pod.Name
 		go func() {
@@ -64,6 +70,7 @@ func (f *Framework) CreatePods(pods []*api.Pod) {
 		}()
 	}
 	wg.Wait()
+	return ps
 }
 
 // Apply test-suite specific transformations to the pod spec.
