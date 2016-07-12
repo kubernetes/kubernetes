@@ -23,6 +23,7 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
+	"path"
 )
 
 // FakeTestTypes implements TestTypeInterface
@@ -116,9 +117,9 @@ func (c *FakeTestTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *FakeTestTypes) Patch(name string, pt api.PatchType, data []byte) (result *testgroup_k8s_io.TestType, err error) {
+func (c *FakeTestTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(testtypesResource, c.ns, name, data), &testgroup_k8s_io.TestType{})
+		Invokes(core.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, path.Join(subresources...)), &testgroup_k8s_io.TestType{})
 
 	if obj == nil {
 		return nil, err

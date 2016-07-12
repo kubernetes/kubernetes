@@ -161,7 +161,7 @@ var interfaceTemplate3 = `
 	Get(name string) (*$.type|raw$, error)
 	List(opts $.apiListOptions|raw$) (*$.type|raw$List, error)
 	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
-	Patch(name string, pt $.PatchType|raw$, data []byte) (result *$.type|raw$, err error)`
+	Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error)`
 
 var interfaceTemplate4 = `
 	$.type|public$Expansion
@@ -315,11 +315,12 @@ func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterf
 
 var patchTemplate = `
 // Patch applies the patch and returns the patched $.type|private$.
-func (c *$.type|privatePlural$) Patch(name string, pt $.PatchType|raw$, data []byte) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Patch(pt).
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

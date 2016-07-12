@@ -134,6 +134,8 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"NewRootUpdateSubresourceAction": c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootUpdateSubresourceAction"}),
 		"NewRootPatchAction":             c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootPatchAction"}),
 		"NewPatchAction":                 c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewPatchAction"}),
+		"NewRootPatchSubresourceAction":  c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootPatchSubresourceAction"}),
+		"NewPatchSubresourceAction":      c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewPatchSubresourceAction"}),
 	}
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
@@ -301,10 +303,10 @@ func (c *Fake$.type|publicPlural$) Watch(opts $.apiListOptions|raw$) ($.watchInt
 
 var patchTemplate = `
 // Patch applies the patch and returns the patched $.type|private$.
-func (c *Fake$.type|publicPlural$) Patch(name string, pt $.PatchType|raw$, data []byte) (result *$.type|raw$, err error) {
+func (c *Fake$.type|publicPlural$) Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchAction|raw$($.type|allLowercasePlural$Resource, c.ns, name, data), &$.type|raw${})
-		$else$Invokes($.NewRootPatchAction|raw$($.type|allLowercasePlural$Resource, name, data), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, name, data, subresources... ), &$.type|raw${})
+		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, name, data, subresources...), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
