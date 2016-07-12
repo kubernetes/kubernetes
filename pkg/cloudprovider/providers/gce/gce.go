@@ -81,7 +81,7 @@ type GCECloud struct {
 	projectID                string
 	region                   string
 	localZone                string   // The zone in which we are running
-	managedZones             []string // List of zones we are spanning (for Ubernetes-Lite, primarily when running on master)
+	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
 	networkURL               string
 	nodeTags                 []string // List of tags to use on firewall rules for load balancers
 	nodeInstancePrefix       string   // If non-"", an advisory prefix for all nodes in the cluster

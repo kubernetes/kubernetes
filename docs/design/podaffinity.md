@@ -347,7 +347,7 @@ scheduler to not put more than one pod from S in the same zone, and thus by
 definition it will not put more than one pod from S on the same node, assuming
 each node is in one zone. This rule is more useful as PreferredDuringScheduling
 anti-affinity, e.g. one might expect it to be common in
-[Ubernetes](../../docs/proposals/federation.md) clusters.)
+[Cluster Federation](../../docs/proposals/federation.md) clusters.)
 
 * **Don't co-locate pods of this service with pods from service "evilService"**:
 `{LabelSelector: selector that matches evilService's pods, TopologyKey: "node"}`
