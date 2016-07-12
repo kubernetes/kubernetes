@@ -38,8 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -58,6 +58,14 @@ const (
 	nodeEvictionPeriod = 100 * time.Millisecond
 )
 
+type zoneState string
+
+const (
+	stateNormal              = zoneState("Normal")
+	stateFullSegmentation    = zoneState("FullSegmentation")
+	statePartialSegmentation = zoneState("PartialSegmentation")
+)
+
 type nodeStatusData struct {
 	probeTimestamp           unversioned.Time
 	readyTransitionTimestamp unversioned.Time
@@ -70,7 +78,7 @@ type NodeController struct {
 	clusterCIDR             *net.IPNet
 	serviceCIDR             *net.IPNet
 	deletingPodsRateLimiter flowcontrol.RateLimiter
-	knownNodeSet            sets.String
+	knownNodeSet            map[string]*api.Node
 	kubeClient              clientset.Interface
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
@@ -124,11 +132,9 @@ type NodeController struct {
 
 	forcefullyDeletePod       func(*api.Pod) error
 	nodeExistsInCloudProvider func(string) (bool, error)
+	computeZoneStateFunc      func(nodeConditions []*api.NodeCondition) zoneState
 
-	// If in network segmentation mode NodeController won't evict Pods from unhealthy Nodes.
-	// It is enabled when all Nodes observed by the NodeController are NotReady and disabled
-	// when NC sees any healthy Node. This is a temporary fix for v1.3.
-	networkSegmentationMode bool
+	zoneStates map[string]zoneState
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -172,7 +178,7 @@ func NewNodeController(
 
 	nc := &NodeController{
 		cloud:                     cloud,
-		knownNodeSet:              make(sets.String),
+		knownNodeSet:              make(map[string]*api.Node),
 		kubeClient:                kubeClient,
 		recorder:                  recorder,
 		podEvictionTimeout:        podEvictionTimeout,
@@ -191,6 +197,8 @@ func NewNodeController(
 		allocateNodeCIDRs:         allocateNodeCIDRs,
 		forcefullyDeletePod:       func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
 		nodeExistsInCloudProvider: func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
+		computeZoneStateFunc:      ComputeZoneState,
+		zoneStates:                make(map[string]zoneState),
 	}
 
 	nc.podStore.Indexer, nc.podController = framework.NewIndexerInformer(
@@ -360,31 +368,22 @@ func (nc *NodeController) monitorNodeStatus() error {
 	if err != nil {
 		return err
 	}
-	for _, node := range nodes.Items {
-		if !nc.knownNodeSet.Has(node.Name) {
-			glog.V(1).Infof("NodeController observed a new Node: %#v", node)
-			recordNodeEvent(nc.recorder, node.Name, api.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", node.Name))
-			nc.cancelPodEviction(node.Name)
-			nc.knownNodeSet.Insert(node.Name)
-		}
-	}
-	// If there's a difference between lengths of known Nodes and observed nodes
-	// we must have removed some Node.
-	if len(nc.knownNodeSet) != len(nodes.Items) {
-		observedSet := make(sets.String)
-		for _, node := range nodes.Items {
-			observedSet.Insert(node.Name)
-		}
-		deleted := nc.knownNodeSet.Difference(observedSet)
-		for nodeName := range deleted {
-			glog.V(1).Infof("NodeController observed a Node deletion: %v", nodeName)
-			recordNodeEvent(nc.recorder, nodeName, api.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", nodeName))
-			nc.evictPods(nodeName)
-			nc.knownNodeSet.Delete(nodeName)
-		}
+	added, deleted := nc.checkForNodeAddedDeleted(nodes)
+	for i := range added {
+		glog.V(1).Infof("NodeController observed a new Node: %#v", added[i].Name)
+		recordNodeEvent(nc.recorder, added[i].Name, api.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", added[i].Name))
+		nc.cancelPodEviction(added[i])
+		nc.knownNodeSet[added[i].Name] = added[i]
 	}
 
-	seenReady := false
+	for i := range deleted {
+		glog.V(1).Infof("NodeController observed a Node deletion: %v", deleted[i].Name)
+		recordNodeEvent(nc.recorder, deleted[i].Name, api.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", deleted[i].Name))
+		nc.evictPods(deleted[i])
+		delete(nc.knownNodeSet, deleted[i].Name)
+	}
+
+	zoneToNodeConditions := map[string][]*api.NodeCondition{}
 	for i := range nodes.Items {
 		var gracePeriod time.Duration
 		var observedReadyCondition api.NodeCondition
@@ -407,29 +406,28 @@ func (nc *NodeController) monitorNodeStatus() error {
 				"Skipping - no pods will be evicted.", node.Name)
 			continue
 		}
+		// We do not treat a master node as a part of the cluster for network segmentation checking.
+		if !system.IsMasterNode(node) {
+			zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)
+		}
 
 		decisionTimestamp := nc.now()
-
 		if currentReadyCondition != nil {
 			// Check eviction timeout against decisionTimestamp
 			if observedReadyCondition.Status == api.ConditionFalse &&
 				decisionTimestamp.After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
-				if nc.evictPods(node.Name) {
+				if nc.evictPods(node) {
 					glog.V(4).Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
 				}
 			}
 			if observedReadyCondition.Status == api.ConditionUnknown &&
 				decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) {
-				if nc.evictPods(node.Name) {
+				if nc.evictPods(node) {
 					glog.V(4).Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
 				}
 			}
 			if observedReadyCondition.Status == api.ConditionTrue {
-				// We do not treat a master node as a part of the cluster for network segmentation checking.
-				if !system.IsMasterNode(node) {
-					seenReady = true
-				}
-				if nc.cancelPodEviction(node.Name) {
+				if nc.cancelPodEviction(node) {
 					glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 				}
 			}
@@ -468,19 +466,35 @@ func (nc *NodeController) monitorNodeStatus() error {
 		}
 	}
 
-	// NC don't see any Ready Node. We assume that the network is segmented and Nodes cannot connect to API server and
-	// update their statuses. NC enteres network segmentation mode and cancels all evictions in progress.
-	if !seenReady {
-		nc.networkSegmentationMode = true
-		nc.stopAllPodEvictions()
-		glog.V(2).Info("NodeController is entering network segmentation mode.")
-	} else {
-		if nc.networkSegmentationMode {
-			forceUpdateAllProbeTimes(nc.now(), nc.nodeStatusMap)
-			nc.networkSegmentationMode = false
-			glog.V(2).Info("NodeController exited network segmentation mode.")
+	for k, v := range zoneToNodeConditions {
+		newState := nc.computeZoneStateFunc(v)
+		if newState == nc.zoneStates[k] {
+			continue
 		}
+		if newState == stateFullSegmentation {
+			glog.V(2).Infof("NodeController is entering network segmentation mode in zone %v.", k)
+		} else if newState == stateNormal {
+			glog.V(2).Infof("NodeController exited network segmentation mode in zone %v.", k)
+		}
+		for i := range nodes.Items {
+			if utilnode.GetZoneKey(&nodes.Items[i]) == k {
+				if newState == stateFullSegmentation {
+					// When zone is fully segmented we stop the eviction all together.
+					nc.cancelPodEviction(&nodes.Items[i])
+				}
+				if newState == stateNormal && nc.zoneStates[k] == stateFullSegmentation {
+					// When exiting segmentation mode update probe timestamps on all Nodes.
+					now := nc.now()
+					v := nc.nodeStatusMap[nodes.Items[i].Name]
+					v.probeTimestamp = now
+					v.readyTransitionTimestamp = now
+					nc.nodeStatusMap[nodes.Items[i].Name] = v
+				}
+			}
+		}
+		nc.zoneStates[k] = newState
 	}
+
 	return nil
 }
 
@@ -649,15 +663,38 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	return gracePeriod, observedReadyCondition, currentReadyCondition, err
 }
 
+func (nc *NodeController) checkForNodeAddedDeleted(nodes *api.NodeList) (added, deleted []*api.Node) {
+	for i := range nodes.Items {
+		if _, has := nc.knownNodeSet[nodes.Items[i].Name]; !has {
+			added = append(added, &nodes.Items[i])
+		}
+	}
+	// If there's a difference between lengths of known Nodes and observed nodes
+	// we must have removed some Node.
+	if len(nc.knownNodeSet)+len(added) != len(nodes.Items) {
+		knowSetCopy := map[string]*api.Node{}
+		for k, v := range nc.knownNodeSet {
+			knowSetCopy[k] = v
+		}
+		for i := range nodes.Items {
+			delete(knowSetCopy, nodes.Items[i].Name)
+		}
+		for i := range knowSetCopy {
+			deleted = append(deleted, knowSetCopy[i])
+		}
+	}
+	return
+}
+
 // cancelPodEviction removes any queued evictions, typically because the node is available again. It
 // returns true if an eviction was queued.
-func (nc *NodeController) cancelPodEviction(nodeName string) bool {
+func (nc *NodeController) cancelPodEviction(node *api.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	wasDeleting := nc.podEvictor.Remove(nodeName)
-	wasTerminating := nc.terminationEvictor.Remove(nodeName)
+	wasDeleting := nc.podEvictor.Remove(node.Name)
+	wasTerminating := nc.terminationEvictor.Remove(node.Name)
 	if wasDeleting || wasTerminating {
-		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", nodeName)
+		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
 		return true
 	}
 	return false
@@ -665,20 +702,11 @@ func (nc *NodeController) cancelPodEviction(nodeName string) bool {
 
 // evictPods queues an eviction for the provided node name, and returns false if the node is already
 // queued for eviction.
-func (nc *NodeController) evictPods(nodeName string) bool {
-	if nc.networkSegmentationMode {
+func (nc *NodeController) evictPods(node *api.Node) bool {
+	if nc.zoneStates[utilnode.GetZoneKey(node)] == stateFullSegmentation {
 		return false
 	}
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.podEvictor.Add(nodeName)
-}
-
-// stopAllPodEvictions removes any queued evictions for all Nodes.
-func (nc *NodeController) stopAllPodEvictions() {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	glog.V(3).Infof("Cancelling all pod evictions.")
-	nc.podEvictor.Clear()
-	nc.terminationEvictor.Clear()
+	return nc.podEvictor.Add(node.Name)
 }

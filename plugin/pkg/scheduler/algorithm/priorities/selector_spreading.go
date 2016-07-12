@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -52,27 +53,6 @@ func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algo
 		replicaSetLister: replicaSetLister,
 	}
 	return selectorSpread.CalculateSpreadPriority
-}
-
-// Helper function that builds a string identifier that is unique per failure-zone
-// Returns empty-string for no zone
-func getZoneKey(node *api.Node) string {
-	labels := node.Labels
-	if labels == nil {
-		return ""
-	}
-
-	region, _ := labels[unversioned.LabelZoneRegion]
-	failureDomain, _ := labels[unversioned.LabelZoneFailureDomain]
-
-	if region == "" && failureDomain == "" {
-		return ""
-	}
-
-	// We include the null character just in case region or failureDomain has a colon
-	// (We do assume there's no null characters in a region or failureDomain)
-	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
-	return region + ":\x00:" + failureDomain
 }
 
 // CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.
@@ -188,7 +168,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 			continue
 		}
 
-		zoneId := getZoneKey(node)
+		zoneId := utilnode.GetZoneKey(node)
 		if zoneId == "" {
 			continue
 		}
@@ -218,7 +198,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 
 		// If there is zone information present, incorporate it
 		if haveZones {
-			zoneId := getZoneKey(node)
+			zoneId := utilnode.GetZoneKey(node)
 			if zoneId != "" {
 				zoneScore := maxPriority * (float32(maxCountByZone-countsByZone[zoneId]) / float32(maxCountByZone))
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
