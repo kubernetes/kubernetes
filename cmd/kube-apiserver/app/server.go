@@ -46,6 +46,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -225,7 +227,14 @@ func Run(s *options.APIServer) error {
 		return false
 	}
 
-	if modeEnabled(apiserver.ModeRBAC) {
+	authorizationConfig := authorizer.AuthorizationConfig{
+		PolicyFile:                  s.AuthorizationPolicyFile,
+		WebhookConfigFile:           s.AuthorizationWebhookConfigFile,
+		WebhookCacheAuthorizedTTL:   s.AuthorizationWebhookCacheAuthorizedTTL,
+		WebhookCacheUnauthorizedTTL: s.AuthorizationWebhookCacheUnauthorizedTTL,
+		RBACSuperUser:               s.AuthorizationRBACSuperUser,
+	}
+	if modeEnabled(genericoptions.ModeRBAC) {
 		mustGetRESTOptions := func(resource string) generic.RESTOptions {
 			config, err := storageFactory.NewConfig(rbac.Resource(resource))
 			if err != nil {
@@ -235,13 +244,13 @@ func Run(s *options.APIServer) error {
 		}
 
 		// For initial bootstrapping go directly to etcd to avoid privillege escalation check.
-		s.AuthorizationConfig.RBACRoleRegistry = role.NewRegistry(roleetcd.NewREST(mustGetRESTOptions("roles")))
-		s.AuthorizationConfig.RBACRoleBindingRegistry = rolebinding.NewRegistry(rolebindingetcd.NewREST(mustGetRESTOptions("rolebindings")))
-		s.AuthorizationConfig.RBACClusterRoleRegistry = clusterrole.NewRegistry(clusterroleetcd.NewREST(mustGetRESTOptions("clusterroles")))
-		s.AuthorizationConfig.RBACClusterRoleBindingRegistry = clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(mustGetRESTOptions("clusterrolebindings")))
+		authorizationConfig.RBACRoleRegistry = role.NewRegistry(roleetcd.NewREST(mustGetRESTOptions("roles")))
+		authorizationConfig.RBACRoleBindingRegistry = rolebinding.NewRegistry(rolebindingetcd.NewREST(mustGetRESTOptions("rolebindings")))
+		authorizationConfig.RBACClusterRoleRegistry = clusterrole.NewRegistry(clusterroleetcd.NewREST(mustGetRESTOptions("clusterroles")))
+		authorizationConfig.RBACClusterRoleBindingRegistry = clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(mustGetRESTOptions("clusterrolebindings")))
 	}
 
-	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, s.AuthorizationConfig)
+	authorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}
@@ -265,7 +274,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.Authenticator = authenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = authorizer
-	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationConfig.RBACSuperUser
+	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationRBACSuperUser
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace

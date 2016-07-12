@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apiserver"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -47,6 +46,16 @@ const (
 
 var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
+const (
+	ModeAlwaysAllow string = "AlwaysAllow"
+	ModeAlwaysDeny  string = "AlwaysDeny"
+	ModeABAC        string = "ABAC"
+	ModeWebhook     string = "Webhook"
+	ModeRBAC        string = "RBAC"
+)
+
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC}
+
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
 	APIGroupPrefix             string
@@ -54,17 +63,24 @@ type ServerRunOptions struct {
 	AdmissionControl           string
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
-	AuthorizationConfig        apiserver.AuthorizationConfig
-	AuthorizationMode          string
-	BasicAuthFile              string
-	BindAddress                net.IP
-	CertDirectory              string
-	ClientCAFile               string
-	CloudConfigFile            string
-	CloudProvider              string
-	CorsAllowedOriginList      []string
-	DefaultStorageMediaType    string
-	DeleteCollectionWorkers    int
+
+	// Authorization mode and associated flags.
+	AuthorizationMode                        string
+	AuthorizationPolicyFile                  string
+	AuthorizationWebhookConfigFile           string
+	AuthorizationWebhookCacheAuthorizedTTL   time.Duration
+	AuthorizationWebhookCacheUnauthorizedTTL time.Duration
+	AuthorizationRBACSuperUser               string
+
+	BasicAuthFile           string
+	BindAddress             net.IP
+	CertDirectory           string
+	ClientCAFile            string
+	CloudConfigFile         string
+	CloudProvider           string
+	CorsAllowedOriginList   []string
+	DefaultStorageMediaType string
+	DeleteCollectionWorkers int
 	// Used to specify the storage version that should be used for the legacy v1 api group.
 	DeprecatedStorageVersion  string
 	AuditLogPath              string
@@ -110,33 +126,31 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
-		APIGroupPrefix:    "/apis",
-		APIPrefix:         "/api",
-		AdmissionControl:  "AlwaysAdmit",
-		AuthorizationMode: "AlwaysAllow",
-		AuthorizationConfig: apiserver.AuthorizationConfig{
-			WebhookCacheAuthorizedTTL:   5 * time.Minute,
-			WebhookCacheUnauthorizedTTL: 30 * time.Second,
-		},
-		BindAddress:             net.ParseIP("0.0.0.0"),
-		CertDirectory:           "/var/run/kubernetes",
-		DefaultStorageMediaType: "application/json",
-		DefaultStorageVersions:  registered.AllPreferredGroupVersions(),
-		DeleteCollectionWorkers: 1,
-		EnableLogsSupport:       true,
-		EnableProfiling:         true,
-		EnableWatchCache:        true,
-		InsecureBindAddress:     net.ParseIP("127.0.0.1"),
-		InsecurePort:            8080,
-		LongRunningRequestRE:    defaultLongRunningRequestRE,
-		MasterCount:             1,
-		MasterServiceNamespace:  api.NamespaceDefault,
-		MaxRequestsInFlight:     400,
-		MinRequestTimeout:       1800,
-		RuntimeConfig:           make(config.ConfigurationMap),
-		SecurePort:              6443,
-		ServiceNodePortRange:    DefaultServiceNodePortRange,
-		StorageVersions:         registered.AllPreferredGroupVersions(),
+		APIGroupPrefix:                           "/apis",
+		APIPrefix:                                "/api",
+		AdmissionControl:                         "AlwaysAdmit",
+		AuthorizationMode:                        "AlwaysAllow",
+		AuthorizationWebhookCacheAuthorizedTTL:   5 * time.Minute,
+		AuthorizationWebhookCacheUnauthorizedTTL: 30 * time.Second,
+		BindAddress:                              net.ParseIP("0.0.0.0"),
+		CertDirectory:                            "/var/run/kubernetes",
+		DefaultStorageMediaType:                  "application/json",
+		DefaultStorageVersions:                   registered.AllPreferredGroupVersions(),
+		DeleteCollectionWorkers:                  1,
+		EnableLogsSupport:                        true,
+		EnableProfiling:                          true,
+		EnableWatchCache:                         true,
+		InsecureBindAddress:                      net.ParseIP("127.0.0.1"),
+		InsecurePort:                             8080,
+		LongRunningRequestRE:                     defaultLongRunningRequestRE,
+		MasterCount:                              1,
+		MasterServiceNamespace:                   api.NamespaceDefault,
+		MaxRequestsInFlight:                      400,
+		MinRequestTimeout:                        1800,
+		RuntimeConfig:                            make(config.ConfigurationMap),
+		SecurePort:                               6443,
+		ServiceNodePortRange:                     DefaultServiceNodePortRange,
+		StorageVersions:                          registered.AllPreferredGroupVersions(),
 	}
 }
 
@@ -238,24 +252,24 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, ""+
 		"Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+
-		strings.Join(apiserver.AuthorizationModeChoices, ",")+".")
+		strings.Join(AuthorizationModeChoices, ",")+".")
 
-	fs.StringVar(&s.AuthorizationConfig.PolicyFile, "authorization-policy-file", s.AuthorizationConfig.PolicyFile, ""+
+	fs.StringVar(&s.AuthorizationPolicyFile, "authorization-policy-file", s.AuthorizationPolicyFile, ""+
 		"File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
 
-	fs.StringVar(&s.AuthorizationConfig.WebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationConfig.WebhookConfigFile, ""+
+	fs.StringVar(&s.AuthorizationWebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationWebhookConfigFile, ""+
 		"File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. "+
 		"The API server will query the remote service to determine access on the API server's secure port.")
 
-	fs.DurationVar(&s.AuthorizationConfig.WebhookCacheAuthorizedTTL, "authorization-webhook-cache-authorized-ttl",
-		s.AuthorizationConfig.WebhookCacheAuthorizedTTL,
+	fs.DurationVar(&s.AuthorizationWebhookCacheAuthorizedTTL, "authorization-webhook-cache-authorized-ttl",
+		s.AuthorizationWebhookCacheAuthorizedTTL,
 		"The duration to cache 'authorized' responses from the webhook authorizer. Default is 5m.")
 
-	fs.DurationVar(&s.AuthorizationConfig.WebhookCacheUnauthorizedTTL,
-		"authorization-webhook-cache-unauthorized-ttl", s.AuthorizationConfig.WebhookCacheUnauthorizedTTL,
+	fs.DurationVar(&s.AuthorizationWebhookCacheUnauthorizedTTL,
+		"authorization-webhook-cache-unauthorized-ttl", s.AuthorizationWebhookCacheUnauthorizedTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer. Default is 30s.")
 
-	fs.StringVar(&s.AuthorizationConfig.RBACSuperUser, "authorization-rbac-super-user", s.AuthorizationConfig.RBACSuperUser, ""+
+	fs.StringVar(&s.AuthorizationRBACSuperUser, "authorization-rbac-super-user", s.AuthorizationRBACSuperUser, ""+
 		"If specified, a username which avoids RBAC authorization checks and role binding "+
 		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
 
