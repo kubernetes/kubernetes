@@ -64,7 +64,8 @@ func TestAssumePodScheduled(t *testing.T) {
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			pods: []*api.Pod{testPods[0]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[0]},
 		},
 	}, {
 		pods: []*api.Pod{testPods[1], testPods[2]},
@@ -77,7 +78,8 @@ func TestAssumePodScheduled(t *testing.T) {
 				MilliCPU: 300,
 				Memory:   1524,
 			},
-			pods: []*api.Pod{testPods[1], testPods[2]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[1], testPods[2]},
 		},
 	}, { // test non-zero request
 		pods: []*api.Pod{testPods[3]},
@@ -90,7 +92,8 @@ func TestAssumePodScheduled(t *testing.T) {
 				MilliCPU: priorityutil.DefaultMilliCpuRequest,
 				Memory:   priorityutil.DefaultMemoryRequest,
 			},
-			pods: []*api.Pod{testPods[3]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[3]},
 		},
 	}}
 
@@ -147,7 +150,8 @@ func TestExpirePod(t *testing.T) {
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			pods: []*api.Pod{testPods[1]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[1]},
 		},
 	}}
 
@@ -194,7 +198,8 @@ func TestAddPodWillConfirm(t *testing.T) {
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			pods: []*api.Pod{testPods[0]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[0]},
 		},
 	}}
 
@@ -237,7 +242,8 @@ func TestAddPodAfterExpiration(t *testing.T) {
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			pods: []*api.Pod{basePod},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{basePod},
 		},
 	}}
 
@@ -288,7 +294,8 @@ func TestUpdatePod(t *testing.T) {
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			pods: []*api.Pod{testPods[1]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[1]},
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -298,7 +305,8 @@ func TestUpdatePod(t *testing.T) {
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			pods: []*api.Pod{testPods[0]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[0]},
 		}},
 	}}
 
@@ -351,7 +359,8 @@ func TestExpireAddUpdatePod(t *testing.T) {
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			pods: []*api.Pod{testPods[1]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[1]},
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -361,7 +370,8 @@ func TestExpireAddUpdatePod(t *testing.T) {
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			pods: []*api.Pod{testPods[0]},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{testPods[0]},
 		}},
 	}}
 
@@ -414,7 +424,8 @@ func TestRemovePod(t *testing.T) {
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			pods: []*api.Pod{basePod},
+			allocatableResource: &Resource{},
+			pods:                []*api.Pod{basePod},
 		},
 	}}
 

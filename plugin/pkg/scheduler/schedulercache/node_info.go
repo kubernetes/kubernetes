@@ -39,6 +39,9 @@ type NodeInfo struct {
 	requestedResource *Resource
 	pods              []*api.Pod
 	nonzeroRequest    *Resource
+	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
+	// as int64, to avoid conversions and accessing map.
+	allocatableResource *Resource
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
 	allowedPodNumber int
@@ -60,10 +63,11 @@ type Resource struct {
 // the returned object.
 func NewNodeInfo(pods ...*api.Pod) *NodeInfo {
 	ni := &NodeInfo{
-		requestedResource: &Resource{},
-		nonzeroRequest:    &Resource{},
-		allowedPodNumber:  0,
-		generation:        0,
+		requestedResource:   &Resource{},
+		nonzeroRequest:      &Resource{},
+		allocatableResource: &Resource{},
+		allowedPodNumber:    0,
+		generation:          0,
 	}
 	for _, pod := range pods {
 		ni.addPod(pod)
@@ -110,15 +114,24 @@ func (n *NodeInfo) NonZeroRequest() Resource {
 	return *n.nonzeroRequest
 }
 
+// AllocatableResource returns allocatable resources on a given node.
+func (n *NodeInfo) AllocatableResource() Resource {
+	if n == nil {
+		return emptyResource
+	}
+	return *n.allocatableResource
+}
+
 func (n *NodeInfo) Clone() *NodeInfo {
 	pods := append([]*api.Pod(nil), n.pods...)
 	clone := &NodeInfo{
-		node:              n.node,
-		requestedResource: &(*n.requestedResource),
-		nonzeroRequest:    &(*n.nonzeroRequest),
-		allowedPodNumber:  n.allowedPodNumber,
-		pods:              pods,
-		generation:        n.generation,
+		node:                n.node,
+		requestedResource:   &(*n.requestedResource),
+		nonzeroRequest:      &(*n.nonzeroRequest),
+		allocatableResource: &(*n.allocatableResource),
+		allowedPodNumber:    n.allowedPodNumber,
+		pods:                pods,
+		generation:          n.generation,
 	}
 	return clone
 }
@@ -193,6 +206,9 @@ func calculateResource(pod *api.Pod) (cpu int64, mem int64, nvidia_gpu int64, no
 // Sets the overall node information.
 func (n *NodeInfo) SetNode(node *api.Node) error {
 	n.node = node
+	n.allocatableResource.MilliCPU = node.Status.Allocatable.Cpu().MilliValue()
+	n.allocatableResource.Memory = node.Status.Allocatable.Memory().Value()
+	n.allocatableResource.NvidiaGPU = node.Status.Allocatable.NvidiaGPU().Value()
 	n.allowedPodNumber = int(node.Status.Allocatable.Pods().Value())
 	n.generation++
 	return nil
@@ -205,6 +221,7 @@ func (n *NodeInfo) RemoveNode(node *api.Node) error {
 	// and thus can potentially be observed later, even though they happened before
 	// node removal. This is handled correctly in cache.go file.
 	n.node = nil
+	n.allocatableResource = &Resource{}
 	n.allowedPodNumber = 0
 	n.generation++
 	return nil
