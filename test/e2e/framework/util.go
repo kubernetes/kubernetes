@@ -86,8 +86,7 @@ const (
 	// How long to wait for the pod to be listable
 	PodListTimeout = time.Minute
 	// Initial pod start can be delayed O(minutes) by slow docker pulls
-	// TODO: Make this 30 seconds once #4566 is resolved.
-	PodStartTimeout = 5 * time.Minute
+	PodStartTimeout = 30 * time.Second
 
 	// How long to wait for the pod to no longer be running
 	podNoLongerRunningTimeout = 30 * time.Second
