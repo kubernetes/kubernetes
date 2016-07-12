@@ -192,6 +192,9 @@ type DirectEncoder struct {
 func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 	gvks, _, err := e.ObjectTyper.ObjectKinds(obj)
 	if err != nil {
+		if runtime.IsNotRegisteredError(err) {
+			return e.Encoder.Encode(obj, stream)
+		}
 		return err
 	}
 	kind := obj.GetObjectKind()
