@@ -370,7 +370,10 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
 	// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
 	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) error {
-		username := attrs.GetUserName()
+		username := ""
+		if user := attrs.GetUser(); user != nil {
+			username = user.GetName()
+		}
 		ns := attrs.GetNamespace()
 
 		// If the user is "root"...
