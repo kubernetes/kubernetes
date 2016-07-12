@@ -39,6 +39,7 @@ const (
 type cniNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
+	loNetwork      *cniNetwork
 	defaultNetwork *cniNetwork
 	host           network.Host
 	execer         utilexec.Interface
@@ -104,6 +105,23 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentcon
 		return err
 	}
 
+	loConfig, err := libcni.ConfFromBytes([]byte(`{
+  "cniVersion": "0.1.0",
+  "name": "cni-loopback",
+  "type": "loopback"
+}`))
+	if err != nil {
+		return err
+	}
+	cninet := &libcni.CNIConfig{
+		Path: []string{DefaultCNIDir},
+	}
+	plugin.loNetwork = &cniNetwork{
+		name:          "lo",
+		NetworkConfig: loConfig,
+		CNIConfig:     cninet,
+	}
+
 	plugin.host = host
 	return nil
 }
@@ -116,6 +134,12 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+	}
+
+	_, err = plugin.loNetwork.addToNetwork(name, namespace, id, netnsPath)
+	if err != nil {
+		glog.Errorf("Error while adding to cni lo network: %s", err)
+		return err
 	}
 
 	_, err = plugin.defaultNetwork.addToNetwork(name, namespace, id, netnsPath)
