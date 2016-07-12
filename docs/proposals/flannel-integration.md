@@ -120,7 +120,7 @@ From 1000 feet:
 __But will it blend?__
 
 Kubernetes integration is fairly straight-forward once we understand the pieces involved, and can be prioritized as follows:
-* Kubelet understands flannel daemon in client mode, flannel server manages independent etcd store on master, node controller backs off cidr allocation
+* Kubelet understands flannel daemon in client mode, flannel server manages independent etcd store on master, node controller backs off CIDR allocation
 * Flannel server consults the Kubernetes master for everything network related
 * Flannel daemon works through network plugins in a generic way without bothering the kubelet: needs CNI x Kubernetes standardization
 
