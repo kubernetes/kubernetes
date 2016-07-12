@@ -337,9 +337,6 @@ spec:
   - kernel.shmmax
   - kernel.shmall
   - net.*
-  groups:
-  - postgres
-  - mysql
 ```
 
 and a restricted default `PodSecurityPolicy`:
@@ -351,9 +348,6 @@ metadata:
   name: 
 spec:
   sysctls: # none
-  groups:
-  - system:authenticated
-  - system:service-accounts
 ```
 
 in contrast to a permissive default `PodSecurityPolicy`:
@@ -366,9 +360,6 @@ metadata:
 spec:
   sysctls:
   - *
-  groups:
-  - system:authenticated
-  - system:service-accounts
 ```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
