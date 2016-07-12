@@ -23,6 +23,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -49,6 +50,7 @@ var cleanup = flag.Bool("cleanup", true, "If true remove files from remote hosts
 var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any instances created")
 var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
 var setupNode = flag.Bool("setup-node", false, "When true, current user will be added to docker group on the test machine")
+var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
 
 var computeService *compute.Service
 
@@ -254,6 +256,19 @@ func createInstance(image string) (string, error) {
 			},
 		},
 	}
+	if *instanceMetadata != "" {
+		raw := parseInstanceMetadata(*instanceMetadata)
+		i.Metadata = &compute.Metadata{}
+		metadata := []*compute.MetadataItems{}
+		for k, v := range raw {
+			val := v
+			metadata = append(metadata, &compute.MetadataItems{
+				Key:   k,
+				Value: &val,
+			})
+		}
+		i.Metadata.Items = metadata
+	}
 	op, err := computeService.Instances.Insert(*project, *zone, i).Do()
 	if err != nil {
 		return "", err
@@ -341,6 +356,30 @@ func deleteInstance(image string) {
 	if err != nil {
 		glog.Infof("Error deleting instance %s", imageToInstanceName(image))
 	}
+}
+
+func parseInstanceMetadata(str string) map[string]string {
+	metadata := make(map[string]string)
+	ss := strings.Split(str, ",")
+	for _, s := range ss {
+		kv := strings.Split(s, "=")
+		if len(kv) == 2 {
+			metadata[kv[0]] = kv[1]
+			continue
+		}
+		kp := strings.Split(s, "<")
+		if len(kp) != 2 {
+			glog.Errorf("Invalid instance metadata: %q", s)
+			continue
+		}
+		v, err := ioutil.ReadFile(kp[1])
+		if err != nil {
+			glog.Errorf("Failed to read metadata file %q: %v", kp[1], err)
+			continue
+		}
+		metadata[kp[0]] = string(v)
+	}
+	return metadata
 }
 
 func imageToInstanceName(image string) string {
