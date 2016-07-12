@@ -233,8 +233,6 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	// We use conflicted pod ports to incur fit predicate failure.
 	secondPod := podWithPort("bar", "", 8080)
 	queuedPodStore.Add(secondPod)
-	// queuedPodStore: [bar:8080]
-	// cache: [(assumed)foo:8080]
 
 	scheduler.scheduleOne()
 	select {
@@ -311,12 +309,8 @@ func setupTestSchedulerWithOnePod(t *testing.T, queuedPodStore *clientcache.FIFO
 	scheduler := New(cfg)
 
 	queuedPodStore.Add(pod)
-	// queuedPodStore: [foo:8080]
-	// cache: []
 
 	scheduler.scheduleOne()
-	// queuedPodStore: []
-	// cache: [(assumed)foo:8080]
 
 	select {
 	case b := <-bindingChan:
