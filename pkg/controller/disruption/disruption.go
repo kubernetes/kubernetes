@@ -168,9 +168,40 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 
 // FIXME(mml): Also cover the case where there is a ReplicaSet with no deployment.
 func (dc *DisruptionController) finders() []podControllerFinder {
-	return []podControllerFinder{dc.getPodReplicationControllers, dc.getPodDeployments}
+	return []podControllerFinder{dc.getPodReplicationControllers, dc.getPodDeployments, dc.getPodReplicaSets}
 }
 
+/* getPodReplicaSets finds replicasets which have no matching deployments.
+ */
+func (dc *DisruptionController) getPodReplicaSets(pod *api.Pod) ([]controllerAndScale, error) {
+	cas := []controllerAndScale{}
+	rss, err := dc.rsLister.GetPodReplicaSets(pod)
+	// GetPodReplicaSets returns an error only if no ReplicaSets are found.  We
+	// don't return that as an error to the caller.
+	if err != nil {
+		return cas, nil
+	}
+	controllerScale := map[types.UID]int32{}
+	for _, rs := range rss {
+		// GetDeploymentsForReplicaSet returns an error only if no matching
+		// deployments are found.
+		_, err := dc.dLister.GetDeploymentsForReplicaSet(&rs)
+		if err == nil { // A deployment was found, so this finder will not count this RS.
+			continue
+		}
+		// FIXME(mml): use ScaleStatus
+		controllerScale[rs.UID] = rs.Spec.Replicas
+	}
+
+	for uid, scale := range controllerScale {
+		cas = append(cas, controllerAndScale{UID: uid, scale: scale})
+	}
+
+	return cas, nil
+}
+
+/* getPodDeployments finds deployments for any replicasets which are being managed by deployments.
+ */
 func (dc *DisruptionController) getPodDeployments(pod *api.Pod) ([]controllerAndScale, error) {
 	cas := []controllerAndScale{}
 	rss, err := dc.rsLister.GetPodReplicaSets(pod)
