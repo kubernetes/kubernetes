@@ -484,6 +484,10 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 
+	if d.DeletionTimestamp != nil {
+		return dc.syncStatusOnly(d)
+	}
+
 	if d.Spec.Paused {
 		return dc.sync(d)
 	}
