@@ -70,7 +70,7 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 	if len(args) == 0 && len(options.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
-	revisionDetail := cmdutil.GetFlagInt64(cmd, "revision")
+	revision := cmdutil.GetFlagInt64(cmd, "revision")
 
 	mapper, typer := f.Object(false)
 
@@ -92,7 +92,7 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 		return err
 	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
+	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -101,28 +101,17 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 		if err != nil {
 			return err
 		}
-		historyInfo, err := historyViewer.History(info.Namespace, info.Name)
+		historyInfo, err := historyViewer.ViewHistory(info.Namespace, info.Name, revision)
 		if err != nil {
 			return err
 		}
 
-		if revisionDetail > 0 {
-			// Print details of a specific revision
-			template, ok := historyInfo.RevisionToTemplate[revisionDetail]
-			if !ok {
-				return fmt.Errorf("unable to find revision %d of %s %q", revisionDetail, mapping.Resource, info.Name)
-			}
-			fmt.Fprintf(out, "%s %q revision %d\n", mapping.Resource, info.Name, revisionDetail)
-			kubectl.DescribePodTemplate(template, out)
-		} else {
-			// Print all revisions
-			formattedOutput, printErr := kubectl.PrintRolloutHistory(historyInfo, mapping.Resource, info.Name)
-			if printErr != nil {
-				return printErr
-			}
-			fmt.Fprintf(out, "%s\n", formattedOutput)
+		header := fmt.Sprintf("%s %q", mapping.Resource, info.Name)
+		if revision > 0 {
+			header = fmt.Sprintf("%s with revision #%d", header, revision)
 		}
+		fmt.Fprintf(out, "%s\n", header)
+		fmt.Fprintf(out, "%s\n", historyInfo)
 		return nil
 	})
-	return err
 }
