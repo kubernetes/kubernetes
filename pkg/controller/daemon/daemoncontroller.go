@@ -661,7 +661,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return err
 	}
 	dsNeedsSync := dsc.expectations.SatisfiedExpectations(dsKey)
-	if dsNeedsSync {
+	if dsNeedsSync && ds.DeletionTimestamp == nil {
 		dsc.manage(ds)
 	}
 
