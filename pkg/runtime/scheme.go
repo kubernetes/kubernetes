@@ -232,7 +232,7 @@ func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, bool, 
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, false, &notRegisteredErr{t: t}
+		return nil, false, NewNotRegisteredErr(unversioned.GroupVersionKind{}, t)
 	}
 	_, unversionedType := s.unversionedTypes[t]
 
@@ -270,7 +270,7 @@ func (s *Scheme) New(kind unversioned.GroupVersionKind) (Object, error) {
 	if t, exists := s.unversionedKinds[kind.Kind]; exists {
 		return reflect.New(t).Interface().(Object), nil
 	}
-	return nil, &notRegisteredErr{gvk: kind}
+	return nil, NewNotRegisteredErr(kind, nil)
 }
 
 // AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
@@ -486,7 +486,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
-		return nil, &notRegisteredErr{t: t}
+		return nil, NewNotRegisteredErr(unversioned.GroupVersionKind{}, t)
 	}
 
 	// if the Go type is also registered to the destination kind, no conversion is necessary
