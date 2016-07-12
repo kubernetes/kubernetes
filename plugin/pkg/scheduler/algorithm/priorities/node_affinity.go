@@ -37,7 +37,7 @@ func CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*sche
 	}
 
 	var maxCount float64
-	counts := make(map[string]float64, len(nodes.Items))
+	counts := make(map[string]float64, len(nodes))
 
 	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
 	if err != nil {
@@ -59,7 +59,7 @@ func CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*sche
 				return nil, err
 			}
 
-			for _, node := range nodes.Items {
+			for _, node := range nodes {
 				if nodeSelector.Matches(labels.Set(node.Labels)) {
 					counts[node.Name] += float64(preferredSchedulingTerm.Weight)
 				}
@@ -71,9 +71,8 @@ func CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*sche
 		}
 	}
 
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	for _, node := range nodes {
 		if maxCount > 0 {
 			fScore := 10 * (counts[node.Name] / maxCount)
 			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})

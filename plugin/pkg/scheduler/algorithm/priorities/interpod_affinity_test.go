@@ -30,12 +30,12 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type FakeNodeListInfo []api.Node
+type FakeNodeListInfo []*api.Node
 
 func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	for _, node := range nodes {
 		if node.Name == nodeName {
-			return &node, nil
+			return node, nil
 		}
 	}
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
@@ -252,13 +252,13 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	tests := []struct {
 		pod          *api.Pod
 		pods         []*api.Pod
-		nodes        []api.Node
+		nodes        []*api.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
 			pod: &api.Pod{Spec: api.PodSpec{NodeName: ""}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1, Annotations: map[string]string{}}},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
@@ -276,7 +276,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2}},
 				{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
@@ -294,7 +294,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			pods: []*api.Pod{
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
@@ -316,7 +316,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine4"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2}},
 				{Spec: api.PodSpec{NodeName: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelRgChina}},
@@ -334,7 +334,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2}},
 				{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
@@ -350,7 +350,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1, Annotations: stayWithS1InRegion}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2, Annotations: stayWithS2InRegion}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
@@ -364,7 +364,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1, Annotations: hardAffinity}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2, Annotations: hardAffinity}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
@@ -385,7 +385,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
@@ -398,7 +398,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
@@ -412,7 +412,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 			},
@@ -426,7 +426,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1, Annotations: awayFromS2InAz}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS2, Annotations: awayFromS1InAz}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelAzAz2}},
 			},
@@ -440,7 +440,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelAzAz1}},
 			},
@@ -462,7 +462,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine4"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 				{Spec: api.PodSpec{NodeName: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelRgChina}},
@@ -485,7 +485,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Annotations: stayWithS1InRegionAwayFromS2InAz}},
 				{Spec: api.PodSpec{NodeName: "machine4"}, ObjectMeta: api.ObjectMeta{Annotations: awayFromS1InAz}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
@@ -499,12 +499,12 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
 		interPodAffinity := InterPodAffinity{
 			info:                  FakeNodeListInfo(test.nodes),
-			nodeLister:            algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}),
+			nodeLister:            algorithm.FakeNodeLister(test.nodes),
 			podLister:             algorithm.FakePodLister(test.pods),
 			hardPodAffinityWeight: api.DefaultHardPodAffinitySymmetricWeight,
 			failureDomains:        priorityutil.Topologies{DefaultKeys: strings.Split(api.DefaultFailureDomains, ",")},
 		}
-		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(test.nodes))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -548,7 +548,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	tests := []struct {
 		pod                   *api.Pod
 		pods                  []*api.Pod
-		nodes                 []api.Node
+		nodes                 []*api.Node
 		hardPodAffinityWeight int
 		expectedList          schedulerapi.HostPriorityList
 		test                  string
@@ -559,7 +559,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Annotations: hardPodAffinity}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Annotations: hardPodAffinity}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
@@ -574,7 +574,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Annotations: hardPodAffinity}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Annotations: hardPodAffinity}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
@@ -588,11 +588,11 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
 		ipa := InterPodAffinity{
 			info:                  FakeNodeListInfo(test.nodes),
-			nodeLister:            algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}),
+			nodeLister:            algorithm.FakeNodeLister(test.nodes),
 			podLister:             algorithm.FakePodLister(test.pods),
 			hardPodAffinityWeight: test.hardPodAffinityWeight,
 		}
-		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(test.nodes))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -634,7 +634,7 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 	tests := []struct {
 		pod            *api.Pod
 		pods           []*api.Pod
-		nodes          []api.Node
+		nodes          []*api.Node
 		failureDomains priorityutil.Topologies
 		expectedList   schedulerapi.HostPriorityList
 		test           string
@@ -645,7 +645,7 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel1}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabel1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
 			},
@@ -659,7 +659,7 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 				{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel1}},
 				{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabel1}},
 			},
-			nodes: []api.Node{
+			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
 			},
@@ -672,12 +672,12 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
 		ipa := InterPodAffinity{
 			info:                  FakeNodeListInfo(test.nodes),
-			nodeLister:            algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}),
+			nodeLister:            algorithm.FakeNodeLister(test.nodes),
 			podLister:             algorithm.FakePodLister(test.pods),
 			hardPodAffinityWeight: api.DefaultHardPodAffinitySymmetricWeight,
 			failureDomains:        test.failureDomains,
 		}
-		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(test.nodes))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

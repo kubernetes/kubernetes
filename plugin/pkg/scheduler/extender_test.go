@@ -28,7 +28,7 @@ import (
 )
 
 type fitPredicate func(pod *api.Pod, node *api.Node) (bool, error)
-type priorityFunc func(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, error)
+type priorityFunc func(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, error)
 
 type priorityConfig struct {
 	function priorityFunc
@@ -61,13 +61,13 @@ func machine2PredicateExtender(pod *api.Pod, node *api.Node) (bool, error) {
 	return false, nil
 }
 
-func errorPrioritizerExtender(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, error) {
+func errorPrioritizerExtender(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, error) {
 	return &schedulerapi.HostPriorityList{}, fmt.Errorf("Some error")
 }
 
-func machine1PrioritizerExtender(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, error) {
+func machine1PrioritizerExtender(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, error) {
 	result := schedulerapi.HostPriorityList{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		score := 1
 		if node.Name == "machine1" {
 			score = 10
@@ -77,9 +77,9 @@ func machine1PrioritizerExtender(pod *api.Pod, nodes *api.NodeList) (*schedulera
 	return &result, nil
 }
 
-func machine2PrioritizerExtender(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, error) {
+func machine2PrioritizerExtender(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, error) {
 	result := schedulerapi.HostPriorityList{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		score := 1
 		if node.Name == "machine2" {
 			score = 10
@@ -96,7 +96,7 @@ func machine2Prioritizer(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.N
 	}
 
 	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		score := 1
 		if node.Name == "machine2" {
 			score = 10
@@ -112,14 +112,14 @@ type FakeExtender struct {
 	weight       int
 }
 
-func (f *FakeExtender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, error) {
-	filtered := []api.Node{}
-	for _, node := range nodes.Items {
+func (f *FakeExtender) Filter(pod *api.Pod, nodes []*api.Node) ([]*api.Node, error) {
+	filtered := []*api.Node{}
+	for _, node := range nodes {
 		fits := true
 		for _, predicate := range f.predicates {
-			fit, err := predicate(pod, &node)
+			fit, err := predicate(pod, node)
 			if err != nil {
-				return &api.NodeList{}, err
+				return []*api.Node{}, err
 			}
 			if !fit {
 				fits = false
@@ -130,10 +130,10 @@ func (f *FakeExtender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList,
 			filtered = append(filtered, node)
 		}
 	}
-	return &api.NodeList{Items: filtered}, nil
+	return filtered, nil
 }
 
-func (f *FakeExtender) Prioritize(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, int, error) {
+func (f *FakeExtender) Prioritize(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, int, error) {
 	result := schedulerapi.HostPriorityList{}
 	combinedScores := map[string]int{}
 	for _, prioritizer := range f.prioritizers {

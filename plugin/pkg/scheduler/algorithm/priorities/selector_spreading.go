@@ -117,12 +117,13 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 		// Create a number of go-routines that will be computing number
 		// of "similar" pods for given nodes.
 		workers := 16
-		toProcess := make(chan string, len(nodes.Items))
-		for i := range nodes.Items {
-			toProcess <- nodes.Items[i].Name
+		toProcess := make(chan string, len(nodes))
+		for i := range nodes {
+			toProcess <- nodes[i].Name
 		}
 		close(toProcess)
 
+		// TODO: Use Parallelize.
 		wg := sync.WaitGroup{}
 		wg.Add(workers)
 		for i := 0; i < workers; i++ {
@@ -181,9 +182,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 
 	// Count similar pods by zone, if zone information is present
 	countsByZone := map[string]int{}
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
-
+	for _, node := range nodes {
 		count, found := countsByNodeName[node.Name]
 		if !found {
 			continue
@@ -207,11 +206,10 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 		}
 	}
 
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	//score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
+	for _, node := range nodes {
 		// initializing to the default/max node score of maxPriority
 		fScore := float32(maxPriority)
 		if maxCountByNodeName > 0 {
@@ -281,7 +279,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNa
 	// separate out the nodes that have the label from the ones that don't
 	otherNodes := []string{}
 	labeledNodes := map[string]string{}
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		if labels.Set(node.Labels).Has(s.label) {
 			label := labels.Set(node.Labels).Get(s.label)
 			labeledNodes[node.Name] = label

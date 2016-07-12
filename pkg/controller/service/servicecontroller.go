@@ -629,13 +629,26 @@ func stringSlicesEqual(x, y []string) bool {
 	return true
 }
 
+func includeNodeFromNodeList(node *api.Node) bool {
+	return !node.Spec.Unschedulable
+}
+
 func hostsFromNodeList(list *api.NodeList) []string {
 	result := []string{}
 	for ix := range list.Items {
-		if list.Items[ix].Spec.Unschedulable {
-			continue
+		if includeNodeFromNodeList(&list.Items[ix]) {
+			result = append(result, list.Items[ix].Name)
 		}
-		result = append(result, list.Items[ix].Name)
+	}
+	return result
+}
+
+func hostsFromNodeSlice(nodes []*api.Node) []string {
+	result := []string{}
+	for _, node := range nodes {
+		if includeNodeFromNodeList(node) {
+			result = append(result, node.Name)
+		}
 	}
 	return result
 }
@@ -675,7 +688,7 @@ func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
 			continue
 		}
-		newHosts := hostsFromNodeList(&nodes)
+		newHosts := hostsFromNodeSlice(nodes)
 		if stringSlicesEqual(newHosts, prevHosts) {
 			// The set of nodes in the cluster hasn't changed, but we can retry
 			// updating any services that we failed to update last time around.

@@ -61,7 +61,7 @@ func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*sch
 	// the max value of counts
 	var maxCount float64
 	// counts hold the count of intolerable taints of a pod for a given node
-	counts := make(map[string]float64, len(nodes.Items))
+	counts := make(map[string]float64, len(nodes))
 
 	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
 	if err != nil {
@@ -71,8 +71,7 @@ func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*sch
 	tolerationList := getAllTolerationPreferNoSchedule(tolerations)
 
 	// calculate the intolerable taints for all the nodes
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
+	for _, node := range nodes {
 		taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
 		if err != nil {
 			return nil, err
@@ -88,9 +87,8 @@ func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*sch
 	// The maximum priority value to give to a node
 	// Priority values range from 0 - maxPriority
 	const maxPriority = float64(10)
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes.Items))
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	for _, node := range nodes {
 		fScore := maxPriority
 		if maxCount > 0 {
 			fScore = (1.0 - counts[node.Name]/maxCount) * 10
