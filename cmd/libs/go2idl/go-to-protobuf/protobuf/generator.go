@@ -53,6 +53,8 @@ func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 	return []string{
 		"option (gogoproto.marshaler_all) = true;",
 		"option (gogoproto.sizer_all) = true;",
+		"option (gogoproto.goproto_stringer_all) = false;",
+		"option (gogoproto.stringer_all) = true;",
 		"option (gogoproto.unmarshaler_all) = true;",
 		"option (gogoproto.goproto_unrecognized_all) = false;",
 		"option (gogoproto.goproto_enum_prefix_all) = false;",
@@ -316,6 +318,9 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 				}
 			default:
 				if !b.omitGogo || !strings.HasPrefix(key, "(gogoproto.") {
+					if key == "(gogoproto.goproto_stringer)" && v[0] == "false" {
+						options = append(options, "(gogoproto.stringer) = false")
+					}
 					options = append(options, fmt.Sprintf("%s = %s", key, v[0]))
 				}
 			}

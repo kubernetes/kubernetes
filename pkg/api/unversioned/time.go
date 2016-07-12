@@ -29,6 +29,7 @@ import (
 //
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type Time struct {
 	time.Time `protobuf:"-"`
 }
@@ -38,6 +39,11 @@ type Time struct {
 // copy-by-assign, despite the presence of (unexported) Pointer fields.
 func (t Time) DeepCopy() Time {
 	return t
+}
+
+// String returns the representation of the time.
+func (t Time) String() string {
+	return t.Time.String()
 }
 
 // NewTime returns a wrapped instance of the provided time
