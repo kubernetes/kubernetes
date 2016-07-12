@@ -31,5 +31,6 @@ kubectl-rolling-update.1
 kubectl-run.1
 kubectl-scale.1
 kubectl-stop.1
+kubectl-top.1
 kubectl-version.1
 kubectl.1

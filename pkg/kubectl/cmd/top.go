@@ -64,7 +64,7 @@ var (
 var HandledResources []unversioned.GroupKind = []unversioned.GroupKind{
 	api.Kind("Pod"),
 	api.Kind("Node"),
-};
+}
 
 var GetResourcesHandledByTop = func() []string {
 	keys := make([]string, 0)
