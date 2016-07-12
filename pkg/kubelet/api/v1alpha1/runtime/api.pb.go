@@ -548,7 +548,7 @@ type PodSandboxConfig struct {
 	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
 	//     ContainerConfig.LogPath = `containerName_Instance#.log`
 	//
-	// WARNING: Log managment and how kubelet should interface with the
+	// WARNING: Log management and how kubelet should interface with the
 	// container logs are under active discussion in
 	// https://issues.k8s.io/24677. There *may* be future change of direction
 	// for logging as the discussion carries on.
@@ -561,7 +561,7 @@ type PodSandboxConfig struct {
 	// aggregate cpu/memory resources limits of all containers).
 	// Note: On a Linux host, kubelet will create a pod-level cgroup and pass
 	// it as the cgroup parent for the PodSandbox. For some runtimes, this is
-	// sufficent. For others, e.g., hypervisor-based runtimes, explicit
+	// sufficient. For others, e.g., hypervisor-based runtimes, explicit
 	// resource limits for the sandbox are needed at creation time.
 	Resources *PodSandboxResources `protobuf:"bytes,6,opt,name=resources" json:"resources,omitempty"`
 	// Labels are key value pairs that may be used to scope and select individual resources.
@@ -1326,7 +1326,7 @@ type ContainerConfig struct {
 	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
 	//     ContainerConfig.LogPath = `containerName_Instance#.log`
 	//
-	// WARNING: Log managment and how kubelet should interface with the
+	// WARNING: Log management and how kubelet should interface with the
 	// container logs are under active discussion in
 	// https://issues.k8s.io/24677. There *may* be future change of direction
 	// for logging as the discussion carries on.
@@ -1602,7 +1602,7 @@ type ContainerFilter struct {
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	// ID of the container.
 	Id *string `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
-	// State of the contianer.
+	// State of the container.
 	State *ContainerState `protobuf:"varint,3,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
 	// The id of the pod sandbox
 	PodSandboxId *string `protobuf:"bytes,4,opt,name=pod_sandbox_id" json:"pod_sandbox_id,omitempty"`
@@ -1684,7 +1684,10 @@ type Container struct {
 	// State is the state of the container.
 	State *ContainerState `protobuf:"varint,5,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
 	// Labels are key value pairs that may be used to scope and select individual resources.
-	Labels           map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Labels map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Annotations is an unstructured key value map that may be set by external
+	// tools to store and retrieve arbitrary metadata.
+	Annotations      map[string]string `protobuf:"bytes,7,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	XXX_unrecognized []byte            `json:"-"`
 }
 
@@ -1730,6 +1733,13 @@ func (m *Container) GetState() ContainerState {
 func (m *Container) GetLabels() map[string]string {
 	if m != nil {
 		return m.Labels
+	}
+	return nil
+}
+
+func (m *Container) GetAnnotations() map[string]string {
+	if m != nil {
+		return m.Annotations
 	}
 	return nil
 }

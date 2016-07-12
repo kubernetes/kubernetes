@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -225,12 +226,11 @@ func (id DockerID) ContainerID() ContainerID {
 type ContainerState string
 
 const (
+	ContainerStateCreated ContainerState = "created"
 	ContainerStateRunning ContainerState = "running"
 	ContainerStateExited  ContainerState = "exited"
 	// This unknown encompasses all the states that we currently don't care.
 	ContainerStateUnknown ContainerState = "unknown"
-	// Not in use yet.
-	ContainerStateCreated ContainerState = "created"
 )
 
 // Container provides the runtime information for a container, such as ID, hash,
@@ -265,6 +265,9 @@ type PodStatus struct {
 	Namespace string
 	// IP of the pod.
 	IP string
+	// Status of the pod sandbox.
+	// Only for kuberuntime now, other runtime may keep it nil.
+	SandboxStatus []*runtimeApi.PodSandboxStatus
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
 }
