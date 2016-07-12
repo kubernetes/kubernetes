@@ -42,24 +42,23 @@ var (
 		Display Resource (CPU/Memory/Storage) usage of nodes or pods.
 
 		The top command allows you to see the resource consumption of the nodes or pods.
-		It downloads the usage metrics of a given resource (node/pod) via the Resource Metrics API.
-		`)
+		It downloads the usage metrics of a given resource (node/pod) via the Resource Metrics API.`)
 
 	topExample = dedent.Dedent(`
-		  # Show metrics for all nodes in the default namespace
+		  # Show metrics for all nodes
 		  kubectl top node
 
-		  # Show metrics for all nodes in the given namespace
-		  kubectl top node --namespace=NAMESPACE
+		  # Show metrics for a given node
+		  kubectl top node NODE_NAME
 
-		  # Show metrics for a given pod in the default namespace
-		  kubectl top pod POD_NAME
+		  # Show metrics for all pods in the given namespace
+		  kubectl top pod --namespace=NAMESPACE
 
 		  # Show metrics for a given pod and its containers
 		  kubectl top pod POD_NAME --containers
 
-		  # Show metrics for the pods defined by the selector query
-		  kubectl top pod --selector="KEY: VALUE"`)
+		  # Show metrics for the pods defined by label name=myLabel
+		  kubectl top pod -l name=myLabel`)
 )
 
 var HandledResources []unversioned.GroupKind = []unversioned.GroupKind{
@@ -134,7 +133,7 @@ func PrintMetrics(out io.Writer, cli *client.Client, cmdNamespace string, allNam
 	if len(args) > 1 {
 		name = args[1]
 	}
-	// TODO: check for a heapster config?
+
 	heapsterClient := metricsutil.DefaultHeapsterMetricsClient(cli)
 	printer := metricsutil.NewTopCmdPrinter(out)
 
