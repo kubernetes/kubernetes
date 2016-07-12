@@ -298,6 +298,22 @@ func TestNakedPod(t *testing.T) {
 	ps.VerifyDisruptionAllowed(t, pdbName, false)
 }
 
+// Verify that we count the scale of a ReplicaSet even when it has no Deployment.
+func TestReplicaSet(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("20%"))
+	add(t, dc.pdbLister.Store, pdb)
+
+	rs, _ := newReplicaSet(t, 10)
+	add(t, dc.rsLister.Store, rs)
+
+	pod, _ := newPod(t, "pod")
+	add(t, dc.podLister.Indexer, pod)
+	dc.sync(pdbName)
+	ps.VerifyPdbStatus(t, pdbName, false, 1, 2, 10)
+}
+
 func TestReplicationController(t *testing.T) {
 	// The budget in this test matches foo=bar, but the RC and its pods match
 	// {foo=bar, baz=quux}.  Later, when we add a rogue pod with only a foo=bar
