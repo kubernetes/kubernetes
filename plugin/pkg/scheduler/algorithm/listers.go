@@ -27,20 +27,23 @@ import (
 
 // NodeLister interface represents anything that can list nodes for a scheduler.
 type NodeLister interface {
-	List() (list api.NodeList, err error)
+	// We explicitly return []*api.Node, instead of api.NodeList, to avoid
+	// performing expensive copies that are unneded.
+	List() ([]*api.Node, error)
 }
 
 // FakeNodeLister implements NodeLister on a []string for test purposes.
-type FakeNodeLister api.NodeList
+type FakeNodeLister []*api.Node
 
 // List returns nodes as a []string.
-func (f FakeNodeLister) List() (api.NodeList, error) {
-	return api.NodeList(f), nil
+func (f FakeNodeLister) List() ([]*api.Node, error) {
+	return f, nil
 }
 
 // PodLister interface represents anything that can list pods for a scheduler.
 type PodLister interface {
-	// TODO: make this exactly the same as client's Pods(ns).List() method, by returning a api.PodList
+	// We explicitly return []*api.Pod, instead of api.PodList, to avoid
+	// performing expensive copies that are unneded.
 	List(labels.Selector) ([]*api.Pod, error)
 }
 

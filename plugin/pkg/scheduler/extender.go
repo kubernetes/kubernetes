@@ -93,16 +93,20 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (al
 
 // Filter based on extender implemented predicate functions. The filtered list is
 // expected to be a subset of the supplied list.
-func (h *HTTPExtender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, error) {
+func (h *HTTPExtender) Filter(pod *api.Pod, nodes []*api.Node) ([]*api.Node, error) {
 	var result schedulerapi.ExtenderFilterResult
 
 	if h.filterVerb == "" {
 		return nodes, nil
 	}
 
+	nodeItems := make([]api.Node, 0, len(nodes))
+	for _, node := range nodes {
+		nodeItems = append(nodeItems, *node)
+	}
 	args := schedulerapi.ExtenderArgs{
 		Pod:   *pod,
-		Nodes: *nodes,
+		Nodes: api.NodeList{Items: nodeItems},
 	}
 
 	if err := h.send(h.filterVerb, &args, &result); err != nil {
@@ -111,26 +115,34 @@ func (h *HTTPExtender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList,
 	if result.Error != "" {
 		return nil, fmt.Errorf(result.Error)
 	}
-	return &result.Nodes, nil
+	nodeResult := make([]*api.Node, 0, len(result.Nodes.Items))
+	for i := range result.Nodes.Items {
+		nodeResult = append(nodeResult, &result.Nodes.Items[i])
+	}
+	return nodeResult, nil
 }
 
 // Prioritize based on extender implemented priority functions. Weight*priority is added
 // up for each such priority function. The returned score is added to the score computed
 // by Kubernetes scheduler. The total score is used to do the host selection.
-func (h *HTTPExtender) Prioritize(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, int, error) {
+func (h *HTTPExtender) Prioritize(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, int, error) {
 	var result schedulerapi.HostPriorityList
 
 	if h.prioritizeVerb == "" {
 		result := schedulerapi.HostPriorityList{}
-		for _, node := range nodes.Items {
+		for _, node := range nodes {
 			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 0})
 		}
 		return &result, 0, nil
 	}
 
+	nodeItems := make([]api.Node, 0, len(nodes))
+	for _, node := range nodes {
+		nodeItems = append(nodeItems, *node)
+	}
 	args := schedulerapi.ExtenderArgs{
 		Pod:   *pod,
-		Nodes: *nodes,
+		Nodes: api.NodeList{Items: nodeItems},
 	}
 
 	if err := h.send(h.prioritizeVerb, &args, &result); err != nil {

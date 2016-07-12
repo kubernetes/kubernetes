@@ -151,11 +151,11 @@ type storeToNodeConditionLister struct {
 }
 
 // List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
-func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
+func (s storeToNodeConditionLister) List() (nodes []*api.Node, err error) {
 	for _, m := range s.store.List() {
 		node := m.(*api.Node)
 		if s.predicate(node) {
-			nodes.Items = append(nodes.Items, *node)
+			nodes = append(nodes, node)
 		} else {
 			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
 		}
