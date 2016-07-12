@@ -444,6 +444,8 @@ function stage-images() {
 
   if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
     local docker_push_cmd=("gcloud" "docker")
+  else
+    local docker_push_cmd=("${docker_cmd[@]}")
   fi
 
   local temp_dir="$(mktemp -d -t 'kube-server-XXXX')"
