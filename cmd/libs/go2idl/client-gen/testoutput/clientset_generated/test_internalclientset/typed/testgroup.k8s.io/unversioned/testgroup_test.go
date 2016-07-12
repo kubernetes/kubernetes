@@ -267,3 +267,25 @@ func TestPatchTestType(t *testing.T) {
 	receivedTestType, err := c.Setup(t).TestTypes(ns).Patch(requestTestType.Name, api.StrategicMergePatchType, []byte{})
 	c.simpleClient.Validate(t, receivedTestType, err)
 }
+
+func TestPatchSubresourcesTestType(t *testing.T) {
+	ns := api.NamespaceDefault
+	requestTestType := &testgroup.TestType{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"foo":  "bar",
+				"name": "baz",
+			},
+		},
+	}
+	c := DecoratedSimpleClient{
+		simpleClient: simple.Client{
+			Request:  simple.Request{Method: "PATCH", Path: testHelper.ResourcePath("testtypes", ns, "foo/status"), Query: simple.BuildQueryValues(nil)},
+			Response: simple.Response{StatusCode: http.StatusOK, Body: requestTestType},
+		},
+	}
+	receivedTestType, err := c.Setup(t).TestTypes(ns).Patch(requestTestType.Name, api.StrategicMergePatchType, []byte{}, "status")
+	c.simpleClient.Validate(t, receivedTestType, err)
+}

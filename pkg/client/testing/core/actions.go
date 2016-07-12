@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"path"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -139,11 +140,25 @@ func NewPatchAction(resource unversioned.GroupVersionResource, namespace string,
 	return action
 }
 
-func NewPatchSubresourceAction(resource unversioned.GroupVersionResource, subresource string) PatchActionImpl {
+func NewRootPatchSubresourceAction(resource unversioned.GroupVersionResource, name string, patch []byte, subresources ...string) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
-	action.Subresource = subresource
+	action.Subresource = path.Join(subresources...)
+	action.Name = name
+	action.Patch = patch
+
+	return action
+}
+
+func NewPatchSubresourceAction(resource unversioned.GroupVersionResource, namespace, name string, patch []byte, subresources ...string) PatchActionImpl {
+	action := PatchActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Subresource = path.Join(subresources...)
+	action.Namespace = namespace
+	action.Name = name
+	action.Patch = patch
 
 	return action
 }
