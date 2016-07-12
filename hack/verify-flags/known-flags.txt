@@ -214,6 +214,7 @@ input-dirs
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
+instance-metadata
 instance-name-prefix
 iptables-masquerade-bit
 iptables-sync-period
