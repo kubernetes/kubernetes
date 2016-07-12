@@ -168,12 +168,17 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	var unk runtime.Unknown
-	kind := obj.GetObjectKind().GroupVersionKind()
-	unk = runtime.Unknown{
-		TypeMeta: runtime.TypeMeta{
-			Kind:       kind.Kind,
-			APIVersion: kind.GroupVersion().String(),
-		},
+	switch t := obj.(type) {
+	case *runtime.Unknown:
+		unk = *t
+	default:
+		kind := obj.GetObjectKind().GroupVersionKind()
+		unk = runtime.Unknown{
+			TypeMeta: runtime.TypeMeta{
+				Kind:       kind.Kind,
+				APIVersion: kind.GroupVersion().String(),
+			},
+		}
 	}
 
 	prefixSize := uint64(len(s.prefix))

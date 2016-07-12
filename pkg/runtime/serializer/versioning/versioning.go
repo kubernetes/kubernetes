@@ -182,7 +182,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 
-	if e, ok := obj.(runtime.NestedObjectEncoder); ok {
+	if e, ok := out.(runtime.NestedObjectEncoder); ok {
 		if err := e.EncodeNestedObjects(DirectEncoder{Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
 			return err
 		}
@@ -204,6 +204,9 @@ type DirectEncoder struct {
 func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 	gvks, _, err := e.ObjectTyper.ObjectKinds(obj)
 	if err != nil {
+		if runtime.IsNotRegisteredError(err) {
+			return e.Encoder.Encode(obj, stream)
+		}
 		return err
 	}
 	kind := obj.GetObjectKind()

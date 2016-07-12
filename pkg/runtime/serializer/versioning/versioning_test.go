@@ -75,19 +75,20 @@ func TestNestedDecode(t *testing.T) {
 
 func TestNestedEncode(t *testing.T) {
 	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
+	n2 := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode 2")}
 	encoder := &mockSerializer{obj: n}
 	codec := NewCodec(
 		encoder, nil,
-		&checkConvertor{obj: n, groupVersion: unversioned.GroupVersion{Group: "other"}},
+		&checkConvertor{obj: n2, groupVersion: unversioned.GroupVersion{Group: "other"}},
 		nil, nil,
 		&mockTyper{gvks: []unversioned.GroupVersionKind{{Kind: "test"}}},
 		unversioned.GroupVersion{Group: "other"}, nil,
 	)
-	if err := codec.Encode(n, ioutil.Discard); err != n.nestedErr {
+	if err := codec.Encode(n, ioutil.Discard); err != n2.nestedErr {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !n.nestedCalled {
-		t.Errorf("did not invoke nested decoder")
+	if n.nestedCalled || !n2.nestedCalled {
+		t.Errorf("did not invoke correct nested decoder")
 	}
 }
 
