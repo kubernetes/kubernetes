@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
+// be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
 func TestRoundTripAndNewConnection(t *testing.T) {
 	localhostPool := x509.NewCertPool()
 	if !localhostPool.AppendCertsFromPEM(localhostCert) {
