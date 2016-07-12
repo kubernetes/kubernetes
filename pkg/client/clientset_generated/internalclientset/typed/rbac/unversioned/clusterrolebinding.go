@@ -37,7 +37,7 @@ type ClusterRoleBindingInterface interface {
 	Get(name string) (*rbac.ClusterRoleBinding, error)
 	List(opts api.ListOptions) (*rbac.ClusterRoleBindingList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *rbac.ClusterRoleBinding, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error)
 	ClusterRoleBindingExpansion
 }
 
@@ -128,10 +128,11 @@ func (c *clusterRoleBindings) Watch(opts api.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
-func (c *clusterRoleBindings) Patch(name string, pt api.PatchType, data []byte) (result *rbac.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error) {
 	result = &rbac.ClusterRoleBinding{}
 	err = c.client.Patch(pt).
 		Resource("clusterrolebindings").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

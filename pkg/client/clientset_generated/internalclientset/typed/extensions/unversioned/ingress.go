@@ -38,7 +38,7 @@ type IngressInterface interface {
 	Get(name string) (*extensions.Ingress, error)
 	List(opts api.ListOptions) (*extensions.IngressList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *extensions.Ingress, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Ingress, err error)
 	IngressExpansion
 }
 
@@ -151,11 +151,12 @@ func (c *ingresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *ingresses) Patch(name string, pt api.PatchType, data []byte) (result *extensions.Ingress, err error) {
+func (c *ingresses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("ingresses").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

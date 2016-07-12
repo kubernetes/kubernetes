@@ -38,7 +38,7 @@ type DeploymentInterface interface {
 	Get(name string) (*v1beta1.Deployment, error)
 	List(opts api.ListOptions) (*v1beta1.DeploymentList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Deployment, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Deployment, err error)
 	DeploymentExpansion
 }
 
@@ -151,11 +151,12 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (c *deployments) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Deployment, err error) {
+func (c *deployments) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("deployments").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

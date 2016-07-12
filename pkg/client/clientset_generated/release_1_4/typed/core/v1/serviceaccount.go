@@ -37,7 +37,7 @@ type ServiceAccountInterface interface {
 	Get(name string) (*v1.ServiceAccount, error)
 	List(opts api.ListOptions) (*v1.ServiceAccountList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1.ServiceAccount, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
 	ServiceAccountExpansion
 }
 
@@ -137,11 +137,12 @@ func (c *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *serviceAccounts) Patch(name string, pt api.PatchType, data []byte) (result *v1.ServiceAccount, err error) {
+func (c *serviceAccounts) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

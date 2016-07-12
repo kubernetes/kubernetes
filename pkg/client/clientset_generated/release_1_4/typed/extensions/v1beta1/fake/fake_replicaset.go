@@ -116,9 +116,9 @@ func (c *FakeReplicaSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *FakeReplicaSets) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(replicasetsResource, c.ns, name, data), &v1beta1.ReplicaSet{})
+		Invokes(core.NewPatchSubresourceAction(replicasetsResource, c.ns, name, data, subresources...), &v1beta1.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err

@@ -116,9 +116,9 @@ func (c *FakeIngresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *FakeIngresses) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Ingress, err error) {
+func (c *FakeIngresses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(ingressesResource, c.ns, name, data), &v1beta1.Ingress{})
+		Invokes(core.NewPatchSubresourceAction(ingressesResource, c.ns, name, data, subresources...), &v1beta1.Ingress{})
 
 	if obj == nil {
 		return nil, err

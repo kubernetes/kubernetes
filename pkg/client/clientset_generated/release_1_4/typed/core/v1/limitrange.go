@@ -37,7 +37,7 @@ type LimitRangeInterface interface {
 	Get(name string) (*v1.LimitRange, error)
 	List(opts api.ListOptions) (*v1.LimitRangeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1.LimitRange, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.LimitRange, err error)
 	LimitRangeExpansion
 }
 
@@ -137,11 +137,12 @@ func (c *limitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched limitRange.
-func (c *limitRanges) Patch(name string, pt api.PatchType, data []byte) (result *v1.LimitRange, err error) {
+func (c *limitRanges) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.LimitRange, err error) {
 	result = &v1.LimitRange{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("limitranges").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

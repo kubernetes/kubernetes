@@ -106,9 +106,9 @@ func (c *FakeRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *FakeRoles) Patch(name string, pt api.PatchType, data []byte) (result *rbac.Role, err error) {
+func (c *FakeRoles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(rolesResource, c.ns, name, data), &rbac.Role{})
+		Invokes(core.NewPatchSubresourceAction(rolesResource, c.ns, name, data, subresources...), &rbac.Role{})
 
 	if obj == nil {
 		return nil, err

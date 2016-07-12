@@ -99,9 +99,9 @@ func (c *FakePodSecurityPolicies) Watch(opts api.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched podSecurityPolicy.
-func (c *FakePodSecurityPolicies) Patch(name string, pt api.PatchType, data []byte) (result *extensions.PodSecurityPolicy, err error) {
+func (c *FakePodSecurityPolicies) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(podsecuritypoliciesResource, name, data), &extensions.PodSecurityPolicy{})
+		Invokes(core.NewRootPatchSubresourceAction(podsecuritypoliciesResource, name, data, subresources...), &extensions.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}

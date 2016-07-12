@@ -116,9 +116,9 @@ func (c *FakeResourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error
 }
 
 // Patch applies the patch and returns the patched resourceQuota.
-func (c *FakeResourceQuotas) Patch(name string, pt api.PatchType, data []byte) (result *v1.ResourceQuota, err error) {
+func (c *FakeResourceQuotas) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(resourcequotasResource, c.ns, name, data), &v1.ResourceQuota{})
+		Invokes(core.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, data, subresources...), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err

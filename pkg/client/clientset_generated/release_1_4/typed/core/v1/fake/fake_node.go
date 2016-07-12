@@ -108,9 +108,9 @@ func (c *FakeNodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *FakeNodes) Patch(name string, pt api.PatchType, data []byte) (result *v1.Node, err error) {
+func (c *FakeNodes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(nodesResource, name, data), &v1.Node{})
+		Invokes(core.NewRootPatchSubresourceAction(nodesResource, name, data, subresources...), &v1.Node{})
 	if obj == nil {
 		return nil, err
 	}

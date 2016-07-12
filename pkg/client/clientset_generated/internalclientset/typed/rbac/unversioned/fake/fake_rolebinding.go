@@ -106,9 +106,9 @@ func (c *FakeRoleBindings) Watch(opts api.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched roleBinding.
-func (c *FakeRoleBindings) Patch(name string, pt api.PatchType, data []byte) (result *rbac.RoleBinding, err error) {
+func (c *FakeRoleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(rolebindingsResource, c.ns, name, data), &rbac.RoleBinding{})
+		Invokes(core.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, data, subresources...), &rbac.RoleBinding{})
 
 	if obj == nil {
 		return nil, err

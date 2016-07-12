@@ -115,9 +115,9 @@ func (c *FakePersistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interfac
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *FakePersistentVolumeClaims) Patch(name string, pt api.PatchType, data []byte) (result *api.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(persistentvolumeclaimsResource, c.ns, name, data), &api.PersistentVolumeClaim{})
+		Invokes(core.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, data, subresources...), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err

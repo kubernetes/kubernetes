@@ -106,9 +106,9 @@ func (c *FakeEvents) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *FakeEvents) Patch(name string, pt api.PatchType, data []byte) (result *v1.Event, err error) {
+func (c *FakeEvents) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(eventsResource, c.ns, name, data), &v1.Event{})
+		Invokes(core.NewPatchSubresourceAction(eventsResource, c.ns, name, data, subresources...), &v1.Event{})
 
 	if obj == nil {
 		return nil, err

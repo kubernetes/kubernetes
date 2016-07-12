@@ -116,9 +116,9 @@ func (c *FakeReplicationControllers) Watch(opts api.ListOptions) (watch.Interfac
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *FakeReplicationControllers) Patch(name string, pt api.PatchType, data []byte) (result *v1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(replicationcontrollersResource, c.ns, name, data), &v1.ReplicationController{})
+		Invokes(core.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
