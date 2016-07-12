@@ -54,7 +54,7 @@ RUN gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D && \
         /tmp/*
 
 
-VOLUME ["/cassandra_data/data"]
+VOLUME ["/cassandra_data"]
 
 # 7000: intra-node communication
 # 7001: TLS intra-node communication
