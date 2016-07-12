@@ -23,108 +23,133 @@ package federation
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
 )
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_federation_Cluster,
-		DeepCopy_federation_ClusterCondition,
-		DeepCopy_federation_ClusterList,
-		DeepCopy_federation_ClusterSpec,
-		DeepCopy_federation_ClusterStatus,
-		DeepCopy_federation_ServerAddressByClientCIDR,
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_Cluster, InType: reflect.TypeOf(func() *Cluster { var x *Cluster; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterCondition, InType: reflect.TypeOf(func() *ClusterCondition { var x *ClusterCondition; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterList, InType: reflect.TypeOf(func() *ClusterList { var x *ClusterList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterSpec, InType: reflect.TypeOf(func() *ClusterSpec { var x *ClusterSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterStatus, InType: reflect.TypeOf(func() *ClusterStatus { var x *ClusterStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ServerAddressByClientCIDR, InType: reflect.TypeOf(func() *ServerAddressByClientCIDR { var x *ServerAddressByClientCIDR; return x }())},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
 }
 
-func DeepCopy_federation_Cluster(in Cluster, out *Cluster, c *conversion.Cloner) error {
-	out.TypeMeta = in.TypeMeta
-	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
+func DeepCopy_federation_Cluster(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Cluster)
+		out := out.(*Cluster)
+		out.TypeMeta = in.TypeMeta
+		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+			return err
+		}
+		if err := DeepCopy_federation_ClusterSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		if err := DeepCopy_federation_ClusterStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
+		return nil
 	}
-	if err := DeepCopy_federation_ClusterSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_federation_ClusterStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
-	return nil
 }
 
-func DeepCopy_federation_ClusterCondition(in ClusterCondition, out *ClusterCondition, c *conversion.Cloner) error {
-	out.Type = in.Type
-	out.Status = in.Status
-	out.LastProbeTime = in.LastProbeTime.DeepCopy()
-	out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-	out.Reason = in.Reason
-	out.Message = in.Message
-	return nil
+func DeepCopy_federation_ClusterCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterCondition)
+		out := out.(*ClusterCondition)
+		out.Type = in.Type
+		out.Status = in.Status
+		out.LastProbeTime = in.LastProbeTime.DeepCopy()
+		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+		out.Reason = in.Reason
+		out.Message = in.Message
+		return nil
+	}
 }
 
-func DeepCopy_federation_ClusterList(in ClusterList, out *ClusterList, c *conversion.Cloner) error {
-	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := in.Items, &out.Items
-		*out = make([]Cluster, len(in))
-		for i := range in {
-			if err := DeepCopy_federation_Cluster(in[i], &(*out)[i], c); err != nil {
-				return err
+func DeepCopy_federation_ClusterList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterList)
+		out := out.(*ClusterList)
+		out.TypeMeta = in.TypeMeta
+		out.ListMeta = in.ListMeta
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]Cluster, len(*in))
+			for i := range *in {
+				if err := DeepCopy_federation_Cluster(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
+		} else {
+			out.Items = nil
 		}
-	} else {
-		out.Items = nil
+		return nil
 	}
-	return nil
 }
 
-func DeepCopy_federation_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conversion.Cloner) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]ServerAddressByClientCIDR, len(in))
-		for i := range in {
-			(*out)[i] = in[i]
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
-	}
-	if in.SecretRef != nil {
-		in, out := in.SecretRef, &out.SecretRef
-		*out = new(api.LocalObjectReference)
-		**out = *in
-	} else {
-		out.SecretRef = nil
-	}
-	return nil
-}
-
-func DeepCopy_federation_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *conversion.Cloner) error {
-	if in.Conditions != nil {
-		in, out := in.Conditions, &out.Conditions
-		*out = make([]ClusterCondition, len(in))
-		for i := range in {
-			if err := DeepCopy_federation_ClusterCondition(in[i], &(*out)[i], c); err != nil {
-				return err
+func DeepCopy_federation_ClusterSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterSpec)
+		out := out.(*ClusterSpec)
+		if in.ServerAddressByClientCIDRs != nil {
+			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
+			*out = make([]ServerAddressByClientCIDR, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
 			}
+		} else {
+			out.ServerAddressByClientCIDRs = nil
 		}
-	} else {
-		out.Conditions = nil
+		if in.SecretRef != nil {
+			in, out := &in.SecretRef, &out.SecretRef
+			*out = new(api.LocalObjectReference)
+			**out = **in
+		} else {
+			out.SecretRef = nil
+		}
+		return nil
 	}
-	if in.Zones != nil {
-		in, out := in.Zones, &out.Zones
-		*out = make([]string, len(in))
-		copy(*out, in)
-	} else {
-		out.Zones = nil
-	}
-	out.Region = in.Region
-	return nil
 }
 
-func DeepCopy_federation_ServerAddressByClientCIDR(in ServerAddressByClientCIDR, out *ServerAddressByClientCIDR, c *conversion.Cloner) error {
-	out.ClientCIDR = in.ClientCIDR
-	out.ServerAddress = in.ServerAddress
-	return nil
+func DeepCopy_federation_ClusterStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterStatus)
+		out := out.(*ClusterStatus)
+		if in.Conditions != nil {
+			in, out := &in.Conditions, &out.Conditions
+			*out = make([]ClusterCondition, len(*in))
+			for i := range *in {
+				if err := DeepCopy_federation_ClusterCondition(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.Conditions = nil
+		}
+		if in.Zones != nil {
+			in, out := &in.Zones, &out.Zones
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Zones = nil
+		}
+		out.Region = in.Region
+		return nil
+	}
+}
+
+func DeepCopy_federation_ServerAddressByClientCIDR(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ServerAddressByClientCIDR)
+		out := out.(*ServerAddressByClientCIDR)
+		out.ClientCIDR = in.ClientCIDR
+		out.ServerAddress = in.ServerAddress
+		return nil
+	}
 }
