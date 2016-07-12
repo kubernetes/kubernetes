@@ -36,7 +36,7 @@ type ConfigMapInterface interface {
 	Get(name string) (*api.ConfigMap, error)
 	List(opts api.ListOptions) (*api.ConfigMapList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.ConfigMap, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error)
 	ConfigMapExpansion
 }
 
@@ -136,11 +136,12 @@ func (c *configMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *configMaps) Patch(name string, pt api.PatchType, data []byte) (result *api.ConfigMap, err error) {
+func (c *configMaps) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error) {
 	result = &api.ConfigMap{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("configmaps").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

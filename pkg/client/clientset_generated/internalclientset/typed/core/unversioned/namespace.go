@@ -37,7 +37,7 @@ type NamespaceInterface interface {
 	Get(name string) (*api.Namespace, error)
 	List(opts api.ListOptions) (*api.NamespaceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.Namespace, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Namespace, err error)
 	NamespaceExpansion
 }
 
@@ -140,10 +140,11 @@ func (c *namespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched namespace.
-func (c *namespaces) Patch(name string, pt api.PatchType, data []byte) (result *api.Namespace, err error) {
+func (c *namespaces) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
 	err = c.client.Patch(pt).
 		Resource("namespaces").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

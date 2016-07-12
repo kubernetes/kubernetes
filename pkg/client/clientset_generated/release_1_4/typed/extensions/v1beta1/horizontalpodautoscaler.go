@@ -38,7 +38,7 @@ type HorizontalPodAutoscalerInterface interface {
 	Get(name string) (*v1beta1.HorizontalPodAutoscaler, error)
 	List(opts api.ListOptions) (*v1beta1.HorizontalPodAutoscalerList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.HorizontalPodAutoscaler, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.HorizontalPodAutoscaler, err error)
 	HorizontalPodAutoscalerExpansion
 }
 
@@ -151,11 +151,12 @@ func (c *horizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface,
 }
 
 // Patch applies the patch and returns the patched horizontalPodAutoscaler.
-func (c *horizontalPodAutoscalers) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.HorizontalPodAutoscaler, err error) {
+func (c *horizontalPodAutoscalers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.HorizontalPodAutoscaler, err error) {
 	result = &v1beta1.HorizontalPodAutoscaler{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

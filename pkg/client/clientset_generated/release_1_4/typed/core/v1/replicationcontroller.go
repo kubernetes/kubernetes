@@ -38,7 +38,7 @@ type ReplicationControllerInterface interface {
 	Get(name string) (*v1.ReplicationController, error)
 	List(opts api.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1.ReplicationController, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error)
 	ReplicationControllerExpansion
 }
 
@@ -151,11 +151,12 @@ func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, e
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *replicationControllers) Patch(name string, pt api.PatchType, data []byte) (result *v1.ReplicationController, err error) {
+func (c *replicationControllers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

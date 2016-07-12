@@ -37,7 +37,7 @@ type EventInterface interface {
 	Get(name string) (*v1.Event, error)
 	List(opts api.ListOptions) (*v1.EventList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1.Event, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Event, err error)
 	EventExpansion
 }
 
@@ -137,11 +137,12 @@ func (c *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(name string, pt api.PatchType, data []byte) (result *v1.Event, err error) {
+func (c *events) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("events").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

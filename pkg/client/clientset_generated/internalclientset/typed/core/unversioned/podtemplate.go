@@ -36,7 +36,7 @@ type PodTemplateInterface interface {
 	Get(name string) (*api.PodTemplate, error)
 	List(opts api.ListOptions) (*api.PodTemplateList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.PodTemplate, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
@@ -136,11 +136,12 @@ func (c *podTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *podTemplates) Patch(name string, pt api.PatchType, data []byte) (result *api.PodTemplate, err error) {
+func (c *podTemplates) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("podtemplates").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

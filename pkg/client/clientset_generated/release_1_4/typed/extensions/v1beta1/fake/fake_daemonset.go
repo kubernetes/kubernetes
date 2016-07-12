@@ -116,9 +116,9 @@ func (c *FakeDaemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched daemonSet.
-func (c *FakeDaemonSets) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.DaemonSet, err error) {
+func (c *FakeDaemonSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(daemonsetsResource, c.ns, name, data), &v1beta1.DaemonSet{})
+		Invokes(core.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, data, subresources...), &v1beta1.DaemonSet{})
 
 	if obj == nil {
 		return nil, err

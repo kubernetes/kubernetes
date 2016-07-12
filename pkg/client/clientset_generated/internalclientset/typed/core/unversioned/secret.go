@@ -36,7 +36,7 @@ type SecretInterface interface {
 	Get(name string) (*api.Secret, error)
 	List(opts api.ListOptions) (*api.SecretList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.Secret, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Secret, err error)
 	SecretExpansion
 }
 
@@ -136,11 +136,12 @@ func (c *secrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *secrets) Patch(name string, pt api.PatchType, data []byte) (result *api.Secret, err error) {
+func (c *secrets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("secrets").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

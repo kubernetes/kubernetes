@@ -108,9 +108,9 @@ func (c *FakeNamespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched namespace.
-func (c *FakeNamespaces) Patch(name string, pt api.PatchType, data []byte) (result *v1.Namespace, err error) {
+func (c *FakeNamespaces) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(namespacesResource, name, data), &v1.Namespace{})
+		Invokes(core.NewRootPatchSubresourceAction(namespacesResource, name, data, subresources...), &v1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}

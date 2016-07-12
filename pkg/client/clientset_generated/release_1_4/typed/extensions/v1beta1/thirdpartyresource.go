@@ -37,7 +37,7 @@ type ThirdPartyResourceInterface interface {
 	Get(name string) (*v1beta1.ThirdPartyResource, error)
 	List(opts api.ListOptions) (*v1beta1.ThirdPartyResourceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.ThirdPartyResource, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error)
 	ThirdPartyResourceExpansion
 }
 
@@ -128,10 +128,11 @@ func (c *thirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched thirdPartyResource.
-func (c *thirdPartyResources) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.ThirdPartyResource, err error) {
+func (c *thirdPartyResources) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
 	err = c.client.Patch(pt).
 		Resource("thirdpartyresources").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

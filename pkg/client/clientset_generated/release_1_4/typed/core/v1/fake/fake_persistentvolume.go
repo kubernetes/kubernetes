@@ -108,9 +108,9 @@ func (c *FakePersistentVolumes) Watch(opts api.ListOptions) (watch.Interface, er
 }
 
 // Patch applies the patch and returns the patched persistentVolume.
-func (c *FakePersistentVolumes) Patch(name string, pt api.PatchType, data []byte) (result *v1.PersistentVolume, err error) {
+func (c *FakePersistentVolumes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(persistentvolumesResource, name, data), &v1.PersistentVolume{})
+		Invokes(core.NewRootPatchSubresourceAction(persistentvolumesResource, name, data, subresources...), &v1.PersistentVolume{})
 	if obj == nil {
 		return nil, err
 	}
