@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/examples/apiserver"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
 func waitForServerUp(serverURL string) error {
@@ -64,17 +66,14 @@ func runDiscoverySummarizer(t *testing.T) string {
 	return serverURL
 }
 
-func runAPIServer(t *testing.T) string {
-	serverRunOptions := apiserver.NewServerRunOptions()
-	// Change the port, because otherwise it will fail if examples/apiserver/apiserver_test and this are run in parallel.
-	serverRunOptions.InsecurePort = 8083
+func runAPIServer(t *testing.T, serverOptions *genericoptions.ServerRunOptions) string {
 	go func() {
-		if err := apiserver.Run(serverRunOptions); err != nil {
+		if err := apiserver.Run(serverOptions); err != nil {
 			t.Fatalf("Error in bringing up the example apiserver: %v", err)
 		}
 	}()
 
-	serverURL := fmt.Sprintf("http://localhost:%d", serverRunOptions.InsecurePort)
+	serverURL := fmt.Sprintf("http://localhost:%d", serverOptions.InsecurePort)
 	if err := waitForServerUp(serverURL); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -83,6 +82,9 @@ func runAPIServer(t *testing.T) string {
 
 // Runs a discovery summarizer server and tests that all endpoints work as expected.
 func TestRunDiscoverySummarizer(t *testing.T) {
+	etcdServer := etcdtesting.NewEtcdTestClientServer(t)
+	defer etcdServer.Terminate(t)
+
 	discoveryURL := runDiscoverySummarizer(t)
 
 	// Test /api path.
@@ -96,8 +98,17 @@ func TestRunDiscoverySummarizer(t *testing.T) {
 	// Test a random path, which should give a 404.
 	testResponse(t, discoveryURL, "/randomPath", http.StatusNotFound)
 
+	options := apiserver.NewServerRunOptions()
+	// Change the port, because otherwise it will fail if examples/apiserver/apiserver_test and this are run in parallel.
+	options.InsecurePort = 8083
+
+	options.StorageConfig.ServerList = []string{"https://" + etcdServer.ClientListeners[0].Addr().String()}
+	options.StorageConfig.CAFile = etcdServer.CAFile
+	options.StorageConfig.KeyFile = etcdServer.KeyFile
+	options.StorageConfig.CertFile = etcdServer.CertFile
+
 	// Run the APIServer now to test the good case.
-	runAPIServer(t)
+	runAPIServer(t, options)
 
 	// Test /api path.
 	// There is no server running at that URL, so we will get a 500.

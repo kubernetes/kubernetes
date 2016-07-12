@@ -40,27 +40,22 @@ const (
 	InsecurePort = 8081
 )
 
-func newStorageFactory() genericapiserver.StorageFactory {
-	config := storagebackend.Config{
-		Prefix:     genericoptions.DefaultEtcdPathPrefix,
-		ServerList: []string{"http://127.0.0.1:4001"},
-	}
+func newStorageFactory(config storagebackend.Config) genericapiserver.StorageFactory {
 	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(), genericapiserver.NewResourceConfig())
-
 	return storageFactory
 }
 
 func NewServerRunOptions() *genericoptions.ServerRunOptions {
 	serverOptions := genericoptions.NewServerRunOptions()
 	serverOptions.InsecurePort = InsecurePort
-	return serverOptions
-}
-
-func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	// Set ServiceClusterIPRange
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
 	serverOptions.StorageConfig.ServerList = []string{"http://127.0.0.1:4001"}
+	return serverOptions
+}
+
+func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	genericapiserver.ValidateRunOptions(serverOptions)
 	config := genericapiserver.NewConfig(serverOptions)
 	config.Serializer = api.Codecs
@@ -75,7 +70,7 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	storageFactory := newStorageFactory()
+	storageFactory := newStorageFactory(serverOptions.StorageConfig)
 	storage, err := storageFactory.New(unversioned.GroupResource{Group: groupName, Resource: "testtype"})
 	if err != nil {
 		return fmt.Errorf("Unable to get storage: %v", err)

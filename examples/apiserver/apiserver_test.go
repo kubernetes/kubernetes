@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
 var serverIP = fmt.Sprintf("http://localhost:%d", InsecurePort)
@@ -40,8 +41,16 @@ var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
 }
 
 func TestRun(t *testing.T) {
+	etcdServer := etcdtesting.NewEtcdTestClientServer(t)
+	defer etcdServer.Terminate(t)
+
+	options := NewServerRunOptions()
+	options.StorageConfig.ServerList = []string{"https://" + etcdServer.ClientListeners[0].Addr().String()}
+	options.StorageConfig.CAFile = etcdServer.CAFile
+	options.StorageConfig.KeyFile = etcdServer.KeyFile
+	options.StorageConfig.CertFile = etcdServer.CertFile
 	go func() {
-		if err := Run(NewServerRunOptions()); err != nil {
+		if err := Run(options); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
