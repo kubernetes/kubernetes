@@ -52,7 +52,7 @@ For every container without Resources specified it will try to predict amount of
 So that a pod without specified resources will be treated as
 .
 
-InitialResources will set only [request](../design/resource-qos.md#requests-and-limits) (independently for each resource type: cpu, memory) field in the first version to avoid killing containers due to OOM (however the container still may be killed if exceeds requested resources).
+InitialResources will set only [request](../design/resource-qos.md#requests-and-limits) (independently for each resource type: cpu, memory, gpu) field in the first version to avoid killing containers due to OOM (however the container still may be killed if exceeds requested resources).
 To make the component work with LimitRanger the estimated value will be capped by min and max possible values if defined.
 It will prevent from situation when the pod is rejected due to too low or too high estimation.
 
@@ -63,9 +63,9 @@ The predicting algorithm should have very low latency to not increase significan
 ### Predicting algorithm details
 
 In the first version estimation will be made based on historical data for the Docker image being run in the container (both the name and the tag matters).
-CPU/memory usage of each container is exported periodically (by default with 1 minute resolution) to the backend (see more in [Monitoring pipeline](#monitoring-pipeline)).
+CPU/memory/GPU usage of each container is exported periodically (by default with 1 minute resolution) to the backend (see more in [Monitoring pipeline](#monitoring-pipeline)).
 
-InitialResources will set Request for both cpu/mem as the 90th percentile of the first (in the following order) set of samples defined in the following way:
+InitialResources will set Request for both cpu/mem/gpu as the 90th percentile of the first (in the following order) set of samples defined in the following way:
 
 * 7 days same image:tag, assuming there is at least 60 samples (1 hour)
 * 30 days same image:tag, assuming there is at least 60 samples (1 hour)
