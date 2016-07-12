@@ -171,6 +171,16 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return err
 }
 
+func (d *kubeDockerClient) KillContainer(id, signal string) error {
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+	err := d.client.ContainerKill(ctx, id, signal)
+	if ctxErr := contextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
+	return err
+}
+
 func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()

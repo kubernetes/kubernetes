@@ -39,7 +39,7 @@ type managerImpl struct {
 	// config is how the manager is configured
 	config Config
 	// the function to invoke to kill a pod
-	killPodFunc KillPodFunc
+	stopPodFunc StopPodFunc
 	// protects access to internal state
 	sync.RWMutex
 	// node conditions are the set of conditions present
@@ -65,13 +65,13 @@ var _ Manager = &managerImpl{}
 func NewManager(
 	summaryProvider stats.SummaryProvider,
 	config Config,
-	killPodFunc KillPodFunc,
+	stopPodFunc StopPodFunc,
 	recorder record.EventRecorder,
 	nodeRef *api.ObjectReference,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
 	manager := &managerImpl{
 		clock:           clock,
-		killPodFunc:     killPodFunc,
+		stopPodFunc:     stopPodFunc,
 		config:          config,
 		recorder:        recorder,
 		summaryProvider: summaryProvider,
@@ -234,7 +234,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
 		}
 		// this is a blocking call and should only return when the pod and its containers are killed.
-		err := m.killPodFunc(pod, status, &gracePeriodOverride)
+		err := m.stopPodFunc(pod, status, &gracePeriodOverride)
 		if err != nil {
 			glog.Infof("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
 			continue

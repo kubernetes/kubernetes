@@ -235,11 +235,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 	return
 }
 
-// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+// StopPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 // gracePeriodOverride if specified allows the caller to override the pod default grace period.
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-func (m *kubeGenericRuntimeManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (m *kubeGenericRuntimeManager) StopPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
 	return fmt.Errorf("not implemented")
 }
 

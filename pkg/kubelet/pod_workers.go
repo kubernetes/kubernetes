@@ -41,8 +41,8 @@ type OnCompleteFunc func(err error)
 // PodStatusFunc is a function that is invoked to generate a pod status.
 type PodStatusFunc func(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus
 
-// KillPodOptions are options when performing a pod update whose update type is kill.
-type KillPodOptions struct {
+// StopPodOptions are options when performing a pod update whose update type is kill.
+type StopPodOptions struct {
 	// PodStatusFunc is the function to invoke to set pod status in response to a kill request.
 	PodStatusFunc PodStatusFunc
 	// PodTerminationGracePeriodSecondsOverride is optional override to use if a pod is being killed as part of kill operation.
@@ -64,7 +64,7 @@ type UpdatePodOptions struct {
 	// always delivered.
 	OnCompleteFunc OnCompleteFunc
 	// if update type is kill, use the specified options to kill the pod.
-	KillPodOptions *KillPodOptions
+	StopPodOptions *StopPodOptions
 }
 
 // PodWorkers is an abstract interface for testability.
@@ -85,7 +85,7 @@ type syncPodOptions struct {
 	// the current status
 	podStatus *kubecontainer.PodStatus
 	// if update type is kill, use the specified options to kill the pod.
-	killPodOptions *KillPodOptions
+	stopPodOptions *StopPodOptions
 }
 
 // the function to invoke to perform a sync.
@@ -167,7 +167,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 				mirrorPod:      update.MirrorPod,
 				pod:            update.Pod,
 				podStatus:      status,
-				killPodOptions: update.KillPodOptions,
+				stopPodOptions: update.StopPodOptions,
 				updateType:     update.UpdateType,
 			})
 			lastSyncTime = time.Now()
@@ -222,7 +222,7 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 	} else {
 		// if a request to kill a pod is pending, we do not let anything overwrite that request.
 		update, found := p.lastUndeliveredWorkUpdate[pod.UID]
-		if !found || update.UpdateType != kubetypes.SyncPodKill {
+		if !found || update.UpdateType != kubetypes.SyncPodStop {
 			p.lastUndeliveredWorkUpdate[pod.UID] = *options
 		}
 	}
@@ -280,9 +280,9 @@ func (p *podWorkers) checkForUpdates(uid types.UID) {
 	}
 }
 
-// killPodNow returns a KillPodFunc that can be used to kill a pod.
+// stopPodNow returns a StopPodFunc that can be used to kill a pod.
 // It is intended to be injected into other modules that need to kill a pod.
-func killPodNow(podWorkers PodWorkers) eviction.KillPodFunc {
+func stopPodNow(podWorkers PodWorkers) eviction.StopPodFunc {
 	return func(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
 		// determine the grace period to use when killing the pod
 		gracePeriod := int64(0)
@@ -308,11 +308,11 @@ func killPodNow(podWorkers PodWorkers) eviction.KillPodFunc {
 		ch := make(chan response)
 		podWorkers.UpdatePod(&UpdatePodOptions{
 			Pod:        pod,
-			UpdateType: kubetypes.SyncPodKill,
+			UpdateType: kubetypes.SyncPodStop,
 			OnCompleteFunc: func(err error) {
 				ch <- response{err: err}
 			},
-			KillPodOptions: &KillPodOptions{
+			StopPodOptions: &StopPodOptions{
 				PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
 					return status
 				},

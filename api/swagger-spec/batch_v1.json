@@ -2054,6 +2054,13 @@
      "tty": {
       "type": "boolean",
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false."
+     },
+     "notifications": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Notification"
+      },
+      "description": "List of notifications defined in the container."
      }
     }
    },
@@ -2430,6 +2437,27 @@
      "level": {
       "type": "string",
       "description": "Level is SELinux level label that applies to the container."
+     }
+    }
+   },
+   "v1.Notification": {
+    "id": "v1.Notification",
+    "required": [
+     "name",
+     "type"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "User-friendly name of notification."
+     },
+     "type": {
+      "type": "string",
+      "description": "Type of notification"
+     },
+     "signal": {
+      "type": "string",
+      "description": "POSIX signal name; used only when type is \"signal\""
      }
     }
    },

@@ -8828,6 +8828,67 @@
     ]
    },
    {
+    "path": "/api/v1/namespaces/{namespace}/pods/{name}/notify",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.Notify",
+      "method": "POST",
+      "summary": "create notify of a Notify",
+      "nickname": "createNamespacedNotifyNotify",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Notify",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Notify",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Notify"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/portforward",
     "description": "API at /api/v1",
     "operations": [
@@ -18142,6 +18203,13 @@
      "tty": {
       "type": "boolean",
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false."
+     },
+     "notifications": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Notification"
+      },
+      "description": "List of notifications defined in the container."
      }
     }
    },
@@ -18507,6 +18575,27 @@
      }
     }
    },
+   "v1.Notification": {
+    "id": "v1.Notification",
+    "required": [
+     "name",
+     "type"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "User-friendly name of notification."
+     },
+     "type": {
+      "type": "string",
+      "description": "Type of notification"
+     },
+     "signal": {
+      "type": "string",
+      "description": "POSIX signal name; used only when type is \"signal\""
+     }
+    }
+   },
    "v1.PodSecurityContext": {
     "id": "v1.PodSecurityContext",
     "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
@@ -18746,6 +18835,42 @@
      "containerID": {
       "type": "string",
       "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'"
+     }
+    }
+   },
+   "v1.Notify": {
+    "id": "v1.Notify",
+    "description": "Notify represents a notification request for a pod.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1.NotifySpec"
+     }
+    }
+   },
+   "v1.NotifySpec": {
+    "id": "v1.NotifySpec",
+    "description": "NotifySpec describes the attributes of a notify subresource.",
+    "required": [
+     "name",
+     "container"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "container": {
+      "type": "string"
      }
     }
    },

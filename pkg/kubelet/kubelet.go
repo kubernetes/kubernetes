@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -121,6 +122,9 @@ const (
 	// Period for performing global cleanup tasks.
 	housekeepingPeriod = time.Second * 2
 
+	// Period for performing pod notifications.
+	notificationPeriod = time.Second * 10
+
 	// Period for performing eviction monitoring.
 	// TODO ensure this is in sync with internal cadvisor housekeeping.
 	evictionMonitoringPeriod = time.Second * 10
@@ -166,6 +170,7 @@ type SyncHandler interface {
 	HandlePodRemoves(pods []*api.Pod)
 	HandlePodReconcile(pods []*api.Pod)
 	HandlePodSyncs(pods []*api.Pod)
+	HandlePodNotifications(pods []*api.Pod)
 	HandlePodCleanups() error
 }
 
@@ -537,7 +542,7 @@ func NewMainKubelet(
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers), recorder, nodeRef, klet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, stopPodNow(klet.podWorkers), recorder, nodeRef, klet.clock)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize eviction manager: %v", err)
 	}
@@ -968,7 +973,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start a goroutine responsible for killing pods (that are not properly
 	// handled by pod workers).
-	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)
+	go wait.Until(kl.podStopper, 1*time.Second, wait.NeverStop)
 
 	// Start component sync loops.
 	kl.statusManager.Start()
@@ -1478,15 +1483,15 @@ func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 }
 
 // One of the following arguments must be non-nil: runningPod, status.
-// TODO: Modify containerRuntime.KillPod() to accept the right arguments.
-func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
+// TODO: Modify containerRuntime.StopPod() to accept the right arguments.
+func (kl *Kubelet) stopPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
 	var p kubecontainer.Pod
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
 		p = kubecontainer.ConvertPodStatusToRunningPod(status)
 	}
-	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
+	return kl.containerRuntime.StopPod(pod, p, gracePeriodOverride)
 }
 
 // makePodDataDirs creates the dirs for the pod datas.
@@ -1535,15 +1540,15 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	updateType := o.updateType
 
 	// if we want to kill a pod, do it now!
-	if updateType == kubetypes.SyncPodKill {
-		killPodOptions := o.killPodOptions
-		if killPodOptions == nil || killPodOptions.PodStatusFunc == nil {
+	if updateType == kubetypes.SyncPodStop {
+		stopPodOptions := o.stopPodOptions
+		if stopPodOptions == nil || stopPodOptions.PodStatusFunc == nil {
 			return fmt.Errorf("kill pod options are required if update type is kill")
 		}
-		apiPodStatus := killPodOptions.PodStatusFunc(pod, podStatus)
+		apiPodStatus := stopPodOptions.PodStatusFunc(pod, podStatus)
 		kl.statusManager.SetPodStatus(pod, apiPodStatus)
 		// we kill the pod with the specified grace period since this is a termination
-		if err := kl.killPod(pod, nil, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
+		if err := kl.stopPod(pod, nil, podStatus, stopPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
 			// there was an error killing the pod, so we return that error directly
 			utilruntime.HandleError(err)
 			return err
@@ -1589,7 +1594,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Kill pod if it should not be running
 	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
-		if errInner := kl.killPod(pod, nil, podStatus, nil); errInner != nil {
+		if errInner := kl.stopPod(pod, nil, podStatus, nil); errInner != nil {
 			errOuter = fmt.Errorf("error killing pod: %v", errInner)
 			utilruntime.HandleError(errOuter)
 		}
@@ -1767,6 +1772,20 @@ func (kl *Kubelet) getPodsToSync() []*api.Pod {
 	return podsToSync
 }
 
+// Get pods which should be notified
+func (kl *Kubelet) getPodsToNotify() []*api.Pod {
+	allPods := kl.podManager.GetPods()
+	var podsToNotify []*api.Pod
+	for _, pod := range allPods {
+		glog.Infof("%v", pod.Annotations)
+		glog.Infof(utilpod.PodPendingNotificationsAnnotation)
+		if notificationsAnnotation, ok := pod.Annotations[utilpod.PodPendingNotificationsAnnotation]; ok && len(notificationsAnnotation) > 0 {
+			podsToNotify = append(podsToNotify, pod)
+		}
+	}
+	return podsToNotify
+}
+
 // Returns true if pod is in the terminated state ("Failed" or "Succeeded").
 func (kl *Kubelet) podIsTerminated(pod *api.Pod) bool {
 	var status api.PodStatus
@@ -1925,9 +1944,9 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	return nil
 }
 
-// podKiller launches a goroutine to kill a pod received from the channel if
+// podStopper launches a goroutine to kill a pod received from the channel if
 // another goroutine isn't already in action.
-func (kl *Kubelet) podKiller() {
+func (kl *Kubelet) podStopper() {
 	killing := sets.NewString()
 	resultCh := make(chan types.UID)
 	defer close(resultCh)
@@ -1949,7 +1968,7 @@ func (kl *Kubelet) podKiller() {
 					ch <- runningPod.ID
 				}()
 				glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
-				err := kl.killPod(apiPod, runningPod, nil, nil)
+				err := kl.stopPod(apiPod, runningPod, nil, nil)
 				if err != nil {
 					glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
 				}
@@ -2094,13 +2113,14 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	housekeepingTicker := time.NewTicker(housekeepingPeriod)
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
+	notificationTicker := time.NewTicker(notificationPeriod)
 	for {
 		if rs := kl.runtimeState.errors(); len(rs) != 0 {
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C, plegCh) {
+		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C, plegCh, notificationTicker.C) {
 			break
 		}
 	}
@@ -2139,7 +2159,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // * liveness manager: sync pods that have failed or in which one or more
 //                     containers have failed liveness checks
 func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
-	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
+	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent, notificationCh <-chan time.Time) bool {
 	kl.syncLoopMonitor.Store(kl.clock.Now())
 	select {
 	case u, open := <-configCh:
@@ -2229,6 +2249,14 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 				glog.Errorf("Failed cleaning pods: %v", err)
 			}
 		}
+	case <-notificationCh:
+		podsToNotify := kl.getPodsToNotify()
+		glog.Infof("notification incoming")
+		if len(podsToNotify) == 0 {
+			break
+		}
+		glog.Infof("SyncLoop (notification): %d pods; %s", len(podsToNotify), format.Pods(podsToNotify))
+		handler.HandlePodNotifications(podsToNotify)
 	}
 	kl.syncLoopMonitor.Store(kl.clock.Now())
 	return true
@@ -2355,6 +2383,45 @@ func (kl *Kubelet) HandlePodSyncs(pods []*api.Pod) {
 	for _, pod := range pods {
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+	}
+}
+
+func (kl *Kubelet) handlePodNotification(pod *api.Pod) {
+	var notifications []utilpod.PodPendingNotification
+
+	serializedNotifications, _ := pod.Annotations[utilpod.PodPendingNotificationsAnnotation]
+	json.Unmarshal([]byte(serializedNotifications), &notifications)
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	podUID := kl.podManager.TranslatePodUID(pod.ObjectMeta.UID)
+
+	for _, notification := range notifications {
+		container, err := kl.findContainer(podFullName, podUID, notification.Container)
+		if err != nil {
+			glog.Errorf("Coudn't find container: %v", err)
+			return
+		}
+		switch notification.Type {
+		case "signal":
+			kl.containerRuntime.KillContainer(container.ID, notification.Signal)
+		}
+	}
+
+	apiPod, err := kl.kubeClient.Core().Pods(pod.Namespace).Get(pod.ObjectMeta.Name)
+	if err != nil {
+		glog.Errorf("Failed getting pod from apiserver: %v", err)
+		return
+	}
+	delete(apiPod.Annotations, utilpod.PodPendingNotificationsAnnotation)
+	if _, err = kl.kubeClient.Core().Pods(pod.Namespace).Update(apiPod); err != nil {
+		glog.Errorf("Failed updating pod: %v", err)
+	}
+}
+
+func (kl *Kubelet) HandlePodNotifications(pods []*api.Pod) {
+	for _, pod := range pods {
+		kl.handlePodNotification(pod)
+		glog.Infof(pod.Name)
 	}
 }
 

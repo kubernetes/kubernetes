@@ -215,6 +215,7 @@ var map_Container = map[string]string{
 	"stdin":                  "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
 	"stdinOnce":              "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
 	"tty":                    "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+	"notifications":          "List of notifications defined in the container.",
 }
 
 func (Container) SwaggerDoc() map[string]string {
@@ -923,6 +924,32 @@ var map_NodeSystemInfo = map[string]string{
 
 func (NodeSystemInfo) SwaggerDoc() map[string]string {
 	return map_NodeSystemInfo
+}
+
+var map_Notification = map[string]string{
+	"name":   "User-friendly name of notification.",
+	"type":   "Type of notification",
+	"signal": "POSIX signal name; used only when type is \"signal\"",
+}
+
+func (Notification) SwaggerDoc() map[string]string {
+	return map_Notification
+}
+
+var map_Notify = map[string]string{
+	"": "Notify represents a notification request for a pod.",
+}
+
+func (Notify) SwaggerDoc() map[string]string {
+	return map_Notify
+}
+
+var map_NotifySpec = map[string]string{
+	"": "NotifySpec describes the attributes of a notify subresource.",
+}
+
+func (NotifySpec) SwaggerDoc() map[string]string {
+	return map_NotifySpec
 }
 
 var map_ObjectFieldSelector = map[string]string{

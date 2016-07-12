@@ -46,9 +46,9 @@ type FakeRuntime struct {
 	APIPodStatus      api.PodStatus
 	PodStatus         PodStatus
 	StartedPods       []string
-	KilledPods        []string
+	StoppedPods       []string
 	StartedContainers []string
-	KilledContainers  []string
+	StoppedContainers []string
 	VersionInfo       string
 	APIVersionInfo    string
 	RuntimeType       string
@@ -108,9 +108,9 @@ func (f *FakeRuntime) ClearCalls() {
 	f.AllPodList = []*FakePod{}
 	f.APIPodStatus = api.PodStatus{}
 	f.StartedPods = []string{}
-	f.KilledPods = []string{}
+	f.StoppedPods = []string{}
 	f.StartedContainers = []string{}
-	f.KilledContainers = []string{}
+	f.StoppedContainers = []string{}
 	f.VersionInfo = ""
 	f.RuntimeType = ""
 	f.Err = nil
@@ -138,10 +138,10 @@ func (f *FakeRuntime) AssertStartedPods(pods []string) error {
 	return f.assertList(pods, f.StartedPods)
 }
 
-func (f *FakeRuntime) AssertKilledPods(pods []string) error {
+func (f *FakeRuntime) AssertStoppedPods(pods []string) error {
 	f.Lock()
 	defer f.Unlock()
-	return f.assertList(pods, f.KilledPods)
+	return f.assertList(pods, f.StoppedPods)
 }
 
 func (f *FakeRuntime) AssertStartedContainers(containers []string) error {
@@ -150,10 +150,10 @@ func (f *FakeRuntime) AssertStartedContainers(containers []string) error {
 	return f.assertList(containers, f.StartedContainers)
 }
 
-func (f *FakeRuntime) AssertKilledContainers(containers []string) error {
+func (f *FakeRuntime) AssertStoppedContainers(containers []string) error {
 	f.Lock()
 	defer f.Unlock()
-	return f.assertList(containers, f.KilledContainers)
+	return f.assertList(containers, f.StoppedContainers)
 }
 
 func (f *FakeRuntime) Type() string {
@@ -219,14 +219,14 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []a
 	return
 }
 
-func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) StopPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "KillPod")
-	f.KilledPods = append(f.KilledPods, string(runningPod.ID))
+	f.CalledFunctions = append(f.CalledFunctions, "StopPod")
+	f.StoppedPods = append(f.StoppedPods, string(runningPod.ID))
 	for _, c := range runningPod.Containers {
-		f.KilledContainers = append(f.KilledContainers, c.Name)
+		f.StoppedContainers = append(f.StoppedContainers, c.Name)
 	}
 	return f.Err
 }
@@ -248,12 +248,12 @@ func (f *FakeRuntime) RunContainerInPod(container api.Container, pod *api.Pod, v
 	return f.Err
 }
 
-func (f *FakeRuntime) KillContainerInPod(container api.Container, pod *api.Pod) error {
+func (f *FakeRuntime) StopContainerInPod(container api.Container, pod *api.Pod) error {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "KillContainerInPod")
-	f.KilledContainers = append(f.KilledContainers, container.Name)
+	f.CalledFunctions = append(f.CalledFunctions, "StopContainerInPod")
+	f.StoppedContainers = append(f.StoppedContainers, container.Name)
 
 	var containers []api.Container
 	for _, c := range pod.Spec.Containers {
@@ -390,6 +390,14 @@ func (f *FakeRuntime) DeleteContainer(containerID ContainerID) error {
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "DeleteContainer")
+	return f.Err
+}
+
+func (f *FakeRuntime) KillContainer(containerID ContainerID, signal string) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "KillContainer")
 	return f.Err
 }
 

@@ -84,6 +84,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+		&Notify{},
 	)
 
 	// Add common types

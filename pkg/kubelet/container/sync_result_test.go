@@ -27,7 +27,7 @@ func TestPodSyncResult(t *testing.T) {
 		NewSyncResult(SetupNetwork, "pod"),
 	}
 	errResults := []*SyncResult{
-		NewSyncResult(KillContainer, "container_1"),
+		NewSyncResult(StopContainer, "container_1"),
 		NewSyncResult(TeardownNetwork, "pod"),
 	}
 	errResults[0].Fail(errors.New("error_0"), "message_0")

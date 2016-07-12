@@ -1455,6 +1455,21 @@ func validateInitContainers(containers, otherContainers []api.Container, volumes
 	return allErrs
 }
 
+// validateNotifications tests if given notifications have valid data.
+func validateNotifications(notifications []api.Notification, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	for i, notification := range notifications {
+		idxPath := fldPath.Index(i)
+		if len(notification.Name) == 0 {
+			allErrors = append(allErrors, field.Required(idxPath.Child("name"), ""))
+		}
+		if len(notification.Type) == 0 {
+			allErrors = append(allErrors, field.Required(idxPath.Child("type"), ""))
+		}
+	}
+	return allErrors
+}
+
 func validateContainers(containers []api.Container, volumes sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -1495,6 +1510,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
+		allErrs = append(allErrs, validateNotifications(ctr.Notifications, idxPath.Child("notifications"))...)
 	}
 	// Check for colliding ports across all containers.
 	allErrs = append(allErrs, checkHostPortConflicts(containers, fldPath)...)

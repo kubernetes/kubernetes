@@ -225,7 +225,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers), fakeRecorder, nodeRef, kubelet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, stopPodNow(kubelet.podWorkers), fakeRecorder, nodeRef, kubelet.clock)
 	if err != nil {
 		t.Fatalf("failed to initialize eviction manager: %v", err)
 	}
@@ -297,15 +297,16 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 	syncCh := make(chan time.Time, 1)
 	housekeepingCh := make(chan time.Time, 1)
 	plegCh := make(chan *pleg.PodLifecycleEvent)
+	notificationCh := make(chan time.Time, 1)
 	syncCh <- time.Now()
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
+	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh, notificationCh)
 	loopTime2 := kubelet.LatestLoopEntryTime()
 	if loopTime2.IsZero() {
 		t.Errorf("Unexpected sync loop time: 0, expected non-zero value.")
 	}
 
 	syncCh <- time.Now()
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
+	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh, notificationCh)
 	loopTime3 := kubelet.LatestLoopEntryTime()
 	if !loopTime3.After(loopTime1) {
 		t.Errorf("Sync Loop Time was not updated correctly. Second update timestamp should be greater than first update timestamp")
@@ -325,7 +326,7 @@ func TestSyncLoopAbort(t *testing.T) {
 	close(ch)
 
 	// sanity check (also prevent this test from hanging in the next step)
-	ok := kubelet.syncLoopIteration(ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1))
+	ok := kubelet.syncLoopIteration(ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1), make(chan time.Time))
 	if ok {
 		t.Fatalf("expected syncLoopIteration to return !ok since update chan was closed")
 	}
@@ -377,13 +378,13 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	}
 	kubelet.HandlePodCleanups()
 	// Sources are not ready yet. Don't remove any pods.
-	fakeRuntime.AssertKilledPods([]string{})
+	fakeRuntime.AssertStoppedPods([]string{})
 
 	ready = true
 	kubelet.HandlePodCleanups()
 
 	// Sources are ready. Remove unwanted pods.
-	fakeRuntime.AssertKilledPods([]string{"12345678"})
+	fakeRuntime.AssertStoppedPods([]string{"12345678"})
 }
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
@@ -3823,7 +3824,7 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 	}
 }
 
-func TestSyncPodKillPod(t *testing.T) {
+func TestSyncPodStopPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	pod := &api.Pod{
@@ -3839,8 +3840,8 @@ func TestSyncPodKillPod(t *testing.T) {
 	err := kl.syncPod(syncPodOptions{
 		pod:        pod,
 		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodKill,
-		killPodOptions: &KillPodOptions{
+		updateType: kubetypes.SyncPodStop,
+		stopPodOptions: &StopPodOptions{
 			PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
 				return api.PodStatus{
 					Phase:   api.PodFailed,

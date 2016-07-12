@@ -32,10 +32,10 @@ func TestReasonCache(t *testing.T) {
 		// reason cache should not be set for SyncResult with StartContainer action but without error
 		kubecontainer.NewSyncResult(kubecontainer.StartContainer, "container_2"),
 		// reason cache should not be set for SyncResult with other actions
-		kubecontainer.NewSyncResult(kubecontainer.KillContainer, "container_3"),
+		kubecontainer.NewSyncResult(kubecontainer.StopContainer, "container_3"),
 	}
 	results[0].Fail(kubecontainer.ErrRunContainer, "message_1")
-	results[2].Fail(kubecontainer.ErrKillContainer, "message_3")
+	results[2].Fail(kubecontainer.ErrStopContainer, "message_3")
 	syncResult.AddSyncResult(results...)
 	uid := types.UID("pod_1")
 

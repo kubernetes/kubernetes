@@ -368,6 +368,9 @@ message Container {
   // Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
   // Default is false.
   optional bool tty = 18;
+
+  // List of notifications defined in the container.
+  repeated Notification notifications = 19;
 }
 
 // Describe a container image
@@ -1360,6 +1363,31 @@ message NodeSystemInfo {
 
   // The Architecture reported by the node
   optional string architecture = 10;
+}
+
+message Notification {
+  // User-friendly name of notification.
+  optional string name = 1;
+
+  // Type of notification
+  optional string type = 2;
+
+  // POSIX signal name; used only when type is "signal"
+  optional string signal = 3;
+}
+
+// Notify represents a notification request for a pod.
+message Notify {
+  optional ObjectMeta metadata = 1;
+
+  optional NotifySpec spec = 2;
+}
+
+// NotifySpec describes the attributes of a notify subresource.
+message NotifySpec {
+  optional string name = 1;
+
+  optional string container = 2;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.

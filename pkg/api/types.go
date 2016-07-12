@@ -967,6 +967,22 @@ type ResourceRequirements struct {
 	Requests ResourceList `json:"requests,omitempty"`
 }
 
+type Notification struct {
+	// User-friendly name of notification.
+	Name string `json:"name"`
+	// Type of notification
+	Type NotificationType `json:"type"`
+	// POSIX signal name; used only when type is "signal"
+	Signal string `json:"signal,omitempty"`
+}
+
+// A notification type is the set of types that can be used in a notification.
+type NotificationType string
+
+const (
+	NotificationSignal NotificationType = "signal"
+)
+
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
@@ -1009,6 +1025,8 @@ type Container struct {
 	Stdin     bool `json:"stdin,omitempty"`
 	StdinOnce bool `json:"stdinOnce,omitempty"`
 	TTY       bool `json:"tty,omitempty"`
+	// List of notifications defined in the pod.
+	Notifications []Notification `json:"notifications,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -2911,6 +2929,19 @@ type RangeAllocation struct {
 	// represented as a bit array starting at the base IP of the CIDR in Range, with each bit representing
 	// a single allocated address (the fifth bit on CIDR 10.0.0.0/8 is 10.0.0.4).
 	Data []byte `json:"data"`
+}
+
+// NotifySpec describes the attributes of a notify subresource.
+type NotifySpec struct {
+	Name      string `json:"name"`
+	Container string `json:"container"`
+}
+
+// Notify represents a notification request for a pod.
+type Notify struct {
+	unversioned.TypeMeta `json:",inline"`
+	ObjectMeta           `json:"metadata,omitempty"`
+	Spec                 NotifySpec `json:"spec,omitempty"`
 }
 
 const (

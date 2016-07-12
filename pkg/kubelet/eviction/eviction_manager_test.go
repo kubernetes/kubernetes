@@ -29,15 +29,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/clock"
 )
 
-// mockPodKiller is used to testing which pod is killed
-type mockPodKiller struct {
+// mockPodStopper is used to testing which pod is stopped
+type mockPodStopper struct {
 	pod                 *api.Pod
 	status              api.PodStatus
 	gracePeriodOverride *int64
 }
 
-// killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
+// stopPodNow records the pod that was stopped
+func (m *mockPodStopper) stopPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
 	m.pod = pod
 	m.status = status
 	m.gracePeriodOverride = gracePeriodOverride
@@ -104,7 +104,7 @@ func TestMemoryPressure(t *testing.T) {
 	}
 
 	fakeClock := clock.NewFakeClock(time.Now())
-	podKiller := &mockPodKiller{}
+	podStopper := &mockPodStopper{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
@@ -128,7 +128,7 @@ func TestMemoryPressure(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
 		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
+		stopPodFunc:     podStopper.stopPodNow,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -167,9 +167,9 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager should report memory pressure since soft threshold was met")
 	}
 
-	// verify no pod was yet killed because there has not yet been enough time passed.
-	if podKiller.pod != nil {
-		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod)
+	// verify no pod was yet stopped because there has not yet been enough time passed.
+	if podStopper.pod != nil {
+		t.Errorf("Manager should not have stopped a pod yet, but stopped: %v", podStopper.pod)
 	}
 
 	// step forward in time pass the grace period
@@ -182,20 +182,20 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager should report memory pressure since soft threshold was met")
 	}
 
-	// verify the right pod was killed with the right grace period.
-	if podKiller.pod != pods[0] {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	// verify the right pod was stopped with the right grace period.
+	if podStopper.pod != pods[0] {
+		t.Errorf("Manager chose to stop pod: %v, but should have chosen %v", podStopper.pod, pods[0])
 	}
-	if podKiller.gracePeriodOverride == nil {
-		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+	if podStopper.gracePeriodOverride == nil {
+		t.Errorf("Manager chose to stop pod but should have had a grace period override.")
 	}
-	observedGracePeriod := *podKiller.gracePeriodOverride
+	observedGracePeriod := *podStopper.gracePeriodOverride
 	if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
+		t.Errorf("Manager chose to stop pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
 	}
 	// reset state
-	podKiller.pod = nil
-	podKiller.gracePeriodOverride = nil
+	podStopper.pod = nil
+	podStopper.gracePeriodOverride = nil
 
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
@@ -217,13 +217,13 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager should report memory pressure")
 	}
 
-	// check the right pod was killed
-	if podKiller.pod != pods[0] {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	// check the right pod was stopped
+	if podStopper.pod != pods[0] {
+		t.Errorf("Manager chose to stop pod: %v, but should have chosen %v", podStopper.pod, pods[0])
 	}
-	observedGracePeriod = *podKiller.gracePeriodOverride
+	observedGracePeriod = *podStopper.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+		t.Errorf("Manager chose to stop pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
 	}
 
 	// the best-effort pod should not admit, burstable should
@@ -237,7 +237,7 @@ func TestMemoryPressure(t *testing.T) {
 	// reduce memory pressure
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
-	podKiller.pod = nil // reset state
+	podStopper.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should have memory pressure (because transition period not yet met)
@@ -245,9 +245,9 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager should report memory pressure")
 	}
 
-	// no pod should have been killed
-	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	// no pod should have been stopped
+	if podStopper.pod != nil {
+		t.Errorf("Manager chose to stop pod: %v when no pod should have been stopped", podStopper.pod)
 	}
 
 	// the best-effort pod should not admit, burstable should
@@ -261,7 +261,7 @@ func TestMemoryPressure(t *testing.T) {
 	// move the clock past transition period to ensure that we stop reporting pressure
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
-	podKiller.pod = nil // reset state
+	podStopper.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should not have memory pressure (because transition period met)
@@ -269,9 +269,9 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager should not report memory pressure")
 	}
 
-	// no pod should have been killed
-	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	// no pod should have been stopped
+	if podStopper.pod != nil {
+		t.Errorf("Manager chose to stop pod: %v when no pod should have been stopped", podStopper.pod)
 	}
 
 	// all pods should admit now
@@ -349,7 +349,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	}
 
 	fakeClock := clock.NewFakeClock(time.Now())
-	podKiller := &mockPodKiller{}
+	podStopper := &mockPodStopper{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
@@ -373,7 +373,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("16Gi", "200Gi", podStats)}
 	manager := &managerImpl{
 		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
+		stopPodFunc:     podStopper.stopPodNow,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -408,9 +408,9 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		t.Errorf("Manager should report disk pressure since soft threshold was met")
 	}
 
-	// verify no pod was yet killed because there has not yet been enough time passed.
-	if podKiller.pod != nil {
-		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod)
+	// verify no pod was yet stopped because there has not yet been enough time passed.
+	if podStopper.pod != nil {
+		t.Errorf("Manager should not have stopped a pod yet, but stopped: %v", podStopper.pod)
 	}
 
 	// step forward in time pass the grace period
@@ -423,20 +423,20 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		t.Errorf("Manager should report disk pressure since soft threshold was met")
 	}
 
-	// verify the right pod was killed with the right grace period.
-	if podKiller.pod != pods[0] {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	// verify the right pod was stopped with the right grace period.
+	if podStopper.pod != pods[0] {
+		t.Errorf("Manager chose to stop pod: %v, but should have chosen %v", podStopper.pod, pods[0])
 	}
-	if podKiller.gracePeriodOverride == nil {
-		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+	if podStopper.gracePeriodOverride == nil {
+		t.Errorf("Manager chose to stop pod but should have had a grace period override.")
 	}
-	observedGracePeriod := *podKiller.gracePeriodOverride
+	observedGracePeriod := *podStopper.gracePeriodOverride
 	if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
+		t.Errorf("Manager chose to stop pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
 	}
 	// reset state
-	podKiller.pod = nil
-	podKiller.gracePeriodOverride = nil
+	podStopper.pod = nil
+	podStopper.gracePeriodOverride = nil
 
 	// remove disk pressure
 	fakeClock.Step(20 * time.Minute)
@@ -458,13 +458,13 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		t.Errorf("Manager should report disk pressure")
 	}
 
-	// check the right pod was killed
-	if podKiller.pod != pods[0] {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	// check the right pod was stopped
+	if podStopper.pod != pods[0] {
+		t.Errorf("Manager chose to stop pod: %v, but should have chosen %v", podStopper.pod, pods[0])
 	}
-	observedGracePeriod = *podKiller.gracePeriodOverride
+	observedGracePeriod = *podStopper.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+		t.Errorf("Manager chose to stop pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
 	}
 
 	// try to admit our pod (should fail)
@@ -475,7 +475,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// reduce disk pressure
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	podKiller.pod = nil // reset state
+	podStopper.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should have disk pressure (because transition period not yet met)
@@ -483,9 +483,9 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		t.Errorf("Manager should report disk pressure")
 	}
 
-	// no pod should have been killed
-	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	// no pod should have been stopped
+	if podStopper.pod != nil {
+		t.Errorf("Manager chose to stop pod: %v when no pod should have been stopped", podStopper.pod)
 	}
 
 	// try to admit our pod (should fail)
@@ -496,7 +496,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// move the clock past transition period to ensure that we stop reporting pressure
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	podKiller.pod = nil // reset state
+	podStopper.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should not have disk pressure (because transition period met)
@@ -504,9 +504,9 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		t.Errorf("Manager should not report disk pressure")
 	}
 
-	// no pod should have been killed
-	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	// no pod should have been stopped
+	if podStopper.pod != nil {
+		t.Errorf("Manager chose to stop pod: %v when no pod should have been stopped", podStopper.pod)
 	}
 
 	// try to admit our pod (should succeed)

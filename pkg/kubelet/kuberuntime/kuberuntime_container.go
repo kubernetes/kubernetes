@@ -47,3 +47,8 @@ func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.Co
 func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
 	return m.runtimeService.RemoveContainer(containerID.ID)
 }
+
+// KillContainer sends a signal to a container.
+func (m *kubeGenericRuntimeManager) KillContainer(containerID kubecontainer.ContainerID, signal string) error {
+	return fmt.Errorf("not implemented")
+}

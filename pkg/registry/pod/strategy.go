@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -26,12 +27,16 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	utilcontainer "k8s.io/kubernetes/pkg/api/container"
 	"k8s.io/kubernetes/pkg/api/errors"
+	utilpod "k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -499,4 +504,53 @@ func PortForwardLocation(
 		Path:   fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
 	}
 	return loc, nodeTransport, nil
+}
+
+func NotifyPod(
+	store *registry.Store,
+	ctx api.Context,
+	name string,
+	obj runtime.Object,
+) error {
+	nObj, ok := obj.(*api.Notify)
+	if !ok {
+		return fmt.Errorf("The following object is not a Notify instance: %#v", obj)
+	}
+
+	pod, err := getPod(store, ctx, name)
+	if err != nil {
+		return err
+	}
+	container, err := utilpod.FindContainer(pod, nObj.Spec.Container)
+	if err != nil {
+		return err
+	}
+	notification, err := utilcontainer.FindNotification(container, nObj.Spec.Name)
+	if err != nil {
+		return err
+	}
+
+	var pendingNotifications []utilpod.PodPendingNotification
+
+	serializedNotifications, _ := pod.Annotations[utilpod.PodPendingNotificationsAnnotation]
+	json.Unmarshal([]byte(serializedNotifications), &pendingNotifications)
+
+	pendingNotifications = append(pendingNotifications, utilpod.PodPendingNotification{
+		Name:      nObj.Spec.Name,
+		Type:      notification.Type,
+		Signal:    notification.Signal,
+		Container: nObj.Spec.Container,
+	})
+
+	newSerializedNotifications, err := json.Marshal(pendingNotifications)
+	if err != nil {
+		return err
+	}
+	pod.Annotations[utilpod.PodPendingNotificationsAnnotation] = string(newSerializedNotifications)
+	_, _, err = store.Update(ctx, name, rest.DefaultUpdatedObjectInfo(pod, api.Scheme))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

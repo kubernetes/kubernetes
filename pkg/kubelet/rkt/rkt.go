@@ -1231,8 +1231,8 @@ func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, f
 			r.recorder.Eventf(ref, api.EventTypeNormal, events.StartedContainer, "Started with rkt id %v", uuid)
 		case "Failed":
 			r.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToStartContainer, "Failed to start with rkt id %v with error %v", uuid, failure)
-		case "Killing":
-			r.recorder.Eventf(ref, api.EventTypeNormal, events.KillingContainer, "Killing with rkt id %v", uuid)
+		case "Stopping":
+			r.recorder.Eventf(ref, api.EventTypeNormal, events.StoppingContainer, "Killing with rkt id %v", uuid)
 		default:
 			glog.Errorf("rkt: Unexpected event %q", reason)
 		}
@@ -1355,7 +1355,7 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 	// This is a temporary solution until we have a clean design on how
 	// kubelet handles events. See https://github.com/kubernetes/kubernetes/issues/23084.
 	if err := r.runLifecycleHooks(pod, runtimePod, lifecyclePostStartHook); err != nil {
-		if errKill := r.KillPod(pod, *runtimePod, nil); errKill != nil {
+		if errKill := r.StopPod(pod, *runtimePod, nil); errKill != nil {
 			return errors.NewAggregate([]error{err, errKill})
 		}
 		r.cleanupPodNetwork(pod)
@@ -1629,9 +1629,9 @@ func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) 
 	}
 }
 
-// KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
+// StopPod invokes 'systemctl kill' to kill the unit that runs the pod.
 // TODO: add support for gracePeriodOverride which is used in eviction scenarios
-func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (r *Runtime) StopPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
 	glog.V(4).Infof("Rkt is killing pod: name %q.", runningPod.Name)
 
 	if len(runningPod.Containers) == 0 {
@@ -1651,7 +1651,7 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePerio
 	serviceName := makePodServiceFileName(containerID.uuid)
 	serviceFile := serviceFilePath(serviceName)
 
-	r.generateEvents(&runningPod, "Killing", nil)
+	r.generateEvents(&runningPod, "Stopping", nil)
 	for _, c := range runningPod.Containers {
 		r.containerRefManager.ClearRef(c.ID)
 	}
@@ -1763,7 +1763,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStat
 	if restartPod {
 		// Kill the pod only if the pod is actually running.
 		if len(runningPod.Containers) > 0 {
-			if err = r.KillPod(pod, runningPod, nil); err != nil {
+			if err = r.StopPod(pod, runningPod, nil); err != nil {
 				return
 			}
 		}
@@ -1856,6 +1856,10 @@ func podDetailsFromServiceFile(serviceFilePath string) (string, string, string, 
 }
 
 func (r *Runtime) DeleteContainer(containerID kubecontainer.ContainerID) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (r *Runtime) KillContainer(containerID kubecontainer.ContainerID, signal string) error {
 	return fmt.Errorf("unimplemented")
 }
 

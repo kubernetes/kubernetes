@@ -69,7 +69,7 @@ func (r *Mock) SyncPod(pod *api.Pod, apiStatus api.PodStatus, status *PodStatus,
 	return args.Get(0).(PodSyncResult)
 }
 
-func (r *Mock) KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (r *Mock) StopPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
 	args := r.Called(pod, runningPod, gracePeriodOverride)
 	return args.Error(0)
 }
@@ -79,7 +79,7 @@ func (r *Mock) RunContainerInPod(container api.Container, pod *api.Pod, volumeMa
 	return args.Error(0)
 }
 
-func (r *Mock) KillContainerInPod(container api.Container, pod *api.Pod) error {
+func (r *Mock) StopContainerInPod(container api.Container, pod *api.Pod) error {
 	args := r.Called(pod, pod)
 	return args.Error(0)
 }
@@ -146,6 +146,11 @@ func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
 
 func (r *Mock) DeleteContainer(containerID ContainerID) error {
 	args := r.Called(containerID)
+	return args.Error(0)
+}
+
+func (r *Mock) KillContainer(containerID ContainerID, signal string) error {
+	args := r.Called(containerID, signal)
 	return args.Error(0)
 }
 
