@@ -20,13 +20,12 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-
-	"strings"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -182,7 +181,7 @@ func main() {
 			IncludedTypesOverrides:  includedTypesOverrides,
 		}
 
-		fmt.Printf("==arguments: %v\n", arguments)
+		glog.Infof("==arguments: %v\n", arguments)
 	}
 
 	if err := arguments.Execute(
