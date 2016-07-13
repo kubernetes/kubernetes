@@ -179,12 +179,12 @@ func Run(g *Generator) {
 		},
 		"public",
 	)
-	c.Verify = g.Common.VerifyOnly
-	c.FileTypes["protoidl"] = NewProtoFile()
-
 	if err != nil {
 		log.Fatalf("Failed making a context: %v", err)
 	}
+
+	c.Verify = g.Common.VerifyOnly
+	c.FileTypes["protoidl"] = NewProtoFile()
 
 	if err := protobufNames.AssignTypesToPackages(c); err != nil {
 		log.Fatalf("Failed to identify Common types: %v", err)
