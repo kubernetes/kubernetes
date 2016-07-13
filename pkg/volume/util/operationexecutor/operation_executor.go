@@ -26,6 +26,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/volume"
@@ -96,6 +98,9 @@ type OperationExecutor interface {
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
 	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName string, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+
+	// Recorder sets EventRecorder to use
+	Recorder (record.EventRecorder) OperationExecutor
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -324,7 +329,16 @@ type operationExecutor struct {
 	// pendingOperations keeps track of pending attach and detach operations so
 	// multiple operations are not started on the same volume
 	pendingOperations goroutinemap.GoRoutineMap
+
+	// The EventRecorder to use
+	recorder record.EventRecorder
 }
+
+func (oe *operationExecutor) Recorder(recorder record.EventRecorder) OperationExecutor {
+	oe.recorder = recorder
+	return oe
+}
+
 
 func (oe *operationExecutor) AttachVolume(
 	volumeToAttach VolumeToAttach,
@@ -702,6 +716,12 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 		// Execute mount
 		mountErr := volumeMounter.SetUp(fsGroup)
 		if mountErr != nil {
+			ref, errGetRef := api.GetReference(volumeToMount.Pod)
+			if errGetRef == nil && ref != nil && oe.recorder != nil {
+				oe.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedMountVolume,
+					"Unable to mount volume %q: %v", volumeToMount.VolumeSpec.Name(), mountErr,)
+			}
+
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
 				"MountVolume.SetUp failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
