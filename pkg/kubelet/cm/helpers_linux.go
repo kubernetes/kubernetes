@@ -22,20 +22,9 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
-// cgroupSubsystems holds information about the mounted cgroup subsytems
-type cgroupSubsystems struct {
-	// Cgroup subsystem mounts.
-	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
-	mounts []libcontainercgroups.Mount
-
-	// Cgroup subsystem to their mount location.
-	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
-	mountPoints map[string]string
-}
-
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func getCgroupSubsystems() (*cgroupSubsystems, error) {
-	// Get all cgroup mounts.
+func GetCgroupSubsystems() (*cgroupSubsystems, error) {
+	// get all cgroup mounts.
 	allCgroups, err := libcontainercgroups.GetCgroupMounts()
 	if err != nil {
 		return &cgroupSubsystems{}, err
@@ -44,7 +33,6 @@ func getCgroupSubsystems() (*cgroupSubsystems, error) {
 		return &cgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
 	}
 
-	//TODO(@dubstack) should we trim to only the supported ones
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
 		for _, subsystem := range mount.Subsystems {
