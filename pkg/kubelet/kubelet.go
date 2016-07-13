@@ -402,6 +402,20 @@ func NewMainKubelet(
 	klet.podCache = kubecontainer.NewCache()
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
+	klet.volumePluginMgr, err =
+		NewInitializedVolumePluginMgr(klet, volumePlugins)
+	if err != nil {
+		return nil, err
+	}
+
+	klet.volumeManager, err = volumemanager.NewVolumeManager(
+		enableControllerAttachDetach,
+		hostname,
+		klet.podManager,
+		klet.kubeClient,
+		klet.volumePluginMgr,
+		klet.containerRuntime)
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -419,6 +433,7 @@ func NewMainKubelet(
 			containerLogsDir,
 			osInterface,
 			klet.networkPlugin,
+			klet.volumeManager,
 			klet,
 			klet.httpClient,
 			dockerExecHandler,
@@ -494,20 +509,6 @@ func NewMainKubelet(
 		klet.runner,
 		containerRefManager,
 		recorder)
-
-	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, volumePlugins)
-	if err != nil {
-		return nil, err
-	}
-
-	klet.volumeManager, err = volumemanager.NewVolumeManager(
-		enableControllerAttachDetach,
-		hostname,
-		klet.podManager,
-		klet.kubeClient,
-		klet.volumePluginMgr,
-		klet.containerRuntime)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
