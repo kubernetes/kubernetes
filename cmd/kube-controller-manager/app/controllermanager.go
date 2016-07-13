@@ -466,7 +466,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			glog.Errorf("Failed to start the generic garbage collector")
 		} else {
 			// TODO: make this a flag of kube-controller-manager
-			workers := 5
+			workers := int(s.ConcurrentGCSyncs)
 			go garbageCollector.Run(workers, wait.NeverStop)
 		}
 	}
