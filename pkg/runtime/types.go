@@ -456,6 +456,14 @@ func (u *Unstructured) SetFinalizers(finalizers []string) {
 	u.setNestedSlice(finalizers, "metadata", "finalizers")
 }
 
+func (u *Unstructured) GetClusterName() string {
+	return getNestedString(u.Object, "metadata", "clusterName")
+}
+
+func (u *Unstructured) SetClusterName(clusterName string) {
+	u.setNestedField(clusterName, "metadata", "clusterName")
+}
+
 // UnstructuredList allows lists that do not have Golang structs
 // registered to be manipulated generically. This can be used to deal
 // with the API lists from a plug-in.
