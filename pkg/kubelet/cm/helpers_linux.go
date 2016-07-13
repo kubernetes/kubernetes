@@ -17,42 +17,85 @@ limitations under the License.
 package cm
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
-// cgroupSubsystems holds information about the mounted cgroup subsytems
-type cgroupSubsystems struct {
-	// Cgroup subsystem mounts.
-	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
-	mounts []libcontainercgroups.Mount
-
-	// Cgroup subsystem to their mount location.
-	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
-	mountPoints map[string]string
+// ReduceCpuLimits reduces the cgroup's cpu shares to the lowest possible value
+func ReduceCpuLimits(cgroupName string, subsystems *CgroupSubsystems) error {
+	// Set lowest possible CpuShares value for the cgroup
+	minimumCPUShares := int64(2)
+	resources := &ResourceConfig{
+		CpuShares: &minimumCPUShares,
+	}
+	containerConfig := &CgroupConfig{
+		Name:               cgroupName,
+		ResourceParameters: resources,
+	}
+	cgroupManager := NewCgroupManager(subsystems)
+	err := cgroupManager.Update(containerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to update %v cgroup: %v", cgroupName, err)
+	}
+	return nil
 }
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func getCgroupSubsystems() (*cgroupSubsystems, error) {
-	// Get all cgroup mounts.
+func GetCgroupSubsystems() (*CgroupSubsystems, error) {
+	// get all cgroup mounts.
 	allCgroups, err := libcontainercgroups.GetCgroupMounts()
 	if err != nil {
-		return &cgroupSubsystems{}, err
+		return &CgroupSubsystems{}, err
 	}
 	if len(allCgroups) == 0 {
-		return &cgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
+		return &CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
 	}
-
-	//TODO(@dubstack) should we trim to only the supported ones
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
 		for _, subsystem := range mount.Subsystems {
 			mountPoints[subsystem] = mount.Mountpoint
 		}
 	}
-	return &cgroupSubsystems{
-		mounts:      allCgroups,
-		mountPoints: mountPoints,
+	return &CgroupSubsystems{
+		Mounts:      allCgroups,
+		MountPoints: mountPoints,
 	}, nil
+}
+
+// getCgroupProcs takes a cgroup directory name as an argument
+// reads through the cgroup's procs file and returns a list of tgid's.
+// It returns an empty list if a procs file doesn't exists
+func getCgroupProcs(dir string) ([]int, error) {
+	procsFile := filepath.Join(dir, "cgroup.procs")
+	_, err := os.Stat(procsFile)
+	if os.IsNotExist(err) {
+		// The procsFile does not exist, So no pids attached to this directory
+		return []int{}, nil
+	}
+	f, err := os.Open(procsFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var (
+		s   = bufio.NewScanner(f)
+		out = []int{}
+	)
+
+	for s.Scan() {
+		if t := s.Text(); t != "" {
+			pid, err := strconv.Atoi(t)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, pid)
+		}
+	}
+	return out, nil
 }
