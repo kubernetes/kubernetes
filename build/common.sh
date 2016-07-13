@@ -821,6 +821,88 @@ function kube::release::package_server_tarballs() {
   done
 }
 
+# Copy images to stage
+# Assumed vars:
+#   PLATFORM
+# Vars set:
+#   targets
+function kube::release::package_components() {
+  local bins=()
+  local -a b
+  for b in $@; do
+    bins+=("${b##*/}")    # get the name
+  done
+
+  local -a platforms=("${KUBE_BUILD_PLATFORMS[@]:+${KUBE_BUILD_PLATFORMS[@]}}")
+  if [[ ${#platforms[@]} -eq 0 ]]; then
+    platforms=$(kube::golang::host_platform)
+  fi
+
+  local platform
+  for platform in "${platforms}"; do
+    local platform_tag=${platform/\//-}  # Replace a "/" for a "-"
+    local arch=$(basename ${platform})
+    kube::log::status "Building components: ${bins} ${platform_tag}"
+
+    local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
+    [ -d ${release_stage}/server/bin/ ] || mkdir -p ${release_stage}/server/bin/
+
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the bins array.
+    cp "${bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" "${release_stage}/server/bin/"
+
+    kube::release::create_docker_images_for_component ${release_stage}/server/bin ${arch} ${bins}
+  done
+}
+
+function kube::release::create_docker_images_for_component() {
+  # Create a sub-shell so that we don't pollute the outer environment
+  (
+    local binary_dir="$1"
+    local arch="$2"
+    local binaries="$3"
+    local binary_name
+
+    local base_image="busybox"
+
+    for binary_name in "${binaries[@]}"; do
+      kube::log::status "Starting Docker build for image: ${binary_name}"
+      (
+        local md5_sum=$(kube::release::md5 "$binary_dir/${binary_name}")
+
+        local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
+        local docker_file_path="${docker_build_path}/Dockerfile"
+        local binary_file_path="${binary_dir}/${binary_name}"
+
+        rm -rf ${docker_build_path}
+        mkdir -p ${docker_build_path}
+        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
+
+        if [[ ${arch} == "amd64" ]]; then
+          # If we are building a amd64 docker image, preserve the original image name
+          local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
+        else
+          # If we are building a docker image for another architecture, append the arch in the image tag
+          local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
+        fi
+
+        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        docker save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
+        echo ${md5_sum} > ${binary_dir}/${binary_name}.docker_tag
+
+        rm -rf ${docker_build_path}
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
+      ) &
+    done
+
+    kube::util::wait-for-jobs || { kube::log::error "previous Docker build failed"; return 1; }
+    kube::log::status "Docker builds done"
+  )
+}
+
+
 function kube::release::md5() {
   if which md5 >/dev/null 2>&1; then
     md5 -q "$1"
