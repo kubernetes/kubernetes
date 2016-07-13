@@ -17,6 +17,3 @@ Please remove this comment block before submitting.
 -OR-
 * Enter your extended release note here
 ```
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/.github/PULL_REQUEST_TEMPLATE.md?pixel)]()
