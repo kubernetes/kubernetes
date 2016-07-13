@@ -516,7 +516,7 @@ type KubeControllerManagerConfiguration struct {
 	// deletingPodsQps is the number of nodes per second on which pods are deleted in
 	// case of node failure.
 	DeletingPodsQps float32 `json:"deletingPodsQps"`
-	// deletingPodsBurst is the number of nodes on which pods are bursty deleted in
+	// DEPRECATED: deletingPodsBurst is the number of nodes on which pods are bursty deleted in
 	// case of node failure. For more details look into RateLimiter.
 	DeletingPodsBurst int32 `json:"deletingPodsBurst"`
 	// nodeMontiorGracePeriod is the amount of time which we allow a running node to be
