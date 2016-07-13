@@ -58,6 +58,7 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
 	conf.ContentType = runtime.ContentTypeJSON
+	conf.AcceptContentTypes = runtime.ContentTypeJSON
 	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
 	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo)
 

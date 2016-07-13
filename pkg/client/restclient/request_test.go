@@ -19,6 +19,7 @@ package restclient
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -283,6 +284,9 @@ func defaultSerializers() Serializers {
 		Decoder:             testapi.Default.Codec(),
 		StreamingSerializer: testapi.Default.Codec(),
 		Framer:              runtime.DefaultFramer,
+		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
+			return testapi.Default.Codec(), nil
+		},
 	}
 }
 
@@ -409,6 +413,161 @@ func TestTransformResponse(t *testing.T) {
 		}
 		if test.Created != created {
 			t.Errorf("%d: expected created %t, got %t", i, test.Created, created)
+		}
+	}
+}
+
+type renegotiator struct {
+	called      bool
+	contentType string
+	params      map[string]string
+	decoder     runtime.Decoder
+	err         error
+}
+
+func (r *renegotiator) invoke(contentType string, params map[string]string) (runtime.Decoder, error) {
+	r.called = true
+	r.contentType = contentType
+	r.params = params
+	return r.decoder, r.err
+}
+
+func TestTransformResponseNegotiate(t *testing.T) {
+	invalid := []byte("aaaaa")
+	uri, _ := url.Parse("http://localhost")
+	testCases := []struct {
+		Response *http.Response
+		Data     []byte
+		Created  bool
+		Error    bool
+		ErrFn    func(err error) bool
+
+		ContentType       string
+		Called            bool
+		ExpectContentType string
+		Decoder           runtime.Decoder
+		NegotiateErr      error
+	}{
+		{
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 401,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() != "aaaaa" && apierrors.IsUnauthorized(err)
+			},
+		},
+		{
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 401,
+				Header:     http.Header{"Content-Type": []string{"application/protobuf"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+
+			Called:            true,
+			ExpectContentType: "application/protobuf",
+
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() != "aaaaa" && apierrors.IsUnauthorized(err)
+			},
+		},
+		{
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 500,
+				Header:     http.Header{"Content-Type": []string{"application/,others"}},
+			},
+			Decoder: testapi.Default.Codec(),
+
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() == "Internal error occurred: mime: expected token after slash" && err.(apierrors.APIStatus).Status().Code == 500
+			},
+		},
+		{
+			// no negotiation when no content type specified
+			Response: &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"text/any"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+		},
+		{
+			// no negotiation when no response content type specified
+			ContentType: "text/any",
+			Response: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+		},
+		{
+			// unrecognized content type is not handled
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 404,
+				Header:     http.Header{"Content-Type": []string{"application/unrecognized"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+
+			NegotiateErr:      fmt.Errorf("aaaa"),
+			Called:            true,
+			ExpectContentType: "application/unrecognized",
+
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() != "aaaaa" && apierrors.IsNotFound(err)
+			},
+		},
+	}
+	for i, test := range testCases {
+		serializers := defaultSerializers()
+		negotiator := &renegotiator{
+			decoder: test.Decoder,
+			err:     test.NegotiateErr,
+		}
+		serializers.RenegotiatedDecoder = negotiator.invoke
+		contentConfig := defaultContentConfig()
+		contentConfig.ContentType = test.ContentType
+		r := NewRequest(nil, "", uri, "", contentConfig, serializers, nil, nil)
+		if test.Response.Body == nil {
+			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+		}
+		result := r.transformResponse(test.Response, &http.Request{})
+		_, err := result.body, result.err
+		hasErr := err != nil
+		if hasErr != test.Error {
+			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
+			continue
+		} else if hasErr && test.Response.StatusCode > 399 {
+			status, ok := err.(apierrors.APIStatus)
+			if !ok {
+				t.Errorf("%d: response should have been transformable into APIStatus: %v", i, err)
+				continue
+			}
+			if int(status.Status().Code) != test.Response.StatusCode {
+				t.Errorf("%d: status code did not match response: %#v", i, status.Status())
+			}
+		}
+		if test.ErrFn != nil && !test.ErrFn(err) {
+			t.Errorf("%d: error function did not match: %v", i, err)
+		}
+		if negotiator.called != test.Called {
+			t.Errorf("%d: negotiator called %t != %t", i, negotiator.called, test.Called)
+		}
+		if !test.Called {
+			continue
+		}
+		if negotiator.contentType != test.ExpectContentType {
+			t.Errorf("%d: unexpected content type: %s", i, negotiator.contentType)
 		}
 	}
 }
