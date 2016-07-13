@@ -165,6 +165,10 @@ func (t *testPrinter) HandledResources() []string {
 	return []string{}
 }
 
+func (t *testPrinter) FinishPrint(output io.Writer, res string) error {
+	return nil
+}
+
 type testDescriber struct {
 	Name, Namespace string
 	Settings        kubectl.DescriberSettings

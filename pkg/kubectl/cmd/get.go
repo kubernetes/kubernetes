@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -42,7 +43,7 @@ var (
 	get_long = dedent.Dedent(`
 		Display one or many resources.
 
-		`) + kubectl.PossibleResourceTypes + dedent.Dedent(`
+		`) + kubectl.PossibleResourceTypes + kubectl.HiddenPodsWarning + dedent.Dedent(`
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resource(s).`)
@@ -177,7 +178,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-
 		obj, err := r.Object()
 		if err != nil {
 			return err
@@ -203,6 +203,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			if err := printer.PrintObj(obj, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
+			printer.FinishPrint(os.Stderr, mapping.Resource)
 		}
 
 		// print watched changes
@@ -218,7 +219,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 				first = false
 				return nil
 			}
-			return printer.PrintObj(e.Object, out)
+			err := printer.PrintObj(e.Object, out)
+			if err == nil {
+				printer.FinishPrint(os.Stderr, mapping.Resource)
+			}
+			return err
 		})
 		return nil
 	}
@@ -265,6 +270,10 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
+		res := ""
+		if len(infos) > 0 {
+			res = infos[0].ResourceMapping().Resource
+		}
 
 		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
 		if err != nil {
@@ -274,6 +283,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err := printer.PrintObj(obj, out); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		printer.FinishPrint(os.Stderr, res)
 		return utilerrors.NewAggregate(allErrs)
 	}
 
@@ -323,7 +333,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	var lastMapping *meta.RESTMapping
 	var withKind bool = allKinds
 	w := kubectl.GetNewTabWriter(out)
-	defer w.Flush()
 
 	// determine if printing multiple kinds of
 	// objects and enforce "show-kinds" flag if so
@@ -355,6 +364,10 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			original = infos[ix].Object
 		}
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
+			if printer != nil {
+				w.Flush()
+				printer.FinishPrint(os.Stderr, lastMapping.Resource)
+			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
 				allErrs = append(allErrs, err)
@@ -381,6 +394,10 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			allErrs = append(allErrs, err)
 			continue
 		}
+	}
+	w.Flush()
+	if printer != nil {
+		printer.FinishPrint(os.Stderr, lastMapping.Resource)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -155,6 +155,10 @@ type CustomColumnsPrinter struct {
 	NoHeaders bool
 }
 
+func (s *CustomColumnsPrinter) FinishPrint(w io.Writer, res string) error {
+	return nil
+}
+
 func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	w := tabwriter.NewWriter(out, columnwidth, tabwidth, padding, padding_character, flags)
 
