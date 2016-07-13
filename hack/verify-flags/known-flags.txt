@@ -68,6 +68,7 @@ concurrent-replicaset-syncs
 concurrent-service-syncs
 concurrent-resource-quota-syncs
 concurrent-serviceaccount-token-syncs
+concurrent-gc-syncs
 config-sync-period
 configure-cbr0
 configure-cloud-routes
