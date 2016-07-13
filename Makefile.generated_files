@@ -198,11 +198,11 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 # in a single run of the tool.
 .PHONY: gen_deepcopy
 gen_deepcopy: $(DEEPCOPY_FILES)
-	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                \
-	    $(DEEPCOPY_GEN)                                               \
+	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
+	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
 	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
-	        --bounding-dirs $(PRJ_SRC_PATH)                           \
-	        -O $(DEEPCOPY_BASENAME);                                  \
+	        --bounding-dirs $(PRJ_SRC_PATH)                             \
+	        -O $(DEEPCOPY_BASENAME);                                    \
 	fi
 
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
@@ -243,6 +243,7 @@ $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/deepcopy-gen                    \
 	     | grep "^$(PRJ_SRC_PATH)"                         \
+	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
 	echo $$DIRECT $$INDIRECT | sed 's/ / =,/g' | tr '=,' '\n\t'; \
 	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
@@ -308,10 +309,10 @@ CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 # in a single run of the tool.
 .PHONY: gen_conversion
 gen_conversion: $(CONVERSION_FILES)
-	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                \
-	    $(CONVERSION_GEN)                                               \
+	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
+	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
 	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
-	        -O $(CONVERSION_BASENAME);                                  \
+	        -O $(CONVERSION_BASENAME);                                    \
 	fi
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
@@ -419,6 +420,7 @@ $(META_DIR)/$(CONVERSION_GEN).mk:
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/conversion-gen                  \
 	     | grep "^$(PRJ_SRC_PATH)"                         \
+	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
 	echo $$DIRECT $$INDIRECT | sed 's/ / =,/g' | tr '=,' '\n\t'; \
 	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
