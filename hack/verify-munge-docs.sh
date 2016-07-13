@@ -57,6 +57,19 @@ if [[ $ret -gt 1 ]]; then
   exit 1
 fi
 
+"${mungedocs}" "--verify=true" "--verbose=true" \
+               "--upstream=${git_upstream}" \
+               "--skip-munges=unversioned-warning,analytics" \
+               "--norecurse" \
+               "--root-dir=${KUBE_ROOT}/" && ret=0 || ret=$?
+if [[ $ret -eq 1 ]]; then
+  echo "${KUBE_ROOT}/ is out of date. Please run hack/update-munge-docs.sh"
+  exit 1
+elif [[ $ret -gt 1 ]]; then
+  echo "Error running mungedocs."
+  exit 1
+fi
+
 needsanalytics=($(kube::util::gen-analytics "${KUBE_ROOT}" 1))
 if [[ ${#needsanalytics[@]} -ne 0 ]]; then
   echo -e "Some md files are missing ga-beacon analytics link:"
