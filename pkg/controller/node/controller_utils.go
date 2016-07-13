@@ -35,18 +35,34 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	// Number of Nodes that needs to be in the cluster for it to be treated as "large"
+	LargeClusterThreshold = 20
+)
+
 // This function is expected to get a slice of NodeReadyConditions for all Nodes in a given zone.
+// The zone is considered:
+// - fullyDisrupted if there're no Ready Nodes,
+// - partiallyDisrupted if more than 1/3 of Nodes (at least 3) are not Ready,
+// - normal otherwise
 func ComputeZoneState(nodeReadyConditions []*api.NodeCondition) zoneState {
-	seenReady := false
+	readyNodes := 0
+	notReadyNodes := 0
 	for i := range nodeReadyConditions {
 		if nodeReadyConditions[i] != nil && nodeReadyConditions[i].Status == api.ConditionTrue {
-			seenReady = true
+			readyNodes++
+		} else {
+			notReadyNodes++
 		}
 	}
-	if seenReady {
+	switch {
+	case readyNodes == 0 && notReadyNodes > 0:
+		return stateFullDisruption
+	case notReadyNodes > 2 && 2*notReadyNodes > readyNodes:
+		return statePartialDisruption
+	default:
 		return stateNormal
 	}
-	return stateFullSegmentation
 }
 
 // cleanupOrphanedPods deletes pods that are bound to nodes that don't
@@ -319,4 +335,16 @@ func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder
 		}
 	}
 	return complete, nextAttempt, nil
+}
+
+func HealthyQPSFunc(nodeNum int, defaultQPS float32) float32 {
+	return defaultQPS
+}
+
+// If the cluster is large make evictions slower, if they're small stop evictions altogether.
+func ReducedQPSFunc(nodeNum int, defaultQPS float32) float32 {
+	if nodeNum > LargeClusterThreshold {
+		return defaultQPS / 10
+	}
+	return 0
 }

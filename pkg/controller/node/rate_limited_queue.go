@@ -21,9 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/golang/glog"
 )
 
 // TimedValue is a value that should be processed at a designated time.
@@ -179,7 +180,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
-			glog.V(10).Info("Try rate limited...")
+			glog.V(10).Infof("Try rate limited for value: %v", val)
 			// Try again later
 			break
 		}
