@@ -129,7 +129,7 @@ For Q&A, our threads are at:
  * [Stack Overflow](http://stackoverflow.com/questions/tagged/kubernetes)
  * [Slack](http://slack.k8s.io/)
 
-### Want to do more than just 'discuss' Kubernetes?
+### Want to contribute to Kubernetes?
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
 
