@@ -23,64 +23,81 @@ package v1beta1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
 )
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1beta1_TokenReview,
-		DeepCopy_v1beta1_TokenReviewSpec,
-		DeepCopy_v1beta1_TokenReviewStatus,
-		DeepCopy_v1beta1_UserInfo,
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_TokenReview, InType: reflect.TypeOf(func() *TokenReview { var x *TokenReview; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_TokenReviewSpec, InType: reflect.TypeOf(func() *TokenReviewSpec { var x *TokenReviewSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_TokenReviewStatus, InType: reflect.TypeOf(func() *TokenReviewStatus { var x *TokenReviewStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_UserInfo, InType: reflect.TypeOf(func() *UserInfo { var x *UserInfo; return x }())},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
 }
 
-func DeepCopy_v1beta1_TokenReview(in TokenReview, out *TokenReview, c *conversion.Cloner) error {
-	out.TypeMeta = in.TypeMeta
-	out.Spec = in.Spec
-	if err := DeepCopy_v1beta1_TokenReviewStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeepCopy_v1beta1_TokenReviewSpec(in TokenReviewSpec, out *TokenReviewSpec, c *conversion.Cloner) error {
-	out.Token = in.Token
-	return nil
-}
-
-func DeepCopy_v1beta1_TokenReviewStatus(in TokenReviewStatus, out *TokenReviewStatus, c *conversion.Cloner) error {
-	out.Authenticated = in.Authenticated
-	if err := DeepCopy_v1beta1_UserInfo(in.User, &out.User, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeepCopy_v1beta1_UserInfo(in UserInfo, out *UserInfo, c *conversion.Cloner) error {
-	out.Username = in.Username
-	out.UID = in.UID
-	if in.Groups != nil {
-		in, out := in.Groups, &out.Groups
-		*out = make([]string, len(in))
-		copy(*out, in)
-	} else {
-		out.Groups = nil
-	}
-	if in.Extra != nil {
-		in, out := in.Extra, &out.Extra
-		*out = make(map[string][]string)
-		for key, val := range in {
-			if newVal, err := c.DeepCopy(val); err != nil {
-				return err
-			} else {
-				(*out)[key] = newVal.([]string)
-			}
+func DeepCopy_v1beta1_TokenReview(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*TokenReview)
+		out := out.(*TokenReview)
+		out.TypeMeta = in.TypeMeta
+		out.Spec = in.Spec
+		if err := DeepCopy_v1beta1_TokenReviewStatus(&in.Status, &out.Status, c); err != nil {
+			return err
 		}
-	} else {
-		out.Extra = nil
+		return nil
 	}
-	return nil
+}
+
+func DeepCopy_v1beta1_TokenReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*TokenReviewSpec)
+		out := out.(*TokenReviewSpec)
+		out.Token = in.Token
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_TokenReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*TokenReviewStatus)
+		out := out.(*TokenReviewStatus)
+		out.Authenticated = in.Authenticated
+		if err := DeepCopy_v1beta1_UserInfo(&in.User, &out.User, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_UserInfo(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*UserInfo)
+		out := out.(*UserInfo)
+		out.Username = in.Username
+		out.UID = in.UID
+		if in.Groups != nil {
+			in, out := &in.Groups, &out.Groups
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Groups = nil
+		}
+		if in.Extra != nil {
+			in, out := &in.Extra, &out.Extra
+			*out = make(map[string][]string)
+			for key, val := range *in {
+				if newVal, err := c.DeepCopy(&val); err != nil {
+					return err
+				} else {
+					(*out)[key] = *newVal.(*[]string)
+				}
+			}
+		} else {
+			out.Extra = nil
+		}
+		return nil
+	}
 }

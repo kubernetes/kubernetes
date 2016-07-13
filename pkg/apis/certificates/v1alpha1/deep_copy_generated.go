@@ -24,98 +24,119 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	reflect "reflect"
 )
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1alpha1_CertificateSigningRequest,
-		DeepCopy_v1alpha1_CertificateSigningRequestCondition,
-		DeepCopy_v1alpha1_CertificateSigningRequestList,
-		DeepCopy_v1alpha1_CertificateSigningRequestSpec,
-		DeepCopy_v1alpha1_CertificateSigningRequestStatus,
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CertificateSigningRequest, InType: reflect.TypeOf(func() *CertificateSigningRequest { var x *CertificateSigningRequest; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CertificateSigningRequestCondition, InType: reflect.TypeOf(func() *CertificateSigningRequestCondition { var x *CertificateSigningRequestCondition; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CertificateSigningRequestList, InType: reflect.TypeOf(func() *CertificateSigningRequestList { var x *CertificateSigningRequestList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CertificateSigningRequestSpec, InType: reflect.TypeOf(func() *CertificateSigningRequestSpec { var x *CertificateSigningRequestSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_CertificateSigningRequestStatus, InType: reflect.TypeOf(func() *CertificateSigningRequestStatus { var x *CertificateSigningRequestStatus; return x }())},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
 }
 
-func DeepCopy_v1alpha1_CertificateSigningRequest(in CertificateSigningRequest, out *CertificateSigningRequest, c *conversion.Cloner) error {
-	out.TypeMeta = in.TypeMeta
-	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_v1alpha1_CertificateSigningRequestSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_v1alpha1_CertificateSigningRequestStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeepCopy_v1alpha1_CertificateSigningRequestCondition(in CertificateSigningRequestCondition, out *CertificateSigningRequestCondition, c *conversion.Cloner) error {
-	out.Type = in.Type
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
-	return nil
-}
-
-func DeepCopy_v1alpha1_CertificateSigningRequestList(in CertificateSigningRequestList, out *CertificateSigningRequestList, c *conversion.Cloner) error {
-	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := in.Items, &out.Items
-		*out = make([]CertificateSigningRequest, len(in))
-		for i := range in {
-			if err := DeepCopy_v1alpha1_CertificateSigningRequest(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+func DeepCopy_v1alpha1_CertificateSigningRequest(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*CertificateSigningRequest)
+		out := out.(*CertificateSigningRequest)
+		out.TypeMeta = in.TypeMeta
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+			return err
 		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func DeepCopy_v1alpha1_CertificateSigningRequestSpec(in CertificateSigningRequestSpec, out *CertificateSigningRequestSpec, c *conversion.Cloner) error {
-	if in.Request != nil {
-		in, out := in.Request, &out.Request
-		*out = make([]byte, len(in))
-		copy(*out, in)
-	} else {
-		out.Request = nil
-	}
-	out.Username = in.Username
-	out.UID = in.UID
-	if in.Groups != nil {
-		in, out := in.Groups, &out.Groups
-		*out = make([]string, len(in))
-		copy(*out, in)
-	} else {
-		out.Groups = nil
-	}
-	return nil
-}
-
-func DeepCopy_v1alpha1_CertificateSigningRequestStatus(in CertificateSigningRequestStatus, out *CertificateSigningRequestStatus, c *conversion.Cloner) error {
-	if in.Conditions != nil {
-		in, out := in.Conditions, &out.Conditions
-		*out = make([]CertificateSigningRequestCondition, len(in))
-		for i := range in {
-			if err := DeepCopy_v1alpha1_CertificateSigningRequestCondition(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
+		if err := DeepCopy_v1alpha1_CertificateSigningRequestSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
 		}
-	} else {
-		out.Conditions = nil
+		if err := DeepCopy_v1alpha1_CertificateSigningRequestStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
+		return nil
 	}
-	if in.Certificate != nil {
-		in, out := in.Certificate, &out.Certificate
-		*out = make([]byte, len(in))
-		copy(*out, in)
-	} else {
-		out.Certificate = nil
+}
+
+func DeepCopy_v1alpha1_CertificateSigningRequestCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*CertificateSigningRequestCondition)
+		out := out.(*CertificateSigningRequestCondition)
+		out.Type = in.Type
+		out.Reason = in.Reason
+		out.Message = in.Message
+		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
+		return nil
 	}
-	return nil
+}
+
+func DeepCopy_v1alpha1_CertificateSigningRequestList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*CertificateSigningRequestList)
+		out := out.(*CertificateSigningRequestList)
+		out.TypeMeta = in.TypeMeta
+		out.ListMeta = in.ListMeta
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]CertificateSigningRequest, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1alpha1_CertificateSigningRequest(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.Items = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_CertificateSigningRequestSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*CertificateSigningRequestSpec)
+		out := out.(*CertificateSigningRequestSpec)
+		if in.Request != nil {
+			in, out := &in.Request, &out.Request
+			*out = make([]byte, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Request = nil
+		}
+		out.Username = in.Username
+		out.UID = in.UID
+		if in.Groups != nil {
+			in, out := &in.Groups, &out.Groups
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Groups = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_CertificateSigningRequestStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*CertificateSigningRequestStatus)
+		out := out.(*CertificateSigningRequestStatus)
+		if in.Conditions != nil {
+			in, out := &in.Conditions, &out.Conditions
+			*out = make([]CertificateSigningRequestCondition, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1alpha1_CertificateSigningRequestCondition(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.Conditions = nil
+		}
+		if in.Certificate != nil {
+			in, out := &in.Certificate, &out.Certificate
+			*out = make([]byte, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Certificate = nil
+		}
+		return nil
+	}
 }
