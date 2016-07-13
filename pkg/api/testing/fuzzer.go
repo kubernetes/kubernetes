@@ -169,6 +169,14 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				j.ManualSelector = nil
 			}
 		},
+		func(sj *batch.ScheduledJobSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(sj)
+			suspend := c.RandBool()
+			sj.Suspend = &suspend
+			sds := int64(c.RandUint64())
+			sj.StartingDeadlineSeconds = &sds
+			sj.Schedule = c.RandString()
+		},
 		func(cp *batch.ConcurrencyPolicy, c fuzz.Continue) {
 			policies := []batch.ConcurrencyPolicy{batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent}
 			*cp = policies[c.Rand.Intn(len(policies))]
