@@ -378,6 +378,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.KubeReserved = nil
 		}
 		out.ProtectKernelDefaults = in.ProtectKernelDefaults
+		if in.APIServerList != nil {
+			in, out := &in.APIServerList, &out.APIServerList
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.APIServerList = nil
+		}
 		return nil
 	}
 }

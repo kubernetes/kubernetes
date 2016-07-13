@@ -454,4 +454,7 @@ type KubeletConfiguration struct {
 	KubeReserved map[string]string `json:"kubeReserved"`
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
+	// apiServerList is a list of Kubernetes API servers for publishing events
+	// and reading pods and services. (ip:port), comma separated.
+	APIServerList []string `json:"apiServerList"`
 }

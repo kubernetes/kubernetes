@@ -320,6 +320,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		out.KubeReserved = nil
 	}
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
+	out.APIServerList = in.APIServerList
 	return nil
 }
 
@@ -485,6 +486,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		out.KubeReserved = nil
 	}
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
+	out.APIServerList = in.APIServerList
 	return nil
 }
 

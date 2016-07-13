@@ -41,16 +41,20 @@ const (
 type KubeletServer struct {
 	componentconfig.KubeletConfiguration
 
-	AuthPath      util.StringFlag // Deprecated -- use KubeConfig instead
-	KubeConfig    util.StringFlag
-	APIServerList []string
-
-	RunOnce bool
+	AuthPath   util.StringFlag // Deprecated -- use KubeConfig instead
+	KubeConfig util.StringFlag
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
+
+	// TODO(mtaufen): It is increasingly looking like nobody actually uses the
+	//                Kubelet's runonce mode anymore, so it may be a candidate
+	//                for deprecation and removal.
+	// If runOnce is true, the Kubelet will check the API server once for pods,
+	// run those in addition to the pods specified by the local manifest, and exit.
+	RunOnce bool
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
