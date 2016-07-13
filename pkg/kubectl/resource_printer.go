@@ -146,6 +146,9 @@ type ResourcePrinter interface {
 	// Print receives a runtime object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
 	HandledResources() []string
+	//Can be used to print out warning/clarifications if needed
+	//after all objects were printed
+	FinishPrint(io.Writer, string) error
 }
 
 // ResourcePrinterFunc is a function that can print objects
@@ -159,6 +162,10 @@ func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 // TODO: implement HandledResources()
 func (fn ResourcePrinterFunc) HandledResources() []string {
 	return []string{}
+}
+
+func (fn ResourcePrinterFunc) FinishPrint(io.Writer, string) error {
+	return nil
 }
 
 // VersionedPrinter takes runtime objects and ensures they are converted to a given API version
@@ -176,6 +183,10 @@ func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConver
 		converter: converter,
 		versions:  versions,
 	}
+}
+
+func (p *VersionedPrinter) FinishPrint(w io.Writer, res string) error {
+	return nil
 }
 
 // PrintObj implements ResourcePrinter
@@ -208,6 +219,10 @@ func (p *VersionedPrinter) HandledResources() []string {
 type NamePrinter struct {
 	Decoder runtime.Decoder
 	Typer   runtime.ObjectTyper
+}
+
+func (p *NamePrinter) FinishPrint(w io.Writer, res string) error {
+	return nil
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
@@ -258,6 +273,10 @@ func (p *NamePrinter) HandledResources() []string {
 type JSONPrinter struct {
 }
 
+func (p *JSONPrinter) FinishPrint(w io.Writer, res string) error {
+	return nil
+}
+
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	switch obj := obj.(type) {
@@ -290,6 +309,10 @@ type YAMLPrinter struct {
 	converter runtime.ObjectConvertor
 }
 
+func (p *YAMLPrinter) FinishPrint(w io.Writer, res string) error {
+	return nil
+}
+
 // PrintObj prints the data as YAML.
 func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	switch obj := obj.(type) {
@@ -318,6 +341,7 @@ func (p *YAMLPrinter) HandledResources() []string {
 type handlerEntry struct {
 	columns   []string
 	printFunc reflect.Value
+	args      []reflect.Value
 }
 
 type PrintOptions struct {
@@ -337,9 +361,10 @@ type PrintOptions struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // received from watches.
 type HumanReadablePrinter struct {
-	handlerMap map[reflect.Type]*handlerEntry
-	options    PrintOptions
-	lastType   reflect.Type
+	handlerMap   map[reflect.Type]*handlerEntry
+	options      PrintOptions
+	lastType     reflect.Type
+	hiddenObjNum int
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
@@ -383,6 +408,7 @@ func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) 
 		glog.Errorf("Unable to add print handler: %v", err)
 		return err
 	}
+
 	objType := printFuncValue.Type().In(0)
 	h.handlerMap[objType] = &handlerEntry{
 		columns:   columns,
@@ -430,6 +456,14 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 	return keys
 }
 
+func (h *HumanReadablePrinter) FinishPrint(output io.Writer, res string) error {
+	if !h.options.NoHeaders && !h.options.ShowAll && h.hiddenObjNum > 0 {
+		_, err := fmt.Fprintf(output, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", h.hiddenObjNum, res)
+		return err
+	}
+	return nil
+}
+
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
@@ -469,10 +503,40 @@ var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS",
 var clusterColumns = []string{"NAME", "STATUS", "VERSION", "AGE"}
 var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
 
+func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
+	reason := string(pod.Status.Phase)
+	// if not printing all pods, skip terminated pods (default)
+	if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
+		h.hiddenObjNum++
+		return nil
+	}
+	if err := printPodBase(pod, w, options); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error {
+	for _, pod := range podList.Items {
+		reason := string(pod.Status.Phase)
+		// if not printing all pods, skip terminated pods (default)
+		if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
+			h.hiddenObjNum++
+			continue
+		}
+
+		if err := printPodBase(&pod, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
-	h.Handler(podColumns, printPod)
-	h.Handler(podColumns, printPodList)
+	h.Handler(podColumns, h.printPodList)
+	h.Handler(podColumns, h.printPod)
 	h.Handler(podTemplateColumns, printPodTemplate)
 	h.Handler(podTemplateColumns, printPodTemplateList)
 	h.Handler(replicationControllerColumns, printReplicationController)
@@ -613,10 +677,6 @@ func translateTimestamp(timestamp unversioned.Time) string {
 	return shortHumanDuration(time.Now().Sub(timestamp.Time))
 }
 
-func printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
-	return printPodBase(pod, w, options)
-}
-
 func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	name := formatResourceName(options.Kind, pod.Name, options.WithKind)
 	namespace := pod.Namespace
@@ -626,10 +686,6 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	readyContainers := 0
 
 	reason := string(pod.Status.Phase)
-	// if not printing all pods, skip terminated pods (default)
-	if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-		return nil
-	}
 	if pod.Status.Reason != "" {
 		reason = pod.Status.Reason
 	}
@@ -724,15 +780,6 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 		return err
 	}
 
-	return nil
-}
-
-func printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error {
-	for _, pod := range podList.Items {
-		if err := printPodBase(&pod, w, options); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -2118,6 +2165,10 @@ func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 	}, nil
 }
 
+func (p *TemplatePrinter) FinishPrint(w io.Writer, res string) error {
+	return nil
+}
+
 // PrintObj formats the obj with the Go Template.
 func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	data, err := json.Marshal(obj)
@@ -2263,6 +2314,10 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 		return nil, err
 	}
 	return &JSONPathPrinter{tmpl, j}, nil
+}
+
+func (j *JSONPathPrinter) FinishPrint(w io.Writer, res string) error {
+	return nil
 }
 
 // PrintObj formats the obj with the JSONPath Template.
