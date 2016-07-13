@@ -64,6 +64,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.ResourceContainer = in.ResourceContainer
 	out.UDPIdleTimeout = in.UDPIdleTimeout
 	out.ConntrackMax = in.ConntrackMax
+	out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
 	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 	return nil
 }
@@ -92,6 +93,7 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.ResourceContainer = in.ResourceContainer
 	out.UDPIdleTimeout = in.UDPIdleTimeout
 	out.ConntrackMax = in.ConntrackMax
+	out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
 	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 	return nil
 }
@@ -234,6 +236,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.RuntimeCgroups = in.RuntimeCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
+	if err := api.Convert_Pointer_bool_To_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
+		return err
+	}
 	out.ContainerRuntime = in.ContainerRuntime
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.RktPath = in.RktPath
@@ -391,6 +396,9 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
 	out.KubeletCgroups = in.KubeletCgroups
+	if err := api.Convert_bool_To_Pointer_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
+		return err
+	}
 	out.RuntimeCgroups = in.RuntimeCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
