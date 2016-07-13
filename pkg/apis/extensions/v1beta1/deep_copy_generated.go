@@ -984,6 +984,7 @@ func DeepCopy_v1beta1_ReplicaSetSpec(in ReplicaSetSpec, out *ReplicaSetSpec, c *
 	if err := v1.DeepCopy_v1_PodTemplateSpec(in.Template, &out.Template, c); err != nil {
 		return err
 	}
+	out.Paused = in.Paused
 	return nil
 }
 

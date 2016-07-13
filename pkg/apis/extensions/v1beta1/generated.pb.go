@@ -2617,6 +2617,14 @@ func (m *ReplicaSetSpec) MarshalTo(data []byte) (int, error) {
 		return 0, err
 	}
 	i += n65
+	data[i] = 0x20
+	i++
+	if m.Paused {
+		data[i] = 1
+	} else {
+		data[i] = 0
+	}
+	i++
 	return i, nil
 }
 
@@ -3897,6 +3905,7 @@ func (m *ReplicaSetSpec) Size() (n int) {
 	}
 	l = m.Template.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	n += 2
 	return n
 }
 
@@ -11147,6 +11156,26 @@ func (m *ReplicaSetSpec) Unmarshal(data []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Paused", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Paused = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
