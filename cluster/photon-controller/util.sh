@@ -692,7 +692,13 @@ function upload-server-tars {
 # Wait for the Kubernets healthz API to be responsive on the master
 #
 function wait-master-api {
-  local curl_creds="--insecure --user ${KUBE_USER}:${KUBE_PASSWORD}"
+  if [[ $(curl -V | awk '{print $2}' | head -1) > 7.34.0 ]]; then
+    TLS_OPTS="--insecure --tlsv1.2"
+  else
+    TLS_OPTS="--insecure"
+  fi
+
+  local curl_creds="${TLS_OPTS} --user ${KUBE_USER}:${KUBE_PASSWORD}"
   local curl_output="--fail --output /dev/null --silent"
   local curl_net="--max-time 1"
 

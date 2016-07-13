@@ -235,6 +235,11 @@ health_monitoring() {
   max_seconds=10
   # We simply kill the process when there is a failure. Another upstart job will automatically
   # restart the process.
+  if [[ $(curl -V | awk '{print $2}' | head -1) > 7.34.0 ]]; then
+    TLS_OPTS="--insecure --tlsv1.2"
+  else
+    TLS_OPTS="--insecure"
+  fi
   while [ 1 ]; do
     if ! timeout 10 docker version > /dev/null; then
       echo "Docker daemon failed!"
@@ -242,7 +247,7 @@ health_monitoring() {
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 30
     fi
-    if ! curl --insecure -m "${max_seconds}" -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
+    if ! curl $TLS_OPTS -m "${max_seconds}" -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
       echo "Kubelet is unhealthy!"
       pkill kubelet
       # Wait for a while, as we don't want to kill it again before it is really up.

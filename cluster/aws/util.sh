@@ -1211,7 +1211,13 @@ function wait-master() {
   echo "  up."
   echo
 
-  until $(curl --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
+  if [[ $(curl -V | awk '{print $2}' | head -1) > 7.34.0 ]]; then
+    TLS_OPTS="--insecure --tlsv1.2"
+  else
+    TLS_OPTS="--insecure"
+  fi
+
+  until $(curl $TLS_OPTS --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
     --fail --output $LOG --silent https://${KUBE_MASTER_IP}/healthz); do
     printf "."
     sleep 2
