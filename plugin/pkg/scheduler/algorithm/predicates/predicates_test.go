@@ -2254,6 +2254,62 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: false,
 			test: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
 		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Labels: podLabel,
+				},
+			},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"},
+				ObjectMeta: api.ObjectMeta{Labels: podLabel,
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+						{"PodAntiAffinity": {
+							"requiredDuringSchedulingIgnoredDuringExecution": [{
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "service",
+										"operator": "In",
+										"values": ["securityscan", "value2"]
+									}]
+								},
+								"topologyKey": "zone"
+							}]
+						}}`,
+					}},
+			}},
+			node: &node1,
+			fits: false,
+			test: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. doesn't satisfy PodAntiAffinity symmetry with the existing pod",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Labels: podLabel,
+				},
+			},
+			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"},
+				ObjectMeta: api.ObjectMeta{Labels: podLabel,
+					Annotations: map[string]string{
+						api.AffinityAnnotationKey: `
+                        {"PodAntiAffinity": {
+                            "requiredDuringSchedulingIgnoredDuringExecution": [{
+                                "labelSelector": {
+                                    "matchExpressions": [{
+                                        "key": "service",
+                                        "operator": "NotIn",
+                                        "values": ["securityscan", "value2"]
+                                    }]
+                                },
+                                "topologyKey": "zone"
+                            }]
+                        }}`,
+					}},
+			}},
+			node: &node1,
+			fits: true,
+			test: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. satisfy PodAntiAffinity symmetry with the existing pod",
+		},
 	}
 	for _, test := range tests {
 		node := test.node
