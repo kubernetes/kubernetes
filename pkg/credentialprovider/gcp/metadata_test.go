@@ -20,9 +20,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -30,6 +32,14 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
+
+func createProductNameFile() (string, error) {
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary test file: %v", err)
+	}
+	return file.Name(), ioutil.WriteFile(file.Name(), []byte("Google"), 0600)
+}
 
 func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 	registryUrl := "hello.kubernetes.io"
@@ -44,6 +54,12 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
    }
 }`, registryUrl, email, auth)
 
+	var err error
+	gceProductNameFile, err = createProductNameFile()
+	if err != nil {
+		t.Errorf("failed to create gce product name file: %v", err)
+	}
+	defer os.Remove(gceProductNameFile)
 	const probeEndpoint = "/computeMetadata/v1/"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only serve the one metadata key.
@@ -111,6 +127,12 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
    }
 }`, registryUrl, email, auth)
 
+	var err error
+	gceProductNameFile, err = createProductNameFile()
+	if err != nil {
+		t.Errorf("failed to create gce product name file: %v", err)
+	}
+	defer os.Remove(gceProductNameFile)
 	const probeEndpoint = "/computeMetadata/v1/"
 	const valueEndpoint = "/my/value"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -181,6 +203,13 @@ func TestContainerRegistryBasics(t *testing.T) {
 		emailEndpoint   = defaultEndpoint + "email"
 		tokenEndpoint   = defaultEndpoint + "token"
 	)
+	var err error
+	gceProductNameFile, err = createProductNameFile()
+	if err != nil {
+		t.Errorf("failed to create gce product name file: %v", err)
+	}
+	defer os.Remove(gceProductNameFile)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only serve the URL key and the value endpoint
 		if scopeEndpoint == r.URL.Path {
@@ -260,6 +289,13 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 	}))
 	defer server.Close()
 
+	var err error
+	gceProductNameFile, err = createProductNameFile()
+	if err != nil {
+		t.Errorf("failed to create gce product name file: %v", err)
+	}
+	defer os.Remove(gceProductNameFile)
+
 	// Make a transport that reroutes all traffic to the example server
 	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
@@ -292,6 +328,13 @@ func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 		}
 	}))
 	defer server.Close()
+
+	var err error
+	gceProductNameFile, err = createProductNameFile()
+	if err != nil {
+		t.Errorf("failed to create gce product name file: %v", err)
+	}
+	defer os.Remove(gceProductNameFile)
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := utilnet.SetTransportDefaults(&http.Transport{

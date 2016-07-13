@@ -18,6 +18,7 @@ package gcp_credentials
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -36,7 +37,11 @@ const (
 	metadataEmail            = metadataUrl + "instance/service-accounts/default/email"
 	storageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
 	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
+	googleProductName        = "Google"
 )
+
+// A variable to enable testing
+var gceProductNameFile = "/sys/class/dmi/id/product_name"
 
 // For these urls, the parts of the host name can be glob, for example '*.gcr.io" will match
 // "foo.gcr.io" and "bar.gcr.io".
@@ -98,10 +103,19 @@ func init() {
 		})
 }
 
+// Returns true if it finds a local GCE VM
+func onGCEVM() bool {
+	data, err := ioutil.ReadFile(gceProductNameFile)
+	if err != nil {
+		glog.V(2).Infof("Error while reading product_name: %v", err)
+		return false
+	}
+	return strings.Contains(string(data), googleProductName)
+}
+
 // Enabled implements DockerConfigProvider for all of the Google implementations.
 func (g *metadataProvider) Enabled() bool {
-	_, err := credentialprovider.ReadUrl(metadataUrl, g.Client, metadataHeader)
-	return err == nil
+	return onGCEVM()
 }
 
 // LazyProvide implements DockerConfigProvider. Should never be called.
@@ -151,12 +165,30 @@ func (g *dockerConfigUrlKeyProvider) Provide() credentialprovider.DockerConfig {
 // Enabled implements a special metadata-based check, which verifies the
 // storage scope is available on the GCE VM.
 func (g *containerRegistryProvider) Enabled() bool {
-	value, err := credentialprovider.ReadUrl(metadataScopes+"?alt=json", g.Client, metadataHeader)
-	if err != nil {
+	if !onGCEVM() {
 		return false
 	}
+	// Given that we are on GCE, we should keep retrying until the metadata server responds.
+	var (
+		value   []byte
+		err     error
+		backoff = time.Millisecond
+	)
+	const maxBackoff = time.Minute
+	for {
+		value, err = credentialprovider.ReadUrl(metadataScopes+"?alt=json", g.Client, metadataHeader)
+		if err == nil {
+			break
+		}
+		glog.Errorf("failed to Get %q: %v", metadataScopes+"?alt=json", err)
+		time.Sleep(backoff)
+		backoff = backoff * 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
 	var scopes []string
-	if err := json.Unmarshal([]byte(value), &scopes); err != nil {
+	if err := json.Unmarshal(value, &scopes); err != nil {
 		return false
 	}
 
