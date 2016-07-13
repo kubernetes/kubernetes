@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	pkgstorage "k8s.io/kubernetes/pkg/storage"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -157,7 +158,14 @@ func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
 			}
 			return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
 		},
+		IndexFields: []string{"metadata.name"},
 	}
+}
+
+func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
+	node := obj.(*api.Node)
+	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: node.ObjectMeta.Name}
+	return []pkgstorage.MatchValue{result}
 }
 
 // ResourceLocation returns an URL and transport which one can use to send traffic for the specified node.

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/replicaset"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // ReplicaSetStorage includes dummy storage for ReplicaSets and for Scale subresource.
@@ -61,7 +62,14 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 	newListFunc := func() runtime.Object { return &extensions.ReplicaSetList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Replicasets), &extensions.ReplicaSet{}, prefix, replicaset.Strategy, newListFunc)
+		opts.Storage,
+		cachesize.GetWatchCacheSizeByResource(cachesize.Replicasets),
+		&extensions.ReplicaSet{},
+		prefix,
+		replicaset.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher,
+	)
 
 	store := &registry.Store{
 		NewFunc: func() runtime.Object { return &extensions.ReplicaSet{} },

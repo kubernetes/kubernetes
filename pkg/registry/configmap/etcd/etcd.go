@@ -20,9 +20,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/configmap"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime"
-
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for ConfigMap against etcd
@@ -36,7 +36,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 	newListFunc := func() runtime.Object { return &api.ConfigMapList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage, 100, &api.ConfigMap{}, prefix, configmap.Strategy, newListFunc)
+		opts.Storage, 100, &api.ConfigMap{}, prefix, configmap.Strategy, newListFunc, storage.NoTriggerPublisher)
 
 	store := &registry.Store{
 		NewFunc: func() runtime.Object {

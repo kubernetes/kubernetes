@@ -36,6 +36,41 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 	}
 }
 
+// SimpleFilter implements Filter interface.
+type SimpleFilter struct {
+	filterFunc  func(runtime.Object) bool
+	triggerFunc func() []MatchValue
+}
+
+func (s *SimpleFilter) Filter(obj runtime.Object) bool {
+	return s.filterFunc(obj)
+}
+
+func (s *SimpleFilter) Trigger() []MatchValue {
+	return s.triggerFunc()
+}
+
+func NewSimpleFilter(
+	filterFunc func(runtime.Object) bool,
+	triggerFunc func() []MatchValue) Filter {
+	return &SimpleFilter{
+		filterFunc:  filterFunc,
+		triggerFunc: triggerFunc,
+	}
+}
+
+func EverythingFunc(runtime.Object) bool {
+	return true
+}
+
+func NoTriggerFunc() []MatchValue {
+	return nil
+}
+
+func NoTriggerPublisher(runtime.Object) []MatchValue {
+	return nil
+}
+
 // ParseWatchResourceVersion takes a resource version argument and converts it to
 // the etcd version we should pass to helper.Watch(). Because resourceVersion is
 // an opaque value, the default watch behavior for non-zero watch is to watch

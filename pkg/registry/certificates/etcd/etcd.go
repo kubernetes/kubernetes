@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for CertificateSigningRequest against etcd
@@ -39,7 +40,15 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *ApprovalREST) {
 	prefix := "/certificatesigningrequests"
 
 	newListFunc := func() runtime.Object { return &certificates.CertificateSigningRequestList{} }
-	storageInterface := opts.Decorator(opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.CertificateSigningRequests), &certificates.CertificateSigningRequest{}, prefix, csrregistry.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage,
+		cachesize.GetWatchCacheSizeByResource(cachesize.CertificateSigningRequests),
+		&certificates.CertificateSigningRequest{},
+		prefix,
+		csrregistry.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher,
+	)
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &certificates.CertificateSigningRequest{} },

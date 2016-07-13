@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/poddisruptionbudget"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for pod disruption budgets against etcd
@@ -38,7 +39,14 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 	newListFunc := func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.PodDisruptionBudget), &policyapi.PodDisruptionBudget{}, prefix, poddisruptionbudget.Strategy, newListFunc)
+		opts.Storage,
+		cachesize.GetWatchCacheSizeByResource(cachesize.PodDisruptionBudget),
+		&policyapi.PodDisruptionBudget{},
+		prefix,
+		poddisruptionbudget.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher,
+	)
 
 	store := &registry.Store{
 		NewFunc: func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
