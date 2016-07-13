@@ -148,8 +148,9 @@ func (q *UniqueQueue) Clear() {
 // RateLimitedTimedQueue is a unique item priority queue ordered by the expected next time
 // of execution. It is also rate limited.
 type RateLimitedTimedQueue struct {
-	queue   UniqueQueue
-	limiter flowcontrol.RateLimiter
+	queue       UniqueQueue
+	limiterLock sync.Mutex
+	limiter     flowcontrol.RateLimiter
 }
 
 // Creates new queue which will use given RateLimiter to oversee execution.
@@ -173,6 +174,8 @@ type ActionFunc func(TimedValue) (bool, time.Duration)
 // time to execute the next item in the queue.
 func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	val, ok := q.queue.Head()
+	q.limiterLock.Lock()
+	defer q.limiterLock.Unlock()
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
@@ -215,4 +218,25 @@ func (q *RateLimitedTimedQueue) Remove(value string) bool {
 // Removes all items from the queue
 func (q *RateLimitedTimedQueue) Clear() {
 	q.queue.Clear()
+}
+
+// SwapLimiter safely swaps current limiter for this queue with the passed one if capacities or qps's differ.
+func (q *RateLimitedTimedQueue) SwapLimiter(limiter flowcontrol.RateLimiter) {
+	if q.limiter.Capacity() == limiter.Capacity() && q.limiter.QPS() == limiter.QPS() {
+		return
+	}
+	q.limiterLock.Lock()
+	defer q.limiterLock.Unlock()
+	// If we're currently waiting on limiter, we drain the new one - this is best effort approach.
+	for q.limiter.Saturation() > limiter.Saturation() {
+		// Check if we're not using fake limiter
+		previousSaturation := limiter.Saturation()
+		limiter.TryAccept()
+		// It's a fake limiter
+		if limiter.Saturation() == previousSaturation {
+			break
+		}
+	}
+	q.limiter.Stop()
+	q.limiter = limiter
 }
