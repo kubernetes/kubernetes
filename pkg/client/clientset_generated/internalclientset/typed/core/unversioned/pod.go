@@ -37,7 +37,7 @@ type PodInterface interface {
 	Get(name string) (*api.Pod, error)
 	List(opts api.ListOptions) (*api.PodList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.Pod, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Pod, err error)
 	PodExpansion
 }
 
@@ -150,11 +150,12 @@ func (c *pods) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched pod.
-func (c *pods) Patch(name string, pt api.PatchType, data []byte) (result *api.Pod, err error) {
+func (c *pods) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("pods").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

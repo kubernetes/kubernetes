@@ -98,9 +98,9 @@ func (c *FakeComponentStatuses) Watch(opts api.ListOptions) (watch.Interface, er
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *FakeComponentStatuses) Patch(name string, pt api.PatchType, data []byte) (result *api.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(componentstatusesResource, name, data), &api.ComponentStatus{})
+		Invokes(core.NewRootPatchSubresourceAction(componentstatusesResource, name, data, subresources...), &api.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}

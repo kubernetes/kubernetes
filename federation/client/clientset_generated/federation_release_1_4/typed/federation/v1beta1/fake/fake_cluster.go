@@ -108,9 +108,9 @@ func (c *FakeClusters) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched cluster.
-func (c *FakeClusters) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Cluster, err error) {
+func (c *FakeClusters) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(clustersResource, name, data), &v1beta1.Cluster{})
+		Invokes(core.NewRootPatchSubresourceAction(clustersResource, name, data, subresources...), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}

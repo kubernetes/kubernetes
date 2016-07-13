@@ -37,7 +37,7 @@ type ServiceInterface interface {
 	Get(name string) (*api.Service, error)
 	List(opts api.ListOptions) (*api.ServiceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.Service, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Service, err error)
 	ServiceExpansion
 }
 
@@ -150,11 +150,12 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched service.
-func (c *services) Patch(name string, pt api.PatchType, data []byte) (result *api.Service, err error) {
+func (c *services) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("services").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

@@ -37,7 +37,7 @@ type NodeInterface interface {
 	Get(name string) (*api.Node, error)
 	List(opts api.ListOptions) (*api.NodeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.Node, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Node, err error)
 	NodeExpansion
 }
 
@@ -140,10 +140,11 @@ func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *nodes) Patch(name string, pt api.PatchType, data []byte) (result *api.Node, err error) {
+func (c *nodes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Node, err error) {
 	result = &api.Node{}
 	err = c.client.Patch(pt).
 		Resource("nodes").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

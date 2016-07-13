@@ -38,7 +38,7 @@ type ReplicaSetInterface interface {
 	Get(name string) (*extensions.ReplicaSet, error)
 	List(opts api.ListOptions) (*extensions.ReplicaSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *extensions.ReplicaSet, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error)
 	ReplicaSetExpansion
 }
 
@@ -151,11 +151,12 @@ func (c *replicaSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *replicaSets) Patch(name string, pt api.PatchType, data []byte) (result *extensions.ReplicaSet, err error) {
+func (c *replicaSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("replicasets").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

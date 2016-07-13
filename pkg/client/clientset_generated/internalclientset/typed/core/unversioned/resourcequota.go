@@ -37,7 +37,7 @@ type ResourceQuotaInterface interface {
 	Get(name string) (*api.ResourceQuota, error)
 	List(opts api.ListOptions) (*api.ResourceQuotaList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.ResourceQuota, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ResourceQuota, err error)
 	ResourceQuotaExpansion
 }
 
@@ -150,11 +150,12 @@ func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched resourceQuota.
-func (c *resourceQuotas) Patch(name string, pt api.PatchType, data []byte) (result *api.ResourceQuota, err error) {
+func (c *resourceQuotas) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("resourcequotas").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

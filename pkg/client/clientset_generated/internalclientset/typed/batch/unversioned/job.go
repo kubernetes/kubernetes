@@ -38,7 +38,7 @@ type JobInterface interface {
 	Get(name string) (*batch.Job, error)
 	List(opts api.ListOptions) (*batch.JobList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *batch.Job, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.Job, err error)
 	JobExpansion
 }
 
@@ -151,11 +151,12 @@ func (c *jobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched job.
-func (c *jobs) Patch(name string, pt api.PatchType, data []byte) (result *batch.Job, err error) {
+func (c *jobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.Job, err error) {
 	result = &batch.Job{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("jobs").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

@@ -37,7 +37,7 @@ type EndpointsInterface interface {
 	Get(name string) (*v1.Endpoints, error)
 	List(opts api.ListOptions) (*v1.EndpointsList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *v1.Endpoints, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Endpoints, err error)
 	EndpointsExpansion
 }
 
@@ -137,11 +137,12 @@ func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched endpoints.
-func (c *endpoints) Patch(name string, pt api.PatchType, data []byte) (result *v1.Endpoints, err error) {
+func (c *endpoints) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Endpoints, err error) {
 	result = &v1.Endpoints{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("endpoints").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

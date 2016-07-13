@@ -36,7 +36,7 @@ type ComponentStatusInterface interface {
 	Get(name string) (*api.ComponentStatus, error)
 	List(opts api.ListOptions) (*api.ComponentStatusList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.ComponentStatus, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ComponentStatus, err error)
 	ComponentStatusExpansion
 }
 
@@ -127,10 +127,11 @@ func (c *componentStatuses) Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *componentStatuses) Patch(name string, pt api.PatchType, data []byte) (result *api.ComponentStatus, err error) {
+func (c *componentStatuses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Patch(pt).
 		Resource("componentstatuses").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().
