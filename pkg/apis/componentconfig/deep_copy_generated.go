@@ -174,6 +174,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in KubeProxyConfiguration, 
 		return err
 	}
 	out.ConntrackMax = in.ConntrackMax
+	out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
 	if err := unversioned.DeepCopy_unversioned_Duration(in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, c); err != nil {
 		return err
 	}

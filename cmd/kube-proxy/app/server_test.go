@@ -19,12 +19,14 @@ package app
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -268,7 +270,6 @@ func Test_getProxyMode(t *testing.T) {
 // Config and iptinterface are not nil when CleanupAndExit is true.
 // To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
-
 	// creates default config
 	config := options.NewProxyConfig()
 
@@ -283,4 +284,52 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 	assert.NotNil(t, proxyserver)
 	assert.NotNil(t, proxyserver.Config)
 	assert.NotNil(t, proxyserver.IptInterface)
+}
+
+func TestGetConntrackMax(t *testing.T) {
+	ncores := runtime.NumCPU()
+	testCases := []struct {
+		config   componentconfig.KubeProxyConfiguration
+		expected int
+		err      string
+	}{
+		{
+			config:   componentconfig.KubeProxyConfiguration{},
+			expected: 0,
+		},
+		{
+			config: componentconfig.KubeProxyConfiguration{
+				ConntrackMax: 12345,
+			},
+			expected: 12345,
+		},
+		{
+			config: componentconfig.KubeProxyConfiguration{
+				ConntrackMax:        12345,
+				ConntrackMaxPerCore: 67890,
+			},
+			expected: -1,
+			err:      "mutually exclusive",
+		},
+		{
+			config: componentconfig.KubeProxyConfiguration{
+				ConntrackMaxPerCore: 67890, // use this if other is 0
+			},
+			expected: 67890 * ncores,
+		},
+	}
+
+	for i, tc := range testCases {
+		cfg := options.ProxyServerConfig{KubeProxyConfiguration: tc.config}
+		x, e := getConntrackMax(&cfg)
+		if e != nil {
+			if tc.err == "" {
+				t.Errorf("[%d] unexpected error: %v", i, e)
+			} else if !strings.Contains(e.Error(), tc.err) {
+				t.Errorf("[%d] expected an error containing %q: %v", i, tc.err, e)
+			}
+		} else if x != tc.expected {
+			t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
+		}
+	}
 }
