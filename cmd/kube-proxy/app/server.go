@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -298,8 +299,12 @@ func (s *ProxyServer) Run() error {
 
 	// Tune conntrack, if requested
 	if s.Conntracker != nil {
-		if s.Config.ConntrackMax > 0 {
-			err := s.Conntracker.SetMax(int(s.Config.ConntrackMax))
+		max, err := getConntrackMax(s.Config)
+		if err != nil {
+			return err
+		}
+		if max > 0 {
+			err := s.Conntracker.SetMax(max)
 			if err != nil {
 				if err != readOnlySysFSError {
 					return err
@@ -327,6 +332,18 @@ func (s *ProxyServer) Run() error {
 	// Just loop forever for now...
 	s.Proxier.SyncLoop()
 	return nil
+}
+
+func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
+	if config.ConntrackMax > 0 && config.ConntrackMaxPerCore > 0 {
+		return -1, fmt.Errorf("invalid config: ConntrackMax and ConntrackMaxPerCore are mutually exclusive")
+	}
+	if config.ConntrackMax > 0 {
+		return int(config.ConntrackMax), nil
+	} else if config.ConntrackMaxPerCore > 0 {
+		return (int(config.ConntrackMaxPerCore) * runtime.NumCPU()), nil
+	}
+	return 0, nil
 }
 
 type nodeGetter interface {
