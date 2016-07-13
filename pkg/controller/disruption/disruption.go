@@ -430,31 +430,40 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 		expectedCount = int32(len(pods))
 	} else if pdb.Spec.MinAvailable.Type == intstr.String {
 		// When the user specifies a fraction of pods that must be available, we
-		// use as the fraction's denominator the sum of the values of the /scale
-		// subresource for the pods' controllers.
+		// use as the fraction's denominator
+		// SUM_{all c in C} scale(c)
+		// where C is the union of C_p1, C_p2, ..., C_pN
+		// and each C_pi is the set of controllers controlling the pod pi
+
+		// k8s only defines what will happens when 0 or 1 controllers control a
+		// given pod.  We explicitly exclude the 0 controllers case here, and we
+		// report an error if we find a pod with more than 1 controller.  Thus in
+		// practice each C_pi is a set of exactly 1 controller.
 
 		// A mapping from controllers to their scale.
 		controllerScale := map[types.UID]int32{}
 
 		// 1. Find the controller(s) for each pod.  If any pod has 0 controllers,
-		// that's an error.
+		// that's an error.  If any pod has more than 1 controller, that's also an
+		// error.
 		for _, pod := range pods {
-			foundController := false
+			controllerCount := 0
 			for _, finder := range dc.finders() {
 				var controllers []controllerAndScale
 				controllers, err = finder(pod)
 				if err != nil {
 					return
 				}
-				if len(controllers) > 0 {
-					foundController = true
-					for _, controller := range controllers {
-						controllerScale[controller.UID] = controller.scale
-					}
+				for _, controller := range controllers {
+					controllerScale[controller.UID] = controller.scale
+					controllerCount++
 				}
 			}
-			if !foundController {
+			if controllerCount == 0 {
 				err = fmt.Errorf("Asked for percentage, but found no controllers for pod %q", pod.Name)
+				return
+			} else if controllerCount > 1 {
+				err = fmt.Errorf("Pod %q has %v>1 controllers", pod.Name, controllerCount)
 				return
 			}
 		}
