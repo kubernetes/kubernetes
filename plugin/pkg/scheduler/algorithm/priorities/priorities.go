@@ -28,9 +28,25 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
+type resources struct {
+	millicpu int64
+	memory   int64
+}
+
+func getNonZeroRequests(pod *api.Pod) *resources {
+	result := &resources{}
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
+		result.millicpu += cpu
+		result.memory += memory
+	}
+	return result
+}
+
 // the unused capacity is calculated on a scale of 0-10
 // 0 being the lowest priority and 10 being the highest
-func calculateScore(requested int64, capacity int64, node string) int {
+func calculateScore(requested int64, capacity int64, node string) int64 {
 	if capacity == 0 {
 		return 0
 	}
@@ -39,36 +55,33 @@ func calculateScore(requested int64, capacity int64, node string) int {
 			requested, capacity, node)
 		return 0
 	}
-	return int(((capacity - requested) * 10) / capacity)
+	return ((capacity - requested) * 10) / capacity
 }
 
 // Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 // TODO: Use Node() from nodeInfo instead of passing it.
-func calculateResourceOccupancy(pod *api.Pod, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
-	totalMilliCPU := nodeInfo.NonZeroRequest().MilliCPU
-	totalMemory := nodeInfo.NonZeroRequest().Memory
+func calculateResourceOccupancy(pod *api.Pod, podRequests *resources, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
 	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
 	capacityMemory := node.Status.Allocatable.Memory().Value()
 
-	// Add the resources requested by the current pod being scheduled.
-	// This also helps differentiate between differently sized, but empty, nodes.
-	for i := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[i]
-		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
-		totalMilliCPU += cpu
-		totalMemory += memory
-	}
+	totalResources := *podRequests
+	totalResources.millicpu += nodeInfo.NonZeroRequest().MilliCPU
+	totalResources.memory += nodeInfo.NonZeroRequest().Memory
 
-	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
-	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
-	glog.V(10).Infof(
-		"%v -> %v: Least Requested Priority, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d CPU %d memory",
-		pod.Name, node.Name,
-		capacityMilliCPU, capacityMemory,
-		totalMilliCPU, totalMemory,
-		cpuScore, memoryScore,
-	)
+	cpuScore := calculateScore(totalResources.millicpu, capacityMilliCPU, node.Name)
+	memoryScore := calculateScore(totalResources.memory, capacityMemory, node.Name)
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.V(10).Infof(
+			"%v -> %v: Least Requested Priority, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d CPU %d memory",
+			pod.Name, node.Name,
+			capacityMilliCPU, capacityMemory,
+			totalResources.millicpu, totalResources.memory,
+			cpuScore, memoryScore,
+		)
+	}
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
@@ -86,9 +99,10 @@ func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulerca
 		return schedulerapi.HostPriorityList{}, err
 	}
 
+	podResources := getNonZeroRequests(pod)
 	list := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	for _, node := range nodes {
-		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name]))
+		list = append(list, calculateResourceOccupancy(pod, podResources, node, nodeNameToInfo[node.Name]))
 	}
 	return list, nil
 }
@@ -220,32 +234,26 @@ func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedul
 		return schedulerapi.HostPriorityList{}, err
 	}
 
+	podResources := getNonZeroRequests(pod)
 	list := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	for _, node := range nodes {
-		list = append(list, calculateBalancedResourceAllocation(pod, node, nodeNameToInfo[node.Name]))
+		list = append(list, calculateBalancedResourceAllocation(pod, podResources, node, nodeNameToInfo[node.Name]))
 	}
 	return list, nil
 }
 
 // TODO: Use Node() from nodeInfo instead of passing it.
-func calculateBalancedResourceAllocation(pod *api.Pod, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
-	totalMilliCPU := nodeInfo.NonZeroRequest().MilliCPU
-	totalMemory := nodeInfo.NonZeroRequest().Memory
-	score := int(0)
-	// Add the resources requested by the current pod being scheduled.
-	// This also helps differentiate between differently sized, but empty, nodes.
-	for i := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[i]
-		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
-		totalMilliCPU += cpu
-		totalMemory += memory
-	}
-
+func calculateBalancedResourceAllocation(pod *api.Pod, podRequests *resources, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
 	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
 	capacityMemory := node.Status.Allocatable.Memory().Value()
 
-	cpuFraction := fractionOfCapacity(totalMilliCPU, capacityMilliCPU)
-	memoryFraction := fractionOfCapacity(totalMemory, capacityMemory)
+	totalResources := *podRequests
+	totalResources.millicpu += nodeInfo.NonZeroRequest().MilliCPU
+	totalResources.memory += nodeInfo.NonZeroRequest().Memory
+
+	cpuFraction := fractionOfCapacity(totalResources.millicpu, capacityMilliCPU)
+	memoryFraction := fractionOfCapacity(totalResources.memory, capacityMemory)
+	score := int(0)
 	if cpuFraction >= 1 || memoryFraction >= 1 {
 		// if requested >= capacity, the corresponding host should never be preferrred.
 		score = 0
@@ -257,13 +265,17 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node *api.Node, nodeInfo 
 		diff := math.Abs(cpuFraction - memoryFraction)
 		score = int(10 - diff*10)
 	}
-	glog.V(10).Infof(
-		"%v -> %v: Balanced Resource Allocation, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
-		pod.Name, node.Name,
-		capacityMilliCPU, capacityMemory,
-		totalMilliCPU, totalMemory,
-		score,
-	)
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.V(10).Infof(
+			"%v -> %v: Balanced Resource Allocation, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
+			pod.Name, node.Name,
+			capacityMilliCPU, capacityMemory,
+			totalResources.millicpu, totalResources.memory,
+			score,
+		)
+	}
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,

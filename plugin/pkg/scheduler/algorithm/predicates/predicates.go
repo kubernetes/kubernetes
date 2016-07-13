@@ -69,6 +69,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 type predicateMetadata struct {
 	podBestEffort bool
 	podRequest    *resourceRequest
+	podPorts      map[int]bool
 }
 
 func PredicateMetadata(pod *api.Pod) interface{} {
@@ -79,6 +80,7 @@ func PredicateMetadata(pod *api.Pod) interface{} {
 	return &predicateMetadata{
 		podBestEffort: isPodBestEffort(pod),
 		podRequest:    getResourceRequest(pod),
+		podPorts:      getUsedPorts(pod),
 	}
 }
 
@@ -479,8 +481,7 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 	}
 
 	var podRequest *resourceRequest
-	predicateMeta, ok := meta.(*predicateMetadata)
-	if ok {
+	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podRequest = predicateMeta.podRequest
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
@@ -751,16 +752,21 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, n
 }
 
 func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	wantPorts := getUsedPorts(pod)
+	var wantPorts map[int]bool
+	if predicateMeta, ok := meta.(*predicateMetadata); ok {
+		wantPorts = predicateMeta.podPorts
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		wantPorts = getUsedPorts(pod)
+	}
 	if len(wantPorts) == 0 {
 		return true, nil
 	}
+
+	// TODO: Aggregate it at the NodeInfo level.
 	existingPorts := getUsedPorts(nodeInfo.Pods()...)
 	for wport := range wantPorts {
-		if wport == 0 {
-			continue
-		}
-		if existingPorts[wport] {
+		if wport != 0 && existingPorts[wport] {
 			return false, ErrPodNotFitsHostPorts
 		}
 	}
@@ -768,7 +774,6 @@ func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 }
 
 func getUsedPorts(pods ...*api.Pod) map[int]bool {
-	// TODO: Aggregate it at the NodeInfo level.
 	ports := make(map[int]bool)
 	for _, pod := range pods {
 		for j := range pod.Spec.Containers {
