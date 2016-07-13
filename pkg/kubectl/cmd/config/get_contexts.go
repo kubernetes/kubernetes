@@ -62,7 +62,7 @@ func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess)
 		Long:    getContextsLong,
 		Example: getContextsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
+			validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
 			supportedOutputTypes := sets.NewString("", "name")
 			outputFormat := cmdutil.GetFlagString(cmd, "output")
 			if !validOutputTypes.Has(outputFormat) {
