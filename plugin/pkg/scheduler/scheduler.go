@@ -140,6 +140,9 @@ func (s *Scheduler) scheduleOne() {
 		err := s.config.Binder.Bind(b)
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %v/%v", pod.Namespace, pod.Name)
+			if err := s.config.SchedulerCache.ForgetPod(&assumed); err != nil {
+				glog.Errorf("scheduler cache ForgetPod failed: %v", err)
+			}
 			s.config.Error(pod, err)
 			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
