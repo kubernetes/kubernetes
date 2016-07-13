@@ -76,8 +76,15 @@ export KUBE_GOLDFLAGS GOLDFLAGS
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
 .PHONY: all
-all: generated_files
+all: precheck generated_files
 	hack/make-rules/build.sh $(WHAT)
+
+.PHONY: precheck
+precheck: precheck-gopath
+
+.PHONY: precheck-gopath
+precheck-gopath:
+	hack/make-rules/precheck-gopath.sh
 
 # Build ginkgo
 #
