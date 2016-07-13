@@ -376,11 +376,15 @@ purge-old-docker-package:
     - mode: 644
     - makedirs: true
 
+libltdl7:
+  pkg.installed
+
 docker-upgrade:
   cmd.run:
     - name: /opt/kubernetes/helpers/pkg install-no-start {{ docker_pkg_name }} {{ override_docker_ver }} /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
+      - pkg: libltdl7
 
 {% endif %} # end override_docker_ver != ''
 
