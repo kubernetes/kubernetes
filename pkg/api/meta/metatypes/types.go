@@ -28,3 +28,7 @@ type OwnerReference struct {
 	Name       string
 	Controller *bool
 }
+
+type ClusterReference struct {
+	ClusterName string
+}

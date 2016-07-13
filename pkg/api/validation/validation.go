@@ -174,6 +174,16 @@ func ValidateOwnerReferences(ownerReferences []api.OwnerReference, fldPath *fiel
 	return allErrs
 }
 
+func ValidateClusterReference(clusterReference *api.ClusterReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if clusterReference != nil && len(clusterReference.ClusterName) != 0 {
+		for _, msg := range ValidateClusterName(clusterReference.ClusterName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), clusterReference.ClusterName, msg))
+		}
+	}
+	return allErrs
+}
+
 // ValidateNameFunc validates that the provided name is valid for a given resource type.
 // Not all resources have the same validation rules for names. Prefix is true
 // if the name will have a value appended to it.  If the name is not valid,
@@ -241,6 +251,9 @@ var ValidateServiceAccountName = NameIsDNSSubdomain
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 var ValidateEndpointsName = NameIsDNSSubdomain
+
+// ValidateClusterName can be used to check whether the given cluster name is valid.
+var ValidateClusterName = NameIsDNSSubdomain
 
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
@@ -327,6 +340,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type"))
 		}
 	}
+	allErrs = append(allErrs, ValidateClusterReference(meta.Cluster, fldPath.Child("cluster"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
@@ -388,6 +402,7 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *api.ObjectMeta, fldPath *field.P
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.Namespace, oldMeta.Namespace, fldPath.Child("namespace"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.UID, oldMeta.UID, fldPath.Child("uid"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.CreationTimestamp, oldMeta.CreationTimestamp, fldPath.Child("creationTimestamp"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.Cluster, oldMeta.Cluster, fldPath.Child("cluster"))...)
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(newMeta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.Annotations, fldPath.Child("annotations"))...)

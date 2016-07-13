@@ -150,6 +150,12 @@ type ObjectMeta struct {
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
 	// in this list can only be removed.
 	Finalizers []string `json:"finalizers,omitempty"`
+
+	// A referece to the cluster which the object belongs to.
+	// This is used to distinguish resources with same name and namespace in different clusters.
+	// An empty value means the object belongs to the local cluster (the one the client connects to).
+	// Cannot be updated.
+	Cluster *ClusterReference `json:"cluster,omitempty"`
 }
 
 const (
@@ -164,6 +170,13 @@ const (
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
+
+// ClusterReference contains information to identify a cluster.
+type ClusterReference struct {
+	// The name of the cluster.
+	// Cannot be updated.
+	ClusterName string `json:"clusterName,omitempty"`
+}
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
