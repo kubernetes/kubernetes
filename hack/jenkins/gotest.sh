@@ -41,5 +41,5 @@ export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/_artifacts
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 
-./hack/test-go.sh
-./hack/test-integration.sh
+make test
+make test-integration

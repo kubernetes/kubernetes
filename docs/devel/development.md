@@ -71,11 +71,16 @@ up a GOPATH.
 To build Kubernetes using your local Go development environment (generate linux
 binaries):
 
-        hack/build-go.sh
+```sh
+        make
+```
+
 You may pass build options and packages to the script as necessary. To build
 binaries for all platforms:
 
-        hack/build-cross.sh
+```sh
+        make cross
+```
 
 ## Workflow
 
@@ -314,8 +319,8 @@ Three basic commands let you run unit, integration and/or e2e tests:
 
 ```sh
 cd kubernetes
-hack/test-go.sh  # Run unit tests
-hack/test-integration.sh  # Run integration tests, requires etcd
+make test  # Run unit tests
+make test-integration  # Run integration tests, requires etcd
 go run hack/e2e.go -v --build --up --test --down  # Run e2e tests
 ```
 

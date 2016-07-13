@@ -59,12 +59,10 @@ func main() {
 	arguments := args.Default()
 
 	// Override defaults.
-	arguments.OutputFileBaseName = "deep_copy_generated"
+	arguments.OutputFileBaseName = "deepcopy_generated"
 
 	// Custom args.
-	customArgs := &generators.CustomArgs{
-		BoundingDirs: []string{"k8s.io/kubernetes"},
-	}
+	customArgs := &generators.CustomArgs{}
 	pflag.CommandLine.StringSliceVar(&customArgs.BoundingDirs, "bounding-dirs", customArgs.BoundingDirs,
 		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
 	arguments.CustomArgs = customArgs

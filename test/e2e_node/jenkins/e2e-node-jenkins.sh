@@ -28,6 +28,7 @@ set -x
 
 . $1
 
+make generated_files
 go build test/e2e_node/environment/conformance.go
 
 WORKSPACE=${WORKSPACE:-"/tmp/"}

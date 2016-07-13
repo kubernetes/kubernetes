@@ -83,13 +83,13 @@ passing, so it is often a good idea to make sure the e2e tests work as well.
 
 ### Run all unit tests
 
-The `hack/test-go.sh` script is the entrypoint for running the unit tests that
-ensures that `GOPATH` is set up correctly.  If you have `GOPATH` set up
-correctly, you can also just use `go test` directly.
+`make test` is the entrypoint for running the unit tests that ensures that
+`GOPATH` is set up correctly.  If you have `GOPATH` set up correctly, you can
+also just use `go test` directly.
 
 ```sh
 cd kubernetes
-hack/test-go.sh  # Run all unit tests.
+make test  # Run all unit tests.
 ```
 
 ### Set go flags during unit tests
@@ -99,18 +99,23 @@ You can set [go flags](https://golang.org/cmd/go/) by setting the
 
 ### Run unit tests from certain packages
 
-The `hack/test-go.sh` script accepts packages as arguments; the
-`k8s.io/kubernetes` prefix is added automatically to these:
+`make test` accepts packages as arguments; the `k8s.io/kubernetes` prefix is
+added automatically to these:
 
 ```sh
-hack/test-go.sh pkg/api             # run tests for pkg/api
-hack/test-go.sh pkg/api pkg/kubelet # run tests for pkg/api and pkg/kubelet
+make test WHAT=pkg/api                # run tests for pkg/api
+```
+
+To run multiple targets you need quotes:
+
+```sh
+make test WHAT="pkg/api pkg/kubelet"  # run tests for pkg/api and pkg/kubelet
 ```
 
 In a shell, it's often handy to use brace expansion:
 
 ```sh
-hack/test-go.sh pkg/{api,kubelet} # run tests for pkg/api and pkg/kubelet
+make test WHAT=pkg/{api,kubelet}  # run tests for pkg/api and pkg/kubelet
 ```
 
 ### Run specific unit test cases in a package
@@ -121,10 +126,10 @@ regular expression for the name of the test that should be run.
 
 ```sh
 # Runs TestValidatePod in pkg/api/validation with the verbose flag set
-KUBE_GOFLAGS="-v" KUBE_TEST_ARGS='-run ^TestValidatePod$' hack/test-go.sh pkg/api/validation
+make test WHAT=pkg/api/validation KUBE_GOFLAGS="-v" KUBE_TEST_ARGS='-run ^TestValidatePod$'
 
 # Runs tests that match the regex ValidatePod|ValidateConfigMap in pkg/api/validation
-KUBE_GOFLAGS="-v" KUBE_TEST_ARGS="-run ValidatePod\|ValidateConfigMap$" hack/test-go.sh pkg/api/validation
+make test WHAT=pkg/api/validation KUBE_GOFLAGS="-v" KUBE_TEST_ARGS="-run ValidatePod\|ValidateConfigMap$"
 ```
 
 For other supported test flags, see the [golang
@@ -137,7 +142,7 @@ You can do this efficiently.
 
 ```sh
 # Have 2 workers run all tests 5 times each (10 total iterations).
-hack/test-go.sh -p 2 -i 5
+make test PARALLEL=2 ITERATION=5
 ```
 
 For more advanced ideas please see [flaky-tests.md](flaky-tests.md).
@@ -149,7 +154,7 @@ Currently, collecting coverage is only supported for the Go unit tests.
 To run all unit tests and generate an HTML coverage report, run the following:
 
 ```sh
-KUBE_COVER=y hack/test-go.sh
+make test KUBE_COVER=y
 ```
 
 At the end of the run, an HTML report will be generated with the path
@@ -159,7 +164,7 @@ To run tests and collect coverage in only one package, pass its relative path
 under the `kubernetes` directory as an argument, for example:
 
 ```sh
-KUBE_COVER=y hack/test-go.sh pkg/kubectl
+make test WHAT=pkg/kubectl KUBE_COVER=y
 ```
 
 Multiple arguments can be passed, in which case the coverage results will be
@@ -224,14 +229,14 @@ for those internal etcd instances with the `TEST_ETCD_DIR` environment variable.
 
 ### Run integration tests
 
-The integration tests are run using the `hack/test-integration.sh` script.
+The integration tests are run using `make test-integration`.
 The Kubernetes integration tests are writting using the normal golang testing
 package but expect to have a running etcd instance to connect to.  The `test-
-integration.sh` script wraps `hack/test-go.sh` and sets up an etcd instance
+integration.sh` script wraps `make test` and sets up an etcd instance
 for the integration tests to use.
 
 ```sh
-hack/test-integration.sh  # Run all integration tests.
+make test-integration  # Run all integration tests.
 ```
 
 This script runs the golang tests in package
@@ -244,7 +249,7 @@ You can use also use the `KUBE_TEST_ARGS` environment variable with the `hack
 
 ```sh
 # Run integration test TestPodUpdateActiveDeadlineSeconds with the verbose flag set.
-KUBE_GOFLAGS="-v" KUBE_TEST_ARGS="-run ^TestPodUpdateActiveDeadlineSeconds$" hack/test-integration.sh
+make test-integration KUBE_GOFLAGS="-v" KUBE_TEST_ARGS="-run ^TestPodUpdateActiveDeadlineSeconds$"
 ```
 
 If you set `KUBE_TEST_ARGS`, the test case will be run with only the `v1` API

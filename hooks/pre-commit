@@ -7,7 +7,7 @@ readonly green=$(tput bold; tput setaf 2)
 exit_code=0
 
 echo -ne "Checking that it builds... "
-if ! OUT=$("hack/build-go.sh" 2>&1); then
+if ! OUT=$(make 2>&1); then
   echo
   echo "${red}${OUT}"
   exit_code=1
