@@ -82,6 +82,6 @@ type PodContainerManager interface {
 
 	Exists(*api.Pod) bool
 
-	//Destroy takes a pod as argument and destroys the pod's container.
+	//Destroy takes a pod Cgroup name as argument and destroys the pod's container.
 	Destroy(string) error
 }
