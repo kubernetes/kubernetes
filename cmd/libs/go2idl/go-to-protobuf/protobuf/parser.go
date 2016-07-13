@@ -213,9 +213,41 @@ func (v *optionalItemsVisitor) Visit(n ast.Node) ast.Visitor {
 			}
 		}
 	case *ast.IfStmt:
-		if b, ok := t.Cond.(*ast.BinaryExpr); ok && b.Op == token.EQL {
-			if isFieldSelector(b.X, "m", "Items") && isIdent(b.Y, "nil") {
-				b.X = &ast.StarExpr{X: &ast.Ident{Name: "m"}}
+		switch cond := t.Cond.(type) {
+		case *ast.BinaryExpr:
+			if cond.Op == token.EQL {
+				if isFieldSelector(cond.X, "m", "Items") && isIdent(cond.Y, "nil") {
+					cond.X = &ast.StarExpr{X: &ast.Ident{Name: "m"}}
+				}
+			}
+		}
+		if t.Init != nil {
+			// Find form:
+			// if err := m[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			// 	return err
+			// }
+			switch s := t.Init.(type) {
+			case *ast.AssignStmt:
+				if call, ok := s.Rhs[0].(*ast.CallExpr); ok {
+					if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+						if x, ok := sel.X.(*ast.IndexExpr); ok {
+							// m[] -> (*m)[]
+							if sel2, ok := x.X.(*ast.SelectorExpr); ok {
+								if ident, ok := sel2.X.(*ast.Ident); ok && ident.Name == "m" {
+									x.X = &ast.StarExpr{X: &ast.Ident{Name: "m"}}
+								}
+							}
+							// len(m.Items) -> len(*m)
+							if bin, ok := x.Index.(*ast.BinaryExpr); ok {
+								if call2, ok := bin.X.(*ast.CallExpr); ok && len(call2.Args) == 1 {
+									if isFieldSelector(call2.Args[0], "m", "Items") {
+										call2.Args[0] = &ast.StarExpr{X: &ast.Ident{Name: "m"}}
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	case *ast.IndexExpr:
