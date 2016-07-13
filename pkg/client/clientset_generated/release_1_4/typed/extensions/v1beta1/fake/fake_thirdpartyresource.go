@@ -99,9 +99,9 @@ func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched thirdPartyResource.
-func (c *FakeThirdPartyResources) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.ThirdPartyResource, err error) {
+func (c *FakeThirdPartyResources) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(thirdpartyresourcesResource, name, data), &v1beta1.ThirdPartyResource{})
+		Invokes(core.NewRootPatchSubresourceAction(thirdpartyresourcesResource, name, data, subresources...), &v1beta1.ThirdPartyResource{})
 	if obj == nil {
 		return nil, err
 	}

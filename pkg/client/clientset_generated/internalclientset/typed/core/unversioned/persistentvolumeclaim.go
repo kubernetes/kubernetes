@@ -37,7 +37,7 @@ type PersistentVolumeClaimInterface interface {
 	Get(name string) (*api.PersistentVolumeClaim, error)
 	List(opts api.ListOptions) (*api.PersistentVolumeClaimList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *api.PersistentVolumeClaim, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PersistentVolumeClaim, err error)
 	PersistentVolumeClaimExpansion
 }
 
@@ -150,11 +150,12 @@ func (c *persistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, e
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *persistentVolumeClaims) Patch(name string, pt api.PatchType, data []byte) (result *api.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

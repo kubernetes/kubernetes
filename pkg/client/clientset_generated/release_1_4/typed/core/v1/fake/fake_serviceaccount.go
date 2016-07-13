@@ -106,9 +106,9 @@ func (c *FakeServiceAccounts) Watch(opts api.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *FakeServiceAccounts) Patch(name string, pt api.PatchType, data []byte) (result *v1.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(serviceaccountsResource, c.ns, name, data), &v1.ServiceAccount{})
+		Invokes(core.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, data, subresources...), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err

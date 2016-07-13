@@ -37,7 +37,7 @@ type PodSecurityPolicyInterface interface {
 	Get(name string) (*extensions.PodSecurityPolicy, error)
 	List(opts api.ListOptions) (*extensions.PodSecurityPolicyList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *extensions.PodSecurityPolicy, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error)
 	PodSecurityPolicyExpansion
 }
 
@@ -128,10 +128,11 @@ func (c *podSecurityPolicies) Watch(opts api.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched podSecurityPolicy.
-func (c *podSecurityPolicies) Patch(name string, pt api.PatchType, data []byte) (result *extensions.PodSecurityPolicy, err error) {
+func (c *podSecurityPolicies) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error) {
 	result = &extensions.PodSecurityPolicy{}
 	err = c.client.Patch(pt).
 		Resource("podsecuritypolicies").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

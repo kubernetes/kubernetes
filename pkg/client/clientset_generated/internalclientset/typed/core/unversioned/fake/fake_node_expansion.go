@@ -23,7 +23,7 @@ import (
 
 func (c *FakeNodes) PatchStatus(nodeName string, data []byte) (*api.Node, error) {
 	obj, err := c.Fake.Invokes(
-		core.NewPatchSubresourceAction(nodesResource, "status"), &api.Node{})
+		core.NewRootPatchSubresourceAction(nodesResource, nodeName, data, "status"), &api.Node{})
 	if obj == nil {
 		return nil, err
 	}

@@ -99,9 +99,9 @@ func (c *FakeClusterRoleBindings) Watch(opts api.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
-func (c *FakeClusterRoleBindings) Patch(name string, pt api.PatchType, data []byte) (result *rbac.ClusterRoleBinding, err error) {
+func (c *FakeClusterRoleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(clusterrolebindingsResource, name, data), &rbac.ClusterRoleBinding{})
+		Invokes(core.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, data, subresources...), &rbac.ClusterRoleBinding{})
 	if obj == nil {
 		return nil, err
 	}

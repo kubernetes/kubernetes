@@ -188,7 +188,7 @@ func (m *FakeNodeHandler) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return nil, nil
 }
 
-func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte) (*api.Node, error) {
+func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Node, error) {
 	return nil, nil
 }
 

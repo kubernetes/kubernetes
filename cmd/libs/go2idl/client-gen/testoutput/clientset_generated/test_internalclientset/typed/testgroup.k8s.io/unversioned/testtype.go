@@ -38,7 +38,7 @@ type TestTypeInterface interface {
 	Get(name string) (*testgroup_k8s_io.TestType, error)
 	List(opts api.ListOptions) (*testgroup_k8s_io.TestTypeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte) (result *testgroup_k8s_io.TestType, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error)
 	TestTypeExpansion
 }
 
@@ -151,11 +151,12 @@ func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *testTypes) Patch(name string, pt api.PatchType, data []byte) (result *testgroup_k8s_io.TestType, err error) {
+func (c *testTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error) {
 	result = &testgroup_k8s_io.TestType{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("testtypes").
+		SubResource(subresources...).
 		Name(name).
 		Body(data).
 		Do().

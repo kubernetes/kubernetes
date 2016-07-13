@@ -106,9 +106,9 @@ func (c *FakeConfigMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *FakeConfigMaps) Patch(name string, pt api.PatchType, data []byte) (result *v1.ConfigMap, err error) {
+func (c *FakeConfigMaps) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ConfigMap, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(configmapsResource, c.ns, name, data), &v1.ConfigMap{})
+		Invokes(core.NewPatchSubresourceAction(configmapsResource, c.ns, name, data, subresources...), &v1.ConfigMap{})
 
 	if obj == nil {
 		return nil, err

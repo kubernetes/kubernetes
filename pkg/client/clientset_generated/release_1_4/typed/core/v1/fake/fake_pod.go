@@ -116,9 +116,9 @@ func (c *FakePods) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched pod.
-func (c *FakePods) Patch(name string, pt api.PatchType, data []byte) (result *v1.Pod, err error) {
+func (c *FakePods) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchAction(podsResource, c.ns, name, data), &v1.Pod{})
+		Invokes(core.NewPatchSubresourceAction(podsResource, c.ns, name, data, subresources...), &v1.Pod{})
 
 	if obj == nil {
 		return nil, err

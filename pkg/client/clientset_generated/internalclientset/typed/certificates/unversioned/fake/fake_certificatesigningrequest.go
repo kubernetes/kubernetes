@@ -108,9 +108,9 @@ func (c *FakeCertificateSigningRequests) Watch(opts api.ListOptions) (watch.Inte
 }
 
 // Patch applies the patch and returns the patched certificateSigningRequest.
-func (c *FakeCertificateSigningRequests) Patch(name string, pt api.PatchType, data []byte) (result *certificates.CertificateSigningRequest, err error) {
+func (c *FakeCertificateSigningRequests) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchAction(certificatesigningrequestsResource, name, data), &certificates.CertificateSigningRequest{})
+		Invokes(core.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, data, subresources...), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}
