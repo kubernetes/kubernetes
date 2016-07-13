@@ -240,7 +240,7 @@ func DefaultKubernetesUserAgent() string {
 
 // InClusterConfig returns a config object which uses the service account
 // kubernetes gives to pods. It's intended for clients that expect to be
-// running inside a pod running on kuberenetes. It will return an error if
+// running inside a pod running on kubernetes. It will return an error if
 // called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")

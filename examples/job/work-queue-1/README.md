@@ -102,7 +102,7 @@ Later, we will make a docker image that includes these packages.
 Next, we will check that we can discover the rabbitmq service:
 
 ```
-# Note the rabitmq-service has a DNS name, provided by Kubernetes:
+# Note the rabbitmq-service has a DNS name, provided by Kubernetes:
 
 root@temp-loe07:/# nslookup rabbitmq-service
 Server:		10.0.0.10
@@ -355,7 +355,7 @@ not all items will be processed.
 If the number of completions is set to more than the number of items in the queue,
 then the Job will not appear to be completed, even though all items in the queue
 have been processed.  It will start additional pods which will block waiting
-for a mesage.
+for a message.
 
 There is an unlikely race with this pattern.  If the container is killed in between the time
 that the message is acknowledged by the amqp-consume command and the time that the container

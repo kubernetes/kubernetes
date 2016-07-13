@@ -18,7 +18,7 @@ package testing
 
 import "k8s.io/kubernetes/pkg/util/iptables"
 
-// no-op implemenatation of iptables Interface
+// no-op implementation of iptables Interface
 type fake struct{}
 
 func NewFake() *fake {

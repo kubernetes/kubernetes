@@ -54,7 +54,7 @@ func NewDiscoveryRESTMapper(resources []*unversioned.APIResourceList, versionFun
 	return rm, nil
 }
 
-// ObjectTyper provides an ObjectTyper implmentation for
+// ObjectTyper provides an ObjectTyper implementation for
 // runtime.Unstructured object based on discovery information.
 type ObjectTyper struct {
 	registered map[unversioned.GroupVersionKind]bool

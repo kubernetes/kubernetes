@@ -76,7 +76,7 @@ Common workflow for Kubemark is:
 - monitoring test execution and debugging problems
 - turning down Kubemark cluster
 
-Included in descrptions there will be comments helpful for anyone who’ll want to
+Included in descriptions there will be comments helpful for anyone who’ll want to
 port Kubemark to different providers.
 
 ### Starting a Kubemark cluster
