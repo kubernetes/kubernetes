@@ -338,16 +338,16 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 	case types.Struct:
 		convertible := true
 		for _, inMember := range in.Members {
+			// Check if the member doesn't have comment:
+			// "+ genconversion=false"
+			// comment to ignore this field for conversion.
+			// TODO: Switch to SecondClosestCommentLines.
+			if types.ExtractCommentTags("+", inMember.CommentLines)["genconversion"] == "false" {
+				continue
+			}
 			// Check if there is an out member with that name.
 			outMember, found := findMember(out, inMember.Name)
 			if !found {
-				// Check if the member doesn't have comment:
-				// "+ genconversion=false"
-				// comment to ignore this field for conversion.
-				// TODO: Switch to SecondClosestCommentLines.
-				if types.ExtractCommentTags("+", inMember.CommentLines)["genconversion"] == "false" {
-					continue
-				}
 				return false
 			}
 			convertible = convertible && isConvertible(inMember.Type, outMember.Type, preexisting)
@@ -684,6 +684,12 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	for _, m := range inType.Members {
+		// Check if the member doesn't have comment:
+		// "+ genconversion=false"
+		// comment to ignore this field for conversion.
+		if types.ExtractCommentTags("+", m.CommentLines)["genconversion"] == "false" {
+			continue
+		}
 		outMember, isOutMember := findMember(outType, m.Name)
 		if !isOutMember {
 			// Since this object wasn't filtered out, this means that
