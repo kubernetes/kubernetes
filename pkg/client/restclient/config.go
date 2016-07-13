@@ -131,6 +131,9 @@ type TLSClientConfig struct {
 }
 
 type ContentConfig struct {
+	// AcceptContentTypes specifies the types the client will accept and is optional.
+	// If not set, ContentType will be used to define the Accept header
+	AcceptContentTypes string
 	// ContentType specifies the wire format used to communicate with the server.
 	// This value will be set as the Accept header on requests made to the server, and
 	// as the default content type on any object sent to the server. If not set,
