@@ -28,18 +28,13 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type resources struct {
-	millicpu int64
-	memory   int64
-}
-
-func getNonZeroRequests(pod *api.Pod) *resources {
-	result := &resources{}
+func getNonZeroRequests(pod *api.Pod) *schedulercache.Resource {
+	result := &schedulercache.Resource{}
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
 		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
-		result.millicpu += cpu
-		result.memory += memory
+		result.MilliCPU += cpu
+		result.Memory += memory
 	}
 	return result
 }
@@ -61,24 +56,22 @@ func calculateScore(requested int64, capacity int64, node string) int64 {
 // Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 // TODO: Use Node() from nodeInfo instead of passing it.
-func calculateResourceOccupancy(pod *api.Pod, podRequests *resources, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
-	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
-	capacityMemory := node.Status.Allocatable.Memory().Value()
-
+func calculateResourceOccupancy(pod *api.Pod, podRequests *schedulercache.Resource, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
+	allocatableResources := nodeInfo.AllocatableResource()
 	totalResources := *podRequests
-	totalResources.millicpu += nodeInfo.NonZeroRequest().MilliCPU
-	totalResources.memory += nodeInfo.NonZeroRequest().Memory
+	totalResources.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
+	totalResources.Memory += nodeInfo.NonZeroRequest().Memory
 
-	cpuScore := calculateScore(totalResources.millicpu, capacityMilliCPU, node.Name)
-	memoryScore := calculateScore(totalResources.memory, capacityMemory, node.Name)
+	cpuScore := calculateScore(totalResources.MilliCPU, allocatableResources.MilliCPU, node.Name)
+	memoryScore := calculateScore(totalResources.Memory, allocatableResources.Memory, node.Name)
 	if glog.V(10) {
 		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
 		// not logged. There is visible performance gain from it.
 		glog.V(10).Infof(
 			"%v -> %v: Least Requested Priority, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d CPU %d memory",
 			pod.Name, node.Name,
-			capacityMilliCPU, capacityMemory,
-			totalResources.millicpu, totalResources.memory,
+			allocatableResources.MilliCPU, allocatableResources.Memory,
+			totalResources.MilliCPU, totalResources.Memory,
 			cpuScore, memoryScore,
 		)
 	}
@@ -243,16 +236,14 @@ func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedul
 }
 
 // TODO: Use Node() from nodeInfo instead of passing it.
-func calculateBalancedResourceAllocation(pod *api.Pod, podRequests *resources, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
-	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
-	capacityMemory := node.Status.Allocatable.Memory().Value()
-
+func calculateBalancedResourceAllocation(pod *api.Pod, podRequests *schedulercache.Resource, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
+	allocatableResources := nodeInfo.AllocatableResource()
 	totalResources := *podRequests
-	totalResources.millicpu += nodeInfo.NonZeroRequest().MilliCPU
-	totalResources.memory += nodeInfo.NonZeroRequest().Memory
+	totalResources.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
+	totalResources.Memory += nodeInfo.NonZeroRequest().Memory
 
-	cpuFraction := fractionOfCapacity(totalResources.millicpu, capacityMilliCPU)
-	memoryFraction := fractionOfCapacity(totalResources.memory, capacityMemory)
+	cpuFraction := fractionOfCapacity(totalResources.MilliCPU, allocatableResources.MilliCPU)
+	memoryFraction := fractionOfCapacity(totalResources.Memory, allocatableResources.Memory)
 	score := int(0)
 	if cpuFraction >= 1 || memoryFraction >= 1 {
 		// if requested >= capacity, the corresponding host should never be preferrred.
@@ -271,8 +262,8 @@ func calculateBalancedResourceAllocation(pod *api.Pod, podRequests *resources, n
 		glog.V(10).Infof(
 			"%v -> %v: Balanced Resource Allocation, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
 			pod.Name, node.Name,
-			capacityMilliCPU, capacityMemory,
-			totalResources.millicpu, totalResources.memory,
+			allocatableResources.MilliCPU, allocatableResources.Memory,
+			totalResources.MilliCPU, totalResources.Memory,
 			score,
 		)
 	}
