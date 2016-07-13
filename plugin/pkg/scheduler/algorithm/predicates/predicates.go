@@ -925,7 +925,7 @@ func (checker *PodAffinityChecker) NodeMatchesHardPodAffinity(pod *api.Pod, allP
 // break any existing pods' anti-affinity rules, then return true.
 func (checker *PodAffinityChecker) NodeMatchesHardPodAntiAffinity(pod *api.Pod, allPods []*api.Pod, node *api.Node, podAntiAffinity *api.PodAntiAffinity) bool {
 	var podAntiAffinityTerms []api.PodAffinityTerm
-	if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+	if podAntiAffinity != nil && len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 		podAntiAffinityTerms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 	}
 	// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
@@ -999,19 +999,15 @@ func (checker *PodAffinityChecker) NodeMatchPodAffinityAntiAffinity(pod *api.Pod
 	}
 
 	// check if the current node match the inter-pod affinity scheduling rules.
+	// hard inter-pod affinity is not symmetric, check only when affinity.PodAffinity is not nil.
 	if affinity.PodAffinity != nil {
 		if !checker.NodeMatchesHardPodAffinity(pod, allPods, node, affinity.PodAffinity) {
 			return false
 		}
 	}
 
-	// check if the current node match the inter-pod anti-affinity scheduling rules.
-	if affinity.PodAntiAffinity != nil {
-		if !checker.NodeMatchesHardPodAntiAffinity(pod, allPods, node, affinity.PodAntiAffinity) {
-			return false
-		}
-	}
-	return true
+	// hard inter-pod anti-affinity is symmetric, check both when affinity.PodAntiAffinity is nil and not nil.
+	return checker.NodeMatchesHardPodAntiAffinity(pod, allPods, node, affinity.PodAntiAffinity)
 }
 
 func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
