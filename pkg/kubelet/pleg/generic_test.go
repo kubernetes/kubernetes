@@ -146,8 +146,10 @@ func TestRelisting(t *testing.T) {
 	pleg.relist()
 	// Only report containers that transitioned to running or exited status.
 	expected = []*PodLifecycleEvent{
+		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
 		{ID: "1234", Type: ContainerDied, Data: "c2"},
 		{ID: "1234", Type: ContainerStarted, Data: "c3"},
+		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
 		{ID: "4567", Type: ContainerStarted, Data: "c4"},
 	}
 
@@ -199,6 +201,8 @@ func testReportMissingContainers(t *testing.T, numRelists int) {
 	pleg.relist()
 	expected := []*PodLifecycleEvent{
 		{ID: "1234", Type: ContainerDied, Data: "c2"},
+		{ID: "1234", Type: ContainerRemoved, Data: "c2"},
+		{ID: "1234", Type: ContainerRemoved, Data: "c3"},
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
@@ -228,6 +232,7 @@ func testReportMissingPods(t *testing.T, numRelists int) {
 	pleg.relist()
 	expected := []*PodLifecycleEvent{
 		{ID: "1234", Type: ContainerDied, Data: "c2"},
+		{ID: "1234", Type: ContainerRemoved, Data: "c2"},
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
