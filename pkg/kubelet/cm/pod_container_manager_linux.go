@@ -18,14 +18,20 @@ package cm
 
 import (
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
 	podCgroupNamePrefix = "pod#"
+	minimumMemoryValue  = int64(1)
 )
 
 // podContainerManagerImpl implements podContainerManager interface.
@@ -90,7 +96,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *api.Pod) error {
 // GetPodContainerName is a util func takes in a pod as an argument
 // and returns the pod's cgroup name. We follow a pod cgroup naming format
 // which is opaque and deterministic. Given a pod it's cgroup would be named
-// "pod-UID" where the UID is the Pod UID
+// "pod#UID" where the UID is the Pod UID
 func (m *podContainerManagerImpl) GetPodContainerName(pod *api.Pod) string {
 	podQOS := qos.GetPodQOS(pod)
 	// Get the parent QOS container name
@@ -108,10 +114,101 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *api.Pod) string {
 	return path.Join(parentContainer, podContainer)
 }
 
+// Scans through all the subsystems pod cgroups directory.
+// Will also scan through the container cgroups that still exist under
+// the pod cgroup and haven't been Garbage Collected yet
+func (m *podContainerManagerImpl) getPIDsToKill(podCgroup string) []int {
+	// Get a list of processes that we need to kill
+	pidsToKill := sets.NewInt()
+	var pids []int
+	for _, val := range m.subsystems.MountPoints {
+		dir := path.Join(val, podCgroup)
+		_, err := os.Stat(dir)
+		if os.IsNotExist(err) {
+			// The subsystem pod cgroup is already deleted
+			// do nothing, continue
+			continue
+		}
+		// Get a list of pids that are still charged to the pod's cgroup
+		pids, err = getCgroupProcs(dir)
+		if err != nil {
+			continue
+		}
+		pidsToKill.Insert(pids...)
+
+		// WalkFunc which is called for each file and directory in the pod cgroup dir
+		visitor := func(path string, info os.FileInfo, err error) error {
+			if !info.IsDir() {
+				return nil
+			}
+			pids, err = getCgroupProcs(path)
+			if err != nil {
+				return err
+			}
+			pidsToKill.Insert(pids...)
+			return nil
+		}
+		// Walk through the pod cgroup directory to check if
+		// container cgroups haven't been GCed yet. Get attached processes to
+		// all such unwanted containers under the pod cgroup
+		err = filepath.Walk(dir, visitor)
+	}
+	return pidsToKill.List()
+}
+
+// Scan through the whole cgroup directory and kill all processes either
+// attached to the pod cgroup or to a container cgroup under the pod cgroup
+func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup string) error {
+	pidsToKill := m.getPIDsToKill(podCgroup)
+	// No pids charged to the terminated pod cgroup return
+	if len(pidsToKill) == 0 {
+		return nil
+	}
+
+	var errlist []error
+	// os.Kill often errors out,
+	// We try killing all the pids multiple times
+	for i := 0; i < 5; i++ {
+		if i != 0 {
+			glog.V(3).Infof("Attempt %v failed to kill all unwanted process. Retyring", i)
+		}
+		errlist = []error{}
+		for _, pid := range pidsToKill {
+			p, err := os.FindProcess(pid)
+			if err != nil {
+				// Process not running anymore, do nothing
+				continue
+			}
+			glog.V(3).Infof("Attempt to kill process with pid: %v", pid)
+			if err := p.Kill(); err != nil {
+				glog.V(3).Infof("failed to kill process with pid: %v", pid)
+				errlist = append(errlist, err)
+			}
+		}
+		if len(errlist) == 0 {
+			glog.V(3).Infof("successfully killed all unwanted processes.")
+			return nil
+		}
+	}
+	return utilerrors.NewAggregate(errlist)
+}
+
 // Destroy destroys the pod container cgroup paths
 func (m *podContainerManagerImpl) Destroy(podCgroup string) error {
-	// This will house the logic for destroying the pod cgroups.
-	// Will be handled in the next PR.
+	// Try killing all the processes attached to the pod cgroup
+	if err := m.tryKillingCgroupProcesses(podCgroup); err != nil {
+		glog.V(3).Infof("failed to kill all the processes attached to the %v cgroups", podCgroup)
+		return fmt.Errorf("failed to kill all the processes attached to the %v cgroups : %v", podCgroup, err)
+	}
+
+	// Now its safe to remove the pod's cgroup
+	containerConfig := &CgroupConfig{
+		Name:               podCgroup,
+		ResourceParameters: &ResourceConfig{},
+	}
+	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
+		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
+	}
 	return nil
 }
 
