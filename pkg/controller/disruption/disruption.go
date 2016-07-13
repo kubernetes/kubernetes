@@ -166,6 +166,13 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 	return dc
 }
 
+// TODO(mml): When controllerRef is implemented (#2210), we *could* simply
+// return controllers without their scales, and access scale type-generically
+// via the scale subresource.  That may not be as much of a win as it sounds,
+// however.  We are accessing everything through the pkg/client/cache API that
+// we have to set up and tune to the types we know we'll be accessing anyway,
+// and we may well need further tweaks just to be able to access scale
+// subresources.
 func (dc *DisruptionController) finders() []podControllerFinder {
 	return []podControllerFinder{dc.getPodReplicationControllers, dc.getPodDeployments, dc.getPodReplicaSets}
 }
@@ -188,7 +195,6 @@ func (dc *DisruptionController) getPodReplicaSets(pod *api.Pod) ([]controllerAnd
 		if err == nil { // A deployment was found, so this finder will not count this RS.
 			continue
 		}
-		// FIXME(mml): use ScaleStatus
 		controllerScale[rs.UID] = rs.Spec.Replicas
 	}
 
@@ -218,7 +224,6 @@ func (dc *DisruptionController) getPodDeployments(pod *api.Pod) ([]controllerAnd
 			return cas, nil
 		}
 		for _, d := range ds {
-			// FIXME(mml): use ScaleStatus
 			controllerScale[d.UID] = d.Spec.Replicas
 		}
 	}
@@ -235,7 +240,6 @@ func (dc *DisruptionController) getPodReplicationControllers(pod *api.Pod) ([]co
 	rcs, err := dc.rcLister.GetPodControllers(pod)
 	if err == nil {
 		for _, rc := range rcs {
-			// FIXME(mml): use ScaleStatus
 			cas = append(cas, controllerAndScale{UID: rc.UID, scale: rc.Spec.Replicas})
 		}
 	}
@@ -419,7 +423,6 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 	return err
 }
 
-// FIXME(mml): explain *that* and *why* we are using ScaleStatus here, once we are.
 func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*api.Pod) (expectedCount, desiredHealthy int32, err error) {
 	err = nil
 	if pdb.Spec.MinAvailable.Type == intstr.Int {
