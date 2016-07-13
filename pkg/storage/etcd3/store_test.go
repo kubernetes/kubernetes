@@ -226,15 +226,18 @@ func TestGetToList(t *testing.T) {
 
 	tests := []struct {
 		key         string
-		filter      storage.FilterFunc
+		filter      func(runtime.Object) bool
+		trigger     func() []storage.MatchValue
 		expectedOut []*api.Pod
 	}{{ // test GetToList on existing key
 		key:         key,
-		filter:      storage.Everything,
+		filter:      storage.EverythingFunc,
+		trigger:     storage.NoTriggerFunc,
 		expectedOut: []*api.Pod{storedObj},
 	}, { // test GetToList on non-existing key
 		key:         "/non-existing",
-		filter:      storage.Everything,
+		filter:      storage.EverythingFunc,
+		trigger:     storage.NoTriggerFunc,
 		expectedOut: nil,
 	}, { // test GetToList with filter to reject the pod
 		key: "/non-existing",
@@ -245,12 +248,14 @@ func TestGetToList(t *testing.T) {
 			}
 			return pod.Name != storedObj.Name
 		},
+		trigger:     storage.NoTriggerFunc,
 		expectedOut: nil,
 	}}
 
 	for i, tt := range tests {
 		out := &api.PodList{}
-		err := store.GetToList(ctx, tt.key, tt.filter, out)
+		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
+		err := store.GetToList(ctx, tt.key, filter, out)
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
 		}
@@ -487,15 +492,18 @@ func TestList(t *testing.T) {
 
 	tests := []struct {
 		prefix      string
-		filter      storage.FilterFunc
+		filter      func(runtime.Object) bool
+		trigger     func() []storage.MatchValue
 		expectedOut []*api.Pod
 	}{{ // test List on existing key
 		prefix:      "/one-level/",
-		filter:      storage.Everything,
+		filter:      storage.EverythingFunc,
+		trigger:     storage.NoTriggerFunc,
 		expectedOut: []*api.Pod{preset[0].storedObj},
 	}, { // test List on non-existing key
 		prefix:      "/non-existing/",
-		filter:      storage.Everything,
+		filter:      storage.EverythingFunc,
+		trigger:     storage.NoTriggerFunc,
 		expectedOut: nil,
 	}, { // test List with filter
 		prefix: "/one-level/",
@@ -506,16 +514,19 @@ func TestList(t *testing.T) {
 			}
 			return pod.Name != preset[0].storedObj.Name
 		},
+		trigger:     storage.NoTriggerFunc,
 		expectedOut: nil,
 	}, { // test List with multiple levels of directories and expect flattened result
 		prefix:      "/two-level/",
-		filter:      storage.Everything,
+		filter:      storage.EverythingFunc,
+		trigger:     storage.NoTriggerFunc,
 		expectedOut: []*api.Pod{preset[1].storedObj, preset[2].storedObj},
 	}}
 
 	for i, tt := range tests {
 		out := &api.PodList{}
-		err := store.List(ctx, tt.prefix, "0", tt.filter, out)
+		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
+		err := store.List(ctx, tt.prefix, "0", filter, out)
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
