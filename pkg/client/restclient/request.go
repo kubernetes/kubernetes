@@ -538,10 +538,10 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
-		glog.V(8).Infof("Request Body: %s", string(data))
+		glog.V(8).Infof("Request Body: %#v", string(data))
 		r.body = bytes.NewReader(data)
 	case []byte:
-		glog.V(8).Infof("Request Body: %s", string(t))
+		glog.V(8).Infof("Request Body: %#v", string(t))
 		r.body = bytes.NewReader(t)
 	case io.Reader:
 		r.body = t
@@ -555,7 +555,7 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
-		glog.V(8).Infof("Request Body: %s", string(data))
+		glog.V(8).Infof("Request Body: %#v", string(data))
 		r.body = bytes.NewReader(data)
 		r.SetHeader("Content-Type", r.content.ContentType)
 	default:
@@ -888,7 +888,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			body = data
 		}
 	}
-	glog.V(8).Infof("Response Body: %s", string(body))
+	glog.V(8).Infof("Response Body: %#v", string(body))
 
 	// Did the server give us a status response?
 	isStatusResponse := false
@@ -970,7 +970,7 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 			body = data
 		}
 	}
-	glog.V(8).Infof("Response Body: %s", string(body))
+	glog.V(8).Infof("Response Body: %#v", string(body))
 
 	message := "unknown"
 	if isTextResponse(resp) {
