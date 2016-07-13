@@ -16,7 +16,7 @@
       - [Docker runtime Known Issues](#docker-runtime-known-issues)
       - [Rkt runtime Known Issues](#rkt-runtime-known-issues)
   - [Provider-specific Notes](#provider-specific-notes)
-    - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
+  - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
 - [v1.3.0-beta.3](#v130-beta3)
   - [Downloads](#downloads-2)
   - [Changelog since v1.3.0-beta.2](#changelog-since-v130-beta2)
