@@ -280,10 +280,12 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	}
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
-	if outputFormat != "" {
-		return f.PrintObject(cmd, mapper, obj, cmdOut)
+	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
+		f.PrintObject(cmd, mapper, obj, cmdOut)
 	}
-	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], "created")
+	if !cmdutil.GetDryRunFlag(cmd) {
+		cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], "created")
+	}
 	return nil
 }
 
