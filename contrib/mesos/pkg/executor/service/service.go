@@ -164,7 +164,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	// apply Mesos specific settings
-	kcfg.Builder = func(kc *kubeletapp.KubeletConfig) (kubeletapp.KubeletBootstrap, *kconfig.PodConfig, error) {
+	kcfg.Builder = func(kc *kubelet.KubeletConfig) (kubelet.KubeletBootstrap, *kconfig.PodConfig, error) {
 		k, pc, err := kubeletapp.CreateAndInitKubelet(kc)
 		if err != nil {
 			return k, pc, err

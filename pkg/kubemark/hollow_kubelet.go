@@ -22,6 +22,7 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -33,7 +34,7 @@ import (
 )
 
 type HollowKubelet struct {
-	KubeletConfig *kubeletapp.KubeletConfig
+	KubeletConfig *kubelet.KubeletConfig
 }
 
 func NewHollowKubelet(

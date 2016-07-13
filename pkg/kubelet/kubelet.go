@@ -172,83 +172,149 @@ type SyncHandler interface {
 // Option is a functional option type for Kubelet
 type Option func(*Kubelet)
 
+// bootstrapping interface for kubelet, targets the initialization protocol
+type KubeletBootstrap interface {
+	BirthCry()
+	StartGarbageCollection()
+	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool)
+	ListenAndServeReadOnly(address net.IP, port uint)
+	Run(<-chan kubetypes.PodUpdate)
+	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
+}
+
+// create and initialize a Kubelet instance
+type KubeletBuilder func(kc *KubeletConfig) (KubeletBootstrap, *config.PodConfig, error)
+
+// KubeletConfig is all of the parameters necessary for running a kubelet.
+// TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
+type KubeletConfig struct {
+	Address                        net.IP
+	AllowPrivileged                bool
+	Auth                           server.AuthInterface
+	AutoDetectCloudProvider        bool
+	Builder                        KubeletBuilder
+	CAdvisorInterface              cadvisor.Interface
+	VolumeStatsAggPeriod           time.Duration
+	CgroupRoot                     string
+	Cloud                          cloudprovider.Interface
+	ClusterDNS                     net.IP
+	ClusterDomain                  string
+	ConfigFile                     string
+	ConfigureCBR0                  bool
+	ContainerManager               cm.ContainerManager
+	ContainerRuntime               string
+	RuntimeRequestTimeout          time.Duration
+	CPUCFSQuota                    bool
+	DiskSpacePolicy                DiskSpacePolicy
+	DockerClient                   dockertools.DockerInterface
+	RuntimeCgroups                 string
+	DockerExecHandler              dockertools.ExecHandler
+	EnableControllerAttachDetach   bool
+	EnableCustomMetrics            bool
+	EnableDebuggingHandlers        bool
+	CgroupsPerQOS                  bool
+	EnableServer                   bool
+	EventClient                    *clientset.Clientset
+	EventBurst                     int
+	EventRecordQPS                 float32
+	FileCheckFrequency             time.Duration
+	Hostname                       string
+	HostnameOverride               string
+	HostNetworkSources             []string
+	HostPIDSources                 []string
+	HostIPCSources                 []string
+	HTTPCheckFrequency             time.Duration
+	ImageGCPolicy                  images.ImageGCPolicy
+	KubeClient                     *clientset.Clientset
+	ManifestURL                    string
+	ManifestURLHeader              http.Header
+	MasterServiceNamespace         string
+	MaxContainerCount              int
+	MaxOpenFiles                   uint64
+	MaxPerPodContainerCount        int
+	MaxPods                        int
+	MinimumGCAge                   time.Duration
+	Mounter                        mount.Interface
+	NetworkPluginName              string
+	NetworkPlugins                 []network.NetworkPlugin
+	NodeName                       string
+	NodeLabels                     map[string]string
+	NodeStatusUpdateFrequency      time.Duration
+	NonMasqueradeCIDR              string
+	NvidiaGPUs                     int
+	OOMAdjuster                    *oom.OOMAdjuster
+	OSInterface                    kubecontainer.OSInterface
+	PodCIDR                        string
+	PodsPerCore                    int
+	ReconcileCIDR                  bool
+	PodConfig                      *config.PodConfig
+	PodInfraContainerImage         string
+	Port                           uint
+	ReadOnlyPort                   uint
+	Recorder                       record.EventRecorder
+	RegisterNode                   bool
+	RegisterSchedulable            bool
+	RegistryBurst                  int
+	RegistryPullQPS                float64
+	Reservation                    kubetypes.Reservation
+	ResolverConfig                 string
+	KubeletCgroups                 string
+	RktPath                        string
+	RktAPIEndpoint                 string
+	RktStage1Image                 string
+	RootDirectory                  string
+	Runonce                        bool
+	SeccompProfileRoot             string
+	SerializeImagePulls            bool
+	StandaloneMode                 bool
+	StreamingConnectionIdleTimeout time.Duration
+	SyncFrequency                  time.Duration
+	SystemCgroups                  string
+	TLSOptions                     *server.TLSOptions
+	Writer                         kubeio.Writer
+	VolumePlugins                  []volume.VolumePlugin
+	OutOfDiskTransitionFrequency   time.Duration
+	EvictionConfig                 eviction.Config
+
+	ExperimentalFlannelOverlay bool
+	NodeIP                     net.IP
+	ContainerRuntimeOptions    []kubecontainer.Option
+	HairpinMode                string
+	BabysitDaemons             bool
+	Options                    []Option
+}
+
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(
-	hostname string,
-	nodeName string,
-	dockerClient dockertools.DockerInterface,
-	kubeClient clientset.Interface,
-	rootDirectory string,
-	seccompProfileRoot string,
-	podInfraContainerImage string,
-	resyncInterval time.Duration,
-	pullQPS float32,
-	pullBurst int,
-	eventQPS float32,
-	eventBurst int,
-	containerGCPolicy kubecontainer.ContainerGCPolicy,
+	kc *KubeletConfig,
 	sourcesReadyFn config.SourcesReadyFn,
-	registerNode bool,
-	registerSchedulable bool,
-	standaloneMode bool,
-	clusterDomain string,
-	clusterDNS net.IP,
-	masterServiceNamespace string,
-	volumePlugins []volume.VolumePlugin,
-	networkPlugins []network.NetworkPlugin,
-	networkPluginName string,
-	streamingConnectionIdleTimeout time.Duration,
-	recorder record.EventRecorder,
-	cadvisorInterface cadvisor.Interface,
-	imageGCPolicy images.ImageGCPolicy,
-	diskSpacePolicy DiskSpacePolicy,
-	cloud cloudprovider.Interface,
-	autoDetectCloudProvider bool,
-	nodeLabels map[string]string,
-	nodeStatusUpdateFrequency time.Duration,
-	osInterface kubecontainer.OSInterface,
-	CgroupsPerQOS bool,
-	cgroupRoot string,
-	containerRuntime string,
-	runtimeRequestTimeout time.Duration,
-	rktPath string,
-	rktAPIEndpoint string,
-	rktStage1Image string,
-	mounter mount.Interface,
-	writer kubeio.Writer,
-	configureCBR0 bool,
-	nonMasqueradeCIDR string,
-	podCIDR string,
-	reconcileCIDR bool,
-	maxPods int,
-	podsPerCore int,
-	nvidiaGPUs int,
-	dockerExecHandler dockertools.ExecHandler,
-	resolverConfig string,
-	cpuCFSQuota bool,
-	daemonEndpoints *api.NodeDaemonEndpoints,
-	oomAdjuster *oom.OOMAdjuster,
-	serializeImagePulls bool,
-	containerManager cm.ContainerManager,
-	outOfDiskTransitionFrequency time.Duration,
-	flannelExperimentalOverlay bool,
-	nodeIP net.IP,
-	reservation kubetypes.Reservation,
-	enableCustomMetrics bool,
-	volumeStatsAggPeriod time.Duration,
-	containerRuntimeOptions []kubecontainer.Option,
-	hairpinMode string,
-	babysitDaemons bool,
-	evictionConfig eviction.Config,
-	kubeOptions []Option,
-	enableControllerAttachDetach bool,
 ) (*Kubelet, error) {
-	if rootDirectory == "" {
-		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
+
+	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
+	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
+	// a nil pointer to it when what we really want is a nil interface.
+	var kubeClient clientset.Interface
+	if kc.KubeClient != nil {
+		kubeClient = kc.KubeClient
+		// TODO: remove this when we've refactored kubelet to only use clientset.
 	}
-	if resyncInterval <= 0 {
-		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
+
+	containerGCPolicy := kubecontainer.ContainerGCPolicy{
+		MinAge:             kc.MinimumGCAge,
+		MaxPerPodContainer: kc.MaxPerPodContainerCount,
+		MaxContainers:      kc.MaxContainerCount,
+	}
+
+	daemonEndpoints := &api.NodeDaemonEndpoints{
+		KubeletEndpoint: api.DaemonEndpoint{Port: int32(kc.Port)},
+	}
+
+	if kc.RootDirectory == "" {
+		return nil, fmt.Errorf("invalid root directory %q", kc.RootDirectory)
+	}
+	if kc.SyncFrequency <= 0 {
+		return nil, fmt.Errorf("invalid sync frequency %d", kc.SyncFrequency)
 	}
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -271,7 +337,7 @@ func NewMainKubelet(
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
-		fieldSelector := fields.Set{api.ObjectNameField: nodeName}.AsSelector()
+		fieldSelector := fields.Set{api.ObjectNameField: kc.NodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
@@ -292,80 +358,86 @@ func NewMainKubelet(
 	// TODO: what is namespace for node?
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
-		Name:      nodeName,
-		UID:       types.UID(nodeName),
+		Name:      kc.NodeName,
+		UID:       types.UID(kc.NodeName),
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
+	diskSpaceManager, err := newDiskSpaceManager(kc.CAdvisorInterface, kc.DiskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	oomWatcher := NewOOMWatcher(cadvisorInterface, recorder)
+	oomWatcher := NewOOMWatcher(kc.CAdvisorInterface, kc.Recorder)
 
+	// TODO(mtaufen): This is an example of modification being done to the config. This may be necessary ATM, will investigate further.
+	//                I renamed configureCBR0 and flannelExperimentalOverlay to myConfigureCBR0 and myFlannelExperimentalOverlay to differentiate from kc sub-values.
+	//                Eventually these hacks should be removed (THEY SHOULD NEVER MAKE IT UPSTREAM!)
+	//                These values were originally args to this function, but no longer!
 	// TODO: remove when internal cbr0 implementation gets removed in favor
 	// of the kubenet network plugin
-	if networkPluginName == "kubenet" {
-		configureCBR0 = false
-		flannelExperimentalOverlay = false
+	var myConfigureCBR0 bool = kc.ConfigureCBR0
+	var myFlannelExperimentalOverlay bool = kc.ExperimentalFlannelOverlay
+	if kc.NetworkPluginName == "kubenet" {
+		myConfigureCBR0 = false
+		myFlannelExperimentalOverlay = false
 	}
 
 	klet := &Kubelet{
-		hostname:                       hostname,
-		nodeName:                       nodeName,
-		dockerClient:                   dockerClient,
+		hostname:                       kc.Hostname,
+		nodeName:                       kc.NodeName,
+		dockerClient:                   kc.DockerClient,
 		kubeClient:                     kubeClient,
-		rootDirectory:                  rootDirectory,
-		resyncInterval:                 resyncInterval,
+		rootDirectory:                  kc.RootDirectory,
+		resyncInterval:                 kc.SyncFrequency,
 		containerRefManager:            containerRefManager,
 		httpClient:                     &http.Client{},
 		sourcesReady:                   config.NewSourcesReady(sourcesReadyFn),
-		registerNode:                   registerNode,
-		registerSchedulable:            registerSchedulable,
-		standaloneMode:                 standaloneMode,
-		clusterDomain:                  clusterDomain,
-		clusterDNS:                     clusterDNS,
+		registerNode:                   kc.RegisterNode,
+		registerSchedulable:            kc.RegisterSchedulable,
+		standaloneMode:                 kc.StandaloneMode,
+		clusterDomain:                  kc.ClusterDomain,
+		clusterDNS:                     kc.ClusterDNS,
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
 		nodeInfo:                       nodeInfo,
-		masterServiceNamespace:         masterServiceNamespace,
-		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
-		recorder:                       recorder,
-		cadvisor:                       cadvisorInterface,
+		masterServiceNamespace:         kc.MasterServiceNamespace,
+		streamingConnectionIdleTimeout: kc.StreamingConnectionIdleTimeout,
+		recorder:                       kc.Recorder,
+		cadvisor:                       kc.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
-		cloud:                          cloud,
-		autoDetectCloudProvider:   autoDetectCloudProvider,
+		cloud:                          kc.Cloud,
+		autoDetectCloudProvider:   kc.AutoDetectCloudProvider,
 		nodeRef:                   nodeRef,
-		nodeLabels:                nodeLabels,
-		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
-		os:                         osInterface,
+		nodeLabels:                kc.NodeLabels,
+		nodeStatusUpdateFrequency: kc.NodeStatusUpdateFrequency,
+		os:                         kc.OSInterface,
 		oomWatcher:                 oomWatcher,
-		CgroupsPerQOS:              CgroupsPerQOS,
-		cgroupRoot:                 cgroupRoot,
-		mounter:                    mounter,
-		writer:                     writer,
-		configureCBR0:              configureCBR0,
-		nonMasqueradeCIDR:          nonMasqueradeCIDR,
-		reconcileCIDR:              reconcileCIDR,
-		maxPods:                    maxPods,
-		podsPerCore:                podsPerCore,
-		nvidiaGPUs:                 nvidiaGPUs,
+		cgroupsPerQOS:              kc.CgroupsPerQOS,
+		cgroupRoot:                 kc.CgroupRoot,
+		mounter:                    kc.Mounter,
+		writer:                     kc.Writer,
+		configureCBR0:              myConfigureCBR0,
+		nonMasqueradeCIDR:          kc.NonMasqueradeCIDR,
+		reconcileCIDR:              kc.ReconcileCIDR,
+		maxPods:                    kc.MaxPods,
+		podsPerCore:                kc.PodsPerCore,
+		nvidiaGPUs:                 kc.NvidiaGPUs,
 		syncLoopMonitor:            atomic.Value{},
-		resolverConfig:             resolverConfig,
-		cpuCFSQuota:                cpuCFSQuota,
+		resolverConfig:             kc.ResolverConfig,
+		cpuCFSQuota:                kc.CPUCFSQuota,
 		daemonEndpoints:            daemonEndpoints,
-		containerManager:           containerManager,
-		flannelExperimentalOverlay: flannelExperimentalOverlay,
+		containerManager:           kc.ContainerManager,
+		flannelExperimentalOverlay: myFlannelExperimentalOverlay,
 		flannelHelper:              nil,
-		nodeIP:                     nodeIP,
+		nodeIP:                     kc.NodeIP,
 		clock:                      clock.RealClock{},
-		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
-		reservation:                  reservation,
-		enableCustomMetrics:          enableCustomMetrics,
-		babysitDaemons:               babysitDaemons,
-		enableControllerAttachDetach: enableControllerAttachDetach,
+		outOfDiskTransitionFrequency: kc.OutOfDiskTransitionFrequency,
+		reservation:                  kc.Reservation,
+		enableCustomMetrics:          kc.EnableCustomMetrics,
+		babysitDaemons:               kc.BabysitDaemons,
+		enableControllerAttachDetach: kc.EnableControllerAttachDetach,
 		iptClient:                    utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 	}
 
@@ -380,7 +452,7 @@ func NewMainKubelet(
 		glog.Infof("Using node IP: %q", klet.nodeIP.String())
 	}
 
-	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(hairpinMode), containerRuntime, configureCBR0, networkPluginName); err != nil {
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kc.HairpinMode), kc.ContainerRuntime, kc.ConfigureCBR0, kc.NetworkPluginName); err != nil {
 		// This is a non-recoverable error. Returning it up the callstack will just
 		// lead to retries of the same failure, so just fail hard.
 		glog.Fatalf("Invalid hairpin mode: %v", err)
@@ -389,7 +461,7 @@ func NewMainKubelet(
 	}
 	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
-	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR); err != nil {
+	if plug, err := network.InitNetworkPlugin(kc.NetworkPlugins, kc.NetworkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
@@ -409,53 +481,53 @@ func NewMainKubelet(
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
 	// Initialize the runtime.
-	switch containerRuntime {
+	switch kc.ContainerRuntime {
 	case "docker":
 		// Only supported one for now, continue.
 		klet.containerRuntime = dockertools.NewDockerManager(
-			dockerClient,
-			kubecontainer.FilterEventRecorder(recorder),
+			kc.DockerClient,
+			kubecontainer.FilterEventRecorder(kc.Recorder),
 			klet.livenessManager,
 			containerRefManager,
 			klet.podManager,
 			machineInfo,
-			podInfraContainerImage,
-			pullQPS,
-			pullBurst,
+			kc.PodInfraContainerImage,
+			float32(kc.RegistryPullQPS),
+			kc.RegistryBurst,
 			containerLogsDir,
-			osInterface,
+			kc.OSInterface,
 			klet.networkPlugin,
 			klet,
 			klet.httpClient,
-			dockerExecHandler,
-			oomAdjuster,
+			kc.DockerExecHandler,
+			kc.OOMAdjuster,
 			procFs,
 			klet.cpuCFSQuota,
 			imageBackOff,
-			serializeImagePulls,
-			enableCustomMetrics,
+			kc.SerializeImagePulls,
+			kc.EnableCustomMetrics,
 			// If using "kubenet", the Kubernetes network plugin that wraps
 			// CNI's bridge plugin, it knows how to set the hairpin veth flag
 			// so we tell the container runtime to back away from setting it.
 			// If the kubelet is started with any other plugin we can't be
 			// sure it handles the hairpin case so we instruct the docker
 			// runtime to set the flag instead.
-			klet.hairpinMode == componentconfig.HairpinVeth && networkPluginName != "kubenet",
-			seccompProfileRoot,
-			containerRuntimeOptions...,
+			klet.hairpinMode == componentconfig.HairpinVeth && kc.NetworkPluginName != "kubenet",
+			kc.SeccompProfileRoot,
+			kc.ContainerRuntimeOptions...,
 		)
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
 		conf := &rkt.Config{
-			Path:            rktPath,
-			Stage1Image:     rktStage1Image,
+			Path:            kc.RktPath,
+			Stage1Image:     kc.RktStage1Image,
 			InsecureOptions: "image,ondisk",
 		}
 		rktRuntime, err := rkt.New(
-			rktAPIEndpoint,
+			kc.RktAPIEndpoint,
 			conf,
 			klet,
-			recorder,
+			kc.Recorder,
 			containerRefManager,
 			klet.podManager,
 			klet.livenessManager,
@@ -465,23 +537,23 @@ func NewMainKubelet(
 			utilexec.New(),
 			kubecontainer.RealOS{},
 			imageBackOff,
-			serializeImagePulls,
-			runtimeRequestTimeout,
+			kc.SerializeImagePulls,
+			kc.RuntimeRequestTimeout,
 		)
 		if err != nil {
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
 	default:
-		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
+		return nil, fmt.Errorf("unsupported container runtime %q specified", kc.ContainerRuntime)
 	}
 
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
-	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod, klet.containerRuntime)
+	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, kc.VolumeStatsAggPeriod, klet.containerRuntime)
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
-	klet.updatePodCIDR(podCIDR)
+	klet.updatePodCIDR(kc.PodCIDR)
 
 	// setup containerGC
 	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy)
@@ -492,7 +564,8 @@ func NewMainKubelet(
 	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, kc.CAdvisorInterface, kc.Recorder, nodeRef, kc.ImageGCPolicy)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -506,22 +579,22 @@ func NewMainKubelet(
 		klet.livenessManager,
 		klet.runner,
 		containerRefManager,
-		recorder)
+		kc.Recorder)
 
 	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, volumePlugins)
+		NewInitializedVolumePluginMgr(klet, kc.VolumePlugins)
 	if err != nil {
 		return nil, err
 	}
 
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
-		enableControllerAttachDetach,
-		nodeName,
+		kc.EnableControllerAttachDetach,
+		kc.NodeName,
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
 		klet.containerRuntime,
-		mounter)
+		klet.mounter)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -530,14 +603,15 @@ func NewMainKubelet(
 	klet.runtimeCache = runtimeCache
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
-	klet.podWorkers = newPodWorkers(klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+	klet.podWorkers = newPodWorkers(klet.syncPod, kc.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers), klet.imageManager, recorder, nodeRef, klet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, kc.EvictionConfig, killPodNow(klet.podWorkers), klet.imageManager, kc.Recorder, nodeRef, klet.clock)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize eviction manager: %v", err)
 	}
@@ -553,7 +627,7 @@ func NewMainKubelet(
 	klet.AddPodSyncHandler(activeDeadlineHandler)
 
 	// apply functional Option's
-	for _, opt := range kubeOptions {
+	for _, opt := range kc.Options {
 		opt(klet)
 	}
 	return klet, nil
@@ -721,7 +795,7 @@ type Kubelet struct {
 	resourceAnalyzer stats.ResourceAnalyzer
 
 	// Whether or not we should have the QOS cgroup hierarchy for resource management
-	CgroupsPerQOS bool
+	cgroupsPerQOS bool
 
 	// If non-empty, pass this to the container runtime as the root cgroup.
 	cgroupRoot string
