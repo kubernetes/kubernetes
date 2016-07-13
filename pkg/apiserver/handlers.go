@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -137,12 +138,10 @@ func tooManyRequests(req *http.Request, w http.ResponseWriter) {
 // RecoverPanics wraps an http Handler to recover and log panics.
 func RecoverPanics(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer func() {
-			if x := recover(); x != nil {
-				http.Error(w, "apis panic. Look in log for details.", http.StatusInternalServerError)
-				glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
-			}
-		}()
+		defer runtime.HandleCrash(func(err interface{}) {
+			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)
+			glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
+		})
 		defer httplog.NewLogged(req, &w).StacktraceWhen(
 			httplog.StatusIsNot(
 				http.StatusOK,
