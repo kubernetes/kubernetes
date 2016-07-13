@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -36,6 +35,8 @@ const (
 	testNodeMonitorGracePeriod = 40 * time.Second
 	testNodeStartupGracePeriod = 60 * time.Second
 	testNodeMonitorPeriod      = 5 * time.Second
+	testRateLimiterBurst       = 10000
+	testRateLimiterQPS         = float32(10000)
 )
 
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
@@ -74,12 +75,20 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: fakeNow,
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -110,6 +119,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -126,6 +139,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -166,6 +183,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -182,6 +203,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -249,6 +274,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -265,6 +294,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -305,6 +338,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -321,6 +358,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -361,6 +402,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -377,6 +422,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -417,6 +466,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -433,6 +486,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node1",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region2",
+								unversioned.LabelZoneFailureDomain: "zone2",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -484,6 +541,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -500,6 +561,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "node-master",
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
 						},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
@@ -536,7 +601,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler,
-			evictionTimeout, flowcontrol.NewFakeAlwaysRateLimiter(), flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod,
+			evictionTimeout, testRateLimiterQPS, testRateLimiterBurst, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		for _, ds := range item.daemonSets {
@@ -553,18 +618,21 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
+		zones := getZones(item.fakeNodeHandler)
+		for _, zone := range zones {
+			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+				if remaining {
+					nodeController.zoneTerminationEvictor[zone].Add(value.Value)
+				}
+				return true, 0
+			})
+			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
+				return true, 0
+			})
+		}
 
-		nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-			remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
-			if remaining {
-				nodeController.terminationEvictor.Add(value.Value)
-			}
-			return true, 0
-		})
-		nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-			terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
-			return true, 0
-		})
 		podEvicted := false
 		for _, action := range item.fakeNodeHandler.Actions() {
 			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
@@ -606,7 +674,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		deleteWaitChan: make(chan struct{}),
 	}
 	nodeController := NewNodeController(nil, fnh, 10*time.Minute,
-		flowcontrol.NewFakeAlwaysRateLimiter(), flowcontrol.NewFakeAlwaysRateLimiter(),
+		testRateLimiterQPS, testRateLimiterBurst,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
 		testNodeMonitorPeriod, nil, nil, 0, false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
@@ -626,7 +694,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	if len(fnh.DeletedNodes) != 1 || fnh.DeletedNodes[0].Name != "node0" {
 		t.Errorf("Node was not deleted")
 	}
-	if nodeOnQueue := nodeController.podEvictor.Remove("node0"); nodeOnQueue {
+	if nodeOnQueue := nodeController.zonePodEvictor[""].Remove("node0"); nodeOnQueue {
 		t.Errorf("Node was queued for eviction. Should have been immediately deleted.")
 	}
 }
@@ -839,8 +907,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, flowcontrol.NewFakeAlwaysRateLimiter(),
-			flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, testRateLimiterQPS, testRateLimiterBurst,
+			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -989,8 +1057,8 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, flowcontrol.NewFakeAlwaysRateLimiter(),
-			flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, testRateLimiterQPS, testRateLimiterBurst,
+			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("Case[%d] unexpected error: %v", i, err)
@@ -1071,8 +1139,9 @@ func TestNodeDeletion(t *testing.T) {
 		Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
 	}
 
-	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, flowcontrol.NewFakeAlwaysRateLimiter(), flowcontrol.NewFakeAlwaysRateLimiter(),
-		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, testRateLimiterQPS, testRateLimiterBurst,
+		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
+		testNodeMonitorPeriod, nil, nil, 0, false)
 	nodeController.now = func() unversioned.Time { return fakeNow }
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1081,7 +1150,7 @@ func TestNodeDeletion(t *testing.T) {
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
+	nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
 		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
 		return true, 0
 	})
@@ -1097,7 +1166,6 @@ func TestNodeDeletion(t *testing.T) {
 }
 
 func TestCheckPod(t *testing.T) {
-
 	tcs := []struct {
 		pod   api.Pod
 		prune bool
@@ -1175,7 +1243,7 @@ func TestCheckPod(t *testing.T) {
 		},
 	}
 
-	nc := NewNodeController(nil, nil, 0, nil, nil, 0, 0, 0, nil, nil, 0, false)
+	nc := NewNodeController(nil, nil, 0, 0, 0, 0, 0, 0, nil, nil, 0, false)
 	nc.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
 	nc.nodeStore.Store.Add(&api.Node{
 		ObjectMeta: api.ObjectMeta{
@@ -1242,7 +1310,7 @@ func TestCleanupOrphanedPods(t *testing.T) {
 		newPod("b", "bar"),
 		newPod("c", "gone"),
 	}
-	nc := NewNodeController(nil, nil, 0, nil, nil, 0, 0, 0, nil, nil, 0, false)
+	nc := NewNodeController(nil, nil, 0, 0, 0, 0, 0, 0, nil, nil, 0, false)
 
 	nc.nodeStore.Store.Add(newNode("foo"))
 	nc.nodeStore.Store.Add(newNode("bar"))

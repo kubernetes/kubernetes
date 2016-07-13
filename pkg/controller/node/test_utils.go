@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -234,4 +236,14 @@ func contains(node *api.Node, nodes []*api.Node) bool {
 		}
 	}
 	return false
+}
+
+// Returns list of zones for all Nodes stored in FakeNodeHandler
+func getZones(nodeHandler *FakeNodeHandler) []string {
+	nodes, _ := nodeHandler.List(api.ListOptions{})
+	zones := sets.NewString()
+	for _, node := range nodes.Items {
+		zones.Insert(utilnode.GetZoneKey(&node))
+	}
+	return zones.List()
 }
