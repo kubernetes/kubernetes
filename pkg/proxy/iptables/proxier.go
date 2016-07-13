@@ -141,6 +141,7 @@ type serviceInfo struct {
 	stickyMaxAgeSeconds    int
 	externalIPs            []string
 	onlyNodeLocalEndpoints bool
+	guid                   types.UID
 }
 
 // returns a new serviceInfo struct
@@ -428,6 +429,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			info.protocol = servicePort.Protocol
 			info.nodePort = int(servicePort.NodePort)
 			info.externalIPs = service.Spec.ExternalIPs
+			info.guid = service.ObjectMeta.UID
 			// Deep-copy in case the service instance changes
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
@@ -803,7 +805,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture the clusterIP.
 		args := []string{
 			"-A", string(kubeServicesChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcName.String()),
+			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
 			"-m", protocol, "-p", protocol,
 			"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
 			"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -844,7 +846,7 @@ func (proxier *Proxier) syncProxyRules() {
 			} // We're holding the port, so it's OK to install iptables rules.
 			args := []string{
 				"-A", string(kubeServicesChain),
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcName.String()),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
 				"-m", protocol, "-p", protocol,
 				"-d", fmt.Sprintf("%s/32", externalIP),
 				"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -871,7 +873,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if ingress.IP != "" {
 				args := []string{
 					"-A", string(kubeServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
 					"-m", protocol, "-p", protocol,
 					"-d", fmt.Sprintf("%s/32", ingress.IP),
 					"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -914,7 +916,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			args := []string{
 				"-A", string(kubeNodePortsChain),
-				"-m", "comment", "--comment", svcName.String(),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
 				"-m", protocol, "-p", protocol,
 				"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
 			}
@@ -928,7 +930,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if len(proxier.endpointsMap[svcName]) == 0 {
 			writeLine(filterRules,
 				"-A", string(kubeServicesChain),
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcName.String()),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
 				"-m", protocol, "-p", protocol,
 				"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
 				"--dport", fmt.Sprintf("%d", svcInfo.port),
@@ -960,7 +962,8 @@ func (proxier *Proxier) syncProxyRules() {
 			for _, endpointChain := range endpointChains {
 				writeLine(natRules,
 					"-A", string(svcChain),
-					"-m", "comment", "--comment", svcName.String(),
+					"-m", "comment", "--comment",
+					fmt.Sprintf(`"Session affinity rules for %s (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
 					"-m", "recent", "--name", string(endpointChain),
 					"--rcheck", "--seconds", fmt.Sprintf("%d", svcInfo.stickyMaxAgeSeconds), "--reap",
 					"-j", string(endpointChain))
@@ -973,7 +976,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// Balancing rules in the per-service chain.
 			args := []string{
 				"-A", string(svcChain),
-				"-m", "comment", "--comment", svcName.String(),
+				"-m", "comment", "--comment",
+				fmt.Sprintf(`"Balancing rules for %s (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
 			}
 			if i < (n - 1) {
 				// Each rule is a probabilistic match.
@@ -989,7 +993,9 @@ func (proxier *Proxier) syncProxyRules() {
 			// Rules in the per-endpoint chain.
 			args = []string{
 				"-A", string(endpointChain),
-				"-m", "comment", "--comment", svcName.String(),
+				"-m", "comment", "--comment",
+				fmt.Sprintf(`"Hairpin case mark-for-SNAT for %s (svc-guid: %s) destined to %s"`,
+					svcName.String(), svcInfo.guid, endpoints[i]),
 			}
 			// Handle traffic that loops back to the originator with SNAT.
 			// Technically we only need to do this if the endpoint is on this
@@ -1000,6 +1006,12 @@ func (proxier *Proxier) syncProxyRules() {
 				"-s", fmt.Sprintf("%s/32", strings.Split(endpoints[i], ":")[0]),
 				"-j", string(KubeMarkMasqChain))...)
 
+			args = []string{
+				"-A", string(endpointChain),
+				"-m", "comment", "--comment",
+				fmt.Sprintf(`"Endpoint rule for %s (svc-guid: %s) destined to %s"`,
+					svcName.String(), svcInfo.guid, endpoints[i]),
+			}
 			// Update client-affinity lists.
 			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
