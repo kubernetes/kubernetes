@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e_node"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
@@ -43,6 +44,7 @@ import (
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
+var imageConfigFile = flag.String("image-config-file", "", "yaml file describing images to run")
 var imageProject = flag.String("image-project", "", "gce project the hosts live in")
 var images = flag.String("images", "", "images to test")
 var hosts = flag.String("hosts", "", "hosts to test")
@@ -69,6 +71,24 @@ type TestResult struct {
 	exitOk bool
 }
 
+// ImageConfig specifies what images should be run and how for these tests.
+// It can be created via the `--images` and `--image-project` flags, or by
+// specifying the `--image-config-file` flag, pointing to a json or yaml file
+// of the form:
+//
+//     images:
+//       short-name:
+//         image: gce-image-name
+//         project: gce-image-project
+type ImageConfig struct {
+	Images map[string]GCEImage `json:"images"`
+}
+
+type GCEImage struct {
+	Image   string `json:"image"`
+	Project string `json:"project"`
+}
+
 func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -78,18 +98,50 @@ func main() {
 		return
 	}
 
-	if *hosts == "" && *images == "" {
-		glog.Fatalf("Must specify one of --images or --hosts flag.")
+	if *hosts == "" && *imageConfigFile == "" && *images == "" {
+		glog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
 	}
-	if *images != "" && *zone == "" {
-		glog.Fatal("Must specify --zone flag")
+	gceImages := &ImageConfig{
+		Images: make(map[string]GCEImage),
 	}
+	if *imageConfigFile != "" {
+		// parse images
+		imageConfigData, err := ioutil.ReadFile(*imageConfigFile)
+		if err != nil {
+			glog.Fatalf("Could not read image config file provided: %v", err)
+		}
+		err = yaml.Unmarshal(imageConfigData, gceImages)
+		if err != nil {
+			glog.Fatalf("Could not parse image config file: %v", err)
+		}
+	}
+
+	// Allow users to specify additional images via cli flags for local testing
+	// convenience; merge in with config file
 	if *images != "" {
 		if *imageProject == "" {
-			glog.Fatal("Must specify --image-project flag")
+			glog.Fatal("Must specify --image-project if you specify --images")
 		}
+		cliImages := strings.Split(*images, ",")
+		for _, img := range cliImages {
+			gceImages.Images[img] = GCEImage{
+				Image:   img,
+				Project: *imageProject,
+			}
+		}
+	}
+
+	if len(gceImages.Images) != 0 && *zone == "" {
+		glog.Fatal("Must specify --zone flag")
+	}
+	for shortName, image := range gceImages.Images {
+		if image.Project == "" {
+			glog.Fatalf("Invalid config for %v; must specify a project", shortName)
+		}
+	}
+	if len(gceImages.Images) != 0 {
 		if *project == "" {
-			glog.Fatal("Must specify --project flag")
+			glog.Fatal("Must specify --project flag to launch images into")
 		}
 	}
 	if *instanceNamePrefix == "" {
@@ -117,12 +169,12 @@ func main() {
 
 	results := make(chan *TestResult)
 	running := 0
-	if *images != "" {
-		for _, image := range strings.Split(*images, ",") {
-			running++
-			fmt.Printf("Initializing e2e tests using image %s.\n", image)
-			go func(image string, junitFileNum int) { results <- testImage(image, junitFileNum) }(image, running)
-		}
+	for shortName, image := range gceImages.Images {
+		running++
+		fmt.Printf("Initializing e2e tests using image %s.\n", shortName)
+		go func(image, imageProject string, junitFileNum int) {
+			results <- testImage(image, imageProject, junitFileNum)
+		}(image.Image, image.Project, running)
 	}
 	if *hosts != "" {
 		for _, host := range strings.Split(*hosts, ",") {
@@ -213,8 +265,8 @@ func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(image string, junitFileNum int) *TestResult {
-	host, err := createInstance(image)
+func testImage(image, imageProject string, junitFileNum int) *TestResult {
+	host, err := createInstance(image, imageProject)
 	if *deleteInstances {
 		defer deleteInstance(image)
 	}
@@ -231,7 +283,7 @@ func testImage(image string, junitFileNum int) *TestResult {
 }
 
 // Provision a gce instance using image
-func createInstance(image string) (string, error) {
+func createInstance(image, imageProject string) (string, error) {
 	name := imageToInstanceName(image)
 	i := &compute.Instance{
 		Name:        name,
@@ -251,7 +303,7 @@ func createInstance(image string) (string, error) {
 				Boot:       true,
 				Type:       "PERSISTENT",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
-					SourceImage: sourceImage(image),
+					SourceImage: sourceImage(image, imageProject),
 				},
 			},
 		},
@@ -386,8 +438,8 @@ func imageToInstanceName(image string) string {
 	return *instanceNamePrefix + "-" + image
 }
 
-func sourceImage(image string) string {
-	return fmt.Sprintf("projects/%s/global/images/%s", *imageProject, image)
+func sourceImage(image, imageProject string) string {
+	return fmt.Sprintf("projects/%s/global/images/%s", imageProject, image)
 }
 
 func machineType() string {
