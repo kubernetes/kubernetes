@@ -79,7 +79,7 @@ func New() *Builder {
 			// The returned string will have some/path/bin/go, so remove the last two elements.
 			c.GOROOT = filepath.Dir(filepath.Dir(strings.Trim(string(p), "\n")))
 		} else {
-			fmt.Printf("Warning: $GOROOT not set, and unable to run `which go` to find it: %v\n", err)
+			glog.Warningf("Warning: $GOROOT not set, and unable to run `which go` to find it: %v\n", err)
 		}
 	}
 	// Force this to off, since we don't properly parse CGo.  All symbols must
@@ -304,7 +304,7 @@ func (b *Builder) importer(imports map[string]*tc.Package, path string) (*tc.Pac
 	pkg, err := b.typeCheckPackage(path)
 	if err != nil {
 		if ignoreError && pkg != nil {
-			fmt.Printf("type checking encountered some errors in %q, but ignoring.\n", path)
+			glog.V(2).Infof("type checking encountered some errors in %q, but ignoring.\n", path)
 		} else {
 			return nil, err
 		}
@@ -350,7 +350,7 @@ func (b *Builder) typeCheckPackage(id string) (*tc.Package, error) {
 		// method. So there can't be cycles in the import graph.
 		Importer: importAdapter{b},
 		Error: func(err error) {
-			fmt.Printf("type checker error: %v\n", err)
+			glog.V(2).Infof("type checker error: %v\n", err)
 		},
 	}
 	pkg, err := c.Check(id, b.fset, files, nil)
@@ -685,7 +685,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			return out
 		}
 		out.Kind = types.Unsupported
-		fmt.Printf("Making unsupported type entry %q for: %#v\n", out, t)
+		glog.Warningf("Making unsupported type entry %q for: %#v\n", out, t)
 		return out
 	}
 }
