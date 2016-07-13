@@ -491,22 +491,18 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		return true, nil
 	}
 
-	allocatable := node.Status.Allocatable
-	totalMilliCPU := allocatable.Cpu().MilliValue()
-	totalMemory := allocatable.Memory().Value()
-	totalNvidiaGPU := allocatable.NvidiaGPU().Value()
-
-	if totalMilliCPU < podRequest.milliCPU+nodeInfo.RequestedResource().MilliCPU {
+	allocatable := nodeInfo.AllocatableResource()
+	if allocatable.MilliCPU < podRequest.milliCPU+nodeInfo.RequestedResource().MilliCPU {
 		return false,
-			newInsufficientResourceError(cpuResourceName, podRequest.milliCPU, nodeInfo.RequestedResource().MilliCPU, totalMilliCPU)
+			newInsufficientResourceError(cpuResourceName, podRequest.milliCPU, nodeInfo.RequestedResource().MilliCPU, allocatable.MilliCPU)
 	}
-	if totalMemory < podRequest.memory+nodeInfo.RequestedResource().Memory {
+	if allocatable.Memory < podRequest.memory+nodeInfo.RequestedResource().Memory {
 		return false,
-			newInsufficientResourceError(memoryResourceName, podRequest.memory, nodeInfo.RequestedResource().Memory, totalMemory)
+			newInsufficientResourceError(memoryResourceName, podRequest.memory, nodeInfo.RequestedResource().Memory, allocatable.Memory)
 	}
-	if totalNvidiaGPU < podRequest.nvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
+	if allocatable.NvidiaGPU < podRequest.nvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
 		return false,
-			newInsufficientResourceError(nvidiaGpuResourceName, podRequest.nvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, totalNvidiaGPU)
+			newInsufficientResourceError(nvidiaGpuResourceName, podRequest.nvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU)
 	}
 	if glog.V(10) {
 		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
