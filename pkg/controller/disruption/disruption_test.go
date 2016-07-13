@@ -314,6 +314,40 @@ func TestReplicaSet(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, false, 1, 2, 10)
 }
 
+// Verify that multiple controllers doesn't allow the PDB to be set true.
+func TestMultipleControllers(t *testing.T) {
+	const rcCount = 2
+	const podCount = 2
+
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("1%"))
+	add(t, dc.pdbLister.Store, pdb)
+
+	for i := 0; i < podCount; i++ {
+		pod, _ := newPod(t, fmt.Sprintf("pod %d", i))
+		add(t, dc.podLister.Indexer, pod)
+	}
+	dc.sync(pdbName)
+
+	// No controllers yet => no disruption allowed
+	ps.VerifyDisruptionAllowed(t, pdbName, false)
+
+	rc, _ := newReplicationController(t, 1)
+	add(t, dc.rcLister.Indexer, rc)
+	dc.sync(pdbName)
+
+	// One RC and 200%>1% healthy => disruption allowed
+	ps.VerifyDisruptionAllowed(t, pdbName, true)
+
+	rc, _ = newReplicationController(t, 1)
+	add(t, dc.rcLister.Indexer, rc)
+	dc.sync(pdbName)
+
+	// 100%>1% healthy BUT two RCs => no disruption allowed
+	ps.VerifyDisruptionAllowed(t, pdbName, false)
+}
+
 func TestReplicationController(t *testing.T) {
 	// The budget in this test matches foo=bar, but the RC and its pods match
 	// {foo=bar, baz=quux}.  Later, when we add a rogue pod with only a foo=bar
