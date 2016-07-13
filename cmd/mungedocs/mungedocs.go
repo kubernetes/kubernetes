@@ -158,14 +158,14 @@ func (f fileProcessor) visit(path string) error {
 func newWalkFunc(fp *fileProcessor, changesNeeded *bool) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
 		stat, err := os.Stat(path)
-		if path != *rootDir && stat.IsDir() && *norecurse {
-			return filepath.SkipDir
-		}
 		if err := fp.visit(path); err != nil {
 			*changesNeeded = true
 			if err != ErrChangesNeeded {
 				return err
 			}
+		}
+		if path != *rootDir && stat.IsDir() && *norecurse {
+			return filepath.SkipDir
 		}
 		return nil
 	}
