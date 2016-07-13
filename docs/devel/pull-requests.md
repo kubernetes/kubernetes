@@ -69,9 +69,9 @@ Additionally, for infrequent or new contributors, we require the on call to appl
 The following will save time for both you and your reviewer:
 
 * Enable [pre-commit hooks](development.md#committing-changes-to-your-fork) and verify they pass.
-* Verify `hack/verify-all.sh` passes.
-* Verify `hack/test-go.sh` passes.
-* Verify `hack/test-integration.sh` passes.
+* Verify `make verify` passes.
+* Verify `make test` passes.
+* Verify `make test-integration.sh` passes.
 
 ## Release Notes
 

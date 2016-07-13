@@ -25,15 +25,11 @@ kube::golang::setup_env
 
 BUILD_TARGETS=(
   cmd/libs/go2idl/client-gen
-  cmd/libs/go2idl/conversion-gen
-  cmd/libs/go2idl/deepcopy-gen
   cmd/libs/go2idl/set-gen
 )
-"${KUBE_ROOT}/hack/build-go.sh" ${BUILD_TARGETS[*]}
+make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
 clientgen=$(kube::util::find-binary "client-gen")
-conversiongen=$(kube::util::find-binary "conversion-gen")
-deepcopygen=$(kube::util::find-binary "deepcopy-gen")
 setgen=$(kube::util::find-binary "set-gen")
 
 # Please do not add any logic to this shell script. Add logic to the go code
@@ -50,44 +46,3 @@ ${clientgen} --clientset-name=federation_release_1_4 --clientset-path=k8s.io/kub
 ${setgen} "$@"
 
 # You may add additional calls of code generators like set-gen above.
-
-# Generate a list of all files that have a `+k8s:` comment-tag.  This will be
-# used to derive lists of files/dirs for generation tools.
-ALL_K8S_TAG_FILES=$(
-    grep -l '^// \?+k8s:' $(
-        find . \
-            -not \( \
-                \( \
-                    -path ./vendor -o \
-                    -path ./_output -o \
-                    -path ./.git \
-                \) -prune \
-            \) \
-            -type f -name \*.go \
-            | sed 's|^./||'
-        )
-    )
-DEEP_COPY_DIRS=$(
-    grep -l '+k8s:deepcopy-gen=' ${ALL_K8S_TAG_FILES} \
-        | xargs dirname \
-        | sort -u
-    )
-DEEPCOPY_INPUTS=$(
-    for d in ${DEEP_COPY_DIRS}; do
-        echo k8s.io/kubernetes/$d
-    done | paste -sd,
-    )
-${deepcopygen} -i ${DEEPCOPY_INPUTS}
-
-CONVERSION_DIRS=$(
-    grep '^// *+k8s:conversion-gen=' ${ALL_K8S_TAG_FILES} \
-        | cut -f1 -d:                                     \
-        | xargs dirname                                   \
-        | sort -u                                         \
-    )
-CONVERSION_INPUTS=$(
-     for d in ${CONVERSION_DIRS}; do
-         echo k8s.io/kubernetes/$d
-     done | paste -sd,
-     )
-${conversiongen} -i ${CONVERSION_INPUTS}

@@ -168,6 +168,7 @@ kube::util::find-binary() {
   local lookfor="${1}"
   local host_platform="$(kube::util::host_platform)"
   local locations=(
+    "${KUBE_ROOT}/_output/bin/${lookfor}"
     "${KUBE_ROOT}/_output/dockerized/bin/${host_platform}/${lookfor}"
     "${KUBE_ROOT}/_output/local/bin/${host_platform}/${lookfor}"
     "${KUBE_ROOT}/platforms/${host_platform}/${lookfor}"

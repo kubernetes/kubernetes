@@ -119,8 +119,8 @@ pkg/kubectl/cmd/util/factory.go.
 1. Add your group in pkg/api/testapi/testapi.go, then you can access the group
 in tests through testapi.`<group>`;
 
-2. Add your "group/version" to `KUBE_API_VERSIONS` and `KUBE_TEST_API_VERSIONS`
-in hack/test-go.sh.
+2. Add your "group/version" to `KUBE_TEST_API_VERSIONS` in
+   hack/make-rules/test.sh and hack/make-rules/test-integration.sh
 
 TODO: Add a troubleshooting section.
 

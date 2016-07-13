@@ -63,6 +63,8 @@ def get_all_files(rootdir):
             dirs.remove('third_party')
         if '.git' in dirs:
             dirs.remove('.git')
+        if '.make' in dirs:
+            dirs.remove('.make')
         if 'exceptions.txt' in files:
             files.remove('exceptions.txt')
         if 'known-flags.txt' in files:
