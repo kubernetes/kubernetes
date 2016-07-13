@@ -160,6 +160,9 @@ func TestUnstructuredGetters(t *testing.T) {
 					"finalizer.1",
 					"finalizer.2",
 				},
+				"cluster": map[string]interface{}{
+					"clusterName": "cluster123",
+				},
 			},
 		},
 	}
@@ -232,6 +235,9 @@ func TestUnstructuredGetters(t *testing.T) {
 	if got, want := unstruct.GetFinalizers(), []string{"finalizer.1", "finalizer.2"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetFinalizers()=%v, want %v", got, want)
 	}
+	if got, want := unstruct.GetCluster().ClusterName, "cluster123"; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetClusterName()=%v, want %v", got, want)
+	}
 }
 
 func TestUnstructuredSetters(t *testing.T) {
@@ -277,6 +283,9 @@ func TestUnstructuredSetters(t *testing.T) {
 					"finalizer.1",
 					"finalizer.2",
 				},
+				"cluster": map[string]interface{}{
+					"clusterName": "cluster123",
+				},
 			},
 		},
 	}
@@ -311,6 +320,7 @@ func TestUnstructuredSetters(t *testing.T) {
 	}
 	unstruct.SetOwnerReferences(newOwnerReferences)
 	unstruct.SetFinalizers([]string{"finalizer.1", "finalizer.2"})
+	unstruct.SetCluster(&metatypes.ClusterReference{ClusterName: "cluster123"})
 
 	if !reflect.DeepEqual(unstruct, want) {
 		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)

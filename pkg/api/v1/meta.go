@@ -83,3 +83,14 @@ func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference
 	}
 	meta.OwnerReferences = newReferences
 }
+
+func (meta *ObjectMeta) GetCluster() *metatypes.ClusterReference {
+	return &metatypes.ClusterReference{
+		ClusterName: meta.Cluster.ClusterName,
+	}
+}
+func (meta *ObjectMeta) SetCluster(cluster *metatypes.ClusterReference) {
+	meta.Cluster = &ClusterReference{
+		ClusterName: cluster.ClusterName,
+	}
+}

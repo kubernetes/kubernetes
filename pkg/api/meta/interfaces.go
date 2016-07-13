@@ -62,6 +62,8 @@ type Object interface {
 	SetFinalizers(finalizers []string)
 	GetOwnerReferences() []metatypes.OwnerReference
 	SetOwnerReferences([]metatypes.OwnerReference)
+	GetCluster() *metatypes.ClusterReference
+	SetCluster(cluster *metatypes.ClusterReference)
 }
 
 var _ Object = &runtime.Unstructured{}
