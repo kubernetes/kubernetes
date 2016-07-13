@@ -109,7 +109,7 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	return &Preconditions{UID: &u}
 }
 
-// Interface offers a common interface for object marshaling/unmarshling operations and
+// Interface offers a common interface for object marshaling/unmarshaling operations and
 // hides all the storage-related operations behind it.
 type Interface interface {
 	// Returns list of servers addresses of the underyling database.

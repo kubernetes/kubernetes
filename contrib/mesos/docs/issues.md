@@ -37,7 +37,7 @@ Setting either of these flags to non-zero values may impact connection tracking 
 In order for pods (replicated, or otherwise) to be scheduled on the cluster, it is strongly recommended that:
 * `pod.spec.containers[x].ports[y].hostPort` be left unspecified (or zero), or else;
 * `pod.spec.containers[x].ports[y].hostPort` exists in the range of `ports` resources declared on Mesos slaves
-  - double-check the resource declaraions for your Mesos slaves, the default for `ports` is typically `[31000-32000]`
+  - double-check the resource declarations for your Mesos slaves, the default for `ports` is typically `[31000-32000]`
 
 Mesos slave host `ports` are resources that are managed by the Mesos resource/offers ecosystem; slave host ports are consumed by launched tasks.
 Kubernetes pod container specifications identify two types of ports, "container ports" and "host ports":

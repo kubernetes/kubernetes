@@ -72,7 +72,7 @@
    },
    "unversioned.GroupVersionForDiscovery": {
     "id": "unversioned.GroupVersionForDiscovery",
-    "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensiblity.",
+    "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
     "required": [
      "groupVersion",
      "version"

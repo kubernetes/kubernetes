@@ -153,7 +153,7 @@ Then, run
 
 This will do a dry run of the release.  It will give you instructions at the
 end for `pushd`ing into the dry-run directory and having a look around.
-`pushd` into the directory and make sure everythig looks as you expect:
+`pushd` into the directory and make sure everything looks as you expect:
 
 ```console
 git log "${RELEASE_VERSION}"  # do you see the commit you expect?

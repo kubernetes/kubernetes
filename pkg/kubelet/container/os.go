@@ -36,7 +36,7 @@ type OSInterface interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
 }
 
-// RealOS is used to dispatch the real system level operaitons.
+// RealOS is used to dispatch the real system level operations.
 type RealOS struct{}
 
 // MkDir will will call os.Mkdir to create a directory.

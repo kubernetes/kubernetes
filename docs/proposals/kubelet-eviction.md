@@ -99,7 +99,7 @@ An eviction threshold is of the following form:
 * valid `operator` tokens are `<`
 * valid `quantity` tokens must match the quantity representation used by Kubernetes
 
-If threhold criteria are met, the `kubelet` will take pro-active action to attempt
+If threshold criteria are met, the `kubelet` will take pro-active action to attempt
 to reclaim the starved compute resource associated with the eviction signal.
 
 The `kubelet` will support soft and hard eviction thresholds.

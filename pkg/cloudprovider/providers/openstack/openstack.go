@@ -46,7 +46,7 @@ import (
 
 const ProviderName = "openstack"
 
-// metadataUrl is URL to OpenStack metadata server. It's hadrcoded IPv4
+// metadataUrl is URL to OpenStack metadata server. It's hardcoded IPv4
 // link-local address as documented in "OpenStack Cloud Administrator Guide",
 // chapter Compute - Networking with nova-network.
 // http://docs.openstack.org/admin-guide-cloud/compute-networking-nova.html#metadata-service

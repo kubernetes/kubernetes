@@ -311,7 +311,7 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 	}
 }
 
-// ListAlgorithmProviders is called when listing all available algortihm providers in `kube-scheduler --help`
+// ListAlgorithmProviders is called when listing all available algorithm providers in `kube-scheduler --help`
 func ListAlgorithmProviders() string {
 	var availableAlgorithmProviders []string
 	for name := range algorithmProviderMap {

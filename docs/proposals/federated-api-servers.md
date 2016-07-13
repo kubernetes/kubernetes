@@ -116,7 +116,7 @@ Cluster admins are also free to use any of the multiple open source API manageme
 provide a lot more functionality like: rate-limiting, caching, logging,
 transformations and authentication.
 In future, we can also use ingress. That will give cluster admins the flexibility to
-easily swap out the ingress controller by a Go reverse proxy, ngingx, haproxy
+easily swap out the ingress controller by a Go reverse proxy, nginx, haproxy
 or any other solution they might want.
 
 ### Storage

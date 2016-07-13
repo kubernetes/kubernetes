@@ -144,7 +144,7 @@ message GroupVersion {
 }
 
 // GroupVersion contains the "group/version" and "version" string of a version.
-// It is made a struct to keep extensiblity.
+// It is made a struct to keep extensibility.
 message GroupVersionForDiscovery {
   // groupVersion specifies the API group and version in the form "group/version"
   optional string groupVersion = 1;
