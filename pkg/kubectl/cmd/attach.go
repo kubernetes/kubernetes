@@ -77,18 +77,25 @@ func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer)
 
 // RemoteAttach defines the interface accepted by the Attach command - provided for test stubbing
 type RemoteAttach interface {
-	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error
 }
 
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
-func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error {
 	exec, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
-	return exec.Stream(remotecommandserver.SupportedStreamingProtocols, stdin, stdout, stderr, tty)
+	return exec.Stream(remotecommand.StreamOptions{
+		SupportedProtocols: remotecommandserver.SupportedStreamingProtocols,
+		Stdin:              stdin,
+		Stdout:             stdout,
+		Stderr:             stderr,
+		Tty:                tty,
+		TerminalSizeQueue:  terminalSizeQueue,
+	})
 }
 
 // AttachOptions declare the arguments accepted by the Exec command
@@ -182,7 +189,10 @@ func (p *AttachOptions) Run() error {
 	pod := p.Pod
 
 	// ensure we can recover the terminal while attached
-	t := term.TTY{Parent: p.InterruptParent}
+	t := term.TTY{
+		Parent: p.InterruptParent,
+		Out:    p.Out,
+	}
 
 	// check for TTY
 	tty := p.TTY
@@ -196,17 +206,41 @@ func (p *AttachOptions) Run() error {
 	}
 	if p.Stdin {
 		t.In = p.In
-		if tty && !t.IsTerminal() {
+		if tty && !t.IsTerminalIn() {
 			tty = false
 			fmt.Fprintln(p.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
 		}
+	} else {
+		p.In = nil
 	}
 	t.Raw = tty
 
-	fn := func() error {
-		if tty {
-			fmt.Fprintln(p.Out, "\nHit enter for command prompt")
+	// save p.Err so we can print the command prompt message below
+	stderr := p.Err
+
+	var sizeQueue term.TerminalSizeQueue
+	if tty {
+		if size := t.GetSize(); size != nil {
+			// fake resizing +1 and then back to normal so that attach-detach-reattach will result in the
+			// screen being redrawn
+			sizePlusOne := *size
+			sizePlusOne.Width++
+			sizePlusOne.Height++
+
+			// this call spawns a goroutine to monitor/update the terminal size
+			sizeQueue = t.MonitorSize(&sizePlusOne, size)
 		}
+
+		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
+		// true
+		p.Err = nil
+	}
+
+	fn := func() error {
+		if stderr != nil {
+			fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
+		}
+
 		// TODO: consider abstracting into a client invocation or client helper
 		req := p.Client.RESTClient.Post().
 			Resource("pods").
@@ -215,13 +249,13 @@ func (p *AttachOptions) Run() error {
 			SubResource("attach")
 		req.VersionedParams(&api.PodAttachOptions{
 			Container: containerToAttach.Name,
-			Stdin:     p.In != nil,
+			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.Err != nil,
 			TTY:       tty,
 		}, api.ParameterCodec)
 
-		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, tty)
+		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, tty, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {
