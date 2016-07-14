@@ -440,7 +440,7 @@ var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CU
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 var deploymentColumns = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 var configMapColumns = []string{"NAME", "DATA", "AGE"}
-var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS", "SELINUX", "RUNASUSER"}
+var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "READONLYFS", "VOLUMEPLUGINS", "SECCOMP"}
 var clusterColumns = []string{"NAME", "STATUS", "VERSION", "AGE"}
 var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
 
@@ -1955,9 +1955,11 @@ func printPodSecurityPolicy(item *extensions.PodSecurityPolicy, w io.Writer, opt
 	if options.WithKind {
 		name = kind + "/" + name
 	}
-	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%t\t%v\n", name, item.Spec.Privileged,
+	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%t\t%v\t%v\n",
+		name, item.Spec.Privileged,
 		item.Spec.AllowedCapabilities, item.Spec.SELinux.Rule,
-		item.Spec.RunAsUser.Rule, item.Spec.FSGroup.Rule, item.Spec.SupplementalGroups.Rule, item.Spec.ReadOnlyRootFilesystem, item.Spec.Volumes)
+		item.Spec.RunAsUser.Rule, item.Spec.FSGroup.Rule, item.Spec.SupplementalGroups.Rule,
+		item.Spec.ReadOnlyRootFilesystem, item.Spec.Volumes, item.Spec.SeccompProfiles)
 	return err
 }
 

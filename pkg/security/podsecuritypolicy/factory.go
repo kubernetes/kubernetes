@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/user"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -64,6 +65,11 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		errs = append(errs, err)
 	}
 
+	seccompStrat, err := createSeccompStrategy(psp.Spec.SeccompProfiles)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.NewAggregate(errs)
 	}
@@ -74,6 +80,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		FSGroupStrategy:           fsGroupStrat,
 		SupplementalGroupStrategy: supGroupStrat,
 		CapabilitiesStrategy:      capStrat,
+		SeccompStrategy:           seccompStrat,
 	}
 
 	return strategies, nil
@@ -132,4 +139,9 @@ func createSupplementalGroupStrategy(opts *extensions.SupplementalGroupsStrategy
 // createCapabilitiesStrategy creates a new capabilities strategy.
 func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []api.Capability) (capabilities.CapabilitiesStrategy, error) {
 	return capabilities.NewDefaultCapabilities(defaultAddCaps, requiredDropCaps, allowedCaps)
+}
+
+// createSeccompStrategy creates a new seccomp strategy
+func createSeccompStrategy(allowedProfiles []string) (seccomp.SeccompStrategy, error) {
+	return seccomp.NewWithSeccompProfile(allowedProfiles)
 }

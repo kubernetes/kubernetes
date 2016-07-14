@@ -417,6 +417,11 @@ func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, 
 	} else {
 		delete(out.Annotations, PodInitContainersAnnotationKey)
 	}
+
+	// TODO: when seccomp moves to beta the PSC and SC should get the
+	// SeccompProfile field and this can be removed
+	internalConvertApiSeccompToV1Seccomp(&in.Spec, &out.ObjectMeta)
+
 	return nil
 }
 
@@ -439,6 +444,10 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
+
+	// TODO: when seccomp is out of alpha this can be removed
+	internalConvertV1SeccompToApiSeccomp(in.Annotations, &out.Spec)
+
 	if len(out.Annotations) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old))
@@ -446,6 +455,9 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 			out.Annotations[k] = v
 		}
 		delete(out.Annotations, PodInitContainersAnnotationKey)
+
+		// TODO: when seccomp is out of alpha this can be removed
+		internalRemoveSeccompAnnotations(&out.Spec, out.Annotations)
 	}
 	return nil
 }
@@ -524,6 +536,10 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		out.Annotations[PodInitContainerStatusesAnnotationKey] = string(value)
 	}
 
+	// TODO: when seccomp moves to beta the PSC and SC should get the
+	// SeccompProfile field and this can be removed
+	internalConvertApiSeccompToV1Seccomp(&in.Spec, &out.ObjectMeta)
+
 	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
 	// (#15960).
 	// TODO: Remove this code after we drop support for v1.0 kubelets.
@@ -536,6 +552,33 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		}
 	}
 	return nil
+}
+
+func internalConvertApiSeccompToV1Seccomp(inPodSpec *api.PodSpec, outObjectMeta *ObjectMeta) {
+	if inPodSpec.SecurityContext != nil && inPodSpec.SecurityContext.SeccompProfile != "" {
+		if outObjectMeta.Annotations == nil {
+			outObjectMeta.Annotations = map[string]string{}
+		}
+		outObjectMeta.Annotations[api.SeccompPodAnnotationKey] = inPodSpec.SecurityContext.SeccompProfile
+	}
+
+	for _, c := range inPodSpec.Containers {
+		if c.SecurityContext != nil && c.SecurityContext.SeccompProfile != "" {
+			if outObjectMeta.Annotations == nil {
+				outObjectMeta.Annotations = map[string]string{}
+			}
+			outObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+c.Name] = c.SecurityContext.SeccompProfile
+		}
+	}
+
+	for _, c := range inPodSpec.InitContainers {
+		if c.SecurityContext != nil && c.SecurityContext.SeccompProfile != "" {
+			if outObjectMeta.Annotations == nil {
+				outObjectMeta.Annotations = map[string]string{}
+			}
+			outObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+c.Name] = c.SecurityContext.SeccompProfile
+		}
+	}
 }
 
 func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
@@ -570,6 +613,10 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 	if err := autoConvert_v1_Pod_To_api_Pod(in, out, s); err != nil {
 		return err
 	}
+
+	// TODO: when seccomp is out of alpha this can be removed
+	internalConvertV1SeccompToApiSeccomp(in.Annotations, &out.Spec)
+
 	if len(out.Annotations) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old))
@@ -578,8 +625,50 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 		}
 		delete(out.Annotations, PodInitContainersAnnotationKey)
 		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
+
+		// TODO: when seccomp is out of alpha this can be removed
+		internalRemoveSeccompAnnotations(&out.Spec, out.Annotations)
 	}
 	return nil
+}
+
+func internalConvertV1SeccompToApiSeccomp(inAnnotations map[string]string, outPodSpec *api.PodSpec) {
+	if podProfile, hasPodProfile := inAnnotations[api.SeccompPodAnnotationKey]; hasPodProfile {
+		if outPodSpec.SecurityContext == nil {
+			outPodSpec.SecurityContext = &api.PodSecurityContext{}
+		}
+		outPodSpec.SecurityContext.SeccompProfile = podProfile
+	}
+
+	for i, c := range outPodSpec.Containers {
+		if containerProfile, hasContainerProfile :=
+			inAnnotations[api.SeccompContainerAnnotationKeyPrefix+c.Name]; hasContainerProfile {
+			if outPodSpec.Containers[i].SecurityContext == nil {
+				outPodSpec.Containers[i].SecurityContext = &api.SecurityContext{}
+			}
+			outPodSpec.Containers[i].SecurityContext.SeccompProfile = containerProfile
+		}
+	}
+
+	for i, c := range outPodSpec.InitContainers {
+		if containerProfile, hasContainerProfile :=
+			inAnnotations[api.SeccompContainerAnnotationKeyPrefix+c.Name]; hasContainerProfile {
+			if outPodSpec.InitContainers[i].SecurityContext == nil {
+				outPodSpec.InitContainers[i].SecurityContext = &api.SecurityContext{}
+			}
+			outPodSpec.InitContainers[i].SecurityContext.SeccompProfile = containerProfile
+		}
+	}
+}
+
+func internalRemoveSeccompAnnotations(podSpec *api.PodSpec, annotations map[string]string) {
+	delete(annotations, api.SeccompPodAnnotationKey)
+	for _, c := range podSpec.Containers {
+		delete(annotations, api.SeccompContainerAnnotationKeyPrefix+c.Name)
+	}
+	for _, c := range podSpec.InitContainers {
+		delete(annotations, api.SeccompContainerAnnotationKeyPrefix+c.Name)
+	}
 }
 
 func Convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {

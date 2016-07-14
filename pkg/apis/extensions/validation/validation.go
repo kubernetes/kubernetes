@@ -544,9 +544,22 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
 	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
+	allErrs = append(allErrs, validatePSPSeccompProfiles(fldPath.Child("seccompProfiles"), spec.SeccompProfiles)...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 
+	return allErrs
+}
+
+// validatePSPSeccompProfiles validates the SeccompProfiles field of PodSecurityPolicy.
+func validatePSPSeccompProfiles(fldPath *field.Path, allowedProfiles []string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, p := range allowedProfiles {
+		if p == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath, p, "profile must not be empty"))
+		}
+		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath)...)
+	}
 	return allErrs
 }
 

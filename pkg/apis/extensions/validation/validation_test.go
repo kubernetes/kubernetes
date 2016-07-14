@@ -1508,6 +1508,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	allowedCapListedInRequiredDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
 	allowedCapListedInRequiredDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
 
+	emptySeccompProfile := validPSP()
+	emptySeccompProfile.Spec.SeccompProfiles = []string{""}
+
+	invalidSeccompProfile := validPSP()
+	invalidSeccompProfile.Spec.SeccompProfiles = []string{"foo"}
+
+	invalidSeccompProfileSubpath := validPSP()
+	invalidSeccompProfileSubpath.Spec.SeccompProfiles = []string{"localhost/../test"}
+
 	errorCases := map[string]struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -1587,6 +1596,21 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         allowedCapListedInRequiredDrop,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "capability is listed in allowedCapabilities and requiredDropCapabilities",
+		},
+		"empty seccomp profile": {
+			psp:         emptySeccompProfile,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "profile must not be empty",
+		},
+		"invalid seccomp profile": {
+			psp:         invalidSeccompProfile,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
+		"invalid seccomp profile subpath": {
+			psp:         invalidSeccompProfileSubpath,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must not start with '../'",
 		},
 	}
 

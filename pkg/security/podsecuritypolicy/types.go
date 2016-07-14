@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/user"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -59,4 +60,5 @@ type ProviderStrategies struct {
 	FSGroupStrategy           group.GroupStrategy
 	SupplementalGroupStrategy group.GroupStrategy
 	CapabilitiesStrategy      capabilities.CapabilitiesStrategy
+	SeccompStrategy           seccomp.SeccompStrategy
 }

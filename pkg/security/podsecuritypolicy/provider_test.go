@@ -46,6 +46,7 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 				Name: "psp-sa",
 			},
 			Spec: extensions.PodSecurityPolicySpec{
+				SeccompProfiles:          []string{"foo"},
 				DefaultAddCapabilities:   []api.Capability{"foo"},
 				RequiredDropCapabilities: []api.Capability{"bar"},
 				RunAsUser: extensions.RunAsUserStrategyOptions{
@@ -211,6 +212,16 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		Level: "bar",
 	}
 
+	failNoSeccompAllowed := defaultPod()
+	failNoSeccompAllowed.Spec.SecurityContext.SeccompProfile = "bar"
+	failNoSeccompAllowedPSP := defaultPSP()
+	failNoSeccompAllowedPSP.Spec.SeccompProfiles = nil
+
+	failInvalidSeccompProfile := defaultPod()
+	failInvalidSeccompProfile.Spec.SecurityContext.SeccompProfile = "bar"
+	failInvalidSeccompProfilePSP := defaultPSP()
+	failInvalidSeccompProfilePSP.Spec.SeccompProfiles = []string{"foo"}
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *extensions.PodSecurityPolicy
@@ -260,6 +271,16 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failInvalidSELinuxPod,
 			psp:           failSELinuxPSP,
 			expectedError: "does not match required level.  Found bar, wanted foo",
+		},
+		"failNoSeccompAllowed": {
+			pod:           failNoSeccompAllowed,
+			psp:           failNoSeccompAllowedPSP,
+			expectedError: "seccomp may not be set",
+		},
+		"failInvalidSeccompPod": {
+			pod:           failInvalidSeccompProfile,
+			psp:           failInvalidSeccompProfilePSP,
+			expectedError: "bar is not a valid seccomp profile",
 		},
 	}
 	for k, v := range errorCases {
@@ -332,6 +353,16 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	readOnlyRootFS := false
 	readOnlyRootFSPodFalse.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &readOnlyRootFS
 
+	failNoSeccompAllowed := defaultPod()
+	failNoSeccompAllowed.Spec.Containers[0].SecurityContext.SeccompProfile = "bar"
+	failNoSeccompAllowedPSP := defaultPSP()
+	failNoSeccompAllowedPSP.Spec.SeccompProfiles = nil
+
+	failInvalidSeccompProfile := defaultPod()
+	failInvalidSeccompProfile.Spec.Containers[0].SecurityContext.SeccompProfile = "bar"
+	failInvalidSeccompProfilePSP := defaultPSP()
+	failInvalidSeccompProfilePSP.Spec.SeccompProfiles = []string{"foo"}
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *extensions.PodSecurityPolicy
@@ -376,6 +407,16 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 			pod:           readOnlyRootFSPodFalse,
 			psp:           readOnlyRootFSPSP,
 			expectedError: "ReadOnlyRootFilesystem must be set to true",
+		},
+		"failNoSeccompAllowed": {
+			pod:           failNoSeccompAllowed,
+			psp:           failNoSeccompAllowedPSP,
+			expectedError: "seccomp may not be set",
+		},
+		"failInvalidSeccompPod": {
+			pod:           failInvalidSeccompProfile,
+			psp:           failInvalidSeccompProfilePSP,
+			expectedError: "bar is not a valid seccomp profile",
 		},
 	}
 
@@ -448,6 +489,19 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		Level: "level",
 	}
 
+	seccompNilWithNoProfiles := defaultPod()
+	seccompNilWithNoProfilesPSP := defaultPSP()
+	seccompNilWithNoProfilesPSP.Spec.SeccompProfiles = nil
+
+	seccompAllowAnyPSP := defaultPSP()
+	seccompAllowAnyPSP.Spec.SeccompProfiles = []string{"*"}
+
+	seccompAllowFooPSP := defaultPSP()
+	seccompAllowFooPSP.Spec.SeccompProfiles = []string{"foo"}
+
+	seccompFooPod := defaultPod()
+	seccompFooPod.Spec.SecurityContext.SeccompProfile = "foo"
+
 	errorCases := map[string]struct {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
@@ -475,6 +529,18 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		"pass selinux validating PSP": {
 			pod: seLinuxPod,
 			psp: seLinuxPSP,
+		},
+		"pass seccomp nil with no profiles": {
+			pod: seccompNilWithNoProfiles,
+			psp: seccompNilWithNoProfilesPSP,
+		},
+		"pass seccomp wild card": {
+			pod: seccompFooPod,
+			psp: seccompAllowAnyPSP,
+		},
+		"pass seccomp specific profile": {
+			pod: seccompFooPod,
+			psp: seccompAllowFooPSP,
 		},
 	}
 
@@ -579,6 +645,19 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	readOnlyRootFSTrue := true
 	readOnlyRootFSPodTrue.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &readOnlyRootFSTrue
 
+	seccompNilWithNoProfiles := defaultPod()
+	seccompNilWithNoProfilesPSP := defaultPSP()
+	seccompNilWithNoProfilesPSP.Spec.SeccompProfiles = nil
+
+	seccompAllowAnyPSP := defaultPSP()
+	seccompAllowAnyPSP.Spec.SeccompProfiles = []string{"*"}
+
+	seccompAllowFooPSP := defaultPSP()
+	seccompAllowFooPSP.Spec.SeccompProfiles = []string{"foo"}
+
+	seccompFooPod := defaultPod()
+	seccompFooPod.Spec.Containers[0].SecurityContext.SeccompProfile = "foo"
+
 	errorCases := map[string]struct {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
@@ -622,6 +701,18 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		"pass read only root fs - true": {
 			pod: readOnlyRootFSPodTrue,
 			psp: defaultPSP(),
+		},
+		"pass seccomp nil with no profiles": {
+			pod: seccompNilWithNoProfiles,
+			psp: seccompNilWithNoProfilesPSP,
+		},
+		"pass seccomp wild card": {
+			pod: seccompFooPod,
+			psp: seccompAllowAnyPSP,
+		},
+		"pass seccomp specific profile": {
+			pod: seccompFooPod,
+			psp: seccompAllowFooPSP,
 		},
 	}
 
@@ -735,6 +826,7 @@ func defaultPSP() *extensions.PodSecurityPolicy {
 			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 			},
+			SeccompProfiles: []string{"*"},
 		},
 	}
 }
@@ -742,6 +834,7 @@ func defaultPSP() *extensions.PodSecurityPolicy {
 func defaultPod() *api.Pod {
 	var notPriv bool = false
 	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{Annotations: map[string]string{}},
 		Spec: api.PodSpec{
 			SecurityContext: &api.PodSecurityContext{
 			// fill in for test cases

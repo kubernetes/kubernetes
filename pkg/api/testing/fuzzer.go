@@ -126,6 +126,22 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			if s.SecurityContext == nil {
 				s.SecurityContext = new(api.PodSecurityContext)
 			}
+
+			// TODO: seccomp uses a field on the internal object and an annotation on the
+			// external object.  The annotation is keyed by container name.  If more than 1 container
+			// is fuzzed with no name then the conversion will be broken.  Containers must have
+			// unique names across init and containers, enforced in validation.go.
+			// This can be removed when the external object has the seccomp profile field in the
+			// security context.
+			if len(s.InitContainers)+len(s.Containers) > 1 {
+				for i := range s.InitContainers {
+					s.InitContainers[i].Name = c.RandString()
+				}
+				for i := range s.Containers {
+					s.Containers[i].Name = c.RandString()
+				}
+			}
+
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}

@@ -941,6 +941,106 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 	}
 }
 
+func TestAdmitSeccomp(t *testing.T) {
+	createPodWithSeccomp := func(podProfile, containerProfile string) *kapi.Pod {
+		pod := goodPod()
+		if podProfile != "" {
+			pod.Spec.SecurityContext.SeccompProfile = podProfile
+		}
+		if containerProfile != "" {
+			pod.Spec.Containers[0].SecurityContext.SeccompProfile = containerProfile
+		}
+		return pod
+	}
+
+	noSeccompPSP := restrictivePSP()
+	noSeccompPSP.Name = "noseccomp"
+
+	seccompPSP := restrictivePSP()
+	seccompPSP.Name = "seccomp"
+	seccompPSP.Spec.SeccompProfiles = []string{"foo"}
+
+	wildcardPSP := restrictivePSP()
+	wildcardPSP.Name = "wildcard"
+	wildcardPSP.Spec.SeccompProfiles = []string{"*"}
+
+	tests := map[string]struct {
+		pod                *kapi.Pod
+		psps               []*extensions.PodSecurityPolicy
+		shouldPass         bool
+		expectedPodProfile string
+		expectedPSP        string
+	}{
+		"no seccomp, no requests": {
+			pod:         goodPod(),
+			psps:        []*extensions.PodSecurityPolicy{noSeccompPSP},
+			shouldPass:  true,
+			expectedPSP: noSeccompPSP.Name,
+		},
+		"no seccomp, bad container requests": {
+			pod:        createPodWithSeccomp("foo", "bar"),
+			psps:       []*extensions.PodSecurityPolicy{noSeccompPSP},
+			shouldPass: false,
+		},
+		"seccomp, no requests": {
+			pod:                goodPod(),
+			psps:               []*extensions.PodSecurityPolicy{seccompPSP},
+			shouldPass:         true,
+			expectedPodProfile: "foo",
+			expectedPSP:        seccompPSP.Name,
+		},
+		"seccomp, valid pod profile, no container profile": {
+			pod:                createPodWithSeccomp("foo", ""),
+			psps:               []*extensions.PodSecurityPolicy{seccompPSP},
+			shouldPass:         true,
+			expectedPodProfile: "foo",
+			expectedPSP:        seccompPSP.Name,
+		},
+		"seccomp, no pod profile, valid container profile": {
+			pod:                createPodWithSeccomp("", "foo"),
+			psps:               []*extensions.PodSecurityPolicy{seccompPSP},
+			shouldPass:         true,
+			expectedPodProfile: "foo",
+			expectedPSP:        seccompPSP.Name,
+		},
+		"seccomp, valid pod profile, invalid container profile": {
+			pod:        createPodWithSeccomp("foo", "bar"),
+			psps:       []*extensions.PodSecurityPolicy{seccompPSP},
+			shouldPass: false,
+		},
+		"wild card, no requests": {
+			pod:         goodPod(),
+			psps:        []*extensions.PodSecurityPolicy{wildcardPSP},
+			shouldPass:  true,
+			expectedPSP: wildcardPSP.Name,
+		},
+		"wild card, requests": {
+			pod:                createPodWithSeccomp("foo", "bar"),
+			psps:               []*extensions.PodSecurityPolicy{wildcardPSP},
+			shouldPass:         true,
+			expectedPodProfile: "foo",
+			expectedPSP:        wildcardPSP.Name,
+		},
+	}
+
+	for k, v := range tests {
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+
+		if v.shouldPass {
+			if len(v.expectedPodProfile) > 0 {
+				if v.pod.Spec.SecurityContext.SeccompProfile == "" {
+					t.Errorf("%s expected to have pod profile for seccomp but found none", k)
+					continue
+				}
+				if v.pod.Spec.SecurityContext.SeccompProfile != v.expectedPodProfile {
+					t.Errorf("%s expected pod profile to be %s but found %s", k, v.expectedPodProfile, v.pod.Spec.SecurityContext.SeccompProfile)
+				}
+			}
+		}
+	}
+
+}
+
 func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod *kapi.Pod, shouldPass bool, expectedPSP string, t *testing.T) {
 	namespace := createNamespaceForTest()
 	serviceAccount := createSAForTest()

@@ -101,6 +101,16 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 		sc.SELinuxOptions = seLinux
 	}
 
+	// we only generate a seccomp profile for the entire pod.  Validation
+	// will catch any container profiles that are invalid and containers
+	// will inherit the pod profile.
+	if sc.SeccompProfile == "" {
+		profile, err := s.strategies.SeccompStrategy.Generate(pod)
+		if err != nil {
+			return nil, err
+		}
+		sc.SeccompProfile = profile
+	}
 	return sc, nil
 }
 
@@ -179,6 +189,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 	}
 	allErrs = append(allErrs, s.strategies.FSGroupStrategy.Validate(pod, fsGroups)...)
 	allErrs = append(allErrs, s.strategies.SupplementalGroupStrategy.Validate(pod, pod.Spec.SecurityContext.SupplementalGroups)...)
+	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidatePod(pod)...)
 
 	// make a dummy container context to reuse the selinux strategies
 	container := &api.Container{
@@ -216,6 +227,7 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	sc := container.SecurityContext
 	allErrs = append(allErrs, s.strategies.RunAsUserStrategy.Validate(pod, container)...)
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(pod, container)...)
+	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidateContainer(pod, container)...)
 
 	if !s.psp.Spec.Privileged && *sc.Privileged {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("privileged"), *sc.Privileged, "Privileged containers are not allowed"))

@@ -166,6 +166,10 @@ func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *
 		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
 	}
 
+	if containerSc.SeccompProfile != "" {
+		effectiveSc.SeccompProfile = containerSc.SeccompProfile
+	}
+
 	return effectiveSc
 }
 
@@ -189,6 +193,8 @@ func securityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
 		synthesized.RunAsNonRoot = new(bool)
 		*synthesized.RunAsNonRoot = *pod.Spec.SecurityContext.RunAsNonRoot
 	}
+
+	synthesized.SeccompProfile = pod.Spec.SecurityContext.SeccompProfile
 
 	return synthesized
 }
