@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -718,7 +720,8 @@ func TestWatchPods(t *testing.T) {
 	// and make sure it hits the sync method for the right job.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go manager.Run(1, stopCh)
+	go manager.internalPodInformer.Run(stopCh)
+	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, api.PodRunning, testJob)
 	testPod := pods[0]
