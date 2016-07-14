@@ -428,7 +428,7 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			klet.hairpinMode == componentconfig.HairpinVeth,
+			klet.hairpinMode == componentconfig.HairpinVeth && networkPluginName != "kubenet",
 			seccompProfileRoot,
 			containerRuntimeOptions...,
 		)
