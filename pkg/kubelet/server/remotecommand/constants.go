@@ -31,6 +31,11 @@ const (
 	// attachment/execution. It is the second version of the subprotocol and
 	// resolves the issues present in the first version.
 	StreamProtocolV2Name = "v2.channel.k8s.io"
+
+	// The SPDY subprotocol "v3.channel.k8s.io" is used for remote command
+	// attachment/execution. It is the third version of the subprotocol and
+	// adds support for resizing container terminals.
+	StreamProtocolV3Name = "v3.channel.k8s.io"
 )
 
-var SupportedStreamingProtocols = []string{StreamProtocolV2Name, StreamProtocolV1Name}
+var SupportedStreamingProtocols = []string{StreamProtocolV3Name, StreamProtocolV2Name, StreamProtocolV1Name}

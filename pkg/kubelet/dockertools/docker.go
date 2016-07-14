@@ -77,6 +77,8 @@ type DockerInterface interface {
 	StartExec(string, dockertypes.ExecStartCheck, StreamOptions) error
 	InspectExec(id string) (*dockertypes.ContainerExecInspect, error)
 	AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
+	ResizeContainerTTY(id string, height, width int) error
+	ResizeExecTTY(id string, height, width int) error
 }
 
 // KubeletContainerName encapsulates a pod name and a Kubernetes container name.
