@@ -37,12 +37,12 @@ func TestReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "rc,svc,pods,pvc",
+			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "rc,svc,pods,pvc,secrets",
+			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
 		},
 	}
 
