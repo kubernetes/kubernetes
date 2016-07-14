@@ -535,8 +535,10 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 		for portname := range portsToEndpoints {
 			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
+			glog.Infof("Generated svcPort %+v", svcPort)
 			curEndpoints := proxier.endpointsMap[svcPort]
 			newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+			/* These changes will eliminate all balancing rules
 			if svc, ok := proxier.serviceMap[svcPort]; ok && svc.onlyNodeLocalEndpoints {
 				localEndpoints := []string{}
 				for i := range newEndpoints {
@@ -548,7 +550,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				glog.V(4).Infof("Found localized Service, endpoints modified from %+v -> %+v", newEndpoints, localEndpoints)
 				newEndpoints = localEndpoints
 			}
-
+			*/
 			curEndpointIPs := flattenEndpointsInfo(curEndpoints)
 			if len(curEndpointIPs) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpointIPs), newEndpoints) {
 				removedEndpoints := getRemovedEndpoints(curEndpointIPs, newEndpoints)
@@ -924,7 +926,7 @@ func (proxier *Proxier) syncProxyRules() {
 				if !svcInfo.onlyNodeLocalEndpoints {
 					writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 				} else {
-					glog.Infof("Skipping NAT rules for localized service %+v", svcInfo)
+					glog.V(3).Infof("Skipping LoadBalancer IP NAT rules for localized service %s (svc-guid: %s)", svcName.String(), svcInfo.guid)
 				}
 				writeLine(natRules, append(args, "-j", string(svcChain))...)
 			}
