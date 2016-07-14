@@ -750,8 +750,18 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		Handler:        apiserver.RecoverPanics(handler),
 		MaxHeaderBytes: 1 << 20,
 	}
+
 	glog.Infof("Serving insecurely on %s", insecureLocation)
-	glog.Fatal(http.ListenAndServe())
+	go func() {
+		defer utilruntime.HandleCrash()
+		for {
+			if err := http.ListenAndServe(); err != nil {
+				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
+			}
+			time.Sleep(15 * time.Second)
+		}
+	}()
+	select {}
 }
 
 // Exposes the given group version in API.
