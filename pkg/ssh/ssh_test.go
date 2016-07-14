@@ -329,49 +329,38 @@ func TestSSHUser(t *testing.T) {
 
 }
 
+type slowDialer struct {
+	delay time.Duration
+	err   error
+}
+
+func (s *slowDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	time.Sleep(s.delay)
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &ssh.Client{}, nil
+}
+
 func TestTimeoutDialer(t *testing.T) {
 	testCases := []struct {
+		delay             time.Duration
 		timeout           time.Duration
+		err               error
 		expectedErrString string
 	}{
-		// should cause ssh.Dial to timeout.
-		{0, "i/o timeout"},
-		// should succeed
-		{1 * time.Second, ""},
+		// delay > timeout should cause ssh.Dial to timeout.
+		{1 * time.Second, 0, nil, "timed out dialing"},
+		// delay < timeout should return the result of the call to the dialer.
+		{0, 1 * time.Second, nil, ""},
+		{0, 1 * time.Second, fmt.Errorf("test dial error"), "test dial error"},
 	}
 	for _, tc := range testCases {
-		// setup
-		private, _, err := GenerateKey(2048)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			t.FailNow()
-		}
-		server, err := runTestSSHServer("foo", "bar")
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			t.FailNow()
-		}
-		privateData := EncodePrivateKey(private)
-		tunnel, err := NewSSHTunnelFromBytes("foo", privateData, server.Host)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			t.FailNow()
-		}
-		tunnel.SSHPort = server.Port
-
-		// test the dialer
-		dialer := &timeoutDialer{tc.timeout}
-		client, err := dialer.Dial("tcp", net.JoinHostPort(tunnel.Host, tunnel.SSHPort), tunnel.Config)
+		dialer := &timeoutDialer{&slowDialer{tc.delay, tc.err}, tc.timeout}
+		_, err := dialer.Dial("tcp", "addr:port", &ssh.ClientConfig{})
 		if len(tc.expectedErrString) == 0 && err != nil ||
 			!strings.Contains(fmt.Sprint(err), tc.expectedErrString) {
 			t.Errorf("Expected error to contain %q; got %v", tc.expectedErrString, err)
-		}
-		if len(tc.expectedErrString) == 0 {
-			// verify the connection doesn't timeout after the handshake is done.
-			time.Sleep(tc.timeout + 1*time.Second)
-			if _, _, err := client.OpenChannel("direct-tcpip", nil); err != nil {
-				t.Errorf("unexpected error %v", err)
-			}
 		}
 	}
 }
