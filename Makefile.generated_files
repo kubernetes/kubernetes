@@ -200,7 +200,7 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 gen_deepcopy: $(DEEPCOPY_FILES)
 	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                \
 	    $(DEEPCOPY_GEN)                                               \
-	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd,)  \
+	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
 	        --bounding-dirs $(PRJ_SRC_PATH)                           \
 	        -O $(DEEPCOPY_BASENAME);                                  \
 	fi
@@ -244,7 +244,7 @@ $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	     ./cmd/libs/go2idl/deepcopy-gen                    \
 	     | grep "^$(PRJ_SRC_PATH)"                         \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
-	 echo $$DIRECT $$INDIRECT | sed 's/ / \\\n\t/g';       \
+	echo $$DIRECT $$INDIRECT | sed 's/ / =,/g' | tr '=,' '\n\t'; \
 	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
@@ -310,7 +310,7 @@ CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 gen_conversion: $(CONVERSION_FILES)
 	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                \
 	    $(CONVERSION_GEN)                                               \
-	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd,)  \
+	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
 	        -O $(CONVERSION_BASENAME);                                  \
 	fi
 
@@ -420,7 +420,7 @@ $(META_DIR)/$(CONVERSION_GEN).mk:
 	     ./cmd/libs/go2idl/conversion-gen                  \
 	     | grep "^$(PRJ_SRC_PATH)"                         \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
-	 echo $$DIRECT $$INDIRECT | sed 's/ / \\\n\t/g';       \
+	echo $$DIRECT $$INDIRECT | sed 's/ / =,/g' | tr '=,' '\n\t'; \
 	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
