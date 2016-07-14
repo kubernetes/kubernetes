@@ -38,6 +38,9 @@ import math "math"
 
 import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 
+import strings "strings"
+import reflect "reflect"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -45,21 +48,17 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-func (m *PodDisruptionBudget) Reset()         { *m = PodDisruptionBudget{} }
-func (m *PodDisruptionBudget) String() string { return proto.CompactTextString(m) }
-func (*PodDisruptionBudget) ProtoMessage()    {}
+func (m *PodDisruptionBudget) Reset()      { *m = PodDisruptionBudget{} }
+func (*PodDisruptionBudget) ProtoMessage() {}
 
-func (m *PodDisruptionBudgetList) Reset()         { *m = PodDisruptionBudgetList{} }
-func (m *PodDisruptionBudgetList) String() string { return proto.CompactTextString(m) }
-func (*PodDisruptionBudgetList) ProtoMessage()    {}
+func (m *PodDisruptionBudgetList) Reset()      { *m = PodDisruptionBudgetList{} }
+func (*PodDisruptionBudgetList) ProtoMessage() {}
 
-func (m *PodDisruptionBudgetSpec) Reset()         { *m = PodDisruptionBudgetSpec{} }
-func (m *PodDisruptionBudgetSpec) String() string { return proto.CompactTextString(m) }
-func (*PodDisruptionBudgetSpec) ProtoMessage()    {}
+func (m *PodDisruptionBudgetSpec) Reset()      { *m = PodDisruptionBudgetSpec{} }
+func (*PodDisruptionBudgetSpec) ProtoMessage() {}
 
-func (m *PodDisruptionBudgetStatus) Reset()         { *m = PodDisruptionBudgetStatus{} }
-func (m *PodDisruptionBudgetStatus) String() string { return proto.CompactTextString(m) }
-func (*PodDisruptionBudgetStatus) ProtoMessage()    {}
+func (m *PodDisruptionBudgetStatus) Reset()      { *m = PodDisruptionBudgetStatus{} }
+func (*PodDisruptionBudgetStatus) ProtoMessage() {}
 
 func init() {
 	proto.RegisterType((*PodDisruptionBudget)(nil), "k8s.io.kubernetes.pkg.apis.policy.v1alpha1.PodDisruptionBudget")
@@ -305,6 +304,61 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *PodDisruptionBudget) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodDisruptionBudget{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "PodDisruptionBudgetSpec", "PodDisruptionBudgetSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "PodDisruptionBudgetStatus", "PodDisruptionBudgetStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodDisruptionBudgetList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodDisruptionBudgetList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PodDisruptionBudget", "PodDisruptionBudget", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodDisruptionBudgetSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodDisruptionBudgetSpec{`,
+		`MinAvailable:` + strings.Replace(strings.Replace(this.MinAvailable.String(), "IntOrString", "k8s_io_kubernetes_pkg_util_intstr.IntOrString", 1), `&`, ``, 1) + `,`,
+		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned.LabelSelector", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodDisruptionBudgetStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodDisruptionBudgetStatus{`,
+		`PodDisruptionAllowed:` + fmt.Sprintf("%v", this.PodDisruptionAllowed) + `,`,
+		`CurrentHealthy:` + fmt.Sprintf("%v", this.CurrentHealthy) + `,`,
+		`DesiredHealthy:` + fmt.Sprintf("%v", this.DesiredHealthy) + `,`,
+		`ExpectedPods:` + fmt.Sprintf("%v", this.ExpectedPods) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringGenerated(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *PodDisruptionBudget) Unmarshal(data []byte) error {
 	l := len(data)
