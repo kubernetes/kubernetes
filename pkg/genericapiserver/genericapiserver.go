@@ -372,16 +372,14 @@ func New(c *Config) (*GenericAPIServer, error) {
 		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},
 	}
 
-	var handlerContainer *restful.Container
 	if c.RestfulContainer != nil {
 		s.mux = c.RestfulContainer.ServeMux
-		handlerContainer = c.RestfulContainer
+		s.HandlerContainer = c.RestfulContainer
 	} else {
 		mux := http.NewServeMux()
 		s.mux = mux
-		handlerContainer = NewHandlerContainer(mux, c.Serializer)
+		s.HandlerContainer = NewHandlerContainer(mux, c.Serializer)
 	}
-	s.HandlerContainer = handlerContainer
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	s.HandlerContainer.Router(restful.CurlyRouter{})
 	s.MuxHelper = &apiserver.MuxHelper{Mux: s.mux, RegisteredPaths: []string{}}
