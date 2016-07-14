@@ -428,6 +428,10 @@ const (
 	// CreatedByAnnotation represents the key used to store the spec(json)
 	// used to create the resource.
 	CreatedByAnnotation = "kubernetes.io/created-by"
+
+	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
+	// in the Annotations of a Node.
+	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
@@ -499,4 +503,15 @@ func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
 		}
 	}
 	return tolerated
+}
+
+func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, error) {
+	var avoidPods AvoidPods
+	if len(annotations) > 0 && annotations[PreferAvoidPodsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[PreferAvoidPodsAnnotationKey]), &avoidPods)
+		if err != nil {
+			return avoidPods, err
+		}
+	}
+	return avoidPods, nil
 }
