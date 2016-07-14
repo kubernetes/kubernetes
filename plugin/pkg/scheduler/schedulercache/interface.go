@@ -36,13 +36,13 @@ import (
 //   |                                           |  |    | Update
 //   +      Assume                Add            v  v    |
 //Initial +--------> Assumed +------------+---> Added <--+
-//                      +                 |       +
-//                      |                 |       |
-//                      |             Add |       | Remove
-//                      |                 |       |
-//                      |                 +       |
-//                      +-------------> Expired   +----> Deleted
-//                          Expire
+//   ^                +   +               |       +
+//   |                |   |               |       |
+//   |                |   |           Add |       | Remove
+//   |                |   |               |       |
+//   |                |   |               +       |
+//   +----------------+   +-----------> Expired   +----> Deleted
+//         Forget             Expire
 //
 //
 // Note that an assumed pod can expire, because if we haven't received Add event notifying us
@@ -60,6 +60,9 @@ type Cache interface {
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
 	AssumePod(pod *api.Pod) error
+
+	// ForgetPod removes an assumed pod from cache.
+	ForgetPod(pod *api.Pod) error
 
 	// AddPod either confirms a pod if it's assumed, or adds it back if it's expired.
 	// If added back, the pod's information would be added again.
