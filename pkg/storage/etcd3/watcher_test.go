@@ -315,3 +315,62 @@ func testCheckStop(t *testing.T, i int, w watch.Interface) {
 		t.Errorf("#%d: time out after waiting 1s on ResultChan", i)
 	}
 }
+
+// TestWatchSync tests that if Events received from resultChan are in order
+func TestReceiveResultInOrder(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	tests := []struct {
+		key      string
+		eventNum int
+	}{{ // 1 update events
+		key:      "/somekey-1",
+		eventNum: 1,
+	}, { // orderedBufSize update events
+		key:      "/somekey-2",
+		eventNum: orderedBufSize,
+	}, { // 10*orderedBufSize update events
+		key:      "/somekey-3",
+		eventNum: 10 * orderedBufSize,
+	}}
+
+	for i, tt := range tests {
+		w, err := store.Watch(ctx, tt.key, "0", storage.Everything)
+		if err != nil {
+			t.Fatalf("Watch failed: %v", err)
+		}
+
+		prevOut := &api.Pod{}
+		err = store.Create(ctx, tt.key, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Generation: 0}}, prevOut, 0)
+		if err != nil {
+			t.Fatalf("Create key failed: %v", err)
+		}
+
+		outs := make([]*api.Pod, tt.eventNum+1)
+		outs[0] = prevOut
+		for j := 1; j <= tt.eventNum; j++ {
+			outs[j] = &api.Pod{}
+			err := store.GuaranteedUpdate(ctx, tt.key, outs[j], true, nil, storage.SimpleUpdate(
+				func(runtime.Object) (runtime.Object, error) {
+					return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Generation: int64(j)}}, nil
+				}))
+			if err != nil {
+				t.Fatalf("GuaranteedUpdate failed: %v", err)
+			}
+		}
+
+		// Check if update events are in order
+		for j := 0; j <= tt.eventNum; j++ {
+			if j != 0 {
+				testCheckResult(t, i, watch.Modified, w, outs[j])
+			} else {
+				testCheckResult(t, i, watch.Added, w, outs[0])
+
+			}
+		}
+
+		w.Stop()
+		testCheckStop(t, i, w)
+	}
+}
