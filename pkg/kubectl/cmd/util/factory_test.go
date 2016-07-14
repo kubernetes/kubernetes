@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flag"
@@ -711,6 +713,46 @@ func TestMakePortsString(t *testing.T) {
 		output := makePortsString(test.ports, test.useNodePort)
 		if output != test.expectedOutput {
 			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
+		}
+	}
+}
+
+func fakeClient() resource.ClientMapper {
+	return resource.ClientMapperFunc(func(*meta.RESTMapping) (resource.RESTClient, error) {
+		return &fake.RESTClient{}, nil
+	})
+}
+
+func TestReplaceAliases(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		expected string
+	}{
+		{
+			name:     "no-replacement",
+			arg:      "service",
+			expected: "service",
+		},
+		{
+			name:     "all-replacement",
+			arg:      "all",
+			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
+		},
+	}
+
+	mapper := DiscoveryRESTMapper(nil, testapi.Default.RESTMapper())
+	b := resource.NewBuilder(mapper, api.Scheme, fakeClient(), testapi.Default.Codec())
+
+	for _, test := range tests {
+		replaced := b.ReplaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }
