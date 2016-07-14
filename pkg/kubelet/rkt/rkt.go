@@ -1992,7 +1992,7 @@ func (r *Runtime) removePod(uuid string) error {
 	return errors.NewAggregate(errlist)
 }
 
-// rktExitError implemets /pkg/util/exec.ExitError interface.
+// rktExitError implements /pkg/util/exec.ExitError interface.
 type rktExitError struct{ *exec.ExitError }
 
 var _ utilexec.ExitError = &rktExitError{}

@@ -28,7 +28,7 @@ This project combines concepts and technologies from two already-complex project
 
 To get up and running with Kubernetes-Mesos, follow:
 
-- the [Getting started guide](../../docs/getting-started-guides/mesos.md) to launch a Kuberneters-Mesos cluster,
+- the [Getting started guide](../../docs/getting-started-guides/mesos.md) to launch a Kubernetes-Mesos cluster,
 - the [Kubernetes-Mesos Scheduler Guide](./docs/scheduler.md) for topics concerning the custom scheduler used in this distribution.
 
 

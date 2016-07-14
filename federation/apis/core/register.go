@@ -35,7 +35,7 @@ const GroupName = ""
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
-// Unversiond is group version for unversioned API objects
+// Unversioned is group version for unversioned API objects
 // TODO: this should be v1 probably
 var Unversioned = unversioned.GroupVersion{Group: "", Version: "v1"}
 

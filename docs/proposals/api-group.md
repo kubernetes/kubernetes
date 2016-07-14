@@ -105,7 +105,7 @@ Documentation for other releases can be found at
 
     Types in the unversioned package will not have the APIVersion field, but may retain the Kind field.
 
-    For backward compatibility, when hanlding the Status, the server will encode it to v1 if the client expects the Status to be encoded in v1, otherwise the server will send the unversioned#Status. If an error occurs before the version can be determined, the server will send the unversioned#Status.
+    For backward compatibility, when handling the Status, the server will encode it to v1 if the client expects the Status to be encoded in v1, otherwise the server will send the unversioned#Status. If an error occurs before the version can be determined, the server will send the unversioned#Status.
 
   * non-top-level common API objects:
 

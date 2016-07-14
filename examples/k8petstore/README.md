@@ -76,7 +76,7 @@ The web app is written in Go, and borrowed from the original Guestbook example b
 
 K8petstore is built to be expanded, and aims to attract developers interested in building and maintaining a polyglot, non-trivial kubernetes app as a community.
 
-It can be a simple way to get started with kuberentes or golang application development.
+It can be a simple way to get started with kubernetes or golang application development.
 
 Thus we've tried to make it easy to hack on, even without kubernetes.  Just run the containers and glue them together using docker IP addresses !
 
@@ -156,7 +156,7 @@ We are open to other ways of expanding the coverage and realism of the k8petstor
 
 Reach out with ideas, pull requests, and so on!
 
-The end goal is to support polyglot, real world, data-intensive application on kuberenetes which can be used both to learn how to maintain kubernetes applications
+The end goal is to support polyglot, real world, data-intensive application on kubernetes which can be used both to learn how to maintain kubernetes applications
 
 as well as for scale and functionality testing.
 

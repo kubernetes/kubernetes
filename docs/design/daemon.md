@@ -174,7 +174,7 @@ upgradable, and more generally could not be managed through the API server
 interface.
 
 A third alternative is to generalize the Replication Controller. We would do
-something like: if you set the `replicas` field of the ReplicationConrollerSpec
+something like: if you set the `replicas` field of the ReplicationControllerSpec
 to -1, then it means "run exactly one replica on every node matching the
 nodeSelector in the pod template." The ReplicationController would pretend
 `replicas` had been set to some large number -- larger than the largest number

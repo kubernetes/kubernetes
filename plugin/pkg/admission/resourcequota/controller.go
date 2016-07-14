@@ -180,7 +180,7 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 	e.checkQuotas(quotas, admissionAttributes, 3)
 }
 
-// checkQuotas checks the admission atttributes against the passed quotas.  If a quota applies, it will attempt to update it
+// checkQuotas checks the admission attributes against the passed quotas.  If a quota applies, it will attempt to update it
 // AFTER it has checked all the admissionAttributes.  The method breaks down into phase like this:
 // 0. make a copy of the quotas to act as a "running" quota so we know what we need to update and can still compare against the
 //    originals

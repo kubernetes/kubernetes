@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-// The comments for the structs and fields can be used from go-resful to
+// The comments for the structs and fields can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
 // information on the implementation: https://github.com/emicklei/go-restful/pull/215
 //

@@ -38,7 +38,7 @@ Documentation for other releases can be found at
 
 ## Introduction
 
-Full Cluster Federation will offer sophisticated federation between multiple kuberentes
+Full Cluster Federation will offer sophisticated federation between multiple kubernetes
 clusters, offering true high-availability, multiple provider support &
 cloud-bursting, multiple region support etc.  However, many users have
 expressed a desire for a "reasonably" high-available cluster, that runs in
@@ -73,7 +73,7 @@ advanced/experimental functionality, so the interface is not initially going to
 be particularly user-friendly.  As we design the evolution of kube-up, we will
 make multiple zones better supported.
 
-For the initial implemenation, kube-up must be run multiple times, once for
+For the initial implementation, kube-up must be run multiple times, once for
 each zone.  The first kube-up will take place as normal, but then for each
 additional zone the user must run kube-up again, specifying
 `KUBE_USE_EXISTING_MASTER=true` and `KUBE_SUBNET_CIDR=172.20.x.0/24`.  This will then
@@ -226,7 +226,7 @@ Initially therefore, the GCE changes will be to:
 
 1. change kube-up to support creation of a cluster in multiple zones
 1. pass a flag enabling multi-AZ clusters with kube-up
-1. change the kuberentes cloud provider to iterate through relevant zones when resolving items
+1. change the kubernetes cloud provider to iterate through relevant zones when resolving items
 1. tag GCE PD volumes with the appropriate zone information
 
 
