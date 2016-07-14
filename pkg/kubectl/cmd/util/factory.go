@@ -274,12 +274,62 @@ func makeInterfacesFor(versionList []unversioned.GroupVersion) func(version unve
 	}
 }
 
+type DiscoveryExpander struct {
+	kubectl.ShortcutExpander
+	clients *ClientCache
+}
+
+func (e DiscoveryExpander) getAll() ([]unversioned.GroupResource, error) {
+	if e.clients == nil {
+		return e.All, nil
+	}
+
+	client, err := e.clients.ClientSetForVersion(&unversioned.GroupVersion{Version: "v1"})
+	if err != nil {
+		return e.All, nil
+	}
+
+	// Check if we have access to server resources
+	apiResources, err := client.Discovery().ServerResources()
+	if err != nil {
+		return e.All, nil
+	}
+
+	availableResources := []unversioned.GroupVersionResource{}
+	for groupVersionString, resourceList := range apiResources {
+		currVersion, err := unversioned.ParseGroupVersion(groupVersionString)
+		if err != nil {
+			return e.All, nil
+		}
+
+		for _, resource := range resourceList.APIResources {
+			availableResources = append(availableResources, currVersion.WithResource(resource.Name))
+		}
+	}
+
+	availableAll := []unversioned.GroupResource{}
+	for _, requestedResource := range e.All {
+		for _, availableResource := range availableResources {
+			if requestedResource.Group == availableResource.Group &&
+				requestedResource.Resource == availableResource.Resource {
+				availableAll = append(availableAll, requestedResource)
+				break
+			}
+		}
+	}
+
+	return availableAll, nil
+}
+
+func DiscoveryRESTMapper(clients *ClientCache, delegate meta.RESTMapper) DiscoveryExpander {
+	expander := kubectl.NewShortcutExpander(delegate)
+	return DiscoveryExpander{expander, clients}
+}
+
 // NewFactory creates a factory with the default Kubernetes resources defined
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
 func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
-	mapper := kubectl.ShortcutExpander{RESTMapper: registered.RESTMapper()}
-
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
@@ -289,6 +339,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
+	mapper := DiscoveryRESTMapper(clients, registered.RESTMapper())
 
 	return &Factory{
 		clients: clients,

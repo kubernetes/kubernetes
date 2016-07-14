@@ -32,6 +32,18 @@ const (
 	kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
 )
 
+// userResources is a group of resources mostly used by a kubectl user
+var userResources = []unversioned.GroupResource{
+	{Group: "", Resource: "pods"},
+	{Group: "", Resource: "replicationcontrollers"},
+	{Group: "", Resource: "services"},
+	{Group: "apps", Resource: "petsets"},
+	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
+	{Group: "extensions", Resource: "jobs"},
+	{Group: "extensions", Resource: "deployments"},
+	{Group: "extensions", Resource: "replicasets"},
+}
+
 type NamespaceInfo struct {
 	Namespace string
 }
@@ -101,9 +113,22 @@ func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...s
 // resources.  It expands the resource first, then invokes the wrapped RESTMapper
 type ShortcutExpander struct {
 	RESTMapper meta.RESTMapper
+
+	All []unversioned.GroupResource
+}
+
+func NewShortcutExpander(delegate meta.RESTMapper) ShortcutExpander {
+	return ShortcutExpander{
+		All:        userResources,
+		RESTMapper: delegate,
+	}
 }
 
 var _ meta.RESTMapper = &ShortcutExpander{}
+
+func (e ShortcutExpander) getAll() ([]unversioned.GroupResource, error) {
+	return e.All, nil
+}
 
 func (e ShortcutExpander) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
 	return e.RESTMapper.KindFor(expandResourceShortcut(resource))
@@ -133,7 +158,19 @@ func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) 
 	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
 }
 
+// AliasesForResource returns whether a resource has an alias or not
 func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
+	if strings.ToLower(resource) == "all" {
+		var resources []unversioned.GroupResource
+		if resources = e.All; len(e.All) == 0 {
+			resources = userResources
+		}
+		aliases := []string{}
+		for _, r := range resources {
+			aliases = append(aliases, r.Resource)
+		}
+		return aliases, true
+	}
 	return e.RESTMapper.AliasesForResource(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
 }
 
