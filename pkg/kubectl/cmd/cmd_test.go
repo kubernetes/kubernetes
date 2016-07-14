@@ -225,7 +225,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Ne
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -295,7 +295,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Neg
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, showLabels bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -371,7 +371,10 @@ func stringBody(body string) io.ReadCloser {
 
 func Example_printReplicationControllerWithNamespace() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		WithNamespace: true,
+		ColumnLabels:  []string{},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -417,7 +420,10 @@ func Example_printReplicationControllerWithNamespace() {
 
 func Example_printMultiContainersReplicationControllerWithWide() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		Wide:         true,
+		ColumnLabels: []string{},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -466,7 +472,9 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 
 func Example_printReplicationController() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		ColumnLabels: []string{},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -515,7 +523,10 @@ func Example_printReplicationController() {
 
 func Example_printPodWithWideFormat() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		Wide:         true,
+		ColumnLabels: []string{},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -552,7 +563,10 @@ func Example_printPodWithWideFormat() {
 
 func Example_printPodWithShowLabels() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, true, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		ShowLabels:   true,
+		ColumnLabels: []string{},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -684,7 +698,9 @@ func newAllPhasePodList() *api.PodList {
 
 func Example_printPodHideTerminated() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		ColumnLabels: []string{},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -705,7 +721,10 @@ func Example_printPodHideTerminated() {
 
 func Example_printPodShowAll() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		ShowAll:      true,
+		ColumnLabels: []string{},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -728,7 +747,10 @@ func Example_printPodShowAll() {
 
 func Example_printServiceWithNamespacesAndLabels() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, false, []string{"l1"})
+	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+		WithNamespace: true,
+		ColumnLabels:  []string{"l1"},
+	})
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,

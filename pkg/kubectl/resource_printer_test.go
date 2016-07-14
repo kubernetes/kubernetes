@@ -231,7 +231,9 @@ func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options PrintOptions) er
 
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []string{"Data"}
-	printer := NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+	})
 	printer.Handler(columns, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
@@ -248,7 +250,9 @@ func TestCustomTypePrinting(t *testing.T) {
 
 func TestCustomTypePrintingWithKind(t *testing.T) {
 	columns := []string{"Data"}
-	printer := NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+	})
 	printer.Handler(columns, PrintCustomType)
 	printer.Options.WithKind = true
 	printer.Options.KindName = "test"
@@ -267,7 +271,9 @@ func TestCustomTypePrintingWithKind(t *testing.T) {
 
 func TestPrintHandlerError(t *testing.T) {
 	columns := []string{"Data"}
-	printer := NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+	})
 	printer.Handler(columns, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
@@ -278,7 +284,9 @@ func TestPrintHandlerError(t *testing.T) {
 }
 
 func TestUnknownTypePrinting(t *testing.T) {
-	printer := NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+	})
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&TestUnknownType{}, buffer)
 	if err == nil {
@@ -482,13 +490,18 @@ func TestPrinters(t *testing.T) {
 		t.Fatal(err)
 	}
 	printers := map[string]ResourcePrinter{
-		"humanReadable":        NewHumanReadablePrinter(true, false, false, false, false, false, []string{}),
-		"humanReadableHeaders": NewHumanReadablePrinter(false, false, false, false, false, false, []string{}),
-		"json":                 &JSONPrinter{},
-		"yaml":                 &YAMLPrinter{},
-		"template":             templatePrinter,
-		"template2":            templatePrinter2,
-		"jsonpath":             jsonpathPrinter,
+		"humanReadable": NewHumanReadablePrinter(PrintOptions{
+			NoHeaders:    true,
+			ColumnLabels: []string{},
+		}),
+		"humanReadableHeaders": NewHumanReadablePrinter(PrintOptions{
+			ColumnLabels: []string{},
+		}),
+		"json":      &JSONPrinter{},
+		"yaml":      &YAMLPrinter{},
+		"template":  templatePrinter,
+		"template2": templatePrinter2,
+		"jsonpath":  jsonpathPrinter,
 		"name": &NamePrinter{
 			Typer:   api.Scheme,
 			Decoder: api.Codecs.UniversalDecoder(),
@@ -526,7 +539,9 @@ func TestPrinters(t *testing.T) {
 
 func TestPrintEventsResultSorted(t *testing.T) {
 	// Arrange
-	printer := NewHumanReadablePrinter(false /* noHeaders */, false, false, false, false, false, []string{})
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+	})
 
 	obj := api.EventList{
 		Items: []api.Event{
@@ -570,7 +585,9 @@ func TestPrintEventsResultSorted(t *testing.T) {
 }
 
 func TestPrintNodeStatus(t *testing.T) {
-	printer := NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+	})
 	table := []struct {
 		node   api.Node
 		status string
@@ -694,7 +711,9 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		},
 	}
 	buff := bytes.Buffer{}
-	printIngress(&ingress, &buff, PrintOptions{false, false, false, false, false, false, false, "", []string{"app_name"}})
+	printIngress(&ingress, &buff, PrintOptions{
+		ColumnLabels: []string{"app_name"},
+	})
 	output := string(buff.Bytes())
 	appName := ingress.ObjectMeta.Labels["app_name"]
 	if !strings.Contains(output, appName) {
@@ -1001,7 +1020,10 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 	for _, test := range table {
 		if test.isNamespaced {
 			// Expect output to include namespace when requested.
-			printer := NewHumanReadablePrinter(false, true, false, false, false, false, []string{})
+			printer := NewHumanReadablePrinter(PrintOptions{
+				WithNamespace: true,
+				ColumnLabels:  []string{},
+			})
 			buffer := &bytes.Buffer{}
 			err := printer.PrintObj(test.obj, buffer)
 			if err != nil {
@@ -1013,7 +1035,10 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			}
 		} else {
 			// Expect error when trying to get all namespaces for un-namespaced object.
-			printer := NewHumanReadablePrinter(false, true, false, false, false, false, []string{})
+			printer := NewHumanReadablePrinter(PrintOptions{
+				WithNamespace: true,
+				ColumnLabels:  []string{},
+			})
 			buffer := &bytes.Buffer{}
 			err := printer.PrintObj(test.obj, buffer)
 			if err == nil {
