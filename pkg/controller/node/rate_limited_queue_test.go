@@ -281,3 +281,27 @@ func TestClear(t *testing.T) {
 		t.Fatalf("Clear should remove all elements from the queue.")
 	}
 }
+
+func TestSwapLimiter(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	fakeAlways := flowcontrol.NewFakeAlwaysRateLimiter()
+	qps := evictor.limiter.QPS()
+	if qps != fakeAlways.QPS() {
+		t.Fatalf("QPS does not match create one: %v instead of %v", qps, fakeAlways.QPS())
+	}
+
+	evictor.SwapLimiter(0)
+	qps = evictor.limiter.QPS()
+	fakeNever := flowcontrol.NewFakeNeverRateLimiter()
+	if qps != fakeNever.QPS() {
+		t.Fatalf("QPS does not match create one: %v instead of %v", qps, fakeNever.QPS())
+	}
+
+	createdQPS := float32(5.5)
+	evictor.SwapLimiter(createdQPS)
+	qps = evictor.limiter.QPS()
+	if qps != createdQPS {
+		t.Fatalf("QPS does not match create one: %v instead of %v", qps, createdQPS)
+	}
+
+}
