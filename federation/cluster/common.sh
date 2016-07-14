@@ -156,7 +156,7 @@ function create-federation-api-objects {
 	   create-kubeconfig
 
     # Create secret with federation-apiserver's kubeconfig
-    $host_kubectl create secret generic federation-apiserver-secret --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+    $host_kubectl create secret generic federation-apiserver-kubeconfig --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
 
     # Create secrets with all the kubernetes-apiserver's kubeconfigs.
     # Note: This is used only by the test setup (where kubernetes clusters are
