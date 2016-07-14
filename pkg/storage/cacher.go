@@ -479,7 +479,7 @@ func filterFunction(key string, keyFunc func(runtime.Object) (string, error), fi
 			glog.Errorf("invalid object for filter: %v", obj)
 			return false
 		}
-		if !strings.HasPrefix(objKey, key) {
+		if !strings.HasPrefix(objKey+"/", key+"/") {
 			return false
 		}
 		return filter.Filter(obj)
