@@ -352,16 +352,13 @@ func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFunc
 	case types.Struct:
 		convertible := true
 		for _, inMember := range in.Members {
+			// Check if this member is excluded from conversion
+			if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
+				continue
+			}
 			// Check if there is an out member with that name.
 			outMember, found := findMember(out, inMember.Name)
 			if !found {
-				// Check if the member has opted out with:
-				//   "+k8s:conversion-gen=false"
-				// TODO: Switch to SecondClosestCommentLines.
-				if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
-					glog.V(5).Infof("field %v.%s requests no conversion generation, skipping", in, inMember.Name)
-					continue
-				}
 				return false
 			}
 			convertible = convertible && isConvertible(inMember.Type, outMember.Type, manualConversions)
@@ -727,6 +724,10 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	for _, m := range inType.Members {
+		// Check if this member is excluded from conversion
+		if tagvals := extractTag(m.CommentLines); tagvals != nil && tagvals[0] == "false" {
+			continue
+		}
 		outMember, isOutMember := findMember(outType, m.Name)
 		if !isOutMember {
 			// Since this object wasn't filtered out, this means that
