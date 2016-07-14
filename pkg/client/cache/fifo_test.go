@@ -233,3 +233,21 @@ func TestFIFO_HasSynced(t *testing.T) {
 		}
 	}
 }
+
+func TestFIFO_resync(t *testing.T) {
+	f := NewResyncableFIFO(testFifoObjectKeyFunc)
+	f.Add(mkFifoObj("foo", 10))
+	f.Add(mkFifoObj("bar", 15))
+	Pop(f)
+
+	if err := f.Resync(); err != nil {
+		t.Fatal(err)
+	}
+
+	if e, a := "bar", Pop(f).(testFifoObject).name; e != a {
+		t.Fatalf("expected %v, got %v", e, a)
+	}
+	if e, a := "foo", Pop(f).(testFifoObject).name; e != a {
+		t.Fatalf("expected %v, got %v", e, a)
+	}
+}
