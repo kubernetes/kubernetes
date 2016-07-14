@@ -853,10 +853,11 @@ func (checker *PodAffinityChecker) InterPodAffinityMatches(pod *api.Pod, meta in
 // AnyPodMatchesPodAffinityTerm checks if any of given pods can match the specific podAffinityTerm.
 func (checker *PodAffinityChecker) AnyPodMatchesPodAffinityTerm(pod *api.Pod, allPods []*api.Pod, node *api.Node, podAffinityTerm api.PodAffinityTerm) (bool, error) {
 	for _, ep := range allPods {
-		match, err := checker.failureDomains.CheckIfPodMatchPodAffinityTerm(ep, pod, podAffinityTerm,
-			func(ep *api.Pod) (*api.Node, error) { return checker.info.GetNodeInfo(ep.Spec.NodeName) },
-			func(pod *api.Pod) (*api.Node, error) { return node, nil },
-		)
+		epNode, err := checker.info.GetNodeInfo(ep.Spec.NodeName)
+		if err != nil {
+			return false, err
+		}
+		match, err := checker.failureDomains.CheckIfPodMatchPodAffinityTerm(ep, epNode, node, pod, podAffinityTerm)
 		if err != nil || match {
 			return match, err
 		}
