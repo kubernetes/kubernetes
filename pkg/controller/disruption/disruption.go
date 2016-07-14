@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -64,6 +65,9 @@ type DisruptionController struct {
 
 	queue *workqueue.Type
 
+	broadcaster record.EventBroadcaster
+	recorder    record.EventRecorder
+
 	getUpdater func() updater
 }
 
@@ -83,7 +87,9 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 		kubeClient:    kubeClient,
 		podController: podInformer.GetController(),
 		queue:         workqueue.New(),
+		broadcaster:   record.NewBroadcaster(),
 	}
+	dc.recorder = dc.broadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
@@ -248,6 +254,12 @@ func (dc *DisruptionController) getPodReplicationControllers(pod *api.Pod) ([]co
 
 func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting disruption controller")
+	if dc.kubeClient != nil {
+		glog.V(0).Infof("Sending events to api server.")
+		dc.broadcaster.StartRecordingToSink(dc.kubeClient.Events(""))
+	} else {
+		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
+	}
 	go dc.pdbController.Run(stopCh)
 	go dc.podController.Run(stopCh)
 	go dc.rcController.Run(stopCh)
@@ -331,7 +343,11 @@ func (dc *DisruptionController) getPdbForPod(pod *api.Pod) *policy.PodDisruption
 		return nil
 	}
 
-	// FIXME(mml): when >1 matches, emit an event and log something
+	if len(pdbs) > 1 {
+		msg := fmt.Sprintf("Pod %q/%q matches multiple PodDisruptionBudgets.  Chose %q arbitrarily.", pod.Namespace, pod.Name, pdbs[0].Name)
+		glog.Warning(msg)
+		dc.recorder.Event(pod, api.EventTypeWarning, "MultiplePodDisruptionBudgets", msg)
+	}
 	return &pdbs[0]
 }
 
