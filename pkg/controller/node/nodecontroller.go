@@ -56,6 +56,8 @@ const (
 	nodeStatusUpdateRetry = 5
 	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
 	nodeEvictionPeriod = 100 * time.Millisecond
+	// Burst value for all eviction rate limiters
+	evictionRateLimiterBurst = 1
 )
 
 type zoneState string
@@ -114,7 +116,6 @@ type NodeController struct {
 	zonePodEvictor         map[string]*RateLimitedTimedQueue
 	zoneTerminationEvictor map[string]*RateLimitedTimedQueue
 	evictionLimiterQPS     float32
-	evictionLimiterBurst   int
 	podEvictionTimeout     time.Duration
 	// The maximum duration before a pod evicted from a node can be forcefully terminated.
 	maximumGracePeriod time.Duration
@@ -144,7 +145,6 @@ func NewNodeController(
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
 	evictionLimiterQPS float32,
-	evictionLimiterBurst int,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -200,7 +200,6 @@ func NewNodeController(
 		nodeExistsInCloudProvider: func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
 		computeZoneStateFunc:      ComputeZoneState,
 		evictionLimiterQPS:        evictionLimiterQPS,
-		evictionLimiterBurst:      evictionLimiterBurst,
 		zoneStates:                make(map[string]zoneState),
 	}
 
@@ -385,11 +384,11 @@ func (nc *NodeController) monitorNodeStatus() error {
 		if _, found := nc.zonePodEvictor[zone]; !found {
 			nc.zonePodEvictor[zone] =
 				NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, nc.evictionLimiterBurst))
+					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
 		}
 		if _, found := nc.zoneTerminationEvictor[zone]; !found {
 			nc.zoneTerminationEvictor[zone] = NewRateLimitedTimedQueue(
-				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, nc.evictionLimiterBurst))
+				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
 		}
 		nc.cancelPodEviction(added[i])
 	}
