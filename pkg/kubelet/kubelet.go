@@ -507,7 +507,8 @@ func NewMainKubelet(
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
-		klet.containerRuntime)
+		klet.containerRuntime,
+		recorder)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
