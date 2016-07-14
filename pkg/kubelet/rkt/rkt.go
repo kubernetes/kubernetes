@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -152,7 +153,7 @@ type Runtime struct {
 	runtimeHelper       kubecontainer.RuntimeHelper
 	recorder            record.EventRecorder
 	livenessManager     proberesults.Manager
-	imagePuller         kubecontainer.ImagePuller
+	imagePuller         images.ImageManager
 	runner              kubecontainer.HandlerRunner
 	execer              utilexec.Interface
 	os                  kubecontainer.OSInterface
@@ -271,11 +272,7 @@ func New(
 
 	rkt.runner = lifecycle.NewHandlerRunner(httpClient, rkt, rkt)
 
-	if serializeImagePulls {
-		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
-	} else {
-		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
-	}
+	rkt.imagePuller = images.NewImageManager(recorder, rkt, imageBackOff, serializeImagePulls)
 
 	if err := rkt.getVersions(); err != nil {
 		return nil, fmt.Errorf("rkt: error getting version info: %v", err)
@@ -753,7 +750,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, podIP string, c api.Container,
 	if requiresPrivileged && !securitycontext.HasPrivilegedRequest(&c) {
 		return fmt.Errorf("cannot make %q: running a custom stage1 requires a privileged security context", format.Pod(pod))
 	}
-	if err, _ := r.imagePuller.PullImage(pod, &c, pullSecrets); err != nil {
+	if err, _ := r.imagePuller.EnsureImageExists(pod, &c, pullSecrets); err != nil {
 		return nil
 	}
 	imgManifest, err := r.getImageManifest(c.Image)

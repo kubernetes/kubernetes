@@ -142,13 +142,6 @@ type ContainerCommandRunner interface {
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 }
 
-// ImagePuller wraps Runtime.PullImage() to pull a container image.
-// It will check the presence of the image, and report the 'image pulling',
-// 'image pulled' events correspondingly.
-type ImagePuller interface {
-	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
-}
-
 // Pod is a group of containers.
 type Pod struct {
 	// The ID of the pod, which can be used to retrieve a particular pod
