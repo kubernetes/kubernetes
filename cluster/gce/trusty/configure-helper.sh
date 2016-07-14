@@ -542,7 +542,12 @@ start_kube_apiserver() {
   fi
 
   src_dir="/home/kubernetes/kube-manifests/kubernetes/gci-trusty"
-  cp "${src_dir}/abac-authz-policy.jsonl" /etc/srv/kubernetes/
+
+  local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+  remove_salt_config_comments "${abac_policy_json}"
+  sed -i -e "s@{{kube_user}}@${KUBE_USER}@g" "${abac_policy_json}"
+  cp "${abac_policy_json}" /etc/srv/kubernetes/
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove_salt_config_comments "${src_file}"
   # Evaluate variables
