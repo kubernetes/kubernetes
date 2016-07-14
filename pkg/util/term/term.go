@@ -60,17 +60,17 @@ type fd interface {
 // IsTerminalIn returns true if t.In is a terminal. Does not check /dev/tty
 // even if TryDev is set.
 func (t TTY) IsTerminalIn() bool {
-	return isTerminal(t.In)
+	return IsTerminal(t.In)
 }
 
 // IsTerminalOut returns true if t.Out is a terminal. Does not check /dev/tty
 // even if TryDev is set.
 func (t TTY) IsTerminalOut() bool {
-	return isTerminal(t.Out)
+	return IsTerminal(t.Out)
 }
 
-// isTerminal returns whether the passed object is a terminal or not
-func isTerminal(i interface{}) bool {
+// IsTerminal returns whether the passed object is a terminal or not
+func IsTerminal(i interface{}) bool {
 	file, ok := i.(fd)
 	return ok && term.IsTerminal(file.Fd())
 }
