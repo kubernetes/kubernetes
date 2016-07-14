@@ -75,6 +75,8 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 
+	os.Setenv("KUBECTL", *root+`/cluster/kubectl.sh`+kubectlArgs())
+
 	if *isup {
 		status := 1
 		if IsUp() {
@@ -95,8 +97,6 @@ func main() {
 			log.Fatal("Error building. Aborting.")
 		}
 	}
-
-	os.Setenv("KUBECTL", *root+`/cluster/kubectl.sh`+kubectlArgs())
 
 	if *pushup {
 		if IsUp() {
