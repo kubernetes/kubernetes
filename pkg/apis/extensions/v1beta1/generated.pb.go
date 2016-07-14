@@ -2431,6 +2431,21 @@ func (m *PodSecurityPolicySpec) MarshalTo(data []byte) (int, error) {
 		data[i] = 0
 	}
 	i++
+	if len(m.SeccompProfiles) > 0 {
+		for _, s := range m.SeccompProfiles {
+			data[i] = 0x7a
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			data[i] = uint8(l)
+			i++
+			i += copy(data[i:], s)
+		}
+	}
 	return i, nil
 }
 
@@ -3791,6 +3806,12 @@ func (m *PodSecurityPolicySpec) Size() (n int) {
 	l = m.FSGroup.Size()
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
+	if len(m.SeccompProfiles) > 0 {
+		for _, s := range m.SeccompProfiles {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -4650,6 +4671,7 @@ func (this *PodSecurityPolicySpec) String() string {
 		`SupplementalGroups:` + strings.Replace(strings.Replace(this.SupplementalGroups.String(), "SupplementalGroupsStrategyOptions", "SupplementalGroupsStrategyOptions", 1), `&`, ``, 1) + `,`,
 		`FSGroup:` + strings.Replace(strings.Replace(this.FSGroup.String(), "FSGroupStrategyOptions", "FSGroupStrategyOptions", 1), `&`, ``, 1) + `,`,
 		`ReadOnlyRootFilesystem:` + fmt.Sprintf("%v", this.ReadOnlyRootFilesystem) + `,`,
+		`SeccompProfiles:` + fmt.Sprintf("%v", this.SeccompProfiles) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -11542,6 +11564,35 @@ func (m *PodSecurityPolicySpec) Unmarshal(data []byte) error {
 				}
 			}
 			m.ReadOnlyRootFilesystem = bool(v != 0)
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SeccompProfiles", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SeccompProfiles = append(m.SeccompProfiles, string(data[iNdEx:postIndex]))
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])

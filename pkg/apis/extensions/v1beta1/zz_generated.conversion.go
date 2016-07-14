@@ -2004,6 +2004,7 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySp
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	out.SeccompProfiles = in.SeccompProfiles
 	return nil
 }
 
@@ -2076,6 +2077,7 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	out.SeccompProfiles = in.SeccompProfiles
 	return nil
 }
 

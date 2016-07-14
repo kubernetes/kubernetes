@@ -1136,6 +1136,13 @@ func DeepCopy_v1beta1_PodSecurityPolicySpec(in interface{}, out interface{}, c *
 			return err
 		}
 		out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+		if in.SeccompProfiles != nil {
+			in, out := &in.SeccompProfiles, &out.SeccompProfiles
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.SeccompProfiles = nil
+		}
 		return nil
 	}
 }

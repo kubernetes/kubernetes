@@ -2515,6 +2515,7 @@ func DeepCopy_api_PodSecurityContext(in interface{}, out interface{}, c *convers
 		} else {
 			out.FSGroup = nil
 		}
+		out.SeccompProfile = in.SeccompProfile
 		return nil
 	}
 }
@@ -3185,6 +3186,7 @@ func DeepCopy_api_SecurityContext(in interface{}, out interface{}, c *conversion
 		} else {
 			out.ReadOnlyRootFilesystem = nil
 		}
+		out.SeccompProfile = in.SeccompProfile
 		return nil
 	}
 }
