@@ -73,6 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rand"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
@@ -1078,7 +1079,7 @@ type fakeContainerCommandRunner struct {
 	Stream io.ReadWriteCloser
 }
 
-func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+func (f *fakeContainerCommandRunner) ExecInContainer(id kubecontainer.ContainerID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	f.Cmd = cmd
 	f.ID = id
 	f.Stdin = in
@@ -2095,6 +2096,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 		nil,
 		nil,
 		false,
+		nil,
 	)
 	if err == nil {
 		t.Fatal("unexpected non-error")
@@ -2139,6 +2141,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 		nil,
 		nil,
 		false,
+		nil,
 	)
 	if err == nil {
 		t.Fatal("unexpected non-error")
@@ -2199,6 +2202,7 @@ func TestExecInContainer(t *testing.T) {
 		stdout,
 		stderr,
 		tty,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)

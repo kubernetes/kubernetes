@@ -213,3 +213,21 @@ func (in instrumentedDockerInterface) ImageHistory(id string) ([]dockertypes.Ima
 	recordError(operation, err)
 	return out, err
 }
+
+func (in instrumentedDockerInterface) ResizeExecTTY(id string, height, width int) error {
+	const operation = "resize_exec"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.ResizeExecTTY(id, height, width)
+	recordError(operation, err)
+	return err
+}
+
+func (in instrumentedDockerInterface) ResizeContainerTTY(id string, height, width int) error {
+	const operation = "resize_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.ResizeContainerTTY(id, height, width)
+	recordError(operation, err)
+	return err
+}

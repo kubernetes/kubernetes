@@ -454,6 +454,24 @@ func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.Contain
 	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
+func (d *kubeDockerClient) ResizeExecTTY(id string, height, width int) error {
+	ctx, cancel := d.getCancelableContext()
+	defer cancel()
+	return d.client.ContainerExecResize(ctx, id, dockertypes.ResizeOptions{
+		Height: height,
+		Width:  width,
+	})
+}
+
+func (d *kubeDockerClient) ResizeContainerTTY(id string, height, width int) error {
+	ctx, cancel := d.getCancelableContext()
+	defer cancel()
+	return d.client.ContainerResize(ctx, id, dockertypes.ResizeOptions{
+		Height: height,
+		Width:  width,
+	})
+}
+
 // redirectResponseToOutputStream redirect the response stream to stdout and stderr. When tty is true, all stream will
 // only be redirected to stdout.
 func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream, errorStream io.Writer, resp io.Reader) error {
