@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -58,6 +59,8 @@ type RollingUpdaterConfig struct {
 	Interval time.Duration
 	// Timeout is the time to wait for controller updates before giving up.
 	Timeout time.Duration
+	// MinReadySeconds is the number of seconds to wait after the pods are ready
+	MinReadySeconds int32
 	// CleanupPolicy defines the cleanup action to take after the deployment is
 	// complete.
 	CleanupPolicy RollingUpdaterCleanupPolicy
@@ -118,7 +121,9 @@ type RollingUpdater struct {
 	// cleanup performs post deployment cleanup tasks for newRc and oldRc.
 	cleanup func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error
 	// getReadyPods returns the amount of old and new ready pods.
-	getReadyPods func(oldRc, newRc *api.ReplicationController) (int32, int32, error)
+	getReadyPods func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error)
+	// nowFn returns the current time used to calculate the minReadySeconds
+	nowFn func() unversioned.Time
 }
 
 // NewRollingUpdater creates a RollingUpdater from a client.
@@ -132,6 +137,7 @@ func NewRollingUpdater(namespace string, client client.Interface) *RollingUpdate
 	updater.getOrCreateTargetController = updater.getOrCreateTargetControllerWithClient
 	updater.getReadyPods = updater.readyPods
 	updater.cleanup = updater.cleanupWithClients
+	updater.nowFn = func() unversioned.Time { return unversioned.Now() }
 	return updater
 }
 
@@ -340,7 +346,7 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 	// Get ready pods. We shouldn't block, otherwise in case both old and new
 	// pods are unavailable then the rolling update process blocks.
 	// Timeout-wise we are already covered by the progress check.
-	_, newAvailable, err := r.getReadyPods(oldRc, newRc)
+	_, newAvailable, err := r.getReadyPods(oldRc, newRc, config.MinReadySeconds)
 	if err != nil {
 		return nil, err
 	}
@@ -397,10 +403,13 @@ func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, r
 // readyPods returns the old and new ready counts for their pods.
 // If a pod is observed as being ready, it's considered ready even
 // if it later becomes notReady.
-func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
+func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error) {
 	controllers := []*api.ReplicationController{oldRc, newRc}
 	oldReady := int32(0)
 	newReady := int32(0)
+	if r.nowFn == nil {
+		r.nowFn = func() unversioned.Time { return unversioned.Now() }
+	}
 
 	for i := range controllers {
 		controller := controllers[i]
@@ -411,13 +420,14 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController) (int
 			return 0, 0, err
 		}
 		for _, pod := range pods.Items {
-			if api.IsPodReady(&pod) {
-				switch controller.Name {
-				case oldRc.Name:
-					oldReady++
-				case newRc.Name:
-					newReady++
-				}
+			if !deployment.IsPodAvailable(&pod, minReadySeconds, r.nowFn().Time) {
+				continue
+			}
+			switch controller.Name {
+			case oldRc.Name:
+				oldReady++
+			case newRc.Name:
+				newReady++
 			}
 		}
 	}
