@@ -73,7 +73,7 @@ type timestampedEntry struct {
 	timestamp time.Time
 }
 
-// getTimestampedEntry returnes the timestampedEntry stored under the given key.
+// getTimestampedEntry returns the timestampedEntry stored under the given key.
 func (c *ExpirationCache) getTimestampedEntry(key string) (*timestampedEntry, bool) {
 	item, _ := c.cacheStorage.Get(key)
 	if tsEntry, ok := item.(*timestampedEntry); ok {

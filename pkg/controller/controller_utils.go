@@ -203,7 +203,7 @@ func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, de
 	}
 }
 
-// CreationObserved atomically decrements the `add` expecation count of the given controller.
+// CreationObserved atomically decrements the `add` expectation count of the given controller.
 func (r *ControllerExpectations) CreationObserved(controllerKey string) {
 	r.LowerExpectations(controllerKey, 1, 0)
 }
@@ -666,7 +666,7 @@ func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions
 // PodKey returns a key unique to the given pod within a cluster.
 // It's used so we consistently use the same key scheme in this module.
 // It does exactly what cache.MetaNamespaceKeyFunc would have done
-// expcept there's not possibility for error since we know the exact type.
+// except there's not possibility for error since we know the exact type.
 func PodKey(pod *api.Pod) string {
 	return fmt.Sprintf("%v/%v", pod.Namespace, pod.Name)
 }

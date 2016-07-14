@@ -505,7 +505,7 @@ depend on what scheduling policy is in force. In the above example, the
 scheduler created an equal number of replicas (2) in each of the three
 underlying clusters, to make up the total of 6 replicas required. To handle
 entire cluster failures, various approaches are possible, including:
-1. **simple overprovisioing**, such that sufficient replicas remain even if a
+1. **simple overprovisioning**, such that sufficient replicas remain even if a
    cluster fails. This wastes some resources, but is simple and reliable.
 2. **pod autoscaling**, where the replication controller in each
       cluster automatically and autonomously increases the number of

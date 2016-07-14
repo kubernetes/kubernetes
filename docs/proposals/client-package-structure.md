@@ -198,7 +198,7 @@ sources AND out-of-tree destinations, so it will be useful for consuming
 out-of-tree APIs and for others to build custom clients into their own
 repositories.
 
-Typed clients will be constructabale given a ClientMux; the typed constructor will use
+Typed clients will be constructable given a ClientMux; the typed constructor will use
 the ClientMux to find or construct an appropriate RESTClient. Alternatively, a
 typed client should be constructable individually given a config, from which it
 will be able to construct the appropriate RESTClient.
@@ -342,7 +342,7 @@ changes for multiple releases, to give users time to transition.
 Once we release a clientset, we will not make interface changes to it. Users of
 that client will not have to change their code until they are deliberately
 upgrading their import. We probably will want to generate some sort of stub test
-with a clienset, to ensure that we don't change the interface.
+with a clientset, to ensure that we don't change the interface.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1639,7 +1639,7 @@ func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	return dns, dnsSearch, nil
 }
 
-// One of the following aruguements must be non-nil: runningPod, status.
+// One of the following arguments must be non-nil: runningPod, status.
 // TODO: Modify containerRuntime.KillPod() to accept the right arguments.
 func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
 	var p kubecontainer.Pod

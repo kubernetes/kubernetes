@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 //
-// diskManager interface and diskSetup/TearDown functions abtract commonly used procedures to setup a block volume
+// diskManager interface and diskSetup/TearDown functions abstract commonly used procedures to setup a block volume
 // rbd volume implements diskManager, calls diskSetup when creating a volume, and calls diskTearDown inside volume unmounter.
 // TODO: consolidate, refactor, and share diskManager among iSCSI, GCE PD, and RBD
 //

@@ -384,7 +384,7 @@ func sum(inputs []api.ResourceList) api.ResourceList {
 	return result
 }
 
-// DefaultLimitRangerActions is the default implementatation of LimitRangerActions.
+// DefaultLimitRangerActions is the default implementation of LimitRangerActions.
 type DefaultLimitRangerActions struct{}
 
 // ensure DefaultLimitRangerActions implements the LimitRangerActions interface.

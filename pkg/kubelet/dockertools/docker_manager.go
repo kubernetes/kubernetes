@@ -1214,7 +1214,7 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gra
 	return result.Error()
 }
 
-// TODO(random-liu): This is just a temporary function, will be removed when we acturally add PodSyncResult
+// TODO(random-liu): This is just a temporary function, will be removed when we actually add PodSyncResult
 // NOTE(random-liu): The pod passed in could be *nil* when kubelet restarted.
 func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
 	// Send the kills in parallel since they may take a long time.

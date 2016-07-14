@@ -31,8 +31,8 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-Meteor on Kuberenetes
-=====================
+Meteor on Kubernetes
+====================
 
 This example shows you how to package and run a
 [Meteor](https://www.meteor.com/) app on Kubernetes.

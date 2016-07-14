@@ -50,7 +50,7 @@ will generate a clientset named "my_release" which includes clients for api/v1 o
 - Adding expansion methods: client-gen only generates the common methods, such as `Create()` and `Delete()`. You can manually add additional methods through the expansion interface. For example, this [file](../../pkg/client/clientset_generated/release_1_2/typed/core/v1/pod_expansion.go) adds additional methods to Pod's client. As a convention, we put the expansion interface and its methods in file ${TYPE}_expansion.go.
 - Generating Fake clients for testing purposes: client-gen will generate a fake clientset if the command line argument `--fake-clientset` is set. The fake clientset provides the default implementation, you only need to fake out the methods you care about when writing test cases.
 
-The output of client-gen inlcudes:
+The output of client-gen includes:
 - clientset: the clientset will be generated at `pkg/client/clientset_generated/` by default, and you can change the path via the `--clientset-path` command line argument.
 - Individual typed clients and client for group: They will be generated at `pkg/client/clientset_generated/${clientset_name}/typed/generated/${GROUP}/${VERSION}/`
 

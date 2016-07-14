@@ -141,11 +141,11 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"The number of retries for initial node registration.  Retry interval equals node-sync-period.")
 	fs.MarkDeprecated("register-retry-count", "This flag is currently no-op and will be deleted.")
 	fs.DurationVar(&s.NodeMonitorGracePeriod.Duration, "node-monitor-grace-period", s.NodeMonitorGracePeriod.Duration,
-		"Amount of time which we allow running Node to be unresponsive before marking it unhealty. "+
+		"Amount of time which we allow running Node to be unresponsive before marking it unhealthy. "+
 			"Must be N times more than kubelet's nodeStatusUpdateFrequency, "+
 			"where N means number of retries allowed for kubelet to post node status.")
 	fs.DurationVar(&s.NodeStartupGracePeriod.Duration, "node-startup-grace-period", s.NodeStartupGracePeriod.Duration,
-		"Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
+		"Amount of time which we allow starting Node to be unresponsive before marking it unhealthy.")
 	fs.DurationVar(&s.NodeMonitorPeriod.Duration, "node-monitor-period", s.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeController.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
