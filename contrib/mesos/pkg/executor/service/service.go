@@ -164,10 +164,10 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	// apply Mesos specific settings
-	kcfg.Builder = func(kc *kubelet.KubeletConfig) (kubelet.KubeletBootstrap, *kconfig.PodConfig, error) {
-		k, pc, err := kubeletapp.CreateAndInitKubelet(kc)
+	kcfg.Builder = func(kc *kubelet.KubeletConfig) (kubelet.KubeletBootstrap, error) {
+		k, err := kubeletapp.CreateAndInitKubelet(kc)
 		if err != nil {
-			return k, pc, err
+			return k, err
 		}
 
 		// decorate kubelet such that it shuts down when the executor is
@@ -177,7 +177,7 @@ func (s *KubeletExecutorServer) runKubelet(
 			executorDone: executorDone,
 		}
 
-		return decorated, pc, nil
+		return decorated, nil
 	}
 	kcfg.RuntimeCgroups = "" // don't move the docker daemon into a cgroup
 	kcfg.Hostname = kcfg.HostnameOverride

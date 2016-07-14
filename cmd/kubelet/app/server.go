@@ -682,10 +682,11 @@ func RunKubelet(kcfg *kubelet.KubeletConfig) error {
 	if kcfg.OSInterface == nil {
 		kcfg.OSInterface = kubecontainer.RealOS{}
 	}
-	k, podCfg, err := builder(kcfg)
+	k, err := builder(kcfg)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
+	podCfg := k.GetConfig().PodConfig
 
 	rlimit.RlimitNumFiles(kcfg.MaxOpenFiles)
 
@@ -755,54 +756,20 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kc *kube
 	}
 }
 
-func makePodSourceConfig(kc *kubelet.KubeletConfig) *config.PodConfig {
-	// source of all configuration
-	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kc.Recorder)
-
-	// define file config source
-	if kc.ConfigFile != "" {
-		glog.Infof("Adding manifest file: %v", kc.ConfigFile)
-		config.NewSourceFile(kc.ConfigFile, kc.NodeName, kc.FileCheckFrequency, cfg.Channel(kubetypes.FileSource))
-	}
-
-	// define url config source
-	if kc.ManifestURL != "" {
-		glog.Infof("Adding manifest url %q with HTTP header %v", kc.ManifestURL, kc.ManifestURLHeader)
-		config.NewSourceURL(kc.ManifestURL, kc.ManifestURLHeader, kc.NodeName, kc.HTTPCheckFrequency, cfg.Channel(kubetypes.HTTPSource))
-	}
-	if kc.KubeClient != nil {
-		glog.Infof("Watching apiserver")
-		config.NewSourceApiserver(kc.KubeClient, kc.NodeName, cfg.Channel(kubetypes.ApiserverSource))
-	}
-	return cfg
-}
-
-func CreateAndInitKubelet(kc *kubelet.KubeletConfig) (k kubelet.KubeletBootstrap, pc *config.PodConfig, err error) {
+func CreateAndInitKubelet(kc *kubelet.KubeletConfig) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	pc = kc.PodConfig
-	if pc == nil {
-		// TODO(mtaufen): This looks like something that would ultimately be appropriate
-		//                to apply as a default during the conversion between external
-		//                and internal KubeletConfiguration type.
-		pc = makePodSourceConfig(kc)
-	}
-
-	k, err = kubelet.NewMainKubelet(
-		kc,
-		pc.SeenAllSources,
-	)
-
+	k, err = kubelet.NewMainKubelet(kc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	k.BirthCry()
 
 	k.StartGarbageCollection()
 
-	return k, pc, nil
+	return k, nil
 }
 
 func parseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) (*kubetypes.Reservation, error) {

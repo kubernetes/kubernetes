@@ -174,6 +174,7 @@ type Option func(*Kubelet)
 
 // bootstrapping interface for kubelet, targets the initialization protocol
 type KubeletBootstrap interface {
+	GetConfig() *KubeletConfig
 	BirthCry()
 	StartGarbageCollection()
 	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool)
@@ -183,7 +184,7 @@ type KubeletBootstrap interface {
 }
 
 // create and initialize a Kubelet instance
-type KubeletBuilder func(kc *KubeletConfig) (KubeletBootstrap, *config.PodConfig, error)
+type KubeletBuilder func(kc *KubeletConfig) (KubeletBootstrap, error)
 
 // KubeletConfig is all of the parameters necessary for running a kubelet.
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
@@ -284,12 +285,31 @@ type KubeletConfig struct {
 	Options                    []Option
 }
 
+func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
+	// source of all configuration
+	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kc.Recorder)
+
+	// define file config source
+	if kc.ConfigFile != "" {
+		glog.Infof("Adding manifest file: %v", kc.ConfigFile)
+		config.NewSourceFile(kc.ConfigFile, kc.NodeName, kc.FileCheckFrequency, cfg.Channel(kubetypes.FileSource))
+	}
+
+	// define url config source
+	if kc.ManifestURL != "" {
+		glog.Infof("Adding manifest url %q with HTTP header %v", kc.ManifestURL, kc.ManifestURLHeader)
+		config.NewSourceURL(kc.ManifestURL, kc.ManifestURLHeader, kc.NodeName, kc.HTTPCheckFrequency, cfg.Channel(kubetypes.HTTPSource))
+	}
+	if kc.KubeClient != nil {
+		glog.Infof("Watching apiserver")
+		config.NewSourceApiserver(kc.KubeClient, kc.NodeName, cfg.Channel(kubetypes.ApiserverSource))
+	}
+	return cfg
+}
+
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(
-	kc *KubeletConfig,
-	sourcesReadyFn config.SourcesReadyFn,
-) (*Kubelet, error) {
+func NewMainKubelet(kc *KubeletConfig) (*Kubelet, error) {
 
 	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
 	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
@@ -298,6 +318,13 @@ func NewMainKubelet(
 	if kc.KubeClient != nil {
 		kubeClient = kc.KubeClient
 		// TODO: remove this when we've refactored kubelet to only use clientset.
+	}
+
+	if kc.PodConfig == nil {
+		// TODO(mtaufen): This looks like something that would ultimately be appropriate
+		//                to apply as a default during the conversion between external
+		//                and internal KubeletConfiguration type.
+		kc.PodConfig = makePodSourceConfig(kc)
 	}
 
 	containerGCPolicy := kubecontainer.ContainerGCPolicy{
@@ -393,7 +420,7 @@ func NewMainKubelet(
 		resyncInterval:                 kc.SyncFrequency,
 		containerRefManager:            containerRefManager,
 		httpClient:                     &http.Client{},
-		sourcesReady:                   config.NewSourcesReady(sourcesReadyFn),
+		sourcesReady:                   config.NewSourcesReady(kc.PodConfig.SeenAllSources),
 		registerNode:                   kc.RegisterNode,
 		registerSchedulable:            kc.RegisterSchedulable,
 		standaloneMode:                 kc.StandaloneMode,
@@ -630,6 +657,10 @@ func NewMainKubelet(
 	for _, opt := range kc.Options {
 		opt(klet)
 	}
+
+	// Finally, put the most recent version of the config on the Kubelet, so
+	// people can see how it was configured.
+	klet.kubeletConfig = kc
 	return klet, nil
 }
 
@@ -643,6 +674,8 @@ type nodeLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
+	kubeletConfig *KubeletConfig
+
 	hostname      string
 	nodeName      string
 	dockerClient  dockertools.DockerInterface
@@ -2992,6 +3025,11 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 		return fmt.Errorf("pod not found (%q)", podFullName)
 	}
 	return kl.runner.PortForward(&pod, port, stream)
+}
+
+// GetConfig returns the KubeletConfig used to configure for the kubelet.
+func (kl *Kubelet) GetConfig() *KubeletConfig {
+	return kl.kubeletConfig
 }
 
 // BirthCry sends an event that the kubelet has started up.
