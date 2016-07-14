@@ -280,3 +280,79 @@ func fractionOfCapacity(requested, capacity int64) float64 {
 	}
 	return float64(requested) / float64(capacity)
 }
+
+type NodePreferAvoidPod struct {
+	controllerLister algorithm.ControllerLister
+	replicaSetLister algorithm.ReplicaSetLister
+}
+
+func NewNodePreferAvoidPodsPriority(controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
+	nodePreferAvoid := &NodePreferAvoidPod{
+		controllerLister: controllerLister,
+		replicaSetLister: replicaSetLister,
+	}
+	return nodePreferAvoid.CalculateNodePreferAvoidPodsPriority
+}
+
+func (npa *NodePreferAvoidPod) CalculateNodePreferAvoidPodsPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+	var score int
+	nodes, err := nodeLister.List()
+	if err != nil {
+		return nil, err
+	}
+
+	result := []schedulerapi.HostPriority{}
+
+	// TODO: Once we have ownerReference fully implemented, use it to find controller for the pod.
+	rcs, err := npa.controllerLister.GetPodControllers(pod)
+	rss, err := npa.replicaSetLister.GetPodReplicaSets(pod)
+	if len(rcs) == 0 && len(rss) == 0 {
+		for _, node := range nodes {
+			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 10})
+		}
+		return result, nil
+	}
+
+	avoidNodes := map[string]bool{}
+	for _, node := range nodes {
+		avoidNodes[node.Name] = false
+
+		avoids, err := api.GetAvoidPodsFromNodeAnnotations(node.Annotations)
+		if err != nil {
+			continue
+		}
+
+		for _, avoid := range avoids.PreferAvoidPods {
+			for _, rc := range rcs {
+				if avoid.PodSignature.PodController.Kind == "ReplicationController" && avoid.PodSignature.PodController.UID == rc.UID {
+					avoidNodes[node.Name] = true
+					break
+				}
+			}
+			if avoidNodes[node.Name] {
+				break
+			}
+			for _, rs := range rss {
+				if avoid.PodSignature.PodController.Kind == "ReplicaSet" && avoid.PodSignature.PodController.UID == rs.UID {
+					avoidNodes[node.Name] = true
+					break
+				}
+			}
+			if avoidNodes[node.Name] {
+				break
+			}
+		}
+	}
+
+	//score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest
+	for nodeName, shouldAvoid := range avoidNodes {
+		if shouldAvoid {
+			score = 0
+		} else {
+			score = 10
+		}
+		result = append(result, schedulerapi.HostPriority{Host: nodeName, Score: score})
+	}
+	return result, nil
+}
