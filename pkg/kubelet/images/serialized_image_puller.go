@@ -23,13 +23,14 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type imagePullRequest struct {
-	spec        ImageSpec
+	spec        kubecontainer.ImageSpec
 	container   *api.Container
 	pullSecrets []api.Secret
 	logPrefix   string
@@ -42,7 +43,7 @@ type imagePullRequest struct {
 // 'image pulled' events correspondingly.
 type serializedImagePuller struct {
 	recorder     record.EventRecorder
-	runtime      Runtime
+	runtime      kubecontainer.Runtime
 	backOff      *flowcontrol.Backoff
 	pullRequests chan *imagePullRequest
 }
@@ -54,7 +55,7 @@ var _ imagePuller = &serializedImagePuller{}
 // image puller that wraps the container runtime's PullImage interface.
 // Pulls one image at a time.
 // Issue #10959 has the rationale behind serializing image pulls.
-func NewSerializedImagePuller(recorder record.EventRecorder, runtime Runtime, imageBackOff *flowcontrol.Backoff) imagePuller {
+func newSerializedImagePuller(recorder record.EventRecorder, runtime kubecontainer.Runtime, imageBackOff *flowcontrol.Backoff) imagePuller {
 	imagePuller := &serializedImagePuller{
 		recorder:     recorder,
 		runtime:      runtime,
@@ -75,19 +76,19 @@ func (puller *serializedImagePuller) logIt(ref *api.ObjectReference, eventtype, 
 }
 
 // PullImage pulls the image for the specified pod and container.
-func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
+func (puller *serializedImagePuller) pullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
 	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
-	ref, err := GenerateContainerRef(pod, container)
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	spec := ImageSpec{container.Image}
+	spec := kubecontainer.ImageSpec{Image: container.Image}
 	present, err := puller.runtime.IsImagePresent(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
 		puller.logIt(ref, api.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, glog.Warning)
-		return ErrImageInspect, msg
+		return kubecontainer.ErrImageInspect, msg
 	}
 
 	if !shouldPullImage(container, present) {
@@ -98,7 +99,7 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 		} else {
 			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
 			puller.logIt(ref, api.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
-			return ErrImageNeverPull, msg
+			return kubecontainer.ErrImageNeverPull, msg
 		}
 	}
 
@@ -106,7 +107,7 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		puller.logIt(ref, api.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, glog.Info)
-		return ErrImagePullBackOff, msg
+		return kubecontainer.ErrImagePullBackOff, msg
 	}
 
 	// enqueue image pull request and wait for response.
@@ -122,11 +123,11 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 	if err = <-returnChan; err != nil {
 		puller.logIt(ref, api.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
-		if err == RegistryUnavailable {
+		if err == kubecontainer.RegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
 			return err, msg
 		} else {
-			return ErrImagePull, err.Error()
+			return kubecontainer.ErrImagePull, err.Error()
 		}
 	}
 	puller.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
