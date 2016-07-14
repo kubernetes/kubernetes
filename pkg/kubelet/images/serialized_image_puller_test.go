@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container_test
+package images
 
 import (
 	"errors"
@@ -106,7 +106,7 @@ func TestSerializedPuller(t *testing.T) {
 
 		fakeRuntime := &ctest.FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
-		puller := NewSerializedImagePuller(fakeRecorder, fakeRuntime, backOff)
+		puller := newSerializedImagePuller(fakeRecorder, fakeRuntime, backOff)
 
 		fakeRuntime.ImageList = []Image{{"present_image", nil, nil, 0}}
 		fakeRuntime.Err = c.pullerErr
@@ -114,7 +114,7 @@ func TestSerializedPuller(t *testing.T) {
 
 		for tick, expected := range c.expectedErr {
 			fakeClock.Step(time.Second)
-			err, _ := puller.PullImage(pod, container, nil)
+			err, _ := puller.pullImage(pod, container, nil)
 			fakeRuntime.AssertCalls(c.calledFunctions)
 			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
 		}
