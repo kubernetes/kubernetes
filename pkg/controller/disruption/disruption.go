@@ -39,6 +39,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const statusUpdateRetries = 2
+
 type updater func(*policy.PodDisruptionBudget) error
 
 type DisruptionController struct {
@@ -556,10 +558,30 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 	return dc.getUpdater()(&newPdb)
 }
 
+/* refresh tries to re-GET the given PDB.  If there are any errors, it just
+ * returns the old PDB.  Intended to be used in a retry loop where it runs a
+ * bounded number of times.
+ */
+func refresh(pdbClient client.PodDisruptionBudgetInterface, pdb *policy.PodDisruptionBudget) *policy.PodDisruptionBudget {
+	newPdb, err := pdbClient.Get(pdb.Name)
+	if err == nil {
+		return newPdb
+	} else {
+		return pdb
+	}
+}
+
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
 	pdbClient := dc.kubeClient.Policy().PodDisruptionBudgets(pdb.Namespace)
+	st := pdb.Status
 
-	// FIXME(mml): retry
-	_, err := pdbClient.UpdateStatus(pdb)
+	var err error
+	for i, pdb := 0, pdb; i < statusUpdateRetries; i, pdb = i+1, refresh(pdbClient, pdb) {
+		pdb.Status = st
+		if _, err = pdbClient.UpdateStatus(pdb); err == nil {
+			break
+		}
+	}
+
 	return err
 }
