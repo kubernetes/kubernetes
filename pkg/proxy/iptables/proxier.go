@@ -144,6 +144,13 @@ type serviceInfo struct {
 	guid                   types.UID
 }
 
+// internal struct for endpoints information
+type endpointsInfo struct {
+	ip      string
+	guid    types.UID
+	podGuid types.UID
+}
+
 // returns a new serviceInfo struct
 func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
 	return &serviceInfo{
@@ -157,7 +164,7 @@ func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
 type Proxier struct {
 	mu                          sync.Mutex // protects the following fields
 	serviceMap                  map[proxy.ServicePortName]*serviceInfo
-	endpointsMap                map[proxy.ServicePortName][]string
+	endpointsMap                map[proxy.ServicePortName][]*endpointsInfo
 	portsMap                    map[localPort]closeable
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
@@ -216,7 +223,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 
 	return &Proxier{
 		serviceMap:     make(map[proxy.ServicePortName]*serviceInfo),
-		endpointsMap:   make(map[proxy.ServicePortName][]string),
+		endpointsMap:   make(map[proxy.ServicePortName][]*endpointsInfo),
 		portsMap:       make(map[localPort]closeable),
 		syncPeriod:     syncPeriod,
 		iptables:       ipt,
@@ -464,6 +471,32 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 
 }
 
+func flattenEndpointsInfo(endPoints []*endpointsInfo) []string {
+	var endpointIPs []string
+	for _, ep := range endPoints {
+		endpointIPs = append(endpointIPs, ep.ip)
+	}
+	return endpointIPs
+}
+
+func filterEndpoints(endPoints []hostPortInfo, endpointIPs []string) []*endpointsInfo {
+
+	lookupMap := make(map[string]bool)
+	for _, ip := range endpointIPs {
+		lookupMap[ip] = true
+	}
+
+	var filteredEndpoints []*endpointsInfo
+	for _, hpp := range endPoints {
+		key := net.JoinHostPort(hpp.host, strconv.Itoa(hpp.port))
+		_, ok := lookupMap[key]
+		if ok {
+			filteredEndpoints = append(filteredEndpoints, &endpointsInfo{ip: key, guid: hpp.epGuid, podGuid: hpp.podGuid})
+		}
+	}
+	return filteredEndpoints
+}
+
 // OnEndpointsUpdate takes in a slice of updated endpoints.
 func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	start := time.Now()
@@ -484,14 +517,18 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 		// We need to build a map of portname -> all ip:ports for that
 		// portname.  Explode Endpoints.Subsets[*] into this structure.
-		portsToEndpoints := map[string][]hostPortPair{}
+		portsToEndpoints := map[string][]hostPortInfo{}
 		for i := range svcEndpoints.Subsets {
 			ss := &svcEndpoints.Subsets[i]
 			for i := range ss.Ports {
 				port := &ss.Ports[i]
 				for i := range ss.Addresses {
 					addr := &ss.Addresses[i]
-					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortPair{addr.IP, int(port.Port)})
+					var podGuid types.UID
+					if addr.TargetRef != nil {
+						podGuid = addr.TargetRef.UID
+					}
+					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortInfo{svcEndpoints.ObjectMeta.UID, podGuid, addr.IP, int(port.Port)})
 				}
 			}
 		}
@@ -512,13 +549,14 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				newEndpoints = localEndpoints
 			}
 
-			if len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
-				removedEndpoints := getRemovedEndpoints(curEndpoints, newEndpoints)
+			curEndpointIPs := flattenEndpointsInfo(curEndpoints)
+			if len(curEndpointIPs) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpointIPs), newEndpoints) {
+				removedEndpoints := getRemovedEndpoints(curEndpointIPs, newEndpoints)
 				for _, ep := range removedEndpoints {
 					staleConnections[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
 				}
 				glog.V(1).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
-				proxier.endpointsMap[svcPort] = newEndpoints
+				proxier.endpointsMap[svcPort] = filterEndpoints(portsToEndpoints[portname], newEndpoints)
 			}
 			activeEndpoints[svcPort] = true
 		}
@@ -529,7 +567,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 		if !activeEndpoints[name] {
 			// record endpoints of unactive service to stale connections
 			for _, ep := range proxier.endpointsMap[name] {
-				staleConnections[endpointServicePair{endpoint: ep, servicePortName: name}] = true
+				staleConnections[endpointServicePair{endpoint: ep.ip, servicePortName: name}] = true
 			}
 
 			glog.V(2).Infof("Removing endpoints for %q", name)
@@ -542,12 +580,14 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 }
 
 // used in OnEndpointsUpdate
-type hostPortPair struct {
-	host string
-	port int
+type hostPortInfo struct {
+	epGuid  types.UID
+	podGuid types.UID
+	host    string
+	port    int
 }
 
-func isValidEndpoint(hpp *hostPortPair) bool {
+func isValidEndpoint(hpp *hostPortInfo) bool {
 	return hpp.host != "" && hpp.port > 0
 }
 
@@ -562,7 +602,7 @@ func slicesEquiv(lhs, rhs []string) bool {
 	return false
 }
 
-func flattenValidEndpoints(endpoints []hostPortPair) []string {
+func flattenValidEndpoints(endpoints []hostPortInfo) []string {
 	// Convert Endpoint objects into strings for easier use later.
 	var result []string
 	for i := range endpoints {
@@ -941,11 +981,11 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Generate the per-endpoint chains.  We do this in multiple passes so we
 		// can group rules together.
-		endpoints := make([]string, 0)
+		endpoints := make([]*endpointsInfo, 0)
 		endpointChains := make([]utiliptables.Chain, 0)
 		for _, ep := range proxier.endpointsMap[svcName] {
 			endpoints = append(endpoints, ep)
-			endpointChain := servicePortEndpointChainName(svcName, protocol, ep)
+			endpointChain := servicePortEndpointChainName(svcName, protocol, ep.ip)
 			endpointChains = append(endpointChains, endpointChain)
 
 			// Create the endpoint chain, retaining counters if possible.
@@ -977,7 +1017,7 @@ func (proxier *Proxier) syncProxyRules() {
 			args := []string{
 				"-A", string(svcChain),
 				"-m", "comment", "--comment",
-				fmt.Sprintf(`"Balancing rules for %s (svc-guid: %s)"`, svcName.String(), svcInfo.guid),
+				fmt.Sprintf(`"Balancing rule %d for %s (svc-guid: %s endpoint-guid: %s pod-guid: %s"`, i, svcName.String(), svcInfo.guid, endpoints[i].guid, endpoints[i].podGuid),
 			}
 			if i < (n - 1) {
 				// Each rule is a probabilistic match.
@@ -994,8 +1034,8 @@ func (proxier *Proxier) syncProxyRules() {
 			args = []string{
 				"-A", string(endpointChain),
 				"-m", "comment", "--comment",
-				fmt.Sprintf(`"Hairpin case mark-for-SNAT for %s (svc-guid: %s) destined to %s"`,
-					svcName.String(), svcInfo.guid, endpoints[i]),
+				fmt.Sprintf(`"Hairpin case mark-for-SNAT for %s (svc-guid: %s) destined to %s (pod-guid: %s)"`,
+					svcName.String(), svcInfo.guid, endpoints[i].ip, endpoints[i].podGuid),
 			}
 			// Handle traffic that loops back to the originator with SNAT.
 			// Technically we only need to do this if the endpoint is on this
@@ -1003,21 +1043,21 @@ func (proxier *Proxier) syncProxyRules() {
 			// all endpoints.
 			// TODO: if we grow logic to get this node's pod CIDR, we can use it.
 			writeLine(natRules, append(args,
-				"-s", fmt.Sprintf("%s/32", strings.Split(endpoints[i], ":")[0]),
+				"-s", fmt.Sprintf("%s/32", strings.Split(endpoints[i].ip, ":")[0]),
 				"-j", string(KubeMarkMasqChain))...)
 
 			args = []string{
 				"-A", string(endpointChain),
 				"-m", "comment", "--comment",
-				fmt.Sprintf(`"Endpoint rule for %s (svc-guid: %s) destined to %s"`,
-					svcName.String(), svcInfo.guid, endpoints[i]),
+				fmt.Sprintf(`"Endpoint rule for %s (svc-guid: %s) destined to %s (pod-guid: %s)"`,
+					svcName.String(), svcInfo.guid, endpoints[i].ip, endpoints[i].podGuid),
 			}
 			// Update client-affinity lists.
 			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
 			}
 			// DNAT to final destination.
-			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", endpoints[i])
+			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", endpoints[i].ip)
 			writeLine(natRules, args...)
 		}
 	}
