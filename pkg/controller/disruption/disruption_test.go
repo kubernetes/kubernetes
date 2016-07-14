@@ -334,6 +334,7 @@ func TestMultipleControllers(t *testing.T) {
 	ps.VerifyDisruptionAllowed(t, pdbName, false)
 
 	rc, _ := newReplicationController(t, 1)
+	rc.Name = "rc 1"
 	add(t, dc.rcLister.Indexer, rc)
 	dc.sync(pdbName)
 
@@ -341,6 +342,7 @@ func TestMultipleControllers(t *testing.T) {
 	ps.VerifyDisruptionAllowed(t, pdbName, true)
 
 	rc, _ = newReplicationController(t, 1)
+	rc.Name = "rc 2"
 	add(t, dc.rcLister.Indexer, rc)
 	dc.sync(pdbName)
 
