@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	"k8s.io/kubernetes/pkg/util/env"
 )
 
 var (
@@ -221,6 +222,11 @@ func (p *ExecOptions) Run() error {
 				fmt.Fprintln(p.Err, "Unable to use a TTY - input is not the right kind of file")
 			}
 		}
+	}
+
+	if tty {
+		term := fmt.Sprintf("TERM=%s", env.GetEnvAsStringOrFallback("TERM", "xterm"))
+		p.Command = append([]string{"env", term}, p.Command...)
 	}
 
 	// TODO: consider abstracting into a client invocation or client helper
