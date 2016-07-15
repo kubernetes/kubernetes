@@ -684,7 +684,6 @@ func (gc *GarbageCollector) processItem(item *node) error {
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
-	glog.V(0).Infof("GarbageCollector is starting running!")
 	for _, monitor := range gc.monitors {
 		go monitor.controller.Run(stopCh)
 	}
