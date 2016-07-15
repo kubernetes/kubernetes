@@ -253,7 +253,9 @@ func TestCreatePods(t *testing.T) {
 	controllerSpec := newReplicationController(1)
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
+	if err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -265,7 +267,7 @@ func TestCreatePods(t *testing.T) {
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
 	actualPod, err := runtime.Decode(testapi.Default.Codec(), []byte(fakeHandler.RequestBody))
 	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
