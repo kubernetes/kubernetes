@@ -2336,15 +2336,17 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 
 		}
 	case e := <-plegCh:
-		// PLEG event for a pod; sync it.
-		pod, ok := kl.podManager.GetPodByUID(e.ID)
-		if !ok {
-			// If the pod no longer exists, ignore the event.
-			glog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
-			break
+		if isSyncPodWorthy(e) {
+			// PLEG event for a pod; sync it.
+			pod, ok := kl.podManager.GetPodByUID(e.ID)
+			if !ok {
+				// If the pod no longer exists, ignore the event.
+				glog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
+				break
+			}
+			glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
+			handler.HandlePodSyncs([]*api.Pod{pod})
 		}
-		glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
-		handler.HandlePodSyncs([]*api.Pod{pod})
 	case <-syncCh:
 		// Sync pods waiting for sync
 		podsToSync := kl.getPodsToSync()
@@ -3563,4 +3565,10 @@ func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, kl.containerRuntime)
+}
+
+// Filter out events that are not worthy of pod syncing
+func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
+	// ContatnerRemoved doesn't affect pod state
+	return event.Type != pleg.ContainerRemoved
 }
