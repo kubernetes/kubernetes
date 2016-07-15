@@ -16,7 +16,10 @@ limitations under the License.
 
 package componentconfig
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
+)
 
 type KubeProxyConfiguration struct {
 	unversioned.TypeMeta
@@ -58,7 +61,7 @@ type KubeProxyConfiguration struct {
 	PortRange string `json:"portRange"`
 	// resourceContainer is the absolute name of the resource-only container to create and run
 	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"kubeletCgroups"`
+	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout unversioned.Duration `json:"udpTimeoutMilliseconds"`
@@ -102,6 +105,8 @@ const (
 
 // TODO: curate the ordering and structure of this config object
 type KubeletConfiguration struct {
+	unversioned.TypeMeta
+
 	// config is the path to the config file or directory of files
 	Config string `json:"config"`
 	// syncFrequency is the max period between synchronizing running
@@ -123,19 +128,19 @@ type KubeletConfiguration struct {
 	// for all interfaces)
 	Address string `json:"address"`
 	// port is the port for the Kubelet to serve on.
-	Port uint `json:"port"`
+	Port int32 `json:"port"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
-	ReadOnlyPort uint `json:"readOnlyPort"`
-	// tLSCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
+	ReadOnlyPort int32 `json:"readOnlyPort"`
+	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
 	// passed to certDir.
-	TLSCertFile string `json:"tLSCertFile"`
-	// tLSPrivateKeyFile is the ile containing x509 private key matching
+	TLSCertFile string `json:"tlsCertFile"`
+	// tlsPrivateKeyFile is the ile containing x509 private key matching
 	// tlsCertFile.
-	TLSPrivateKeyFile string `json:"tLSPrivateKeyFile"`
+	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
 	// certDirectory is the directory where the TLS certs are located (by
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
@@ -157,24 +162,25 @@ type KubeletConfiguration struct {
 	// Defaults to false.
 	AllowPrivileged bool `json:"allowPrivileged"`
 	// hostNetworkSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use of host network. Defaults to "*".
-	HostNetworkSources string `json:"hostNetworkSources"`
+	// Kubelet allows pods to use of host network. Defaults to "*". Valid
+	// options are "file", "http", "api", and "*" (all sources).
+	HostNetworkSources []string `json:"hostNetworkSources"`
 	// hostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
-	HostPIDSources string `json:"hostPIDSources"`
+	HostPIDSources []string `json:"hostPIDSources"`
 	// hostIPCSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
-	HostIPCSources string `json:"hostIPCSources"`
+	HostIPCSources []string `json:"hostIPCSources"`
 	// registryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
-	RegistryPullQPS float64 `json:"registryPullQPS"`
+	RegistryPullQPS int32 `json:"registryPullQPS"`
 	// registryBurst is the maximum size of a bursty pulls, temporarily allows
 	// pulls to burst to this number, while still not exceeding registryQps.
-	// Only used if registryQps > 0.
+	// Only used if registryQPS > 0.
 	RegistryBurst int32 `json:"registryBurst"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
-	EventRecordQPS float32 `json:"eventRecordQPS"`
+	EventRecordQPS int32 `json:"eventRecordQPS"`
 	// eventBurst is the maximum size of a bursty event records, temporarily
 	// allows event records to burst to this number, while still not exceeding
 	// event-qps. Only used if eventQps > 0
@@ -192,7 +198,7 @@ type KubeletConfiguration struct {
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32 `json:"maxContainerCount"`
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
-	CAdvisorPort uint `json:"cAdvisorPort"`
+	CAdvisorPort int32 `json:"cAdvisorPort"`
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve
@@ -221,7 +227,7 @@ type KubeletConfiguration struct {
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency unversioned.Duration `json:"nodeStatusUpdateFrequency"`
-	// minimumGCAge is the minimum age for a unused image before it is
+	// imageMinimumGCAge is the minimum age for a unused image before it is
 	// garbage collected.
 	ImageMinimumGCAge unversioned.Duration `json:"imageMinimumGCAge"`
 	// imageGCHighThresholdPercent is the percent of disk usage after which
@@ -257,7 +263,7 @@ type KubeletConfiguration struct {
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
-	SystemCgroups string `json:"systemContainer,omitempty"`
+	SystemCgroups string `json:"systemCgroups,omitempty"`
 	// cgroupRoot is the root cgroup to use for pods. This is handled by the
 	// container runtime on a best effort basis.
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
@@ -318,7 +324,7 @@ type KubeletConfiguration struct {
 	// containerized should be set to true if kubelet is running in a container.
 	Containerized bool `json:"containerized"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
-	MaxOpenFiles uint64 `json:"maxOpenFiles"`
+	MaxOpenFiles int64 `json:"maxOpenFiles"`
 	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
 	// API server. No-op if register-node or configure-cbr0 is false.
 	ReconcileCIDR bool `json:"reconcileCIDR"`
@@ -328,7 +334,7 @@ type KubeletConfiguration struct {
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
-	KubeAPIQPS float32 `json:"kubeAPIQPS"`
+	KubeAPIQPS int32 `json:"kubeAPIQPS"`
 	// kubeAPIBurst is the burst to allow while talking with kubernetes
 	// apiserver
 	KubeAPIBurst int32 `json:"kubeAPIBurst"`
@@ -369,6 +375,16 @@ type KubeletConfiguration struct {
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool `json:"enableControllerAttachDetach"`
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for non-kubernetes components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	SystemReserved utilconfig.ConfigurationMap `json:"systemReserved"`
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for kubernetes system components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	KubeReserved utilconfig.ConfigurationMap `json:"kubeReserved"`
 }
 
 type KubeSchedulerConfiguration struct {

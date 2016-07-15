@@ -19,38 +19,15 @@ package options
 
 import (
 	_ "net/http/pprof"
-	"path/filepath"
-	"runtime"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/kubelet/rkt"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/config"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 
 	"github.com/spf13/pflag"
 )
-
-const (
-	defaultRootDir             = "/var/lib/kubelet"
-	experimentalFlannelOverlay = false
-
-	// When these values are updated, also update test/e2e/framework/util.go
-	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
-	defaultPodInfraContainerImageVersion = "3.0"
-	// Auto detect cloud provider.
-	AutoDetectCloudProvider = "auto-detect"
-)
-
-// Returns the arch-specific pause image that kubelet should use as the default
-func GetDefaultPodInfraContainerImage() string {
-	return defaultPodInfraContainerImageName + "-" + runtime.GOARCH + ":" + defaultPodInfraContainerImageVersion
-}
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.
@@ -67,94 +44,16 @@ type KubeletServer struct {
 	ChaosChance float64
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
-	SystemReserved        config.ConfigurationMap
-	KubeReserved          config.ConfigurationMap
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
+	config := componentconfig.KubeletConfiguration{}
+	api.Scheme.Convert(&v1alpha1.KubeletConfiguration{}, &config)
 	return &KubeletServer{
-		AuthPath:   util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
-		KubeConfig: util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-
-		SystemReserved: make(config.ConfigurationMap),
-		KubeReserved:   make(config.ConfigurationMap),
-		KubeletConfiguration: componentconfig.KubeletConfiguration{
-			Address:                      "0.0.0.0",
-			CAdvisorPort:                 4194,
-			VolumeStatsAggPeriod:         unversioned.Duration{Duration: time.Minute},
-			CertDirectory:                "/var/run/kubernetes",
-			CgroupRoot:                   "",
-			CloudProvider:                AutoDetectCloudProvider,
-			ConfigureCBR0:                false,
-			ContainerRuntime:             "docker",
-			RuntimeRequestTimeout:        unversioned.Duration{Duration: 2 * time.Minute},
-			CPUCFSQuota:                  true,
-			DockerExecHandlerName:        "native",
-			EventBurst:                   10,
-			EventRecordQPS:               5.0,
-			EnableControllerAttachDetach: true,
-			EnableCustomMetrics:          false,
-			EnableDebuggingHandlers:      true,
-			EnableServer:                 true,
-			FileCheckFrequency:           unversioned.Duration{Duration: 20 * time.Second},
-			HealthzBindAddress:           "127.0.0.1",
-			HealthzPort:                  10248,
-			HostNetworkSources:           kubetypes.AllSource,
-			HostPIDSources:               kubetypes.AllSource,
-			HostIPCSources:               kubetypes.AllSource,
-			HTTPCheckFrequency:           unversioned.Duration{Duration: 20 * time.Second},
-			ImageMinimumGCAge:            unversioned.Duration{Duration: 2 * time.Minute},
-			ImageGCHighThresholdPercent:  90,
-			ImageGCLowThresholdPercent:   80,
-			LowDiskSpaceThresholdMB:      256,
-			MasterServiceNamespace:       api.NamespaceDefault,
-			MaxContainerCount:            -1,
-			MaxPerPodContainerCount:      1,
-			MaxOpenFiles:                 1000000,
-			MaxPods:                      110,
-			NvidiaGPUs:                   0,
-			MinimumGCAge:                 unversioned.Duration{Duration: 0},
-			NetworkPluginDir:             "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
-			NetworkPluginName:            "",
-			NonMasqueradeCIDR:            "10.0.0.0/8",
-			VolumePluginDir:              "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-			NodeStatusUpdateFrequency:    unversioned.Duration{Duration: 10 * time.Second},
-			NodeLabels:                   make(map[string]string),
-			OOMScoreAdj:                  int32(qos.KubeletOOMScoreAdj),
-			LockFilePath:                 "",
-			ExitOnLockContention:         false,
-			PodInfraContainerImage:       GetDefaultPodInfraContainerImage(),
-			Port:                             ports.KubeletPort,
-			ReadOnlyPort:                     ports.KubeletReadOnlyPort,
-			RegisterNode:                     true, // will be ignored if no apiserver is configured
-			RegisterSchedulable:              true,
-			RegistryBurst:                    10,
-			RegistryPullQPS:                  5.0,
-			KubeletCgroups:                   "",
-			ResolverConfig:                   kubetypes.ResolvConfDefault,
-			RktPath:                          "",
-			RktAPIEndpoint:                   rkt.DefaultRktAPIServiceEndpoint,
-			RktStage1Image:                   "",
-			RootDirectory:                    defaultRootDir,
-			RuntimeCgroups:                   "",
-			SerializeImagePulls:              true,
-			SeccompProfileRoot:               filepath.Join(defaultRootDir, "seccomp"),
-			StreamingConnectionIdleTimeout:   unversioned.Duration{Duration: 4 * time.Hour},
-			SyncFrequency:                    unversioned.Duration{Duration: 1 * time.Minute},
-			SystemCgroups:                    "",
-			ReconcileCIDR:                    true,
-			ContentType:                      "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:                       5.0,
-			KubeAPIBurst:                     10,
-			ExperimentalFlannelOverlay:       experimentalFlannelOverlay,
-			OutOfDiskTransitionFrequency:     unversioned.Duration{Duration: 5 * time.Minute},
-			HairpinMode:                      componentconfig.PromiscuousBridge,
-			BabysitDaemons:                   false,
-			EvictionHard:                     "memory.available<100Mi",
-			EvictionPressureTransitionPeriod: unversioned.Duration{Duration: 5 * time.Minute},
-			PodsPerCore:                      0,
-		},
+		AuthPath:             util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
+		KubeConfig:           util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+		KubeletConfiguration: config,
 	}
 }
 
@@ -168,8 +67,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ManifestURLHeader, "manifest-url-header", s.ManifestURLHeader, "HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'")
 	fs.BoolVar(&s.EnableServer, "enable-server", s.EnableServer, "Enable the Kubelet's server")
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.UintVar(&s.Port, "port", s.Port, "The port for the Kubelet to serve on.")
-	fs.UintVar(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
+	fs.Int32Var(&s.Port, "port", s.Port, "The port for the Kubelet to serve on.")
+	fs.Int32Var(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key "+
@@ -179,16 +78,16 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&s.PodInfraContainerImage, "pod-infra-container-image", s.PodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
-	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
+	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, "Use this for the docker endpoint to communicate with")
 	fs.StringVar(&s.RootDirectory, "root-dir", s.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 	fs.StringVar(&s.SeccompProfileRoot, "seccomp-profile-root", s.SeccompProfileRoot, "Directory path for seccomp profiles.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow containers to request privileged mode. [default=false]")
-	fs.StringVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. [default=\"*\"]")
-	fs.StringVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. [default=\"*\"]")
-	fs.StringVar(&s.HostIPCSources, "host-ipc-sources", s.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. [default=\"*\"]")
-	fs.Float64Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=5.0]")
+	fs.StringSliceVar(&s.HostNetworkSources, "host-network-sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. [default=\"*\"]")
+	fs.StringSliceVar(&s.HostPIDSources, "host-pid-sources", s.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace. [default=\"*\"]")
+	fs.StringSliceVar(&s.HostIPCSources, "host-ipc-sources", s.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. [default=\"*\"]")
+	fs.Int32Var(&s.RegistryPullQPS, "registry-qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=5.0]")
 	fs.Int32Var(&s.RegistryBurst, "registry-burst", s.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0")
-	fs.Float32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited.")
+	fs.Int32Var(&s.EventRecordQPS, "event-qps", s.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited.")
 	fs.Int32Var(&s.EventBurst, "event-burst", s.EventBurst, "Maximum size of a bursty event records, temporarily allows event records to burst to this number, while still not exceeding event-qps. Only used if --event-qps > 0")
 	fs.BoolVar(&s.RunOnce, "runonce", s.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server")
 	fs.BoolVar(&s.EnableDebuggingHandlers, "enable-debugging-handlers", s.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
@@ -201,7 +100,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
-	fs.UintVar(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
+	fs.Int32Var(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.Int32Var(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(componentconfig.IPVar{Val: &s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.Int32Var(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
@@ -212,7 +111,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "IP address for a cluster DNS server.  This value is used for containers' DNS server in case of Pods with \"dnsPolicy=ClusterFirst\"")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", s.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
-	bindableNodeLabels := config.ConfigurationMap(s.NodeLabels)
+	s.NodeLabels = make(map[string]string)
+	bindableNodeLabels := utilconfig.ConfigurationMap(s.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','.")
 	fs.DurationVar(&s.ImageMinimumGCAge.Duration, "minimum-image-ttl-duration", s.ImageMinimumGCAge.Duration, "Minimum age for a unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'. Default: '2m'")
 	fs.Int32Var(&s.ImageGCHighThresholdPercent, "image-gc-high-threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%")
@@ -259,13 +159,13 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
-	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", s.MaxOpenFiles, "Number of files that can be opened by Kubelet process. [default=1000000]")
+	fs.Int64Var(&s.MaxOpenFiles, "max-open-files", s.MaxOpenFiles, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.BoolVar(&s.ReconcileCIDR, "reconcile-cidr", s.ReconcileCIDR, "Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]")
 	fs.Var(&s.SystemReserved, "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail. [default=none]")
 	fs.Var(&s.KubeReserved, "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail. [default=none]")
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
 	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "Content type of requests sent to apiserver.")
-	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
+	fs.Int32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 	fs.BoolVar(&s.ExperimentalFlannelOverlay, "experimental-flannel-overlay", s.ExperimentalFlannelOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
