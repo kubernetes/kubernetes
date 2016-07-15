@@ -41,7 +41,7 @@ type NodeStorage struct {
 
 type REST struct {
 	*registry.Store
-	connection     client.ConnectionInfoGetter
+	connection     client.KubeletClient
 	proxyTransport http.RoundTripper
 }
 
@@ -65,7 +65,7 @@ func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedOb
 }
 
 // NewStorage returns a NodeStorage object that will work against nodes.
-func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) NodeStorage {
+func NewStorage(opts generic.RESTOptions, connection client.KubeletClient, proxyTransport http.RoundTripper) NodeStorage {
 	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
@@ -140,7 +140,7 @@ func (r *REST) getKubeletPort(ctx api.Context, nodeName string) (int, error) {
 }
 
 func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	scheme, port, transport, err := c.connection.GetConnectionInfo(ctx, nodeName)
+	scheme, port, transport, err := c.connection.GetRawConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return "", 0, nil, err
 	}

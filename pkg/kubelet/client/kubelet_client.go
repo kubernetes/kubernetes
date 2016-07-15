@@ -51,7 +51,7 @@ type KubeletClientConfig struct {
 
 // KubeletClient is an interface for all kubelet functionality
 type KubeletClient interface {
-	ConnectionInfoGetter
+	GetRawConnectionInfo(ctx api.Context, nodeName string) (scheme string, port uint, transport http.RoundTripper, err error)
 }
 
 type ConnectionInfoGetter interface {
@@ -98,7 +98,7 @@ func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) 
 }
 
 // In default HTTPKubeletClient ctx is unused.
-func (c *HTTPKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
 	if errs := validation.ValidateNodeName(nodeName, false); len(errs) != 0 {
 		return "", 0, nil, fmt.Errorf("invalid node name: %s", strings.Join(errs, ";"))
 	}
@@ -114,7 +114,7 @@ func (c *HTTPKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) 
 // no kubelets.
 type FakeKubeletClient struct{}
 
-func (c FakeKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+func (c FakeKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
 

@@ -102,7 +102,7 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 	}
 
 	{
-		scheme, port, transport, err := client.GetConnectionInfo(nil, "foo")
+		scheme, port, transport, err := client.GetRawConnectionInfo(nil, "foo")
 		if err != nil {
 			t.Errorf("Error getting info: %v", err)
 		}
@@ -118,7 +118,7 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 	}
 
 	{
-		_, _, _, err := client.GetConnectionInfo(nil, "foo bar")
+		_, _, _, err := client.GetRawConnectionInfo(nil, "foo bar")
 		if err == nil {
 			t.Errorf("Expected error getting connection info for invalid node name, got none")
 		}
