@@ -345,24 +345,16 @@ func fractionOfCapacity(requested, capacity int64) float64 {
 	return float64(requested) / float64(capacity)
 }
 
-type NodePreferAvoidPod struct {
-	controllerLister algorithm.ControllerLister
-	replicaSetLister algorithm.ReplicaSetLister
-}
-
-func NewNodePreferAvoidPodsPriority(controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
-	nodePreferAvoid := &NodePreferAvoidPod{
-		controllerLister: controllerLister,
-		replicaSetLister: replicaSetLister,
+func CalculateNodePreferAvoidPodsPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+	controllerRef := priorityutil.GetControllerRef(pod)
+	if controllerRef != nil {
+		// Ignore pods that are owned by other controller than ReplicationController
+		// or ReplicaSet.
+		if controllerRef.Kind != "ReplicationController" && controllerRef.Kind != "ReplicaSet" {
+			controllerRef = nil
+		}
 	}
-	return nodePreferAvoid.CalculateNodePreferAvoidPodsPriority
-}
-
-func (npa *NodePreferAvoidPod) CalculateNodePreferAvoidPodsPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
-	// TODO: Once we have ownerReference fully implemented, use it to find controller for the pod.
-	rcs, _ := npa.controllerLister.GetPodControllers(pod)
-	rss, _ := npa.replicaSetLister.GetPodReplicaSets(pod)
-	if len(rcs) == 0 && len(rss) == 0 {
+	if controllerRef == nil {
 		result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 		for _, node := range nodes {
 			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 10})
@@ -381,17 +373,8 @@ func (npa *NodePreferAvoidPod) CalculateNodePreferAvoidPodsPriority(pod *api.Pod
 		avoidNode = false
 		for i := range avoids.PreferAvoidPods {
 			avoid := &avoids.PreferAvoidPods[i]
-			// TODO: Once we have controllerRef implemented there will be at most one owner
-			// of our pod. That said we won't even need loop theoretically. That said for
-			// code simplicity, we can get rid of all breaks.
-			// Also, we can simply compare fields from ownerRef with avoid.
-			for _, rc := range rcs {
-				if avoid.PodSignature.PodController.Kind == "ReplicationController" && avoid.PodSignature.PodController.UID == rc.UID {
-					avoidNode = true
-				}
-			}
-			for _, rs := range rss {
-				if avoid.PodSignature.PodController.Kind == "ReplicaSet" && avoid.PodSignature.PodController.UID == rs.UID {
+			if controllerRef != nil {
+				if avoid.PodSignature.PodController.Kind == controllerRef.Kind && avoid.PodSignature.PodController.UID == controllerRef.UID {
 					avoidNode = true
 				}
 			}
