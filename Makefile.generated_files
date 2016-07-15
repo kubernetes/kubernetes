@@ -245,7 +245,9 @@ $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	     | grep "^$(PRJ_SRC_PATH)"                         \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
-	echo $$DIRECT $$INDIRECT | sed 's/ / =,/g' | tr '=,' '\n\t'; \
+	 echo $$DIRECT $$INDIRECT                              \
+	     | sed 's/ / \\=,/g'                               \
+	     | tr '=,' '\n\t';                                 \
 	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
@@ -422,7 +424,9 @@ $(META_DIR)/$(CONVERSION_GEN).mk:
 	     | grep "^$(PRJ_SRC_PATH)"                         \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
-	echo $$DIRECT $$INDIRECT | sed 's/ / =,/g' | tr '=,' '\n\t'; \
+	 echo $$DIRECT $$INDIRECT                              \
+	     | sed 's/ / \\=,/g'                               \
+	     | tr '=,' '\n\t';                                 \
 	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
