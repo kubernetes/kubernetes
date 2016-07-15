@@ -67,8 +67,6 @@ func ListMetaFor(obj runtime.Object) (*unversioned.ListMeta, error) {
 
 func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
 
-func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind { return obj }
-
 // Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.
 func (meta *ObjectMeta) GetNamespace() string                   { return meta.Namespace }
