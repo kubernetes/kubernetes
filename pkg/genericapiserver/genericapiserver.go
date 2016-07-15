@@ -656,7 +656,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
 	}
-	// We serve on 2 ports. See docs/accessing_the_api.md
+	// We serve on 2 ports. See docs/admin/accessing-the-api.md
 	secureLocation := ""
 	if options.SecurePort != 0 {
 		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
