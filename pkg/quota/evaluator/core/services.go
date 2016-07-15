@@ -73,3 +73,14 @@ func QuotaServiceType(service *api.Service) bool {
 	}
 	return false
 }
+
+//GetQuotaServiceType returns ServiceType if the service type is eligible to track against a quota, nor return ""
+func GetQuotaServiceType(service *api.Service) api.ServiceType {
+	switch service.Spec.Type {
+	case api.ServiceTypeNodePort:
+		return api.ServiceTypeNodePort
+	case api.ServiceTypeLoadBalancer:
+		return api.ServiceTypeLoadBalancer
+	}
+	return api.ServiceType("")
+}
