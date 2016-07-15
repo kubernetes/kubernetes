@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -45,6 +46,9 @@ type imageManager interface {
 	Start() error
 
 	GetImageList() ([]kubecontainer.Image, error)
+
+	// Delete all unused images and returns the number of bytes freed. The number of bytes freed is always returned.
+	DeleteUnusedImages() (int64, error)
 
 	// TODO(vmarmol): Have this subsume pulls as well.
 }
@@ -246,6 +250,10 @@ func (im *realImageManager) GarbageCollect() error {
 	}
 
 	return nil
+}
+
+func (im *realImageManager) DeleteUnusedImages() (int64, error) {
+	return im.freeSpace(math.MaxInt64, time.Now())
 }
 
 // Tries to free bytesToFree worth of images on the disk.
