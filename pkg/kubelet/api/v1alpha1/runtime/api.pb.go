@@ -57,6 +57,7 @@ It has these top-level messages:
 	SELinuxOption
 	Capability
 	LinuxContainerConfig
+	LinuxUser
 	ContainerConfig
 	CreateContainerRequest
 	CreateContainerResponse
@@ -1216,8 +1217,10 @@ type LinuxContainerConfig struct {
 	// Capabilities to add or drop.
 	Capabilities *Capability `protobuf:"bytes,2,opt,name=capabilities" json:"capabilities,omitempty"`
 	// Optional SELinux context to be applied.
-	SelinuxOptions   *SELinuxOption `protobuf:"bytes,3,opt,name=selinux_options" json:"selinux_options,omitempty"`
-	XXX_unrecognized []byte         `json:"-"`
+	SelinuxOptions *SELinuxOption `protobuf:"bytes,3,opt,name=selinux_options" json:"selinux_options,omitempty"`
+	// User contains the user for the container process.
+	User             *LinuxUser `protobuf:"bytes,4,opt,name=user" json:"user,omitempty"`
+	XXX_unrecognized []byte     `json:"-"`
 }
 
 func (m *LinuxContainerConfig) Reset()         { *m = LinuxContainerConfig{} }
@@ -1241,6 +1244,48 @@ func (m *LinuxContainerConfig) GetCapabilities() *Capability {
 func (m *LinuxContainerConfig) GetSelinuxOptions() *SELinuxOption {
 	if m != nil {
 		return m.SelinuxOptions
+	}
+	return nil
+}
+
+func (m *LinuxContainerConfig) GetUser() *LinuxUser {
+	if m != nil {
+		return m.User
+	}
+	return nil
+}
+
+type LinuxUser struct {
+	// uid specifies the user ID the container process has.
+	Uid *int64 `protobuf:"varint,1,opt,name=uid" json:"uid,omitempty"`
+	// gid specifies the group ID the container process has.
+	Gid *int64 `protobuf:"varint,2,opt,name=gid" json:"gid,omitempty"`
+	// additional_gids specifies additional GIDs the container process has.
+	AdditionalGids   []int64 `protobuf:"varint,3,rep,name=additional_gids" json:"additional_gids,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *LinuxUser) Reset()         { *m = LinuxUser{} }
+func (m *LinuxUser) String() string { return proto.CompactTextString(m) }
+func (*LinuxUser) ProtoMessage()    {}
+
+func (m *LinuxUser) GetUid() int64 {
+	if m != nil && m.Uid != nil {
+		return *m.Uid
+	}
+	return 0
+}
+
+func (m *LinuxUser) GetGid() int64 {
+	if m != nil && m.Gid != nil {
+		return *m.Gid
+	}
+	return 0
+}
+
+func (m *LinuxUser) GetAdditionalGids() []int64 {
+	if m != nil {
+		return m.AdditionalGids
 	}
 	return nil
 }
@@ -2228,6 +2273,7 @@ func init() {
 	proto.RegisterType((*SELinuxOption)(nil), "runtime.SELinuxOption")
 	proto.RegisterType((*Capability)(nil), "runtime.Capability")
 	proto.RegisterType((*LinuxContainerConfig)(nil), "runtime.LinuxContainerConfig")
+	proto.RegisterType((*LinuxUser)(nil), "runtime.LinuxUser")
 	proto.RegisterType((*ContainerConfig)(nil), "runtime.ContainerConfig")
 	proto.RegisterType((*CreateContainerRequest)(nil), "runtime.CreateContainerRequest")
 	proto.RegisterType((*CreateContainerResponse)(nil), "runtime.CreateContainerResponse")

@@ -369,6 +369,17 @@ message LinuxContainerConfig {
     optional Capability capabilities = 2;
     // Optional SELinux context to be applied.
     optional SELinuxOption selinux_options = 3;
+    // User contains the user for the container process.
+    optional LinuxUser user = 4;
+}
+
+message LinuxUser {
+    // uid specifies the user ID the container process has.
+    optional int64 uid = 1;
+    // gid specifies the group ID the container process has.
+    optional int64 gid = 2;
+    // additional_gids specifies additional GIDs the container process has.
+    repeated int64 additional_gids = 3;
 }
 
 message ContainerConfig {
