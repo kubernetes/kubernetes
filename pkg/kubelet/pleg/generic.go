@@ -134,29 +134,25 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	return true, nil
 }
 
-func generateEvent(podID types.UID, cid string, oldState, newState plegContainerState) *PodLifecycleEvent {
+func generateEvents(podID types.UID, cid string, oldState, newState plegContainerState) []*PodLifecycleEvent {
 	if newState == oldState {
 		return nil
 	}
 	glog.V(4).Infof("GenericPLEG: %v/%v: %v -> %v", podID, cid, oldState, newState)
 	switch newState {
 	case plegContainerRunning:
-		return &PodLifecycleEvent{ID: podID, Type: ContainerStarted, Data: cid}
+		return []*PodLifecycleEvent{{ID: podID, Type: ContainerStarted, Data: cid}}
 	case plegContainerExited:
-		return &PodLifecycleEvent{ID: podID, Type: ContainerDied, Data: cid}
+		return []*PodLifecycleEvent{{ID: podID, Type: ContainerDied, Data: cid}}
 	case plegContainerUnknown:
-		return &PodLifecycleEvent{ID: podID, Type: ContainerChanged, Data: cid}
+		return []*PodLifecycleEvent{{ID: podID, Type: ContainerChanged, Data: cid}}
 	case plegContainerNonExistent:
-		// We report "ContainerDied" when container was stopped OR removed. We
-		// may want to distinguish the two cases in the future.
 		switch oldState {
 		case plegContainerExited:
 			// We already reported that the container died before.
-			return &PodLifecycleEvent{ID: podID, Type: ContainerRemoved, Data: cid}
+			return []*PodLifecycleEvent{{ID: podID, Type: ContainerRemoved, Data: cid}}
 		default:
-			// TODO: We may want to generate a ContainerRemoved event as well.
-			// It's ok now because no one relies on the ContainerRemoved event.
-			return &PodLifecycleEvent{ID: podID, Type: ContainerDied, Data: cid}
+			return []*PodLifecycleEvent{{ID: podID, Type: ContainerDied, Data: cid}, {ID: podID, Type: ContainerRemoved, Data: cid}}
 		}
 	default:
 		panic(fmt.Sprintf("unrecognized container state: %v", newState))
@@ -208,8 +204,10 @@ func (g *GenericPLEG) relist() {
 		// Get all containers in the old and the new pod.
 		allContainers := getContainersFromPods(oldPod, pod)
 		for _, container := range allContainers {
-			e := computeEvent(oldPod, pod, &container.ID)
-			updateEvents(eventsByPodID, e)
+			events := computeEvents(oldPod, pod, &container.ID)
+			for _, e := range events {
+				updateEvents(eventsByPodID, e)
+			}
 		}
 	}
 
@@ -250,7 +248,7 @@ func (g *GenericPLEG) relist() {
 		g.podRecords.update(pid)
 		for i := range events {
 			// Filter out events that are not reliable and no other components use yet.
-			if events[i].Type == ContainerChanged || events[i].Type == ContainerRemoved {
+			if events[i].Type == ContainerChanged {
 				continue
 			}
 			g.eventChannel <- events[i]
@@ -297,7 +295,7 @@ func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Containe
 	return containers
 }
 
-func computeEvent(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID) *PodLifecycleEvent {
+func computeEvents(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID) []*PodLifecycleEvent {
 	var pid types.UID
 	if oldPod != nil {
 		pid = oldPod.ID
@@ -306,7 +304,7 @@ func computeEvent(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.Containe
 	}
 	oldState := getContainerState(oldPod, cid)
 	newState := getContainerState(newPod, cid)
-	return generateEvent(pid, cid.ID, oldState, newState)
+	return generateEvents(pid, cid.ID, oldState, newState)
 }
 
 func (g *GenericPLEG) cacheEnabled() bool {
