@@ -18,8 +18,10 @@ package images
 
 import (
 	"errors"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 var (
@@ -48,5 +50,31 @@ type ImageManager interface {
 	// EnsureImageExists ensures that image specified in `container` exists.
 	EnsureImageExists(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 
-	// TODO(ronl): consolidating image managing and deleting operation in this interface
+	// Applies the garbage collection policy. Errors include being unable to free
+	// enough space as per the garbage collection policy.
+	GarbageCollect() error
+
+	// Start async garbage collection of images.
+	Start() error
+
+	// GetImageList returns the images that's available
+	GetImageList() ([]kubecontainer.Image, error)
+
+	// DeleteUnusedImages deletes all unused images and returns the number of bytes freed. The number of bytes freed is always returned.
+	DeleteUnusedImages() (int64, error)
+}
+
+// A policy for garbage collecting images. Policy defines an allowed band in
+// which garbage collection will be run.
+type ImageGCPolicy struct {
+	// Any usage above this threshold will always trigger garbage collection.
+	// This is the highest usage we will allow.
+	HighThresholdPercent int
+
+	// Any usage below this threshold will never trigger garbage collection.
+	// This is the lowest threshold we will try to garbage collect to.
+	LowThresholdPercent int
+
+	// Minimum age at which a image can be garbage collected.
+	MinAge time.Duration
 }

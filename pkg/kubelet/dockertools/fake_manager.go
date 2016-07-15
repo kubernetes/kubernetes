@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -49,10 +50,18 @@ func NewFakeDockerManager(
 	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFS()
 	fakePodGetter := &fakePodGetter{}
+	var fakeImageManager images.ImageManager
 	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, fakePodGetter, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, runtimeHelper, httpClient, &NativeExecHandler{},
-		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, false, false, true, "/var/lib/kubelet/seccomp")
+		fakeOOMAdjuster, fakeProcFs, false, false, true, "/var/lib/kubelet/seccomp",
+		func(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
+			return fakeImageManager.EnsureImageExists(pod, container, pullSecrets)
+		})
 	dm.dockerPuller = &FakeDockerPuller{}
+	fakeImageManager, err := images.NewImageManager(recorder, dm, imageBackOff, false, nil, nil, images.ImageGCPolicy{})
+	if err != nil {
+		return nil
+	}
 
 	// ttl of version cache is set to 0 so we always call version api directly in tests.
 	dm.versionCache = cache.NewObjectCache(
