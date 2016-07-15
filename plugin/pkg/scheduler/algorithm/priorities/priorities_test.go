@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/codeinspector"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -151,8 +150,7 @@ func TestZeroRequest(t *testing.T) {
 					Function: NewSelectorSpreadPriority(
 						algorithm.FakePodLister(test.pods),
 						algorithm.FakeServiceLister([]api.Service{}),
-						algorithm.FakeControllerLister([]api.ReplicationController{}),
-						algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
+						true),
 					Weight: 1,
 				},
 			},
