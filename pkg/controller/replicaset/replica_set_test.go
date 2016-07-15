@@ -352,9 +352,10 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	fakePodControl.Err = fmt.Errorf("Fake Error")
 
 	manager.syncReplicaSet(getKey(rsSpec, t))
-	validateSyncReplicaSet(t, &fakePodControl, 0, 0)
+	validateSyncReplicaSet(t, &fakePodControl, 1, 0)
 
 	// This replica should not need a Lowering of expectations, since the previous create failed
+	fakePodControl.Clear()
 	fakePodControl.Err = nil
 	manager.syncReplicaSet(getKey(rsSpec, t))
 	validateSyncReplicaSet(t, &fakePodControl, 1, 0)

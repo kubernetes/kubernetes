@@ -349,8 +349,12 @@ type PodControlInterface interface {
 	CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error
 	// CreatePodsOnNode creates a new pod accorting to the spec on the specified node.
 	CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error
+	// CreatePodsWithControllerRef creates new pods according to the spec, and sets object as the pod's controller.
+	CreatePodsWithControllerRef(namespace string, template *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string, object runtime.Object) error
+	// PatchPod patches the pod.
+	PatchPod(namespace, name string, data []byte) error
 }
 
 // RealPodControl is the default implementation of PodControlInterface.
@@ -404,14 +408,35 @@ func getPodsPrefix(controllerName string) string {
 }
 
 func (r RealPodControl) CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods("", namespace, template, object)
+	return r.createPods("", namespace, template, object, nil)
+}
+
+func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *api.PodTemplateSpec, controllerObject runtime.Object, controllerRef *api.OwnerReference) error {
+	if controllerRef == nil {
+		return fmt.Errorf("controllerRef is nil")
+	}
+	if len(controllerRef.APIVersion) == 0 {
+		return fmt.Errorf("controllerRef has empty APIVersion")
+	}
+	if len(controllerRef.Kind) == 0 {
+		return fmt.Errorf("controllerRef has empty Kind")
+	}
+	if controllerRef.Controller == nil || *controllerRef.Controller != true {
+		return fmt.Errorf("controllerRef.Controller is not set")
+	}
+	return r.createPods("", namespace, template, controllerObject, controllerRef)
 }
 
 func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods(nodeName, namespace, template, object)
+	return r.createPods(nodeName, namespace, template, object, nil)
 }
 
-func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object) (*api.Pod, error) {
+func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
+	_, err := r.KubeClient.Core().Pods(namespace).Patch(name, api.StrategicMergePatchType, data)
+	return err
+}
+
+func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object, controllerRef *api.OwnerReference) (*api.Pod, error) {
 	desiredLabels := getPodsLabelSet(template)
 	desiredAnnotations, err := getPodsAnnotationSet(template, parentObject)
 	if err != nil {
@@ -430,14 +455,17 @@ func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Obje
 			GenerateName: prefix,
 		},
 	}
+	if controllerRef != nil {
+		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
+	}
 	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
 		return nil, fmt.Errorf("unable to convert pod template: %v", err)
 	}
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	pod, err := GetPodFromTemplate(template, object)
+func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error {
+	pod, err := GetPodFromTemplate(template, object, controllerRef)
 	if err != nil {
 		return err
 	}
@@ -479,40 +507,63 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 
 type FakePodControl struct {
 	sync.Mutex
-	Templates     []api.PodTemplateSpec
-	DeletePodName []string
-	Err           error
+	Templates      []api.PodTemplateSpec
+	ControllerRefs []api.OwnerReference
+	DeletePodName  []string
+	Patches        [][]byte
+	Err            error
 }
 
 var _ PodControlInterface = &FakePodControl{}
 
-func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 	f.Lock()
 	defer f.Unlock()
+	f.Patches = append(f.Patches, data)
 	if f.Err != nil {
 		return f.Err
 	}
+	return nil
+}
+
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
 	f.Templates = append(f.Templates, *spec)
+	if f.Err != nil {
+		return f.Err
+	}
+	return nil
+}
+
+func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error {
+	f.Lock()
+	defer f.Unlock()
+	f.Templates = append(f.Templates, *spec)
+	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
+	if f.Err != nil {
+		return f.Err
+	}
 	return nil
 }
 
 func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
+	f.Templates = append(f.Templates, *template)
 	if f.Err != nil {
 		return f.Err
 	}
-	f.Templates = append(f.Templates, *template)
 	return nil
 }
 
 func (f *FakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
+	f.DeletePodName = append(f.DeletePodName, podID)
 	if f.Err != nil {
 		return f.Err
 	}
-	f.DeletePodName = append(f.DeletePodName, podID)
 	return nil
 }
 
@@ -521,6 +572,8 @@ func (f *FakePodControl) Clear() {
 	defer f.Unlock()
 	f.DeletePodName = []string{}
 	f.Templates = []api.PodTemplateSpec{}
+	f.ControllerRefs = []api.OwnerReference{}
+	f.Patches = [][]byte{}
 }
 
 // ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.

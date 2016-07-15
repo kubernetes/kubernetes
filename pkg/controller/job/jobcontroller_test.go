@@ -164,7 +164,7 @@ func TestControllerSyncJob(t *testing.T) {
 		"too few active pods, with controller error": {
 			2, 5, false,
 			fmt.Errorf("Fake error"), 0, 1, 1, 0,
-			0, 0, 1, 1, 0, false,
+			1, 0, 1, 1, 0, false,
 		},
 		"too many active pods": {
 			2, 5, false,
@@ -174,7 +174,7 @@ func TestControllerSyncJob(t *testing.T) {
 		"too many active pods, with controller error": {
 			2, 5, false,
 			fmt.Errorf("Fake error"), 0, 3, 0, 0,
-			0, 0, 3, 0, 0, false,
+			0, 1, 3, 0, 0, false,
 		},
 		"failed pod": {
 			2, 5, false,

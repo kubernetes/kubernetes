@@ -215,6 +215,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
 		int(s.LookupCacheSizeForRC),
+		s.EnableGarbageCollector,
 	).Run(int(s.ConcurrentRCSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
