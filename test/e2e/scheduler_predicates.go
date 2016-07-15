@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
@@ -54,7 +53,9 @@ func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.
 				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
 				Expect(scheduledCondition != nil).To(Equal(true))
 				Expect(scheduledCondition.Status).To(Equal(api.ConditionFalse))
-				notScheduledPods = append(notScheduledPods, pod)
+				if scheduledCondition.Reason == "Unschedulable" {
+					notScheduledPods = append(notScheduledPods, pod)
+				}
 			}
 		}
 	}
@@ -69,37 +70,11 @@ func getRequestedCPU(pod api.Pod) int64 {
 	return result
 }
 
-func verifyResult(c *client.Client, podName string, ns string) {
-	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
+// TODO: upgrade calls in PodAffinity tests when we're able to run them
+func verifyResult(c *client.Client, podName string, expectedScheduled int, expectedNotScheduled int, ns string) {
+	allPods, err := c.Pods(ns).List(api.ListOptions{})
 	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
-
-	selector := fields.Set{
-		"involvedObject.kind":      "Pod",
-		"involvedObject.name":      podName,
-		"involvedObject.namespace": ns,
-		"source":                   api.DefaultSchedulerName,
-		"reason":                   "FailedScheduling",
-	}.AsSelector()
-	options := api.ListOptions{FieldSelector: selector}
-	schedEvents, err := c.Events(ns).List(options)
-	framework.ExpectNoError(err)
-	// If we failed to find event with a capitalized first letter of reason
-	// try looking for one starting with a small one for backward compatibility.
-	// If we don't do it we end up in #15806.
-	// TODO: remove this block when we don't care about supporting v1.0 too much.
-	if len(schedEvents.Items) == 0 {
-		selector := fields.Set{
-			"involvedObject.kind":      "Pod",
-			"involvedObject.name":      podName,
-			"involvedObject.namespace": ns,
-			"source":                   "scheduler",
-			"reason":                   "failedScheduling",
-		}.AsSelector()
-		options := api.ListOptions{FieldSelector: selector}
-		schedEvents, err = c.Events(ns).List(options)
-		framework.ExpectNoError(err)
-	}
 
 	printed := false
 	printOnce := func(msg string) string {
@@ -111,8 +86,8 @@ func verifyResult(c *client.Client, podName string, ns string) {
 		}
 	}
 
-	Expect(len(notScheduledPods)).To(Equal(1), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	Expect(len(notScheduledPods)).To(Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	Expect(scheduledPods).To(Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 func cleanupPods(c *client.Client, ns string) {
@@ -299,7 +274,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -394,7 +369,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -432,7 +407,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, 0, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -610,7 +585,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, 0, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -872,7 +847,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, 0, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -1054,7 +1029,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, labelPodName, ns)
+		verifyResult(c, labelPodName, 1, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -1541,7 +1516,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podNameNoTolerations, ns)
+		verifyResult(c, podNameNoTolerations, 0, 1, ns)
 		cleanupPods(c, ns)
 
 		// TODO(@kevin-wangzefeng) Figure out how to do it correctly
