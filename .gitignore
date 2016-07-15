@@ -99,7 +99,8 @@ network_closure.sh
 kubernetes.tar.gz
 
 # generated files in any directory
-zz_generated.*
+# TODO(thockin): uncomment this when we stop committing the generated files.
+#zz_generated.*
 
 # make-related metadata
 /.make/
