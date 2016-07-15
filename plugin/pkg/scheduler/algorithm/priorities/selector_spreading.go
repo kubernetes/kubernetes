@@ -45,7 +45,11 @@ type SelectorSpread struct {
 	replicaSetLister algorithm.ReplicaSetLister
 }
 
-func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
+func NewSelectorSpreadPriority(
+	podLister algorithm.PodLister,
+	serviceLister algorithm.ServiceLister,
+	controllerLister algorithm.ControllerLister,
+	replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
 	selectorSpread := &SelectorSpread{
 		podLister:        podLister,
 		serviceLister:    serviceLister,
