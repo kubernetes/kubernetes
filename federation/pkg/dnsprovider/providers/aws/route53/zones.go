@@ -31,17 +31,17 @@ type Zones struct {
 }
 
 func (zones Zones) List() ([]dnsprovider.Zone, error) {
+	var zoneList []dnsprovider.Zone
+
 	input := route53.ListHostedZonesInput{}
-	response, err := zones.interface_.service.ListHostedZones(&input)
+	err := zones.interface_.service.ListHostedZonesPages(&input, func(page *route53.ListHostedZonesOutput, lastPage bool) bool {
+		for _, zone := range page.HostedZones {
+			zoneList = append(zoneList, &Zone{zone, &zones})
+		}
+		return true
+	})
 	if err != nil {
 		return []dnsprovider.Zone{}, err
-	}
-	hostedZones := response.HostedZones
-	// TODO: Handle result truncation
-	// https://docs.aws.amazon.com/sdk-for-go/api/service/route53/Route53.html#ListHostedZones-instance_method
-	zoneList := make([]dnsprovider.Zone, len(hostedZones))
-	for i, zone := range hostedZones {
-		zoneList[i] = &Zone{zone, &zones}
 	}
 	return zoneList, nil
 }

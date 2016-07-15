@@ -34,14 +34,16 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	input := route53.ListResourceRecordSetsInput{
 		HostedZoneId: rrsets.zone.impl.Id,
 	}
-	response, err := rrsets.zone.zones.interface_.service.ListResourceRecordSets(&input)
-	// TODO: Handle truncated responses
+
+	var list []dnsprovider.ResourceRecordSet
+	err := rrsets.zone.zones.interface_.service.ListResourceRecordSetsPages(&input, func(page *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+		for _, rrset := range page.ResourceRecordSets {
+			list = append(list, &ResourceRecordSet{rrset, &rrsets})
+		}
+		return true
+	})
 	if err != nil {
 		return nil, err
-	}
-	list := make([]dnsprovider.ResourceRecordSet, len(response.ResourceRecordSets))
-	for i, rrset := range response.ResourceRecordSets {
-		list[i] = &ResourceRecordSet{rrset, &rrsets}
 	}
 	return list, nil
 }
