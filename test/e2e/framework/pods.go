@@ -54,23 +54,22 @@ func (c *PodClient) Create(pod *api.Pod) *api.Pod {
 func (c *PodClient) CreateSync(pod *api.Pod) *api.Pod {
 	p := c.Create(pod)
 	ExpectNoError(c.f.WaitForPodRunning(p.Name))
+	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
+	p, err := c.Get(pod.Name)
+	ExpectNoError(err)
 	return p
 }
 
 // CreateBatch create a batch of pods. All pods are created before waiting.
 func (c *PodClient) CreateBatch(pods []*api.Pod) []*api.Pod {
 	ps := make([]*api.Pod, len(pods))
-	for i, pod := range pods {
-		ps[i] = c.Create(pod)
-	}
 	var wg sync.WaitGroup
-	for _, pod := range ps {
+	for i, pod := range pods {
 		wg.Add(1)
-		podName := pod.Name
-		go func() {
-			ExpectNoError(c.f.WaitForPodRunning(podName))
+		go func(i int, pod *api.Pod) {
+			ps[i] = c.CreateSync(pod)
 			wg.Done()
-		}()
+		}(i, pod)
 	}
 	wg.Wait()
 	return ps
