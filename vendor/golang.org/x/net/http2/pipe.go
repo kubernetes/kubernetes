@@ -29,6 +29,12 @@ type pipeBuffer interface {
 	io.Reader
 }
 
+func (p *pipe) Len() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.b.Len()
+}
+
 // Read waits until data is available and copies bytes
 // from the buffer into p.
 func (p *pipe) Read(d []byte) (n int, err error) {
