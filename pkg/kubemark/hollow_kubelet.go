@@ -21,6 +21,7 @@ import (
 
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -34,7 +35,8 @@ import (
 )
 
 type HollowKubelet struct {
-	KubeletConfig *kubelet.KubeletConfig
+	KubeletConfig_old        *kubelet.KubeletConfig
+	KubeletConfiguration_new *componentconfig.KubeletConfiguration
 }
 
 func NewHollowKubelet(
@@ -51,7 +53,7 @@ func NewHollowKubelet(
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	return &HollowKubelet{
-		KubeletConfig: kubeletapp.SimpleKubelet(
+		KubeletConfig_old: kubeletapp.SimpleKubelet(
 			client,
 			dockerClient,
 			nodeName,
@@ -84,6 +86,6 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletConfig)
+	kubeletapp.RunKubelet(hk.KubeletConfig_old, hk.KubeletConfiguration_new)
 	select {}
 }

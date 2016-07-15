@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
@@ -164,8 +165,8 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	// apply Mesos specific settings
-	kcfg.Builder = func(kc *kubelet.KubeletConfig) (kubelet.KubeletBootstrap, error) {
-		k, err := kubeletapp.CreateAndInitKubelet(kc)
+	kcfg.Builder = func(kc_old *kubelet.KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (kubelet.KubeletBootstrap, error) {
+		k, err := kubeletapp.CreateAndInitKubelet(kc_old, kc_new)
 		if err != nil {
 			return k, err
 		}

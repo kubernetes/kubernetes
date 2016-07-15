@@ -389,7 +389,7 @@ func run(s *options.KubeletServer, kcfg *kubelet.KubeletConfig) (err error) {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(kcfg); err != nil {
+	if err := RunKubelet(kcfg, &s.KubeletConfiguration); err != nil {
 		return err
 	}
 
@@ -631,7 +631,7 @@ func SimpleKubelet(client *clientset.Clientset,
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kcfg *kubelet.KubeletConfig) error {
+func RunKubelet(kcfg *kubelet.KubeletConfig, kcfg_new *componentconfig.KubeletConfiguration) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
 	if len(kcfg.NodeName) == 0 {
@@ -682,7 +682,7 @@ func RunKubelet(kcfg *kubelet.KubeletConfig) error {
 	if kcfg.OSInterface == nil {
 		kcfg.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kcfg)
+	k, err := builder(kcfg, kcfg_new)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -733,34 +733,34 @@ func RunKubelet(kcfg *kubelet.KubeletConfig) error {
 		}
 		glog.Infof("Started kubelet %s as runonce", version.Get().String())
 	} else {
-		startKubelet(k, podCfg, kcfg)
+		startKubelet(k, podCfg, kcfg, kcfg_new)
 		glog.Infof("Started kubelet %s", version.Get().String())
 	}
 	return nil
 }
 
-func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kc *kubelet.KubeletConfig) {
+func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kc_old *kubelet.KubeletConfig, kc_new *componentconfig.KubeletConfiguration) {
 	// start the kubelet
 	go wait.Until(func() { k.Run(podCfg.Updates()) }, 0, wait.NeverStop)
 
 	// start the kubelet server
-	if kc.EnableServer {
+	if kc_old.EnableServer {
 		go wait.Until(func() {
-			k.ListenAndServe(kc.Address, kc.Port, kc.TLSOptions, kc.Auth, kc.EnableDebuggingHandlers)
+			k.ListenAndServe(kc_old.Address, kc_old.Port, kc_old.TLSOptions, kc_old.Auth, kc_old.EnableDebuggingHandlers)
 		}, 0, wait.NeverStop)
 	}
-	if kc.ReadOnlyPort > 0 {
+	if kc_old.ReadOnlyPort > 0 {
 		go wait.Until(func() {
-			k.ListenAndServeReadOnly(kc.Address, kc.ReadOnlyPort)
+			k.ListenAndServeReadOnly(kc_old.Address, kc_old.ReadOnlyPort)
 		}, 0, wait.NeverStop)
 	}
 }
 
-func CreateAndInitKubelet(kc *kubelet.KubeletConfig) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kc_old *kubelet.KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kc)
+	k, err = kubelet.NewMainKubelet(kc_old, kc_new)
 	if err != nil {
 		return nil, err
 	}
