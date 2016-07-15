@@ -112,7 +112,7 @@ func NewKubeletServer() *KubeletServer {
 			MaxContainerCount:            -1,
 			MaxPerPodContainerCount:      1,
 			MaxOpenFiles:                 1000000,
-			MaxPods:                      110,
+			MaxPods:                      250,
 			NvidiaGPUs:                   0,
 			MinimumGCAge:                 unversioned.Duration{Duration: 0},
 			NetworkPluginDir:             "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
@@ -153,7 +153,7 @@ func NewKubeletServer() *KubeletServer {
 			BabysitDaemons:                   false,
 			EvictionHard:                     "memory.available<100Mi",
 			EvictionPressureTransitionPeriod: unversioned.Duration{Duration: 5 * time.Minute},
-			PodsPerCore:                      0,
+			PodsPerCore:                      10,
 		},
 	}
 }
