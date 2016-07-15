@@ -47,7 +47,6 @@ import (
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/runtime"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -110,13 +109,7 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 	}
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
-	networkPlugin, _ := network.InitNetworkPlugin(
-		[]network.NetworkPlugin{},
-		"",
-		nettest.NewFakeHost(nil),
-		componentconfig.HairpinNone,
-		"10.0.0.0/8")
-
+	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8")
 	dockerManager := NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
@@ -127,7 +120,6 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 		0, 0, "",
 		&containertest.FakeOS{},
 		networkPlugin,
-		volumemanager.NewFakeVolumeManager(),
 		&fakeRuntimeHelper{},
 		fakeHTTPClient,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second))

@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	kubetypes "k8s.io/kubernetes/pkg/types"
@@ -139,9 +138,6 @@ type DockerManager struct {
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
-	// Kubelet Volume Manager.
-	volumeManager volumemanager.VolumeManager
-
 	// Health check results.
 	livenessManager proberesults.Manager
 
@@ -214,7 +210,6 @@ func NewDockerManager(
 	containerLogsDir string,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
-	volumeManager volumemanager.VolumeManager,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	httpClient types.HttpGetter,
 	execHandler ExecHandler,
@@ -253,7 +248,6 @@ func NewDockerManager(
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
-		volumeManager:          volumeManager,
 		livenessManager:        livenessManager,
 		runtimeHelper:          runtimeHelper,
 		execHandler:            execHandler,
@@ -696,12 +690,9 @@ func (dm *DockerManager) runContainer(
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
-	// todo: query volume manager for supplemental GIDs
-	supplementalGids := dm.volumeManager.GetExtraSupplementalGroupsForPod(pod)
-
 	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
-	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
+	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig)
 	createResp, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
