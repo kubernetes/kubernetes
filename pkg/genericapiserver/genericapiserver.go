@@ -489,13 +489,13 @@ func (s *GenericAPIServer) init(c *Config) {
 
 	// After all wrapping is done, put a context filter around both handlers
 	if handler, err := api.NewRequestContextFilter(s.RequestContextMapper, s.Handler); err != nil {
-		glog.Fatalf("Could not initialize request context filter: %v", err)
+		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
 	} else {
 		s.Handler = handler
 	}
 
 	if handler, err := api.NewRequestContextFilter(s.RequestContextMapper, s.InsecureHandler); err != nil {
-		glog.Fatalf("Could not initialize request context filter: %v", err)
+		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
 	} else {
 		s.InsecureHandler = handler
 	}
