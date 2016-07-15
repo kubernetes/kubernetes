@@ -33,4 +33,4 @@ skydns-svc.yaml.in
 skydns-rc.yaml.sed
 skydns-svc.yaml.sed
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/saltbase/salt/kube-dns/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/README.md?pixel)]()

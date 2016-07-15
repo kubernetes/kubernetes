@@ -57,8 +57,8 @@ endif
 	mkdir -p ${TEMP_DIR}/cni ${TEMP_DIR}/addons
 	cp ../../saltbase/salt/helpers/safe_format_and_mount ${TEMP_DIR}
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
-	cp ../../saltbase/salt/kube-dns/skydns-rc.yaml.base ${TEMP_DIR}/addons/skydns-rc.yaml
-	cp ../../saltbase/salt/kube-dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/skydns-svc.yaml
+	cp ../../addons/dns/skydns-rc.yaml.base ${TEMP_DIR}/addons/skydns-rc.yaml
+	cp ../../addons/dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/skydns-svc.yaml
 	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons
 	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons
 	
