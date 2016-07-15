@@ -238,6 +238,28 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
+func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+		makeImage(1, 2048),
+		makeImage(2, 2048),
+	}
+	fakeRuntime.AllPodList = []*containertest.FakePod{
+		{Pod: &container.Pod{
+			Containers: []*container.Container{
+				makeContainer(2),
+			},
+		}},
+	}
+
+	spaceFreed, err := manager.DeleteUnusedImages()
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.EqualValues(3072, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, 1)
+}
+
 func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
