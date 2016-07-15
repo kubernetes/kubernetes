@@ -190,7 +190,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	// make a separate client for events
-	eventClientConfig.QPS = s.EventRecordQPS
+	eventClientConfig.QPS = float32(s.EventRecordQPS)
 	eventClientConfig.Burst = int(s.EventBurst)
 	kcfg.EventClient, err = clientset.NewForConfig(eventClientConfig)
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *KubeletExecutorServer) runKubelet(
 
 	// create custom cAdvisor interface which return the resource values that Mesos reports
 	ni := <-nodeInfos
-	cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, s.CAdvisorPort, kcfg.ContainerRuntime)
+	cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, uint(s.CAdvisorPort), kcfg.ContainerRuntime)
 	if err != nil {
 		return err
 	}

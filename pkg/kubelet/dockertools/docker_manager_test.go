@@ -36,7 +36,6 @@ import (
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -116,7 +115,7 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorapi.MachineInfo{},
-		options.GetDefaultPodInfraContainerImage(),
+		"",
 		0, 0, "",
 		&containertest.FakeOS{},
 		networkPlugin,
@@ -535,7 +534,7 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 	container := &api.Container{
 		Name:            PodInfraContainerName,
-		Image:           options.GetDefaultPodInfraContainerImage(),
+		Image:           "",
 		Ports:           ports,
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}

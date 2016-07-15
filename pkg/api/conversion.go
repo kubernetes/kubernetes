@@ -38,20 +38,83 @@ func init() {
 	)
 	Scheme.AddConversionFuncs(
 		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
+
 		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
+
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
+
 		Convert_unversioned_Time_To_unversioned_Time,
+
 		Convert_Slice_string_To_unversioned_Time,
+
+		Convert_resource_Quantity_To_resource_Quantity,
+
 		Convert_string_To_labels_Selector,
+		Convert_labels_Selector_To_string,
+
 		Convert_string_To_fields_Selector,
+		Convert_fields_Selector_To_string,
+
 		Convert_Pointer_bool_To_bool,
 		Convert_bool_To_Pointer_bool,
+
 		Convert_Pointer_string_To_string,
 		Convert_string_To_Pointer_string,
-		Convert_labels_Selector_To_string,
-		Convert_fields_Selector_To_string,
-		Convert_resource_Quantity_To_resource_Quantity,
+
+		Convert_Pointer_int64_To_int,
+		Convert_int_To_Pointer_int64,
+
+		Convert_Pointer_int32_To_int32,
+		Convert_int32_To_Pointer_int32,
+
+		Convert_Pointer_float64_To_float64,
+		Convert_float64_To_Pointer_float64,
 	)
+}
+
+func Convert_Pointer_float64_To_float64(in **float64, out *float64, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = float64(**in)
+	return nil
+}
+
+func Convert_float64_To_Pointer_float64(in *float64, out **float64, s conversion.Scope) error {
+	temp := float64(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_int32_To_int32(in **int32, out *int32, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = int32(**in)
+	return nil
+}
+
+func Convert_int32_To_Pointer_int32(in *int32, out **int32, s conversion.Scope) error {
+	temp := int32(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_int64_To_int(in **int64, out *int, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = int(**in)
+	return nil
+}
+
+func Convert_int_To_Pointer_int64(in *int, out **int64, s conversion.Scope) error {
+	temp := int64(*in)
+	*out = &temp
+	return nil
 }
 
 func Convert_Pointer_string_To_string(in **string, out *string, s conversion.Scope) error {
