@@ -181,8 +181,10 @@ test-cmd:
 #
 # Example:
 #   make clean
+#
+# TODO(thockin): call clean_generated when we stop committing generated code.
 .PHONY: clean
-clean: clean_generated clean_meta
+clean: clean_meta
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
