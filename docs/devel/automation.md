@@ -108,6 +108,18 @@ with numerous other functions. See the README in the link above.
 Please feel free to unleash your creativity on this tool, send us new mungers
 that you think will help support the Kubernetes development process.
 
+### Closing stale pull-requests
+
+Github Munger will close pull-requests that don't have human activity in the
+last 90 days. It will warn about this process 60 days before closing the
+pull-request, and warn again 30 days later. One way to prevent this from
+happening is to add the "keep-open" label on the pull-request.
+
+Feel free to re-open and maybe add the "keep-open" label if this happens to a
+valid pull-request. It may also be a good opportunity to get more attention by
+verifying that it is properly assigned and/or mention people that might be
+interested.
+
 ## PR builder
 
 We also run a robotic PR builder that attempts to run tests for each PR.
