@@ -173,7 +173,7 @@ function kube::build::docker_available_on_osx() {
       kube::log::status "Using Docker for MacOS"
       return 0
     fi
-    
+
     kube::log::status "No docker host is set. Checking options for setting one..."
     if [[ -z "$(which docker-machine)" && -z "$(which boot2docker)" ]]; then
       kube::log::status "It looks like you're running Mac OS X, yet none of Docker for Mac, docker-machine or boot2docker are on the path."
@@ -942,6 +942,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
   cp "${salt_dir}/etcd/etcd.manifest" "${dst_dir}"
+  cp "${salt_dir}/calico/calico-policy-controller.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"
