@@ -176,6 +176,11 @@ func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{}
 	ms.AddExecutorFlags(executorFlags)
 	executorArgs, _ := filterArgsByFlagSet(allArgs, executorFlags)
 
+	// get extra args from system environment
+	if os.Getenv("MESOS_K8S_EXECUTOR_ARGS") != "" {
+		executorArgs = append(executorArgs, os.Getenv("MESOS_K8S_EXECUTOR_ARGS"))
+	}
+
 	// disable resource-container; mesos slave doesn't like sub-containers yet
 	executorArgs = append(executorArgs, "--kubelet-cgroups=")
 
