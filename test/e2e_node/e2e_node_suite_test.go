@@ -31,6 +31,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
+	"k8s.io/kubernetes/pkg/util/wait"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -106,6 +112,9 @@ var _ = BeforeSuite(func() {
 		glog.Infof("Running tests without starting services.")
 	}
 
+	glog.Infof("Starting namespace controller")
+	startNamespaceController()
+
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
 })
@@ -134,4 +143,23 @@ func maskLocksmithdOnCoreos() {
 		}
 		glog.Infof("Locksmithd is masked successfully")
 	}
+}
+
+const (
+	// ncResyncPeriod is resync period of the namespace controller
+	ncResyncPeriod = 5 * time.Minute
+	// ncConcurrency is concurrency of the namespace controller
+	ncConcurrency = 2
+)
+
+func startNamespaceController() {
+	// Use the default QPS
+	config := restclient.AddUserAgent(&restclient.Config{Host: framework.TestContext.Host}, "node-e2e-namespace-controller")
+	client, err := clientset.NewForConfig(config)
+	Expect(err).NotTo(HaveOccurred())
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	resources, err := client.Discovery().ServerPreferredNamespacedResources()
+	Expect(err).NotTo(HaveOccurred())
+	nc := namespacecontroller.NewNamespaceController(client, clientPool, resources, ncResyncPeriod, api.FinalizerKubernetes)
+	go nc.Run(ncConcurrency, wait.NeverStop)
 }
