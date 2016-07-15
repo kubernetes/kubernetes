@@ -630,6 +630,7 @@ ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
+ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-false})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
