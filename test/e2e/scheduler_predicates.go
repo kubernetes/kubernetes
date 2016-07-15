@@ -1367,6 +1367,15 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		taintValue := "testing-taint-value"
 		taintEffect := string(api.TaintEffectNoSchedule)
 		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
+		defer func() {
+			By("removing the taint " + taintName + " off the node " + nodeName)
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
+			By("verifying the node doesn't have the taint " + taintName)
+			output := framework.RunKubectlOrDie("describe", "node", nodeName)
+			if strings.Contains(output, taintName) {
+				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
+			}
+		}()
 		By("verifying the node has the taint " + taintName + " with the value " + taintValue)
 		output := framework.RunKubectlOrDie("describe", "node", nodeName)
 		requiredStrings := [][]string{
@@ -1431,14 +1440,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		deployedPod, err := c.Pods(ns).Get(tolerationPodName)
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
-
-		By("removing the taint " + taintName + " off the node " + nodeName)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
-		By("verifying the node doesn't have the taint " + taintName)
-		output = framework.RunKubectlOrDie("describe", "node", nodeName)
-		if strings.Contains(output, taintName) {
-			framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
-		}
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -1482,6 +1483,15 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		taintValue := "testing-taint-value"
 		taintEffect := string(api.TaintEffectNoSchedule)
 		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
+		defer func() {
+			By("removing the taint " + taintName + " off the node " + nodeName)
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
+			By("verifying the node doesn't have the taint " + taintName)
+			output := framework.RunKubectlOrDie("describe", "node", nodeName)
+			if strings.Contains(output, taintName) {
+				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
+			}
+		}()
 		By("verifying the node has the taint " + taintName + " with the value " + taintValue)
 		output := framework.RunKubectlOrDie("describe", "node", nodeName)
 		requiredStrings := [][]string{
@@ -1533,14 +1543,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		verifyResult(c, podNameNoTolerations, ns)
 		cleanupPods(c, ns)
-
-		By("removing the taint " + taintName + " off the node " + nodeName)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
-		By("verifying the node doesn't have the taint " + taintName)
-		output = framework.RunKubectlOrDie("describe", "node", nodeName)
-		if strings.Contains(output, taintName) {
-			framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
-		}
 
 		By("Trying to relaunch the same.")
 		_, err = c.Pods(ns).Create(&podNoTolerations)
