@@ -328,7 +328,7 @@
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
-			"Comment": "v0.1.0-62-g8d75e11",
+			"Comment": "v0.1-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
@@ -1989,11 +1989,11 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Rev": "4c05eb1145f16d0e6bb4a3e1b6d769f4713cb41f"
+			"Rev": "7c674d9e72017ed25f6d2b5e497a1368086b6a6f"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra/doc",
-			"Rev": "4c05eb1145f16d0e6bb4a3e1b6d769f4713cb41f"
+			"Rev": "7c674d9e72017ed25f6d2b5e497a1368086b6a6f"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
