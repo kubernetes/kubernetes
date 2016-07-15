@@ -58,6 +58,10 @@ import math "math"
 
 import time "time"
 
+import strings "strings"
+import reflect "reflect"
+import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -65,32 +69,26 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-func (m *APIGroup) Reset()         { *m = APIGroup{} }
-func (m *APIGroup) String() string { return proto.CompactTextString(m) }
-func (*APIGroup) ProtoMessage()    {}
+func (m *APIGroup) Reset()      { *m = APIGroup{} }
+func (*APIGroup) ProtoMessage() {}
 
-func (m *APIGroupList) Reset()         { *m = APIGroupList{} }
-func (m *APIGroupList) String() string { return proto.CompactTextString(m) }
-func (*APIGroupList) ProtoMessage()    {}
+func (m *APIGroupList) Reset()      { *m = APIGroupList{} }
+func (*APIGroupList) ProtoMessage() {}
 
-func (m *APIResource) Reset()         { *m = APIResource{} }
-func (m *APIResource) String() string { return proto.CompactTextString(m) }
-func (*APIResource) ProtoMessage()    {}
+func (m *APIResource) Reset()      { *m = APIResource{} }
+func (*APIResource) ProtoMessage() {}
 
-func (m *APIResourceList) Reset()         { *m = APIResourceList{} }
-func (m *APIResourceList) String() string { return proto.CompactTextString(m) }
-func (*APIResourceList) ProtoMessage()    {}
+func (m *APIResourceList) Reset()      { *m = APIResourceList{} }
+func (*APIResourceList) ProtoMessage() {}
 
 func (m *APIVersions) Reset()      { *m = APIVersions{} }
 func (*APIVersions) ProtoMessage() {}
 
-func (m *Duration) Reset()         { *m = Duration{} }
-func (m *Duration) String() string { return proto.CompactTextString(m) }
-func (*Duration) ProtoMessage()    {}
+func (m *Duration) Reset()      { *m = Duration{} }
+func (*Duration) ProtoMessage() {}
 
-func (m *ExportOptions) Reset()         { *m = ExportOptions{} }
-func (m *ExportOptions) String() string { return proto.CompactTextString(m) }
-func (*ExportOptions) ProtoMessage()    {}
+func (m *ExportOptions) Reset()      { *m = ExportOptions{} }
+func (*ExportOptions) ProtoMessage() {}
 
 func (m *GroupKind) Reset()      { *m = GroupKind{} }
 func (*GroupKind) ProtoMessage() {}
@@ -101,9 +99,8 @@ func (*GroupResource) ProtoMessage() {}
 func (m *GroupVersion) Reset()      { *m = GroupVersion{} }
 func (*GroupVersion) ProtoMessage() {}
 
-func (m *GroupVersionForDiscovery) Reset()         { *m = GroupVersionForDiscovery{} }
-func (m *GroupVersionForDiscovery) String() string { return proto.CompactTextString(m) }
-func (*GroupVersionForDiscovery) ProtoMessage()    {}
+func (m *GroupVersionForDiscovery) Reset()      { *m = GroupVersionForDiscovery{} }
+func (*GroupVersionForDiscovery) ProtoMessage() {}
 
 func (m *GroupVersionKind) Reset()      { *m = GroupVersionKind{} }
 func (*GroupVersionKind) ProtoMessage() {}
@@ -111,49 +108,38 @@ func (*GroupVersionKind) ProtoMessage() {}
 func (m *GroupVersionResource) Reset()      { *m = GroupVersionResource{} }
 func (*GroupVersionResource) ProtoMessage() {}
 
-func (m *LabelSelector) Reset()         { *m = LabelSelector{} }
-func (m *LabelSelector) String() string { return proto.CompactTextString(m) }
-func (*LabelSelector) ProtoMessage()    {}
+func (m *LabelSelector) Reset()      { *m = LabelSelector{} }
+func (*LabelSelector) ProtoMessage() {}
 
-func (m *LabelSelectorRequirement) Reset()         { *m = LabelSelectorRequirement{} }
-func (m *LabelSelectorRequirement) String() string { return proto.CompactTextString(m) }
-func (*LabelSelectorRequirement) ProtoMessage()    {}
+func (m *LabelSelectorRequirement) Reset()      { *m = LabelSelectorRequirement{} }
+func (*LabelSelectorRequirement) ProtoMessage() {}
 
-func (m *ListMeta) Reset()         { *m = ListMeta{} }
-func (m *ListMeta) String() string { return proto.CompactTextString(m) }
-func (*ListMeta) ProtoMessage()    {}
+func (m *ListMeta) Reset()      { *m = ListMeta{} }
+func (*ListMeta) ProtoMessage() {}
 
-func (m *RootPaths) Reset()         { *m = RootPaths{} }
-func (m *RootPaths) String() string { return proto.CompactTextString(m) }
-func (*RootPaths) ProtoMessage()    {}
+func (m *RootPaths) Reset()      { *m = RootPaths{} }
+func (*RootPaths) ProtoMessage() {}
 
-func (m *ServerAddressByClientCIDR) Reset()         { *m = ServerAddressByClientCIDR{} }
-func (m *ServerAddressByClientCIDR) String() string { return proto.CompactTextString(m) }
-func (*ServerAddressByClientCIDR) ProtoMessage()    {}
+func (m *ServerAddressByClientCIDR) Reset()      { *m = ServerAddressByClientCIDR{} }
+func (*ServerAddressByClientCIDR) ProtoMessage() {}
 
-func (m *Status) Reset()         { *m = Status{} }
-func (m *Status) String() string { return proto.CompactTextString(m) }
-func (*Status) ProtoMessage()    {}
+func (m *Status) Reset()      { *m = Status{} }
+func (*Status) ProtoMessage() {}
 
-func (m *StatusCause) Reset()         { *m = StatusCause{} }
-func (m *StatusCause) String() string { return proto.CompactTextString(m) }
-func (*StatusCause) ProtoMessage()    {}
+func (m *StatusCause) Reset()      { *m = StatusCause{} }
+func (*StatusCause) ProtoMessage() {}
 
-func (m *StatusDetails) Reset()         { *m = StatusDetails{} }
-func (m *StatusDetails) String() string { return proto.CompactTextString(m) }
-func (*StatusDetails) ProtoMessage()    {}
+func (m *StatusDetails) Reset()      { *m = StatusDetails{} }
+func (*StatusDetails) ProtoMessage() {}
 
-func (m *Time) Reset()         { *m = Time{} }
-func (m *Time) String() string { return proto.CompactTextString(m) }
-func (*Time) ProtoMessage()    {}
+func (m *Time) Reset()      { *m = Time{} }
+func (*Time) ProtoMessage() {}
 
-func (m *Timestamp) Reset()         { *m = Timestamp{} }
-func (m *Timestamp) String() string { return proto.CompactTextString(m) }
-func (*Timestamp) ProtoMessage()    {}
+func (m *Timestamp) Reset()      { *m = Timestamp{} }
+func (*Timestamp) ProtoMessage() {}
 
-func (m *TypeMeta) Reset()         { *m = TypeMeta{} }
-func (m *TypeMeta) String() string { return proto.CompactTextString(m) }
-func (*TypeMeta) ProtoMessage()    {}
+func (m *TypeMeta) Reset()      { *m = TypeMeta{} }
+func (*TypeMeta) ProtoMessage() {}
 
 func init() {
 	proto.RegisterType((*APIGroup)(nil), "k8s.io.kubernetes.pkg.api.unversioned.APIGroup")
@@ -1277,6 +1263,220 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *APIGroup) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&APIGroup{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Versions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Versions), "GroupVersionForDiscovery", "GroupVersionForDiscovery", 1), `&`, ``, 1) + `,`,
+		`PreferredVersion:` + strings.Replace(strings.Replace(this.PreferredVersion.String(), "GroupVersionForDiscovery", "GroupVersionForDiscovery", 1), `&`, ``, 1) + `,`,
+		`ServerAddressByClientCIDRs:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ServerAddressByClientCIDRs), "ServerAddressByClientCIDR", "ServerAddressByClientCIDR", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *APIGroupList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&APIGroupList{`,
+		`Groups:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Groups), "APIGroup", "APIGroup", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *APIResource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&APIResource{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Namespaced:` + fmt.Sprintf("%v", this.Namespaced) + `,`,
+		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *APIResourceList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&APIResourceList{`,
+		`GroupVersion:` + fmt.Sprintf("%v", this.GroupVersion) + `,`,
+		`APIResources:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.APIResources), "APIResource", "APIResource", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Duration) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Duration{`,
+		`Duration:` + fmt.Sprintf("%v", this.Duration) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExportOptions) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExportOptions{`,
+		`Export:` + fmt.Sprintf("%v", this.Export) + `,`,
+		`Exact:` + fmt.Sprintf("%v", this.Exact) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *GroupVersionForDiscovery) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GroupVersionForDiscovery{`,
+		`GroupVersion:` + fmt.Sprintf("%v", this.GroupVersion) + `,`,
+		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *LabelSelector) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForMatchLabels := make([]string, 0, len(this.MatchLabels))
+	for k := range this.MatchLabels {
+		keysForMatchLabels = append(keysForMatchLabels, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForMatchLabels)
+	mapStringForMatchLabels := "map[string]string{"
+	for _, k := range keysForMatchLabels {
+		mapStringForMatchLabels += fmt.Sprintf("%v: %v,", k, this.MatchLabels[k])
+	}
+	mapStringForMatchLabels += "}"
+	s := strings.Join([]string{`&LabelSelector{`,
+		`MatchLabels:` + mapStringForMatchLabels + `,`,
+		`MatchExpressions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.MatchExpressions), "LabelSelectorRequirement", "LabelSelectorRequirement", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *LabelSelectorRequirement) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&LabelSelectorRequirement{`,
+		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
+		`Operator:` + fmt.Sprintf("%v", this.Operator) + `,`,
+		`Values:` + fmt.Sprintf("%v", this.Values) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ListMeta) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ListMeta{`,
+		`SelfLink:` + fmt.Sprintf("%v", this.SelfLink) + `,`,
+		`ResourceVersion:` + fmt.Sprintf("%v", this.ResourceVersion) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RootPaths) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RootPaths{`,
+		`Paths:` + fmt.Sprintf("%v", this.Paths) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ServerAddressByClientCIDR) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ServerAddressByClientCIDR{`,
+		`ClientCIDR:` + fmt.Sprintf("%v", this.ClientCIDR) + `,`,
+		`ServerAddress:` + fmt.Sprintf("%v", this.ServerAddress) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Status) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Status{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "ListMeta", 1), `&`, ``, 1) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
+		`Details:` + strings.Replace(fmt.Sprintf("%v", this.Details), "StatusDetails", "StatusDetails", 1) + `,`,
+		`Code:` + fmt.Sprintf("%v", this.Code) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StatusCause) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusCause{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`Field:` + fmt.Sprintf("%v", this.Field) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *StatusDetails) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&StatusDetails{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Group:` + fmt.Sprintf("%v", this.Group) + `,`,
+		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
+		`Causes:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Causes), "StatusCause", "StatusCause", 1), `&`, ``, 1) + `,`,
+		`RetryAfterSeconds:` + fmt.Sprintf("%v", this.RetryAfterSeconds) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Timestamp) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Timestamp{`,
+		`Seconds:` + fmt.Sprintf("%v", this.Seconds) + `,`,
+		`Nanos:` + fmt.Sprintf("%v", this.Nanos) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TypeMeta) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TypeMeta{`,
+		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
+		`APIVersion:` + fmt.Sprintf("%v", this.APIVersion) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringGenerated(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *APIGroup) Unmarshal(data []byte) error {
 	l := len(data)

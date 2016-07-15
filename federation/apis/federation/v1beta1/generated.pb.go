@@ -40,6 +40,9 @@ import math "math"
 
 import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 
+import strings "strings"
+import reflect "reflect"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -47,29 +50,23 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-func (m *Cluster) Reset()         { *m = Cluster{} }
-func (m *Cluster) String() string { return proto.CompactTextString(m) }
-func (*Cluster) ProtoMessage()    {}
+func (m *Cluster) Reset()      { *m = Cluster{} }
+func (*Cluster) ProtoMessage() {}
 
-func (m *ClusterCondition) Reset()         { *m = ClusterCondition{} }
-func (m *ClusterCondition) String() string { return proto.CompactTextString(m) }
-func (*ClusterCondition) ProtoMessage()    {}
+func (m *ClusterCondition) Reset()      { *m = ClusterCondition{} }
+func (*ClusterCondition) ProtoMessage() {}
 
-func (m *ClusterList) Reset()         { *m = ClusterList{} }
-func (m *ClusterList) String() string { return proto.CompactTextString(m) }
-func (*ClusterList) ProtoMessage()    {}
+func (m *ClusterList) Reset()      { *m = ClusterList{} }
+func (*ClusterList) ProtoMessage() {}
 
-func (m *ClusterSpec) Reset()         { *m = ClusterSpec{} }
-func (m *ClusterSpec) String() string { return proto.CompactTextString(m) }
-func (*ClusterSpec) ProtoMessage()    {}
+func (m *ClusterSpec) Reset()      { *m = ClusterSpec{} }
+func (*ClusterSpec) ProtoMessage() {}
 
-func (m *ClusterStatus) Reset()         { *m = ClusterStatus{} }
-func (m *ClusterStatus) String() string { return proto.CompactTextString(m) }
-func (*ClusterStatus) ProtoMessage()    {}
+func (m *ClusterStatus) Reset()      { *m = ClusterStatus{} }
+func (*ClusterStatus) ProtoMessage() {}
 
-func (m *ServerAddressByClientCIDR) Reset()         { *m = ServerAddressByClientCIDR{} }
-func (m *ServerAddressByClientCIDR) String() string { return proto.CompactTextString(m) }
-func (*ServerAddressByClientCIDR) ProtoMessage()    {}
+func (m *ServerAddressByClientCIDR) Reset()      { *m = ServerAddressByClientCIDR{} }
+func (*ServerAddressByClientCIDR) ProtoMessage() {}
 
 func init() {
 	proto.RegisterType((*Cluster)(nil), "k8s.io.kubernetes.federation.apis.federation.v1beta1.Cluster")
@@ -453,6 +450,86 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *Cluster) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Cluster{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ClusterSpec", "ClusterSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ClusterStatus", "ClusterStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ClusterCondition) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterCondition{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ClusterList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Cluster", "Cluster", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ClusterSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterSpec{`,
+		`ServerAddressByClientCIDRs:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ServerAddressByClientCIDRs), "ServerAddressByClientCIDR", "ServerAddressByClientCIDR", 1), `&`, ``, 1) + `,`,
+		`SecretRef:` + strings.Replace(fmt.Sprintf("%v", this.SecretRef), "LocalObjectReference", "k8s_io_kubernetes_pkg_api_v1.LocalObjectReference", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ClusterStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterStatus{`,
+		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "ClusterCondition", "ClusterCondition", 1), `&`, ``, 1) + `,`,
+		`Zones:` + fmt.Sprintf("%v", this.Zones) + `,`,
+		`Region:` + fmt.Sprintf("%v", this.Region) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ServerAddressByClientCIDR) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ServerAddressByClientCIDR{`,
+		`ClientCIDR:` + fmt.Sprintf("%v", this.ClientCIDR) + `,`,
+		`ServerAddress:` + fmt.Sprintf("%v", this.ServerAddress) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringGenerated(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *Cluster) Unmarshal(data []byte) error {
 	l := len(data)
