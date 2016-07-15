@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -70,7 +71,7 @@ func observePodCreation(w watch.Interface) {
 			framework.Failf("Failed to observe pod creation: %v", event)
 		}
 	case <-time.After(framework.PodStartTimeout):
-		framework.Failf("Timeout while waiting for pod creation")
+		Fail("Timeout while waiting for pod creation")
 	}
 }
 
@@ -90,7 +91,7 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 		}
 	}
 	if !deleted {
-		framework.Failf("Failed to observe pod deletion")
+		Fail("Failed to observe pod deletion")
 	}
 	return
 }
@@ -163,7 +164,7 @@ var _ = framework.KubeDescribe("Generated release_1_2 clientset", func() {
 		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to list pods to verify deletion: %v", err)
+			Fail(fmt.Sprintf("Failed to list pods to verify deletion: %v", err))
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 	})
@@ -237,7 +238,7 @@ var _ = framework.KubeDescribe("Generated release_1_3 clientset", func() {
 		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to list pods to verify deletion: %v", err)
+			Fail(fmt.Sprintf("Failed to list pods to verify deletion: %v", err))
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 	})

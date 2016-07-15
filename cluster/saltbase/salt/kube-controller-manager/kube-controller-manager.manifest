@@ -27,11 +27,6 @@
   {% set terminated_pod_gc = "--terminated-pod-gc-threshold=" + pillar['terminated_pod_gc_threshold'] -%}
 {% endif -%}
 
-{% set enable_garbage_collector = "" -%}
-{% if pillar['enable_garbage_collector'] is defined -%}
-{% set enable_garbage_collector = "--enable-garbage-collector=" + pillar['enable_garbage_collector'] -%}
-{% endif -%}
-
 {% set cloud_provider = "" -%}
 {% set cloud_config = "" -%}
 {% set cloud_config_mount = "" -%}
@@ -73,7 +68,7 @@
   {% set log_level = pillar['controller_manager_test_log_level'] -%}
 {% endif -%}
 
-{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
