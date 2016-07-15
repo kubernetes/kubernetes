@@ -585,7 +585,6 @@ function start-kube-apiserver {
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
-  params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
@@ -664,7 +663,6 @@ function start-kube-controller-manager {
   params+=" --master=127.0.0.1:8080"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
-  params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   if [[ -n "${INSTANCE_PREFIX:-}" ]]; then
     params+=" --cluster-name=${INSTANCE_PREFIX}"
   fi
