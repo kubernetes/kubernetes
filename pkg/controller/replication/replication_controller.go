@@ -104,7 +104,12 @@ type ReplicationManager struct {
 	lookupCache *controller.MatchingCache
 
 	// Controllers that need to be synced
+	// workqueue for CRUD events, those events are usually triggered by user operation, they should be processed
+	// as soon as possible. So we use a dedicate workqueue for CRUD events to avoid a large number of Sync events
+	// saturate workqueue.
 	queue *workqueue.Type
+	// workqueue for Sync events.
+	queueForSyncEvent *workqueue.Type
 }
 
 // NewReplicationManager creates a replication manager
@@ -182,7 +187,20 @@ func newReplicationManagerInternal(eventRecorder record.EventRecorder, podInform
 				if oldRC.Status.Replicas != curRC.Status.Replicas {
 					glog.V(4).Infof("Observed updated replica count for rc: %v, %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
 				}
-				rm.enqueueController(cur)
+				if reflect.DeepEqual(old, cur) {
+					key, err := controller.KeyFunc(cur)
+					if err != nil {
+						glog.Errorf("Couldn't get key for object %+v: %v", cur, err)
+						return
+					}
+					// if the rc was already in the workqueue for CRUD events, do not add it into workqueue for Sync events
+					if rm.queue.Has(key) {
+						return
+					}
+					rm.queueForSyncEvent.Add(key)
+				} else {
+					rm.enqueueController(cur)
+				}
 			},
 			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
 			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
@@ -242,6 +260,9 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	go rm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
 		go wait.Until(rm.worker, time.Second, stopCh)
+	}
+	for i := 0; i < workers; i++ {
+		go wait.Until(rm.workerForSyncEvents, time.Second, stopCh)
 	}
 
 	if rm.internalPodInformer != nil {
@@ -442,6 +463,27 @@ func (rm *ReplicationManager) worker() {
 			return true
 		}
 		defer rm.queue.Done(key)
+		err := rm.syncHandler(key.(string))
+		if err != nil {
+			glog.Errorf("Error syncing replication controller: %v", err)
+		}
+		return false
+	}
+	for {
+		if quit := workFunc(); quit {
+			glog.Infof("replication controller worker shutting down")
+			return
+		}
+	}
+}
+
+func (rm *ReplicationManager) workerForSyncEvents() {
+	workFunc := func() bool {
+		key, quit := rm.queueForSyncEvent.Get()
+		if quit {
+			return true
+		}
+		defer rm.queueForSyncEvent.Done(key)
 		err := rm.syncHandler(key.(string))
 		if err != nil {
 			glog.Errorf("Error syncing replication controller: %v", err)
