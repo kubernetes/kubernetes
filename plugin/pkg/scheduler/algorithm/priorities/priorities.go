@@ -295,64 +295,67 @@ func NewNodePreferAvoidPodsPriority(controllerLister algorithm.ControllerLister,
 }
 
 func (npa *NodePreferAvoidPod) CalculateNodePreferAvoidPodsPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	var score int
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return nil, err
 	}
 
-	result := []schedulerapi.HostPriority{}
-
 	// TODO: Once we have ownerReference fully implemented, use it to find controller for the pod.
 	rcs, err := npa.controllerLister.GetPodControllers(pod)
 	rss, err := npa.replicaSetLister.GetPodReplicaSets(pod)
 	if len(rcs) == 0 && len(rss) == 0 {
+		result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 		for _, node := range nodes {
 			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 10})
 		}
 		return result, nil
 	}
 
-	avoidNodes := map[string]bool{}
+	avoidNodes := make(map[string]bool, len(nodes))
+	avoidNode := false
 	for _, node := range nodes {
-		avoidNodes[node.Name] = false
-
 		avoids, err := api.GetAvoidPodsFromNodeAnnotations(node.Annotations)
 		if err != nil {
 			continue
 		}
 
-		for _, avoid := range avoids.PreferAvoidPods {
+		avoidNode = false
+		for i := range avoids.PreferAvoidPods {
+			avoid := &avoids.PreferAvoidPods[i]
+			// TODO: Once we have controllerRef implemented there will be at most one owner
+			// of our pod. That said we won't even need loop theoretically. That said for
+			// code simplicity, we can get rid of all breaks.
+			// Also, we can simply compare fields from ownerRef with avoid.
 			for _, rc := range rcs {
 				if avoid.PodSignature.PodController.Kind == "ReplicationController" && avoid.PodSignature.PodController.UID == rc.UID {
-					avoidNodes[node.Name] = true
-					break
+					avoidNode = true
 				}
-			}
-			if avoidNodes[node.Name] {
-				break
 			}
 			for _, rs := range rss {
 				if avoid.PodSignature.PodController.Kind == "ReplicaSet" && avoid.PodSignature.PodController.UID == rs.UID {
-					avoidNodes[node.Name] = true
-					break
+					avoidNode = true
 				}
 			}
-			if avoidNodes[node.Name] {
+			if avoidNode {
+				// false is default value, so we don't even need to set it
+				// to avoid unnecessary map operations.
+				avoidNodes[node.Name] = true
 				break
 			}
 		}
 	}
 
+	var score int
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
-	for nodeName, shouldAvoid := range avoidNodes {
-		if shouldAvoid {
+	for _, node := range nodes {
+		if avoidNodes[node.Name] {
 			score = 0
 		} else {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{Host: nodeName, Score: score})
+		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
 	}
 	return result, nil
 }
