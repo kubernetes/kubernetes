@@ -78,9 +78,12 @@ func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*sch
 		}
 
 		count := countIntolerableTaintsPreferNoSchedule(taints, tolerationList)
-		counts[node.Name] = count
-		if count > maxCount {
-			maxCount = count
+		if count > 0 {
+			// 0 is default value, so avoid unnecessary map operations.
+			counts[node.Name] = count
+			if count > maxCount {
+				maxCount = count
+			}
 		}
 	}
 
