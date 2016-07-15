@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,21 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for coreos os distro
+# A library of helper functions and constant for GCI distro
 
-# TODO(dawnchen): Check $CONTAINER_RUNTIME to decide which
-# cloud_config yaml file should be passed
-# $1: template name (required)
-function create-node-instance-template() {
-  local template_name="$1"
-  create-node-template "$template_name" "${scope_flags}" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node-${CONTAINER_RUNTIME}.yaml" \
-    "configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh" \
-    "configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh" \
-    "cluster-name=${KUBE_TEMP}/cluster-name.txt"
-}
-
+source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
@@ -38,21 +26,17 @@ function create-node-instance-template() {
 # It requires a whole slew of assumed variables, partially due to to
 # the call to write-master-env. Listing them would be rather
 # futile. Instead, we list the required calls to ensure any additional
+#
 # variables are set:
 #   ensure-temp-dir
 #   detect-project
 #   get-bearer-token
-#
-function create-master-instance() {
+function create-master-instance {
   local address_opt=""
   [[ -n ${1:-} ]] && address_opt="--address ${1}"
 
-  local preemptible_master=""
-  if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
-    preemptible_master="--preemptible --maintenance-policy TERMINATE"
-  fi
-
   write-master-env
+  ensure-gci-metadata-files
   gcloud compute instances create "${MASTER_NAME}" \
     ${address_opt} \
     --project "${PROJECT}" \
@@ -65,8 +49,7 @@ function create-master-instance() {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/coreos/master-${CONTAINER_RUNTIME}.yaml,configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh,configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
-      ${preemptible_master}
+    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}"
 }

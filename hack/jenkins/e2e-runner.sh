@@ -215,7 +215,7 @@ if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
   GCI_STAGING_PROJECT=container-vm-image-staging
   export KUBE_GCE_MASTER_PROJECT="${GCI_STAGING_PROJECT}"
   export KUBE_GCE_MASTER_IMAGE="$(get_latest_gci_image "${GCI_STAGING_PROJECT}" "${JENKINS_GCI_IMAGE_FAMILY}")"
-  export KUBE_OS_DISTRIBUTION="gci"
+  export KUBE_MASTER_OS_DISTRIBUTION="gci"
   if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
     # The family "gci-canary-test" is reserved for a special type of GCI images
     # that are used to continuously validate Docker releases.
