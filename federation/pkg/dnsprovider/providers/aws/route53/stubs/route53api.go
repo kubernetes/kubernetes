@@ -76,17 +76,18 @@ func (r *Route53APIStub) ChangeResourceRecordSets(input *route53.ChangeResourceR
 	}
 
 	for _, change := range input.ChangeBatch.Changes {
+		key := *change.ResourceRecordSet.Name + "::" + *change.ResourceRecordSet.Type
 		switch *change.Action {
 		case route53.ChangeActionCreate:
-			if _, found := recordSets[*change.ResourceRecordSet.Name]; found {
-				return nil, fmt.Errorf("Attempt to create duplicate rrset %s", *change.ResourceRecordSet.Name) // TODO: Return AWS errors with codes etc
+			if _, found := recordSets[key]; found {
+				return nil, fmt.Errorf("Attempt to create duplicate rrset %s", key) // TODO: Return AWS errors with codes etc
 			}
-			recordSets[*change.ResourceRecordSet.Name] = append(recordSets[*change.ResourceRecordSet.Name], change.ResourceRecordSet)
+			recordSets[key] = append(recordSets[key], change.ResourceRecordSet)
 		case route53.ChangeActionDelete:
-			if _, found := recordSets[*change.ResourceRecordSet.Name]; !found {
-				return nil, fmt.Errorf("Attempt to delete non-existant rrset %s", *change.ResourceRecordSet.Name) // TODO: Check other fields too
+			if _, found := recordSets[key]; !found {
+				return nil, fmt.Errorf("Attempt to delete non-existant rrset %s", key) // TODO: Check other fields too
 			}
-			delete(recordSets, *change.ResourceRecordSet.Name)
+			delete(recordSets, key)
 		case route53.ChangeActionUpsert:
 			// TODO - not used yet
 		}

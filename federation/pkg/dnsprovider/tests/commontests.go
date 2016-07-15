@@ -89,7 +89,7 @@ func CommonTestResourceRecordSetsDifferentTypes(t *testing.T, zone dnsprovider.Z
 	// Add the resource with the same name but different type
 	err := sets.StartChangeset().Add(cnameRrset).Apply()
 	if err != nil {
-		t.Errorf("Failed to add resource record set %v: %v", rrset, cnameRrset, err)
+		t.Errorf("Failed to add resource record set %v: %v", cnameRrset, err)
 	}
 	defer sets.StartChangeset().Remove(cnameRrset).Apply()
 
