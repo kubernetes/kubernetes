@@ -17,7 +17,11 @@ limitations under the License.
 package cm
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
@@ -43,4 +47,37 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 		Mounts:      allCgroups,
 		MountPoints: mountPoints,
 	}, nil
+}
+
+// readProcsFile takes a cgroup directory name as an argument
+// reads through the cgroup's procs file and returns a list of tgid's.
+// It returns an empty list if a procs file doesn't exists
+func readProcsFile(dir string) ([]int, error) {
+	procsFile := filepath.Join(dir, "cgroup.procs")
+	_, err := os.Stat(procsFile)
+	if os.IsNotExist(err) {
+		// The procsFile does not exist, So no pids attached to this directory
+		return []int{}, nil
+	}
+	f, err := os.Open(procsFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var (
+		s   = bufio.NewScanner(f)
+		out = []int{}
+	)
+
+	for s.Scan() {
+		if t := s.Text(); t != "" {
+			pid, err := strconv.Atoi(t)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, pid)
+		}
+	}
+	return out, nil
 }

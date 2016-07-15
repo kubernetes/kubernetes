@@ -435,18 +435,18 @@ func getContainerNameForProcess(name, pidFile string) (string, error) {
 	return cont, nil
 }
 
-func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
-	cm.RLock()
-	defer cm.RUnlock()
-	return cm.NodeConfig
-}
-
 func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
 	return cm.subsystems
 }
 
 func (cm *containerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 	return cm.qosContainers
+}
+
+func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
+	cm.RLock()
+	defer cm.RUnlock()
+	return cm.NodeConfig
 }
 
 func (cm *containerManagerImpl) Status() Status {
