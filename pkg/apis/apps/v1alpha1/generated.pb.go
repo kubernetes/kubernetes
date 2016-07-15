@@ -39,6 +39,9 @@ import math "math"
 import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 
+import strings "strings"
+import reflect "reflect"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -46,21 +49,17 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-func (m *PetSet) Reset()         { *m = PetSet{} }
-func (m *PetSet) String() string { return proto.CompactTextString(m) }
-func (*PetSet) ProtoMessage()    {}
+func (m *PetSet) Reset()      { *m = PetSet{} }
+func (*PetSet) ProtoMessage() {}
 
-func (m *PetSetList) Reset()         { *m = PetSetList{} }
-func (m *PetSetList) String() string { return proto.CompactTextString(m) }
-func (*PetSetList) ProtoMessage()    {}
+func (m *PetSetList) Reset()      { *m = PetSetList{} }
+func (*PetSetList) ProtoMessage() {}
 
-func (m *PetSetSpec) Reset()         { *m = PetSetSpec{} }
-func (m *PetSetSpec) String() string { return proto.CompactTextString(m) }
-func (*PetSetSpec) ProtoMessage()    {}
+func (m *PetSetSpec) Reset()      { *m = PetSetSpec{} }
+func (*PetSetSpec) ProtoMessage() {}
 
-func (m *PetSetStatus) Reset()         { *m = PetSetStatus{} }
-func (m *PetSetStatus) String() string { return proto.CompactTextString(m) }
-func (*PetSetStatus) ProtoMessage()    {}
+func (m *PetSetStatus) Reset()      { *m = PetSetStatus{} }
+func (*PetSetStatus) ProtoMessage() {}
 
 func init() {
 	proto.RegisterType((*PetSet)(nil), "k8s.io.kubernetes.pkg.apis.apps.v1alpha1.PetSet")
@@ -329,6 +328,62 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *PetSet) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PetSet{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "PetSetSpec", "PetSetSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "PetSetStatus", "PetSetStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PetSetList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PetSetList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PetSet", "PetSet", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PetSetSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PetSetSpec{`,
+		`Replicas:` + valueToStringGenerated(this.Replicas) + `,`,
+		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned.LabelSelector", 1) + `,`,
+		`Template:` + strings.Replace(strings.Replace(this.Template.String(), "PodTemplateSpec", "k8s_io_kubernetes_pkg_api_v1.PodTemplateSpec", 1), `&`, ``, 1) + `,`,
+		`VolumeClaimTemplates:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.VolumeClaimTemplates), "PersistentVolumeClaim", "k8s_io_kubernetes_pkg_api_v1.PersistentVolumeClaim", 1), `&`, ``, 1) + `,`,
+		`ServiceName:` + fmt.Sprintf("%v", this.ServiceName) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PetSetStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PetSetStatus{`,
+		`ObservedGeneration:` + valueToStringGenerated(this.ObservedGeneration) + `,`,
+		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringGenerated(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *PetSet) Unmarshal(data []byte) error {
 	l := len(data)

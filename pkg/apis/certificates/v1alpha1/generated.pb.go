@@ -37,6 +37,9 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
+import strings "strings"
+import reflect "reflect"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -44,25 +47,20 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-func (m *CertificateSigningRequest) Reset()         { *m = CertificateSigningRequest{} }
-func (m *CertificateSigningRequest) String() string { return proto.CompactTextString(m) }
-func (*CertificateSigningRequest) ProtoMessage()    {}
+func (m *CertificateSigningRequest) Reset()      { *m = CertificateSigningRequest{} }
+func (*CertificateSigningRequest) ProtoMessage() {}
 
-func (m *CertificateSigningRequestCondition) Reset()         { *m = CertificateSigningRequestCondition{} }
-func (m *CertificateSigningRequestCondition) String() string { return proto.CompactTextString(m) }
-func (*CertificateSigningRequestCondition) ProtoMessage()    {}
+func (m *CertificateSigningRequestCondition) Reset()      { *m = CertificateSigningRequestCondition{} }
+func (*CertificateSigningRequestCondition) ProtoMessage() {}
 
-func (m *CertificateSigningRequestList) Reset()         { *m = CertificateSigningRequestList{} }
-func (m *CertificateSigningRequestList) String() string { return proto.CompactTextString(m) }
-func (*CertificateSigningRequestList) ProtoMessage()    {}
+func (m *CertificateSigningRequestList) Reset()      { *m = CertificateSigningRequestList{} }
+func (*CertificateSigningRequestList) ProtoMessage() {}
 
-func (m *CertificateSigningRequestSpec) Reset()         { *m = CertificateSigningRequestSpec{} }
-func (m *CertificateSigningRequestSpec) String() string { return proto.CompactTextString(m) }
-func (*CertificateSigningRequestSpec) ProtoMessage()    {}
+func (m *CertificateSigningRequestSpec) Reset()      { *m = CertificateSigningRequestSpec{} }
+func (*CertificateSigningRequestSpec) ProtoMessage() {}
 
-func (m *CertificateSigningRequestStatus) Reset()         { *m = CertificateSigningRequestStatus{} }
-func (m *CertificateSigningRequestStatus) String() string { return proto.CompactTextString(m) }
-func (*CertificateSigningRequestStatus) ProtoMessage()    {}
+func (m *CertificateSigningRequestStatus) Reset()      { *m = CertificateSigningRequestStatus{} }
+func (*CertificateSigningRequestStatus) ProtoMessage() {}
 
 func init() {
 	proto.RegisterType((*CertificateSigningRequest)(nil), "k8s.io.kubernetes.pkg.apis.certificates.v1alpha1.CertificateSigningRequest")
@@ -387,6 +385,74 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *CertificateSigningRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CertificateSigningRequest{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "CertificateSigningRequestSpec", "CertificateSigningRequestSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "CertificateSigningRequestStatus", "CertificateSigningRequestStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CertificateSigningRequestCondition) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CertificateSigningRequestCondition{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`LastUpdateTime:` + strings.Replace(strings.Replace(this.LastUpdateTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CertificateSigningRequestList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CertificateSigningRequestList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "CertificateSigningRequest", "CertificateSigningRequest", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CertificateSigningRequestSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CertificateSigningRequestSpec{`,
+		`Request:` + valueToStringGenerated(this.Request) + `,`,
+		`Username:` + fmt.Sprintf("%v", this.Username) + `,`,
+		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
+		`Groups:` + fmt.Sprintf("%v", this.Groups) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CertificateSigningRequestStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CertificateSigningRequestStatus{`,
+		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "CertificateSigningRequestCondition", "CertificateSigningRequestCondition", 1), `&`, ``, 1) + `,`,
+		`Certificate:` + valueToStringGenerated(this.Certificate) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringGenerated(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *CertificateSigningRequest) Unmarshal(data []byte) error {
 	l := len(data)

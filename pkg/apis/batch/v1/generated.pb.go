@@ -42,6 +42,10 @@ import math "math"
 import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 
+import strings "strings"
+import reflect "reflect"
+import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -49,33 +53,26 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-func (m *Job) Reset()         { *m = Job{} }
-func (m *Job) String() string { return proto.CompactTextString(m) }
-func (*Job) ProtoMessage()    {}
+func (m *Job) Reset()      { *m = Job{} }
+func (*Job) ProtoMessage() {}
 
-func (m *JobCondition) Reset()         { *m = JobCondition{} }
-func (m *JobCondition) String() string { return proto.CompactTextString(m) }
-func (*JobCondition) ProtoMessage()    {}
+func (m *JobCondition) Reset()      { *m = JobCondition{} }
+func (*JobCondition) ProtoMessage() {}
 
-func (m *JobList) Reset()         { *m = JobList{} }
-func (m *JobList) String() string { return proto.CompactTextString(m) }
-func (*JobList) ProtoMessage()    {}
+func (m *JobList) Reset()      { *m = JobList{} }
+func (*JobList) ProtoMessage() {}
 
-func (m *JobSpec) Reset()         { *m = JobSpec{} }
-func (m *JobSpec) String() string { return proto.CompactTextString(m) }
-func (*JobSpec) ProtoMessage()    {}
+func (m *JobSpec) Reset()      { *m = JobSpec{} }
+func (*JobSpec) ProtoMessage() {}
 
-func (m *JobStatus) Reset()         { *m = JobStatus{} }
-func (m *JobStatus) String() string { return proto.CompactTextString(m) }
-func (*JobStatus) ProtoMessage()    {}
+func (m *JobStatus) Reset()      { *m = JobStatus{} }
+func (*JobStatus) ProtoMessage() {}
 
-func (m *LabelSelector) Reset()         { *m = LabelSelector{} }
-func (m *LabelSelector) String() string { return proto.CompactTextString(m) }
-func (*LabelSelector) ProtoMessage()    {}
+func (m *LabelSelector) Reset()      { *m = LabelSelector{} }
+func (*LabelSelector) ProtoMessage() {}
 
-func (m *LabelSelectorRequirement) Reset()         { *m = LabelSelectorRequirement{} }
-func (m *LabelSelectorRequirement) String() string { return proto.CompactTextString(m) }
-func (*LabelSelectorRequirement) ProtoMessage()    {}
+func (m *LabelSelectorRequirement) Reset()      { *m = LabelSelectorRequirement{} }
+func (*LabelSelectorRequirement) ProtoMessage() {}
 
 func init() {
 	proto.RegisterType((*Job)(nil), "k8s.io.kubernetes.pkg.apis.batch.v1.Job")
@@ -590,6 +587,115 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *Job) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Job{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "JobSpec", "JobSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "JobStatus", "JobStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *JobCondition) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&JobCondition{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *JobList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&JobList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Job", "Job", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *JobSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&JobSpec{`,
+		`Parallelism:` + valueToStringGenerated(this.Parallelism) + `,`,
+		`Completions:` + valueToStringGenerated(this.Completions) + `,`,
+		`ActiveDeadlineSeconds:` + valueToStringGenerated(this.ActiveDeadlineSeconds) + `,`,
+		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "LabelSelector", 1) + `,`,
+		`ManualSelector:` + valueToStringGenerated(this.ManualSelector) + `,`,
+		`Template:` + strings.Replace(strings.Replace(this.Template.String(), "PodTemplateSpec", "k8s_io_kubernetes_pkg_api_v1.PodTemplateSpec", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *JobStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&JobStatus{`,
+		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "JobCondition", "JobCondition", 1), `&`, ``, 1) + `,`,
+		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`CompletionTime:` + strings.Replace(fmt.Sprintf("%v", this.CompletionTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`Active:` + fmt.Sprintf("%v", this.Active) + `,`,
+		`Succeeded:` + fmt.Sprintf("%v", this.Succeeded) + `,`,
+		`Failed:` + fmt.Sprintf("%v", this.Failed) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *LabelSelector) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForMatchLabels := make([]string, 0, len(this.MatchLabels))
+	for k := range this.MatchLabels {
+		keysForMatchLabels = append(keysForMatchLabels, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForMatchLabels)
+	mapStringForMatchLabels := "map[string]string{"
+	for _, k := range keysForMatchLabels {
+		mapStringForMatchLabels += fmt.Sprintf("%v: %v,", k, this.MatchLabels[k])
+	}
+	mapStringForMatchLabels += "}"
+	s := strings.Join([]string{`&LabelSelector{`,
+		`MatchLabels:` + mapStringForMatchLabels + `,`,
+		`MatchExpressions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.MatchExpressions), "LabelSelectorRequirement", "LabelSelectorRequirement", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *LabelSelectorRequirement) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&LabelSelectorRequirement{`,
+		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
+		`Operator:` + fmt.Sprintf("%v", this.Operator) + `,`,
+		`Values:` + fmt.Sprintf("%v", this.Values) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringGenerated(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *Job) Unmarshal(data []byte) error {
 	l := len(data)

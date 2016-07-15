@@ -35,6 +35,9 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
+import strings "strings"
+import reflect "reflect"
+
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -42,17 +45,14 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-func (m *RawExtension) Reset()         { *m = RawExtension{} }
-func (m *RawExtension) String() string { return proto.CompactTextString(m) }
-func (*RawExtension) ProtoMessage()    {}
+func (m *RawExtension) Reset()      { *m = RawExtension{} }
+func (*RawExtension) ProtoMessage() {}
 
-func (m *TypeMeta) Reset()         { *m = TypeMeta{} }
-func (m *TypeMeta) String() string { return proto.CompactTextString(m) }
-func (*TypeMeta) ProtoMessage()    {}
+func (m *TypeMeta) Reset()      { *m = TypeMeta{} }
+func (*TypeMeta) ProtoMessage() {}
 
-func (m *Unknown) Reset()         { *m = Unknown{} }
-func (m *Unknown) String() string { return proto.CompactTextString(m) }
-func (*Unknown) ProtoMessage()    {}
+func (m *Unknown) Reset()      { *m = Unknown{} }
+func (*Unknown) ProtoMessage() {}
 
 func init() {
 	proto.RegisterType((*RawExtension)(nil), "k8s.io.kubernetes.pkg.runtime.RawExtension")
@@ -224,6 +224,48 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *RawExtension) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RawExtension{`,
+		`Raw:` + valueToStringGenerated(this.Raw) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TypeMeta) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TypeMeta{`,
+		`APIVersion:` + fmt.Sprintf("%v", this.APIVersion) + `,`,
+		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Unknown) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Unknown{`,
+		`TypeMeta:` + strings.Replace(strings.Replace(this.TypeMeta.String(), "TypeMeta", "TypeMeta", 1), `&`, ``, 1) + `,`,
+		`Raw:` + valueToStringGenerated(this.Raw) + `,`,
+		`ContentEncoding:` + fmt.Sprintf("%v", this.ContentEncoding) + `,`,
+		`ContentType:` + fmt.Sprintf("%v", this.ContentType) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringGenerated(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *RawExtension) Unmarshal(data []byte) error {
 	l := len(data)
