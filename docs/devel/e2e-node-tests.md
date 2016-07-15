@@ -205,6 +205,14 @@ less useful for catching flakes related creating the instance from an image.**
 make test-e2e-node REMOTE=true RUN_UNTIL_FAILURE=true
 ```
 
+## Additional QoS Cgroups Hierarchy level testing
+
+For testing with the QoS Cgroup Hierarchy enabled, you can pass --cgroups-per-qos flag as an argument into Ginkgo using TEST_ARGS
+
+```sh
+make test_e2e_node TEST_ARGS="--cgroups-per-qos=true"
+```
+
 # Notes on tests run by the Kubernetes project during pre-, post- submit.
 
 The node e2e tests are run by the PR builder for each Pull Request and the results published at
