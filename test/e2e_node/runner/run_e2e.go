@@ -41,6 +41,7 @@ import (
 	"google.golang.org/api/compute/v1"
 )
 
+var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
@@ -254,7 +255,7 @@ func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *
 		}
 	}
 
-	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFileNum, setupNode)
+	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFileNum, setupNode, *testArgs)
 	return &TestResult{
 		output: output,
 		err:    err,

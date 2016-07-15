@@ -46,6 +46,7 @@ type e2eService struct {
 	kubeletStaticPodDir string
 	nodeName            string
 	logFiles            map[string]logFileData
+	cgroupsPerQOS       bool
 }
 
 type logFileData struct {
@@ -58,14 +59,18 @@ const (
 	LOG_VERBOSITY_LEVEL = "4"
 )
 
-func newE2eService(nodeName string) *e2eService {
+func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
 		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
 		"docker.log": {[]string{"/var/log/docker.log", "/var/log/upstart/docker.log"}, []string{"-u", "docker"}},
 	}
 
-	return &e2eService{nodeName: nodeName, logFiles: logFiles}
+	return &e2eService{
+		nodeName:      nodeName,
+		logFiles:      logFiles,
+		cgroupsPerQOS: cgroupsPerQOS,
+	}
 }
 
 func (es *e2eService) start() error {
@@ -236,6 +241,12 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 	)
+	if es.cgroupsPerQOS {
+		cmdArgs = append(cmdArgs,
+			"--cgroups-per-qos", "true",
+			"--cgroup-root", "/",
+		)
+	}
 	if !*disableKubenet {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -245,6 +256,7 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 			"--network-plugin=kubenet",
 			"--network-plugin-dir", filepath.Join(cwd, CNIDirectory, "bin")) // Enable kubenet
 	}
+
 	cmd := exec.Command("sudo", cmdArgs...)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",

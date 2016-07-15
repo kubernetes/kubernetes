@@ -43,6 +43,8 @@ type NodeConfig struct {
 	SystemCgroupsName  string
 	KubeletCgroupsName string
 	ContainerRuntime   string
+	CgroupsPerQOS      bool
+	CgroupRoot         string
 }
 
 type Status struct {

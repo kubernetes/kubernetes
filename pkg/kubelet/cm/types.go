@@ -56,3 +56,10 @@ type CgroupManager interface {
 	// Exists checks if the cgroup already exists
 	Exists(string) bool
 }
+
+// QOSContainersInfo hold the names of containers per qos
+type QOSContainersInfo struct {
+	Guaranteed string
+	BestEffort string
+	Burstable  string
+}

@@ -33,6 +33,7 @@ cleanup=${CLEANUP:-"true"}
 delete_instances=${DELETE_INSTANCES:-"false"}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 list_images=${LIST_IMAGES:-"false"}
+test_args=${TEST_ARGS:-""}
 
 if  [[ $list_images == "true" ]]; then
   gcloud compute images list --project="${image_project}" | grep "e2e-node"
@@ -117,7 +118,7 @@ if [ $remote = true ] ; then
     --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
     --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
-    --delete-instances="$delete_instances"
+    --delete-instances="$delete_instances" --test_args="$test_args"
   exit $?
 
 else
@@ -129,6 +130,7 @@ else
   # Test using the host the script was run on
   # Provided for backwards compatibility
   "${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} \
-    -- --alsologtostderr --v 2 --node-name $(hostname) --disable-kubenet=true --build-services=true --start-services=true --stop-services=true
+    -- --alsologtostderr --v 2 --node-name $(hostname) --disable-kubenet=true --build-services=true \
+    --start-services=true --stop-services=true "$test_args"
   exit $?
 fi

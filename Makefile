@@ -164,6 +164,7 @@ test-e2e: ginkgo generated_files
 # Example:
 #   make test-e2e-node FOCUS=kubelet SKIP=container
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
+#   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
 # Build and run tests.
 .PHONY: test-e2e-node
 test-e2e-node: ginkgo generated_files
