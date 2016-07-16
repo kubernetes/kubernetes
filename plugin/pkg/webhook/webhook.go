@@ -38,7 +38,7 @@ type GenericWebhook struct {
 	initialBackoff time.Duration
 }
 
-// New creates a new GenericWebhook from the provided kubeconfig file.
+// NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
 func NewGenericWebhook(kubeConfigFile string, groupVersions []unversioned.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
 		if !registered.IsEnabledVersion(groupVersion) {
