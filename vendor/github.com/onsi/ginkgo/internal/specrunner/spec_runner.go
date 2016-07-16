@@ -137,20 +137,19 @@ func (runner *SpecRunner) runSpecs() bool {
 		if skipRemainingSpecs {
 			spec.Skip()
 		}
-		runner.reportSpecWillRun(spec.Summary(runner.suiteID))
 
 		if !spec.Skipped() && !spec.Pending() {
-			runner.runningSpec = spec
-			spec.Run(runner.writer)
-			runner.runningSpec = nil
-			if spec.Failed() {
+			if passed := runner.runSpec(spec); !passed {
 				suiteFailed = true
 			}
 		} else if spec.Pending() && runner.config.FailOnPending {
+			runner.reportSpecWillRun(spec.Summary(runner.suiteID))
 			suiteFailed = true
+			runner.reportSpecDidComplete(spec.Summary(runner.suiteID), spec.Failed())
+		} else {
+			runner.reportSpecWillRun(spec.Summary(runner.suiteID))
+			runner.reportSpecDidComplete(spec.Summary(runner.suiteID), spec.Failed())
 		}
-
-		runner.reportSpecDidComplete(spec.Summary(runner.suiteID), spec.Failed())
 
 		if spec.Failed() && runner.config.FailFast {
 			skipRemainingSpecs = true
@@ -158,6 +157,26 @@ func (runner *SpecRunner) runSpecs() bool {
 	}
 
 	return !suiteFailed
+}
+
+func (runner *SpecRunner) runSpec(spec *spec.Spec) (passed bool) {
+	maxAttempts := 1
+	if runner.config.FlakeAttempts > 0 {
+		// uninitialized configs count as 1
+		maxAttempts = runner.config.FlakeAttempts
+	}
+
+	for i := 0; i < maxAttempts; i++ {
+		runner.reportSpecWillRun(spec.Summary(runner.suiteID))
+		runner.runningSpec = spec
+		spec.Run(runner.writer)
+		runner.runningSpec = nil
+		runner.reportSpecDidComplete(spec.Summary(runner.suiteID), spec.Failed())
+		if !spec.Failed() {
+			return true
+		}
+	}
+	return false
 }
 
 func (runner *SpecRunner) CurrentSpecSummary() (*types.SpecSummary, bool) {
@@ -300,6 +319,10 @@ func (runner *SpecRunner) summary(success bool) *types.SuiteSummary {
 		return ex.Passed()
 	})
 
+	numberOfFlakedSpecs := runner.countSpecsSatisfying(func(ex *spec.Spec) bool {
+		return ex.Flaked()
+	})
+
 	numberOfFailedSpecs := runner.countSpecsSatisfying(func(ex *spec.Spec) bool {
 		return ex.Failed()
 	})
@@ -320,5 +343,6 @@ func (runner *SpecRunner) summary(success bool) *types.SuiteSummary {
 		NumberOfSkippedSpecs:               numberOfSkippedSpecs,
 		NumberOfPassedSpecs:                numberOfPassedSpecs,
 		NumberOfFailedSpecs:                numberOfFailedSpecs,
+		NumberOfFlakedSpecs:                numberOfFlakedSpecs,
 	}
 }

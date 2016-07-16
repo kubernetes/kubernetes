@@ -51,7 +51,7 @@ func New(suite testsuite.TestSuite, numCPU int, parallelStream bool, race bool, 
 	if !suite.Precompiled {
 		dir, err := ioutil.TempDir("", "ginkgo")
 		if err != nil {
-			panic(fmt.Sprintf("coulnd't create temporary directory... might be time to rm -rf:\n%s", err.Error()))
+			panic(fmt.Sprintf("couldn't create temporary directory... might be time to rm -rf:\n%s", err.Error()))
 		}
 		runner.compilationTargetPath = filepath.Join(dir, suite.PackageName+".test")
 	}
