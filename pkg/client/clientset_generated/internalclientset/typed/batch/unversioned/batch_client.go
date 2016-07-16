@@ -80,10 +80,8 @@ func setConfigDefaults(config *restclient.Config) error {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
 	copyGroupVersion := g.GroupVersion
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = api.Codecs
 
