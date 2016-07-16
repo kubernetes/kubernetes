@@ -168,6 +168,8 @@ func CurrentGinkgoTestDescription() GinkgoTestDescription {
 //
 //You use the Time() function to time how long the passed in body function takes to run
 //You use the RecordValue() function to track arbitrary numerical measurements.
+//The RecordValueWithPrecision() function can be used alternatively to provide the unit
+//and resolution of the numeric measurement.
 //The optional info argument is passed to the test reporter and can be used to
 // provide the measurement data to a custom reporter with context.
 //
@@ -175,6 +177,7 @@ func CurrentGinkgoTestDescription() GinkgoTestDescription {
 type Benchmarker interface {
 	Time(name string, body func(), info ...interface{}) (elapsedTime time.Duration)
 	RecordValue(name string, value float64, info ...interface{})
+	RecordValueWithPrecision(name string, value float64, units string, precision int, info ...interface{})
 }
 
 //RunSpecs is the entry point for the Ginkgo test runner.
