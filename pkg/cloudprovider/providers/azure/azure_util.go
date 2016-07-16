@@ -25,6 +25,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const (
@@ -202,8 +203,8 @@ outer:
 	return -1, fmt.Errorf("SecurityGroup priorities are exhausted")
 }
 
-func (az *Cloud) getIPForMachine(machineName string) (string, error) {
-	machine, exists, err := az.getVirtualMachine(machineName)
+func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
+	machine, exists, err := az.getVirtualMachine(nodeName)
 	if !exists {
 		return "", cloudprovider.InstanceNotFound
 	}

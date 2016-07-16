@@ -94,7 +94,7 @@ func TestRunOnce(t *testing.T) {
 	}
 	kb.volumeManager, err = volumemanager.NewVolumeManager(
 		true,
-		kb.hostname,
+		kb.nodeName,
 		kb.podManager,
 		kb.kubeClient,
 		kb.volumePluginMgr,
@@ -107,7 +107,7 @@ func TestRunOnce(t *testing.T) {
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
-		Name:      kb.nodeName,
+		Name:      string(kb.nodeName),
 		UID:       types.UID(kb.nodeName),
 		Namespace: "",
 	}

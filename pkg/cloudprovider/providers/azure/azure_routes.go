@@ -24,6 +24,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
@@ -41,13 +42,13 @@ func (az *Cloud) ListRoutes(clusterName string) (routes []*cloudprovider.Route, 
 	if routeTable.Properties.Routes != nil {
 		kubeRoutes = make([]*cloudprovider.Route, len(*routeTable.Properties.Routes))
 		for i, route := range *routeTable.Properties.Routes {
-			instance := getInstanceName(*route.Name)
+			instance := mapRouteNameToNodeName(*route.Name)
 			cidr := *route.Properties.AddressPrefix
 			glog.V(10).Infof("list: * instance=%q, cidr=%q", instance, cidr)
 
 			kubeRoutes[i] = &cloudprovider.Route{
 				Name:            *route.Name,
-				TargetInstance:  instance,
+				TargetNode:      instance,
 				DestinationCIDR: cidr,
 			}
 		}
@@ -61,7 +62,7 @@ func (az *Cloud) ListRoutes(clusterName string) (routes []*cloudprovider.Route, 
 // route.Name will be ignored, although the cloud-provider may use nameHint
 // to create a more user-meaningful name.
 func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *cloudprovider.Route) error {
-	glog.V(2).Infof("create: creating route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetInstance, kubeRoute.DestinationCIDR)
+	glog.V(2).Infof("create: creating route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 
 	routeTable, existsRouteTable, err := az.getRouteTable()
 	if err != nil {
@@ -107,12 +108,12 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		}
 	}
 
-	targetIP, err := az.getIPForMachine(kubeRoute.TargetInstance)
+	targetIP, err := az.getIPForMachine(kubeRoute.TargetNode)
 	if err != nil {
 		return err
 	}
 
-	routeName := getRouteName(kubeRoute.TargetInstance)
+	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
 	route := network.Route{
 		Name: to.StringPtr(routeName),
 		Properties: &network.RoutePropertiesFormat{
@@ -122,40 +123,40 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		},
 	}
 
-	glog.V(3).Infof("create: creating route: instance=%q cidr=%q", kubeRoute.TargetInstance, kubeRoute.DestinationCIDR)
+	glog.V(3).Infof("create: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 	_, err = az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
 	if err != nil {
 		return err
 	}
 
-	glog.V(2).Infof("create: route created. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetInstance, kubeRoute.DestinationCIDR)
+	glog.V(2).Infof("create: route created. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 	return nil
 }
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
 func (az *Cloud) DeleteRoute(clusterName string, kubeRoute *cloudprovider.Route) error {
-	glog.V(2).Infof("delete: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetInstance, kubeRoute.DestinationCIDR)
+	glog.V(2).Infof("delete: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 
-	routeName := getRouteName(kubeRoute.TargetInstance)
+	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
 	_, err := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
 	if err != nil {
 		return err
 	}
 
-	glog.V(2).Infof("delete: route deleted. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetInstance, kubeRoute.DestinationCIDR)
+	glog.V(2).Infof("delete: route deleted. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 	return nil
 }
 
-// This must be kept in sync with getInstanceName.
+// This must be kept in sync with mapRouteNameToNodeName.
 // These two functions enable stashing the instance name in the route
 // and then retrieving it later when listing. This is needed because
 // Azure does not let you put tags/descriptions on the Route itself.
-func getRouteName(instanceName string) string {
-	return fmt.Sprintf("%s", instanceName)
+func mapNodeNameToRouteName(nodeName types.NodeName) string {
+	return fmt.Sprintf("%s", nodeName)
 }
 
-// Used with getRouteName. See comment on getRouteName.
-func getInstanceName(routeName string) string {
-	return fmt.Sprintf("%s", routeName)
+// Used with mapNodeNameToRouteName. See comment on mapNodeNameToRouteName.
+func mapRouteNameToNodeName(routeName string) types.NodeName {
+	return types.NodeName(fmt.Sprintf("%s", routeName))
 }

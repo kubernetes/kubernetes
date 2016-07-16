@@ -43,6 +43,7 @@ import (
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // TODO(jdef): passing the value of envContainerID to all docker containers instantiated
@@ -197,7 +198,7 @@ func (s *KubeletExecutorServer) runKubelet(
 		return err
 	}
 
-	kcfg.NodeName = kcfg.HostnameOverride
+	kcfg.NodeName = types.NodeName(kcfg.HostnameOverride)
 	kcfg.PodConfig = kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kcfg.Recorder) // override the default pod source
 	kcfg.StandaloneMode = false
 	kcfg.SystemCgroups = "" // don't take control over other system processes.
@@ -250,7 +251,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	// create static-pods directory file source
 	log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
 	fileSourceUpdates := kcfg.PodConfig.Channel(kubetypes.FileSource)
-	kconfig.NewSourceFile(staticPodsConfigPath, kcfg.HostnameOverride, kcfg.FileCheckFrequency, fileSourceUpdates)
+	kconfig.NewSourceFile(staticPodsConfigPath, types.NodeName(kcfg.HostnameOverride), kcfg.FileCheckFrequency, fileSourceUpdates)
 
 	// run the kubelet
 	// NOTE: because kcfg != nil holds, the upstream Run function will not

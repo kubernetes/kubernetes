@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const (
@@ -89,8 +90,8 @@ func newMesosCloud(configReader io.Reader) (*MesosCloud, error) {
 }
 
 // Implementation of Instances.CurrentNodeName
-func (c *MesosCloud) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+func (c *MesosCloud) CurrentNodeName(hostname string) (types.NodeName, error) {
+	return types.NodeName(hostname), nil
 }
 
 func (c *MesosCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -190,8 +191,15 @@ func ipAddress(name string) (net.IP, error) {
 	return ipaddr, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (c *MesosCloud) ExternalID(instance string) (string, error) {
+// mapNodeNameToPrivateDNSName maps a k8s NodeName to an mesos hostname.
+// This is a simple string cast
+func mapNodeNameToHostname(nodeName types.NodeName) string {
+	return string(nodeName)
+}
+
+// ExternalID returns the cloud provider ID of the instance with the specified nodeName (deprecated).
+func (c *MesosCloud) ExternalID(nodeName types.NodeName) (string, error) {
+	hostname := mapNodeNameToHostname(nodeName)
 	//TODO(jdef) use a timeout here? 15s?
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
@@ -201,7 +209,7 @@ func (c *MesosCloud) ExternalID(instance string) (string, error) {
 		return "", err
 	}
 
-	node := nodes[instance]
+	node := nodes[hostname]
 	if node == nil {
 		return "", cloudprovider.InstanceNotFound
 	}
@@ -213,13 +221,13 @@ func (c *MesosCloud) ExternalID(instance string) (string, error) {
 	return ip.String(), nil
 }
 
-// InstanceID returns the cloud provider ID of the specified instance.
-func (c *MesosCloud) InstanceID(name string) (string, error) {
+// InstanceID returns the cloud provider ID of the instance with the specified nodeName.
+func (c *MesosCloud) InstanceID(nodeName types.NodeName) (string, error) {
 	return "", nil
 }
 
-// InstanceType returns the type of the specified instance.
-func (c *MesosCloud) InstanceType(name string) (string, error) {
+// InstanceType returns the type of the instance with the specified nodeName.
+func (c *MesosCloud) InstanceType(nodeName types.NodeName) (string, error) {
 	return "", nil
 }
 
@@ -241,7 +249,7 @@ func (c *MesosCloud) listNodes() (map[string]*slaveNode, error) {
 
 // List lists instances that match 'filter' which is a regular expression
 // which must match the entire instance name (fqdn).
-func (c *MesosCloud) List(filter string) ([]string, error) {
+func (c *MesosCloud) List(filter string) ([]types.NodeName, error) {
 	nodes, err := c.listNodes()
 	if err != nil {
 		return nil, err
@@ -250,13 +258,13 @@ func (c *MesosCloud) List(filter string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	addr := []string{}
+	names := []types.NodeName{}
 	for _, node := range nodes {
 		if filterRegex.MatchString(node.hostname) {
-			addr = append(addr, node.hostname)
+			names = append(names, types.NodeName(node.hostname))
 		}
 	}
-	return addr, nil
+	return names, nil
 }
 
 // ListWithKubelet list those instance which have no running kubelet, i.e. the
@@ -275,8 +283,9 @@ func (c *MesosCloud) ListWithoutKubelet() ([]string, error) {
 	return addr, nil
 }
 
-// NodeAddresses returns the addresses of the specified instance.
-func (c *MesosCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
+// NodeAddresses returns the addresses of the instance with the specified nodeName.
+func (c *MesosCloud) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, error) {
+	name := mapNodeNameToHostname(nodeName)
 	ip, err := ipAddress(name)
 	if err != nil {
 		return nil, err

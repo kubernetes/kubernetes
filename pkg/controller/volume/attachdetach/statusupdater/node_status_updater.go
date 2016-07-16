@@ -60,7 +60,7 @@ type nodeStatusUpdater struct {
 func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
-		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(nodeName)
+		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(string(nodeName))
 		if nodeObj == nil || !exists || err != nil {
 			// If node does not exist, its status cannot be updated, log error and move on.
 			glog.Warningf(
@@ -105,7 +105,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 				err)
 		}
 
-		_, err = nsu.kubeClient.Core().Nodes().PatchStatus(nodeName, patchBytes)
+		_, err = nsu.kubeClient.Core().Nodes().PatchStatus(string(nodeName), patchBytes)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to kubeClient.Core().Nodes().Patch for node %q. %v",

@@ -59,6 +59,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const globalTimeout = time.Minute
@@ -592,7 +593,9 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 			if err != nil {
 				glog.Fatalf("Failed to get hostname: %v", err)
 			}
-			addrs, err := instances.NodeAddresses(name)
+			// On GCE, NodeName == Hostname
+			nodeName := types.NodeName(name)
+			addrs, err := instances.NodeAddresses(nodeName)
 			if err != nil {
 				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
 			} else {

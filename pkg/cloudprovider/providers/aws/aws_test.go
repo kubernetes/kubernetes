@@ -34,6 +34,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const TestClusterId = "clusterid.test"
@@ -597,11 +598,11 @@ func TestList(t *testing.T) {
 
 	table := []struct {
 		input  string
-		expect []string
+		expect []types.NodeName
 	}{
-		{"blahonga", []string{}},
-		{"quux", []string{"instance3.ec2.internal"}},
-		{"a", []string{"instance1.ec2.internal", "instance2.ec2.internal"}},
+		{"blahonga", []types.NodeName{}},
+		{"quux", []types.NodeName{"instance3.ec2.internal"}},
+		{"a", []types.NodeName{"instance1.ec2.internal", "instance2.ec2.internal"}},
 	}
 
 	for _, item := range table {
@@ -697,7 +698,7 @@ func TestNodeAddresses(t *testing.T) {
 	fakeServices.selfInstance.PublicIpAddress = aws.String("2.3.4.5")
 	fakeServices.selfInstance.PrivateIpAddress = aws.String("192.168.0.2")
 
-	addrs4, err4 := aws4.NodeAddresses(*instance0.PrivateDnsName)
+	addrs4, err4 := aws4.NodeAddresses(mapInstanceToNodeName(&instance0))
 	if err4 != nil {
 		t.Errorf("unexpected error: %v", err4)
 	}
@@ -1054,7 +1055,7 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 
-	nodeName := "my-dns.internal"
+	nodeName := types.NodeName("my-dns.internal")
 
 	var tag ec2.Tag
 	tag.Key = aws.String(TagNameKubernetesCluster)
@@ -1063,13 +1064,13 @@ func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 
 	var runningInstance ec2.Instance
 	runningInstance.InstanceId = aws.String("i-running")
-	runningInstance.PrivateDnsName = aws.String(nodeName)
+	runningInstance.PrivateDnsName = aws.String(string(nodeName))
 	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
 	runningInstance.Tags = tags
 
 	var terminatedInstance ec2.Instance
 	terminatedInstance.InstanceId = aws.String("i-terminated")
-	terminatedInstance.PrivateDnsName = aws.String(nodeName)
+	terminatedInstance.PrivateDnsName = aws.String(string(nodeName))
 	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
 	terminatedInstance.Tags = tags
 

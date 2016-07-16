@@ -39,6 +39,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -327,7 +328,7 @@ func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
 }
 
 // List returns names of VMs (inside vm folder) by applying filter and which are currently running.
-func (i *Instances) List(filter string) ([]string, error) {
+func (i *Instances) List(filter string) ([]k8stypes.NodeName, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c, err := vsphereLogin(i.cfg, ctx)
@@ -344,11 +345,16 @@ func (i *Instances) List(filter string) ([]string, error) {
 	glog.V(3).Infof("Found %d instances matching %s: %s",
 		len(vmList), filter, vmList)
 
-	return vmList, nil
+	var nodeNames []k8stypes.NodeName
+	for _, n := range vmList {
+		nodeNames = append(nodeNames, k8stypes.NodeName(n))
+	}
+	return nodeNames, nil
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress, error) {
+	name := nodeNameToVMName(nodeName)
 	addrs := []api.NodeAddress{}
 
 	// Create context
@@ -397,12 +403,18 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
-func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return i.localInstanceID, nil
+func (i *Instances) CurrentNodeName(hostname string) (k8stypes.NodeName, error) {
+	return k8stypes.NodeName(i.localInstanceID), nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (i *Instances) ExternalID(name string) (string, error) {
+// nodeNameToVMName maps a NodeName to the vmware infrastructure name
+func nodeNameToVMName(nodeName k8stypes.NodeName) string {
+	return string(nodeName)
+}
+
+// ExternalID returns the cloud provider ID of the node with the specified Name (deprecated).
+func (i *Instances) ExternalID(nodeName k8stypes.NodeName) (string, error) {
+	name := nodeNameToVMName(nodeName)
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -438,8 +450,9 @@ func (i *Instances) ExternalID(name string) (string, error) {
 	return "", cloudprovider.InstanceNotFound
 }
 
-// InstanceID returns the cloud provider ID of the specified instance.
-func (i *Instances) InstanceID(name string) (string, error) {
+// InstanceID returns the cloud provider ID of the node with the specified Name.
+func (i *Instances) InstanceID(nodeName k8stypes.NodeName) (string, error) {
+	name := nodeNameToVMName(nodeName)
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -472,7 +485,7 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	return "", cloudprovider.InstanceNotFound
 }
 
-func (i *Instances) InstanceType(name string) (string, error) {
+func (i *Instances) InstanceType(name k8stypes.NodeName) (string, error) {
 	return "", nil
 }
 

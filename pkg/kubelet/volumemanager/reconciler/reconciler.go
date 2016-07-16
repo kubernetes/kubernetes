@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -58,7 +59,7 @@ type Reconciler interface {
 //   successive executions
 // waitForAttachTimeout - the amount of time the Mount function will wait for
 //   the volume to be attached
-// hostName - the hostname for this node, used by Attach and Detach methods
+// nodeName - the Name for this node, used by Attach and Detach methods
 // desiredStateOfWorld - cache containing the desired state of the world
 // actualStateOfWorld - cache containing the actual state of the world
 // operationExecutor - used to trigger attach/detach/mount/unmount operations
@@ -70,7 +71,7 @@ func NewReconciler(
 	controllerAttachDetachEnabled bool,
 	loopSleepDuration time.Duration,
 	waitForAttachTimeout time.Duration,
-	hostName string,
+	nodeName types.NodeName,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	operationExecutor operationexecutor.OperationExecutor,
@@ -80,7 +81,7 @@ func NewReconciler(
 		controllerAttachDetachEnabled: controllerAttachDetachEnabled,
 		loopSleepDuration:             loopSleepDuration,
 		waitForAttachTimeout:          waitForAttachTimeout,
-		hostName:                      hostName,
+		nodeName:                      nodeName,
 		desiredStateOfWorld:           desiredStateOfWorld,
 		actualStateOfWorld:            actualStateOfWorld,
 		operationExecutor:             operationExecutor,
@@ -93,7 +94,7 @@ type reconciler struct {
 	controllerAttachDetachEnabled bool
 	loopSleepDuration             time.Duration
 	waitForAttachTimeout          time.Duration
-	hostName                      string
+	nodeName                      types.NodeName
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
 	operationExecutor             operationexecutor.OperationExecutor
@@ -161,7 +162,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						volumeToMount.Pod.UID)
 					err := rc.operationExecutor.VerifyControllerAttachedVolume(
 						volumeToMount.VolumeToMount,
-						rc.hostName,
+						rc.nodeName,
 						rc.actualStateOfWorld)
 					if err != nil &&
 						!nestedpendingoperations.IsAlreadyExists(err) &&
@@ -190,7 +191,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					volumeToAttach := operationexecutor.VolumeToAttach{
 						VolumeName: volumeToMount.VolumeName,
 						VolumeSpec: volumeToMount.VolumeSpec,
-						NodeName:   rc.hostName,
+						NodeName:   rc.nodeName,
 					}
 					glog.V(12).Infof("Attempting to start AttachVolume for volume %q (spec.Name: %q)  pod %q (UID: %q)",
 						volumeToMount.VolumeName,
@@ -294,7 +295,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin,
 						// so just remove it to actualStateOfWorld without attach.
 						rc.actualStateOfWorld.MarkVolumeAsDetached(
-							attachedVolume.VolumeName, rc.hostName)
+							attachedVolume.VolumeName, rc.nodeName)
 					} else {
 						// Only detach if kubelet detach is enabled
 						glog.V(12).Infof("Attempting to start DetachVolume for volume %q (spec.Name: %q)",

@@ -243,7 +243,7 @@ func markAllPodsNotReady(kubeClient clientset.Interface, nodeName string) error 
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
 }
 
-func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName string) (bool, error) {
+func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)

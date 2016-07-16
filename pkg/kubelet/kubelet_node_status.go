@@ -65,7 +65,7 @@ func (kl *Kubelet) registerWithApiserver() {
 				glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
 				continue
 			}
-			currentNode, err := kl.kubeClient.Core().Nodes().Get(kl.nodeName)
+			currentNode, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName))
 			if err != nil {
 				glog.Errorf("error getting node %q: %v", kl.nodeName, err)
 				continue
@@ -101,7 +101,7 @@ func (kl *Kubelet) registerWithApiserver() {
 func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
-			Name: kl.nodeName,
+			Name: string(kl.nodeName),
 			Labels: map[string]string{
 				unversioned.LabelHostname: kl.hostname,
 				unversioned.LabelOS:       goRuntime.GOOS,
@@ -234,7 +234,7 @@ func (kl *Kubelet) updateNodeStatus() error {
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
 // is set, this function will also confirm that cbr0 is configured correctly.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
-	node, err := kl.kubeClient.Core().Nodes().Get(kl.nodeName)
+	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName))
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}

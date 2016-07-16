@@ -63,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/types"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/crypto"
@@ -638,7 +639,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 
 	if len(kcfg.NodeName) == 0 {
 		// Query the cloud provider for our node name, default to Hostname
-		nodeName := kcfg.Hostname
+		nodeName := types.NodeName(kcfg.Hostname)
 		if kcfg.Cloud != nil {
 			var err error
 			instances, ok := kcfg.Cloud.Instances()
@@ -658,7 +659,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.NodeName})
+	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: string(kcfg.NodeName)})
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
@@ -831,7 +832,7 @@ type KubeletConfig struct {
 	Mounter                        mount.Interface
 	NetworkPluginName              string
 	NetworkPlugins                 []network.NetworkPlugin
-	NodeName                       string
+	NodeName                       types.NodeName
 	NodeLabels                     map[string]string
 	NodeStatusUpdateFrequency      time.Duration
 	NonMasqueradeCIDR              string

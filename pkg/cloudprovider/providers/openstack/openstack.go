@@ -37,6 +37,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "openstack"
@@ -237,9 +238,20 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	return &os, nil
 }
 
-func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.Server, error) {
+// mapNodeNameToServerName maps a k8s NodeName to an OpenStack Server Name
+// This is a simple string cast.
+func mapNodeNameToServerName(nodeName types.NodeName) string {
+	return string(nodeName)
+}
+
+// mapServerToNodeName maps an OpenStack Server to a k8s NodeName
+func mapServerToNodeName(server *servers.Server) types.NodeName {
+	return types.NodeName(server.Name)
+}
+
+func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
 	opts := servers.ListOpts{
-		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
+		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
 		Status: "ACTIVE",
 	}
 	pager := servers.List(client, opts)
@@ -270,7 +282,7 @@ func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.S
 	return &serverList[0], nil
 }
 
-func getAddressesByName(client *gophercloud.ServiceClient, name string) ([]api.NodeAddress, error) {
+func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) ([]api.NodeAddress, error) {
 	srv, err := getServerByName(client, name)
 	if err != nil {
 		return nil, err
@@ -339,7 +351,7 @@ func getAddressesByName(client *gophercloud.ServiceClient, name string) ([]api.N
 	return addrs, nil
 }
 
-func getAddressByName(client *gophercloud.ServiceClient, name string) (string, error) {
+func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (string, error) {
 	addrs, err := getAddressesByName(client, name)
 	if err != nil {
 		return "", err
