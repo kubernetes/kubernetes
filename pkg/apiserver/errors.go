@@ -126,7 +126,7 @@ func (e errNotAcceptable) Status() unversioned.Status {
 	}
 }
 
-// errNotAcceptable indicates Content-Type is not recognized
+// errUnsupportedMediaType indicates Content-Type is not recognized
 // TODO: move to api/errors if other code needs to return this
 type errUnsupportedMediaType struct {
 	accepted []string
