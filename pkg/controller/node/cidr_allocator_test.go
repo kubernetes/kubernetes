@@ -128,7 +128,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		expectedAllocatedCIDR string
 		allocatedCIDRs        []string
 	}) {
-		allocator := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize)
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
 		// this is a bit of white box testing
 		for _, allocated := range tc.allocatedCIDRs {
 			_, cidr, err := net.ParseCIDR(allocated)
@@ -209,7 +209,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 		subNetMaskSize  int
 		allocatedCIDRs  []string
 	}) {
-		allocator := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize)
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
 		// this is a bit of white box testing
 		for _, allocated := range tc.allocatedCIDRs {
 			_, cidr, err := net.ParseCIDR(allocated)
@@ -320,7 +320,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		allocatedCIDRs                   []string
 		cidrsToRelease                   []string
 	}) {
-		allocator := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize)
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
 		// this is a bit of white box testing
 		for _, allocated := range tc.allocatedCIDRs {
 			_, cidr, err := net.ParseCIDR(allocated)
