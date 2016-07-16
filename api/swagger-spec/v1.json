@@ -16549,7 +16549,7 @@
      },
      "host": {
       "type": "string",
-      "description": "Host name on which the event is generated."
+      "description": "Node name on which the event is generated."
      }
     }
    },

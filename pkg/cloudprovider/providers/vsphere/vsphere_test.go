@@ -25,6 +25,7 @@ import (
 
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/rand"
 )
 
@@ -186,7 +187,7 @@ func TestInstances(t *testing.T) {
 	}
 	t.Logf("Found ExternalID(%s) = %s\n", srvs[0], externalId)
 
-	nonExistingVM := rand.String(15)
+	nonExistingVM := types.NodeName(rand.String(15))
 	externalId, err = i.ExternalID(nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
 		t.Logf("VM %s was not found as expected\n", nonExistingVM)

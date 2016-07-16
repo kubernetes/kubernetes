@@ -426,11 +426,15 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 			if !supported {
 				glog.Fatalf("GCE cloud provider has no instances.  this shouldn't happen. exiting.")
 			}
-			name, err := os.Hostname()
+			hostname, err := os.Hostname()
 			if err != nil {
 				glog.Fatalf("Failed to get hostname: %v", err)
 			}
-			addrs, err := instances.NodeAddresses(name)
+			nodeName, err := instances.CurrentNodeName(hostname)
+			if err != nil {
+				glog.Fatalf("Failed to get NodeName: %v", err)
+			}
+			addrs, err := instances.NodeAddresses(nodeName)
 			if err != nil {
 				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
 			} else {

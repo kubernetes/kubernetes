@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // checkExistsFromError inspects an error and returns a true if err is nil,
@@ -38,10 +39,11 @@ func checkResourceExistsFromError(err error) (bool, error) {
 	return false, v
 }
 
-func (az *Cloud) getVirtualMachine(machineName string) (vm compute.VirtualMachine, exists bool, err error) {
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, exists bool, err error) {
 	var realErr error
 
-	vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, machineName, "")
+	vmName := string(nodeName)
+	vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, "")
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {

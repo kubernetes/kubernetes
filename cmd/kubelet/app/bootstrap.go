@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
+	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
@@ -42,7 +43,7 @@ const (
 // The kubeconfig at bootstrapPath is used to request a client certificate from the API server.
 // On success, a kubeconfig file referencing the generated key and obtained certificate is written to kubeconfigPath.
 // The certificate and key file are stored in certDir.
-func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir string, nodeName string) error {
+func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir string, nodeName types.NodeName) error {
 	// Short-circuit if the kubeconfig file already exists.
 	// TODO: inspect the kubeconfig, ensure a rest client can be built from it, verify client cert expiration, etc.
 	_, err := os.Stat(kubeconfigPath)

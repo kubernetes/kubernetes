@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 type Instances struct {
@@ -81,7 +82,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	return &Instances{compute, flavor_to_resource}, true
 }
 
-func (i *Instances) List(name_filter string) ([]string, error) {
+func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
 	glog.V(4).Infof("openstack List(%v) called", name_filter)
 
 	opts := servers.ListOpts{
@@ -90,14 +91,14 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 	}
 	pager := servers.List(i.compute, opts)
 
-	ret := make([]string, 0)
+	ret := make([]types.NodeName, 0)
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		sList, err := servers.ExtractServers(page)
 		if err != nil {
 			return false, err
 		}
-		for _, server := range sList {
-			ret = append(ret, server.Name)
+		for i := range sList {
+			ret = append(ret, mapServerToNodeName(&sList[i]))
 		}
 		return true, nil
 	})
@@ -112,15 +113,15 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 }
 
 // Implementation of Instances.CurrentNodeName
-func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
+	return types.NodeName(hostname), nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
-func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+func (i *Instances) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
 	addrs, err := getAddressesByName(i.compute, name)
@@ -133,7 +134,7 @@ func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (i *Instances) ExternalID(name string) (string, error) {
+func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		if err == ErrNotFound {
@@ -150,7 +151,7 @@ func (os *OpenStack) InstanceID() (string, error) {
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
-func (i *Instances) InstanceID(name string) (string, error) {
+func (i *Instances) InstanceID(name types.NodeName) (string, error) {
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		return "", err
@@ -161,6 +162,6 @@ func (i *Instances) InstanceID(name string) (string, error) {
 }
 
 // InstanceType returns the type of the specified instance.
-func (i *Instances) InstanceType(name string) (string, error) {
+func (i *Instances) InstanceType(name types.NodeName) (string, error) {
 	return "", nil
 }

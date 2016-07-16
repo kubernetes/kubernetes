@@ -296,14 +296,14 @@ type VolumeOptions struct {
 // Volumes is an interface for managing cloud-provisioned volumes
 // TODO: Allow other clouds to implement this
 type Volumes interface {
-	// Attach the disk to the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
+	// Attach the disk to the node with the specified NodeName
+	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(diskName string, instanceName string, readOnly bool) (string, error)
-	// Detach the disk from the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
+	AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) (string, error)
+	// Detach the disk from the node with the specified NodeName
+	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device where the volume was attached
-	DetachDisk(diskName string, instanceName string) (string, error)
+	DetachDisk(diskName string, nodeName types.NodeName) (string, error)
 
 	// Create a volume with the specified options
 	CreateDisk(volumeOptions *VolumeOptions) (volumeName string, err error)
@@ -319,8 +319,8 @@ type Volumes interface {
 	// return the device path where the volume is attached
 	GetDiskPath(volumeName string) (string, error)
 
-	// Check if the volume is already attached to the instance
-	DiskIsAttached(diskName, instanceID string) (bool, error)
+	// Check if the volume is already attached to the node with the specified NodeName
+	DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -362,7 +362,7 @@ type Cloud struct {
 	// attached, to avoid a race condition where we assign a device mapping
 	// and then get a second request before we attach the volume
 	attachingMutex sync.Mutex
-	attaching      map[ /*nodeName*/ string]map[mountDevice]string
+	attaching      map[types.NodeName]map[mountDevice]string
 }
 
 var _ Volumes = &Cloud{}
@@ -537,7 +537,7 @@ func (c *Cloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 }
 
 // CurrentNodeName returns the name of the current node
-func (c *Cloud) CurrentNodeName(hostname string) (string, error) {
+func (c *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return c.selfAWSInstance.nodeName, nil
 }
 
@@ -795,7 +795,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		cfg:      cfg,
 		region:   regionName,
 
-		attaching: make(map[string]map[mountDevice]string),
+		attaching: make(map[types.NodeName]map[mountDevice]string),
 	}
 
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
@@ -877,7 +877,7 @@ func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (c *Cloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
+func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
 		addresses := []api.NodeAddress{}
 
@@ -932,15 +932,15 @@ func (c *Cloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return addresses, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (c *Cloud) ExternalID(name string) (string, error) {
-	if c.selfAWSInstance.nodeName == name {
+// ExternalID returns the cloud provider ID of the node with the specified nodeName (deprecated).
+func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
+	if c.selfAWSInstance.nodeName == nodeName {
 		// We assume that if this is run on the instance itself, the instance exists and is alive
 		return c.selfAWSInstance.awsID, nil
 	}
 	// We must verify that the instance still exists
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	instance, err := c.findInstanceByNodeName(name)
+	instance, err := c.findInstanceByNodeName(nodeName)
 	if err != nil {
 		return "", err
 	}
@@ -950,34 +950,34 @@ func (c *Cloud) ExternalID(name string) (string, error) {
 	return orEmpty(instance.InstanceId), nil
 }
 
-// InstanceID returns the cloud provider ID of the specified instance.
-func (c *Cloud) InstanceID(name string) (string, error) {
+// InstanceID returns the cloud provider ID of the node with the specified nodeName.
+func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
-	if c.selfAWSInstance.nodeName == name {
+	if c.selfAWSInstance.nodeName == nodeName {
 		return "/" + c.selfAWSInstance.availabilityZone + "/" + c.selfAWSInstance.awsID, nil
 	}
-	inst, err := c.getInstanceByNodeName(name)
+	inst, err := c.getInstanceByNodeName(nodeName)
 	if err != nil {
-		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", name, err)
+		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", nodeName, err)
 	}
 	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
 }
 
-// InstanceType returns the type of the specified instance.
-func (c *Cloud) InstanceType(name string) (string, error) {
-	if c.selfAWSInstance.nodeName == name {
+// InstanceType returns the type of the node with the specified nodeName.
+func (c *Cloud) InstanceType(nodeName types.NodeName) (string, error) {
+	if c.selfAWSInstance.nodeName == nodeName {
 		return c.selfAWSInstance.instanceType, nil
 	}
-	inst, err := c.getInstanceByNodeName(name)
+	inst, err := c.getInstanceByNodeName(nodeName)
 	if err != nil {
-		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", name, err)
+		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", nodeName, err)
 	}
 	return orEmpty(inst.InstanceType), nil
 }
 
 // Return a list of instances matching regex string.
-func (c *Cloud) getInstancesByRegex(regex string) ([]string, error) {
+func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
 	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
 	filters = c.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
@@ -986,10 +986,10 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]string, error) {
 
 	instances, err := c.ec2.DescribeInstances(request)
 	if err != nil {
-		return []string{}, err
+		return []types.NodeName{}, err
 	}
 	if len(instances) == 0 {
-		return []string{}, fmt.Errorf("no instances returned")
+		return []types.NodeName{}, fmt.Errorf("no instances returned")
 	}
 
 	if strings.HasPrefix(regex, "'") && strings.HasSuffix(regex, "'") {
@@ -999,10 +999,10 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]string, error) {
 
 	re, err := regexp.Compile(regex)
 	if err != nil {
-		return []string{}, err
+		return []types.NodeName{}, err
 	}
 
-	matchingInstances := []string{}
+	matchingInstances := []types.NodeName{}
 	for _, instance := range instances {
 		// Only return fully-ready instances when listing instances
 		// (vs a query by name, where we will return it if we find it)
@@ -1011,16 +1011,16 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]string, error) {
 			continue
 		}
 
-		privateDNSName := orEmpty(instance.PrivateDnsName)
-		if privateDNSName == "" {
+		nodeName := mapInstanceToNodeName(instance)
+		if nodeName == "" {
 			glog.V(2).Infof("Skipping EC2 instance (no PrivateDNSName): %s",
-				orEmpty(instance.InstanceId))
+				aws.StringValue(instance.InstanceId))
 			continue
 		}
 
 		for _, tag := range instance.Tags {
 			if orEmpty(tag.Key) == "Name" && re.MatchString(orEmpty(tag.Value)) {
-				matchingInstances = append(matchingInstances, privateDNSName)
+				matchingInstances = append(matchingInstances, nodeName)
 				break
 			}
 		}
@@ -1030,7 +1030,7 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]string, error) {
 }
 
 // List is an implementation of Instances.List.
-func (c *Cloud) List(filter string) ([]string, error) {
+func (c *Cloud) List(filter string) ([]types.NodeName, error) {
 	// TODO: Should really use tag query. No need to go regexp.
 	return c.getInstancesByRegex(filter)
 }
@@ -1102,7 +1102,7 @@ type awsInstance struct {
 	awsID string
 
 	// node name in k8s
-	nodeName string
+	nodeName types.NodeName
 
 	// availability zone the instance resides in
 	availabilityZone string
@@ -1126,7 +1126,7 @@ func newAWSInstance(ec2Service EC2, instance *ec2.Instance) *awsInstance {
 	self := &awsInstance{
 		ec2:              ec2Service,
 		awsID:            aws.StringValue(instance.InstanceId),
-		nodeName:         aws.StringValue(instance.PrivateDnsName),
+		nodeName:         mapInstanceToNodeName(instance),
 		availabilityZone: az,
 		instanceType:     aws.StringValue(instance.InstanceType),
 		vpcID:            aws.StringValue(instance.VpcId),
@@ -1436,8 +1436,8 @@ func (c *Cloud) buildSelfAWSInstance() (*awsInstance, error) {
 	return newAWSInstance(c.ec2, instance), nil
 }
 
-// Gets the awsInstance with node-name nodeName, or the 'self' instance if nodeName == ""
-func (c *Cloud) getAwsInstance(nodeName string) (*awsInstance, error) {
+// Gets the awsInstance with for the node with the specified nodeName, or the 'self' instance if nodeName == ""
+func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
 	var awsInstance *awsInstance
 	if nodeName == "" {
 		awsInstance = c.selfAWSInstance
@@ -1454,15 +1454,15 @@ func (c *Cloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 }
 
 // AttachDisk implements Volumes.AttachDisk
-func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
+func (c *Cloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(instanceName)
+	awsInstance, err := c.getAwsInstance(nodeName)
 	if err != nil {
-		return "", fmt.Errorf("error finding instance %s: %v", instanceName, err)
+		return "", fmt.Errorf("error finding instance %s: %v", nodeName, err)
 	}
 
 	if readOnly {
@@ -1528,32 +1528,32 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 	// which could theoretically be against a different device (or even instance).
 	if attachment == nil {
 		// Impossible?
-		return "", fmt.Errorf("unexpected state: attachment nil after attached %q to %q", diskName, instanceName)
+		return "", fmt.Errorf("unexpected state: attachment nil after attached %q to %q", diskName, nodeName)
 	}
 	if ec2Device != aws.StringValue(attachment.Device) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, instanceName, ec2Device, aws.StringValue(attachment.Device))
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, nodeName, ec2Device, aws.StringValue(attachment.Device))
 	}
 	if awsInstance.awsID != aws.StringValue(attachment.InstanceId) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, instanceName, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, nodeName, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
 	}
 
 	return hostDevice, nil
 }
 
 // DetachDisk implements Volumes.DetachDisk
-func (c *Cloud) DetachDisk(diskName string, instanceName string) (string, error) {
+func (c *Cloud) DetachDisk(diskName string, nodeName types.NodeName) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(instanceName)
+	awsInstance, err := c.getAwsInstance(nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DetachDisk will assume disk %q is not attached to it.",
-				instanceName,
+				nodeName,
 				diskName)
 			return "", nil
 		}
@@ -1743,14 +1743,14 @@ func (c *Cloud) GetDiskPath(volumeName string) (string, error) {
 }
 
 // DiskIsAttached implements Volumes.DiskIsAttached
-func (c *Cloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
-	awsInstance, err := c.getAwsInstance(instanceID)
+func (c *Cloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error) {
+	awsInstance, err := c.getAwsInstance(nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DiskIsAttached will assume disk %q is not attached to it.",
-				instanceID,
+				nodeName,
 				diskName)
 			return false, nil
 		}
@@ -3184,11 +3184,23 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 	return instances, nil
 }
 
+// mapNodeNameToPrivateDNSName maps a k8s NodeName to an AWS Instance PrivateDNSName
+// This is a simple string cast
+func mapNodeNameToPrivateDNSName(nodeName types.NodeName) string {
+	return string(nodeName)
+}
+
+// mapInstanceToNodeName maps a EC2 instance to a k8s NodeName, by extracting the PrivateDNSName
+func mapInstanceToNodeName(i *ec2.Instance) types.NodeName {
+	return types.NodeName(aws.StringValue(i.PrivateDnsName))
+}
+
 // Returns the instance with the specified node name
 // Returns nil if it does not exist
-func (c *Cloud) findInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
+func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
+	privateDNSName := mapNodeNameToPrivateDNSName(nodeName)
 	filters := []*ec2.Filter{
-		newEc2Filter("private-dns-name", nodeName),
+		newEc2Filter("private-dns-name", privateDNSName),
 		newEc2Filter("instance-state-name", "running"),
 	}
 	filters = c.addFilters(filters)
@@ -3211,7 +3223,7 @@ func (c *Cloud) findInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
 
 // Returns the instance with the specified node name
 // Like findInstanceByNodeName, but returns error if node not found
-func (c *Cloud) getInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
+func (c *Cloud) getInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
 	instance, err := c.findInstanceByNodeName(nodeName)
 	if err == nil && instance == nil {
 		return nil, cloudprovider.InstanceNotFound

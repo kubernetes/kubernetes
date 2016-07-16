@@ -23,6 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const (
@@ -31,8 +32,8 @@ const (
 
 // AttachDisk attaches a vhd to vm
 // the vhd must exist, can be identified by diskName, diskURI, and lun.
-func (az *Cloud) AttachDisk(diskName, diskURI, vmName string, lun int32, cachingMode compute.CachingTypes) error {
-	vm, exists, err := az.getVirtualMachine(vmName)
+func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+	vm, exists, err := az.getVirtualMachine(nodeName)
 	if err != nil {
 		return err
 	} else if !exists {
@@ -58,6 +59,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI, vmName string, lun int32, caching
 			},
 		},
 	}
+	vmName := mapNodeNameToVMName(nodeName)
 	_, err = az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 	if err != nil {
 		glog.Errorf("azure attach failed, err: %v", err)
@@ -65,7 +67,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI, vmName string, lun int32, caching
 		if strings.Contains(detail, "Code=\"AcquireDiskLeaseFailed\"") {
 			// if lease cannot be acquired, immediately detach the disk and return the original error
 			glog.Infof("failed to acquire disk lease, try detach")
-			az.DetachDiskByName(diskName, diskURI, vmName)
+			az.DetachDiskByName(diskName, diskURI, nodeName)
 		}
 	} else {
 		glog.V(4).Infof("azure attach succeeded")
@@ -75,11 +77,11 @@ func (az *Cloud) AttachDisk(diskName, diskURI, vmName string, lun int32, caching
 
 // DetachDiskByName detaches a vhd from host
 // the vhd can be identified by diskName or diskURI
-func (az *Cloud) DetachDiskByName(diskName, diskURI, vmName string) error {
-	vm, exists, err := az.getVirtualMachine(vmName)
+func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
+	vm, exists, err := az.getVirtualMachine(nodeName)
 	if err != nil || !exists {
 		// if host doesn't exist, no need to detach
-		glog.Warningf("cannot find node %s, skip detaching disk %s", vmName, diskName)
+		glog.Warningf("cannot find node %s, skip detaching disk %s", nodeName, diskName)
 		return nil
 	}
 
@@ -100,6 +102,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI, vmName string) error {
 			},
 		},
 	}
+	vmName := mapNodeNameToVMName(nodeName)
 	_, err = az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 	if err != nil {
 		glog.Errorf("azure disk detach failed, err: %v", err)
@@ -110,8 +113,8 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI, vmName string) error {
 }
 
 // GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI
-func (az *Cloud) GetDiskLun(diskName, diskURI, vmName string) (int32, error) {
-	vm, exists, err := az.getVirtualMachine(vmName)
+func (az *Cloud) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
+	vm, exists, err := az.getVirtualMachine(nodeName)
 	if err != nil {
 		return -1, err
 	} else if !exists {
@@ -130,8 +133,8 @@ func (az *Cloud) GetDiskLun(diskName, diskURI, vmName string) (int32, error) {
 
 // GetNextDiskLun searches all vhd attachment on the host and find unused lun
 // return -1 if all luns are used
-func (az *Cloud) GetNextDiskLun(vmName string) (int32, error) {
-	vm, exists, err := az.getVirtualMachine(vmName)
+func (az *Cloud) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
+	vm, exists, err := az.getVirtualMachine(nodeName)
 	if err != nil {
 		return -1, err
 	} else if !exists {
