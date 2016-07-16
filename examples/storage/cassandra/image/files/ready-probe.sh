@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,23 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# build the cassandra image.
-
-VERSION=v11
-PROJECT_ID=google_samples
-PROJECT=gcr.io/${PROJECT_ID}
-
-all: build
-
-kubernetes-cassandra.jar: ../java/* ../java/src/main/java/io/k8s/cassandra/*.java
-	cd ../java && mvn clean && mvn package
-	mv ../java/target/kubernetes-cassandra*.jar files/kubernetes-cassandra.jar
-	cd ../java && mvn clean
-
-build: kubernetes-cassandra.jar
-	docker build -t ${PROJECT}/cassandra:${VERSION} .
-
-push: build
-	gcloud docker push ${PROJECT}/cassandra:${VERSION}
-
-.PHONY: all build push
+if [[ $(nodetool status | grep $POD_IP) == *"UN"* ]]; then
+  if [[ $DEBUG ]]; then
+    echo "Not Up";
+  fi
+  exit 0;
+else
+  if [[ $DEBUG ]]; then
+    echo "UN";
+  fi
+  exit 1;
+fi
