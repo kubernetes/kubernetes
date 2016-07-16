@@ -14,28 +14,36 @@
 
 FROM google/debian:jessie
 
-COPY cassandra.list /etc/apt/sources.list.d/cassandra.list
-COPY run.sh /run.sh
-COPY cassandra.yaml /cassandra.yaml
-COPY logback.xml /logback.xml
-COPY kubernetes-cassandra.jar /kubernetes-cassandra.jar
+ADD files /
 
-RUN gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D && \
-  gpg --export --armor F758CE318D77295D | apt-key add - && \
-  gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00 && \
-  gpg --export --armor 2B5C1B00 | apt-key add - && \
-  gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && \
-  gpg --export --armor 0353B12C | apt-key add - && \
-  apt-get update && \
-  apt-get -qq -y install procps cassandra openjdk-8-jre-headless && \
-  chmod a+rx /run.sh && \
-  mkdir -p /cassandra_data/data && \
-  mv /logback.xml /etc/cassandra/ && \
-  mv /cassandra.yaml /etc/cassandra/ && \
-  chown -R cassandra: /etc/cassandra /cassandra_data /run.sh \
-    /kubernetes-cassandra.jar && \
-  chmod o+w -R /etc/cassandra /cassandra_data && \
-  rm -rf \
+ENV DI_VERSION="1.1.1" DI_SHA="dec8167091671df0dd3748a8938102479db5fffc"
+
+RUN mv /java.list /etc/apt/sources.list.d/java.list \
+  && apt-get update \
+  && apt-get -qq -y install --no-install-recommends procps openjdk-8-jre-headless libjemalloc1 curl \
+    localepurge \
+  && curl -L https://github.com/Yelp/dumb-init/releases/download/v${DI_VERSION}/dumb-init_${DI_VERSION}_amd64 > /sbin/dumb-init \
+  && echo "$DI_SHA  /sbin/dumb-init" | sha1sum -c - \
+  && mv /cassandra.list /etc/apt/sources.list.d/cassandra.list \
+  && gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D \
+  && gpg --export --armor F758CE318D77295D | apt-key add - \
+  && gpg --keyserver pgp.mit.edu --recv-keys 2B5C1B00 \
+  && gpg --export --armor 2B5C1B00 | apt-key add - \
+  && gpg --keyserver pgp.mit.edu --recv-keys 0353B12C \
+  && gpg --export --armor 0353B12C | apt-key add - \
+  && apt-get update \
+  && apt-get -qq -y install --no-install-recommends curl cassandra localepurge \
+  && chmod a+rx /run.sh /sbin/dumb-init /ready-probe.sh \
+  && mkdir -p /cassandra_data/data \
+  && mv /logback.xml /cassandra.yaml /etc/cassandra/ \
+
+  # Not able to run as cassandra until https://github.com/kubernetes/kubernetes/issues/2630 is resolved
+  # && chown -R cassandra: /etc/cassandra /cassandra_data /run.sh /kubernetes-cassandra.jar \
+  # && chmod o+w -R /etc/cassandra /cassandra_data \
+
+  && apt-get -y purge curl localepurge \
+  && apt-get clean \
+  && rm -rf \
         doc \
         man \
         info \
@@ -54,7 +62,7 @@ RUN gpg --keyserver pgp.mit.edu --recv-keys F758CE318D77295D && \
         /tmp/*
 
 
-VOLUME ["/cassandra_data/data"]
+VOLUME ["/cassandra_data"]
 
 # 7000: intra-node communication
 # 7001: TLS intra-node communication
@@ -63,6 +71,8 @@ VOLUME ["/cassandra_data/data"]
 # 9160: thrift service not included cause it is going away
 EXPOSE 7000 7001 7199 9042
 
-USER cassandra
+# Not able to do this until https://github.com/kubernetes/kubernetes/issues/2630 is resolved
+# if you are using attached storage
+# USER cassandra
 
-CMD /run.sh
+CMD ["/sbin/dumb-init", "/bin/bash", "/run.sh"]

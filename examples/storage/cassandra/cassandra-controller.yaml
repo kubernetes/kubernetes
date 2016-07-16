@@ -28,6 +28,8 @@ spec:
               value: 512M
             - name: HEAP_NEWSIZE
               value: 100M
+            - name: CASSANDRA_SEED_PROVIDER
+              value: "io.k8s.cassandra.KubernetesSeedProvider"
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -36,7 +38,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/google-samples/cassandra:v9
+          image: gcr.io/google-samples/cassandra:v11
           name: cassandra
           ports:
             - containerPort: 7000
@@ -47,9 +49,6 @@ spec:
               name: jmx
             - containerPort: 9042
               name: cql
-            # If you need it it is going away in C* 4.0
-            #- containerPort: 9160
-            #  name: thrift
           volumeMounts:
             - mountPath: /cassandra_data
               name: data
