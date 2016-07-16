@@ -17,7 +17,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.k8s.cassandra</groupId>
     <artifactId>kubernetes-cassandra</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <build>
         <plugins>
             <plugin>
@@ -33,6 +33,7 @@
 
     <properties>
         <logback.version>1.1.3</logback.version>
+        <cassandra.version>3.7</cassandra.version>
     </properties>
 
     <dependencies>
@@ -85,7 +86,7 @@
         <dependency>
             <groupId>org.apache.cassandra</groupId>
             <artifactId>cassandra-all</artifactId>
-            <version>3.5</version>
+            <version>${cassandra.version}</version>
             <scope>provided</scope>
         </dependency>
 

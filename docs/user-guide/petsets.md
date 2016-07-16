@@ -27,8 +27,8 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-
+This file has moved to: http://kubernetes.io/docs/user-guide/petset/
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storage/cassandra/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/petsets.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
