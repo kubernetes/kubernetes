@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package metrics defines and exposes instrumentation metrics of the scheduler.
-package metrics
+package metrics // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"

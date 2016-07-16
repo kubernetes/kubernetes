@@ -19,4 +19,4 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/autoscaling
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/batch
 
-package v1beta1
+package v1beta1 // import "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"

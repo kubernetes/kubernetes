@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 
-package policy
+package policy // import "k8s.io/kubernetes/pkg/apis/policy"

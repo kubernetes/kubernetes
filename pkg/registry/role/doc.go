@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package certificates provides Registry interface and its RESTStorage
 // implementation for storing Role objects.
-package role
+package role // import "k8s.io/kubernetes/pkg/registry/role"

@@ -16,4 +16,4 @@ limitations under the License.
 
 // podutil contains utilities for reading, writing and filtering streams
 // and lists of api.Pod objects.
-package podutil
+package podutil // import "k8s.io/kubernetes/contrib/mesos/pkg/podutil"

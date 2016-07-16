@@ -17,4 +17,4 @@ limitations under the License.
 // +k8s:deepcopy-gen=package,register
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/batch
 
-package v2alpha1
+package v2alpha1 // import "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"

@@ -22,4 +22,4 @@ limitations under the License.
 // to resolve conflicts of any sort. Basic idea is that each configuration source gets a channel
 // from the Config service and pushes updates to it via that channel. Config then keeps track of
 // incremental & replace changes and distributes them to listeners as appropriate.
-package config
+package config // import "k8s.io/kubernetes/pkg/proxy/config"

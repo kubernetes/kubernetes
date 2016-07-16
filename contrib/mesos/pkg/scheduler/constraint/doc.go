@@ -18,4 +18,4 @@ limitations under the License.
 // Incomplete.
 // TODO(jdef) We need better alignment between k8s-mesos and k8s scheduling
 // constraints (read: a common constraints API).
-package constraint
+package constraint // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/constraint"

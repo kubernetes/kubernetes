@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package protobuf provides a Kubernetes serializer for the protobuf format.
-package protobuf
+package protobuf // import "k8s.io/kubernetes/pkg/runtime/serializer/protobuf"

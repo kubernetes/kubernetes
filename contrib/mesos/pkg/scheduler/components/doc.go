@@ -17,4 +17,4 @@ limitations under the License.
 // Package components implements independent aspects of the scheduler which
 // do not use Framework or Scheduler internals, but rely solely on the Scheduler
 // interface.
-package components
+package components // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components"

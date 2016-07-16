@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package password contains authenticator.Password implementations
-package password
+package password // import "k8s.io/kubernetes/plugin/pkg/auth/authenticator/password"

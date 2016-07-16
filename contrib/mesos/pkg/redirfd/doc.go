@@ -16,4 +16,4 @@ limitations under the License.
 
 // Some file descriptor manipulation funcs (Unix-Only), inspired by
 // https://github.com/skarnet/execline/blob/master/src/execline/redirfd.c
-package redirfd
+package redirfd // import "k8s.io/kubernetes/contrib/mesos/pkg/redirfd"

@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package resources contains the Mesos scheduler specific resource functions
-package resources
+package resources // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"

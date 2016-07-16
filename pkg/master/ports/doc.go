@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package ports defines ports used by various pieces of the kubernetes
 // infrastructure.
-package ports
+package ports // import "k8s.io/kubernetes/pkg/master/ports"

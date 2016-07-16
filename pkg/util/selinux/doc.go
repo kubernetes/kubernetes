@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package selinux contains selinux utility functions.
-package selinux
+package selinux // import "k8s.io/kubernetes/pkg/util/selinux"
