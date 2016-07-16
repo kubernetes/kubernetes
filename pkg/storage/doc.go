@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Interfaces for database-related operations.
-package storage
+package storage // import "k8s.io/kubernetes/pkg/storage"

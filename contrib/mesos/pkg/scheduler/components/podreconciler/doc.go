@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package podreconciler implements pod reconciliation of pods which failed
 // to launch, i.e. before binding by the executor took place.
-package podreconciler
+package podreconciler // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/podreconciler"

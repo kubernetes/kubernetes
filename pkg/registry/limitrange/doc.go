@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package limitrange provides Registry interface and it's REST
 // implementation for storing LimitRange api objects.
-package limitrange
+package limitrange // import "k8s.io/kubernetes/pkg/registry/limitrange"

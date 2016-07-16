@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package cluster contains code for syncing cluster
-package cluster
+package cluster // import "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"

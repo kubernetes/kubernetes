@@ -17,4 +17,4 @@ limitations under the License.
 // Package tasks provides an API for supervising system processes as Task's.
 // It provides stronger guarantees with respect to process lifecycle than a
 // standalone kubelet running static pods.
-package tasks
+package tasks // import "k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks"

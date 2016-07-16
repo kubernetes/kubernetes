@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package proc provides opinionated utilities for processing background
 // operations and future errors, somewhat inspired by libprocess.
-package proc
+package proc // import "k8s.io/kubernetes/contrib/mesos/pkg/proc"

@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Examples contains sample applications for trying out the concepts in Kubernetes.
-package examples
+package examples // import "k8s.io/kubernetes/examples"

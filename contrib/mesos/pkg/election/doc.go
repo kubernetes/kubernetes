@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package election provides interfaces used for master election.
-package election
+package election // import "k8s.io/kubernetes/contrib/mesos/pkg/election"

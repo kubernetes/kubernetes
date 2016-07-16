@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package wait provides tools for polling or listening for changes
 // to a condition.
-package wait
+package wait // import "k8s.io/kubernetes/pkg/util/wait"

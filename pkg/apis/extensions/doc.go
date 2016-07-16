@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 
-package extensions
+package extensions // import "k8s.io/kubernetes/pkg/apis/extensions"

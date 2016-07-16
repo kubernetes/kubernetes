@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 
-package unversioned
+package unversioned // import "k8s.io/kubernetes/pkg/api/unversioned"

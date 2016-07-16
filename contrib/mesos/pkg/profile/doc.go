@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package profile contains reusable code for profiling Go programs with pprof.
-package profile
+package profile // import "k8s.io/kubernetes/contrib/mesos/pkg/profile"

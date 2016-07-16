@@ -17,4 +17,4 @@ limitations under the License.
 // Package service is largely a clone of the stock Kubernetes endpoints
 // controller, extended with some very specific functionality related
 // to kubernetes-mesos specific host-pod port mapping.
-package service
+package service // import "k8s.io/kubernetes/contrib/mesos/pkg/service"

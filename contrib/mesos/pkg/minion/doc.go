@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package minion contains the executor and proxy bootstrap code for a Mesos slave
-package minion
+package minion // import "k8s.io/kubernetes/contrib/mesos/pkg/minion"
