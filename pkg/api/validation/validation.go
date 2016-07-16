@@ -1197,11 +1197,11 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 	switch rName {
 	case "limits.cpu", "requests.cpu":
 		if !validContainerResourceDivisorForCPU.Has(divisor.String()) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, fmt.Sprintf("only divisor's values 1m and 1 are supported with the cpu resource")))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "only divisor's values 1m and 1 are supported with the cpu resource"))
 		}
 	case "limits.memory", "requests.memory":
 		if !validContainerResourceDivisorForMemory.Has(divisor.String()) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, fmt.Sprintf("only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource")))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource"))
 		}
 	}
 	return allErrs
@@ -2819,11 +2819,11 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		// Check that request <= limit.
 		requestQuantity, exists := requirements.Requests[resourceName]
 		if exists {
-			// For GPUs, require that no request be set.
-			if resourceName == api.ResourceNvidiaGPU {
-				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), "cannot be set"))
+			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
+			if resourceName == api.ResourceNvidiaGPU && quantity.Cmp(requestQuantity) != 0 {
+				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", api.ResourceNvidiaGPU)))
 			} else if quantity.Cmp(requestQuantity) < 0 {
-				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), "must be greater than or equal to request"))
+				allErrs = append(allErrs, field.Invalid(limPath, quantity.String(), fmt.Sprintf("must be greater than or equal to %s request", resourceName)))
 			}
 		}
 	}
@@ -2996,7 +2996,7 @@ func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorL
 
 	if len(strings.Split(stringValue, "/")) == 1 {
 		if !api.IsStandardFinalizerName(stringValue) {
-			return append(allErrs, field.Invalid(fldPath, stringValue, fmt.Sprintf("name is neither a standard finalizer name nor is it fully qualified")))
+			return append(allErrs, field.Invalid(fldPath, stringValue, "name is neither a standard finalizer name nor is it fully qualified"))
 		}
 	}
 
