@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -160,7 +161,7 @@ func checkMirrorPodDisappear(cl *client.Client, name, namespace string) error {
 	if errors.IsNotFound(err) {
 		return nil
 	}
-	return err
+	return goerrors.New("pod not disappear")
 }
 
 func checkMirrorPodRunning(cl *client.Client, name, namespace string) error {
