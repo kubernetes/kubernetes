@@ -59,6 +59,8 @@ const (
 	nodeStatusUpdateRetry = 5
 	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
 	nodeEvictionPeriod = 100 * time.Millisecond
+	// The amount of time the nodecontroller polls on the list nodes endpoint.
+	apiserverStartupGracePeriod = 10 * time.Minute
 )
 
 type nodeStatusData struct {
@@ -135,6 +137,9 @@ type NodeController struct {
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
+// This method returns an error if it is unable to initialize the CIDR bitmap with
+// podCIDRs it has already allocated to nodes. Since we don't allow podCIDR changes
+// currently, this should be handled as a fatal error.
 func NewNodeController(
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
@@ -147,7 +152,7 @@ func NewNodeController(
 	clusterCIDR *net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
-	allocateNodeCIDRs bool) *NodeController {
+	allocateNodeCIDRs bool) (*NodeController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -266,10 +271,30 @@ func NewNodeController(
 	)
 
 	if allocateNodeCIDRs {
-		nc.cidrAllocator = NewCIDRRangeAllocator(kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize)
+		var nodeList *api.NodeList
+		var err error
+		// We must poll because apiserver might not be up. This error causes
+		// controller manager to restart.
+		if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
+			nodeList, err = kubeClient.Core().Nodes().List(api.ListOptions{
+				FieldSelector: fields.Everything(),
+				LabelSelector: labels.Everything(),
+			})
+			if err != nil {
+				glog.Errorf("Failed to list all nodes: %v", err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			return nil, fmt.Errorf("Failed to list all nodes in %v, cannot proceed without updating CIDR map", apiserverStartupGracePeriod)
+		}
+		nc.cidrAllocator, err = NewCIDRRangeAllocator(kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return nc
+	return nc, nil
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
