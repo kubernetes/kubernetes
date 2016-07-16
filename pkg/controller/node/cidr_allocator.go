@@ -64,7 +64,9 @@ type rangeAllocator struct {
 
 // NewCIDRRangeAllocator returns a CIDRAllocator to allocate CIDR for node
 // Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
-func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, serviceCIDR *net.IPNet, subNetMaskSize int) CIDRAllocator {
+// Caller must always pass in a list of existing nodes so the new allocator
+// can initialize its CIDR map. NodeList is only nil in testing.
+func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, serviceCIDR *net.IPNet, subNetMaskSize int, nodeList *api.NodeList) (CIDRAllocator, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -81,6 +83,24 @@ func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, s
 		ra.filterOutServiceRange(serviceCIDR)
 	} else {
 		glog.V(0).Info("No Service CIDR provided. Skipping filtering out service addresses.")
+	}
+
+	if nodeList != nil {
+		for _, node := range nodeList.Items {
+			if node.Spec.PodCIDR == "" {
+				glog.Infof("Node %v has no CIDR, ignoring", node.Name)
+				continue
+			} else {
+				glog.Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDR)
+			}
+			if err := ra.occupyCIDR(&node); err != nil {
+				// This will happen if:
+				// 1. We find garbage in the podCIDR field. Retrying is useless.
+				// 2. CIDR out of range: This means a node CIDR has changed.
+				// This error will keep crashing controller-manager.
+				return nil, err
+			}
+		}
 	}
 	for i := 0; i < cidrUpdateWorkers; i++ {
 		go func(stopChan <-chan struct{}) {
@@ -99,21 +119,28 @@ func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, s
 		}(wait.NeverStop)
 	}
 
-	return ra
+	return ra, nil
+}
+
+func (r *rangeAllocator) occupyCIDR(node *api.Node) error {
+	if node.Spec.PodCIDR == "" {
+		return nil
+	}
+	_, podCIDR, err := net.ParseCIDR(node.Spec.PodCIDR)
+	if err != nil {
+		return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
+	}
+	if err := r.cidrs.occupy(podCIDR); err != nil {
+		return fmt.Errorf("failed to mark cidr as occupied: %v", err)
+	}
+	return nil
 }
 
 // AllocateOrOccupyCIDR looks at the given node, assigns it a valid CIDR
 // if it doesn't currently have one or mark the CIDR as used if the node already have one.
 func (r *rangeAllocator) AllocateOrOccupyCIDR(node *api.Node) error {
 	if node.Spec.PodCIDR != "" {
-		_, podCIDR, err := net.ParseCIDR(node.Spec.PodCIDR)
-		if err != nil {
-			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
-		}
-		if err := r.cidrs.occupy(podCIDR); err != nil {
-			return fmt.Errorf("failed to mark cidr as occupied: %v", err)
-		}
-		return nil
+		return r.occupyCIDR(node)
 	}
 	podCIDR, err := r.cidrs.allocateNext()
 	if err != nil {
