@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -60,21 +61,21 @@ func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
 // Callers are responsible for retryinging on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
-	glog.V(4).Infof("vSphere: Attach disk called for host %s", hostName)
+	glog.V(4).Infof("vSphere: Attach disk called for node %s", nodeName)
 
 	// Keeps concurrent attach operations to same host atomic
-	attachdetachMutex.LockKey(hostName)
-	defer attachdetachMutex.UnlockKey(hostName)
+	attachdetachMutex.LockKey(string(nodeName))
+	defer attachdetachMutex.UnlockKey(string(nodeName))
 
 	// vsphereCloud.AttachDisk checks if disk is already attached to host and
 	// succeeds in that case, so no need to do that separately.
-	_, diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, hostName)
+	_, diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, nodeName)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q: %+v", volumeSource.VolumePath, err)
 		return "", err
@@ -190,27 +191,27 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-// Detach the given device from the given host.
-func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, hostName string) error {
+// Detach the given device from the given node.
+func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
 
 	volPath := getVolPathfromDeviceMountPath(deviceMountPath)
-	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, hostName)
+	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
 			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
-			volPath, hostName, err)
+			volPath, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is already detached from node.
-		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volPath, hostName)
+		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volPath, nodeName)
 		return nil
 	}
 
-	attachdetachMutex.LockKey(hostName)
-	defer attachdetachMutex.UnlockKey(hostName)
-	if err := detacher.vsphereVolumes.DetachDisk(volPath, hostName); err != nil {
+	attachdetachMutex.LockKey(string(nodeName))
+	defer attachdetachMutex.UnlockKey(string(nodeName))
+	if err := detacher.vsphereVolumes.DetachDisk(volPath, nodeName); err != nil {
 		glog.Errorf("Error detaching volume %q: %v", volPath, err)
 		return err
 	}

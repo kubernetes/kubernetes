@@ -7735,7 +7735,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"host": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Host name on which the event is generated.",
+							Description: "Node name on which the event is generated.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

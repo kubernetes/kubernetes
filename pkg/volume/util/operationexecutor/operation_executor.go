@@ -101,7 +101,7 @@ type OperationExecutor interface {
 	// If the volume is not found or there is an error (fetching the node
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
-	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName string, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
@@ -149,18 +149,18 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// TODO: in the future, we should be able to remove the volumeName
 	// argument to this method -- since it is used only for attachable
 	// volumes.  See issue 29695.
-	MarkVolumeAsAttached(volumeName api.UniqueVolumeName, volumeSpec *volume.Spec, nodeName, devicePath string) error
+	MarkVolumeAsAttached(volumeName api.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
 	// Marks the specified volume as detached from the specified node
-	MarkVolumeAsDetached(volumeName api.UniqueVolumeName, nodeName string)
+	MarkVolumeAsDetached(volumeName api.UniqueVolumeName, nodeName types.NodeName)
 
 	// Marks desire to detach the specified volume (remove the volume from the node's
 	// volumesToReportedAsAttached list)
-	RemoveVolumeFromReportAsAttached(volumeName api.UniqueVolumeName, nodeName string) error
+	RemoveVolumeFromReportAsAttached(volumeName api.UniqueVolumeName, nodeName types.NodeName) error
 
 	// Unmarks the desire to detach for the specified volume (add the volume back to
 	// the node's volumesToReportedAsAttached list)
-	AddVolumeToReportAsAttached(volumeName api.UniqueVolumeName, nodeName string)
+	AddVolumeToReportAsAttached(volumeName api.UniqueVolumeName, nodeName types.NodeName)
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -175,7 +175,7 @@ type VolumeToAttach struct {
 
 	// NodeName is the identifier for the node that the volume should be
 	// attached to.
-	NodeName string
+	NodeName types.NodeName
 
 	// scheduledPods is a map containing the set of pods that reference this
 	// volume and are scheduled to the underlying node. The key in the map is
@@ -234,7 +234,7 @@ type AttachedVolume struct {
 	VolumeSpec *volume.Spec
 
 	// NodeName is the identifier for the node that the volume is attached to.
-	NodeName string
+	NodeName types.NodeName
 
 	// PluginIsAttachable indicates that the plugin for this volume implements
 	// the volume.Attacher interface
@@ -453,7 +453,7 @@ func (oe *operationExecutor) UnmountDevice(
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	volumeToMount VolumeToMount,
-	nodeName string,
+	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	verifyControllerAttachedVolumeFunc, err :=
 		oe.generateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
@@ -605,7 +605,7 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 func (oe *operationExecutor) verifyVolumeIsSafeToDetach(
 	volumeToDetach AttachedVolume) error {
 	// Fetch current node object
-	node, fetchErr := oe.kubeClient.Core().Nodes().Get(volumeToDetach.NodeName)
+	node, fetchErr := oe.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName))
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
 			glog.Warningf("Node %q not found on API server. DetachVolume will skip safe to detach check.",
@@ -1001,7 +1001,7 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 
 func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 	volumeToMount VolumeToMount,
-	nodeName string,
+	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 	return func() error {
 		if !volumeToMount.PluginIsAttachable {
@@ -1040,7 +1040,7 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 		}
 
 		// Fetch current node object
-		node, fetchErr := oe.kubeClient.Core().Nodes().Get(nodeName)
+		node, fetchErr := oe.kubeClient.Core().Nodes().Get(string(nodeName))
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(

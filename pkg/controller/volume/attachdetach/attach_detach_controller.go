@@ -237,7 +237,7 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 		return
 	}
 
-	nodeName := node.Name
+	nodeName := types.NodeName(node.Name)
 	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
@@ -258,7 +258,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 		return
 	}
 
-	nodeName := node.Name
+	nodeName := types.NodeName(node.Name)
 	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
 		glog.V(10).Infof("%v", err)
 	}
@@ -278,7 +278,9 @@ func (adc *attachDetachController) processPodVolumes(
 		return
 	}
 
-	if !adc.desiredStateOfWorld.NodeExists(pod.Spec.NodeName) {
+	nodeName := types.NodeName(pod.Spec.NodeName)
+
+	if !adc.desiredStateOfWorld.NodeExists(nodeName) {
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.
@@ -288,7 +290,7 @@ func (adc *attachDetachController) processPodVolumes(
 			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
 			pod.Namespace,
 			pod.Name,
-			pod.Spec.NodeName)
+			nodeName)
 		return
 	}
 
@@ -321,7 +323,7 @@ func (adc *attachDetachController) processPodVolumes(
 		if addVolumes {
 			// Add volume to desired state of world
 			_, err := adc.desiredStateOfWorld.AddPod(
-				uniquePodName, pod, volumeSpec, pod.Spec.NodeName)
+				uniquePodName, pod, volumeSpec, nodeName)
 			if err != nil {
 				glog.V(10).Infof(
 					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
@@ -345,7 +347,7 @@ func (adc *attachDetachController) processPodVolumes(
 				continue
 			}
 			adc.desiredStateOfWorld.DeletePod(
-				uniquePodName, uniqueVolumeName, pod.Spec.NodeName)
+				uniquePodName, uniqueVolumeName, nodeName)
 		}
 	}
 
@@ -516,7 +518,7 @@ func (adc *attachDetachController) getPVSpecFromCache(
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName string, volumesInUse []api.UniqueVolumeName) {
+	nodeName types.NodeName, volumesInUse []api.UniqueVolumeName) {
 	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false

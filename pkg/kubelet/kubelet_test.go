@@ -137,7 +137,7 @@ func newTestKubeletWithImageList(
 	kubelet.os = &containertest.FakeOS{}
 
 	kubelet.hostname = testKubeletHostname
-	kubelet.nodeName = testKubeletHostname
+	kubelet.nodeName = types.NodeName(testKubeletHostname)
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	kubelet.runtimeState.setNetworkState(nil)
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kubelet.nonMasqueradeCIDR, 1440)
@@ -220,7 +220,7 @@ func newTestKubeletWithImageList(
 	kubelet.resourceAnalyzer = stats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.containerRuntime)
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
-		Name:      kubelet.nodeName,
+		Name:      string(kubelet.nodeName),
 		UID:       types.UID(kubelet.nodeName),
 		Namespace: "",
 	}
@@ -241,7 +241,7 @@ func newTestKubeletWithImageList(
 	kubelet.mounter = &mount.FakeMounter{}
 	kubelet.volumeManager, err = kubeletvolume.NewVolumeManager(
 		controllerAttachDetachEnabled,
-		kubelet.hostname,
+		kubelet.nodeName,
 		kubelet.podManager,
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
@@ -1933,7 +1933,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			ObjectMeta: api.ObjectMeta{Name: string(kl.nodeName)},
 			Status: api.NodeStatus{
 				Allocatable: api.ResourceList{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -1943,7 +1943,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			ObjectMeta: api.ObjectMeta{Name: string(kl.nodeName)},
 			Status: api.NodeStatus{
 				Allocatable: api.ResourceList{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -1952,7 +1952,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		},
 	}}
 
-	spec := api.PodSpec{NodeName: kl.nodeName, Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
+	spec := api.PodSpec{NodeName: string(kl.nodeName), Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
 	pods := []*api.Pod{
 		podWithUidNameNsSpec("123456789", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -2086,7 +2086,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	spec := api.PodSpec{NodeName: kl.nodeName,
+	spec := api.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []api.Container{{Resources: api.ResourceRequirements{
 			Requests: api.ResourceList{
 				"memory": resource.MustParse("90"),
@@ -3312,7 +3312,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	kl := testKubelet.kubelet
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			ObjectMeta: api.ObjectMeta{Name: string(kl.nodeName)},
 			Status: api.NodeStatus{
 				Allocatable: api.ResourceList{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -3322,7 +3322,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			ObjectMeta: api.ObjectMeta{Name: string(kl.nodeName)},
 			Status: api.NodeStatus{
 				Allocatable: api.ResourceList{
 					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/runtime"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -45,9 +46,9 @@ const (
 	reconcilerReconstructSleepPeriod time.Duration = 10 * time.Minute
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
-	waitForAttachTimeout time.Duration = 1 * time.Second
-	nodeName             string        = "myhostname"
-	kubeletPodsDir       string        = "fake-dir"
+	waitForAttachTimeout time.Duration     = 1 * time.Second
+	nodeName             k8stypes.NodeName = k8stypes.NodeName("mynodename")
+	kubeletPodsDir       string            = "fake-dir"
 )
 
 // Calls Run()
@@ -452,7 +453,7 @@ func createTestClient() *fake.Clientset {
 	fakeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: nodeName},
+				ObjectMeta: api.ObjectMeta{Name: string(nodeName)},
 				Status: api.NodeStatus{
 					VolumesAttached: []api.AttachedVolume{
 						{
@@ -460,7 +461,7 @@ func createTestClient() *fake.Clientset {
 							DevicePath: "fake/path",
 						},
 					}},
-				Spec: api.NodeSpec{ExternalID: nodeName},
+				Spec: api.NodeSpec{ExternalID: string(nodeName)},
 			}, nil
 		})
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
