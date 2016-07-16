@@ -120,7 +120,7 @@ type WatchServer struct {
 	t timeoutFactory
 }
 
-// Serve serves a series of encoded events via HTTP with Transfer-Encoding: chunked
+// ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
 // or over a websocket connection.
 func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w = httplog.Unlogged(w)
