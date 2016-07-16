@@ -74,6 +74,7 @@ config-sync-period
 configure-cbr0
 configure-cloud-routes
 conntrack-max
+conntrack-max-per-core
 conntrack-tcp-timeout-established
 consumer-port
 consumer-service-name

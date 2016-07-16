@@ -71,6 +71,7 @@ func DeepCopy_v1alpha1_KubeProxyConfiguration(in interface{}, out interface{}, c
 		out.ResourceContainer = in.ResourceContainer
 		out.UDPIdleTimeout = in.UDPIdleTimeout
 		out.ConntrackMax = in.ConntrackMax
+		out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
 		out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 		return nil
 	}
@@ -242,6 +243,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.RuntimeCgroups = in.RuntimeCgroups
 		out.SystemCgroups = in.SystemCgroups
 		out.CgroupRoot = in.CgroupRoot
+		if in.CgroupsPerQOS != nil {
+			in, out := &in.CgroupsPerQOS, &out.CgroupsPerQOS
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.CgroupsPerQOS = nil
+		}
 		out.ContainerRuntime = in.ContainerRuntime
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
