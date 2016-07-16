@@ -188,7 +188,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
 		return kl.initialNodeStatus()
 	}
-	return kl.nodeInfo.GetNodeInfo(kl.nodeName)
+	return kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
 }
 
 // getNodeAnyWay() must return a *api.Node which is required by RunGeneralPredicates().
@@ -198,7 +198,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*api.Node, error) {
 	if !kl.standaloneMode {
-		if n, err := kl.nodeInfo.GetNodeInfo(kl.nodeName); err == nil {
+		if n, err := kl.nodeInfo.GetNodeInfo(string(kl.nodeName)); err == nil {
 			return n, nil
 		}
 	}

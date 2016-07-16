@@ -163,7 +163,7 @@ type AttachedVolume struct {
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
 func NewActualStateOfWorld(
-	nodeName string,
+	nodeName types.NodeName,
 	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
 		nodeName:        nodeName,
@@ -188,7 +188,7 @@ func IsRemountRequiredError(err error) bool {
 
 type actualStateOfWorld struct {
 	// nodeName is the name of this node. This value is passed to Attach/Detach
-	nodeName string
+	nodeName types.NodeName
 	// attachedVolumes is a map containing the set of volumes the kubelet volume
 	// manager believes to be successfully attached to this node. Volume types
 	// that do not implement an attacher interface are assumed to be in this
@@ -274,13 +274,13 @@ type mountedPod struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	volumeSpec *volume.Spec, nodeName string, devicePath string) error {
+	volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error {
 	_, err := asw.AddVolume(volumeSpec, devicePath)
 	return err
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
-	volumeName api.UniqueVolumeName, nodeName string) {
+	volumeName api.UniqueVolumeName, nodeName types.NodeName) {
 	asw.DeleteVolume(volumeName)
 }
 

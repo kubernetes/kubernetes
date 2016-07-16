@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "openstack"
@@ -292,7 +293,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	return &Instances{compute, flavor_to_resource}, true
 }
 
-func (i *Instances) List(name_filter string) ([]string, error) {
+func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
 	glog.V(4).Infof("openstack List(%v) called", name_filter)
 
 	opts := servers.ListOpts{
@@ -301,14 +302,14 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 	}
 	pager := servers.List(i.compute, opts)
 
-	ret := make([]string, 0)
+	ret := make([]types.NodeName, 0)
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		sList, err := servers.ExtractServers(page)
 		if err != nil {
 			return false, err
 		}
-		for _, server := range sList {
-			ret = append(ret, server.Name)
+		for i := range sList {
+			ret = append(ret, mapServerToNodeName(&sList[i]))
 		}
 		return true, nil
 	})
@@ -442,29 +443,42 @@ func getAddressByName(client *gophercloud.ServiceClient, name string) (string, e
 }
 
 // Implementation of Instances.CurrentNodeName
-func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
+	return types.NodeName(hostname), nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
-func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	glog.V(4).Infof("NodeAddresses(%v) called", name)
+// mapNodeNameToServerName maps a k8s NodeName to an OpenStack Server Name
+// This is a straight string cast
+func mapNodeNameToServerName(nodeName types.NodeName) string {
+	return string(nodeName)
+}
 
-	addrs, err := getAddressesByName(i.compute, name)
+// mapServerToNodeName maps an OpenStack Server to a k8s NodeName
+func mapServerToNodeName(server *servers.Server) types.NodeName {
+	return types.NodeName(server.Name)
+}
+
+func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, error) {
+	glog.V(4).Infof("NodeAddresses(%v) called", nodeName)
+	serverName := mapNodeNameToServerName(nodeName)
+
+	addrs, err := getAddressesByName(i.compute, serverName)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+	glog.V(4).Infof("NodeAddresses(%v) => %v", serverName, addrs)
 	return addrs, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (i *Instances) ExternalID(name string) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+// ExternalID returns the cloud provider ID of the node with the specified Name (deprecated).
+func (i *Instances) ExternalID(nodeName types.NodeName) (string, error) {
+	serverName := mapNodeNameToServerName(nodeName)
+	srv, err := getServerByName(i.compute, serverName)
 	if err != nil {
 		return "", err
 	}
@@ -476,9 +490,10 @@ func (os *OpenStack) InstanceID() (string, error) {
 	return os.localInstanceID, nil
 }
 
-// InstanceID returns the cloud provider ID of the specified instance.
-func (i *Instances) InstanceID(name string) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+// InstanceID returns the cloud provider ID of the node with the specified Name.
+func (i *Instances) InstanceID(nodeName types.NodeName) (string, error) {
+	serverName := mapNodeNameToServerName(nodeName)
+	srv, err := getServerByName(i.compute, serverName)
 	if err != nil {
 		return "", err
 	}
@@ -488,7 +503,7 @@ func (i *Instances) InstanceID(name string) (string, error) {
 }
 
 // InstanceType returns the type of the specified instance.
-func (i *Instances) InstanceType(name string) (string, error) {
+func (i *Instances) InstanceType(name types.NodeName) (string, error) {
 	return "", nil
 }
 

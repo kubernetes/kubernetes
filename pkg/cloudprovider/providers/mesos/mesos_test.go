@@ -25,6 +25,7 @@ import (
 
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestIPAddress(t *testing.T) {
@@ -268,7 +269,7 @@ func Test_ExternalID(t *testing.T) {
 		t.Fatalf("ExternalID did not return InstanceNotFound on an unknown instance")
 	}
 
-	slaveName := "mesos3.internal.company.com"
+	slaveName := types.NodeName("mesos3.internal.company.com")
 	id, err := mesosCloud.ExternalID(slaveName)
 	if id != "" {
 		t.Fatalf("ExternalID should not be able to resolve %q", slaveName)

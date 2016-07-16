@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -133,7 +134,7 @@ type NodeController struct {
 	cidrAllocator CIDRAllocator
 
 	forcefullyDeletePod       func(*api.Pod) error
-	nodeExistsInCloudProvider func(string) (bool, error)
+	nodeExistsInCloudProvider func(types.NodeName) (bool, error)
 	computeZoneStateFunc      func(nodeConditions []*api.NodeCondition) zoneState
 
 	zoneStates map[string]zoneState
@@ -197,7 +198,7 @@ func NewNodeController(
 		serviceCIDR:               serviceCIDR,
 		allocateNodeCIDRs:         allocateNodeCIDRs,
 		forcefullyDeletePod:       func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
-		nodeExistsInCloudProvider: func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
+		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
 		computeZoneStateFunc:      ComputeZoneState,
 		evictionLimiterQPS:        evictionLimiterQPS,
 		zoneStates:                make(map[string]zoneState),
@@ -460,7 +461,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Check with the cloud provider to see if the node still exists. If it
 			// doesn't, delete the node immediately.
 			if currentReadyCondition.Status != api.ConditionTrue && nc.cloud != nil {
-				exists, err := nc.nodeExistsInCloudProvider(node.Name)
+				exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
 				if err != nil {
 					glog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
 					continue

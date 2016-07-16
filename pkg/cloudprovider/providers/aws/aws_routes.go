@@ -86,9 +86,9 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 			glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
 			continue
 		}
-		instanceName := orEmpty(instance.PrivateDnsName)
+		nodeName := mapInstanceToNodeName(instance)
 		routeName := clusterName + "-" + destinationCIDR
-		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetInstance: instanceName, DestinationCIDR: destinationCIDR})
+		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetNode: nodeName, DestinationCIDR: destinationCIDR})
 	}
 
 	return routes, nil
@@ -110,7 +110,7 @@ func (c *Cloud) configureInstanceSourceDestCheck(instanceID string, sourceDestCh
 // CreateRoute implements Routes.CreateRoute
 // Create the described route
 func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
-	instance, err := c.getInstanceByNodeName(route.TargetInstance)
+	instance, err := c.getInstanceByNodeName(route.TargetNode)
 	if err != nil {
 		return err
 	}

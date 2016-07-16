@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 type mockVolumes struct {
@@ -33,11 +34,11 @@ type mockVolumes struct {
 
 var _ aws.Volumes = &mockVolumes{}
 
-func (v *mockVolumes) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
+func (v *mockVolumes) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DetachDisk(diskName string, instanceName string) (string, error) {
+func (v *mockVolumes) DetachDisk(diskName string, nodeName types.NodeName) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
@@ -57,7 +58,7 @@ func (c *mockVolumes) GetDiskPath(volumeName string) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DiskIsAttached(volumeName, instanceID string) (bool, error) {
+func (c *mockVolumes) DiskIsAttached(volumeName string, nodeName types.NodeName) (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 

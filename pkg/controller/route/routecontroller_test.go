@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestIsResponsibleForRoute(t *testing.T) {
@@ -58,7 +59,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		rc := New(nil, nil, myClusterName, cidr)
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
-			TargetInstance:  "doesnt-matter-for-this-test",
+			TargetNode:      types.NodeName("doesnt-matter-for-this-test"),
 			DestinationCIDR: testCase.routeCIDR,
 		}
 		if resp := rc.isResponsibleForRoute(route); resp != testCase.expectedResponsible {

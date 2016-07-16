@@ -29,6 +29,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -71,7 +72,7 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 }
 
 func TestReadPodsFromFile(t *testing.T) {
-	hostname := "random-test-hostname"
+	nodeName := "random-test-hostname"
 	grace := int64(30)
 	var testCases = []struct {
 		desc     string
@@ -100,14 +101,14 @@ func TestReadPodsFromFile(t *testing.T) {
 			},
 			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:        "test-" + hostname,
+					Name:        "test-" + nodeName,
 					UID:         "12345",
 					Namespace:   "mynamespace",
 					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
-					SelfLink:    getSelfLink("test-"+hostname, "mynamespace"),
+					SelfLink:    getSelfLink("test-"+nodeName, "mynamespace"),
 				},
 				Spec: api.PodSpec{
-					NodeName:                      hostname,
+					NodeName:                      nodeName,
 					RestartPolicy:                 api.RestartPolicyAlways,
 					DNSPolicy:                     api.DNSClusterFirst,
 					TerminationGracePeriodSeconds: &grace,
@@ -142,7 +143,7 @@ func TestReadPodsFromFile(t *testing.T) {
 			defer os.Remove(file.Name())
 
 			ch := make(chan interface{})
-			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
+			NewSourceFile(file.Name(), types.NodeName(nodeName), time.Millisecond, ch)
 			select {
 			case got := <-ch:
 				update := got.(kubetypes.PodUpdate)

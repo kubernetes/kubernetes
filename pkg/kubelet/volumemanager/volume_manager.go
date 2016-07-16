@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -138,7 +139,7 @@ type VolumeManager interface {
 //   Must be pre-initialized.
 func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
-	hostName string,
+	nodeName k8stypes.NodeName,
 	podManager pod.Manager,
 	kubeClient internalclientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
@@ -147,7 +148,7 @@ func NewVolumeManager(
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr),
-		actualStateOfWorld:  cache.NewActualStateOfWorld(hostName, volumePluginMgr),
+		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
 		operationExecutor: operationexecutor.NewOperationExecutor(
 			kubeClient,
 			volumePluginMgr),
@@ -158,7 +159,7 @@ func NewVolumeManager(
 		controllerAttachDetachEnabled,
 		reconcilerLoopSleepPeriod,
 		waitForAttachTimeout,
-		hostName,
+		nodeName,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		vm.operationExecutor)

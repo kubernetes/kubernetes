@@ -174,7 +174,7 @@ type Option func(*Kubelet)
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(
 	hostname string,
-	nodeName string,
+	nodeName types.NodeName,
 	dockerClient dockertools.DockerInterface,
 	kubeClient clientset.Interface,
 	rootDirectory string,
@@ -268,7 +268,7 @@ func NewMainKubelet(
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
-		fieldSelector := fields.Set{api.ObjectNameField: nodeName}.AsSelector()
+		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
@@ -289,7 +289,7 @@ func NewMainKubelet(
 	// TODO: what is namespace for node?
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
-		Name:      nodeName,
+		Name:      string(nodeName),
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
@@ -504,7 +504,7 @@ func NewMainKubelet(
 
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		enableControllerAttachDetach,
-		hostname,
+		nodeName,
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
@@ -557,7 +557,7 @@ type nodeLister interface {
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname      string
-	nodeName      string
+	nodeName      types.NodeName
 	dockerClient  dockertools.DockerInterface
 	runtimeCache  kubecontainer.RuntimeCache
 	kubeClient    clientset.Interface
@@ -973,7 +973,7 @@ func (kl *Kubelet) getActivePods() []*api.Pod {
 func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
-			Name: kl.nodeName,
+			Name: string(kl.nodeName),
 			Labels: map[string]string{
 				unversioned.LabelHostname: kl.hostname,
 				unversioned.LabelOS:       goRuntime.GOOS,
@@ -1102,7 +1102,7 @@ func (kl *Kubelet) registerWithApiserver() {
 				glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
 				continue
 			}
-			currentNode, err := kl.kubeClient.Core().Nodes().Get(kl.nodeName)
+			currentNode, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName))
 			if err != nil {
 				glog.Errorf("error getting node %q: %v", kl.nodeName, err)
 				continue
@@ -3100,7 +3100,7 @@ func SetNodeStatus(f func(*api.Node) error) Option {
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
 // is set, this function will also confirm that cbr0 is configured correctly.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
-	node, err := kl.kubeClient.Core().Nodes().Get(kl.nodeName)
+	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName))
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}

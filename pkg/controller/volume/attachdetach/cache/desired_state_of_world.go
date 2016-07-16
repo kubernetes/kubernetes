@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -45,7 +46,7 @@ type DesiredStateOfWorld interface {
 	// AddNode adds the given node to the list of nodes managed by the attach/
 	// detach controller.
 	// If the node already exists this is a no-op.
-	AddNode(nodeName string)
+	AddNode(nodeName k8stypes.NodeName)
 
 	// AddPod adds the given pod to the list of pods that reference the
 	// specified volume and is scheduled to the specified node.
@@ -57,13 +58,13 @@ type DesiredStateOfWorld interface {
 	// should be attached to the specified node, the volume is implicitly added.
 	// If no node with the name nodeName exists in list of nodes managed by the
 	// attach/detach attached controller, an error is returned.
-	AddPod(podName types.UniquePodName, pod *api.Pod, volumeSpec *volume.Spec, nodeName string) (api.UniqueVolumeName, error)
+	AddPod(podName types.UniquePodName, pod *api.Pod, volumeSpec *volume.Spec, nodeName k8stypes.NodeName) (api.UniqueVolumeName, error)
 
 	// DeleteNode removes the given node from the list of nodes managed by the
 	// attach/detach controller.
 	// If the node does not exist this is a no-op.
 	// If the node exists but has 1 or more child volumes, an error is returned.
-	DeleteNode(nodeName string) error
+	DeleteNode(nodeName k8stypes.NodeName) error
 
 	// DeletePod removes the given pod from the list of pods that reference the
 	// specified volume and are scheduled to the specified node.
@@ -75,16 +76,16 @@ type DesiredStateOfWorld interface {
 	// volumes under the specified node, this is a no-op.
 	// If after deleting the pod, the specified volume contains no other child
 	// pods, the volume is also deleted.
-	DeletePod(podName types.UniquePodName, volumeName api.UniqueVolumeName, nodeName string)
+	DeletePod(podName types.UniquePodName, volumeName api.UniqueVolumeName, nodeName k8stypes.NodeName)
 
 	// NodeExists returns true if the node with the specified name exists in
 	// the list of nodes managed by the attach/detach controller.
-	NodeExists(nodeName string) bool
+	NodeExists(nodeName k8stypes.NodeName) bool
 
 	// VolumeExists returns true if the volume with the specified name exists
 	// in the list of volumes that should be attached to the specified node by
 	// the attach detach controller.
-	VolumeExists(volumeName api.UniqueVolumeName, nodeName string) bool
+	VolumeExists(volumeName api.UniqueVolumeName, nodeName k8stypes.NodeName) bool
 
 	// GetVolumesToAttach generates and returns a list of volumes to attach
 	// and the nodes they should be attached to based on the current desired
@@ -111,13 +112,13 @@ type PodToAdd struct {
 	VolumeName api.UniqueVolumeName
 
 	// nodeName contains the name of this node.
-	NodeName string
+	NodeName k8stypes.NodeName
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
 func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
 	return &desiredStateOfWorld{
-		nodesManaged:    make(map[string]nodeManaged),
+		nodesManaged:    make(map[k8stypes.NodeName]nodeManaged),
 		volumePluginMgr: volumePluginMgr,
 	}
 }
@@ -126,7 +127,7 @@ type desiredStateOfWorld struct {
 	// nodesManaged is a map containing the set of nodes managed by the attach/
 	// detach controller. The key in this map is the name of the node and the
 	// value is a node object containing more information about the node.
-	nodesManaged map[string]nodeManaged
+	nodesManaged map[k8stypes.NodeName]nodeManaged
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -137,7 +138,7 @@ type desiredStateOfWorld struct {
 // controller.
 type nodeManaged struct {
 	// nodeName contains the name of this node.
-	nodeName string
+	nodeName k8stypes.NodeName
 
 	// volumesToAttach is a map containing the set of volumes that should be
 	// attached to this node. The key in the map is the name of the volume and
@@ -172,7 +173,7 @@ type pod struct {
 	podObj *api.Pod
 }
 
-func (dsw *desiredStateOfWorld) AddNode(nodeName string) {
+func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -188,7 +189,7 @@ func (dsw *desiredStateOfWorld) AddPod(
 	podName types.UniquePodName,
 	podToAdd *api.Pod,
 	volumeSpec *volume.Spec,
-	nodeName string) (api.UniqueVolumeName, error) {
+	nodeName k8stypes.NodeName) (api.UniqueVolumeName, error) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -236,7 +237,7 @@ func (dsw *desiredStateOfWorld) AddPod(
 	return volumeName, nil
 }
 
-func (dsw *desiredStateOfWorld) DeleteNode(nodeName string) error {
+func (dsw *desiredStateOfWorld) DeleteNode(nodeName k8stypes.NodeName) error {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -261,7 +262,7 @@ func (dsw *desiredStateOfWorld) DeleteNode(nodeName string) error {
 func (dsw *desiredStateOfWorld) DeletePod(
 	podName types.UniquePodName,
 	volumeName api.UniqueVolumeName,
-	nodeName string) {
+	nodeName k8stypes.NodeName) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -289,7 +290,7 @@ func (dsw *desiredStateOfWorld) DeletePod(
 	}
 }
 
-func (dsw *desiredStateOfWorld) NodeExists(nodeName string) bool {
+func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {
 	dsw.RLock()
 	defer dsw.RUnlock()
 
@@ -298,7 +299,7 @@ func (dsw *desiredStateOfWorld) NodeExists(nodeName string) bool {
 }
 
 func (dsw *desiredStateOfWorld) VolumeExists(
-	volumeName api.UniqueVolumeName, nodeName string) bool {
+	volumeName api.UniqueVolumeName, nodeName k8stypes.NodeName) bool {
 	dsw.RLock()
 	defer dsw.RUnlock()
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -51,7 +52,7 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 	}, nil
 }
 
-func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -61,7 +62,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 
 	// awsCloud.AttachDisk checks if disk is already attached to node and
 	// succeeds in that case, so no need to do that separately.
-	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, hostName, readOnly)
+	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, nodeName, readOnly)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
 		return "", err
@@ -179,24 +180,24 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 	}, nil
 }
 
-func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
+func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
 	volumeID := path.Base(deviceMountPath)
 
-	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, hostName)
+	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, nodeName)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
 			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
-			volumeID, hostName, err)
+			volumeID, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is already detached from node.
-		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, hostName)
+		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, nodeName)
 		return nil
 	}
 
-	if _, err = detacher.awsVolumes.DetachDisk(volumeID, hostName); err != nil {
+	if _, err = detacher.awsVolumes.DetachDisk(volumeID, nodeName); err != nil {
 		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
 		return err
 	}

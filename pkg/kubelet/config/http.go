@@ -29,19 +29,20 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 type sourceURL struct {
 	url         string
 	header      http.Header
-	nodeName    string
+	nodeName    types.NodeName
 	updates     chan<- interface{}
 	data        []byte
 	failureLogs int
 	client      *http.Client
 }
 
-func NewSourceURL(url string, header http.Header, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
 		header:   header,

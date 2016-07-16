@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/runtime"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -41,8 +42,8 @@ const (
 
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
-	waitForAttachTimeout time.Duration = 1 * time.Second
-	nodeName             string        = "myhostname"
+	waitForAttachTimeout time.Duration     = 1 * time.Second
+	nodeName             k8stypes.NodeName = k8stypes.NodeName("mynodename")
 )
 
 // Calls Run()
@@ -423,7 +424,7 @@ func createTestClient() *fake.Clientset {
 	fakeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: nodeName},
+				ObjectMeta: api.ObjectMeta{Name: string(nodeName)},
 				Status: api.NodeStatus{
 					VolumesAttached: []api.AttachedVolume{
 						{
@@ -431,7 +432,7 @@ func createTestClient() *fake.Clientset {
 							DevicePath: "fake/path",
 						},
 					}},
-				Spec: api.NodeSpec{ExternalID: nodeName},
+				Spec: api.NodeSpec{ExternalID: string(nodeName)},
 			}, nil
 		})
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {

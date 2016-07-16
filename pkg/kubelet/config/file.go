@@ -30,15 +30,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 type sourceFile struct {
 	path     string
-	nodeName string
+	nodeName types.NodeName
 	updates  chan<- interface{}
 }
 
-func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := &sourceFile{
 		path:     path,
 		nodeName: nodeName,
