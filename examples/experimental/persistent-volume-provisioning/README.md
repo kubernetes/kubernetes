@@ -51,8 +51,7 @@ There is no provisioner when running outside of any of those 3 cloud providers.
 
 A fourth provisioner is included for testing and development only.  It creates HostPath volumes,
 which will never work outside of a single node cluster. It is not supported in any way except for
-local for testing and development.
-
+local for testing and development. This provisioner may be used by passing `--enable-hostpath-provisioner=true` to the controller manager while bringing it up. When using the hack/local_up_cluster.sh script, this flag is turned off by default. It may be turned on by setting the environment variable `ENABLE_HOSTPATH_PROVISIONER` to true prior to running the script.
 
 ### User provisioning requests
 
