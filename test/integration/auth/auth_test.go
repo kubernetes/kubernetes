@@ -537,7 +537,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 type allowAliceAuthorizer struct{}
 
 func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
-	if a.GetUserName() == "alice" {
+	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
 		return nil
 	}
 	return errors.New("I can't allow that.  Go ask alice.")
@@ -705,18 +705,18 @@ type impersonateAuthorizer struct{}
 // alice can't act as anyone and bob can't do anything but act-as someone
 func (impersonateAuthorizer) Authorize(a authorizer.Attributes) error {
 	// alice can impersonate service accounts and do other actions
-	if a.GetUserName() == "alice" && a.GetVerb() == "impersonate" && a.GetResource() == "serviceaccounts" {
+	if a.GetUser() != nil && a.GetUser().GetName() == "alice" && a.GetVerb() == "impersonate" && a.GetResource() == "serviceaccounts" {
 		return nil
 	}
-	if a.GetUserName() == "alice" && a.GetVerb() != "impersonate" {
+	if a.GetUser() != nil && a.GetUser().GetName() == "alice" && a.GetVerb() != "impersonate" {
 		return nil
 	}
 	// bob can impersonate anyone, but that it
-	if a.GetUserName() == "bob" && a.GetVerb() == "impersonate" {
+	if a.GetUser() != nil && a.GetUser().GetName() == "bob" && a.GetVerb() == "impersonate" {
 		return nil
 	}
 	// service accounts can do everything
-	if strings.HasPrefix(a.GetUserName(), serviceaccount.ServiceAccountUsernamePrefix) {
+	if a.GetUser() != nil && strings.HasPrefix(a.GetUser().GetName(), serviceaccount.ServiceAccountUsernamePrefix) {
 		return nil
 	}
 
