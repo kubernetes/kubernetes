@@ -30,7 +30,10 @@ MAINTAINER Jimmi Dyson "jimmidyson@gmail.com"
 RUN ulimit -n 65536
 
 # Disable prompts from apt.
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    ES_HOST=elasticsearch-logging \
+    ES_PORT=9200 \
+    ES_INDEX_NAME='fluentd'
 
 # Install prerequisites.
 RUN apt-get update && \
@@ -50,6 +53,8 @@ RUN td-agent-gem install fluent-plugin-kubernetes_metadata_filter fluent-plugin-
 
 # Copy the Fluentd configuration file.
 COPY td-agent.conf /etc/td-agent/td-agent.conf
+COPY run.sh /
+COPY conf.d /etc/td-agent/conf.d/
 
 # Run the Fluentd service.
-ENTRYPOINT ["td-agent"]
+ENTRYPOINT /run.sh
