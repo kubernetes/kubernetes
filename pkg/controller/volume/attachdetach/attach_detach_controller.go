@@ -54,7 +54,7 @@ const (
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 5 * time.Minute
+	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
 )
 
 // AttachDetachController defines the operations supported by this controller.
