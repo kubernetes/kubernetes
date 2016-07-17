@@ -140,7 +140,7 @@ $(foreach dir, $(ALL_GO_DIRS), $(eval           \
 # but we only need to rebuild targets if the contents actually changed.  That
 # is what the .stamp file represents.
 $(foreach dir, $(ALL_GO_DIRS), $(META_DIR)/$(dir)/$(GOFILES_META)):
-	FILES=$$(ls $</*.go | grep -v $(GENERATED_FILE_PREFIX));  \
+	FILES=$$(ls $</*.go | grep --color=never -v $(GENERATED_FILE_PREFIX));  \
 	mkdir -p $(@D);                                           \
 	echo "gofiles__$< := $$(echo $${FILES})" >$@.tmp;         \
 	cmp -s $@.tmp $@ || touch $@.stamp;                       \
@@ -161,7 +161,7 @@ ifeq ($(DBG_MAKEFILE),1)
 endif
 ALL_K8S_TAG_FILES := $(shell                             \
     find $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
-        | xargs grep -l '^// *+k8s:'                     \
+        | xargs grep --color=never -l '^// *+k8s:'       \
 )
 
 #
@@ -188,7 +188,7 @@ ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:deepcopy-gen tags)
 endif
 DEEPCOPY_DIRS := $(shell                               \
-    grep -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
+    grep --color=never -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
         | xargs -n1 dirname                            \
         | sort -u                                      \
 )
@@ -242,7 +242,7 @@ $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	 INDIRECT=$$(go list -e                                \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/deepcopy-gen                    \
-	     | grep "^$(PRJ_SRC_PATH)"                         \
+	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
 	 echo $$DIRECT $$INDIRECT                              \
@@ -299,7 +299,7 @@ ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:conversion-gen tags)
 endif
 CONVERSION_DIRS := $(shell                                \
-    grep '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
+    grep --color=never '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
         | cut -f1 -d:                                     \
         | xargs -n1 dirname                               \
         | sort -u                                         \
@@ -342,7 +342,7 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval           \
 # but we only need to rebuild targets if the contents actually changed.  That
 # is what the .stamp file represents.
 $(foreach dir, $(CONVERSION_DIRS), $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
-	TAGS=$$(grep -h '^// *+k8s:conversion-gen=' $</*.go   \
+	TAGS=$$(grep --color=never -h '^// *+k8s:conversion-gen=' $</*.go  \
 	    | cut -f2- -d=                                    \
 	    | sed 's|$(PRJ_SRC_PATH)/||');                    \
 	mkdir -p $(@D);                                       \
@@ -421,7 +421,7 @@ $(META_DIR)/$(CONVERSION_GEN).mk:
 	 INDIRECT=$$(go list -e                                \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/conversion-gen                  \
-	     | grep "^$(PRJ_SRC_PATH)"                         \
+	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
 	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
 	 echo $$DIRECT $$INDIRECT                              \
