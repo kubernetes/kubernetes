@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
 	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
 	"k8s.io/kubernetes/pkg/registry/role"
@@ -36,16 +35,11 @@ type RBACAuthorizer struct {
 }
 
 func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) error {
-	if r.superUser != "" && attr.GetUserName() == r.superUser {
+	if r.superUser != "" && attr.GetUser() != nil && attr.GetUser().GetName() == r.superUser {
 		return nil
 	}
 
-	userInfo := &user.DefaultInfo{
-		Name:   attr.GetUserName(),
-		Groups: attr.GetGroups(),
-	}
-
-	ctx := api.WithNamespace(api.WithUser(api.NewContext(), userInfo), attr.GetNamespace())
+	ctx := api.WithNamespace(api.WithUser(api.NewContext(), attr.GetUser()), attr.GetNamespace())
 
 	// Frame the authorization request as a privilege escalation check.
 	var requestedRule rbac.PolicyRule
