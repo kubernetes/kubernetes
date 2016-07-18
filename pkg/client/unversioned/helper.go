@@ -258,16 +258,14 @@ func SetKubernetesDefaults(config *restclient.Config) error {
 	if config.APIPath == "" {
 		config.APIPath = legacyAPIPath
 	}
-	g, err := registered.Group(api.GroupName)
-	if err != nil {
-		return err
+	if config.GroupVersion == nil || !isEnabledVersion(api.GroupName, config.GroupVersion) {
+		g, err := registered.Group(api.GroupName)
+		if err != nil {
+			return err
+		}
+		copyGroupVersion := g.GroupVersion
+		config.GroupVersion = &copyGroupVersion
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = api.Codecs
-	}
-
+	config.NegotiatedSerializer = api.Codecs
 	return restclient.SetKubernetesDefaults(config)
 }
