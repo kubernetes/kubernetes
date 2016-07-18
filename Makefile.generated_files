@@ -237,14 +237,14 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	mkdir -p $(@D);                                        \
 	(echo -n "$(DEEPCOPY_GEN): ";                          \
-	 DIRECT=$$(go list -e -f '{{.Dir}} {{.Dir}}/*.go'      \
+	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
 	     ./cmd/libs/go2idl/deepcopy-gen);                  \
-	 INDIRECT=$$(go list -e                                \
+	 INDIRECT=$$(go list                                   \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/deepcopy-gen                    \
 	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
+	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
 	 echo $$DIRECT $$INDIRECT                              \
 	     | sed 's/ / \\=,/g'                               \
 	     | tr '=,' '\n\t';                                 \
@@ -416,14 +416,14 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 $(META_DIR)/$(CONVERSION_GEN).mk:
 	mkdir -p $(@D);                                        \
 	(echo -n "$(CONVERSION_GEN): ";                        \
-	 DIRECT=$$(go list -e -f '{{.Dir}} {{.Dir}}/*.go'      \
+	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
 	     ./cmd/libs/go2idl/conversion-gen);                \
-	 INDIRECT=$$(go list -e                                \
+	 INDIRECT=$$(go list                                   \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/conversion-gen                  \
 	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -e -f '{{.Dir}} {{.Dir}}/*.go');  \
+	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
 	 echo $$DIRECT $$INDIRECT                              \
 	     | sed 's/ / \\=,/g'                               \
 	     | tr '=,' '\n\t';                                 \
