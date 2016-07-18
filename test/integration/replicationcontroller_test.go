@@ -216,7 +216,8 @@ func TestAdoption(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create replication controller: %v", err)
 		}
-		pod := newMatchingPod("pod1", ns.Name)
+		podName := fmt.Sprintf("pod%d", i)
+		pod := newMatchingPod(podName, ns.Name)
 		pod.OwnerReferences = tc.existingOwnerReferences(rc)
 		_, err = podClient.Create(pod)
 		if err != nil {
@@ -225,6 +226,23 @@ func TestAdoption(t *testing.T) {
 
 		stopCh := make(chan struct{})
 		go podInformer.Run(stopCh)
+		// wait for the podInformer to observe the pod, otherwise the rc manager
+		// will try to create a new pod rather than adopting the existing one.
+		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+			objects := podInformer.GetIndexer().List()
+			for _, object := range objects {
+				pod, ok := object.(*api.Pod)
+				if !ok {
+					t.Fatal("expect object to be a pod")
+				}
+				if pod.Name == podName {
+					return true, nil
+				}
+			}
+			return false, nil
+		}); err != nil {
+			t.Fatal(err)
+		}
 		go rm.Run(5, stopCh)
 		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
 			updatedPod, err := podClient.Get(pod.Name)
