@@ -549,6 +549,9 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 	if err != nil {
 		return nil, err
 	}
+	if !fwdRuleExists {
+		glog.Infof("Forwarding rule %v for Service %v/%v doesn't exist", loadBalancerName, apiService.Namespace, apiService.Name)
+	}
 
 	// Make sure we know which IP address will be used and have properly reserved
 	// it as static before moving forward with the rest of our operations.
@@ -683,6 +686,9 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 	if err != nil {
 		return nil, err
 	}
+	if !tpExists {
+		glog.Infof("Target pool %v for Service %v/%v doesn't exist", loadBalancerName, apiService.Namespace, apiService.Name)
+	}
 
 	// Now we get to some slightly more interesting logic.
 	// First, neither target pools nor forwarding rules can be updated in place -
@@ -699,13 +705,13 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 		if err := gce.deleteForwardingRule(loadBalancerName, gce.region); err != nil {
 			return nil, fmt.Errorf("failed to delete existing forwarding rule %s for load balancer update: %v", loadBalancerName, err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): deleted forwarding rule", loadBalancerName, serviceName)
+		glog.Infof("EnsureLoadBalancer(%v(%v)): deleted forwarding rule", loadBalancerName, serviceName)
 	}
 	if tpExists && tpNeedsUpdate {
 		if err := gce.deleteTargetPool(loadBalancerName, gce.region); err != nil {
 			return nil, fmt.Errorf("failed to delete existing target pool %s for load balancer update: %v", loadBalancerName, err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): deleted target pool", loadBalancerName, serviceName)
+		glog.Infof("EnsureLoadBalancer(%v(%v)): deleted target pool", loadBalancerName, serviceName)
 	}
 
 	// Once we've deleted the resources (if necessary), build them back up (or for
@@ -720,9 +726,9 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 			return nil, fmt.Errorf("failed to create target pool %s: %v", loadBalancerName, err)
 		}
 		if len(hosts) <= maxTargetPoolCreateInstances {
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created target pool", loadBalancerName, serviceName)
+			glog.Infof("EnsureLoadBalancer(%v(%v)): created target pool", loadBalancerName, serviceName)
 		} else {
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): created initial target pool (now updating with %d hosts)", loadBalancerName, serviceName, len(hosts)-maxTargetPoolCreateInstances)
+			glog.Infof("EnsureLoadBalancer(%v(%v)): created initial target pool (now updating with %d hosts)", loadBalancerName, serviceName, len(hosts)-maxTargetPoolCreateInstances)
 
 			created := sets.NewString()
 			for _, host := range createInstances {
@@ -760,20 +766,31 @@ func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, loadBalancer
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, "", nil
 		}
-		return false, false, "", fmt.Errorf("error getting load balancer's forwarding rule: %v", err)
+		// Err on the side of caution in case of errors. Caller should notice the error and retry.
+		// We never want to end up recreating resources because gce api flaked.
+		return true, false, "", fmt.Errorf("error getting load balancer's forwarding rule: %v", err)
 	}
-	if loadBalancerIP != fwd.IPAddress {
+	// If the user asks for a specific static ip through the Service spec,
+	// check that we're actually using it.
+	// TODO: we report loadbalancer IP through status, so we want to verify if
+	// that matches the forwarding rule as well.
+	if loadBalancerIP != "" && loadBalancerIP != fwd.IPAddress {
+		glog.Infof("LoadBalancer ip for forwarding rule %v was expected to be %v, but was actually %v", fwd.Name, fwd.IPAddress, loadBalancerIP)
 		return true, true, fwd.IPAddress, nil
 	}
 	portRange, err := loadBalancerPortRange(ports)
 	if err != nil {
-		return false, false, "", err
+		// Err on the side of caution in case of errors. Caller should notice the error and retry.
+		// We never want to end up recreating resources because gce api flaked.
+		return true, false, "", err
 	}
 	if portRange != fwd.PortRange {
+		glog.Infof("LoadBalancer port range for forwarding rule %v was expected to be %v, but was actually %v", fwd.Name, fwd.PortRange, portRange)
 		return true, true, fwd.IPAddress, nil
 	}
 	// The service controller verified all the protocols match on the ports, just check the first one
 	if string(ports[0].Protocol) != fwd.IPProtocol {
+		glog.Infof("LoadBalancer protocol for forwarding rule %v was expected to be %v, but was actually %v", fwd.Name, fwd.IPProtocol, string(ports[0].Protocol))
 		return true, true, fwd.IPAddress, nil
 	}
 
@@ -811,9 +828,20 @@ func (gce *GCECloud) targetPoolNeedsUpdate(name, region string, affinityType api
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, nil
 		}
-		return false, false, fmt.Errorf("error getting load balancer's target pool: %v", err)
+		// Err on the side of caution in case of errors. Caller should notice the error and retry.
+		// We never want to end up recreating resources because gce api flaked.
+		return true, false, fmt.Errorf("error getting load balancer's target pool: %v", err)
 	}
-	if translateAffinityType(affinityType) != tp.SessionAffinity {
+	// TODO: If the user modifies their Service's session affinity, it *should*
+	// reflect in the associated target pool. However, currently not setting the
+	// session affinity on a target pool defaults it to the empty string while
+	// not setting in on a Service defaults it to None. There is a lack of
+	// documentation around the default setting for the target pool, so if we
+	// find it's the undocumented empty string, don't blindly recreate the
+	// target pool (which results in downtime). Fix this when we have formally
+	// defined the defaults on either side.
+	if tp.SessionAffinity != "" && translateAffinityType(affinityType) != tp.SessionAffinity {
+		glog.Infof("LoadBalancer target pool %v changed affinity from %v to %v", name, tp.SessionAffinity, affinityType)
 		return true, true, nil
 	}
 	return true, false, nil
