@@ -1434,7 +1434,7 @@ var errNoPodOnContainer = fmt.Errorf("no pod information labels on Docker contai
 
 // containerAndPodFromLabels tries to load the appropriate container info off of a Docker container's labels
 func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod, container *api.Container, err error) {
-	if inspect == nil && inspect.Config == nil && inspect.Config.Labels == nil {
+	if inspect == nil || inspect.Config == nil || inspect.Config.Labels == nil {
 		return nil, nil, errNoPodOnContainer
 	}
 	labels := inspect.Config.Labels
