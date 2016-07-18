@@ -35,6 +35,8 @@ const (
 	hostExecImage
 	netExecImage
 	nginxImage
+	mountTestImage
+	testWebServer
 	pauseImage
 
 	// Images just used for explicitly testing pulling of images
@@ -45,11 +47,13 @@ const (
 )
 
 var ImageRegistry = map[int]string{
-	busyBoxImage:  "gcr.io/google_containers/busybox:1.24",
-	hostExecImage: "gcr.io/google_containers/hostexec:1.2",
-	netExecImage:  "gcr.io/google_containers/netexec:1.4",
-	nginxImage:    "gcr.io/google_containers/nginx-slim:0.7",
-	pauseImage:    framework.GetPauseImageNameForHostArch(),
+	busyBoxImage:   "gcr.io/google_containers/busybox:1.24",
+	hostExecImage:  "gcr.io/google_containers/hostexec:1.2",
+	netExecImage:   "gcr.io/google_containers/netexec:1.4",
+	nginxImage:     "gcr.io/google_containers/nginx-slim:0.7",
+	mountTestImage: "gcr.io/google_containers/mounttest:0.6",
+	testWebServer:  "gcr.io/google_containers/test-webserver:e2e",
+	pauseImage:     framework.GetPauseImageNameForHostArch(),
 }
 
 // These are used by tests that explicitly test the ability to pull images

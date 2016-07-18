@@ -42,7 +42,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 							RestartPolicy: api.RestartPolicyNever,
 							Containers: []api.Container{
 								{
-									Image:   "gcr.io/google_containers/busybox:1.24",
+									Image:   ImageRegistry[busyBoxImage],
 									Name:    contName,
 									Command: []string{"sh", "-c", "if [ -d /tmp/memory/Burstable ] && [ -d /tmp/memory/BestEffort ]; then exit 0; else exit 1; fi"},
 									VolumeMounts: []api.VolumeMount{
