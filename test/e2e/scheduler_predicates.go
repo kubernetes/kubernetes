@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -97,23 +96,6 @@ func cleanupPods(c *client.Client, ns string) {
 	opt := api.NewDeleteOptions(0)
 	for _, p := range pods.Items {
 		framework.ExpectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
-	}
-}
-
-func removeLabelOffNode(c *client.Client, nodeName string, labelKey string) {
-	By("removing the label " + labelKey + " off the node " + nodeName)
-	node, err := c.Nodes().Get(nodeName)
-	framework.ExpectNoError(err)
-	if node.Labels == nil || len(node.Labels[labelKey]) == 0 {
-		return
-	}
-	delete(node.Labels, labelKey)
-	nodeUpdated, err := c.Nodes().Update(node)
-	framework.ExpectNoError(err)
-
-	By("verifying the node doesn't have the label " + labelKey)
-	if nodeUpdated.Labels != nil && len(nodeUpdated.Labels[labelKey]) != 0 {
-		framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
 	}
 }
 
@@ -488,14 +470,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
 		v := "42"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -626,14 +603,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
 		v := "42"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -722,14 +694,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "kubernetes.io/e2e-az-name"
 		v := "e2e-az1"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-labels"
@@ -887,14 +854,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "china-e2etest"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -979,14 +941,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "china-e2etest"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity with same Labels.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -1069,14 +1026,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "kubernetes-e2e"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -1170,14 +1122,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "e2e-testing"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
 		labelPodName := "with-podantiaffinity-" + string(util.NewUUID())
@@ -1274,14 +1221,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "e2e-az1"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-newlabels"
@@ -1340,39 +1282,17 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random taint on the found node.")
 		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
 		taintValue := "testing-taint-value"
-		taintEffect := string(api.TaintEffectNoSchedule)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
-		defer func() {
-			By("removing the taint " + taintName + " off the node " + nodeName)
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
-			By("verifying the node doesn't have the taint " + taintName)
-			output := framework.RunKubectlOrDie("describe", "node", nodeName)
-			if strings.Contains(output, taintName) {
-				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
-			}
-		}()
-		By("verifying the node has the taint " + taintName + " with the value " + taintValue)
-		output := framework.RunKubectlOrDie("describe", "node", nodeName)
-		requiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Taints:"},
-			{taintName, taintValue, taintEffect},
-		}
-		checkOutput(output, requiredStrings)
+		taintEffect := api.TaintEffectNoSchedule
+		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
+		framework.ExpectNodeHasTaint(c, nodeName, taintName)
+		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.RunKubectlOrDie("label", "nodes", nodeName, labelKey+"="+labelValue)
-		By("verifying the node has the label " + labelKey + " with the value " + labelValue)
-		labelOutput := framework.RunKubectlOrDie("describe", "node", nodeName)
-		labelOutputRequiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Labels:"},
-			{labelKey + "=" + labelValue},
-		}
-		checkOutput(labelOutput, labelOutputRequiredStrings)
-		defer removeLabelOffNode(c, nodeName, labelKey)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
+		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
+		defer framework.RemoveLabelOffNode(c, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
@@ -1388,7 +1308,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 							{
 								"key": "` + taintName + `",
 								"value": "` + taintValue + `",
-								"effect": "` + taintEffect + `"
+								"effect": "` + string(taintEffect) + `"
 							}
 						]`,
 				},
@@ -1456,39 +1376,17 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random taint on the found node.")
 		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
 		taintValue := "testing-taint-value"
-		taintEffect := string(api.TaintEffectNoSchedule)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
-		defer func() {
-			By("removing the taint " + taintName + " off the node " + nodeName)
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
-			By("verifying the node doesn't have the taint " + taintName)
-			output := framework.RunKubectlOrDie("describe", "node", nodeName)
-			if strings.Contains(output, taintName) {
-				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
-			}
-		}()
-		By("verifying the node has the taint " + taintName + " with the value " + taintValue)
-		output := framework.RunKubectlOrDie("describe", "node", nodeName)
-		requiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Taints:"},
-			{taintName, taintValue, taintEffect},
-		}
-		checkOutput(output, requiredStrings)
+		taintEffect := api.TaintEffectNoSchedule
+		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
+		framework.ExpectNodeHasTaint(c, nodeName, taintName)
+		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.RunKubectlOrDie("label", "nodes", nodeName, labelKey+"="+labelValue)
-		By("verifying the node has the label " + labelKey + " with the value " + labelValue)
-		labelOutput := framework.RunKubectlOrDie("describe", "node", nodeName)
-		labelOutputRequiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Labels:"},
-			{labelKey + "=" + labelValue},
-		}
-		checkOutput(labelOutput, labelOutputRequiredStrings)
-		defer removeLabelOffNode(c, nodeName, labelKey)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
+		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
+		defer framework.RemoveLabelOffNode(c, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, still no tolerations.")
 		podNameNoTolerations := "still-no-tolerations"
