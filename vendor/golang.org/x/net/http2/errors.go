@@ -4,7 +4,10 @@
 
 package http2
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // An ErrCode is an unsigned 32-bit error code as defined in the HTTP/2 spec.
 type ErrCode uint32
@@ -88,3 +91,32 @@ type connError struct {
 func (e connError) Error() string {
 	return fmt.Sprintf("http2: connection error: %v: %v", e.Code, e.Reason)
 }
+
+type pseudoHeaderError string
+
+func (e pseudoHeaderError) Error() string {
+	return fmt.Sprintf("invalid pseudo-header %q", string(e))
+}
+
+type duplicatePseudoHeaderError string
+
+func (e duplicatePseudoHeaderError) Error() string {
+	return fmt.Sprintf("duplicate pseudo-header %q", string(e))
+}
+
+type headerFieldNameError string
+
+func (e headerFieldNameError) Error() string {
+	return fmt.Sprintf("invalid header field name %q", string(e))
+}
+
+type headerFieldValueError string
+
+func (e headerFieldValueError) Error() string {
+	return fmt.Sprintf("invalid header field value %q", string(e))
+}
+
+var (
+	errMixPseudoHeaderTypes = errors.New("mix of request and response pseudo headers")
+	errPseudoAfterRegular   = errors.New("pseudo header field after regular")
+)
