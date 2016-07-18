@@ -92,7 +92,7 @@ EOF
     missingok
     notifempty
     compress
-    maxsize 100M
+    size 100M
     daily
     create 0644 root root
 }
