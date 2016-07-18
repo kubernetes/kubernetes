@@ -76,12 +76,12 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		preferredGV = &versionCopy
 	}
 
+	client.SetKubernetesDefaults(&config)
 	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.EnabledVersions())
 	if err != nil {
 		return nil, err
 	}
 	config.GroupVersion = negotiatedVersion
-	client.SetKubernetesDefaults(&config)
 
 	if version != nil {
 		c.configs[*version] = &config
