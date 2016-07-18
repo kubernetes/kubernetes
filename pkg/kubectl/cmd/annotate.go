@@ -190,11 +190,6 @@ func (o AnnotateOptions) Validate(args []string) error {
 		return err
 	}
 
-	// only apply resource version locking on a single resource
-	if len(o.resources) > 1 && len(o.resourceVersion) > 0 {
-		return fmt.Errorf("--resource-version may only be used with a single resource")
-	}
-
 	return nil
 }
 
@@ -203,6 +198,17 @@ func (o AnnotateOptions) RunAnnotate() error {
 	r := o.builder.Do()
 	if err := r.Err(); err != nil {
 		return err
+	}
+
+	var singularResource bool
+	r.IntoSingular(&singularResource)
+
+	// only apply resource version locking on a single resource.
+	// we must perform this check after o.builder.Do() as
+	// []o.resources can not not accurately return the proper number
+	// of resources when they are not passed in "resource/name" format.
+	if !singularResource && len(o.resourceVersion) > 0 {
+		return fmt.Errorf("--resource-version may only be used with a single resource")
 	}
 
 	return r.Visit(func(info *resource.Info, err error) error {
