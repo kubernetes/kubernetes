@@ -103,7 +103,7 @@ func (puller *serializedImagePuller) pullImage(pod *api.Pod, container *api.Cont
 		}
 	}
 
-	backOffKey := fmt.Sprintf("%s_%s", pod.Name, container.Image)
+	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		puller.logIt(ref, api.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, glog.Info)
