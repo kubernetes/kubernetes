@@ -196,7 +196,7 @@ type KubeletConfig struct {
 	Cloud                   cloudprovider.Interface
 	ContainerManager        cm.ContainerManager
 	DockerClient            dockertools.DockerInterface
-	DockerExecHandler       dockertools.ExecHandler
+	// DockerExecHandler       dockertools.ExecHandler
 	EventClient             *clientset.Clientset
 	Hostname                string
 	HostNetworkSources      []string
@@ -283,6 +283,17 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	diskSpacePolicy := DiskSpacePolicy{
 		DockerFreeDiskMB: int(kc_new.LowDiskSpaceThresholdMB),
 		RootFreeDiskMB:   int(kc_new.LowDiskSpaceThresholdMB),
+	}
+
+	var dockerExecHandler dockertools.ExecHandler
+	switch kc_new.DockerExecHandlerName {
+	case "native":
+		dockerExecHandler = &dockertools.NativeExecHandler{}
+	case "nsenter":
+		dockerExecHandler = &dockertools.NsenterExecHandler{}
+	default:
+		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", kc_new.DockerExecHandlerName)
+		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
 	if kc_new.RootDirectory == "" {
@@ -474,7 +485,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 			klet.networkPlugin,
 			klet,
 			klet.httpClient,
-			kc_old.DockerExecHandler,
+			dockerExecHandler,
 			kc_old.OOMAdjuster,
 			procFs,
 			klet.cpuCFSQuota,

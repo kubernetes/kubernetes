@@ -139,17 +139,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		return nil, err
 	}
 
-	var dockerExecHandler dockertools.ExecHandler
-	switch s.DockerExecHandlerName {
-	case "native":
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	case "nsenter":
-		dockerExecHandler = &dockertools.NsenterExecHandler{}
-	default:
-		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", s.DockerExecHandlerName)
-		dockerExecHandler = &dockertools.NativeExecHandler{}
-	}
-
 	manifestURLHeader := make(http.Header)
 	if s.ManifestURLHeader != "" {
 		pieces := strings.Split(s.ManifestURLHeader, ":")
@@ -175,12 +164,12 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 	}
 
 	return &kubelet.KubeletConfig{
-		Auth:               nil, // default does not enforce auth[nz]
-		CAdvisorInterface:  nil, // launches background processes, not set here
-		Cloud:              nil, // cloud provider might start background processes
-		ContainerManager:   nil,
-		DockerClient:       dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
-		DockerExecHandler:  dockerExecHandler,
+		Auth:              nil, // default does not enforce auth[nz]
+		CAdvisorInterface: nil, // launches background processes, not set here
+		Cloud:             nil, // cloud provider might start background processes
+		ContainerManager:  nil,
+		DockerClient:      dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
+		// DockerExecHandler:  dockerExecHandler,
 		HostNetworkSources: hostNetworkSources,
 		HostPIDSources:     hostPIDSources,
 		HostIPCSources:     hostIPCSources,
@@ -502,7 +491,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		// DiskSpacePolicy: diskSpacePolicy,
 		DockerClient: dockerClient,
 		// RuntimeCgroups:               "",
-		DockerExecHandler: &dockertools.NativeExecHandler{},
+		// DockerExecHandler: &dockertools.NativeExecHandler{},
 		// EnableControllerAttachDetach: false,
 		// EnableCustomMetrics:          false,
 		// EnableDebuggingHandlers:      true,
