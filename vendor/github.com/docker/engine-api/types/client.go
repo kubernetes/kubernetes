@@ -10,6 +10,12 @@ import (
 	"github.com/docker/go-units"
 )
 
+// CheckpointCreateOptions holds parameters to create a checkpoint from a container
+type CheckpointCreateOptions struct {
+	CheckpointID string
+	Exit         bool
+}
+
 // ContainerAttachOptions holds parameters to attach to a container.
 type ContainerAttachOptions struct {
 	Stream     bool
@@ -57,6 +63,7 @@ type ContainerLogsOptions struct {
 	Timestamps bool
 	Follow     bool
 	Tail       string
+	Details    bool
 }
 
 // ContainerRemoveOptions holds parameters to remove containers.
@@ -64,6 +71,11 @@ type ContainerRemoveOptions struct {
 	RemoveVolumes bool
 	RemoveLinks   bool
 	Force         bool
+}
+
+// ContainerStartOptions holds parameters to start containers.
+type ContainerStartOptions struct {
+	CheckpointID string
 }
 
 // CopyToContainerOptions holds information
@@ -172,12 +184,14 @@ type ImageListOptions struct {
 
 // ImageLoadResponse returns information to the client about a load process.
 type ImageLoadResponse struct {
+	// Body must be closed to avoid a resource leak
 	Body io.ReadCloser
 	JSON bool
 }
 
 // ImagePullOptions holds information to pull images.
 type ImagePullOptions struct {
+	All           bool
 	RegistryAuth  string // RegistryAuth is the base64 encoded credentials for the registry
 	PrivilegeFunc RequestPrivilegeFunc
 }
@@ -203,11 +217,8 @@ type ImageRemoveOptions struct {
 type ImageSearchOptions struct {
 	RegistryAuth  string
 	PrivilegeFunc RequestPrivilegeFunc
-}
-
-// ImageTagOptions holds parameters to tag an image
-type ImageTagOptions struct {
-	Force bool
+	Filters       filters.Args
+	Limit         int
 }
 
 // ResizeOptions holds parameters to resize a tty.
@@ -228,4 +239,48 @@ type VersionResponse struct {
 // and parse the information received. It returns false otherwise.
 func (v VersionResponse) ServerOK() bool {
 	return v.Server != nil
+}
+
+// NodeListOptions holds parameters to list  nodes with.
+type NodeListOptions struct {
+	Filter filters.Args
+}
+
+// ServiceCreateOptions contains the options to use when creating a service.
+type ServiceCreateOptions struct {
+	// EncodedRegistryAuth is the encoded registry authorization credentials to
+	// use when updating the service.
+	//
+	// This field follows the format of the X-Registry-Auth header.
+	EncodedRegistryAuth string
+}
+
+// ServiceCreateResponse contains the information returned to a client
+// on the  creation of a new service.
+type ServiceCreateResponse struct {
+	// ID is the ID of the created service.
+	ID string
+}
+
+// ServiceUpdateOptions contains the options to be used for updating services.
+type ServiceUpdateOptions struct {
+	// EncodedRegistryAuth is the encoded registry authorization credentials to
+	// use when updating the service.
+	//
+	// This field follows the format of the X-Registry-Auth header.
+	EncodedRegistryAuth string
+
+	// TODO(stevvooe): Consider moving the version parameter of ServiceUpdate
+	// into this field. While it does open API users up to racy writes, most
+	// users may not need that level of consistency in practice.
+}
+
+// ServiceListOptions holds parameters to list  services with.
+type ServiceListOptions struct {
+	Filter filters.Args
+}
+
+// TaskListOptions holds parameters to list  tasks with.
+type TaskListOptions struct {
+	Filter filters.Args
 }

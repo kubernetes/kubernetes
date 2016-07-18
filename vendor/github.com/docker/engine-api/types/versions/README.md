@@ -9,6 +9,6 @@ Consider moving a type here when you need to keep backwards compatibility in the
 The package name convention is to use `v` as a prefix for the version number and `p`(patch) as a separator. We use this nomenclature due to a few restrictions in the Go package name convention:
 
 1. We cannot use `.` because it's interpreted by the language, think of `v1.20.CallFunction`.
-2. We cannot use `_` because golint complains abount it. The code is actually valid, but it looks probably more weird: `v1_20.CallFunction`.
+2. We cannot use `_` because golint complains about it. The code is actually valid, but it looks probably more weird: `v1_20.CallFunction`.
 
 For instance, if you want to modify a type that was available in the version `1.21` of the API but it will have different fields in the version `1.22`, you want to create a new package under `api/types/versions/v1p21`.

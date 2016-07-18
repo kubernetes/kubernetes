@@ -27,7 +27,7 @@ func (cli *Client) ContainerInspect(ctx context.Context, containerID string) (ty
 	return response, err
 }
 
-// ContainerInspectWithRaw returns the container information and it's raw representation.
+// ContainerInspectWithRaw returns the container information and its raw representation.
 func (cli *Client) ContainerInspectWithRaw(ctx context.Context, containerID string, getSize bool) (types.ContainerJSON, []byte, error) {
 	query := url.Values{}
 	if getSize {
@@ -51,15 +51,4 @@ func (cli *Client) ContainerInspectWithRaw(ctx context.Context, containerID stri
 	rdr := bytes.NewReader(body)
 	err = json.NewDecoder(rdr).Decode(&response)
 	return response, body, err
-}
-
-func (cli *Client) containerInspectWithResponse(ctx context.Context, containerID string, query url.Values) (types.ContainerJSON, *serverResponse, error) {
-	serverResp, err := cli.get(ctx, "/containers/"+containerID+"/json", nil, nil)
-	if err != nil {
-		return types.ContainerJSON{}, serverResp, err
-	}
-
-	var response types.ContainerJSON
-	err = json.NewDecoder(serverResp.body).Decode(&response)
-	return response, serverResp, err
 }

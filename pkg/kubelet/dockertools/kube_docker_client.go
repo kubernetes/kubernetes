@@ -143,7 +143,7 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 func (d *kubeDockerClient) StartContainer(id string) error {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-	err := d.client.ContainerStart(ctx, id)
+	err := d.client.ContainerStart(ctx, id, dockertypes.ContainerStartOptions{})
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return ctxErr
 	}
@@ -154,7 +154,8 @@ func (d *kubeDockerClient) StartContainer(id string) error {
 func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-	err := d.client.ContainerStop(ctx, id, timeout)
+	timeoutDuration := time.Duration(timeout) * time.Second
+	err := d.client.ContainerStop(ctx, id, &timeoutDuration)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return ctxErr
 	}

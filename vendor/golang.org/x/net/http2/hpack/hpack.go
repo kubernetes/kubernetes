@@ -41,14 +41,6 @@ type HeaderField struct {
 	Sensitive bool
 }
 
-// IsPseudo reports whether the header field is an http2 pseudo header.
-// That is, it reports whether it starts with a colon.
-// It is not otherwise guaranteed to be a valid pseudo header field,
-// though.
-func (hf HeaderField) IsPseudo() bool {
-	return len(hf.Name) != 0 && hf.Name[0] == ':'
-}
-
 func (hf HeaderField) String() string {
 	var suffix string
 	if hf.Sensitive {
@@ -57,8 +49,7 @@ func (hf HeaderField) String() string {
 	return fmt.Sprintf("header field %q = %q%s", hf.Name, hf.Value, suffix)
 }
 
-// Size returns the size of an entry per RFC 7540 section 5.2.
-func (hf HeaderField) Size() uint32 {
+func (hf *HeaderField) size() uint32 {
 	// http://http2.github.io/http2-spec/compression.html#rfc.section.4.1
 	// "The size of the dynamic table is the sum of the size of
 	// its entries.  The size of an entry is the sum of its name's
@@ -180,7 +171,7 @@ func (dt *dynamicTable) setMaxSize(v uint32) {
 
 func (dt *dynamicTable) add(f HeaderField) {
 	dt.ents = append(dt.ents, f)
-	dt.size += f.Size()
+	dt.size += f.size()
 	dt.evict()
 }
 
@@ -188,7 +179,7 @@ func (dt *dynamicTable) add(f HeaderField) {
 func (dt *dynamicTable) evict() {
 	base := dt.ents // keep base pointer of slice
 	for dt.size > dt.maxSize {
-		dt.size -= dt.ents[0].Size()
+		dt.size -= dt.ents[0].size()
 		dt.ents = dt.ents[1:]
 	}
 

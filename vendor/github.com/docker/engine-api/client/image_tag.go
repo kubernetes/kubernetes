@@ -8,12 +8,11 @@ import (
 	"golang.org/x/net/context"
 
 	distreference "github.com/docker/distribution/reference"
-	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/reference"
 )
 
 // ImageTag tags an image in the docker host
-func (cli *Client) ImageTag(ctx context.Context, imageID, ref string, options types.ImageTagOptions) error {
+func (cli *Client) ImageTag(ctx context.Context, imageID, ref string) error {
 	distributionRef, err := distreference.ParseNamed(ref)
 	if err != nil {
 		return fmt.Errorf("Error parsing reference: %q is not a valid repository/tag", ref)
@@ -28,9 +27,6 @@ func (cli *Client) ImageTag(ctx context.Context, imageID, ref string, options ty
 	query := url.Values{}
 	query.Set("repo", distributionRef.Name())
 	query.Set("tag", tag)
-	if options.Force {
-		query.Set("force", "1")
-	}
 
 	resp, err := cli.post(ctx, "/images/"+imageID+"/tag", query, nil, nil)
 	ensureReaderClosed(resp)

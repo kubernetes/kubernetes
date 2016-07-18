@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"time"
 
 	"golang.org/x/net/http2/hpack"
-	"golang.org/x/net/lex/httplex"
 )
 
 // writeFramer is implemented by any type that is used to write frames.
@@ -230,26 +230,25 @@ func (wu writeWindowUpdate) writeFrame(ctx writeContext) error {
 }
 
 func encodeHeaders(enc *hpack.Encoder, h http.Header, keys []string) {
+	// TODO: garbage. pool sorters like http1? hot path for 1 key?
 	if keys == nil {
-		sorter := sorterPool.Get().(*sorter)
-		// Using defer here, since the returned keys from the
-		// sorter.Keys method is only valid until the sorter
-		// is returned:
-		defer sorterPool.Put(sorter)
-		keys = sorter.Keys(h)
+		keys = make([]string, 0, len(h))
+		for k := range h {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 	}
 	for _, k := range keys {
 		vv := h[k]
 		k = lowerHeader(k)
-		if !validWireHeaderFieldName(k) {
-			// Skip it as backup paranoia. Per
-			// golang.org/issue/14048, these should
-			// already be rejected at a higher level.
+		if !validHeaderFieldName(k) {
+			// TODO: return an error? golang.org/issue/14048
+			// For now just omit it.
 			continue
 		}
 		isTE := k == "transfer-encoding"
 		for _, v := range vv {
-			if !httplex.ValidHeaderFieldValue(v) {
+			if !validHeaderFieldValue(v) {
 				// TODO: return an error? golang.org/issue/14048
 				// For now just omit it.
 				continue

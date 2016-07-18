@@ -10,7 +10,6 @@ import (
 
 	distreference "github.com/docker/distribution/reference"
 	"github.com/docker/engine-api/types"
-	"github.com/docker/engine-api/types/reference"
 )
 
 // ImagePush requests the docker host to push an image to a remote registry.
@@ -27,13 +26,16 @@ func (cli *Client) ImagePush(ctx context.Context, ref string, options types.Imag
 		return nil, errors.New("cannot push a digest reference")
 	}
 
-	tag := reference.GetTagFromNamedRef(distributionRef)
+	var tag = ""
+	if nameTaggedRef, isNamedTagged := distributionRef.(distreference.NamedTagged); isNamedTagged {
+		tag = nameTaggedRef.Tag()
+	}
 
 	query := url.Values{}
 	query.Set("tag", tag)
 
 	resp, err := cli.tryImagePush(ctx, distributionRef.Name(), query, options.RegistryAuth)
-	if resp.statusCode == http.StatusUnauthorized {
+	if resp.statusCode == http.StatusUnauthorized && options.PrivilegeFunc != nil {
 		newAuthHeader, privilegeErr := options.PrivilegeFunc()
 		if privilegeErr != nil {
 			return nil, privilegeErr

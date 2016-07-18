@@ -30,7 +30,7 @@ var (
 //
 // This function deviates from the upstream version in golang.org/x/net/context/ctxhttp by
 // taking a Sender interface rather than a *http.Client directly. That allow us to use
-// this funcion with mocked clients and hijacked connections.
+// this function with mocked clients and hijacked connections.
 func Do(ctx context.Context, client transport.Sender, req *http.Request) (*http.Response, error) {
 	if client == nil {
 		client = http.DefaultClient
