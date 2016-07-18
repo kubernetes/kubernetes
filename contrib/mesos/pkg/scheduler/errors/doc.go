@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package errors contains all scheduler wide used errors
-package errors
+package errors // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"

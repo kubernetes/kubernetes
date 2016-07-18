@@ -17,4 +17,4 @@ limitations under the License.
 // Package controllermanager is largely a clone of the upstream implementation,
 // with additional functionality to select between stock or a customized
 // endpoints controller.
-package controllermanager
+package controllermanager // import "k8s.io/kubernetes/contrib/mesos/pkg/controllermanager"

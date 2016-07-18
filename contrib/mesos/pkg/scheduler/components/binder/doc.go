@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package binder implements the Binder which launched a task and let the
 // executor do the actual binding.
-package binder
+package binder // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/binder"

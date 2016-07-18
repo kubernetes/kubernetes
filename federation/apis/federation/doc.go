@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 
-package federation
+package federation // import "k8s.io/kubernetes/federation/apis/federation"

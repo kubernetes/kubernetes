@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package config contains minion configuration constants.
-package config
+package config // import "k8s.io/kubernetes/contrib/mesos/pkg/minion/config"

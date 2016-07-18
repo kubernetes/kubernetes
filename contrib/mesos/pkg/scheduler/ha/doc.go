@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package ha encapsulates high-availability scheduler concerns.
-package ha
+package ha // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"

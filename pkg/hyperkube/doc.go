@@ -27,4 +27,4 @@ limitations under the License.
 // This package is inspired by https://github.com/spf13/cobra.  However, as
 // the eventual goal is to run *multiple* servers from one call, a new package
 // was needed.
-package hyperkube
+package hyperkube // import "k8s.io/kubernetes/pkg/hyperkube"

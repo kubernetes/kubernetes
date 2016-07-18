@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package apiserver contains the code that provides a rest.ful api service.
-package apiserver
+package apiserver // import "k8s.io/kubernetes/pkg/apiserver"

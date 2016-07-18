@@ -20,4 +20,4 @@ limitations under the License.
 // receives. It serves these records by consulting an in memory tree
 // populated with Kubernetes Services and Endpoints received from the Kubernetes
 // API server.
-package dns
+package dns // import "k8s.io/kubernetes/pkg/dns"

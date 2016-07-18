@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package thirdpartyresourcedata provides Registry interface and its REST
 // implementation for storing ThirdPartyResourceData api objects.
-package thirdpartyresourcedata
+package thirdpartyresourcedata // import "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"

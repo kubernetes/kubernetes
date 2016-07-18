@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package metrics defines and exposes instrumentation metrics related to
 // Mesos offers.
-package metrics
+package metrics // import "k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"

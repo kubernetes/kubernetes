@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package offers contains code that manages Mesos offers.
-package offers
+package offers // import "k8s.io/kubernetes/contrib/mesos/pkg/offers"
