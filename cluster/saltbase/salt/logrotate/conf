@@ -4,8 +4,10 @@
     missingok
     notifempty
     compress
-    size 100M
+    maxsize 100M
     daily
+    dateext
+    dateformat -%Y%m%d-%s
     create 0644 root root
 }
 
