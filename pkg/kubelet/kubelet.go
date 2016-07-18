@@ -196,14 +196,12 @@ type KubeletConfig struct {
 	Cloud                   cloudprovider.Interface
 	ContainerManager        cm.ContainerManager
 	DockerClient            dockertools.DockerInterface
-	// DockerExecHandler       dockertools.ExecHandler
-	EventClient        *clientset.Clientset
-	Hostname           string
-	HostNetworkSources []string
-	HostPIDSources     []string
-	HostIPCSources     []string
-	KubeClient         *clientset.Clientset
-	// ManifestURLHeader       http.Header
+	EventClient             *clientset.Clientset
+	Hostname                string
+	HostNetworkSources      []string
+	HostPIDSources          []string
+	HostIPCSources          []string
+	KubeClient              *clientset.Clientset
 	Mounter                 mount.Interface
 	NetworkPlugins          []network.NetworkPlugin
 	NodeName                string

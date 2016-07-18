@@ -155,27 +155,25 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 	}
 
 	return &kubelet.KubeletConfig{
-		Auth:              nil, // default does not enforce auth[nz]
-		CAdvisorInterface: nil, // launches background processes, not set here
-		Cloud:             nil, // cloud provider might start background processes
-		ContainerManager:  nil,
-		DockerClient:      dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
-		// DockerExecHandler:  dockerExecHandler,
+		Auth:               nil, // default does not enforce auth[nz]
+		CAdvisorInterface:  nil, // launches background processes, not set here
+		Cloud:              nil, // cloud provider might start background processes
+		ContainerManager:   nil,
+		DockerClient:       dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
 		HostNetworkSources: hostNetworkSources,
 		HostPIDSources:     hostPIDSources,
 		HostIPCSources:     hostIPCSources,
 		KubeClient:         nil,
-		// ManifestURLHeader:  manifestURLHeader,
-		Mounter:        mounter,
-		NetworkPlugins: ProbeNetworkPlugins(s.NetworkPluginDir),
-		OOMAdjuster:    oom.NewOOMAdjuster(),
-		OSInterface:    kubecontainer.RealOS{},
-		Reservation:    *reservation,
-		StandaloneMode: (len(s.APIServerList) == 0),
-		TLSOptions:     tlsOptions,
-		Writer:         writer,
-		VolumePlugins:  ProbeVolumePlugins(s.VolumePluginDir),
-		EvictionConfig: evictionConfig,
+		Mounter:            mounter,
+		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir),
+		OOMAdjuster:        oom.NewOOMAdjuster(),
+		OSInterface:        kubecontainer.RealOS{},
+		Reservation:        *reservation,
+		StandaloneMode:     (len(s.APIServerList) == 0),
+		TLSOptions:         tlsOptions,
+		Writer:             writer,
+		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
+		EvictionConfig:     evictionConfig,
 	}, nil
 }
 
