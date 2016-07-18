@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ func scheduledJob() batch.ScheduledJob {
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/snazzycats/jobs/myscheduledjob",
-			CreationTimestamp: unversioned.Time{justBeforeTheHour()},
+			CreationTimestamp: unversioned.Time{Time: justBeforeTheHour()},
 		},
 		Spec: batch.ScheduledJobSpec{
 			Schedule:          "0 0 * * * * ?",
@@ -181,13 +181,13 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		}
 
 		if tc.ranPreviously {
-			sj.ObjectMeta.CreationTimestamp = unversioned.Time{justBeforeThePriorHour()}
-			sj.Status.LastScheduleTime = &unversioned.Time{justAfterThePriorHour()}
+			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeThePriorHour()}
+			sj.Status.LastScheduleTime = &unversioned.Time{Time: justAfterThePriorHour()}
 			if tc.stillActive {
 				sj.Status.Active = []api.ObjectReference{{}}
 			}
 		} else {
-			sj.ObjectMeta.CreationTimestamp = unversioned.Time{justBeforeTheHour()}
+			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeTheHour()}
 			if tc.stillActive {
 				t.Errorf("Test setup error: this case makes no sense.")
 			}

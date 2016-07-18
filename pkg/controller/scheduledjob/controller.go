@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -239,7 +239,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 	} else {
 		sj.Status.Active = append(sj.Status.Active, *ref)
 	}
-	sj.Status.LastScheduleTime = &unversioned.Time{scheduledTime}
+	sj.Status.LastScheduleTime = &unversioned.Time{Time: scheduledTime}
 	if err := sjc.UpdateStatus(&sj); err != nil {
 		glog.Infof("Unable to update status for %s: %v", nameForLog, err)
 	}
