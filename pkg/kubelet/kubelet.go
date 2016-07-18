@@ -189,100 +189,37 @@ type KubeletBuilder func(kc_old *KubeletConfig, kc_new *componentconfig.KubeletC
 // KubeletConfig is all of the parameters necessary for running a kubelet.
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
 type KubeletConfig struct {
-	//Address                        net.IP
-	// AllowPrivileged                bool
 	Auth                    server.AuthInterface
 	AutoDetectCloudProvider bool
 	Builder                 KubeletBuilder
 	CAdvisorInterface       cadvisor.Interface
-	// VolumeStatsAggPeriod           time.Duration
-	// CgroupRoot                     string
-	Cloud cloudprovider.Interface
-	// ClusterDNS                     net.IP
-	// ClusterDomain                  string
-	// ConfigFile                     string
-	// ConfigureCBR0                  bool
-	ContainerManager cm.ContainerManager
-	// ContainerRuntime               string
-	// RuntimeRequestTimeout time.Duration
-	// CPUCFSQuota                    bool
-	// DiskSpacePolicy DiskSpacePolicy
-	DockerClient dockertools.DockerInterface
-	// RuntimeCgroups                 string
-	DockerExecHandler dockertools.ExecHandler
-	// EnableControllerAttachDetach   bool
-	// EnableCustomMetrics            bool
-	// EnableDebuggingHandlers        bool
-	// CgroupsPerQOS                  bool
-	// EnableServer                   bool
-	EventClient *clientset.Clientset
-	// EventBurst     int
-	// EventRecordQPS float32
-	// FileCheckFrequency             time.Duration
-	Hostname string
-	// HostnameOverride               string
-	HostNetworkSources []string
-	HostPIDSources     []string
-	HostIPCSources     []string
-	// HTTPCheckFrequency             time.Duration
-	// ImageGCPolicy images.ImageGCPolicy
-	KubeClient *clientset.Clientset
-	// ManifestURL                    string
-	ManifestURLHeader http.Header
-	// MasterServiceNamespace         string
-	// MaxContainerCount       int
-	// MaxOpenFiles uint64
-	// MaxPerPodContainerCount int
-	// MaxPods                 int
-	// MinimumGCAge                   time.Duration
-	Mounter mount.Interface
-	// NetworkPluginName              string
-	NetworkPlugins []network.NetworkPlugin
-	NodeName       string
-	// NodeLabels                     map[string]string
-	// NodeStatusUpdateFrequency      time.Duration
-	// NonMasqueradeCIDR              string
-	// NvidiaGPUs  int
-	OOMAdjuster *oom.OOMAdjuster
-	OSInterface kubecontainer.OSInterface
-	// PodCIDR                        string
-	// PodsPerCore int
-	// ReconcileCIDR                  bool
-	PodConfig *config.PodConfig
-	// PodInfraContainerImage         string
-	// Port         uint
-	// ReadOnlyPort uint
-	Recorder record.EventRecorder
-	// RegisterNode                   bool
-	// RegisterSchedulable            bool
-	// RegistryBurst   int
-	// RegistryPullQPS float64
-	Reservation kubetypes.Reservation
-	// ResolverConfig                 string
-	// KubeletCgroups                 string
-	// RktPath                        string
-	// RktAPIEndpoint                 string
-	// RktStage1Image                 string
-	// RootDirectory                  string
-	Runonce bool
-	// SeccompProfileRoot             string
-	// SerializeImagePulls            bool
-	StandaloneMode bool
-	// StreamingConnectionIdleTimeout time.Duration
-	// SyncFrequency                  time.Duration
-	// SystemCgroups                  string
-	TLSOptions    *server.TLSOptions
-	Writer        kubeio.Writer
-	VolumePlugins []volume.VolumePlugin
-	// OutOfDiskTransitionFrequency   time.Duration
-	EvictionConfig eviction.Config
-
-	// ExperimentalFlannelOverlay bool
-	// NodeIP                  net.IP
+	Cloud                   cloudprovider.Interface
+	ContainerManager        cm.ContainerManager
+	DockerClient            dockertools.DockerInterface
+	DockerExecHandler       dockertools.ExecHandler
+	EventClient             *clientset.Clientset
+	Hostname                string
+	HostNetworkSources      []string
+	HostPIDSources          []string
+	HostIPCSources          []string
+	KubeClient              *clientset.Clientset
+	ManifestURLHeader       http.Header
+	Mounter                 mount.Interface
+	NetworkPlugins          []network.NetworkPlugin
+	NodeName                string
+	OOMAdjuster             *oom.OOMAdjuster
+	OSInterface             kubecontainer.OSInterface
+	PodConfig               *config.PodConfig
+	Recorder                record.EventRecorder
+	Reservation             kubetypes.Reservation
+	Runonce                 bool
+	StandaloneMode          bool
+	TLSOptions              *server.TLSOptions
+	Writer                  kubeio.Writer
+	VolumePlugins           []volume.VolumePlugin
+	EvictionConfig          eviction.Config
 	ContainerRuntimeOptions []kubecontainer.Option
-	// HairpinMode                string
-	// BabysitDaemons             bool
-	Options []Option
+	Options                 []Option
 }
 
 func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) *config.PodConfig {

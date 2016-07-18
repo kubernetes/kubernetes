@@ -150,17 +150,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	// imageGCPolicy := images.ImageGCPolicy{
-	// 	MinAge:               s.ImageMinimumGCAge.Duration,
-	// 	HighThresholdPercent: int(s.ImageGCHighThresholdPercent),
-	// 	LowThresholdPercent:  int(s.ImageGCLowThresholdPercent),
-	// }
-
-	// diskSpacePolicy := kubelet.DiskSpacePolicy{
-	// 	DockerFreeDiskMB: int(s.LowDiskSpaceThresholdMB),
-	// 	RootFreeDiskMB:   int(s.LowDiskSpaceThresholdMB),
-	// }
-
 	manifestURLHeader := make(http.Header)
 	if s.ManifestURLHeader != "" {
 		pieces := strings.Split(s.ManifestURLHeader, ":")
@@ -186,90 +175,27 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 	}
 
 	return &kubelet.KubeletConfig{
-		// Address:                      net.ParseIP(s.Address),
-		// AllowPrivileged:              s.AllowPrivileged,
-		Auth:              nil, // default does not enforce auth[nz]
-		CAdvisorInterface: nil, // launches background processes, not set here
-		// VolumeStatsAggPeriod:         s.VolumeStatsAggPeriod.Duration,
-		// CgroupRoot:                   s.CgroupRoot,
-		Cloud: nil, // cloud provider might start background processes
-		// ClusterDNS:                   net.ParseIP(s.ClusterDNS),
-		// ClusterDomain:                s.ClusterDomain,
-		// ConfigFile:                   s.PodManifestPath,
-		// ConfigureCBR0:                s.ConfigureCBR0,
-		ContainerManager: nil,
-		// ContainerRuntime:             s.ContainerRuntime,
-		// RuntimeRequestTimeout:        s.RuntimeRequestTimeout.Duration,
-		// CPUCFSQuota:                  s.CPUCFSQuota,
-		// DiskSpacePolicy: diskSpacePolicy,
-		DockerClient: dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
-		// RuntimeCgroups:               s.RuntimeCgroups,
-		DockerExecHandler: dockerExecHandler,
-		// EnableControllerAttachDetach: s.EnableControllerAttachDetach,
-		// EnableCustomMetrics:          s.EnableCustomMetrics,
-		// EnableDebuggingHandlers:      s.EnableDebuggingHandlers,
-		// CgroupsPerQOS:                s.CgroupsPerQOS,
-		// EnableServer:                 s.EnableServer,
-		// EventBurst:     int(s.EventBurst),
-		// EventRecordQPS: float32(s.EventRecordQPS),
-		// FileCheckFrequency:           s.FileCheckFrequency.Duration,
-		// HostnameOverride:             s.HostnameOverride,
+		Auth:               nil, // default does not enforce auth[nz]
+		CAdvisorInterface:  nil, // launches background processes, not set here
+		Cloud:              nil, // cloud provider might start background processes
+		ContainerManager:   nil,
+		DockerClient:       dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
+		DockerExecHandler:  dockerExecHandler,
 		HostNetworkSources: hostNetworkSources,
 		HostPIDSources:     hostPIDSources,
 		HostIPCSources:     hostIPCSources,
-		// HTTPCheckFrequency:           s.HTTPCheckFrequency.Duration,
-		// ImageGCPolicy: imageGCPolicy,
-		KubeClient: nil,
-		// ManifestURL:                  s.ManifestURL,
-		ManifestURLHeader: manifestURLHeader,
-		// MasterServiceNamespace:       s.MasterServiceNamespace,
-		// MaxContainerCount:       int(s.MaxContainerCount),
-		// MaxOpenFiles: uint64(s.MaxOpenFiles),
-		// MaxPerPodContainerCount: int(s.MaxPerPodContainerCount),
-		// MaxPods:                 int(s.MaxPods),
-		// NvidiaGPUs:              int(s.NvidiaGPUs),
-		// MinimumGCAge:                 s.MinimumGCAge.Duration,
-		Mounter: mounter,
-		// NetworkPluginName:            s.NetworkPluginName,
-		NetworkPlugins: ProbeNetworkPlugins(s.NetworkPluginDir),
-		// NodeLabels:                   s.NodeLabels,
-		// NodeStatusUpdateFrequency:    s.NodeStatusUpdateFrequency.Duration,
-		// NonMasqueradeCIDR:            s.NonMasqueradeCIDR,
-		OOMAdjuster: oom.NewOOMAdjuster(),
-		OSInterface: kubecontainer.RealOS{},
-		// PodCIDR:                      s.PodCIDR,
-		// ReconcileCIDR:                s.ReconcileCIDR,
-		// PodInfraContainerImage:       s.PodInfraContainerImage,
-		// Port:         uint(s.Port),
-		// ReadOnlyPort: uint(s.ReadOnlyPort),
-		// RegisterNode:                   s.RegisterNode,
-		// RegisterSchedulable:            s.RegisterSchedulable,
-		// RegistryBurst:   int(s.RegistryBurst),
-		// RegistryPullQPS: float64(s.RegistryPullQPS),
-		// ResolverConfig:                 s.ResolverConfig,
-		Reservation: *reservation,
-		// KubeletCgroups:                 s.KubeletCgroups,
-		// RktPath:                        s.RktPath,
-		// RktAPIEndpoint:                 s.RktAPIEndpoint,
-		// RktStage1Image:                 s.RktStage1Image,
-		// RootDirectory:                  s.RootDirectory,
-		// SeccompProfileRoot:             s.SeccompProfileRoot,
-		// Runonce:                        s.RunOnce,
-		// SerializeImagePulls:            s.SerializeImagePulls,
-		StandaloneMode: (len(s.APIServerList) == 0),
-		// StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout.Duration,
-		// SyncFrequency:                  s.SyncFrequency.Duration,
-		// SystemCgroups:                  s.SystemCgroups,
-		TLSOptions:    tlsOptions,
-		Writer:        writer,
-		VolumePlugins: ProbeVolumePlugins(s.VolumePluginDir),
-		// OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency.Duration,
-		// HairpinMode:                    s.HairpinMode,
-		// BabysitDaemons:                 s.BabysitDaemons,
-		// ExperimentalFlannelOverlay:     s.ExperimentalFlannelOverlay,
-		// NodeIP:         net.ParseIP(s.NodeIP),
-		EvictionConfig: evictionConfig,
-		// PodsPerCore:    int(s.PodsPerCore),
+		KubeClient:         nil,
+		ManifestURLHeader:  manifestURLHeader,
+		Mounter:            mounter,
+		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir),
+		OOMAdjuster:        oom.NewOOMAdjuster(),
+		OSInterface:        kubecontainer.RealOS{},
+		Reservation:        *reservation,
+		StandaloneMode:     (len(s.APIServerList) == 0),
+		TLSOptions:         tlsOptions,
+		Writer:             writer,
+		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
+		EvictionConfig:     evictionConfig,
 	}, nil
 }
 
