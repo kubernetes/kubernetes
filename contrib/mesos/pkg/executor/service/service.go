@@ -201,7 +201,6 @@ func (s *KubeletExecutorServer) runKubelet(
 	kcfg.NodeName = s.HostnameOverride
 	kcfg.PodConfig = kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kcfg.Recorder) // override the default pod source
 
-	kcfg.StandaloneMode = false
 	s.SystemCgroups = "" // don't take control over other system processes.
 
 	if kcfg.Cloud != nil {

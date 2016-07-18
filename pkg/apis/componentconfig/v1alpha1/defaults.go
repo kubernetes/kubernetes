@@ -337,6 +337,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.KubeReserved == nil {
 		obj.KubeReserved = make(map[string]string)
 	}
+	if obj.APIServerList == nil {
+		obj.APIServerList = []string{}
+	}
 }
 
 func boolVar(b bool) *bool {

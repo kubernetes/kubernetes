@@ -169,7 +169,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		OOMAdjuster:        oom.NewOOMAdjuster(),
 		OSInterface:        kubecontainer.RealOS{},
 		Reservation:        *reservation,
-		StandaloneMode:     (len(s.APIServerList) == 0),
 		TLSOptions:         tlsOptions,
 		Writer:             writer,
 		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
@@ -632,7 +631,7 @@ func RunKubelet(kcfg *kubelet.KubeletConfig, kcfg_new *componentconfig.KubeletCo
 	}
 
 	// process pods and exit.
-	if kcfg.Runonce {
+	if kcfg_new.RunOnce {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %v", err)
 		}

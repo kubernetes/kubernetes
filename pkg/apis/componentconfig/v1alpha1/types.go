@@ -452,4 +452,10 @@ type KubeletConfiguration struct {
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
 	KubeReserved map[string]string `json:"kubeReserved"`
+	// apiServerList is a list of Kubernetes API servers for publishing events
+	// and reading pods and services. (ip:port), comma separated.
+	APIServerList []string `json:"apiServerList"`
+	// If runOnce is true, the Kubelet will check the API server once for pods,
+	// run those in addition to the pods specified by the local manifest, and exit.
+	RunOnce bool
 }

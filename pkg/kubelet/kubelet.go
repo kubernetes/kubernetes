@@ -210,8 +210,6 @@ type KubeletConfig struct {
 	PodConfig               *config.PodConfig
 	Recorder                record.EventRecorder
 	Reservation             kubetypes.Reservation
-	Runonce                 bool
-	StandaloneMode          bool
 	TLSOptions              *server.TLSOptions
 	Writer                  kubeio.Writer
 	VolumePlugins           []volume.VolumePlugin
@@ -393,7 +391,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		sourcesReady:                   config.NewSourcesReady(kc_old.PodConfig.SeenAllSources),
 		registerNode:                   kc_new.RegisterNode,
 		registerSchedulable:            kc_new.RegisterSchedulable,
-		standaloneMode:                 kc_old.StandaloneMode,
+		standaloneMode:                 (len(kc_new.APIServerList) == 0),
 		clusterDomain:                  kc_new.ClusterDomain,
 		clusterDNS:                     net.ParseIP(kc_new.ClusterDNS),
 		serviceLister:                  serviceLister,
