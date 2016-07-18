@@ -61,7 +61,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
-	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
@@ -151,16 +150,16 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	imageGCPolicy := images.ImageGCPolicy{
-		MinAge:               s.ImageMinimumGCAge.Duration,
-		HighThresholdPercent: int(s.ImageGCHighThresholdPercent),
-		LowThresholdPercent:  int(s.ImageGCLowThresholdPercent),
-	}
+	// imageGCPolicy := images.ImageGCPolicy{
+	// 	MinAge:               s.ImageMinimumGCAge.Duration,
+	// 	HighThresholdPercent: int(s.ImageGCHighThresholdPercent),
+	// 	LowThresholdPercent:  int(s.ImageGCLowThresholdPercent),
+	// }
 
-	diskSpacePolicy := kubelet.DiskSpacePolicy{
-		DockerFreeDiskMB: int(s.LowDiskSpaceThresholdMB),
-		RootFreeDiskMB:   int(s.LowDiskSpaceThresholdMB),
-	}
+	// diskSpacePolicy := kubelet.DiskSpacePolicy{
+	// 	DockerFreeDiskMB: int(s.LowDiskSpaceThresholdMB),
+	// 	RootFreeDiskMB:   int(s.LowDiskSpaceThresholdMB),
+	// }
 
 	manifestURLHeader := make(http.Header)
 	if s.ManifestURLHeader != "" {
@@ -202,8 +201,8 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		// ContainerRuntime:             s.ContainerRuntime,
 		// RuntimeRequestTimeout:        s.RuntimeRequestTimeout.Duration,
 		// CPUCFSQuota:                  s.CPUCFSQuota,
-		DiskSpacePolicy: diskSpacePolicy,
-		DockerClient:    dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
+		// DiskSpacePolicy: diskSpacePolicy,
+		DockerClient: dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
 		// RuntimeCgroups:               s.RuntimeCgroups,
 		DockerExecHandler: dockerExecHandler,
 		// EnableControllerAttachDetach: s.EnableControllerAttachDetach,
@@ -219,8 +218,8 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		HostPIDSources:     hostPIDSources,
 		HostIPCSources:     hostIPCSources,
 		// HTTPCheckFrequency:           s.HTTPCheckFrequency.Duration,
-		ImageGCPolicy: imageGCPolicy,
-		KubeClient:    nil,
+		// ImageGCPolicy: imageGCPolicy,
+		KubeClient: nil,
 		// ManifestURL:                  s.ManifestURL,
 		ManifestURLHeader: manifestURLHeader,
 		// MasterServiceNamespace:       s.MasterServiceNamespace,
@@ -548,14 +547,14 @@ func SimpleKubelet(client *clientset.Clientset,
 	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency, outOfDiskTransitionFrequency, evictionPressureTransitionPeriod time.Duration,
 	maxPods int, podsPerCore int,
 	containerManager cm.ContainerManager, clusterDNS net.IP) *kubelet.KubeletConfig {
-	imageGCPolicy := images.ImageGCPolicy{
-		HighThresholdPercent: 90,
-		LowThresholdPercent:  80,
-	}
-	diskSpacePolicy := kubelet.DiskSpacePolicy{
-		DockerFreeDiskMB: 256,
-		RootFreeDiskMB:   256,
-	}
+	// imageGCPolicy := images.ImageGCPolicy{
+	// 	HighThresholdPercent: 90,
+	// 	LowThresholdPercent:  80,
+	// }
+	// diskSpacePolicy := kubelet.DiskSpacePolicy{
+	// 	DockerFreeDiskMB: 256,
+	// 	RootFreeDiskMB:   256,
+	// }
 	evictionConfig := eviction.Config{
 		PressureTransitionPeriod: evictionPressureTransitionPeriod,
 	}
@@ -574,8 +573,8 @@ func SimpleKubelet(client *clientset.Clientset,
 		ContainerManager: containerManager,
 		// ContainerRuntime:             "docker",
 		// CPUCFSQuota:                  true,
-		DiskSpacePolicy: diskSpacePolicy,
-		DockerClient:    dockerClient,
+		// DiskSpacePolicy: diskSpacePolicy,
+		DockerClient: dockerClient,
 		// RuntimeCgroups:               "",
 		DockerExecHandler: &dockertools.NativeExecHandler{},
 		// EnableControllerAttachDetach: false,
@@ -591,8 +590,8 @@ func SimpleKubelet(client *clientset.Clientset,
 		// HairpinMode:               componentconfig.HairpinVeth,
 		// HostnameOverride:          hostname,
 		// HTTPCheckFrequency:        httpCheckFrequency,
-		ImageGCPolicy: imageGCPolicy,
-		KubeClient:    client,
+		// ImageGCPolicy: imageGCPolicy,
+		KubeClient: client,
 		// ManifestURL:               manifestURL,
 		// MasterServiceNamespace:    masterServiceNamespace,
 		// MaxContainerCount:       100,
