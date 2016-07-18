@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package service contains the cmd/k8sm-scheduler glue code
-package service
+package service // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/service"

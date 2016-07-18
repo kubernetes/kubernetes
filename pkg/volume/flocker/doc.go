@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package flocker contains the internal representation of Flocker volumes
-package flocker
+package flocker // import "k8s.io/kubernetes/pkg/volume/flocker"

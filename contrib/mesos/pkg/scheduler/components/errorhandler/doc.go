@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package errorhandler implements the ErrorHandler which handles scheduer error
 // and possibly requeue pods for scheduling again.
-package errorhandler
+package errorhandler // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/errorhandler"

@@ -17,4 +17,4 @@ limitations under the License.
 // Package remotecommand adds support for executing commands in containers,
 // with support for separate stdin, stdout, and stderr streams, as well as
 // TTY.
-package remotecommand
+package remotecommand // import "k8s.io/kubernetes/pkg/client/unversioned/remotecommand"

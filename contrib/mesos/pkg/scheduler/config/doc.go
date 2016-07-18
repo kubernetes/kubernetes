@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package config provides mechanisms for low-level scheduler tuning.
-package config
+package config // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"

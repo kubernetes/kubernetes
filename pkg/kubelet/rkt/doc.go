@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package rkt contains the Containerruntime interface implementation for rkt.
-package rkt
+package rkt // import "k8s.io/kubernetes/pkg/kubelet/rkt"

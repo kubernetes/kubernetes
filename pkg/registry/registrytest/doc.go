@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package registrytest provides tests for Registry implementations
 // for storing Minions, Pods, Schedulers and Services.
-package registrytest
+package registrytest // import "k8s.io/kubernetes/pkg/registry/registrytest"

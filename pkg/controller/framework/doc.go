@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package framework implements all the grunt work involved in running a simple controller.
-package framework
+package framework // import "k8s.io/kubernetes/pkg/controller/framework"

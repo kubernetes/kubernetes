@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package chown provides an interface and implementations
 // for things that run run the chmod system call.
-package chmod
+package chmod // import "k8s.io/kubernetes/pkg/util/chmod"

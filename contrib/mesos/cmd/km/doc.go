@@ -21,4 +21,4 @@ limitations under the License.
 // the upstream hyperkube module is not reusable.
 //
 // TODO(jdef,sttts): refactor upstream cmd/hyperkube to be reusable with the necessary mesos changes
-package main
+package main // import "k8s.io/kubernetes/contrib/mesos/cmd/km"

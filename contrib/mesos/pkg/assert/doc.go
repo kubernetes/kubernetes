@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package assert is an utility package containing reusable testing functionality
 // extending github.com/stretchr/testify/assert
-package assert
+package assert // import "k8s.io/kubernetes/contrib/mesos/pkg/assert"
