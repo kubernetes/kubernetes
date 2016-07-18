@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -84,8 +85,8 @@ func NewScheduledJobControllerFromClient(kubeClient clientset.Interface) *Schedu
 func (jm *ScheduledJobController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	glog.Infof("Starting ScheduledJob Manager")
-	// Check things every 1 second.
-	go wait.Until(jm.SyncAll, 1*time.Second, stopCh)
+	// Check things every 10 second.
+	go wait.Until(jm.SyncAll, 10*time.Second, stopCh)
 	<-stopCh
 	glog.Infof("Shutting down ScheduledJob Manager")
 }
@@ -118,13 +119,11 @@ func (jm *ScheduledJobController) SyncAll() {
 
 // SyncOne reconciles a ScheduledJob with a list of any Jobs that it created.
 // All known jobs created by "sj" should be included in "js".
-// Returns a new ScheduledJobStatus if an update to status is required, else nil.
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
 func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, recorder record.EventRecorder) {
-	nameForLog := fmt.Sprintf("namespace/%s/scheduledJob/%s", sj.Namespace, sj.Name)
+	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
-	glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
 	for _, j := range js {
 		found := inActiveList(sj, j.ObjectMeta.UID)
 		if !found {
@@ -140,7 +139,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 			// in the same namespace "adopt" that job.  ReplicaSets and their Pods work the same way.
 			// TBS: how to update sj.Status.LastScheduleTime if the adopted job is newer than any we knew about?
 		} else {
-			if isJobActive(&j) {
+			if job.IsJobFinished(&j) {
 				deleteFromActiveList(&sj, j.ObjectMeta.UID)
 				// TODO: event to call out failure vs success.
 				recorder.Eventf(&sj, api.EventTypeNormal, "SawCompletedJob", "Saw completed job: %v", j.Name)
@@ -152,7 +151,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		glog.Errorf("Unable to update status for %s: %v", nameForLog, err)
 	}
 
-	if sj.Spec.Suspend {
+	if sj.Spec.Suspend != nil && *sj.Spec.Suspend {
 		glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
 		return
 	}
@@ -200,7 +199,6 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		return
 	}
 	if sj.Spec.ConcurrencyPolicy == batch.ReplaceConcurrent {
-		glog.Errorf("Not starting job for %s because of prior execution still running and concurrency policy is Replace and delete is not supported yet", nameForLog)
 		for _, j := range sj.Status.Active {
 			glog.V(4).Infof("Deleting job %s of %s s that was still running at next scheduled start time", j.Name, nameForLog)
 			if err := jc.DeleteJob(j.Namespace, j.Name); err != nil {
@@ -231,7 +229,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 	// iteration of SyncAll, we might not see our own status update, and
 	// then post one again.  So, we need to use the job name as a lock to
 	// prevent us from making the job twice.  TODO: name the job
-	// deterministically.
+	// deterministically (via hash of its scheduled time).
 
 	// Add the just-started job to the status list.
 	ref, err := getRef(jobResp)
@@ -240,7 +238,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 	} else {
 		sj.Status.Active = append(sj.Status.Active, *ref)
 	}
-	sj.Status.LastScheduleTime = &unversioned.Time{scheduledTime}
+	sj.Status.LastScheduleTime = &unversioned.Time{Time: scheduledTime}
 	if err := sjc.UpdateStatus(&sj); err != nil {
 		glog.Infof("Unable to update status for %s: %v", nameForLog, err)
 	}

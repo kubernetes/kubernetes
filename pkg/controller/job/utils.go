@@ -14,5 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package scheduledjob contains the controller for ScheduledJob objects.
-package scheduledjob
+package job
+
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/batch"
+)
+
+func IsJobFinished(j *batch.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == api.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}

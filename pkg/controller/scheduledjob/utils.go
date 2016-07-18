@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -119,9 +119,9 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 	return sched.Next(now), nil
 }
 
-// getRecentUnmetScheduleTimes gets a slice of times that have passed when a Job should have started but did not
+// getRecentUnmetScheduleTimes gets a slice of times (from oldest to latest) that have passed when a Job should have started but did not.
 //
-// If there are too many unstarted times, only the most recent may be returned.
+// If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
 func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
@@ -166,23 +166,11 @@ func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.T
 		// I've somewhat arbitrarily picked 100, as more than 80, but
 		// but less than "lots".
 		if len(starts) > 100 {
+			// We can't get the most recent times so just return an empty slice
 			return []time.Time{}, fmt.Errorf("Too many missed start times to list")
 		}
 	}
 	return starts, nil
-}
-
-func isJobActive(j *batch.Job) bool {
-	return !isJobFinished(j)
-}
-
-func isJobFinished(j *batch.Job) bool {
-	for _, c := range j.Status.Conditions {
-		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == api.ConditionTrue {
-			return true
-		}
-	}
-	return false
 }
 
 // XXX unit test this
