@@ -19,14 +19,17 @@ package cm
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
-	"io/ioutil"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/types"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // ReduceCpuLimits reduces the cgroup's cpu shares to the lowest possible value
@@ -106,28 +109,70 @@ func getCgroupProcs(dir string) ([]int, error) {
 // GetAllPodsFromCgroups scans through all the subsytems of pod cgroups
 // Get list of pods whose cgroup still exist on the cgroup mounts
 func GetAllPodsFromCgroups(subsystems *CgroupSubsystems, qosContainers QOSContainersInfo) (map[types.UID]string, error) {
-        // Map for storing all the found pods on the disk
-        foundPods := make(map[types.UID]string)
-        qosContainersList := [3]string{qosContainers.Guaranteed, qosContainers.Burstable, qosContainers.BestEffort}
-        // Scan through all the subsystem mounts
-        // and through each QoS cgroup directory for each subsystem mount
-        // If a pod cgroup exists in even a single subsystem mount
-        // we will attempt to delete it
-        for _, val := range subsystems.MountPoints {
-                for _, name := range qosContainersList {
-                        // get the subsystems QoS cgroup absolute name
-                        qc := path.Join(val, name)
-                        dirInfo, err := ioutil.ReadDir(qc)
-                        if err != nil {
-                                return nil, fmt.Errorf("failed to read the cgroup directory %v : %v", qc, err)
-                        }
-                        for i := range dirInfo {
-                                if dirInfo[i].IsDir() && strings.HasPrefix(dirInfo[i].Name(), podCgroupNamePrefix) {
-                                        podUID := strings.TrimPrefix(dirInfo[i].Name(), podCgroupNamePrefix)
-                                        foundPods[types.UID(podUID)] = path.Join(name, dirInfo[i].Name())
-                                }
-                        }
-                }
-        }
-        return foundPods, nil
+	// Map for storing all the found pods on the disk
+	foundPods := make(map[types.UID]string)
+	qosContainersList := [3]string{qosContainers.Guaranteed, qosContainers.Burstable, qosContainers.BestEffort}
+	// Scan through all the subsystem mounts
+	// and through each QoS cgroup directory for each subsystem mount
+	// If a pod cgroup exists in even a single subsystem mount
+	// we will attempt to delete it
+	for _, val := range subsystems.MountPoints {
+		for _, name := range qosContainersList {
+			// get the subsystems QoS cgroup absolute name
+			qc := path.Join(val, name)
+			dirInfo, err := ioutil.ReadDir(qc)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read the cgroup directory %v : %v", qc, err)
+			}
+			for i := range dirInfo {
+				if dirInfo[i].IsDir() && strings.HasPrefix(dirInfo[i].Name(), podCgroupNamePrefix) {
+					podUID := strings.TrimPrefix(dirInfo[i].Name(), podCgroupNamePrefix)
+					foundPods[types.UID(podUID)] = path.Join(name, dirInfo[i].Name())
+				}
+			}
+		}
+	}
+	return foundPods, nil
+}
+
+// GetPodResourceRequest returns the pod requests for the supported resources.
+// Pod request is the summation of resource requests of all containers in the pod.
+func GetPodResourceRequests(pod *api.Pod) api.ResourceList {
+	requests := api.ResourceList{}
+	for _, container := range pod.Spec.Containers {
+		requests = quota.Add(requests, container.Resources.Requests)
+	}
+	return requests
+}
+
+// GetPodResourceLimits returns the pod limits for the supported resources
+// Pod limit is the summation of resource limits of all containers
+// in the pod. If limit for a particular resource is not specified for
+// even a single container then we return the node resource Allocatable
+// as the pod limit for the particular resource.
+func GetPodResourceLimits(pod *api.Pod, nodeInfo *api.Node) api.ResourceList {
+	allocatable := nodeInfo.Status.Allocatable
+	limits := api.ResourceList{}
+	for _, resource := range []api.ResourceName{api.ResourceCPU, api.ResourceMemory} {
+		for _, container := range pod.Spec.Containers {
+			quantity, exists := container.Resources.Limits[resource]
+			if exists && !quantity.IsZero() {
+				delta := quantity.Copy()
+				if _, exists := limits[resource]; !exists {
+					limits[resource] = *delta
+				} else {
+					delta.Add(limits[resource])
+					limits[resource] = *delta
+				}
+			} else {
+				// if limit not specified for a particular resource in a container
+				// we default the pod resource limit to the resource allocatable of the node
+				if alo, exists := allocatable[resource]; exists {
+					limits[resource] = *alo.Copy()
+					break
+				}
+			}
+		}
+	}
+	return limits
 }
