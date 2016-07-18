@@ -172,10 +172,6 @@ func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.T
 	return starts, nil
 }
 
-func isJobActive(j *batch.Job) bool {
-	return !isJobFinished(j)
-}
-
 func isJobFinished(j *batch.Job) bool {
 	for _, c := range j.Status.Conditions {
 		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == api.ConditionTrue {

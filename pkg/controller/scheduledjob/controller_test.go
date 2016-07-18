@@ -17,13 +17,14 @@ limitations under the License.
 package scheduledjob
 
 import (
+	"testing"
+	"time"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/types"
-	"testing"
-	"time"
 )
 
 // schedule is hourly on the hour
@@ -173,7 +174,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		t.Log("Test case:", name)
 		sj := scheduledJob()
 		sj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
-		sj.Spec.Suspend = tc.suspend
+		sj.Spec.Suspend = &tc.suspend
 		sj.Spec.Schedule = tc.schedule
 		if tc.deadline != noDead {
 			sj.Spec.StartingDeadlineSeconds = &tc.deadline
