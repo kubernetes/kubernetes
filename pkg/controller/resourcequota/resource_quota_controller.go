@@ -270,6 +270,10 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 	newUsage := api.ResourceList{}
 	usageStatsOptions := quota.UsageStatsOptions{Namespace: resourceQuota.Namespace, Scopes: resourceQuota.Spec.Scopes}
 	for _, evaluator := range evaluators {
+		// only trigger the evaluator if it matches a resource in the quota, otherwise, skip calculating anything
+		if intersection := quota.Intersection(evaluator.MatchesResources(), matchedResources); len(intersection) == 0 {
+			continue
+		}
 		stats, err := evaluator.UsageStats(usageStatsOptions)
 		if err != nil {
 			return err
