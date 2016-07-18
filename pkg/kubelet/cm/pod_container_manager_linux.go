@@ -41,6 +41,8 @@ type podContainerManagerImpl struct {
 	// cgroupManager is the cgroup Manager Object responsible for managing all
 	// pod cgroups.
 	cgroupManager CgroupManager
+	// qosPolciy stores the cgroup resource parameters policy for the three QoS classes
+	qosPolicy map[qos.QOSClass]func(api.ResourceList, api.ResourceList) *ResourceConfig
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -49,8 +51,22 @@ var _ PodContainerManager = &podContainerManagerImpl{}
 // applyLimits sets pod cgroup resource limits
 // It also updates the resource limits on top level qos containers.
 func (m *podContainerManagerImpl) applyLimits(pod *api.Pod) error {
-	// This function will house the logic for setting the resource parameters
-	// on the pod container config and updating top level qos container configs
+	podContainerName := m.GetPodContainerName(pod)
+	podQos := qos.GetPodQOS(pod)
+	// Determine the resources request and limits of the pod
+	// Its the sum of requests/limits of all the containers in the pod
+	// Note: if the limit is not specified for all the containers in the pod
+	// we use the Node Resource capacity as the default limit for the pod
+	podRequests := GetPodResourceRequests(pod)
+	podLimits := GetPodResourceLimits(pod, m.nodeInfo)
+	resourceConfig := m.qosPolicy[podQos](podRequests, podLimits)
+	containerConfig := &CgroupConfig{
+		Name:               podContainerName,
+		ResourceParameters: resourceConfig,
+	}
+	if err := m.cgroupManager.Update(containerConfig); err != nil {
+		return fmt.Errorf("Failed to update container for %v : %v", podContainerName, err)
+	}
 	return nil
 }
 

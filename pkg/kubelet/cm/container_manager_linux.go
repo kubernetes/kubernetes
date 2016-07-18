@@ -196,6 +196,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			qosContainersInfo: cm.qosContainers,
 			nodeInfo:          cm.nodeInfo,
 			subsystems:        cm.subsystems,
+			qosPolicy:         CreatePodQOSPolicyMap(),
 			cgroupManager:     NewCgroupManager(cm.subsystems),
 		}
 	}
