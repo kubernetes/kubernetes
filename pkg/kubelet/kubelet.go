@@ -197,13 +197,13 @@ type KubeletConfig struct {
 	ContainerManager        cm.ContainerManager
 	DockerClient            dockertools.DockerInterface
 	// DockerExecHandler       dockertools.ExecHandler
-	EventClient             *clientset.Clientset
-	Hostname                string
-	HostNetworkSources      []string
-	HostPIDSources          []string
-	HostIPCSources          []string
-	KubeClient              *clientset.Clientset
-	ManifestURLHeader       http.Header
+	EventClient        *clientset.Clientset
+	Hostname           string
+	HostNetworkSources []string
+	HostPIDSources     []string
+	HostIPCSources     []string
+	KubeClient         *clientset.Clientset
+	// ManifestURLHeader       http.Header
 	Mounter                 mount.Interface
 	NetworkPlugins          []network.NetworkPlugin
 	NodeName                string
@@ -222,7 +222,16 @@ type KubeletConfig struct {
 	Options                 []Option
 }
 
-func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) *config.PodConfig {
+func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (*config.PodConfig, error) {
+	manifestURLHeader := make(http.Header)
+	if kc_new.ManifestURLHeader != "" {
+		pieces := strings.Split(kc_new.ManifestURLHeader, ":")
+		if len(pieces) != 2 {
+			return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kc_new.ManifestURLHeader)
+		}
+		manifestURLHeader.Set(pieces[0], pieces[1])
+	}
+
 	// source of all configuration
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kc_old.Recorder)
 
@@ -234,14 +243,14 @@ func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletC
 
 	// define url config source
 	if kc_new.ManifestURL != "" {
-		glog.Infof("Adding manifest url %q with HTTP header %v", kc_new.ManifestURL, kc_old.ManifestURLHeader)
-		config.NewSourceURL(kc_new.ManifestURL, kc_old.ManifestURLHeader, kc_old.NodeName, kc_new.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
+		glog.Infof("Adding manifest url %q with HTTP header %v", kc_new.ManifestURL, manifestURLHeader)
+		config.NewSourceURL(kc_new.ManifestURL, manifestURLHeader, kc_old.NodeName, kc_new.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
 	if kc_old.KubeClient != nil {
 		glog.Infof("Watching apiserver")
 		config.NewSourceApiserver(kc_old.KubeClient, kc_old.NodeName, cfg.Channel(kubetypes.ApiserverSource))
 	}
-	return cfg
+	return cfg, nil
 }
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
@@ -261,7 +270,11 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		// TODO(mtaufen): This looks like something that would ultimately be appropriate
 		//                to apply as a default during the conversion between external
 		//                and internal KubeletConfiguration type.
-		kc_old.PodConfig = makePodSourceConfig(kc_old, kc_new)
+		var err error
+		kc_old.PodConfig, err = makePodSourceConfig(kc_old, kc_new)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	containerGCPolicy := kubecontainer.ContainerGCPolicy{
