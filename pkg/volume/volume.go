@@ -41,7 +41,7 @@ type Volume interface {
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
 // Volume.
 type MetricsProvider interface {
-	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for
+	// GetMetrics returns the Metrics for the Volume. Maybe expensive for
 	// some implementations.
 	GetMetrics() (*Metrics, error)
 }
@@ -107,9 +107,9 @@ type Unmounter interface {
 // Recycler provides methods to reclaim the volume resource.
 type Recycler interface {
 	Volume
-	// Recycle reclaims the resource.  Calls to this method should block until
+	// Recycle reclaims the resource. Calls to this method should block until
 	// the recycling task is complete. Any error returned indicates the volume
-	// has failed to be reclaimed.  A nil return indicates success.
+	// has failed to be reclaimed. A nil return indicates success.
 	Recycle() error
 }
 
@@ -122,7 +122,7 @@ type Provisioner interface {
 	Provision() (*api.PersistentVolume, error)
 }
 
-// Deleter removes the resource from the underlying storage provider.  Calls
+// Deleter removes the resource from the underlying storage provider. Calls
 // to this method should block until the deletion is complete. Any error
 // returned indicates the volume has failed to be reclaimed. A nil return
 // indicates success.
@@ -135,7 +135,7 @@ type Deleter interface {
 // Attacher can attach a volume to a node.
 type Attacher interface {
 	// Attaches the volume specified by the given spec to the given host.
-	// On success, returns the device path where the device was attache don the
+	// On success, returns the device path where the device was attached on the
 	// node.
 	Attach(spec *Spec, hostName string) (string, error)
 
