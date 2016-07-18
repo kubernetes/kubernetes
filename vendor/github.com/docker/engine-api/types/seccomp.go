@@ -24,6 +24,11 @@ const (
 	ArchMIPSEL      Arch = "SCMP_ARCH_MIPSEL"
 	ArchMIPSEL64    Arch = "SCMP_ARCH_MIPSEL64"
 	ArchMIPSEL64N32 Arch = "SCMP_ARCH_MIPSEL64N32"
+	ArchPPC         Arch = "SCMP_ARCH_PPC"
+	ArchPPC64       Arch = "SCMP_ARCH_PPC64"
+	ArchPPC64LE     Arch = "SCMP_ARCH_PPC64LE"
+	ArchS390        Arch = "SCMP_ARCH_S390"
+	ArchS390X       Arch = "SCMP_ARCH_S390X"
 )
 
 // Action taken upon Seccomp rule match

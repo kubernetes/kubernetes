@@ -18,18 +18,6 @@ type ClientConnPool interface {
 	MarkDead(*ClientConn)
 }
 
-// clientConnPoolIdleCloser is the interface implemented by ClientConnPool
-// implementations which can close their idle connections.
-type clientConnPoolIdleCloser interface {
-	ClientConnPool
-	closeIdleConnections()
-}
-
-var (
-	_ clientConnPoolIdleCloser = (*clientConnPool)(nil)
-	_ clientConnPoolIdleCloser = noDialClientConnPool{}
-)
-
 // TODO: use singleflight for dialing and addConnCalls?
 type clientConnPool struct {
 	t *Transport
@@ -52,16 +40,7 @@ const (
 	noDialOnMiss = false
 )
 
-func (p *clientConnPool) getClientConn(req *http.Request, addr string, dialOnMiss bool) (*ClientConn, error) {
-	if req.Close && dialOnMiss {
-		// It gets its own connection.
-		cc, err := p.t.dialClientConn(addr)
-		if err != nil {
-			return nil, err
-		}
-		cc.singleUse = true
-		return cc, nil
-	}
+func (p *clientConnPool) getClientConn(_ *http.Request, addr string, dialOnMiss bool) (*ClientConn, error) {
 	p.mu.Lock()
 	for _, cc := range p.conns[addr] {
 		if cc.CanTakeNewRequest() {
@@ -243,13 +222,4 @@ func filterOutClientConn(in []*ClientConn, exclude *ClientConn) []*ClientConn {
 		in[len(in)-1] = nil
 	}
 	return out
-}
-
-// noDialClientConnPool is an implementation of http2.ClientConnPool
-// which never dials.  We let the HTTP/1.1 client dial and use its TLS
-// connection instead.
-type noDialClientConnPool struct{ *clientConnPool }
-
-func (p noDialClientConnPool) GetClientConn(req *http.Request, addr string) (*ClientConn, error) {
-	return p.getClientConn(req, addr, noDialOnMiss)
 }

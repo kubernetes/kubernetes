@@ -136,28 +136,47 @@ func (n UTSMode) Valid() bool {
 	return true
 }
 
-// PidMode represents the pid stack of the container.
+// PidMode represents the pid namespace of the container.
 type PidMode string
 
-// IsPrivate indicates whether the container uses its private pid stack.
+// IsPrivate indicates whether the container uses its own new pid namespace.
 func (n PidMode) IsPrivate() bool {
-	return !(n.IsHost())
+	return !(n.IsHost() || n.IsContainer())
 }
 
-// IsHost indicates whether the container uses the host's pid stack.
+// IsHost indicates whether the container uses the host's pid namespace.
 func (n PidMode) IsHost() bool {
 	return n == "host"
 }
 
-// Valid indicates whether the pid stack is valid.
+// IsContainer indicates whether the container uses a container's pid namespace.
+func (n PidMode) IsContainer() bool {
+	parts := strings.SplitN(string(n), ":", 2)
+	return len(parts) > 1 && parts[0] == "container"
+}
+
+// Valid indicates whether the pid namespace is valid.
 func (n PidMode) Valid() bool {
 	parts := strings.Split(string(n), ":")
 	switch mode := parts[0]; mode {
 	case "", "host":
+	case "container":
+		if len(parts) != 2 || parts[1] == "" {
+			return false
+		}
 	default:
 		return false
 	}
 	return true
+}
+
+// Container returns the name of the container whose pid namespace is going to be used.
+func (n PidMode) Container() string {
+	parts := strings.SplitN(string(n), ":", 2)
+	if len(parts) > 1 {
+		return parts[1]
+	}
+	return ""
 }
 
 // DeviceMapping represents the device mapping between the host and the container.
@@ -176,7 +195,7 @@ type RestartPolicy struct {
 // IsNone indicates whether the container has the "no" restart policy.
 // This means the container will not automatically restart when exiting.
 func (rp *RestartPolicy) IsNone() bool {
-	return rp.Name == "no"
+	return rp.Name == "no" || rp.Name == ""
 }
 
 // IsAlways indicates whether the container has the "always" restart policy.
@@ -238,11 +257,10 @@ type Resources struct {
 	Ulimits              []*units.Ulimit // List of ulimits to be set in the container
 
 	// Applicable to Windows
-	CPUCount                int64  `json:"CpuCount"`   // CPU count
-	CPUPercent              int64  `json:"CpuPercent"` // CPU percent
-	IOMaximumIOps           uint64 // Maximum IOps for the container system drive
-	IOMaximumBandwidth      uint64 // Maximum IO in bytes per second for the container system drive
-	NetworkMaximumBandwidth uint64 // Maximum bandwidth of the network endpoint in bytes per second
+	CPUCount           int64  `json:"CpuCount"`   // CPU count
+	CPUPercent         int64  `json:"CpuPercent"` // CPU percent
+	IOMaximumIOps      uint64 // Maximum IOps for the container system drive
+	IOMaximumBandwidth uint64 // Maximum IO in bytes per second for the container system drive
 }
 
 // UpdateConfig holds the mutable attributes of a Container.
@@ -285,12 +303,13 @@ type HostConfig struct {
 	PublishAllPorts bool              // Should docker publish all exposed port for the container
 	ReadonlyRootfs  bool              // Is the container root filesystem in read-only
 	SecurityOpt     []string          // List of string values to customize labels for MLS systems, such as SELinux.
-	StorageOpt      map[string]string // Storage driver options per container.
+	StorageOpt      map[string]string `json:",omitempty"` // Storage driver options per container.
 	Tmpfs           map[string]string `json:",omitempty"` // List of tmpfs (mounts) used for the container
 	UTSMode         UTSMode           // UTS namespace to use for the container
 	UsernsMode      UsernsMode        // The user namespace to use for the container
 	ShmSize         int64             // Total shm memory usage
 	Sysctls         map[string]string `json:",omitempty"` // List of Namespaced sysctls used for the container
+	Runtime         string            `json:",omitempty"` // Runtime to use with this container
 
 	// Applicable to Windows
 	ConsoleSize [2]int    // Initial console size

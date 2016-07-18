@@ -32,7 +32,7 @@ func configureTransport(t1 *http.Transport) (*Transport, error) {
 		t1.TLSClientConfig.NextProtos = append(t1.TLSClientConfig.NextProtos, "http/1.1")
 	}
 	upgradeFn := func(authority string, c *tls.Conn) http.RoundTripper {
-		addr := authorityAddr("https", authority)
+		addr := authorityAddr(authority)
 		if used, err := connPool.addConnIfNeeded(addr, t2, c); err != nil {
 			go c.Close()
 			return erringRoundTripper{err}
@@ -65,6 +65,15 @@ func registerHTTPSProtocol(t *http.Transport, rt http.RoundTripper) (err error) 
 	}()
 	t.RegisterProtocol("https", rt)
 	return nil
+}
+
+// noDialClientConnPool is an implementation of http2.ClientConnPool
+// which never dials.  We let the HTTP/1.1 client dial and use its TLS
+// connection instead.
+type noDialClientConnPool struct{ *clientConnPool }
+
+func (p noDialClientConnPool) GetClientConn(req *http.Request, addr string) (*ClientConn, error) {
+	return p.getClientConn(req, addr, noDialOnMiss)
 }
 
 // noDialH2RoundTripper is a RoundTripper which only tries to complete the request

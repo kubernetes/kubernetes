@@ -215,10 +215,22 @@ func (filters Args) ExactMatch(field, source string) bool {
 	}
 
 	// try to match full name value to avoid O(N) regular expression matching
-	if fieldValues[source] {
+	return fieldValues[source]
+}
+
+// UniqueExactMatch returns true if there is only one filter and the source matches exactly this one.
+func (filters Args) UniqueExactMatch(field, source string) bool {
+	fieldValues := filters.fields[field]
+	//do not filter if there is no filter set or cannot determine filter
+	if len(fieldValues) == 0 {
 		return true
 	}
-	return false
+	if len(filters.fields[field]) != 1 {
+		return false
+	}
+
+	// try to match full name value to avoid O(N) regular expression matching
+	return fieldValues[source]
 }
 
 // FuzzyMatch returns true if the source matches exactly one of the filters,

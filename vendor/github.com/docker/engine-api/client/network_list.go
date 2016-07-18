@@ -13,7 +13,7 @@ import (
 func (cli *Client) NetworkList(ctx context.Context, options types.NetworkListOptions) ([]types.NetworkResource, error) {
 	query := url.Values{}
 	if options.Filters.Len() > 0 {
-		filterJSON, err := filters.ToParam(options.Filters)
+		filterJSON, err := filters.ToParamWithVersion(cli.version, options.Filters)
 		if err != nil {
 			return nil, err
 		}

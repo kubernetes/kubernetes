@@ -15,7 +15,7 @@ func (cli *Client) VolumeList(ctx context.Context, filter filters.Args) (types.V
 	query := url.Values{}
 
 	if filter.Len() > 0 {
-		filterJSON, err := filters.ToParam(filter)
+		filterJSON, err := filters.ToParamWithVersion(cli.version, filter)
 		if err != nil {
 			return volumes, err
 		}

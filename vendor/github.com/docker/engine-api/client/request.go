@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/docker/engine-api/client/transport/cancellable"
+	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/versions"
 	"golang.org/x/net/context"
 )
 
@@ -85,6 +87,10 @@ func (cli *Client) sendClientRequest(ctx context.Context, method, path string, q
 	}
 
 	req, err := cli.newRequest(method, path, query, body, headers)
+	if err != nil {
+		return serverResp, err
+	}
+
 	if cli.proto == "unix" || cli.proto == "npipe" {
 		// For local communications, it doesn't matter what the host is. We just
 		// need a valid and meaningful host name. (See #189)
@@ -98,10 +104,6 @@ func (cli *Client) sendClientRequest(ctx context.Context, method, path string, q
 	}
 
 	resp, err := cancellable.Do(ctx, cli.transport, req)
-	if resp != nil {
-		serverResp.statusCode = resp.StatusCode
-	}
-
 	if err != nil {
 		if isTimeout(err) || strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "dial unix") {
 			return serverResp, ErrConnectionFailed
@@ -110,11 +112,16 @@ func (cli *Client) sendClientRequest(ctx context.Context, method, path string, q
 		if !cli.transport.Secure() && strings.Contains(err.Error(), "malformed HTTP response") {
 			return serverResp, fmt.Errorf("%v.\n* Are you trying to connect to a TLS-enabled daemon without TLS?", err)
 		}
-		if cli.transport.Secure() && strings.Contains(err.Error(), "remote error: bad certificate") {
+
+		if cli.transport.Secure() && strings.Contains(err.Error(), "bad certificate") {
 			return serverResp, fmt.Errorf("The server probably has client authentication (--tlsverify) enabled. Please check your TLS client certification settings: %v", err)
 		}
 
 		return serverResp, fmt.Errorf("An error occurred trying to connect: %v", err)
+	}
+
+	if resp != nil {
+		serverResp.statusCode = resp.StatusCode
 	}
 
 	if serverResp.statusCode < 200 || serverResp.statusCode >= 400 {
@@ -125,7 +132,20 @@ func (cli *Client) sendClientRequest(ctx context.Context, method, path string, q
 		if len(body) == 0 {
 			return serverResp, fmt.Errorf("Error: request returned %s for API route and version %s, check if the server supports the requested API version", http.StatusText(serverResp.statusCode), req.URL)
 		}
-		return serverResp, fmt.Errorf("Error response from daemon: %s", bytes.TrimSpace(body))
+
+		var errorMessage string
+		if (cli.version == "" || versions.GreaterThan(cli.version, "1.23")) &&
+			resp.Header.Get("Content-Type") == "application/json" {
+			var errorResponse types.ErrorResponse
+			if err := json.Unmarshal(body, &errorResponse); err != nil {
+				return serverResp, fmt.Errorf("Error reading JSON: %v", err)
+			}
+			errorMessage = errorResponse.Message
+		} else {
+			errorMessage = string(body)
+		}
+
+		return serverResp, fmt.Errorf("Error response from daemon: %s", strings.TrimSpace(errorMessage))
 	}
 
 	serverResp.body = resp.Body
@@ -167,6 +187,8 @@ func encodeData(data interface{}) (*bytes.Buffer, error) {
 
 func ensureReaderClosed(response *serverResponse) {
 	if response != nil && response.body != nil {
+		// Drain up to 512 bytes and close the body to let the Transport reuse the connection
+		io.CopyN(ioutil.Discard, response.body, 512)
 		response.body.Close()
 	}
 }

@@ -1,10 +1,21 @@
 package client
 
-import "golang.org/x/net/context"
+import (
+	"net/url"
+
+	"golang.org/x/net/context"
+
+	"github.com/docker/engine-api/types"
+)
 
 // ContainerStart sends a request to the docker daemon to start a container.
-func (cli *Client) ContainerStart(ctx context.Context, containerID string) error {
-	resp, err := cli.post(ctx, "/containers/"+containerID+"/start", nil, nil, nil)
+func (cli *Client) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
+	query := url.Values{}
+	if len(options.CheckpointID) != 0 {
+		query.Set("checkpoint", options.CheckpointID)
+	}
+
+	resp, err := cli.post(ctx, "/containers/"+containerID+"/start", query, nil, nil)
 	ensureReaderClosed(resp)
 	return err
 }

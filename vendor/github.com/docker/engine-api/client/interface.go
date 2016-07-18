@@ -2,19 +2,34 @@ package client
 
 import (
 	"io"
-
-	"golang.org/x/net/context"
+	"time"
 
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/filters"
 	"github.com/docker/engine-api/types/network"
 	"github.com/docker/engine-api/types/registry"
+	"github.com/docker/engine-api/types/swarm"
+	"golang.org/x/net/context"
 )
 
-// APIClient is an interface that clients that talk with a docker server must implement.
-type APIClient interface {
+// CommonAPIClient is the common methods between stable and experimental versions of APIClient.
+type CommonAPIClient interface {
+	ContainerAPIClient
+	ImageAPIClient
+	NodeAPIClient
+	NetworkAPIClient
+	ServiceAPIClient
+	SwarmAPIClient
+	SystemAPIClient
+	VolumeAPIClient
 	ClientVersion() string
+	ServerVersion(ctx context.Context) (types.Version, error)
+	UpdateClientVersion(v string)
+}
+
+// ContainerAPIClient defines API client methods for the containers
+type ContainerAPIClient interface {
 	ContainerAttach(ctx context.Context, container string, options types.ContainerAttachOptions) (types.HijackedResponse, error)
 	ContainerCommit(ctx context.Context, container string, options types.ContainerCommitOptions) (types.ContainerCommitResponse, error)
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (types.ContainerCreateResponse, error)
@@ -34,18 +49,21 @@ type APIClient interface {
 	ContainerRemove(ctx context.Context, container string, options types.ContainerRemoveOptions) error
 	ContainerRename(ctx context.Context, container, newContainerName string) error
 	ContainerResize(ctx context.Context, container string, options types.ResizeOptions) error
-	ContainerRestart(ctx context.Context, container string, timeout int) error
+	ContainerRestart(ctx context.Context, container string, timeout *time.Duration) error
 	ContainerStatPath(ctx context.Context, container, path string) (types.ContainerPathStat, error)
 	ContainerStats(ctx context.Context, container string, stream bool) (io.ReadCloser, error)
-	ContainerStart(ctx context.Context, container string) error
-	ContainerStop(ctx context.Context, container string, timeout int) error
+	ContainerStart(ctx context.Context, container string, options types.ContainerStartOptions) error
+	ContainerStop(ctx context.Context, container string, timeout *time.Duration) error
 	ContainerTop(ctx context.Context, container string, arguments []string) (types.ContainerProcessList, error)
 	ContainerUnpause(ctx context.Context, container string) error
 	ContainerUpdate(ctx context.Context, container string, updateConfig container.UpdateConfig) error
 	ContainerWait(ctx context.Context, container string) (int, error)
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error)
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, options types.CopyToContainerOptions) error
-	Events(ctx context.Context, options types.EventsOptions) (io.ReadCloser, error)
+}
+
+// ImageAPIClient defines API client methods for the images
+type ImageAPIClient interface {
 	ImageBuild(ctx context.Context, context io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error)
 	ImageCreate(ctx context.Context, parentReference string, options types.ImageCreateOptions) (io.ReadCloser, error)
 	ImageHistory(ctx context.Context, image string) ([]types.ImageHistory, error)
@@ -58,22 +76,60 @@ type APIClient interface {
 	ImageRemove(ctx context.Context, image string, options types.ImageRemoveOptions) ([]types.ImageDelete, error)
 	ImageSearch(ctx context.Context, term string, options types.ImageSearchOptions) ([]registry.SearchResult, error)
 	ImageSave(ctx context.Context, images []string) (io.ReadCloser, error)
-	ImageTag(ctx context.Context, image, ref string, options types.ImageTagOptions) error
-	Info(ctx context.Context) (types.Info, error)
+	ImageTag(ctx context.Context, image, ref string) error
+}
+
+// NetworkAPIClient defines API client methods for the networks
+type NetworkAPIClient interface {
 	NetworkConnect(ctx context.Context, networkID, container string, config *network.EndpointSettings) error
 	NetworkCreate(ctx context.Context, name string, options types.NetworkCreate) (types.NetworkCreateResponse, error)
 	NetworkDisconnect(ctx context.Context, networkID, container string, force bool) error
 	NetworkInspect(ctx context.Context, networkID string) (types.NetworkResource, error)
+	NetworkInspectWithRaw(ctx context.Context, networkID string) (types.NetworkResource, []byte, error)
 	NetworkList(ctx context.Context, options types.NetworkListOptions) ([]types.NetworkResource, error)
 	NetworkRemove(ctx context.Context, networkID string) error
+}
+
+// NodeAPIClient defines API client methods for the nodes
+type NodeAPIClient interface {
+	NodeInspectWithRaw(ctx context.Context, nodeID string) (swarm.Node, []byte, error)
+	NodeList(ctx context.Context, options types.NodeListOptions) ([]swarm.Node, error)
+	NodeRemove(ctx context.Context, nodeID string) error
+	NodeUpdate(ctx context.Context, nodeID string, version swarm.Version, node swarm.NodeSpec) error
+}
+
+// ServiceAPIClient defines API client methods for the services
+type ServiceAPIClient interface {
+	ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options types.ServiceCreateOptions) (types.ServiceCreateResponse, error)
+	ServiceInspectWithRaw(ctx context.Context, serviceID string) (swarm.Service, []byte, error)
+	ServiceList(ctx context.Context, options types.ServiceListOptions) ([]swarm.Service, error)
+	ServiceRemove(ctx context.Context, serviceID string) error
+	ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options types.ServiceUpdateOptions) error
+	TaskInspectWithRaw(ctx context.Context, taskID string) (swarm.Task, []byte, error)
+	TaskList(ctx context.Context, options types.TaskListOptions) ([]swarm.Task, error)
+}
+
+// SwarmAPIClient defines API client methods for the swarm
+type SwarmAPIClient interface {
+	SwarmInit(ctx context.Context, req swarm.InitRequest) (string, error)
+	SwarmJoin(ctx context.Context, req swarm.JoinRequest) error
+	SwarmLeave(ctx context.Context, force bool) error
+	SwarmInspect(ctx context.Context) (swarm.Swarm, error)
+	SwarmUpdate(ctx context.Context, version swarm.Version, swarm swarm.Spec) error
+}
+
+// SystemAPIClient defines API client methods for the system
+type SystemAPIClient interface {
+	Events(ctx context.Context, options types.EventsOptions) (io.ReadCloser, error)
+	Info(ctx context.Context) (types.Info, error)
 	RegistryLogin(ctx context.Context, auth types.AuthConfig) (types.AuthResponse, error)
-	ServerVersion(ctx context.Context) (types.Version, error)
-	UpdateClientVersion(v string)
+}
+
+// VolumeAPIClient defines API client methods for the volumes
+type VolumeAPIClient interface {
 	VolumeCreate(ctx context.Context, options types.VolumeCreateRequest) (types.Volume, error)
 	VolumeInspect(ctx context.Context, volumeID string) (types.Volume, error)
+	VolumeInspectWithRaw(ctx context.Context, volumeID string) (types.Volume, []byte, error)
 	VolumeList(ctx context.Context, filter filters.Args) (types.VolumesListResponse, error)
 	VolumeRemove(ctx context.Context, volumeID string) error
 }
-
-// Ensure that Client always implements APIClient.
-var _ APIClient = &Client{}

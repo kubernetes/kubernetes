@@ -81,6 +81,9 @@ type hybiFrameReader struct {
 
 func (frame *hybiFrameReader) Read(msg []byte) (n int, err error) {
 	n, err = frame.reader.Read(msg)
+	if err != nil {
+		return 0, err
+	}
 	if frame.header.MaskingKey != nil {
 		for i := 0; i < n; i++ {
 			msg[i] = msg[i] ^ frame.header.MaskingKey[frame.pos%4]
