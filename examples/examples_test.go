@@ -401,14 +401,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"javaweb":   &api.Pod{},
 			"javaweb-2": &api.Pod{},
 		},
-		"../examples/job/work-queue-1": {
-			"job": &batch.Job{},
-		},
-		"../examples/job/work-queue-2": {
-			"redis-pod":     &api.Pod{},
-			"redis-service": &api.Service{},
-			"job":           &batch.Job{},
-		},
 		"../examples/volumes/azure_file": {
 			"azure": &api.Pod{},
 		},
