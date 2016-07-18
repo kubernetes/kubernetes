@@ -1631,13 +1631,6 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePerio
 		r.containerRefManager.ClearRef(c.ID)
 	}
 
-	// Touch the systemd service file to update the mod time so it will
-	// not be garbage collected too soon.
-	if err := r.os.Chtimes(serviceFile, time.Now(), time.Now()); err != nil {
-		glog.Errorf("rkt: Failed to change the modification time of the service file %q: %v", serviceName, err)
-		return err
-	}
-
 	// Since all service file have 'KillMode=mixed', the processes in
 	// the unit's cgroup will receive a SIGKILL if the normal stop timeouts.
 	reschan := make(chan string)
