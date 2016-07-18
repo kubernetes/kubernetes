@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/filters"
 	"github.com/docker/engine-api/types/registry"
 	"golang.org/x/net/context"
 )
@@ -16,6 +17,14 @@ func (cli *Client) ImageSearch(ctx context.Context, term string, options types.I
 	var results []registry.SearchResult
 	query := url.Values{}
 	query.Set("term", term)
+
+	if options.Filters.Len() > 0 {
+		filterJSON, err := filters.ToParam(options.Filters)
+		if err != nil {
+			return results, err
+		}
+		query.Set("filters", filterJSON)
+	}
 
 	resp, err := cli.tryImageSearch(ctx, query, options.RegistryAuth)
 	if resp.statusCode == http.StatusUnauthorized {
