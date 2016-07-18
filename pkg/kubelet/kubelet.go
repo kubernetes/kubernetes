@@ -215,9 +215,9 @@ type KubeletConfig struct {
 	// EnableDebuggingHandlers        bool
 	// CgroupsPerQOS                  bool
 	// EnableServer                   bool
-	EventClient    *clientset.Clientset
-	EventBurst     int
-	EventRecordQPS float32
+	EventClient *clientset.Clientset
+	// EventBurst     int
+	// EventRecordQPS float32
 	// FileCheckFrequency             time.Duration
 	Hostname string
 	// HostnameOverride               string
@@ -230,10 +230,10 @@ type KubeletConfig struct {
 	// ManifestURL                    string
 	ManifestURLHeader http.Header
 	// MasterServiceNamespace         string
-	MaxContainerCount       int
-	MaxOpenFiles            uint64
-	MaxPerPodContainerCount int
-	MaxPods                 int
+	// MaxContainerCount       int
+	// MaxOpenFiles uint64
+	// MaxPerPodContainerCount int
+	// MaxPods                 int
 	// MinimumGCAge                   time.Duration
 	Mounter mount.Interface
 	// NetworkPluginName              string
@@ -242,22 +242,22 @@ type KubeletConfig struct {
 	// NodeLabels                     map[string]string
 	// NodeStatusUpdateFrequency      time.Duration
 	// NonMasqueradeCIDR              string
-	NvidiaGPUs  int
+	// NvidiaGPUs  int
 	OOMAdjuster *oom.OOMAdjuster
 	OSInterface kubecontainer.OSInterface
 	// PodCIDR                        string
-	PodsPerCore int
+	// PodsPerCore int
 	// ReconcileCIDR                  bool
 	PodConfig *config.PodConfig
 	// PodInfraContainerImage         string
-	Port         uint
-	ReadOnlyPort uint
-	Recorder     record.EventRecorder
+	// Port         uint
+	// ReadOnlyPort uint
+	Recorder record.EventRecorder
 	// RegisterNode                   bool
 	// RegisterSchedulable            bool
-	RegistryBurst   int
-	RegistryPullQPS float64
-	Reservation     kubetypes.Reservation
+	// RegistryBurst   int
+	// RegistryPullQPS float64
+	Reservation kubetypes.Reservation
 	// ResolverConfig                 string
 	// KubeletCgroups                 string
 	// RktPath                        string
@@ -278,7 +278,7 @@ type KubeletConfig struct {
 	EvictionConfig eviction.Config
 
 	// ExperimentalFlannelOverlay bool
-	NodeIP                  net.IP
+	// NodeIP                  net.IP
 	ContainerRuntimeOptions []kubecontainer.Option
 	// HairpinMode                string
 	// BabysitDaemons             bool
@@ -329,12 +329,12 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 
 	containerGCPolicy := kubecontainer.ContainerGCPolicy{
 		MinAge:             kc_new.MinimumGCAge.Duration,
-		MaxPerPodContainer: kc_old.MaxPerPodContainerCount,
-		MaxContainers:      kc_old.MaxContainerCount,
+		MaxPerPodContainer: int(kc_new.MaxPerPodContainerCount),
+		MaxContainers:      int(kc_new.MaxContainerCount),
 	}
 
 	daemonEndpoints := &api.NodeDaemonEndpoints{
-		KubeletEndpoint: api.DaemonEndpoint{Port: int32(kc_old.Port)},
+		KubeletEndpoint: api.DaemonEndpoint{Port: kc_new.Port},
 	}
 
 	if kc_new.RootDirectory == "" {
@@ -448,9 +448,9 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		configureCBR0:              myConfigureCBR0,
 		nonMasqueradeCIDR:          kc_new.NonMasqueradeCIDR,
 		reconcileCIDR:              kc_new.ReconcileCIDR,
-		maxPods:                    kc_old.MaxPods,
-		podsPerCore:                kc_old.PodsPerCore,
-		nvidiaGPUs:                 kc_old.NvidiaGPUs,
+		maxPods:                    int(kc_new.MaxPods),
+		podsPerCore:                int(kc_new.PodsPerCore),
+		nvidiaGPUs:                 int(kc_new.NvidiaGPUs),
 		syncLoopMonitor:            atomic.Value{},
 		resolverConfig:             kc_new.ResolverConfig,
 		cpuCFSQuota:                kc_new.CPUCFSQuota,
@@ -458,7 +458,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		containerManager:           kc_old.ContainerManager,
 		flannelExperimentalOverlay: myFlannelExperimentalOverlay,
 		flannelHelper:              nil,
-		nodeIP:                     kc_old.NodeIP,
+		nodeIP:                     net.ParseIP(kc_new.NodeIP),
 		clock:                      clock.RealClock{},
 		outOfDiskTransitionFrequency: kc_new.OutOfDiskTransitionFrequency.Duration,
 		reservation:                  kc_old.Reservation,
@@ -519,8 +519,8 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 			klet.podManager,
 			machineInfo,
 			kc_new.PodInfraContainerImage,
-			float32(kc_old.RegistryPullQPS),
-			kc_old.RegistryBurst,
+			float32(kc_new.RegistryPullQPS),
+			int(kc_new.RegistryBurst),
 			containerLogsDir,
 			kc_old.OSInterface,
 			klet.networkPlugin,
