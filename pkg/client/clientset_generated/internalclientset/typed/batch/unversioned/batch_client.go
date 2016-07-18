@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	//"k8s.io/kubernetes/pkg/api/unversioned"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -82,16 +81,8 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	// XXX why is above commented out?
 	copyGroupVersion := g.GroupVersion
 	config.GroupVersion = &copyGroupVersion
-	//}
-	// Do we need something like this:
-	// if config.Version == "" {
-	//	copyGroupVersion := g.GroupVersion
-	//	config.GroupVersion = &copyGroupVersion
-	//} else {
-	//	config.GroupVersion = &unversioned.GroupVersion{Group: "batch", Version: config.Version}
 	//}
 
 	config.NegotiatedSerializer = api.Codecs
