@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -88,7 +86,7 @@ func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 // incompatible ways at any time.
 func NewExtensions(c *restclient.Config) (*ExtensionsClient, error) {
 	config := *c
-	if err := setExtensionsDefaults(&config); err != nil {
+	if err := setGroupDefaults(extensions.GroupName, &config); err != nil {
 		return nil, err
 	}
 	client, err := restclient.RESTClientFor(&config)
@@ -108,24 +106,4 @@ func NewExtensionsOrDie(c *restclient.Config) *ExtensionsClient {
 		panic(err)
 	}
 	return client
-}
-
-func setExtensionsDefaults(config *restclient.Config) error {
-	// if experimental group is not registered, return an error
-	g, err := registered.Group(extensions.GroupName)
-	if err != nil {
-		return err
-	}
-	config.APIPath = defaultAPIPath
-	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
-	//}
-
-	config.NegotiatedSerializer = api.Codecs
-	return nil
 }
