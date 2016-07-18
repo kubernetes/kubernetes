@@ -223,8 +223,10 @@ func (b flockerMounter) updateDatasetPrimary(datasetID, primaryUUID string) erro
 		return err
 	}
 
-	timeoutChan := time.NewTimer(timeoutWaitingForVolume).C
-	tickChan := time.NewTicker(tickerWaitingForVolume).C
+	timeoutChan := time.NewTimer(timeoutWaitingForVolume)
+	defer timeoutChan.Stop()
+	tickChan := time.NewTicker(tickerWaitingForVolume)
+	defer tickChan.Stop()
 
 	for {
 		if s, err := b.client.GetDatasetState(datasetID); err == nil && s.Primary == primaryUUID {
@@ -232,12 +234,12 @@ func (b flockerMounter) updateDatasetPrimary(datasetID, primaryUUID string) erro
 		}
 
 		select {
-		case <-timeoutChan:
+		case <-timeoutChan.C:
 			return fmt.Errorf(
 				"Timed out waiting for the dataset_id: '%s' to be moved to the primary: '%s'\n%v",
 				datasetID, primaryUUID, err,
 			)
-		case <-tickChan:
+		case <-tickChan.C:
 			break
 		}
 	}
