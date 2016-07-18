@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -306,5 +307,161 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+}
+
+func TestAddQuota(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		KubeClient:   kubeClient,
+		ResyncPeriod: controller.NoResyncPeriodFunc,
+		Registry:     install.NewRegistry(kubeClient),
+		GroupKindsToReplenish: []unversioned.GroupKind{
+			api.Kind("Pod"),
+			api.Kind("ReplicationController"),
+			api.Kind("PersistentVolumeClaim"),
+		},
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+	}
+	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
+
+	delete(quotaController.registry.(*generic.GenericRegistry).InternalEvaluators, api.Kind("Service"))
+
+	testCases := []struct {
+		name string
+
+		quota            *api.ResourceQuota
+		expectedPriority bool
+	}{
+		{
+			name:             "no status",
+			expectedPriority: true,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+			},
+		},
+		{
+			name:             "status, no usage",
+			expectedPriority: true,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+			},
+		},
+		{
+			name:             "status, mismatch",
+			expectedPriority: true,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("6"),
+					},
+					Used: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("0"),
+					},
+				},
+			},
+		},
+		{
+			name:             "status, missing usage, but don't care",
+			expectedPriority: false,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceServices: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceServices: resource.MustParse("4"),
+					},
+				},
+			},
+		},
+		{
+			name:             "ready",
+			expectedPriority: false,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+					Used: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("0"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		quotaController.addQuota(tc.quota)
+		if tc.expectedPriority {
+			if e, a := 1, quotaController.missingUsageQueue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+			if e, a := 0, quotaController.queue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+		} else {
+			if e, a := 0, quotaController.missingUsageQueue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+			if e, a := 1, quotaController.queue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+		}
+
+		for quotaController.missingUsageQueue.Len() > 0 {
+			key, _ := quotaController.missingUsageQueue.Get()
+			quotaController.missingUsageQueue.Done(key)
+		}
+		for quotaController.queue.Len() > 0 {
+			key, _ := quotaController.queue.Get()
+			quotaController.queue.Done(key)
+		}
 	}
 }
