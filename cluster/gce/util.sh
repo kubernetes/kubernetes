@@ -61,12 +61,18 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
   # Otherwise, we respect whatever is set by the user.
   MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-"$(get_latest_gci_image)"}
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
+  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
+  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 fi
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
   # If the node image is not set, we use the latest GCI image.
   # Otherwise, we respect whatever is set by the user.
   NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"$(get_latest_gci_image)"}
+  NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
+elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+  NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
   NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
 fi
 
@@ -267,7 +273,9 @@ function upload-server-tars() {
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
   SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
-  KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
+  if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
+    KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
+  fi
 
   local server_binary_tar_urls=()
   local salt_tar_urls=()
@@ -297,16 +305,19 @@ function upload-server-tars() {
     # Convert from gs:// URL to an https:// URL
     server_binary_tar_urls+=("${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
     salt_tar_urls+=("${salt_gs_url/gs:\/\//https://storage.googleapis.com/}")
-
-    local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
-    copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
-    # Convert from gs:// URL to an https:// URL
-    kube_manifests_tar_urls+=("${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}")
+    if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
+      local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
+      copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
+      # Convert from gs:// URL to an https:// URL
+      kube_manifests_tar_urls+=("${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}")
+    fi
   done
 
   SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
   SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
-  KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
+  if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
+    KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
+  fi
 }
 
 # Detect minions created in the minion group
