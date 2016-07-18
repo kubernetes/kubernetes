@@ -435,7 +435,7 @@ func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtim
 
 // AddCmdRecordFlag adds --record flag to command
 func AddRecordFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation.")
+	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
 }
 
 func GetRecordFlag(cmd *cobra.Command) bool {
@@ -489,7 +489,7 @@ func ContainsChangeCause(info *resource.Info) bool {
 
 // ShouldRecord checks if we should record current change cause
 func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
-	return GetRecordFlag(cmd) || ContainsChangeCause(info)
+	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
 }
 
 // GetThirdPartyGroupVersions returns the thirdparty "group/versions"s and
