@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"bytes"
@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	defaultObservationTimeout = time.Minute * 2
+	defaultObservationTimeout = time.Minute * 1
 )
 
 var (
@@ -51,45 +51,47 @@ var (
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
 )
 
-func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRestarts int, timeout time.Duration) {
-	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
-	podDescr, err := c.Pods(ns).Create(podDescr)
-	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
-
+func runLivenessTest(f *framework.Framework, pod *api.Pod, expectNumRestarts int, timeout time.Duration) {
+	podClient := f.PodClient()
+	ns := f.Namespace.Name
+	Expect(pod.Spec.Containers).NotTo(BeEmpty())
+	containerName := pod.Spec.Containers[0].Name
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		c.Pods(ns).Delete(podDescr.Name, api.NewDeleteOptions(0))
+		podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 	}()
+	By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
+	podClient.Create(pod)
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podDescr.Name, podDescr.ResourceVersion),
-		fmt.Sprintf("starting pod %s in namespace %s", podDescr.Name, ns))
-	framework.Logf("Started pod %s in namespace %s", podDescr.Name, ns)
+	framework.ExpectNoError(framework.WaitForPodNotPending(f.Client, ns, pod.Name, pod.ResourceVersion),
+		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
+	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
 	By("checking the pod's current state and verifying that restartCount is present")
-	pod, err := c.Pods(ns).Get(podDescr.Name)
-	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", podDescr.Name, ns))
-	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
-	framework.Logf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount)
+	pod, err := podClient.Get(pod.Name)
+	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
+	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
 	deadline := time.Now().Add(timeout)
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
-		pod, err = c.Pods(ns).Get(podDescr.Name)
-		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
-		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
+		pod, err = podClient.Get(pod.Name)
+		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
+		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
 			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
-				ns, podDescr.Name, restartCount, time.Since(start))
+				ns, pod.Name, restartCount, time.Since(start))
 			if restartCount < lastRestartCount {
 				framework.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
-					ns, podDescr.Name, lastRestartCount, restartCount)
+					ns, pod.Name, lastRestartCount, restartCount)
 			}
 		}
 		observedRestarts = restartCount - initialRestartCount
@@ -104,25 +106,17 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 	// If we expected n restarts (n > 0), fail if we observed < n restarts.
 	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
 		int(observedRestarts) < expectNumRestarts) {
-		framework.Failf("pod %s/%s - expected number of restarts: %t, found restarts: %t",
-			ns, podDescr.Name, expectNumRestarts, observedRestarts)
+		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
+			ns, pod.Name, expectNumRestarts, observedRestarts)
 	}
 }
 
 // testHostIP tests that a pod gets a host IP
-func testHostIP(c *client.Client, ns string, pod *api.Pod) {
-	podClient := c.Pods(ns)
+func testHostIP(podClient *framework.PodClient, pod *api.Pod) {
 	By("creating pod")
 	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-	pod, err := podClient.Create(pod)
-	if err != nil {
-		framework.Failf("Failed to create pod: %v", err)
-	}
-	By("ensuring that pod is running and has a hostIP")
-	// Wait for the pods to enter the running state. Waiting loops until the pods
-	// are running so non-running pods cause a timeout for this test.
-	err = framework.WaitForPodRunningInNamespace(c, pod)
-	Expect(err).NotTo(HaveOccurred())
+	podClient.CreateSync(pod)
+
 	// Try to make sure we get a hostIP for each pod.
 	hostIPTimeout := 2 * time.Minute
 	t := time.Now()
@@ -142,54 +136,39 @@ func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 	}
 }
 
-func runPodFromStruct(f *framework.Framework, pod *api.Pod) {
-	By("submitting the pod to kubernetes")
-
-	podClient := f.Client.Pods(f.Namespace.Name)
-	pod, err := podClient.Create(pod)
-	if err != nil {
-		framework.Failf("Failed to create pod: %v", err)
-	}
-
-	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-
-	By("verifying the pod is in kubernetes")
-	pod, err = podClient.Get(pod.Name)
-	if err != nil {
-		framework.Failf("failed to get pod: %v", err)
-	}
-}
-
-func startPodAndGetBackOffs(f *framework.Framework, pod *api.Pod, podName string, containerName string, sleepAmount time.Duration) (time.Duration, time.Duration) {
-	runPodFromStruct(f, pod)
+func startPodAndGetBackOffs(podClient *framework.PodClient, pod *api.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
+	podClient.CreateSync(pod)
 	time.Sleep(sleepAmount)
+	Expect(pod.Spec.Containers).NotTo(BeEmpty())
+	podName := pod.Name
+	containerName := pod.Spec.Containers[0].Name
 
 	By("getting restart delay-0")
-	_, err := getRestartDelay(f.Client, pod, f.Namespace.Name, podName, containerName)
+	_, err := getRestartDelay(podClient, podName, containerName)
 	if err != nil {
 		framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 	}
 
 	By("getting restart delay-1")
-	delay1, err := getRestartDelay(f.Client, pod, f.Namespace.Name, podName, containerName)
+	delay1, err := getRestartDelay(podClient, podName, containerName)
 	if err != nil {
 		framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 	}
 
 	By("getting restart delay-2")
-	delay2, err := getRestartDelay(f.Client, pod, f.Namespace.Name, podName, containerName)
+	delay2, err := getRestartDelay(podClient, podName, containerName)
 	if err != nil {
 		framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 	}
 	return delay1, delay2
 }
 
-func getRestartDelay(c *client.Client, pod *api.Pod, ns string, name string, containerName string) (time.Duration, error) {
+func getRestartDelay(podClient *framework.PodClient, podName string, containerName string) (time.Duration, error) {
 	beginTime := time.Now()
 	for time.Since(beginTime) < (2 * maxBackOffTolerance) { // may just miss the 1st MaxContainerBackOff delay
 		time.Sleep(time.Second)
-		pod, err := c.Pods(ns).Get(name)
-		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", name))
+		pod, err := podClient.Get(podName)
+		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 		status, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
 		if !ok {
 			framework.Logf("getRestartDelay: status missing")
@@ -208,10 +187,14 @@ func getRestartDelay(c *client.Client, pod *api.Pod, ns string, name string, con
 
 var _ = framework.KubeDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
+	var podClient *framework.PodClient
+	BeforeEach(func() {
+		podClient = f.PodClient()
+	})
 
 	It("should get a host IP [Conformance]", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
-		testHostIP(f.Client, f.Namespace.Name, &api.Pod{
+		testHostIP(podClient, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
 			},
@@ -226,48 +209,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 		})
 	})
 
-	It("should be schedule with cpu and memory limits [Conformance]", func() {
-		podClient := f.Client.Pods(f.Namespace.Name)
-
-		By("creating the pod")
-		name := "pod-update-" + string(uuid.NewUUID())
-		value := strconv.Itoa(time.Now().Nanosecond())
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: name,
-				Labels: map[string]string{
-					"name": "foo",
-					"time": value,
-				},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "nginx",
-						Image: framework.GetPauseImageName(f.Client),
-						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
-								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
-							},
-						},
-					},
-				},
-			},
-		}
-		defer podClient.Delete(pod.Name, nil)
-		_, err := podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Error creating a pod: %v", err)
-		}
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-	})
-
 	It("should be submitted and removed [Conformance]", func() {
-		podClient := f.Client.Pods(f.Namespace.Name)
-
 		By("creating the pod")
-		name := "pod-update-" + string(uuid.NewUUID())
+		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -282,16 +226,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:  "nginx",
 						Image: "gcr.io/google_containers/nginx-slim:0.7",
-						Ports: []api.ContainerPort{{ContainerPort: 80}},
-						LivenessProbe: &api.Probe{
-							Handler: api.Handler{
-								HTTPGet: &api.HTTPGetAction{
-									Path: "/index.html",
-									Port: intstr.FromInt(8080),
-								},
-							},
-							InitialDelaySeconds: 30,
-						},
 					},
 				},
 			},
@@ -301,36 +235,27 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := api.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
-		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(0))
 		options = api.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
 		w, err := podClient.Watch(options)
-		if err != nil {
-			framework.Failf("Failed to set up watch: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
 
 		By("submitting the pod to kubernetes")
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
 		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		_, err = podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
-		}
+		podClient.Create(pod)
 
 		By("verifying the pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
-		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("verifying pod creation was observed")
@@ -343,19 +268,17 @@ var _ = framework.KubeDescribe("Pods", func() {
 			Fail("Timeout while waiting for pod creation")
 		}
 
-		// We need to wait for the pod to be scheduled, otherwise the deletion
-		// will be carried out immediately rather than gracefully.
+		// We need to wait for the pod to be running, otherwise the deletion
+		// may be carried out immediately rather than gracefully.
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-		// save the scheduled pod
-		if pod, err = podClient.Get(pod.Name); err != nil {
-			Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
-		}
-		framework.Logf("scheduled pod: %#v", pod)
+		// save the running pod
+		pod, err = podClient.Get(pod.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
+		framework.Logf("running pod: %#v", pod)
 
 		By("deleting the pod gracefully")
-		if err := podClient.Delete(pod.Name, api.NewDeleteOptions(30)); err != nil {
-			framework.Failf("Failed to delete pod: %v", err)
-		}
+		err = podClient.Delete(pod.Name, api.NewDeleteOptions(30))
+		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
 
 		By("verifying the kubelet observed the termination notice")
 		Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
@@ -404,15 +327,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to list pods to verify deletion: %v", err))
-		}
+		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(0))
 	})
 
 	It("should be updated [Conformance]", func() {
-		podClient := f.Client.Pods(f.Namespace.Name)
-
 		By("creating the pod")
 		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -429,16 +348,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:  "nginx",
 						Image: "gcr.io/google_containers/nginx-slim:0.7",
-						Ports: []api.ContainerPort{{ContainerPort: 80}},
-						LivenessProbe: &api.Probe{
-							Handler: api.Handler{
-								HTTPGet: &api.HTTPGetAction{
-									Path: "/index.html",
-									Port: intstr.FromInt(8080),
-								},
-							},
-							InitialDelaySeconds: 30,
-						},
 					},
 				},
 			},
@@ -449,21 +358,17 @@ var _ = framework.KubeDescribe("Pods", func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
-		pod, err := podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
-		}
-
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		pod = podClient.CreateSync(pod)
 
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := api.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
+		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("updating the pod")
-		f.PodClient().Update(name, func(pod *api.Pod) {
+		podClient.Update(name, func(pod *api.Pod) {
 			value = strconv.Itoa(time.Now().Nanosecond())
 			pod.Labels["time"] = value
 		})
@@ -474,13 +379,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
+		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(1))
 		framework.Logf("Pod update OK")
 	})
 
 	It("should allow activeDeadlineSeconds to be updated [Conformance]", func() {
-		podClient := f.Client.Pods(f.Namespace.Name)
-
 		By("creating the pod")
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -497,16 +401,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:  "nginx",
 						Image: "gcr.io/google_containers/nginx-slim:0.7",
-						Ports: []api.ContainerPort{{ContainerPort: 80}},
-						LivenessProbe: &api.Probe{
-							Handler: api.Handler{
-								HTTPGet: &api.HTTPGetAction{
-									Path: "/index.html",
-									Port: intstr.FromInt(8080),
-								},
-							},
-							InitialDelaySeconds: 30,
-						},
 					},
 				},
 			},
@@ -517,21 +411,17 @@ var _ = framework.KubeDescribe("Pods", func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
-		pod, err := podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
-		}
-
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		podClient.CreateSync(pod)
 
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := api.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
+		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("updating the pod")
-		f.PodClient().Update(name, func(pod *api.Pod) {
+		podClient.Update(name, func(pod *api.Pod) {
 			newDeadline := int64(5)
 			pod.Spec.ActiveDeadlineSeconds = &newDeadline
 		})
@@ -558,12 +448,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
-		defer f.Client.Pods(f.Namespace.Name).Delete(serverPod.Name, api.NewDeleteOptions(0))
-		_, err := f.Client.Pods(f.Namespace.Name).Create(serverPod)
-		if err != nil {
-			framework.Failf("Failed to create serverPod: %v", err)
-		}
-		framework.ExpectNoError(f.WaitForPodRunning(serverPod.Name))
+		defer podClient.Delete(serverPod.Name, api.NewDeleteOptions(0))
+		podClient.CreateSync(serverPod)
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
 		// TODO(filbranden): We would like to use a unique service name such as:
@@ -591,10 +477,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 		defer f.Client.Services(f.Namespace.Name).Delete(svc.Name)
-		_, err = f.Client.Services(f.Namespace.Name).Create(svc)
-		if err != nil {
-			framework.Failf("Failed to create service: %v", err)
-		}
+		_, err := f.Client.Services(f.Namespace.Name).Create(svc)
+		Expect(err).NotTo(HaveOccurred(), "failed to create service")
 
 		// Make a client pod that verifies that it has the service environment variables.
 		podName := "client-envvars-" + string(uuid.NewUUID())
@@ -628,8 +512,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	It("should invoke init containers on a RestartNever pod", func() {
 		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-		podClient := f.Client.Pods(f.Namespace.Name)
 
+		podClient := f.PodClient()
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -665,14 +549,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 		defer podClient.Delete(pod.Name, nil)
-		startedPod, err := podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Error creating a pod: %v", err)
-		}
+		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
-		if err != nil {
-			framework.Failf("Error watching a pod: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(framework.PodStartTimeout, wr, client.PodCompleted)
 		Expect(err).To(BeNil())
@@ -694,8 +573,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	It("should invoke init containers on a RestartAlways pod", func() {
 		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-		podClient := f.Client.Pods(f.Namespace.Name)
 
+		podClient := f.PodClient()
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -735,14 +614,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 		defer podClient.Delete(pod.Name, nil)
-		startedPod, err := podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Error creating a pod: %v", err)
-		}
+		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
-		if err != nil {
-			framework.Failf("Error watching a pod: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(framework.PodStartTimeout, wr, client.PodRunning)
 		Expect(err).To(BeNil())
@@ -764,8 +638,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	It("should not start app containers if init containers fail on a RestartAlways pod", func() {
 		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-		podClient := f.Client.Pods(f.Namespace.Name)
 
+		podClient := f.PodClient()
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -805,14 +679,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 		defer podClient.Delete(pod.Name, nil)
-		startedPod, err := podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Error creating a pod: %v", err)
-		}
+		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
-		if err != nil {
-			framework.Failf("Error watching a pod: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(
@@ -880,8 +749,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	It("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
 		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-		podClient := f.Client.Pods(f.Namespace.Name)
 
+		podClient := f.PodClient()
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -923,14 +792,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 		defer podClient.Delete(pod.Name, nil)
-		startedPod, err := podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Error creating a pod: %v", err)
-		}
+		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
-		if err != nil {
-			framework.Failf("Error watching a pod: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(
@@ -988,8 +852,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(BeNil())
 	})
 
-	It("should be restarted with a docker exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+	It("should be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
@@ -1015,8 +879,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
-	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+	It("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
@@ -1043,7 +907,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should be restarted with a /healthz http liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
@@ -1072,7 +936,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	// Slow by design (5 min)
 	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
@@ -1100,7 +964,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	It("should *not* be restarted with a /healthz http liveness probe [Conformance]", func() {
-		runLivenessTest(f.Client, f.Namespace.Name, &api.Pod{
+		runLivenessTest(f, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
@@ -1109,23 +973,16 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "liveness",
-						Image: "gcr.io/google_containers/nettest:1.7",
-						// These args are garbage but the image will exit if they're not there
-						// we just care about /read serving a 200, which it always does.
-						Args: []string{
-							"-service=liveness-http",
-							"-peers=1",
-							"-namespace=" + f.Namespace.Name},
-						Ports: []api.ContainerPort{{ContainerPort: 8080}},
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
-									Path: "/read",
-									Port: intstr.FromInt(8080),
+									Path: "/",
+									Port: intstr.FromInt(80),
 								},
 							},
 							InitialDelaySeconds: 15,
-							TimeoutSeconds:      10,
 							FailureThreshold:    1,
 						},
 					},
@@ -1136,10 +993,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	It("should support remote command execution over websockets", func() {
 		config, err := framework.LoadConfig()
-		if err != nil {
-			framework.Failf("Unable to get base config: %v", err)
-		}
-		podClient := f.Client.Pods(f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
 		By("creating the pod")
 		name := "pod-exec-websocket-" + string(uuid.NewUUID())
@@ -1163,12 +1017,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
-		pod, err = podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
-		}
-
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		pod = podClient.CreateSync(pod)
 
 		req := f.Client.Get().
 			Namespace(f.Namespace.Name).
@@ -1215,10 +1064,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	It("should support retrieving logs from the container over websockets", func() {
 		config, err := framework.LoadConfig()
-		if err != nil {
-			framework.Failf("Unable to get base config: %v", err)
-		}
-		podClient := f.Client.Pods(f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
 		By("creating the pod")
 		name := "pod-logs-websocket-" + string(uuid.NewUUID())
@@ -1242,12 +1088,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
-		pod, err = podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
-		}
-
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		podClient.CreateSync(pod)
 
 		req := f.Client.Get().
 			Namespace(f.Namespace.Name).
@@ -1285,7 +1126,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 	It("should have their auto-restart back-off timer reset on image update [Slow]", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
-		podClient := f.Client.Pods(f.Namespace.Name)
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   podName,
@@ -1307,10 +1147,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 
-		delay1, delay2 := startPodAndGetBackOffs(f, pod, podName, containerName, buildBackOffDuration)
+		delay1, delay2 := startPodAndGetBackOffs(podClient, pod, buildBackOffDuration)
 
 		By("updating the image")
-		f.PodClient().Update(podName, func(pod *api.Pod) {
+		podClient.Update(podName, func(pod *api.Pod) {
 			pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
 		})
 
@@ -1318,7 +1158,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("get restart delay after image update")
-		delayAfterUpdate, err := getRestartDelay(f.Client, pod, f.Namespace.Name, podName, containerName)
+		delayAfterUpdate, err := getRestartDelay(podClient, podName, containerName)
 		if err != nil {
 			framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
@@ -1330,7 +1170,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	// Slow issue #19027 (20 mins)
 	It("should cap back-off at MaxContainerBackOff [Slow]", func() {
-		podClient := f.Client.Pods(f.Namespace.Name)
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
 		pod := &api.Pod{
@@ -1354,7 +1193,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 
-		runPodFromStruct(f, pod)
+		podClient.CreateSync(pod)
 		time.Sleep(2 * kubelet.MaxContainerBackOff) // it takes slightly more than 2*x to get to a back-off of x
 
 		// wait for a delay == capped delay of MaxContainerBackOff
@@ -1364,7 +1203,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			err    error
 		)
 		for i := 0; i < 3; i++ {
-			delay1, err = getRestartDelay(f.Client, pod, f.Namespace.Name, podName, containerName)
+			delay1, err = getRestartDelay(podClient, podName, containerName)
 			if err != nil {
 				framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 			}
@@ -1379,7 +1218,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 
 		By("getting restart delay after a capped delay")
-		delay2, err := getRestartDelay(f.Client, pod, f.Namespace.Name, podName, containerName)
+		delay2, err := getRestartDelay(podClient, podName, containerName)
 		if err != nil {
 			framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
