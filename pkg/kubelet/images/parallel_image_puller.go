@@ -119,7 +119,6 @@ func (puller *parallelImagePuller) pullImage(pod *api.Pod, container *api.Contai
 		}
 	}
 	puller.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
-	puller.backOff.DeleteEntry(backOffKey)
 	puller.backOff.GC()
 	return nil, ""
 }
