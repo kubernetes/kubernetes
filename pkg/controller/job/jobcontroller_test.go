@@ -657,31 +657,6 @@ func TestWatchJobs(t *testing.T) {
 	<-received
 }
 
-func TestIsJobFinished(t *testing.T) {
-	job := &batch.Job{
-		Status: batch.JobStatus{
-			Conditions: []batch.JobCondition{{
-				Type:   batch.JobComplete,
-				Status: api.ConditionTrue,
-			}},
-		},
-	}
-
-	if !isJobFinished(job) {
-		t.Error("Job was expected to be finished")
-	}
-
-	job.Status.Conditions[0].Status = api.ConditionFalse
-	if isJobFinished(job) {
-		t.Error("Job was not expected to be finished")
-	}
-
-	job.Status.Conditions[0].Status = api.ConditionUnknown
-	if isJobFinished(job) {
-		t.Error("Job was not expected to be finished")
-	}
-}
-
 func TestWatchPods(t *testing.T) {
 	testJob := newJob(2, 2)
 	clientset := fake.NewSimpleClientset(testJob)

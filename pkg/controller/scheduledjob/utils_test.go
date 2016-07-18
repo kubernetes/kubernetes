@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -283,7 +283,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	{
 		// Case 1: no known start times, and none needed yet.
 		// Creation time is before T1.
-		sj.ObjectMeta.CreationTimestamp = unversioned.Time{T1.Add(-10 * time.Minute)}
+		sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is more than creation time, but less than T1.
 		now := T1.Add(-7 * time.Minute)
 		times, err := getRecentUnmetScheduleTimes(sj, now)
@@ -297,7 +297,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	{
 		// Case 2: no known start times, and one needed.
 		// Creation time is before T1.
-		sj.ObjectMeta.CreationTimestamp = unversioned.Time{T1.Add(-10 * time.Minute)}
+		sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is after T1
 		now := T1.Add(2 * time.Second)
 		times, err := getRecentUnmetScheduleTimes(sj, now)
@@ -313,9 +313,9 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	{
 		// Case 3: known LastScheduleTime, no start needed.
 		// Creation time is before T1.
-		sj.ObjectMeta.CreationTimestamp = unversioned.Time{T1.Add(-10 * time.Minute)}
+		sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: T1.Add(-10 * time.Minute)}
 		// Status shows a start at the expected time.
-		sj.Status.LastScheduleTime = &unversioned.Time{T1}
+		sj.Status.LastScheduleTime = &unversioned.Time{Time: T1}
 		// Current time is after T1
 		now := T1.Add(2 * time.Minute)
 		times, err := getRecentUnmetScheduleTimes(sj, now)
@@ -329,9 +329,9 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	{
 		// Case 4: known LastScheduleTime, a start needed
 		// Creation time is before T1.
-		sj.ObjectMeta.CreationTimestamp = unversioned.Time{T1.Add(-10 * time.Minute)}
+		sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: T1.Add(-10 * time.Minute)}
 		// Status shows a start at the expected time.
-		sj.Status.LastScheduleTime = &unversioned.Time{T1}
+		sj.Status.LastScheduleTime = &unversioned.Time{Time: T1}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
 		times, err := getRecentUnmetScheduleTimes(sj, now)
@@ -346,8 +346,8 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	}
 	{
 		// Case 5: known LastScheduleTime, two starts needed
-		sj.ObjectMeta.CreationTimestamp = unversioned.Time{T1.Add(-2 * time.Hour)}
-		sj.Status.LastScheduleTime = &unversioned.Time{T1.Add(-1 * time.Hour)}
+		sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: T1.Add(-2 * time.Hour)}
+		sj.Status.LastScheduleTime = &unversioned.Time{Time: T1.Add(-1 * time.Hour)}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
 		times, err := getRecentUnmetScheduleTimes(sj, now)
@@ -367,8 +367,8 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	}
 	{
 		// Case 6: now is way way ahead of last start time.
-		sj.ObjectMeta.CreationTimestamp = unversioned.Time{T1.Add(-2 * time.Hour)}
-		sj.Status.LastScheduleTime = &unversioned.Time{T1.Add(-1 * time.Hour)}
+		sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: T1.Add(-2 * time.Hour)}
+		sj.Status.LastScheduleTime = &unversioned.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
 		_, err := getRecentUnmetScheduleTimes(sj, now)
 		if err == nil {
@@ -376,29 +376,4 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		}
 	}
 
-}
-
-func TestIsJobFinished(t *testing.T) {
-	job := &batch.Job{
-		Status: batch.JobStatus{
-			Conditions: []batch.JobCondition{{
-				Type:   batch.JobComplete,
-				Status: api.ConditionTrue,
-			}},
-		},
-	}
-
-	if !isJobFinished(job) {
-		t.Error("Job was expected to be finished")
-	}
-
-	job.Status.Conditions[0].Status = api.ConditionFalse
-	if isJobFinished(job) {
-		t.Error("Job was not expected to be finished")
-	}
-
-	job.Status.Conditions[0].Status = api.ConditionUnknown
-	if isJobFinished(job) {
-		t.Error("Job was not expected to be finished")
-	}
 }
