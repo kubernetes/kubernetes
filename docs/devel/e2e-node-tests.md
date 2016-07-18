@@ -205,6 +205,18 @@ less useful for catching flakes related creating the instance from an image.**
 make test-e2e-node REMOTE=true RUN_UNTIL_FAILURE=true
 ```
 
+## Run tests in parallel
+
+Running test in parallel can usually shorten the test duration. By default node
+e2e test runs with`--nodes=8` (see ginkgo flag
+[--nodes](https://onsi.github.io/ginkgo/#parallel-specs)). You can use the
+`PARALLELISM` option to change the parallelism.
+
+```sh
+make test-e2e-node PARALLELISM=4 # run test with 4 parallel nodes
+make test-e2e-node PARALLELISM=1 # run test sequentially
+```
+
 ## Run tests with kubenet network plugin
 
 [kubenet](http://kubernetes.io/docs/admin/network-plugins/#kubenet) is

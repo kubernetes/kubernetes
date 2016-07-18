@@ -26,3 +26,7 @@ var disableKubenet = flag.Bool("disable-kubenet", false, "If true, start kubelet
 var buildServices = flag.Bool("build-services", true, "If true, build local executables")
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+
+type SharedContext struct {
+	PodConfigPath string
+}

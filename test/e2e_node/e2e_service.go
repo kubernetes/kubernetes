@@ -42,11 +42,11 @@ type e2eService struct {
 	killCmds []*killCmd
 	rmDirs   []string
 
-	etcdDataDir         string
-	kubeletStaticPodDir string
-	nodeName            string
-	logFiles            map[string]logFileData
-	cgroupsPerQOS       bool
+	context       *SharedContext
+	etcdDataDir   string
+	nodeName      string
+	logFiles      map[string]logFileData
+	cgroupsPerQOS bool
 }
 
 type logFileData struct {
@@ -59,7 +59,7 @@ const (
 	LOG_VERBOSITY_LEVEL = "4"
 )
 
-func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
+func newE2eService(nodeName string, cgroupsPerQOS bool, context *SharedContext) *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
 		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
@@ -67,6 +67,7 @@ func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
 	}
 
 	return &e2eService{
+		context:       context,
 		nodeName:      nodeName,
 		logFiles:      logFiles,
 		cgroupsPerQOS: cgroupsPerQOS,
@@ -99,7 +100,7 @@ func (es *e2eService) start() error {
 		return err
 	}
 	es.killCmds = append(es.killCmds, cmd)
-	es.rmDirs = append(es.rmDirs, es.kubeletStaticPodDir)
+	es.rmDirs = append(es.rmDirs, es.context.PodConfigPath)
 
 	return nil
 }
@@ -211,7 +212,7 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 	if err != nil {
 		return nil, err
 	}
-	es.kubeletStaticPodDir = dataDir
+	es.context.PodConfigPath = dataDir
 	var killOverride *exec.Cmd
 	cmdArgs := []string{}
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
@@ -236,7 +237,7 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",
-		"--config", es.kubeletStaticPodDir,
+		"--config", es.context.PodConfigPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
