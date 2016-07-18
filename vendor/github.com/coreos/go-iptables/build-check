@@ -1,0 +1,36 @@
+#!/bin/bash -e
+#
+# Run all go-iptables tests
+#   ./test
+#   ./test -v
+#
+# Run tests for one package
+#   PKG=./unit ./test
+#   PKG=ssh ./test
+#
+
+# Invoke ./cover for HTML output
+COVER=${COVER:-"-cover"}
+
+source ./build
+
+FORMATTABLE="iptables"
+
+# user has not provided PKG override
+if [ -z "$PKG" ]; then
+	FMT=$FORMATTABLE
+
+# user has provided PKG override
+else
+	# strip out slashes and dots from PKG=./foo/
+	FMT=${PKG//\//}
+fi
+
+echo "Checking gofmt..."
+fmtRes=$(gofmt -l $FMT)
+if [ -n "${fmtRes}" ]; then
+	echo -e "gofmt checking failed:\n${fmtRes}"
+	exit 255
+fi
+
+echo "Success"

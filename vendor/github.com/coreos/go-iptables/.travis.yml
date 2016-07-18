@@ -1,0 +1,9 @@
+language: go
+go:
+  - 1.4
+
+install:
+ - go get golang.org/x/tools/cmd/cover
+
+script:
+ - ./build-check

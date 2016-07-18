@@ -1,0 +1,24 @@
+language: go
+
+matrix:
+  include:
+    - go: 1.5.4
+      env: GO15VENDOREXPERIMENT=1
+    - go: 1.6.2
+    - go: tip
+  allow_failures: 
+    - go: tip
+
+env:
+  global:
+    - TOOLS_CMD=golang.org/x/tools/cmd
+    - PATH=$GOROOT/bin:$PATH
+
+install:
+ - go get ${TOOLS_CMD}/cover
+
+script:
+ - make test
+
+notifications:
+  email: false
