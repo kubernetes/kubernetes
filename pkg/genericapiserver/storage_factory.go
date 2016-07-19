@@ -261,9 +261,25 @@ func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, stor
 		s = runtime.NewBase64Serializer(s)
 	}
 
+	encoder := ns.EncoderForVersion(
+		s,
+		runtime.NewMultiGroupVersioner(
+			storageVersion,
+			unversioned.GroupKind{Group: storageVersion.Group},
+			unversioned.GroupKind{Group: memoryVersion.Group},
+		),
+	)
+
 	ds := recognizer.NewDecoder(s, ns.UniversalDeserializer())
-	encoder := ns.EncoderForVersion(s, runtime.NewMultiGroupVersioner(storageVersion, unversioned.GroupKind{Group: storageVersion.Group}, unversioned.GroupKind{Group: memoryVersion.Group}))
-	decoder := ns.DecoderToVersion(ds, runtime.NewMultiGroupVersioner(memoryVersion, unversioned.GroupKind{Group: memoryVersion.Group}, unversioned.GroupKind{Group: storageVersion.Group}))
+	decoder := ns.DecoderToVersion(
+		ds,
+		runtime.NewMultiGroupVersioner(
+			memoryVersion,
+			unversioned.GroupKind{Group: memoryVersion.Group},
+			unversioned.GroupKind{Group: storageVersion.Group},
+		),
+	)
+
 	return runtime.NewCodec(encoder, decoder), nil
 }
 
