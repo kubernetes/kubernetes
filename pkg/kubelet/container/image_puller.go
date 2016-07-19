@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
@@ -83,18 +84,18 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	present, err := puller.runtime.IsImagePresent(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
-		puller.logIt(ref, api.EventTypeWarning, FailedToInspectImage, logPrefix, msg, glog.Warning)
+		puller.logIt(ref, api.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, glog.Warning)
 		return ErrImageInspect, msg
 	}
 
 	if !shouldPullImage(container, present) {
 		if present {
 			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
-			puller.logIt(ref, api.EventTypeNormal, PulledImage, logPrefix, msg, glog.Info)
+			puller.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, msg, glog.Info)
 			return nil, ""
 		} else {
 			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
-			puller.logIt(ref, api.EventTypeWarning, ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
+			puller.logIt(ref, api.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
 			return ErrImageNeverPull, msg
 		}
 	}
@@ -102,12 +103,12 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
-		puller.logIt(ref, api.EventTypeNormal, BackOffPullImage, logPrefix, msg, glog.Info)
+		puller.logIt(ref, api.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, glog.Info)
 		return ErrImagePullBackOff, msg
 	}
-	puller.logIt(ref, api.EventTypeNormal, PullingImage, logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
+	puller.logIt(ref, api.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
 	if err := puller.runtime.PullImage(spec, pullSecrets); err != nil {
-		puller.logIt(ref, api.EventTypeWarning, FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
+		puller.logIt(ref, api.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
 		if err == RegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
@@ -116,7 +117,7 @@ func (puller *imagePuller) PullImage(pod *api.Pod, container *api.Container, pul
 			return ErrImagePull, err.Error()
 		}
 	}
-	puller.logIt(ref, api.EventTypeNormal, PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
+	puller.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
 	puller.backOff.DeleteEntry(backOffKey)
 	puller.backOff.GC()
 	return nil, ""
