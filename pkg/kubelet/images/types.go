@@ -16,7 +16,28 @@ limitations under the License.
 
 package images
 
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"errors"
+
+	"k8s.io/kubernetes/pkg/api"
+)
+
+var (
+	// Container image pull failed, kubelet is backing off image pull
+	ErrImagePullBackOff = errors.New("ImagePullBackOff")
+
+	// Unable to inspect image
+	ErrImageInspect = errors.New("ImageInspectError")
+
+	// General image pull error
+	ErrImagePull = errors.New("ErrImagePull")
+
+	// Required Image is absent on host and PullPolicy is NeverPullImage
+	ErrImageNeverPull = errors.New("ErrImageNeverPull")
+
+	// Get http error when pulling image from registry
+	RegistryUnavailable = errors.New("RegistryUnavailable")
+)
 
 // ImageManager provides an interface to manage the lifecycle of images.
 // Implementations of this interface are expected to deal with pulling (downloading),

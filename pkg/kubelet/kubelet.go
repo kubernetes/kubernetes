@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -2586,9 +2587,9 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *api.Pod
 	case waiting != nil:
 		// output some info for the most common pending failures
 		switch reason := waiting.Reason; reason {
-		case kubecontainer.ErrImagePull.Error():
+		case images.ErrImagePull.Error():
 			return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is waiting to start: image can't be pulled", containerName, podName)
-		case kubecontainer.ErrImagePullBackOff.Error():
+		case images.ErrImagePullBackOff.Error():
 			return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is waiting to start: trying and failing to pull image", containerName, podName)
 		default:
 			return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is waiting to start: %v", containerName, podName, reason)

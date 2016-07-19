@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
@@ -1609,7 +1610,7 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 		{kubecontainer.StartContainer, "bar2", nil, ""},
 		{kubecontainer.StartContainer, "bar3", nil, ""},
 		{kubecontainer.StartContainer, "bar4", nil, ""},
-		{kubecontainer.StartContainer, "bar5", kubecontainer.ErrImageNeverPull,
+		{kubecontainer.StartContainer, "bar5", images.ErrImageNeverPull,
 			"Container image \"pull_never_image\" is not present with pull policy of Never"},
 	}
 
@@ -1649,7 +1650,7 @@ func TestSyncPodWithFailure(t *testing.T) {
 			api.Container{Name: "bar", Image: "realImage", ImagePullPolicy: api.PullAlways},
 			map[string]error{},
 			[]error{fmt.Errorf("can't pull image")},
-			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrImagePull, "can't pull image"}},
+			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", images.ErrImagePull, "can't pull image"}},
 		},
 		"CreateContainerFailure": {
 			api.Container{Name: "bar", Image: "alreadyPresent"},

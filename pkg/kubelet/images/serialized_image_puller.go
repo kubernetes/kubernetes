@@ -88,7 +88,7 @@ func (puller *serializedImagePuller) pullImage(pod *api.Pod, container *api.Cont
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
 		puller.logIt(ref, api.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, glog.Warning)
-		return kubecontainer.ErrImageInspect, msg
+		return ErrImageInspect, msg
 	}
 
 	if !shouldPullImage(container, present) {
@@ -99,7 +99,7 @@ func (puller *serializedImagePuller) pullImage(pod *api.Pod, container *api.Cont
 		} else {
 			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
 			puller.logIt(ref, api.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
-			return kubecontainer.ErrImageNeverPull, msg
+			return ErrImageNeverPull, msg
 		}
 	}
 
@@ -107,7 +107,7 @@ func (puller *serializedImagePuller) pullImage(pod *api.Pod, container *api.Cont
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		puller.logIt(ref, api.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, glog.Info)
-		return kubecontainer.ErrImagePullBackOff, msg
+		return ErrImagePullBackOff, msg
 	}
 
 	// enqueue image pull request and wait for response.
@@ -123,11 +123,11 @@ func (puller *serializedImagePuller) pullImage(pod *api.Pod, container *api.Cont
 	if err = <-returnChan; err != nil {
 		puller.logIt(ref, api.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
-		if err == kubecontainer.RegistryUnavailable {
+		if err == RegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
 			return err, msg
 		} else {
-			return kubecontainer.ErrImagePull, err.Error()
+			return ErrImagePull, err.Error()
 		}
 	}
 	puller.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
