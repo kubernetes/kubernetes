@@ -34,9 +34,9 @@ type RBACAuthorizer struct {
 	authorizationRuleResolver validation.AuthorizationRuleResolver
 }
 
-func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) error {
+func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, error) {
 	if r.superUser != "" && attr.GetUser() != nil && attr.GetUser().GetName() == r.superUser {
-		return nil
+		return true, "", nil
 	}
 
 	ctx := api.WithNamespace(api.WithUser(api.NewContext(), attr.GetUser()), attr.GetNamespace())
@@ -57,7 +57,13 @@ func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) error {
 		}
 	}
 
-	return validation.ConfirmNoEscalation(ctx, r.authorizationRuleResolver, []rbac.PolicyRule{requestedRule})
+	// TODO(nhlfr): Try to find more lightweight way to check attributes than escalation checks.
+	err := validation.ConfirmNoEscalation(ctx, r.authorizationRuleResolver, []rbac.PolicyRule{requestedRule})
+	if err != nil {
+		return false, err.Error(), nil
+	}
+
+	return true, "", nil
 }
 
 func New(roleRegistry role.Registry, roleBindingRegistry rolebinding.Registry, clusterRoleRegistry clusterrole.Registry, clusterRoleBindingRegistry clusterrolebinding.Registry, superUser string) *RBACAuthorizer {
