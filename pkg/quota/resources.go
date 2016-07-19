@@ -175,6 +175,10 @@ func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardL
 	newUsage := api.ResourceList{}
 	usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes}
 	for _, evaluator := range evaluators {
+		// only trigger the evaluator if it matches a resource in the quota, otherwise, skip calculating anything
+		if intersection := Intersection(evaluator.MatchesResources(), matchedResources); len(intersection) == 0 {
+			continue
+		}
 		stats, err := evaluator.UsageStats(usageStatsOptions)
 		if err != nil {
 			return nil, err
