@@ -245,8 +245,7 @@ func verifyDNSPodIsRunning(f *framework.Framework) {
 	if len(dnsPods.Items) < 1 {
 		framework.Failf("No pods match the label selector %v", dnsServiceLabelSelector.String())
 	}
-	pod := dnsPods.Items[0]
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, &pod))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, dnsPods.Items[0].Name, api.NamespaceSystem))
 }
 
 func createServiceSpec(serviceName string, isHeadless bool, selector map[string]string) *api.Service {

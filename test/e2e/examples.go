@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("starting redis bootstrap")
 			framework.RunKubectlOrDie("create", "-f", bootstrapYaml, nsFlag)
-			err := framework.WaitForPodNameRunningInNamespace(c, bootstrapPodName, ns)
+			err := framework.WaitForPodRunningInNamespace(c, bootstrapPodName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = framework.LookForStringInLog(ns, bootstrapPodName, "master", expectedOnServer, serverStartTimeout)
@@ -308,7 +308,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting Zookeeper")
 			framework.RunKubectlOrDie("create", "-f", zookeeperPodJson, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", zookeeperServiceJson, nsFlag)
-			err := framework.WaitForPodNameRunningInNamespace(c, zookeeperPod, ns)
+			err := framework.WaitForPodRunningInNamespace(c, zookeeperPod, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if zookeeper is up and running")
@@ -320,7 +320,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting Nimbus")
 			framework.RunKubectlOrDie("create", "-f", nimbusPodJson, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", nimbusServiceJson, nsFlag)
-			err = framework.WaitForPodNameRunningInNamespace(c, "nimbus", ns)
+			err = framework.WaitForPodRunningInNamespace(c, "nimbus", ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = framework.WaitForEndpoint(c, ns, "nimbus")
@@ -365,7 +365,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			var wg sync.WaitGroup
 			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
-				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
+				err := framework.WaitForPodRunningInNamespace(c, podName, ns)
 				Expect(err).NotTo(HaveOccurred())
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
 					pod, err := c.Pods(ns).Get(podName)
@@ -412,7 +412,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("creating secret and pod")
 			framework.RunKubectlOrDie("create", "-f", secretYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", podYaml, nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
+			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if secret was read correctly")
@@ -432,7 +432,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("creating the pod")
 			framework.RunKubectlOrDie("create", "-f", podYaml, nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
+			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if name and namespace were passed correctly")
@@ -477,7 +477,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting admin")
 			framework.RunKubectlOrDie("create", "-f", adminServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", adminPodYaml, nsFlag)
-			err = framework.WaitForPodNameRunningInNamespace(c, "rethinkdb-admin", ns)
+			err = framework.WaitForPodRunningInNamespace(c, "rethinkdb-admin", ns)
 			Expect(err).NotTo(HaveOccurred())
 			checkDbInstances()
 			content, err := makeHttpRequestToService(c, ns, "rethinkdb-admin", "/", framework.EndpointRegisterTimeout)
