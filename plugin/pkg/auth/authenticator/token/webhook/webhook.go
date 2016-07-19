@@ -22,14 +22,14 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
-	_ "k8s.io/kubernetes/pkg/apis/authentication.k8s.io/install"
+	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 )
 
 var (
