@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/healthcheckparser"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -721,6 +722,7 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 	}
 	if tpExists && tpNeedsUpdate {
 		// TODO: Also delete health checks?
+		// GK - TODO - Investigate if deletion of target pool deletes embedded health checks
 		if err := gce.deleteTargetPool(loadBalancerName, gce.region, []*compute.HttpHealthCheck{}); err != nil {
 			return nil, fmt.Errorf("failed to delete existing target pool %s for load balancer update: %v", loadBalancerName, err)
 		}
@@ -801,6 +803,7 @@ func getServiceHealthCheckPath(service *api.Service) string {
 	if !serviceNeedsHealthCheck(service) {
 		return ""
 	}
+	/* TODO - GK - need to set the annotation in ServiceController or choose a pattern here
 	if p, ok := service.Annotations[serviceHealthCheckPathAnnotation]; ok {
 		// GCE requires a leading "/"
 		if string(p[0]) != "/" {
@@ -808,7 +811,8 @@ func getServiceHealthCheckPath(service *api.Service) string {
 		}
 		return p
 	}
-	return "/"
+	*/
+	return healthcheckparser.GenerateURL(service.Namespace, service.Name, string(service.ObjectMeta.UID))
 }
 
 func (gce *GCECloud) createHttpHealthCheckIfNeeded(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {
@@ -834,7 +838,7 @@ func (gce *GCECloud) createHttpHealthCheckIfNeeded(name, path string, port int32
 			// Start sending requests as soon as a pod is found on the node.
 			HealthyThreshold: int64(1),
 			// If a pod is evicted, we get upto 5s?
-			UnhealthyThreshold: int64(2),
+			UnhealthyThreshold: int64(5),
 			// TODO: include headers?.
 		}
 		if err = gce.CreateHttpHealthCheck(newHC); err != nil {
