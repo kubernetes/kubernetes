@@ -131,6 +131,9 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			var services []*api.Service
 			// Read the environment variable to see if we want to create services
 			createServices := os.Getenv("CREATE_SERVICES")
+			if err := os.Setenv("DISABLE_HTTP2", "TRUE"); err != nil {
+				framework.Logf("Failed to disable HTTP2 for pods per node test")
+			}
 			if createServices == "true" {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
@@ -183,6 +186,9 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 					framework.ExpectNoError(err)
 				}
 				framework.Logf("%v Services created.", len(services))
+			}
+			if err := os.Unsetenv("DISABLE_HTTP2"); err != nil {
+				framework.Logf("Failed to re-enable HTTP2")
 			}
 		})
 	}
