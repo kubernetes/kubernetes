@@ -78,3 +78,68 @@ func (s HostStorageSystem) UpdateDiskPartitionInfo(ctx context.Context, devicePa
 	_, err := methods.UpdateDiskPartitions(ctx, s.c, &req)
 	return err
 }
+
+func (s HostStorageSystem) RescanAllHba(ctx context.Context) error {
+	req := types.RescanAllHba{
+		This: s.Reference(),
+	}
+
+	_, err := methods.RescanAllHba(ctx, s.c, &req)
+	return err
+}
+
+func (s HostStorageSystem) MarkAsSsd(ctx context.Context, uuid string) (*Task, error) {
+	req := types.MarkAsSsd_Task{
+		This:         s.Reference(),
+		ScsiDiskUuid: uuid,
+	}
+
+	res, err := methods.MarkAsSsd_Task(ctx, s.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(s.c, res.Returnval), nil
+}
+
+func (s HostStorageSystem) MarkAsNonSsd(ctx context.Context, uuid string) (*Task, error) {
+	req := types.MarkAsNonSsd_Task{
+		This:         s.Reference(),
+		ScsiDiskUuid: uuid,
+	}
+
+	res, err := methods.MarkAsNonSsd_Task(ctx, s.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(s.c, res.Returnval), nil
+}
+
+func (s HostStorageSystem) MarkAsLocal(ctx context.Context, uuid string) (*Task, error) {
+	req := types.MarkAsLocal_Task{
+		This:         s.Reference(),
+		ScsiDiskUuid: uuid,
+	}
+
+	res, err := methods.MarkAsLocal_Task(ctx, s.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(s.c, res.Returnval), nil
+}
+
+func (s HostStorageSystem) MarkAsNonLocal(ctx context.Context, uuid string) (*Task, error) {
+	req := types.MarkAsNonLocal_Task{
+		This:         s.Reference(),
+		ScsiDiskUuid: uuid,
+	}
+
+	res, err := methods.MarkAsNonLocal_Task(ctx, s.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(s.c, res.Returnval), nil
+}

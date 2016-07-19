@@ -304,11 +304,13 @@ func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
 		return fmt.Errorf("directory %s is not mounted", dir)
 	}
 
+	mountPath := refs[0]
+	// Assumption: No file or folder is named starting with '[' in datastore
+	volumePath := mountPath[strings.LastIndex(mountPath, "["):]
 	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().
 	// volumePath eg: "[local] xxx.vmdk" provided to attach/mount
 	// replacing \040 with space to match the actual volumePath
-	mountPath := strings.Replace(path.Base(refs[0]), "\\040", " ", -1)
-	v.volPath = mountPath
+	v.volPath = strings.Replace(volumePath, "\\040", " ", -1)
 	glog.V(4).Infof("Found volume %s mounted to %s", v.volPath, dir)
 
 	// Reload list of references, there might be SetUpAt finished in the meantime
