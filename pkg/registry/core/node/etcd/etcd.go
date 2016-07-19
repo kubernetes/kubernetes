@@ -127,17 +127,17 @@ func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Roun
 
 var _ = client.ConnectionInfoGetter(&REST{})
 
-func (r *REST) getKubeletPort(ctx api.Context, nodeName string) (int, error) {
-	// We probably shouldn't care about context when looking for Node object.
-	obj, err := r.Get(ctx, nodeName)
+func (r *REST) getKubeletHostPortPair(nodeName string) (string, int, error) {
+	obj, err := r.Get(api.NewDefaultContext(), nodeName)
 	if err != nil {
-		return 0, err
+		return "", 0, err
 	}
 	node, ok := obj.(*api.Node)
 	if !ok {
-		return 0, fmt.Errorf("Unexpected object type: %#v", node)
+		return "", 0, fmt.Errorf("Unexpected object type: %#v", node)
 	}
-	return int(node.Status.DaemonEndpoints.KubeletEndpoint.Port), nil
+	port := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
+	return getNodeAddress(node), port, nil
 }
 
 func getNodeAddress(node *api.Node) string {
@@ -152,21 +152,8 @@ func getNodeAddress(node *api.Node) string {
 	return nodeName
 }
 
-func (r *REST) getKubeletHost(nodeName string) (string, error) {
-	obj, err := r.Get(api.NewDefaultContext(), nodeName)
-	if err != nil {
-		return "", err
-	}
-	node, ok := obj.(*api.Node)
-	if !ok {
-		return "", fmt.Errorf("Unexpected object type: %#v", node)
-	}
-
-	return getNodeAddress(node), nil
-}
-
 func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (*client.ConnectionInfo, error) {
-	hostname, err := c.getKubeletHost(nodeName)
+	hostname, port, err := c.getKubeletHostPortPair(nodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -174,13 +161,7 @@ func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (*client.Conn
 	if err != nil {
 		return nil, err
 	}
-	daemonPort, err := c.getKubeletPort(ctx, nodeName)
-	if err != nil {
-		return nil, err
-	}
-	if daemonPort > 0 {
-		connectionInfo.Port = uint(daemonPort)
-	}
+	connectionInfo.Port = uint(port)
 
 	return connectionInfo, nil
 }
