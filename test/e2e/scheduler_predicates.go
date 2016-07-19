@@ -172,7 +172,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 		nodeList = &api.NodeList{}
-		nodes, err := c.Nodes().List(api.ListOptions{})
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		masterNodes = sets.NewString()
 		for _, node := range nodes.Items {
 			if system.IsMasterNode(&node) {
@@ -182,7 +182,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.CheckTestingNSDeletedExcept(c, ns)
+		err := framework.CheckTestingNSDeletedExcept(c, ns)
 		framework.ExpectNoError(err)
 
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
