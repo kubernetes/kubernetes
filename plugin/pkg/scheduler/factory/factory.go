@@ -539,7 +539,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 					break
 				}
 				if errors.IsNotFound(err) {
-					glog.Warning("A pod %v no longer exists", podID)
+					glog.Warningf("A pod %v no longer exists", podID)
 					return
 				}
 				glog.Errorf("Error getting pod %v for retry: %v; retrying...", podID, err)
