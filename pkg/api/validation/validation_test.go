@@ -1503,7 +1503,24 @@ func TestValidateContainers(t *testing.T) {
 			ImagePullPolicy: "IfNotPresent",
 		},
 		{
-			Name:  "resources-test-with-gpu",
+			Name:  "resources-test-with-gpu-with-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
+					api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
+					api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+				},
+			},
+			ImagePullPolicy: "IfNotPresent",
+		},
+		{
+			Name:  "resources-test-with-gpu-without-request",
 			Image: "image",
 			Resources: api.ResourceRequirements{
 				Requests: api.ResourceList{
@@ -1741,15 +1758,15 @@ func TestValidateContainers(t *testing.T) {
 				ImagePullPolicy: "IfNotPresent",
 			},
 		},
-		"Resource can only have GPU limit": {
+		"Resource GPU limit must match request": {
 			{
-				Name:  "resources-request-limit-edge",
+				Name:  "gpu-resource-request-limit",
 				Image: "image",
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
 						api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
-						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("0"),
 					},
 					Limits: api.ResourceList{
 						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
