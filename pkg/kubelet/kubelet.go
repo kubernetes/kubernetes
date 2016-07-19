@@ -2091,20 +2091,23 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// deleted pods.
 	err = kl.cleanupOrphanedPodDirs(allPods, runningPods)
 	if err != nil {
+		// We want all cleanup tasks to be run even if one of them failed. So
+		// we just log an error here and continue other cleanup tasks.
+		// This also applies to the other clean up tasks.
 		glog.Errorf("Failed cleaning up orphaned pod directories: %v", err)
-		return err
 	}
 
 	// Remove any orphaned mirror pods.
 	kl.podManager.DeleteOrphanedMirrorPods()
 
 	// Clear out any old bandwidth rules
-	if err = kl.cleanupBandwidthLimits(allPods); err != nil {
-		return err
+	err = kl.cleanupBandwidthLimits(allPods)
+	if err != nil {
+		glog.Errorf("Failed cleaning up bandwidth limits: %v", err)
 	}
 
 	kl.backOff.GC()
-	return err
+	return nil
 }
 
 // podKiller launches a goroutine to kill a pod received from the channel if
