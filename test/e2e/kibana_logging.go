@@ -73,7 +73,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
+		err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
