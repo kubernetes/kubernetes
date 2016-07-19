@@ -72,7 +72,7 @@ computer.
 
 ## Cassandra Docker
 
-The pods use the [```gcr.io/google-samples/cassandra:v9```](image/Dockerfile)
+The pods use the [```gcr.io/google-samples/cassandra:v10```](image/Dockerfile)
 image from Google's [container registry](https://cloud.google.com/container-registry/docs/).
 The docker is based on `debian:jessie` and includes OpenJDK 8. This image
 includes a standard Cassandra installation from the Apache Debian repo.  Through the use
@@ -245,7 +245,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/google-samples/cassandra:v9
+          image: gcr.io/google-samples/cassandra:v10
           name: cassandra
           ports:
             - containerPort: 7000
@@ -299,7 +299,7 @@ You can list the new controller:
 
 $ kubectl get rc -o wide
 NAME        DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)                             SELECTOR
-cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v9   app=cassandra
+cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v10   app=cassandra
 
 ```
 
@@ -474,7 +474,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/google-samples/cassandra:v9
+          image: gcr.io/google-samples/cassandra:v10
           name: cassandra
           ports:
             - containerPort: 7000
