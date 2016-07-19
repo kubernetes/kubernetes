@@ -83,6 +83,9 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.UDPIdleTimeout.Duration, "udp-timeout", s.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
-	fs.Int32Var(&s.ConntrackMax, "conntrack-max", s.ConntrackMax, "Maximum number of NAT connections to track (0 to leave as-is)")
+	fs.Int32Var(&s.ConntrackMax, "conntrack-max", s.ConntrackMax,
+		"Maximum number of NAT connections to track (0 to leave as-is).")
+	fs.Int32Var(&s.ConntrackMaxPerCore, "conntrack-max-per-core", s.ConntrackMaxPerCore,
+		"Maximum number of NAT connections to track per CPU core (0 to leave as-is). This is only considered if conntrack-max is 0.")
 	fs.DurationVar(&s.ConntrackTCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", s.ConntrackTCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
 }
