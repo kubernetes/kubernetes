@@ -88,6 +88,21 @@ To build binaries for all platforms:
         make cross
 ```
 
+### How to update the Go version used to test & build k8s
+
+The kubernetes project tries to stay on the latest version of Go so it can
+benefit from the improvements to the language over time and can easily
+bump to a minor release version for security updates.
+
+Since kubernetes is mostly built and tested in containers, there are a few
+unique places you need to update the go version.
+
+- The image for cross compiling in [build/build-image/cross/](../../build/build-image/cross/). The `VERSION` file and `Dockerfile`.
+- The jenkins test-image in
+  [hack/jenkins/test-image/](../../hack/jenkins/test-image/). The `Dockerfile` and `Makefile`.
+- The docker image being run in [hack/jenkins/dockerized-e2e-runner.sh](../../hack/jenkins/dockerized-e2e-runner.sh) and [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
+- The cross tag `KUBE_BUILD_IMAGE_CROSS_TAG` in [build/common.sh](../../build/common.sh)
+
 ## Workflow
 
 Below, we outline one of the more common git workflows that core developers use.
@@ -337,6 +352,8 @@ See the [testing guide](testing.md) for additional information and scenarios.
 ```sh
 hack/update-generated-docs.sh
 ```
+
+
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
