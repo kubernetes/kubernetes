@@ -52,7 +52,7 @@ func (c *ConversionError) Error() string {
 
 const (
 	// annotation key prefix used to identify non-convertible json paths.
-	NonConvertibleAnnotationPrefix = "kubernetes.io/non-convertible"
+	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 )
 
 // NonConvertibleFields iterates over the provided map and filters out all but
