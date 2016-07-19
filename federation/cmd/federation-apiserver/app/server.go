@@ -144,6 +144,7 @@ func Run(s *genericoptions.ServerRunOptions) error {
 
 	installFederationAPIs(s, m, storageFactory)
 	installCoreAPIs(s, m, storageFactory)
+	installExtensionsAPIs(s, m, storageFactory)
 
 	m.Run(s)
 	return nil

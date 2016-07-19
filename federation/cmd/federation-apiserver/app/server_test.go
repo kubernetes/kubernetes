@@ -17,20 +17,21 @@ limitations under the License.
 package app
 
 import (
-	"regexp"
-	"testing"
-
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"regexp"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+
+	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 )
 
@@ -78,7 +79,8 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 var insecurePort = 8082
 var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersions = []unversioned.GroupVersion{
-	fed_v1a1.SchemeGroupVersion,
+	fed_v1b1.SchemeGroupVersion,
+	ext_v1b1.SchemeGroupVersion,
 }
 
 func TestRun(t *testing.T) {
@@ -240,10 +242,11 @@ func findResource(resources []unversioned.APIResource, resourceName string) *unv
 func testAPIResourceList(t *testing.T) {
 	testFederationResourceList(t)
 	testCoreResourceList(t)
+	testExtensionsResourceList(t)
 }
 
 func testFederationResourceList(t *testing.T) {
-	serverURL := serverIP + "/apis/" + fed_v1a1.SchemeGroupVersion.String()
+	serverURL := serverIP + "/apis/" + fed_v1b1.SchemeGroupVersion.String()
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -254,7 +257,7 @@ func testFederationResourceList(t *testing.T) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
 	}
 	assert.Equal(t, "v1", apiResourceList.APIVersion)
-	assert.Equal(t, fed_v1a1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
+	assert.Equal(t, fed_v1b1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
 
 	found := findResource(apiResourceList.APIResources, "clusters")
 	assert.NotNil(t, found)
@@ -282,6 +285,32 @@ func testCoreResourceList(t *testing.T) {
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "services/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+}
+
+func testExtensionsResourceList(t *testing.T) {
+	serverURL := serverIP + "/apis/" + ext_v1b1.SchemeGroupVersion.String()
+	contents, err := readResponse(serverURL)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var apiResourceList unversioned.APIResourceList
+	err = json.Unmarshal(contents, &apiResourceList)
+	if err != nil {
+		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
+	}
+	// empty APIVersion for extensions group
+	assert.Equal(t, "", apiResourceList.APIVersion)
+	assert.Equal(t, ext_v1b1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
+
+	found := findResource(apiResourceList.APIResources, "replicasets")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "replicasets/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "replicasets/scale")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 }
