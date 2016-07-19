@@ -58,11 +58,8 @@ func parseGroupVersionType(gvtString string) (gvString string, typeStr string, e
 	length := len(subs)
 	switch length {
 	case 2:
-		// handle legacy api group version.
-		if subs[0] == "api" {
-			return "api/", subs[1], nil
-		}
-		return "", "", invalidFormatErr
+		// gvtString of the form group/type, e.g. api/Service,extensions/ReplicaSet
+		return subs[0] + "/", subs[1], nil
 	case 3:
 		return strings.Join(subs[:length-1], "/"), subs[length-1], nil
 	default:
