@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app"
@@ -35,7 +34,6 @@ func init() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := options.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 

@@ -17,8 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"runtime"
-
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
@@ -34,7 +32,6 @@ func init() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := options.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 

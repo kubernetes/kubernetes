@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"runtime"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -83,7 +82,6 @@ func (c *HollowNodeConfig) createClientFromFile() (*client.Client, error) {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	config := HollowNodeConfig{}
 	config.addFlags(pflag.CommandLine)
