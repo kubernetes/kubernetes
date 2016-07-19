@@ -14,50 +14,62 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package authentication
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+// +genclient=true
+// +nonNamespaced=true
+// +noMethods=true
+
 // TokenReview attempts to authenticate a token to a known user.
-// Note: TokenReview requests may be cached by the webhook token authenticator
-// plugin in the kube-apiserver.
 type TokenReview struct {
-	unversioned.TypeMeta `json:",inline"`
+	unversioned.TypeMeta
+	// ObjectMeta fulfills the meta.ObjectMetaAccessor interface so that the stock
+	// REST handler paths work
+	api.ObjectMeta
 
 	// Spec holds information about the request being evaluated
-	Spec TokenReviewSpec `json:"spec"`
+	Spec TokenReviewSpec
 
 	// Status is filled in by the server and indicates whether the request can be authenticated.
-	Status TokenReviewStatus `json:"status,omitempty"`
+	Status TokenReviewStatus
 }
 
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
 	// Token is the opaque bearer token.
-	Token string `json:"token,omitempty"`
+	Token string
 }
 
 // TokenReviewStatus is the result of the token authentication request.
+// This type mirrors the authentication.Token interface
 type TokenReviewStatus struct {
 	// Authenticated indicates that the token was associated with a known user.
-	Authenticated bool `json:"authenticated,omitempty"`
+	Authenticated bool
 	// User is the UserInfo associated with the provided token.
-	User UserInfo `json:"user,omitempty"`
+	User UserInfo
+	// Error indicates that the token couldn't be checked
+	Error string
 }
 
 // UserInfo holds the information about the user needed to implement the
 // user.Info interface.
 type UserInfo struct {
 	// The name that uniquely identifies this user among all active users.
-	Username string `json:"username,omitempty"`
+	Username string
 	// A unique value that identifies this user across time. If this user is
 	// deleted and another user by the same name is added, they will have
 	// different UIDs.
-	UID string `json:"uid,omitempty"`
+	UID string
 	// The names of groups this user is a part of.
-	Groups []string `json:"groups,omitempty"`
+	Groups []string
 	// Any additional information provided by the authenticator.
-	Extra map[string][]string `json:"extra,omitempty"`
+	Extra map[string]ExtraValue
 }
+
+// ExtraValue masks the value so protobuf can generate
+type ExtraValue []string
