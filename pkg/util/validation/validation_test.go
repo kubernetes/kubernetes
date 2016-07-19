@@ -407,3 +407,29 @@ func TestIsConfigMapKey(t *testing.T) {
 		}
 	}
 }
+
+func TestIsWildcardDNS1123Subdomain(t *testing.T) {
+	goodValues := []string{
+		"*.example.com",
+		"*.bar.com",
+		"*.foo.bar.com",
+	}
+	for _, val := range goodValues {
+		if errs := IsWildcardDNS1123Subdomain(val); len(errs) != 0 {
+			t.Errorf("expected no errors for %q: %v", val, errs)
+		}
+	}
+
+	badValues := []string{
+		"*.*.bar.com",
+		"*.foo.*.com",
+		"*bar.com",
+		"f*.bar.com",
+		"*",
+	}
+	for _, val := range badValues {
+		if errs := IsWildcardDNS1123Subdomain(val); len(errs) == 0 {
+			t.Errorf("expected errors for %q", val)
+		}
+	}
+}
