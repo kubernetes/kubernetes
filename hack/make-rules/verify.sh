@@ -21,15 +21,10 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
-if [ -n "${VERBOSE}" ]; then
-    SILENT=false
-else
-    SILENT=true
-fi
-
 # Excluded checks are always skipped.
 EXCLUDED_CHECKS=(
   "verify-linkcheck.sh"  # runs in separate Jenkins job once per day due to high network usage
+  "verify-govet.sh"      # it has a separate make vet target
   )
 
 function is-excluded {
