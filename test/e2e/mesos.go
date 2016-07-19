@@ -101,7 +101,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		})
 		framework.ExpectNoError(err)
 
-		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 

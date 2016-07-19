@@ -51,7 +51,7 @@ func testPreStop(c *client.Client, ns string) {
 		},
 	}
 	By(fmt.Sprintf("Creating server pod %s in namespace %s", podDescr.Name, ns))
-	podDescr, err := c.Pods(ns).Create(podDescr)
+	_, err := c.Pods(ns).Create(podDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
@@ -61,7 +61,7 @@ func testPreStop(c *client.Client, ns string) {
 	}()
 
 	By("Waiting for pods to come up.")
-	err = framework.WaitForPodRunningInNamespace(c, podDescr)
+	err = framework.WaitForPodRunningInNamespace(c, podDescr.Name, ns)
 	framework.ExpectNoError(err, "waiting for server pod to start")
 
 	val := "{\"Source\": \"prestop\"}"
@@ -94,7 +94,7 @@ func testPreStop(c *client.Client, ns string) {
 	}
 
 	By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
-	preStopDescr, err = c.Pods(ns).Create(preStopDescr)
+	_, err = c.Pods(ns).Create(preStopDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", preStopDescr.Name))
 	deletePreStop := true
 
@@ -106,7 +106,7 @@ func testPreStop(c *client.Client, ns string) {
 		}
 	}()
 
-	err = framework.WaitForPodRunningInNamespace(c, preStopDescr)
+	err = framework.WaitForPodRunningInNamespace(c, preStopDescr.Name, ns)
 	framework.ExpectNoError(err, "waiting for tester pod to start")
 
 	// Delete the pod with the preStop handler.
