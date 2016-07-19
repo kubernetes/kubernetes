@@ -1331,7 +1331,7 @@ func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerI
 		}
 		storedPod, storedContainer, cerr := containerAndPodFromLabels(inspect)
 		if cerr != nil {
-			glog.Errorf("unable to access pod data from container: %v", err)
+			glog.Errorf("unable to access pod data from container: %v", cerr)
 		}
 		if container == nil {
 			container = storedContainer
