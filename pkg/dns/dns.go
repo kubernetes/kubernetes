@@ -247,7 +247,7 @@ func (kd *KubeDNS) newService(obj interface{}) {
 			return
 		}
 		if len(service.Spec.Ports) == 0 {
-			glog.Warning("Unexpected service with no ports, this should not have happend: %v", service)
+			glog.Warningf("Unexpected service with no ports, this should not have happend: %v", service)
 		}
 		kd.newPortalService(service)
 	}

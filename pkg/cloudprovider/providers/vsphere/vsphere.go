@@ -434,9 +434,9 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	}
 
 	if mvm.Summary.Config.Template == false {
-		glog.Warning("VM %s, is not in %s state", name, ActivePowerState)
+		glog.Warningf("VM %s, is not in %s state", name, ActivePowerState)
 	} else {
-		glog.Warning("VM %s, is a template", name)
+		glog.Warningf("VM %s, is a template", name)
 	}
 
 	return "", cloudprovider.InstanceNotFound
