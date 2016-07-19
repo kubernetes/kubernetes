@@ -330,7 +330,7 @@ func (f *Framework) AfterEach() {
 		case "json":
 			for i := range summaries {
 				typeName := reflect.TypeOf(summaries[i]).String()
-				Logf("%v JSON\n%v", typeName[strings.LastIndex(typeName, ".")+1:len(typeName)], summaries[i].PrintJSON())
+				Logf("%v JSON\n%v", typeName[strings.LastIndex(typeName, ".")+1:], summaries[i].PrintJSON())
 				Logf("Finished")
 			}
 		default:
