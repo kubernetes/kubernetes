@@ -52,6 +52,8 @@ type Config struct {
 // IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
 type Preferences struct {
 	Colors bool `json:"colors,omitempty"`
+	// VersionLabels are labels that denote version and should not be used to create selector for services
+	VersionLabels string `json:"version-labels,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
 }
@@ -68,6 +70,8 @@ type Cluster struct {
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
 	// CertificateAuthority is the path to a cert file for the certificate authority.
 	CertificateAuthority string `json:"certificate-authority,omitempty"`
+	// VersionLabels
+	VersionLabels string `json:"version-labels,omitempty"`
 	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
 	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields

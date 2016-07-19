@@ -25,12 +25,22 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	set "k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
+
+// ExposeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type ExposeOptions struct {
+	ConfigAccess clientcmd.ConfigAccess
+	Filenames    []string
+	Recursive    bool
+}
 
 var (
 	expose_resources = dedent.Dedent(`
@@ -47,6 +57,14 @@ var (
 		i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
 		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no
 		labels are specified, the new service will re-use the labels from the resource it exposes.
+
+		Note that if you want your exposed resouce controller to be rolling-upgradeable,
+		the services need to contain at least two labels, one of which will not be targeted
+		by the selector of your service. This is because at least one of the labels needs to change
+		between the two versions. To facilitate this one can use 'version-labels' configuration
+		parameter.
+		The above will cause the expose command to ignore 'version' and 'revision' command
+		while creating the selector for a new service.
 
 		Possible resources include (case insensitive): `) + expose_resources
 
@@ -70,11 +88,14 @@ var (
 		kubectl expose rs nginx --port=80 --target-port=8000
 
 		# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
-		kubectl expose deployment nginx --port=80 --target-port=8000`)
+		kubectl expose deployment nginx --port=80 --target-port=8000
+
+		# Tell expose to ignore 'version' and 'revision' labels when creating selectors
+		kubectl config set preferences.version-labels version,revision`)
 )
 
-func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+func NewCmdExposeService(f *cmdutil.Factory, out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &ExposeOptions{ConfigAccess: configAccess}
 
 	validArgs, argAliases := []string{}, []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(expose_resources, -1)
@@ -171,7 +192,14 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		// For objects that need a pod selector, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --selector
 		if s, found := params["selector"]; found && kubectl.IsZero(s) {
-			s, err := f.MapBasedSelectorForObject(info.Object)
+			config, err := options.ConfigAccess.GetStartingConfig()
+			if err != nil {
+				return nil
+			}
+			volumeLabels := set.NewString(
+				strings.Split(config.Preferences.VersionLabels, ",")...,
+			)
+			s, err := f.MapBasedSelectorForObject(info.Object, volumeLabels)
 			if err != nil {
 				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't retrieve selectors via --selector flag or introspection: %s", err))
 			}

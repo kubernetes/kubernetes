@@ -134,7 +134,6 @@ func getPotentialTypeValues(typeValue reflect.Type) (map[string]reflect.Type, er
 		fieldType := typeValue.Field(fieldIndex)
 		yamlTag := fieldType.Tag.Get("json")
 		yamlTagName := strings.Split(yamlTag, ",")[0]
-
 		ret[yamlTagName] = fieldType.Type
 	}
 

@@ -247,7 +247,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
 				NewCmdCreate(f, out),
-				NewCmdExposeService(f, out),
+				NewCmdExposeService(f, out, clientcmd.NewDefaultPathOptions()),
 				NewCmdRun(f, in, out, err),
 				set.NewCmdSet(f, out),
 			},

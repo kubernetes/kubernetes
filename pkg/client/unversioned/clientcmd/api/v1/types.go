@@ -49,7 +49,8 @@ type Config struct {
 }
 
 type Preferences struct {
-	Colors bool `json:"colors,omitempty"`
+	Colors        bool   `json:"colors,omitempty"`
+	VersionLabels string `json:"version-labels,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
