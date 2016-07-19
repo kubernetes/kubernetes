@@ -19,6 +19,7 @@ package dockertools
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -34,6 +35,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
+	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -44,6 +46,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -2214,4 +2217,92 @@ func TestPruneInitContainers(t *testing.T) {
 	if !reflect.DeepEqual([]string{"init1-new-2", "init1-old-1", "init2-old-1"}, fake.Removed) {
 		t.Fatal(fake.Removed)
 	}
+}
+
+func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
+	const (
+		containerID      = "123"
+		infraContainerID = "9876"
+		fakePodIP        = "10.10.10.10"
+	)
+	dm, fakeDocker := newTestDockerManager()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	fnp := mock_network.NewMockNetworkPlugin(ctrl)
+	dm.networkPlugin = fnp
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{{Name: "container"}},
+		},
+	}
+
+	fakeDocker.SetFakeRunningContainers([]*FakeContainer{
+		{
+			ID:      containerID,
+			Name:    "/k8s_container_foo_new_12345678_42",
+			Running: true,
+		},
+		{
+			ID:      infraContainerID,
+			Name:    "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42",
+			Running: true,
+		},
+	})
+
+	fnp.EXPECT().Name().Return("someNetworkPlugin")
+	fnp.EXPECT().GetPodNetworkStatus("new", "foo", kubecontainer.DockerID(infraContainerID).ContainerID()).Return(&network.PodNetworkStatus{IP: net.ParseIP(fakePodIP)}, nil)
+
+	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if podStatus.IP != fakePodIP {
+		t.Errorf("Got wrong ip, expected %v, got %v", fakePodIP, podStatus.IP)
+	}
+}
+
+func TestSyncPodGetsPodIPFromNetworkPlugin(t *testing.T) {
+	const (
+		containerID      = "123"
+		infraContainerID = "9876"
+		fakePodIP        = "10.10.10.10"
+	)
+	dm, fakeDocker := newTestDockerManager()
+	dm.podInfraContainerImage = "pod_infra_image"
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	fnp := mock_network.NewMockNetworkPlugin(ctrl)
+	dm.networkPlugin = fnp
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar"},
+			},
+		},
+	}
+
+	// Can be called multiple times due to GetPodStatus
+	fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
+	fnp.EXPECT().GetPodNetworkStatus("new", "foo", gomock.Any()).Return(&network.PodNetworkStatus{IP: net.ParseIP(fakePodIP)}, nil).AnyTimes()
+	fnp.EXPECT().SetUpPod("new", "foo", gomock.Any()).Return(nil)
+
+	runSyncPod(t, dm, fakeDocker, pod, nil, false)
+	verifyCalls(t, fakeDocker, []string{
+		// Create pod infra container.
+		"create", "start", "inspect_container", "inspect_container",
+		// Create container.
+		"create", "start", "inspect_container",
+	})
 }
