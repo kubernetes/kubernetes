@@ -59,13 +59,8 @@ func hasNoPodsPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache
 	return false, algorithmpredicates.ErrFakePredicate
 }
 
-func numericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
+func numericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	result := []schedulerapi.HostPriority{}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %v", err)
-	}
 	for _, node := range nodes {
 		score, err := strconv.Atoi(node.Name)
 		if err != nil {
@@ -79,11 +74,11 @@ func numericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.Nod
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []schedulerapi.HostPriority{}
-	result, err := numericPriority(pod, nodeNameToInfo, nodeLister)
+	result, err := numericPriority(pod, nodeNameToInfo, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +316,7 @@ func TestFindFitAllError(t *testing.T) {
 		"2": schedulercache.NewNodeInfo(),
 		"1": schedulercache.NewNodeInfo(),
 	}
-	_, predicateMap, err := findNodesThatFit(&api.Pod{}, nodeNameToInfo, predicates, makeNodeList(nodes), nil)
+	_, predicateMap, err := findNodesThatFit(&api.Pod{}, nodeNameToInfo, makeNodeList(nodes), predicates, nil)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -355,7 +350,7 @@ func TestFindFitSomeError(t *testing.T) {
 		nodeNameToInfo[name].SetNode(&api.Node{ObjectMeta: api.ObjectMeta{Name: name}})
 	}
 
-	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, predicates, makeNodeList(nodes), nil)
+	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil)
 	if err != nil && !reflect.DeepEqual(err, algorithmpredicates.ErrFakePredicate) {
 		t.Errorf("unexpected error: %v", err)
 	}

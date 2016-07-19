@@ -72,11 +72,7 @@ func podMatchesNamespaceAndSelector(pod *api.Pod, affinityPod *api.Pod, term *ap
 // that node; the node(s) with the highest sum are the most preferred.
 // Symmetry need to be considered for preferredDuringSchedulingIgnoredDuringExecution from podAffinity & podAntiAffinity,
 // symmetry need to be considered for hard requirements from podAffinity
-func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
-	}
+func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	allPods, err := ipa.podLister.List(labels.Everything())
 	if err != nil {
 		return nil, err
