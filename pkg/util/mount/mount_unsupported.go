@@ -36,6 +36,14 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
+	return false, nil
+}
+
+func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
 	return nil
 }

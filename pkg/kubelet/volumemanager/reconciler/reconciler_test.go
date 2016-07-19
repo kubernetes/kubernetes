@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -62,7 +63,8 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		oex)
+		oex,
+		&mount.FakeMounter{})
 
 	// Act
 	go reconciler.Run(wait.NeverStop)
@@ -94,7 +96,8 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		oex)
+		oex,
+		&mount.FakeMounter{})
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -161,7 +164,8 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		oex)
+		oex,
+		&mount.FakeMounter{})
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -228,7 +232,8 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		oex)
+		oex,
+		&mount.FakeMounter{})
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",
@@ -307,7 +312,8 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		oex)
+		oex,
+		&mount.FakeMounter{})
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pod1",

@@ -582,7 +582,8 @@ func (asw *actualStateOfWorld) newAttachedVolume(
 			VolumeName:         attachedVolume.volumeName,
 			VolumeSpec:         attachedVolume.spec,
 			NodeName:           asw.nodeName,
-			PluginIsAttachable: attachedVolume.pluginIsAttachable},
+			PluginIsAttachable: attachedVolume.pluginIsAttachable,
+			DevicePath:         attachedVolume.devicePath},
 		GloballyMounted: attachedVolume.globallyMounted}
 }
 

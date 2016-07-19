@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
@@ -62,6 +63,7 @@ type Reconciler interface {
 // operationExecutor - used to trigger attach/detach/mount/unmount operations
 //   safely (prevents more than one operation from being triggered on the same
 //   volume)
+// mounter - mounter passed in from kubelet, passed down unmount path
 func NewReconciler(
 	kubeClient internalclientset.Interface,
 	controllerAttachDetachEnabled bool,
@@ -70,7 +72,8 @@ func NewReconciler(
 	hostName string,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
-	operationExecutor operationexecutor.OperationExecutor) Reconciler {
+	operationExecutor operationexecutor.OperationExecutor,
+	mounter mount.Interface) Reconciler {
 	return &reconciler{
 		kubeClient:                    kubeClient,
 		controllerAttachDetachEnabled: controllerAttachDetachEnabled,
@@ -80,6 +83,7 @@ func NewReconciler(
 		desiredStateOfWorld:           desiredStateOfWorld,
 		actualStateOfWorld:            actualStateOfWorld,
 		operationExecutor:             operationExecutor,
+		mounter:                       mounter,
 	}
 }
 
@@ -92,6 +96,7 @@ type reconciler struct {
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
 	operationExecutor             operationexecutor.OperationExecutor
+	mounter                       mount.Interface
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -264,7 +269,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						attachedVolume.VolumeName,
 						attachedVolume.VolumeSpec.Name())
 					err := rc.operationExecutor.UnmountDevice(
-						attachedVolume.AttachedVolume, rc.actualStateOfWorld)
+						attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
 					if err != nil &&
 						!goroutinemap.IsAlreadyExists(err) &&
 						!goroutinemap.IsExponentialBackoff(err) {
