@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/config"
@@ -340,7 +341,7 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 			name := bestPodIdentString(pod)
 			err := errlist.ToAggregate()
 			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, name, source, err)
-			recorder.Eventf(pod, api.EventTypeWarning, kubecontainer.FailedValidation, "Error validating pod %s from %s, ignoring: %v", name, source, err)
+			recorder.Eventf(pod, api.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s, ignoring: %v", name, source, err)
 			continue
 		}
 		filtered = append(filtered, pod)
