@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
@@ -172,7 +173,21 @@ func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selec
 	}
 
 	if len(metrics) != len(podNames) {
-		return 0, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of pods", len(metrics), len(podNames))
+		present := sets.NewString()
+		for _, m := range metrics {
+			present.Insert(m.Name)
+		}
+		missing := make([]string, 0)
+		for expected := range podNames {
+			if !present.Has(expected) {
+				missing = append(missing, expected)
+			}
+		}
+		hint := ""
+		if len(missing) > 0 {
+			hint = fmt.Sprintf(" (sample missing pod: %s/%s)", namespace, missing[0])
+		}
+		return 0, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of pods%s", len(metrics), len(podNames), hint)
 	}
 
 	sum := int64(0)
@@ -250,7 +265,17 @@ func (h *HeapsterMetricsClient) getCustomMetricForPods(metricSpec metricDefiniti
 
 	sum, count, timestamp := metricSpec.aggregator(metrics)
 	if count != len(podNames) {
-		return nil, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of pods", count, len(podNames))
+		missing := make([]string, 0)
+		for i, expected := range podNames {
+			if len(metrics.Items) > i && len(metrics.Items[i].Metrics) == 0 {
+				missing = append(missing, expected)
+			}
+		}
+		hint := ""
+		if len(missing) > 0 {
+			hint = fmt.Sprintf(" (sample missing pod: %s/%s)", namespace, missing[0])
+		}
+		return nil, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of pods%s", count, len(podNames), hint)
 	}
 
 	return &sum, timestamp, nil
