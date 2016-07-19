@@ -1840,8 +1840,7 @@ func TestInterPodAffinity(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Labels: podLabel2,
 					Annotations: map[string]string{
-						api.AffinityAnnotationKey: `
-						{"podAffinity": {
+						api.AffinityAnnotationKey: `{"podAffinity": {
 							"requiredDuringSchedulingIgnoredDuringExecution": [{
 								"labelSelector": {
 									"matchExpressions": [{
