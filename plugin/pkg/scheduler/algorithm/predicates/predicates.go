@@ -68,7 +68,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 // podMetadata is a type that is passed as metadata for predicate functions
 type predicateMetadata struct {
 	podBestEffort bool
-	podRequest    *resourceRequest
+	podRequest    *schedulercache.Resource
 	podPorts      map[int]bool
 }
 
@@ -402,28 +402,22 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, meta interface{}, nodeInfo *
 	return true, nil
 }
 
-type resourceRequest struct {
-	milliCPU  int64
-	memory    int64
-	nvidiaGPU int64
-}
-
-func getResourceRequest(pod *api.Pod) *resourceRequest {
-	result := resourceRequest{}
+func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
+	result := schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
-		result.memory += requests.Memory().Value()
-		result.milliCPU += requests.Cpu().MilliValue()
-		result.nvidiaGPU += requests.NvidiaGPU().Value()
+		result.Memory += requests.Memory().Value()
+		result.MilliCPU += requests.Cpu().MilliValue()
+		result.NvidiaGPU += requests.NvidiaGPU().Value()
 	}
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
 		requests := container.Resources.Requests
-		if mem := requests.Memory().Value(); mem > result.memory {
-			result.memory = mem
+		if mem := requests.Memory().Value(); mem > result.Memory {
+			result.Memory = mem
 		}
-		if cpu := requests.Cpu().MilliValue(); cpu > result.milliCPU {
-			result.milliCPU = cpu
+		if cpu := requests.Cpu().MilliValue(); cpu > result.MilliCPU {
+			result.MilliCPU = cpu
 		}
 	}
 	return &result
@@ -444,29 +438,29 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber))
 	}
 
-	var podRequest *resourceRequest
+	var podRequest *schedulercache.Resource
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podRequest = predicateMeta.podRequest
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = getResourceRequest(pod)
 	}
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 && podRequest.nvidiaGPU == 0 {
+	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 {
 		return true, nil
 	}
 
 	allocatable := nodeInfo.AllocatableResource()
-	if allocatable.MilliCPU < podRequest.milliCPU+nodeInfo.RequestedResource().MilliCPU {
+	if allocatable.MilliCPU < podRequest.MilliCPU+nodeInfo.RequestedResource().MilliCPU {
 		return false,
-			newInsufficientResourceError(cpuResourceName, podRequest.milliCPU, nodeInfo.RequestedResource().MilliCPU, allocatable.MilliCPU)
+			newInsufficientResourceError(cpuResourceName, podRequest.MilliCPU, nodeInfo.RequestedResource().MilliCPU, allocatable.MilliCPU)
 	}
-	if allocatable.Memory < podRequest.memory+nodeInfo.RequestedResource().Memory {
+	if allocatable.Memory < podRequest.Memory+nodeInfo.RequestedResource().Memory {
 		return false,
-			newInsufficientResourceError(memoryResourceName, podRequest.memory, nodeInfo.RequestedResource().Memory, allocatable.Memory)
+			newInsufficientResourceError(memoryResourceName, podRequest.Memory, nodeInfo.RequestedResource().Memory, allocatable.Memory)
 	}
-	if allocatable.NvidiaGPU < podRequest.nvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
+	if allocatable.NvidiaGPU < podRequest.NvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
 		return false,
-			newInsufficientResourceError(nvidiaGpuResourceName, podRequest.nvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU)
+			newInsufficientResourceError(nvidiaGpuResourceName, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU)
 	}
 	if glog.V(10) {
 		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
