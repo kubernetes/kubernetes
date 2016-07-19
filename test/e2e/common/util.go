@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package common
 
-import (
-	"flag"
+type Suite string
+
+const (
+	E2E     Suite = "e2e"
+	NodeE2E Suite = "node e2e"
 )
 
-var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
-
-var disableKubenet = flag.Bool("disable-kubenet", false, "If true, start kubelet without kubenet")
-var buildServices = flag.Bool("build-services", true, "If true, build local executables")
-var startServices = flag.Bool("start-services", true, "If true, start local node services")
-var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+var CurrentSuite Suite

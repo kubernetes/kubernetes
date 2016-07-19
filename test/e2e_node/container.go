@@ -28,12 +28,12 @@ import (
 // One pod one container
 // TODO: This should be migrated to the e2e framework.
 type ConformanceContainer struct {
-	Framework        *framework.Framework
 	Container        api.Container
 	RestartPolicy    api.RestartPolicy
 	Volumes          []api.Volume
 	ImagePullSecrets []string
 
+	PodClient          *framework.PodClient
 	podName            string
 	PodSecurityContext *api.PodSecurityContext
 }
@@ -58,15 +58,15 @@ func (cc *ConformanceContainer) Create() {
 			ImagePullSecrets: imagePullSecrets,
 		},
 	}
-	cc.Framework.CreatePodAsync(pod)
+	cc.PodClient.Create(pod)
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.Framework.PodClient().Delete(cc.podName, api.NewDeleteOptions(0))
+	return cc.PodClient.Delete(cc.podName, api.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
-	pod, err := cc.Framework.PodClient().Get(cc.podName)
+	pod, err := cc.PodClient.Get(cc.podName)
 	if err != nil {
 		return false, err
 	}
@@ -74,7 +74,7 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 }
 
 func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
-	pod, err := cc.Framework.PodClient().Get(cc.podName)
+	pod, err := cc.PodClient.Get(cc.podName)
 	if err != nil {
 		return api.PodUnknown, err
 	}
@@ -82,7 +82,7 @@ func (cc *ConformanceContainer) GetPhase() (api.PodPhase, error) {
 }
 
 func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
-	pod, err := cc.Framework.PodClient().Get(cc.podName)
+	pod, err := cc.PodClient.Get(cc.podName)
 	if err != nil {
 		return api.ContainerStatus{}, err
 	}
@@ -94,7 +94,7 @@ func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, error) {
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.Framework.PodClient().Get(cc.podName)
+	_, err := cc.PodClient.Get(cc.podName)
 	if err == nil {
 		return true, nil
 	}
