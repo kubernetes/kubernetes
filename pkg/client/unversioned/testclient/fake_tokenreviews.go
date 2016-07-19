@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/authentication
-// +groupName=authentication.k8s.io
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+package testclient
+
+import (
+	"k8s.io/kubernetes/pkg/apis/authentication"
+)
+
+// FakeTokenReviews implements ClusterRoleInterface
+type FakeTokenReviews struct {
+	Fake *FakeAuthentication
+}
+
+func (c *FakeTokenReviews) Create(review *authentication.TokenReview) (*authentication.TokenReview, error) {
+	obj, err := c.Fake.Invokes(NewRootCreateAction("tokenreviews", review), review)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*authentication.TokenReview), err
+}

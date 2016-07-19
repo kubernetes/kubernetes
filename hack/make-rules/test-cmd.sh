@@ -2323,6 +2323,10 @@ __EOF__
   # Post-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 
+  # check webhook token authentication endpoint, kubectl doesn't actually display the returned object so this isn't super useful
+  # but it proves that works
+  kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview.json --validate=false
+
 
   #####################
   # Retrieve multiple #
