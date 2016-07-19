@@ -304,10 +304,10 @@ type CloudConfig struct {
 		//During the instantiation of an new AWS cloud provider, the detected region
 		//is validated against a known set of regions.
 		//
-		//In a non-standard, AWS like environment (e.g. Eucalyptus), this check may 
-		//be undesirable.  Setting this to true will disable the check and provide 
-		//a warning that the check was skipped.  Please note that this is an 
-		//experimental feature and work-in-progress for the moment.  If you find 
+		//In a non-standard, AWS like environment (e.g. Eucalyptus), this check may
+		//be undesirable.  Setting this to true will disable the check and provide
+		//a warning that the check was skipped.  Please note that this is an
+		//experimental feature and work-in-progress for the moment.  If you find
 		//yourself in an non-AWS cloud and open an issue, please indicate that in the
 		//issue body.
 		DisableStrictZoneCheck bool
