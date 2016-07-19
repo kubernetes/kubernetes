@@ -161,3 +161,17 @@ func (sm *Manager) AcquireGenericServiceTicket(ctx context.Context, spec types.B
 
 	return &res.Returnval, nil
 }
+
+func (sm *Manager) AcquireLocalTicket(ctx context.Context, userName string) (*types.SessionManagerLocalTicket, error) {
+	req := types.AcquireLocalTicket{
+		This:     sm.Reference(),
+		UserName: userName,
+	}
+
+	res, err := methods.AcquireLocalTicket(ctx, sm.client, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res.Returnval, nil
+}
