@@ -50,6 +50,7 @@ KUBE_GOFLAGS := $(GOFLAGS)
 KUBE_GOLDFLAGS := $(GOLDFLAGS)
 
 GOGCFLAGS ?=
+BRANCH ?=
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
 export KUBE_GOGCFLAGS GOGCFLAGS
 
@@ -94,6 +95,7 @@ ginkgo:
 .PHONY: verify
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
+	hack/make-rules/vet.sh
 
 # Build and run tests.
 #
