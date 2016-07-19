@@ -152,8 +152,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 			},
 		}
 
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		if err != nil {
+		if pod, err = f.Client.Pods(f.Namespace.Name).Create(pod); err != nil {
 			framework.Failf("unable to create pod %v: %v", pod.Name, err)
 		}
 
@@ -176,6 +175,6 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 			}
 		}()
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
 	})
 })
