@@ -24,8 +24,8 @@ import (
 // and always return nil.
 func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 	aaa := NewAlwaysAllowAuthorizer()
-	if result := aaa.Authorize(nil); result != nil {
-		t.Errorf("AlwaysAllowAuthorizer.Authorize did not return nil. (%s)", result)
+	if authorized, _, _ := aaa.Authorize(nil); !authorized {
+		t.Errorf("AlwaysAllowAuthorizer.Authorize did not authorize successfully.")
 	}
 }
 
@@ -33,7 +33,7 @@ func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 // and always return an error as everything is forbidden.
 func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 	ada := NewAlwaysDenyAuthorizer()
-	if result := ada.Authorize(nil); result == nil {
+	if authorized, _, _ := ada.Authorize(nil); authorized {
 		t.Errorf("AlwaysDenyAuthorizer.Authorize returned nil instead of error.")
 	}
 }
