@@ -26,8 +26,6 @@ import (
 
 type Folder struct {
 	Common
-
-	InventoryPath string
 }
 
 func NewFolder(c *vim25.Client, ref types.ManagedObjectReference) *Folder {
@@ -111,6 +109,20 @@ func (f Folder) CreateFolder(ctx context.Context, name string) (*Folder, error) 
 	}
 
 	return NewFolder(f.c, res.Returnval), err
+}
+
+func (f Folder) CreateStoragePod(ctx context.Context, name string) (*StoragePod, error) {
+	req := types.CreateStoragePod{
+		This: f.Reference(),
+		Name: name,
+	}
+
+	res, err := methods.CreateStoragePod(ctx, f.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewStoragePod(f.c, res.Returnval), err
 }
 
 func (f Folder) AddStandaloneHost(ctx context.Context, spec types.HostConnectSpec, addConnected bool, license *string, compResSpec *types.BaseComputeResourceConfigSpec) (*Task, error) {
