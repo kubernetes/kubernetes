@@ -399,7 +399,7 @@ have to do more later. The files you want are
 
 Note that the conversion machinery doesn't generically handle conversion of
 values, such as various kinds of field references and API constants. [The client
-library](../../pkg/client/unversioned/request.go) has custom conversion code for
+library](../../pkg/client/restclient/request.go) has custom conversion code for
 field references. You also need to add a call to
 api.Scheme.AddFieldLabelConversionFunc with a mapping function that understands
 supported translations.
