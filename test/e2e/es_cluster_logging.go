@@ -99,7 +99,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
+		err = framework.WaitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -227,7 +227,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range fluentdPods.Items {
 		if nodeInNodeList(pod.Spec.NodeName, nodes) {
-			err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
+			err = framework.WaitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
 			Expect(err).NotTo(HaveOccurred())
 		}
 	}

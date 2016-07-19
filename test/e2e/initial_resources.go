@@ -67,6 +67,6 @@ func runPod(f *framework.Framework, name, image string) *api.Pod {
 	}
 	createdPod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, createdPod))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, name, f.Namespace.Name))
 	return createdPod
 }

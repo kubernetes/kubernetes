@@ -53,7 +53,7 @@ var (
 
 func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRestarts int, timeout time.Duration) {
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
-	podDescr, err := c.Pods(ns).Create(podDescr)
+	_, err := c.Pods(ns).Create(podDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
@@ -65,7 +65,7 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podDescr.Name, podDescr.ResourceVersion),
+	framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podDescr.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", podDescr.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", podDescr.Name, ns)
 
@@ -114,14 +114,13 @@ func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 	podClient := c.Pods(ns)
 	By("creating pod")
 	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-	pod, err := podClient.Create(pod)
-	if err != nil {
+	if _, err := podClient.Create(pod); err != nil {
 		framework.Failf("Failed to create pod: %v", err)
 	}
 	By("ensuring that pod is running and has a hostIP")
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	err = framework.WaitForPodRunningInNamespace(c, pod)
+	err := framework.WaitForPodRunningInNamespace(c, pod.Name, ns)
 	Expect(err).NotTo(HaveOccurred())
 	// Try to make sure we get a hostIP for each pod.
 	hostIPTimeout := 2 * time.Minute
@@ -816,7 +815,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(
-			framework.PodReadyBeforeTimeout, wr,
+			framework.PodStartTimeout, wr,
 			// check for the first container to fail at least once
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
