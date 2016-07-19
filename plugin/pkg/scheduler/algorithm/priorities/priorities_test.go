@@ -941,10 +941,10 @@ func TestPrioritiesRegistered(t *testing.T) {
 		if err != nil {
 			switch err.Error() {
 			case "exit status 2":
-				t.Errorf("unexpected error when checking %s", function.Name)
+				t.Errorf("unexpected error when checking %s", function.Name.Name)
 			case "exit status 1":
 				t.Errorf("priority %s is implemented as public but seems not registered or used in any other place",
-					function.Name)
+					function.Name.Name)
 			}
 		}
 	}
