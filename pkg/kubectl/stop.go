@@ -424,7 +424,11 @@ func (reaper *DeploymentReaper) updateDeploymentWithRetries(namespace, name stri
 		if deployment, err = deployments.Update(deployment); err == nil {
 			return true, nil
 		}
-		return false, nil
+		// Retry only on update conflict.
+		if errors.IsConflict(err) {
+			return false, nil
+		}
+		return false, err
 	})
 	return deployment, err
 }
