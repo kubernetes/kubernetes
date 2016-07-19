@@ -20,6 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned"
+	fakeunversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned/fake"
 	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
 	fakeunversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned/fake"
 	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
@@ -85,6 +87,11 @@ func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
 // Autoscaling retrieves the AutoscalingClient
 func (c *Clientset) Autoscaling() unversionedautoscaling.AutoscalingInterface {
 	return &fakeunversionedautoscaling.FakeAutoscaling{Fake: &c.Fake}
+}
+
+// Authentication retrieves the AuthenticationClient
+func (c *Clientset) Authentication() unversionedauthentication.AuthenticationInterface {
+	return &fakeunversionedauthentication.FakeAuthentication{Fake: &c.Fake}
 }
 
 // Batch retrieves the BatchClient
