@@ -623,6 +623,7 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 	for _, c := range pod.Status.Conditions {
 		// we only care about pod ready conditions
 		if c.Type == api.PodReady && c.Status == api.ConditionTrue {
+			glog.V(4).Infof("Comparing pod %s/%s ready condition last transition time %s + minReadySeconds %d with now %s.", pod.Namespace, pod.Name, c.LastTransitionTime.String(), minReadySeconds, now.String())
 			// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is available):
 			// 1. minReadySeconds == 0, or
 			// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
