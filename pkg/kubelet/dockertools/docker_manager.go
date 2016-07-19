@@ -1795,9 +1795,6 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 	Containers:
 		for i, container := range pod.Spec.InitContainers {
 			containerStatus := podStatus.FindContainerStatusByName(container.Name)
-			if containerStatus == nil {
-				continue
-			}
 			switch {
 			case containerStatus == nil:
 				continue
