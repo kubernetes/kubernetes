@@ -397,5 +397,5 @@ func newHealthCheckCommand(healthCheckUrl string, cmd *exec.Cmd, filename string
 }
 
 func (hcc *healthCheckCommand) String() string {
-	return fmt.Sprintf("`%s %s` health-check: %s", hcc.Path, strings.Join(hcc.Args, " "), hcc.HealthCheckUrl)
+	return fmt.Sprintf("`%s` health-check: %s", strings.Join(append([]string{hcc.Path}, hcc.Args[1:]...), " "), hcc.HealthCheckUrl)
 }
