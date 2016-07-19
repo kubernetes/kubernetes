@@ -548,7 +548,15 @@ function create-dhcp-option-set () {
         OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
     esac
 
-    DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS --query DhcpOptions.DhcpOptionsId)
+    if [[ "${ENABLE_NODE_SKYDNS:-}" == "true" ]]; then
+      DHCP_DNS_DOMAINS="${OPTION_SET_DOMAIN} svc.${DNS_DOMAIN}"
+      DHCP_DNS_SERVERS="${DNS_SERVER_IP},AmazonProvidedDNS"
+    else
+      DHCP_DNS_DOMAINS="${OPTION_SET_DOMAIN}"
+      DHCP_DNS_SERVERS="AmazonProvidedDNS"
+    fi
+
+    DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values="${DHCP_DNS_DOMAINS}" Key=domain-name-servers,Values="${DHCP_DNS_SERVERS}" --query DhcpOptions.DhcpOptionsId)
 
     add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
     add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
@@ -961,6 +969,12 @@ function kube-up {
 
     # Wait for the master to be ready
     wait-master
+  fi
+
+  #This must be set late in order to ensure quick cluster turn-up.
+  if [[ "${KUBE_ENABLE_NODE_SKYDNS}" == "true" ]]; then
+    export ENABLE_NODE_SKYDNS=true
+    create-dhcp-option-set
   fi
 
   # Check the cluster is OK

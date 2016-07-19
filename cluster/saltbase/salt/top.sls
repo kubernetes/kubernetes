@@ -50,6 +50,9 @@ base:
 {% endif %}
     - logrotate
     - supervisor
+{% if grains.get('enable_dhcp_cron') == true %}
+    - dhcp-cron
+{% endif %}
 {% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - calico.node
 {% endif %}

@@ -2,15 +2,17 @@ pkg-core:
   pkg.installed:
     - names:
       - curl
+      - socat
 {% if grains['os_family'] == 'RedHat' %}
       - python
       - git
-      - socat
+      - ceph
 {% else %}
       - apt-transport-https
       - python-apt
       - nfs-common
-      - socat
+      - ceph-fs-common
+      - ceph-common
 {% endif %}
 # Ubuntu installs netcat-openbsd by default, but on GCE/Debian netcat-traditional is installed.
 # They behave slightly differently.

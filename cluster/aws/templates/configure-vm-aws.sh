@@ -101,6 +101,12 @@ EOF
 EOF
   fi
 
+  if [[ "${KUBE_ENABLE_NODE_SKYDNS}" == "true" ]]; then
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  enable_dhcp_cron: true
+EOF
+  fi
+
   env-to-grains "runtime_config"
 }
 
@@ -113,6 +119,12 @@ grains:
   cloud: aws
   api_servers: '${API_SERVERS}'
 EOF
+
+  if [[ "${KUBE_ENABLE_NODE_SKYDNS}" == "true" ]]; then
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  enable_dhcp_cron: true
+EOF
+  fi
 
   # We set the hostname_override to the full EC2 private dns name
   # we'd like to use EC2 instance-id, but currently the kubelet health-check assumes the name
