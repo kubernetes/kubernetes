@@ -24,5 +24,6 @@ import (
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
 		v1.SetDefaults_ServiceSpec,
+		v1.SetDefaults_NamespaceStatus,
 	)
 }

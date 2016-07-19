@@ -40,6 +40,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&v1.Service{},
+		&v1.Namespace{},
+		&v1.NamespaceList{},
 		&v1.ServiceList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},

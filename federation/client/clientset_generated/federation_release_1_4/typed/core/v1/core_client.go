@@ -25,12 +25,17 @@ import (
 
 type CoreInterface interface {
 	GetRESTClient() *restclient.RESTClient
+	NamespacesGetter
 	ServicesGetter
 }
 
 // CoreClient is used to interact with features provided by the Core group.
 type CoreClient struct {
 	*restclient.RESTClient
+}
+
+func (c *CoreClient) Namespaces() NamespaceInterface {
+	return newNamespaces(c)
 }
 
 func (c *CoreClient) Services(namespace string) ServiceInterface {
