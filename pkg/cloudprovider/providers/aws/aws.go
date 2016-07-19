@@ -1413,7 +1413,7 @@ func (c *Cloud) DetachDisk(diskName string, instanceName string) (string, error)
 	}
 
 	if !alreadyAttached {
-		glog.Warning("DetachDisk called on non-attached disk: ", diskName)
+		glog.Warning("DetachDisk called on non-attached disk: %s", diskName)
 		// TODO: Continue?  Tolerate non-attached error in DetachVolume?
 	}
 
