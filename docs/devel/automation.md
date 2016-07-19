@@ -118,7 +118,8 @@ happening is to add the "keep-open" label on the pull-request.
 Feel free to re-open and maybe add the "keep-open" label if this happens to a
 valid pull-request. It may also be a good opportunity to get more attention by
 verifying that it is properly assigned and/or mention people that might be
-interested.
+interested. Commenting on the pull-request will also keep it open for another 90
+days.
 
 ## PR builder
 
