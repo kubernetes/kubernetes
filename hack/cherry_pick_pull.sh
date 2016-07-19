@@ -29,7 +29,7 @@ declare -r STARTINGBRANCH=$(git symbolic-ref --short HEAD)
 declare -r REBASEMAGIC="${KUBE_ROOT}/.git/rebase-apply"
 
 if [[ -z ${GITHUB_USER:-} ]]; then
-  echo "Please export GITHUB_USER=<your-user> (or GH organization if that's where your fork lives)"
+  echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
   exit 1
 fi
 
