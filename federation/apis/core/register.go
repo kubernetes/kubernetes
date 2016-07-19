@@ -59,6 +59,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&api.ServiceList{},
 		&api.Service{},
+		&api.Namespace{},
+		&api.NamespaceList{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
 	)
