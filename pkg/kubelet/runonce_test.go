@@ -98,7 +98,8 @@ func TestRunOnce(t *testing.T) {
 		kb.podManager,
 		kb.kubeClient,
 		kb.volumePluginMgr,
-		fakeRuntime)
+		fakeRuntime,
+		kb.mounter)
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
