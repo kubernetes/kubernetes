@@ -68,18 +68,15 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
-func TestRecycler(t *testing.T) {
+func TestRecycle(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	pluginHost := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volumetest.NewFakeRecycler, nil, nil, volume.VolumeConfig{}}}, pluginHost)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, nil, nil, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
-	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
+	_, err := plugMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
-	}
-	if err := plug.Recycle("pv-name", spec); err != nil {
-		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
 }
 

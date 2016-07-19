@@ -76,45 +76,15 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
-func TestRecycler(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+func TestRecycle(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{nil, newMockRecycler, volume.VolumeConfig{}}}, volumetest.NewFakeVolumeHost(tmpDir, nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{nil, volume.VolumeConfig{}}}, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{Path: "/foo"}}}}}
-	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
+	_, err := plugMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if err := plug.Recycle("pv-name", spec); err != nil {
-		t.Errorf("Mock Recycler expected to return nil but got %s", err)
-	}
-}
-
-func newMockRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
-	return &mockRecycler{
-		path: spec.PersistentVolume.Spec.NFS.Path,
-	}, nil
-}
-
-type mockRecycler struct {
-	path string
-	host volume.VolumeHost
-	volume.MetricsNil
-}
-
-func (r *mockRecycler) GetPath() string {
-	return r.path
-}
-
-func (r *mockRecycler) Recycle() error {
-	// return nil means recycle passed
-	return nil
 }
 
 func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
