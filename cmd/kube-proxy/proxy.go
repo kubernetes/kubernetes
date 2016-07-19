@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
@@ -36,7 +35,6 @@ func init() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	config := options.NewProxyConfig()
 	config.AddFlags(pflag.CommandLine)
 
