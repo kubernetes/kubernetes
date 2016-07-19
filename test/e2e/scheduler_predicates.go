@@ -35,6 +35,9 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
+const maxNumberOfPods int64 = 10
+const minPodCPURequest int64 = 500
+
 // variable set in BeforeEach, never modified afterwards
 var masterNodes sets.String
 
@@ -262,11 +265,16 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
+		nodeMaxCapacity := int64(0)
+
 		nodeToCapacityMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
 			capacity, found := node.Status.Capacity["cpu"]
 			Expect(found).To(Equal(true))
 			nodeToCapacityMap[node.Name] = capacity.MilliValue()
+			if nodeMaxCapacity < capacity.MilliValue() {
+				nodeMaxCapacity = capacity.MilliValue()
+			}
 		}
 		waitForStableCluster(c)
 
@@ -281,7 +289,12 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		}
 
 		var podsNeededForSaturation int
-		milliCpuPerPod := int64(500)
+
+		milliCpuPerPod := nodeMaxCapacity / maxNumberOfPods
+		if milliCpuPerPod < minPodCPURequest {
+			milliCpuPerPod = minPodCPURequest
+		}
+		framework.Logf("Using pod capacity: %vm", milliCpuPerPod)
 		for name, leftCapacity := range nodeToCapacityMap {
 			framework.Logf("Node: %v has cpu capacity: %vm", name, leftCapacity)
 			podsNeededForSaturation += (int)(leftCapacity / milliCpuPerPod)
