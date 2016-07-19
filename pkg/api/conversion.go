@@ -17,8 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -27,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utillabels "k8s.io/kubernetes/pkg/util/labels"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -243,8 +240,5 @@ func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *unvers
 func Convert_unversioned_LabelSelector_to_map(in *unversioned.LabelSelector, out *map[string]string, s conversion.Scope) error {
 	var err error
 	*out, err = unversioned.LabelSelectorAsMap(in)
-	if err != nil {
-		err = field.Invalid(field.NewPath("labelSelector"), *in, fmt.Sprintf("cannot convert to old selector: %v", err))
-	}
 	return err
 }
