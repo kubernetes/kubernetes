@@ -81,7 +81,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
-		f.UpdatePod(podName, func(pod *api.Pod) {
+		f.PodClient().Update(podName, func(pod *api.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
 
@@ -116,7 +116,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
-		f.UpdatePod(podName, func(pod *api.Pod) {
+		f.PodClient().Update(podName, func(pod *api.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})
 

@@ -26,7 +26,7 @@ import (
 )
 
 var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
-	f := NewDefaultFramework("kubelet-cgroup-manager")
+	f := framework.NewDefaultFramework("kubelet-cgroup-manager")
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
 			It("Top level QoS containers should have been created", func() {
@@ -35,8 +35,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 					contName := "qos-container" + string(util.NewUUID())
 					pod := &api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name:      podName,
-							Namespace: f.Namespace.Name,
+							Name: podName,
 						},
 						Spec: api.PodSpec{
 							// Don't restart the Pod since it is expected to exit
@@ -64,11 +63,9 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 							},
 						},
 					}
-					f.MungePodSpec(pod)
-					podClient := f.Client.Pods(f.Namespace.Name)
-					_, err := podClient.Create(pod)
-					Expect(err).NotTo(HaveOccurred())
-					err = framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+					podClient := f.PodClient()
+					podClient.Create(pod)
+					err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
 					Expect(err).NotTo(HaveOccurred())
 				}
 			})
