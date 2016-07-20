@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
@@ -142,33 +143,39 @@ func findNodesThatFit(
 	nodes []*api.Node,
 	predicateFuncs map[string]algorithm.FitPredicate,
 	extenders []algorithm.SchedulerExtender) ([]*api.Node, FailedPredicateMap, error) {
-	// Create filtered list with enough space to avoid growing it.
-	filtered := make([]*api.Node, 0, len(nodes))
+	var filtered []*api.Node
 	failedPredicateMap := FailedPredicateMap{}
 
 	if len(predicateFuncs) == 0 {
 		filtered = nodes
 	} else {
-		predicateResultLock := sync.Mutex{}
-		errs := []error{}
+		// Create filtered list with enough space to avoid growing it
+		// and allow assigning.
+		filtered = make([]*api.Node, len(nodes))
 		meta := predicates.PredicateMetadata(pod)
+		errs := []error{}
+
+		var predicateResultLock sync.Mutex
+		var filteredLen int32
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
 			fits, failedPredicate, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs)
-
-			predicateResultLock.Lock()
-			defer predicateResultLock.Unlock()
 			if err != nil {
+				predicateResultLock.Lock()
 				errs = append(errs, err)
+				predicateResultLock.Unlock()
 				return
 			}
 			if fits {
-				filtered = append(filtered, nodes[i])
+				filtered[atomic.AddInt32(&filteredLen, 1)-1] = nodes[i]
 			} else {
+				predicateResultLock.Lock()
 				failedPredicateMap[nodeName] = failedPredicate
+				predicateResultLock.Unlock()
 			}
 		}
 		workqueue.Parallelize(16, len(nodes), checkNode)
+		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
 			return []*api.Node{}, FailedPredicateMap{}, errors.NewAggregate(errs)
 		}
