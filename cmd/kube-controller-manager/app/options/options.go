@@ -95,6 +95,7 @@ func NewCMServer() *CMServer {
 			ConcurrentGCSyncs:       5,
 		},
 	}
+	s.LeaderElection.LeaderElect = true
 	return &s
 }
 
