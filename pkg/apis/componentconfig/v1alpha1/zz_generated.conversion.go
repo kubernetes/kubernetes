@@ -292,6 +292,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
+	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
 	out.PodsPerCore = in.PodsPerCore
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
@@ -455,6 +456,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
+	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
 	out.PodsPerCore = in.PodsPerCore
 	if err := api.Convert_bool_To_Pointer_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err

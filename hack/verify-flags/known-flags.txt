@@ -150,6 +150,7 @@ eviction-soft
 eviction-soft-grace-period
 eviction-pressure-transition-period
 eviction-max-pod-grace-period
+eviction-minimum-reclaim
 executor-bindall
 executor-logv
 executor-path
