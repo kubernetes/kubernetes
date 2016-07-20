@@ -179,12 +179,9 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 			},
 		}
 
-		// TODO(random-liu): Change TestContainerOutput to use PodClient and avoid MungeSpec explicitly
-		f.PodClient().MungeSpec(pod)
-
-		framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
+		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"CONFIG_DATA_1=value-1",
-		}, f.Namespace.Name)
+		})
 	})
 })
 
@@ -261,11 +258,9 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
-	f.PodClient().MungeSpec(pod)
-
-	framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
+	f.TestContainerOutput("consume configMaps", pod, 0, []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
-	}, f.Namespace.Name)
+	})
 
 }
 
@@ -334,9 +329,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
-	f.PodClient().MungeSpec(pod)
-
-	framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
+	f.TestContainerOutput("consume configMaps", pod, 0, []string{
 		"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",
-	}, f.Namespace.Name)
+	})
 }
