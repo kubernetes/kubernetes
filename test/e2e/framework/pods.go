@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -67,8 +68,9 @@ func (c *PodClient) CreateBatch(pods []*api.Pod) []*api.Pod {
 	for i, pod := range pods {
 		wg.Add(1)
 		go func(i int, pod *api.Pod) {
+			defer wg.Done()
+			defer GinkgoRecover()
 			ps[i] = c.CreateSync(pod)
-			wg.Done()
 		}(i, pod)
 	}
 	wg.Wait()
