@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -72,4 +74,9 @@ type UserInfo struct {
 
 // ExtraValue masks the value so protobuf can generate
 // +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type ExtraValue []string
+
+func (t ExtraValue) String() string {
+	return fmt.Sprintf("%v", []string(t))
+}
