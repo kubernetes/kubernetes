@@ -33,9 +33,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"strings"
 )
 
-type FailedPredicateMap map[string]string
+type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
 
 type FitError struct {
 	Pod              *api.Pod
@@ -48,9 +49,13 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 func (f *FitError) Error() string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("pod (%s) failed to fit in any node\n", f.Pod.Name))
-	for node, predicate := range f.FailedPredicates {
-		reason := fmt.Sprintf("fit failure on node (%s): %s\n", node, predicate)
-		buf.WriteString(reason)
+	for node, predicates := range f.FailedPredicates {
+		reasons := make([]string, 0)
+		for _, pred := range predicates {
+			reasons = append(reasons, pred.GetReason())
+		}
+		reasonMsg := fmt.Sprintf("fit failure on node (%s): %s\n", node, strings.Join(reasons, ", "))
+		buf.WriteString(reasonMsg)
 	}
 	return buf.String()
 }
@@ -159,7 +164,7 @@ func findNodesThatFit(
 		var filteredLen int32
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
-			fits, failedPredicate, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs)
+			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs)
 			if err != nil {
 				predicateResultLock.Lock()
 				errs = append(errs, err)
@@ -170,7 +175,7 @@ func findNodesThatFit(
 				filtered[atomic.AddInt32(&filteredLen, 1)-1] = nodes[i]
 			} else {
 				predicateResultLock.Lock()
-				failedPredicateMap[nodeName] = failedPredicate
+				failedPredicateMap[nodeName] = failedPredicates
 				predicateResultLock.Unlock()
 			}
 		}
@@ -197,38 +202,19 @@ func findNodesThatFit(
 }
 
 // Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
-func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, string, error) {
+func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, []algorithm.PredicateFailureReason, error) {
+	failedPredicates := make([]algorithm.PredicateFailureReason, 0)
 	for _, predicate := range predicateFuncs {
-		fit, err := predicate(pod, meta, info)
+		fit, reasons, err := predicate(pod, meta, info)
 		if err != nil {
-			switch e := err.(type) {
-			case *predicates.InsufficientResourceError:
-				if fit {
-					err := fmt.Errorf("got InsufficientResourceError: %v, but also fit='true' which is unexpected", e)
-					return false, "", err
-				}
-			case *predicates.PredicateFailureError:
-				if fit {
-					err := fmt.Errorf("got PredicateFailureError: %v, but also fit='true' which is unexpected", e)
-					return false, "", err
-				}
-			default:
-				return false, "", err
-			}
+			err := fmt.Errorf("SchedulerPredicates failed due to %v, which is unexpected.", err)
+			return false, []algorithm.PredicateFailureReason{}, err
 		}
 		if !fit {
-			if re, ok := err.(*predicates.InsufficientResourceError); ok {
-				return false, fmt.Sprintf("Insufficient %s", re.ResourceName), nil
-			}
-			if re, ok := err.(*predicates.PredicateFailureError); ok {
-				return false, re.PredicateName, nil
-			} else {
-				err := fmt.Errorf("SchedulerPredicates failed due to %v, which is unexpected.", err)
-				return false, "", err
-			}
+			failedPredicates = append(failedPredicates, reasons...)
 		}
 	}
-	return true, "", nil
+	return len(failedPredicates) == 0, failedPredicates, nil
 }
 
 // Prioritizes the nodes by running the individual priority functions in parallel.

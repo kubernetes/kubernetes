@@ -241,7 +241,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	case err := <-errChan:
 		expectErr := &FitError{
 			Pod:              secondPod,
-			FailedPredicates: FailedPredicateMap{"machine1": "PodFitsHostPorts"},
+			FailedPredicates: FailedPredicateMap{"machine1": []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts}},
 		}
 		if !reflect.DeepEqual(expectErr, err) {
 			t.Errorf("err want=%v, get=%v", expectErr, err)

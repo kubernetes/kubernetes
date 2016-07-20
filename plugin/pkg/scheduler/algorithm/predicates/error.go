@@ -69,6 +69,10 @@ func (e *InsufficientResourceError) Error() string {
 		e.ResourceName, e.requested, e.used, e.capacity)
 }
 
+func (e *InsufficientResourceError) GetReason() string {
+	return fmt.Sprintf("Insufficient %v", e.ResourceName)
+}
+
 type PredicateFailureError struct {
 	PredicateName string
 }
@@ -79,4 +83,8 @@ func newPredicateFailureError(predicateName string) *PredicateFailureError {
 
 func (e *PredicateFailureError) Error() string {
 	return fmt.Sprintf("Predicate %s failed", e.PredicateName)
+}
+
+func (e *PredicateFailureError) GetReason() string {
+	return e.PredicateName
 }

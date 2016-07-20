@@ -693,7 +693,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
 			continue
 		}
-		// ignore pods that belong to the daemonset when taking into account wheter
+		// ignore pods that belong to the daemonset when taking into account whether
 		// a daemonset should bind to a node.
 		if pds := dsc.getPodDaemonSet(pod); pds != nil && ds.Name == pds.Name {
 			continue
@@ -703,18 +703,22 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-	fit, err := predicates.GeneralPredicates(newPod, nil, nodeInfo)
+	fit, reasons, err := predicates.GeneralPredicates(newPod, nil, nodeInfo)
 	if err != nil {
-		if re, ok := err.(*predicates.PredicateFailureError); ok {
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
-		}
-		if re, ok := err.(*predicates.InsufficientResourceError); ok {
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
-		}
 		message := fmt.Sprintf("GeneralPredicates failed due to %v.", err)
 		glog.Warningf("Predicate failed on Pod %s - %s", newPod.Name, message)
+	}
+	for _, r := range reasons {
+		if re, ok := r.(*predicates.PredicateFailureError); ok {
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
+		} else if re, ok := r.(*predicates.InsufficientResourceError); ok {
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
+		} else {
+			message := fmt.Sprintf("GeneralPredicates failed due to %v.", err)
+			glog.Warningf("Predicate failed on Pod %s - %s", newPod.Name, message)
+		}
 	}
 	return fit
 }

@@ -33,30 +33,30 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func falsePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	return false, algorithmpredicates.ErrFakePredicate
+func falsePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func truePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	return true, nil
+func truePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return true, []algorithm.PredicateFailureReason{}, nil
 }
 
-func matchesPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func matchesPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, fmt.Errorf("node not found")
+		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("node not found")
 	}
 	if pod.Name == node.Name {
-		return true, nil
+		return true, []algorithm.PredicateFailureReason{}, nil
 	}
-	return false, algorithmpredicates.ErrFakePredicate
+	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func hasNoPodsPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func hasNoPodsPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	if len(nodeInfo.Pods()) == 0 {
-		return true, nil
+		return true, []algorithm.PredicateFailureReason{}, nil
 	}
-	return false, algorithmpredicates.ErrFakePredicate
+	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
 func numericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
@@ -327,12 +327,12 @@ func TestFindFitAllError(t *testing.T) {
 	}
 
 	for _, node := range nodes {
-		failure, found := predicateMap[node]
+		failures, found := predicateMap[node]
 		if !found {
 			t.Errorf("failed to find node: %s in %v", node, predicateMap)
 		}
-		if failure != "FakePredicateError" {
-			t.Errorf("unexpected failures: %v", failure)
+		if len(failures) != 1 || failures[0] != algorithmpredicates.ErrFakePredicate {
+			t.Errorf("unexpected failures: %v", failures)
 		}
 	}
 }
@@ -363,12 +363,12 @@ func TestFindFitSomeError(t *testing.T) {
 		if node == pod.Name {
 			continue
 		}
-		failure, found := predicateMap[node]
+		failures, found := predicateMap[node]
 		if !found {
 			t.Errorf("failed to find node: %s in %v", node, predicateMap)
 		}
-		if failure != "FakePredicateError" {
-			t.Errorf("unexpected failures: %v", failure)
+		if len(failures) != 1 || failures[0] != algorithmpredicates.ErrFakePredicate {
+			t.Errorf("unexpected failures: %v", failures)
 		}
 	}
 }
