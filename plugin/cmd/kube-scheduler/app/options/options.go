@@ -42,6 +42,7 @@ type SchedulerServer struct {
 func NewSchedulerServer() *SchedulerServer {
 	config := componentconfig.KubeSchedulerConfiguration{}
 	api.Scheme.Convert(&v1alpha1.KubeSchedulerConfiguration{}, &config)
+	config.LeaderElection.LeaderElect = true
 	s := SchedulerServer{
 		KubeSchedulerConfiguration: config,
 	}
