@@ -210,7 +210,6 @@ type KubeletConfig struct {
 	TLSOptions              *server.TLSOptions
 	Writer                  kubeio.Writer
 	VolumePlugins           []volume.VolumePlugin
-	EvictionConfig          eviction.Config
 	ContainerRuntimeOptions []kubecontainer.Option
 	Options                 []Option
 }
@@ -289,6 +288,16 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	diskSpacePolicy := DiskSpacePolicy{
 		DockerFreeDiskMB: int(kc_new.LowDiskSpaceThresholdMB),
 		RootFreeDiskMB:   int(kc_new.LowDiskSpaceThresholdMB),
+	}
+
+	thresholds, err := eviction.ParseThresholdConfig(kc_new.EvictionHard, kc_new.EvictionSoft, kc_new.EvictionSoftGracePeriod, kc_new.EvictionMinimumReclaim)
+	if err != nil {
+		return nil, err
+	}
+	evictionConfig := eviction.Config{
+		PressureTransitionPeriod: kc_new.EvictionPressureTransitionPeriod.Duration,
+		MaxPodGracePeriodSeconds: int64(kc_new.EvictionMaxPodGracePeriod),
+		Thresholds:               thresholds,
 	}
 
 	var dockerExecHandler dockertools.ExecHandler
@@ -601,7 +610,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, kc_old.EvictionConfig, killPodNow(klet.podWorkers), klet.imageManager, kc_old.Recorder, nodeRef, klet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers), klet.imageManager, kc_old.Recorder, nodeRef, klet.clock)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize eviction manager: %v", err)
