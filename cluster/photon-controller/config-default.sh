@@ -54,7 +54,7 @@ VM_USER=kube
 # will be reused, and the ssh keys will be different. This prevents us from seeing error
 # due to this, and it will not save the SSH key to the known_hosts file, so users will
 # still have standard ssh security checks.
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 # Optional: Enable node logging.
 # Note: currently untested
