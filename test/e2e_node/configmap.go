@@ -32,7 +32,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 	f := framework.NewDefaultFramework("configmap")
 
-	It("should be consumable from pods in volumpe [Conformance]", func() {
+	It("should be consumable from pods in volume [Conformance]", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0)
 	})
 
