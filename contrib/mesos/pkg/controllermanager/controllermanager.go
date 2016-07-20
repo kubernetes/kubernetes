@@ -268,7 +268,7 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "replicasets") {
 			glog.Infof("Starting ReplicaSet controller")
-			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replicaset-controller")), s.resyncPeriod, replicaset.BurstReplicas, int(s.LookupCacheSizeForRS)).
+			go replicaset.NewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replicaset-controller")), s.resyncPeriod, replicaset.BurstReplicas, int(s.LookupCacheSizeForRS)).
 				Run(int(s.ConcurrentRSSyncs), wait.NeverStop)
 		}
 	}
