@@ -159,10 +159,6 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 }
 
 func (s *ServiceController) init() error {
-	if s.cloud == nil {
-		return fmt.Errorf("WARNING: no cloud provider provided, services of type LoadBalancer will fail.")
-	}
-
 	balancer, ok := s.cloud.LoadBalancer()
 	if !ok {
 		return fmt.Errorf("the cloud provider does not support external load balancers.")
