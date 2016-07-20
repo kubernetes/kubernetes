@@ -21,7 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
-if [ -n "${VERBOSE}" ]; then
+if [ -n "${VERBOSE:-}" ]; then
     SILENT=false
 else
     SILENT=true
