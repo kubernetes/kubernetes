@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"os"
 	"path"
 	"testing"
@@ -30,11 +31,14 @@ import (
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
+	cnitypes "github.com/appc/cni/pkg/types"
+	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
@@ -160,6 +164,9 @@ func TestCNIPlugin(t *testing.T) {
 		},
 	}
 
+	mockLoCNI := &mock_cni.MockCNI{}
+	// TODO mock for the test plugin too
+
 	tmpDir := utiltesting.MkTmpdirOrDie("cni-test")
 	testNetworkConfigPath := path.Join(tmpDir, "plugins", "net", "cni")
 	testVendorCNIDirPrefix := tmpDir
@@ -189,6 +196,9 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("Not a CNI network plugin!")
 	}
 	cniPlugin.execer = fexec
+	cniPlugin.loNetwork.CNIConfig = mockLoCNI
+
+	mockLoCNI.On("AddNetwork", cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&cnitypes.Result{IP4: &cnitypes.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
 
 	plug, err := network.InitNetworkPlugin(plugins, "cni", NewFakeHost(nil, pods), componentconfig.HairpinNone, "10.0.0.0/8")
 	if err != nil {
@@ -230,5 +240,13 @@ func TestCNIPlugin(t *testing.T) {
 	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
+	}
+
+	mockLoCNI.AssertExpectations(t)
+}
+
+func TestLoNetNonNil(t *testing.T) {
+	if conf := getLoNetwork(""); conf == nil {
+		t.Error("Expected non-nil lo network")
 	}
 }

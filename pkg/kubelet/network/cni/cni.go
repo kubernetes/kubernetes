@@ -49,7 +49,7 @@ type cniNetworkPlugin struct {
 type cniNetwork struct {
 	name          string
 	NetworkConfig *libcni.NetworkConfig
-	CNIConfig     *libcni.CNIConfig
+	CNIConfig     libcni.CNI
 }
 
 func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
@@ -60,6 +60,7 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix str
 	}
 	return append(configList, &cniNetworkPlugin{
 		defaultNetwork: network,
+		loNetwork:      getLoNetwork(vendorCNIDirPrefix),
 		execer:         utilexec.New(),
 	})
 }
@@ -88,9 +89,9 @@ func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, er
 			continue
 		}
 		// Search for vendor-specific plugins as well as default plugins in the CNI codebase.
-		vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, vendorCNIDirPrefix, conf.Network.Type)
+		vendorDir := vendorCNIDir(vendorCNIDirPrefix, conf.Network.Type)
 		cninet := &libcni.CNIConfig{
-			Path: []string{DefaultCNIDir, vendorCNIDir},
+			Path: []string{DefaultCNIDir, vendorDir},
 		}
 		network := &cniNetwork{name: conf.Network.Name, NetworkConfig: conf, CNIConfig: cninet}
 		return network, nil
@@ -98,28 +99,38 @@ func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, er
 	return nil, fmt.Errorf("No valid networks found in %s", pluginDir)
 }
 
-func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
-	var err error
-	plugin.nsenterPath, err = plugin.execer.LookPath("nsenter")
-	if err != nil {
-		return err
-	}
+func vendorCNIDir(prefix, pluginType string) string {
+	return fmt.Sprintf(VendorCNIDirTemplate, prefix, pluginType)
+}
 
+func getLoNetwork(vendorDirPrefix string) *cniNetwork {
 	loConfig, err := libcni.ConfFromBytes([]byte(`{
   "cniVersion": "0.1.0",
   "name": "cni-loopback",
   "type": "loopback"
 }`))
 	if err != nil {
-		return err
+		// The hardcoded config above should always be valid and unit tests will
+		// catch this
+		panic(err)
 	}
 	cninet := &libcni.CNIConfig{
-		Path: []string{DefaultCNIDir},
+		Path: []string{vendorCNIDir(vendorDirPrefix, loConfig.Network.Type), DefaultCNIDir},
 	}
-	plugin.loNetwork = &cniNetwork{
+	loNetwork := &cniNetwork{
 		name:          "lo",
 		NetworkConfig: loConfig,
 		CNIConfig:     cninet,
+	}
+
+	return loNetwork
+}
+
+func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
+	var err error
+	plugin.nsenterPath, err = plugin.execer.LookPath("nsenter")
+	if err != nil {
+		return err
 	}
 
 	plugin.host = host
@@ -184,7 +195,7 @@ func (network *cniNetwork) addToNetwork(podName string, podNamespace string, pod
 	}
 
 	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to run with conf.Network.Type=%v, c.Path=%v", netconf.Network.Type, cninet.Path)
+	glog.V(4).Infof("About to run with conf.Network.Type=%v", netconf.Network.Type)
 	res, err := cninet.AddNetwork(netconf, rt)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)
@@ -202,7 +213,7 @@ func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string
 	}
 
 	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to run with conf.Network.Type=%v, c.Path=%v", netconf.Network.Type, cninet.Path)
+	glog.V(4).Infof("About to run with conf.Network.Type=%v", netconf.Network.Type)
 	err = cninet.DelNetwork(netconf, rt)
 	if err != nil {
 		glog.Errorf("Error deleting network: %v", err)
