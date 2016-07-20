@@ -12,8 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Constants used throughout.
-GENERATED_FILE_PREFIX := zz_generated.
+# Don't allow an implicit 'all' rule.  This is not a user-facing file.
+ifeq ($(MAKECMDGOALS),)
+    $(error This Makefile requires an explicit rule to be specified)
+endif
+
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** starting Makefile.generated_files for goal(s) "$(MAKECMDGOALS)")
+    $(warning ***** $(shell date))
+endif
+
+
+# It's necessary to set this because some environments don't link sh -> bash.
+SHELL := /bin/bash
+
+# This rule collects all the generated file sets into a single rule.  Other
+# rules should depend on this to ensure generated files are rebuilt.
+.PHONY: generated_files
+generated_files: gen_deepcopy gen_conversion
 
 # Code-generation logic.
 #
@@ -455,17 +471,3 @@ sinclude $(META_DIR)/$(CONVERSION_GEN).mk
 $(CONVERSION_GEN):
 	hack/make-rules/build.sh cmd/libs/go2idl/conversion-gen
 	touch $@
-
-# This rule collects all the generated file sets into a single dep, which is
-# defined BELOW the *_FILES variables and leaves higher-level rules clean.
-# Top-level rules should depend on this to ensure generated files are rebuilt.
-.PHONY: generated_files
-generated_files: gen_deepcopy gen_conversion
-
-# Remove all auto-generated artifacts.
-#
-# Example:
-#   make clean_generated
-.PHONY: clean_generated
-clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
