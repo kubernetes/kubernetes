@@ -160,7 +160,8 @@ func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration)
 
 func (s *ServiceController) init() error {
 	if s.cloud == nil {
-		return fmt.Errorf("ServiceController should not be run without a cloudprovider.")
+		glog.Warning("ServiceController requires a cloudprovider, and none was specified. Skipping.")
+		return nil
 	}
 
 	balancer, ok := s.cloud.LoadBalancer()
