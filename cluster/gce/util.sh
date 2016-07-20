@@ -379,6 +379,7 @@ function detect-nodes () {
 # Assumed vars:
 #   MASTER_NAME
 #   ZONE
+#   REGION
 # Vars set:
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
@@ -386,7 +387,6 @@ function detect-master () {
   detect-project
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    local REGION=${ZONE%-*}
     KUBE_MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
       --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
   fi
@@ -727,10 +727,7 @@ function create-master() {
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
   # Reserve the master's IP so that it can later be transferred to another VM
-  # without disrupting the kubelets. IPs are associated with regions, not zones,
-  # so extract the region name, which is the same as the zone but with the final
-  # dash and characters trailing the dash removed.
-  local REGION=${ZONE%-*}
+  # without disrupting the kubelets.
   create-static-ip "${MASTER_NAME}-ip" "${REGION}"
   MASTER_RESERVED_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
@@ -778,9 +775,9 @@ function attach-external-ip() {
 #   PROJECT
 #   MASTER_NAME
 #   ZONE
+#   REGION
 function create-loadbalancer() {
   detect-master
-  local REGION=${ZONE%-*}
 
   # Step 0: Return early if LB is already configured.
   if gcloud compute forwarding-rules describe ${MASTER_NAME} \
@@ -807,7 +804,16 @@ function create-loadbalancer() {
     --target-pool ${MASTER_NAME} --address=${KUBE_MASTER_IP} --ports=443
 
   echo -n "Waiting for the load balancer configuration to propagate..."
-  until $(curl -k -m1 https://${KUBE_MASTER_IP} > /dev/null 2>&1); do echo -n .; done
+  local counter=0
+  until $(curl -k -m1 https://${KUBE_MASTER_IP} &> /dev/null); do
+    counter=$((counter+1))
+    echo -n .
+    if [[ ${counter} -ge 1800 ]]; then
+      echo -e "${color_red}TIMEOUT${color_norm}" >&2
+      echo -e "${color_red}Load balancer failed to initialize within ${counter} seconds.${color_norm}" >&2
+      exit 2
+    fi
+  done
   echo "DONE"
 }
 
@@ -1109,10 +1115,8 @@ function kube-down {
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
   if [[ "${REMAINING_MASTER_COUNT}" == "1" ]]; then
-    local REGION=${ZONE%-*}
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       detect-master
-      local REGION=${ZONE%-*}
       local EXISTING_MASTER_ZONE=$(gcloud compute instances list "${MASTER_NAME}" \
         --project "${PROJECT}" --format="value(zone)")
       gcloud compute forwarding-rules delete \
@@ -1146,6 +1150,13 @@ function kube-down {
         --quiet \
         "${MASTER_NAME}-ip"
     fi
+    # Delete firewall rule for minions.
+    if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
+      gcloud compute firewall-rules delete  \
+        --project "${PROJECT}" \
+        --quiet \
+        "${NODE_TAG}-all"
+    fi
   fi
 
   # Find out what minions are running.
@@ -1165,14 +1176,6 @@ function kube-down {
       "${minions[@]::${batch}}"
     minions=( "${minions[@]:${batch}}" )
   done
-
-  # Delete firewall rule for minions.
-  if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
-    gcloud compute firewall-rules delete  \
-      --project "${PROJECT}" \
-      --quiet \
-      "${NODE_TAG}-all"
-  fi
 
   # Delete routes.
   local -a routes
@@ -1203,8 +1206,11 @@ function kube-down {
       "${INSTANCE_PREFIX}"-influxdb-pd
   fi
 
-  export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
-  clear-kubeconfig
+  # If there are no more remaining master replicas, we should update kubeconfig.
+  if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
+    export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
+    clear-kubeconfig
+  fi
   set -e
 }
 
@@ -1225,6 +1231,7 @@ function get-template {
 #   MASTER_NAME
 #   NODE_INSTANCE_PREFIX
 #   ZONE
+#   REGION
 # Vars set:
 #   KUBE_RESOURCE_FOUND
 function check-resources {
@@ -1293,7 +1300,6 @@ function check-resources {
     return 1
   fi
 
-  local REGION=${ZONE%-*}
   if gcloud compute addresses describe --project "${PROJECT}" "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Master's reserved IP"
     return 1
