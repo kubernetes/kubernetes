@@ -1116,7 +1116,7 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 				}
 			}
 		}
-		if page >= maxPages {
+		if page > maxPages {
 			glog.Errorf("computeHostTags exceeded maxPages=%d for Instances.List: truncating.", maxPages)
 		}
 	}
@@ -1146,7 +1146,7 @@ func (gce *GCECloud) projectOwnsStaticIP(name, region string, ipAddress string) 
 			}
 		}
 	}
-	if page >= maxPages {
+	if page > maxPages {
 		glog.Errorf("projectOwnsStaticIP exceeded maxPages=%d for Addresses.List; truncating.", maxPages)
 	}
 	return false, nil
@@ -2096,7 +2096,7 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 				instances = append(instances, instance.Name)
 			}
 		}
-		if page >= maxPages {
+		if page > maxPages {
 			glog.Errorf("List exceeded maxPages=%d for Instances.List: truncating.", maxPages)
 		}
 	}
@@ -2196,7 +2196,7 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetInstance: target, DestinationCIDR: r.DestRange})
 		}
 	}
-	if page >= maxPages {
+	if page > maxPages {
 		glog.Errorf("ListRoutes exceeded maxPages=%d for Routes.List; truncating.", maxPages)
 	}
 	return routes, nil
@@ -2583,7 +2583,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 				remaining--
 			}
 		}
-		if page >= maxPages {
+		if page > maxPages {
 			glog.Errorf("getInstancesByNames exceeded maxPages=%d for Instances.List: truncating.", maxPages)
 		}
 	}
