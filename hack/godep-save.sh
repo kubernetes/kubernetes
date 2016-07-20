@@ -31,4 +31,7 @@ REQUIRED_BINS=(
 
 pushd "${KUBE_ROOT}" > /dev/null
   GO15VENDOREXPERIMENT=1 ${GODEP} save "${REQUIRED_BINS[@]}"
+  # A temporary workaround to prevent godep from not including recursive dependencies.
+  # This can be removed once a restore followed by a save does not drop dependencies.
+  GO15VENDOREXPERIMENT=1 ${GODEP} save "${REQUIRED_BINS[@]}"
 popd > /dev/null
