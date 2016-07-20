@@ -90,7 +90,7 @@ ginkgo:
 # Runs all the presubmission verifications.
 #
 # Args:
-#   BRANCH: Branch to be passed to hack/verify-godeps.sh script.
+#   BRANCH: Branch to be passed to verify-godeps.sh script.
 #
 # Example:
 #   make verify
@@ -174,7 +174,7 @@ test-e2e-node: ginkgo generated_files
 #
 # Example:
 #   make test-cmd
-test-cmd:
+test-cmd: generated_files
 	@hack/make-rules/test-cmd.sh
 .PHONY: test-cmd
 
@@ -217,7 +217,7 @@ vet:
 # Example:
 #   make release
 .PHONY: release
-release: generated_files
+release:
 	build/release.sh
 
 # Build a release, but skip tests
@@ -225,7 +225,7 @@ release: generated_files
 # Example:
 #   make release-skip-tests
 .PHONY: release-skip-tests quick-release
-release-skip-tests quick-release: generated_files
+release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 
 # Cross-compile for all platforms
