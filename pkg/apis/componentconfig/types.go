@@ -560,6 +560,12 @@ type KubeControllerManagerConfiguration struct {
 	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
 	// used to sign service account tokens.
 	ServiceAccountKeyFile string `json:"serviceAccountKeyFile"`
+	// clusterSigningCertFile is the filename containing a PEM-encoded
+	// X509 CA certificate used to issue cluster-scoped certificates
+	ClusterSigningCertFile string `json:"clusterSigningCertFile"`
+	// clusterSigningCertFile is the filename containing a PEM-encoded
+	// RSA or ECDSA private key used to issue cluster-scoped certificates
+	ClusterSigningKeyFile string `json:"clusterSigningKeyFile"`
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool `json:"enableProfiling"`
 	// clusterName is the instance prefix for the cluster.
