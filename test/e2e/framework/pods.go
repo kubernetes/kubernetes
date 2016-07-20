@@ -45,7 +45,7 @@ type PodClient struct {
 
 // Create creates a new pod according to the framework specifications (don't wait for it to start).
 func (c *PodClient) Create(pod *api.Pod) *api.Pod {
-	c.MungeSpec(pod)
+	c.mungeSpec(pod)
 	p, err := c.PodInterface.Create(pod)
 	ExpectNoError(err, "Error creating Pod")
 	return p
@@ -77,16 +77,6 @@ func (c *PodClient) CreateBatch(pods []*api.Pod) []*api.Pod {
 	return ps
 }
 
-// MungeSpec apply test-suite specific transformations to the pod spec.
-// TODO: Refactor the framework to always use PodClient so that we can completely hide the munge logic
-// in the PodClient.
-func (c *PodClient) MungeSpec(pod *api.Pod) {
-	if TestContext.NodeName != "" {
-		Expect(pod.Spec.NodeName).To(Or(BeZero(), Equal(TestContext.NodeName)), "Test misconfigured")
-		pod.Spec.NodeName = TestContext.NodeName
-	}
-}
-
 // Update updates the pod object. It retries if there is a conflict, throw out error if
 // there is any other errors. name is the pod name, updateFn is the function updating the
 // pod object.
@@ -108,6 +98,14 @@ func (c *PodClient) Update(name string, updateFn func(pod *api.Pod)) {
 		}
 		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
 	}))
+}
+
+// mungeSpec apply test-suite specific transformations to the pod spec.
+func (c *PodClient) mungeSpec(pod *api.Pod) {
+	if TestContext.NodeName != "" {
+		Expect(pod.Spec.NodeName).To(Or(BeZero(), Equal(TestContext.NodeName)), "Test misconfigured")
+		pod.Spec.NodeName = TestContext.NodeName
+	}
 }
 
 // TODO(random-liu): Move pod wait function into this file

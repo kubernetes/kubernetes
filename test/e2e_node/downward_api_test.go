@@ -158,8 +158,5 @@ func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, e
 			RestartPolicy: api.RestartPolicyNever,
 		},
 	}
-	// TODO(random-liu): Change TestContainerOutputRegexp to use PodClient and avoid MungeSpec explicitly
-	f.PodClient().MungeSpec(pod)
-
 	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
 }
