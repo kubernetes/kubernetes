@@ -81,6 +81,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
 		out.ConcurrentNamespaceSyncs = in.ConcurrentNamespaceSyncs
 		out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
+		out.ConcurrentRouteSyncs = in.ConcurrentRouteSyncs
 		out.LookupCacheSizeForRC = in.LookupCacheSizeForRC
 		out.LookupCacheSizeForRS = in.LookupCacheSizeForRS
 		out.LookupCacheSizeForDaemonSet = in.LookupCacheSizeForDaemonSet

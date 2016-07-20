@@ -508,6 +508,9 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentSATokenSyncs is the number of service account token syncing operations
 	// that will be done concurrently.
 	ConcurrentSATokenSyncs int32 `json:"concurrentSATokenSyncs"`
+	// concurrentRouteSyncs is the number of route syncing operations
+	// that will be done concurrently.
+	ConcurrentRouteSyncs int32 `json:"concurrentRouteSyncs"`
 	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
 	LookupCacheSizeForRC int32 `json:"lookupCacheSizeForRC"`
