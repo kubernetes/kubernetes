@@ -226,6 +226,7 @@ fi
 if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
   echo 'Activating service account...'  # No harm in doing this multiple times.
   gcloud auth activate-service-account --key-file="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
+  unset GCE_SERVICE_ACCOUNT  # Use checked in credentials, not the metadata server
   unset KUBEKINS_SERVICE_ACCOUNT_FILE
 elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
   echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
