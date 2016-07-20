@@ -143,7 +143,7 @@ That said, if you have questions, reach out to us one way or another.  We don't 
 
 ### Community resources
 
-* **Awesome-kubernetes** - [http://ramitsurana.github.io/awesome-kubernetes](https://ramitsurana.github.io/awesome-kubernetes)
+* **Awesome-kubernetes** - [http://ramitsurana.github.io/awesome-kubernetes](http://ramitsurana.github.io/awesome-kubernetes)
 
 You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
 
