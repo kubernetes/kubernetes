@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package goroutinemap
+package nestedpendingoperations
 
 import (
 	"fmt"
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
@@ -43,12 +45,12 @@ const (
 
 func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation := func() error { return nil }
 
 	// Act
-	err := grm.Run(operationName, operation)
+	err := grm.Run(volumeName, "" /* operationSubName */, operation)
 
 	// Assert
 	if err != nil {
@@ -58,33 +60,55 @@ func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_TwoOps(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
-	operation1Name := "operation1-name"
-	operation2Name := "operation2-name"
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volume1Name := api.UniqueVolumeName("volume1-name")
+	volume2Name := api.UniqueVolumeName("volume2-name")
 	operation := func() error { return nil }
 
 	// Act
-	err1 := grm.Run(operation1Name, operation)
-	err2 := grm.Run(operation2Name, operation)
+	err1 := grm.Run(volume1Name, "" /* operationSubName */, operation)
+	err2 := grm.Run(volume2Name, "" /* operationSubName */, operation)
 
 	// Assert
 	if err1 != nil {
-		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation1Name, err1)
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", volume1Name, err1)
 	}
 
 	if err2 != nil {
-		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation2Name, err2)
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", volume2Name, err2)
+	}
+}
+
+func Test_NewGoRoutineMap_Positive_TwoSubOps(t *testing.T) {
+	// Arrange
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
+	operation1PodName := types.UniquePodName("operation1-podname")
+	operation2PodName := types.UniquePodName("operation2-podname")
+	operation := func() error { return nil }
+
+	// Act
+	err1 := grm.Run(volumeName, operation1PodName, operation)
+	err2 := grm.Run(volumeName, operation2PodName, operation)
+
+	// Assert
+	if err1 != nil {
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation1PodName, err1)
+	}
+
+	if err2 != nil {
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation2PodName, err2)
 	}
 }
 
 func Test_NewGoRoutineMap_Positive_SingleOpWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation := func() error { return nil }
 
 	// Act
-	err := grm.Run(operationName, operation)
+	err := grm.Run(volumeName, "" /* operationSubName */, operation)
 
 	// Assert
 	if err != nil {
@@ -94,11 +118,11 @@ func Test_NewGoRoutineMap_Positive_SingleOpWithExpBackoff(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateCallbackFunc(operation1DoneCh)
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -109,7 +133,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 	err2 := retryWithExponentialBackOff(
 		time.Duration(initialOperationWaitTimeShort),
 		func() (bool, error) {
-			err := grm.Run(operationName, operation2)
+			err := grm.Run(volumeName, "" /* operationSubName */, operation2)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed with %v. Will retry.", err)
 				return false, nil
@@ -126,11 +150,11 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletesWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateCallbackFunc(operation1DoneCh)
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -141,7 +165,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletesWithExpBackoff(t *
 	err2 := retryWithExponentialBackOff(
 		time.Duration(initialOperationWaitTimeShort),
 		func() (bool, error) {
-			err := grm.Run(operationName, operation2)
+			err := grm.Run(volumeName, "" /* operationSubName */, operation2)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed with %v. Will retry.", err)
 				return false, nil
@@ -158,10 +182,10 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletesWithExpBackoff(t *
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanics(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1 := generatePanicFunc()
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -171,7 +195,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanics(t *testing.T) {
 	err2 := retryWithExponentialBackOff(
 		time.Duration(initialOperationWaitTimeShort),
 		func() (bool, error) {
-			err := grm.Run(operationName, operation2)
+			err := grm.Run(volumeName, "" /* operationSubName */, operation2)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed with %v. Will retry.", err)
 				return false, nil
@@ -188,10 +212,10 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanics(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanicsWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1 := generatePanicFunc()
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -201,7 +225,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanicsWithExpBackoff(t *tes
 	err2 := retryWithExponentialBackOff(
 		time.Duration(initialOperationWaitTimeLong), // Longer duration to accommodate for backoff
 		func() (bool, error) {
-			err := grm.Run(operationName, operation2)
+			err := grm.Run(volumeName, "" /* operationSubName */, operation2)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed with %v. Will retry.", err)
 				return false, nil
@@ -218,22 +242,72 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanicsWithExpBackoff(t *tes
 
 func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
 	operation2 := generateNoopFunc()
 
 	// Act
-	err2 := grm.Run(operationName, operation2)
+	err2 := grm.Run(volumeName, "" /* operationSubName */, operation2)
 
 	// Assert
 	if err2 == nil {
-		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", operationName)
+		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", volumeName)
+	}
+	if !IsAlreadyExists(err2) {
+		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
+	}
+}
+
+func Test_NewGoRoutineMap_Negative_SecondSubOpBeforeFirstCompletes2(t *testing.T) {
+	// Arrange
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
+	operationPodName := types.UniquePodName("operation-podname")
+	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1 := generateWaitFunc(operation1DoneCh)
+	err1 := grm.Run(volumeName, operationPodName, operation1)
+	if err1 != nil {
+		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
+	}
+	operation2 := generateNoopFunc()
+
+	// Act
+	err2 := grm.Run(volumeName, operationPodName, operation2)
+
+	// Assert
+	if err2 == nil {
+		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", volumeName)
+	}
+	if !IsAlreadyExists(err2) {
+		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
+	}
+}
+
+func Test_NewGoRoutineMap_Negative_SecondSubOpBeforeFirstCompletes(t *testing.T) {
+	// Arrange
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
+	operationPodName := types.UniquePodName("operation-podname")
+	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1 := generateWaitFunc(operation1DoneCh)
+	err1 := grm.Run(volumeName, operationPodName, operation1)
+	if err1 != nil {
+		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
+	}
+	operation2 := generateNoopFunc()
+
+	// Act
+	err2 := grm.Run(volumeName, operationPodName, operation2)
+
+	// Assert
+	if err2 == nil {
+		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", volumeName)
 	}
 	if !IsAlreadyExists(err2) {
 		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
@@ -242,22 +316,22 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 
 func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletesWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
 	operation2 := generateNoopFunc()
 
 	// Act
-	err2 := grm.Run(operationName, operation2)
+	err2 := grm.Run(volumeName, "" /* operationSubName */, operation2)
 
 	// Assert
 	if err2 == nil {
-		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", operationName)
+		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", volumeName)
 	}
 	if !IsAlreadyExists(err2) {
 		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
@@ -266,11 +340,11 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletesWithExpBackoff(t 
 
 func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -278,11 +352,11 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	operation3 := generateNoopFunc()
 
 	// Act
-	err2 := grm.Run(operationName, operation2)
+	err2 := grm.Run(volumeName, "" /* operationSubName */, operation2)
 
 	// Assert
 	if err2 == nil {
-		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", operationName)
+		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", volumeName)
 	}
 	if !IsAlreadyExists(err2) {
 		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
@@ -293,7 +367,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	err3 := retryWithExponentialBackOff(
 		time.Duration(initialOperationWaitTimeShort),
 		func() (bool, error) {
-			err := grm.Run(operationName, operation3)
+			err := grm.Run(volumeName, "" /* operationSubName */, operation3)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed with %v. Will retry.", err)
 				return false, nil
@@ -310,11 +384,11 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletesWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err1 := grm.Run(operationName, operation1)
+	err1 := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -322,11 +396,11 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletesWithExpBackoff(t *t
 	operation3 := generateNoopFunc()
 
 	// Act
-	err2 := grm.Run(operationName, operation2)
+	err2 := grm.Run(volumeName, "" /* operationSubName */, operation2)
 
 	// Assert
 	if err2 == nil {
-		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", operationName)
+		t.Fatalf("NewGoRoutine did not fail. Expected: <Failed to create operation with name \"%s\". An operation with that name already exists.> Actual: <no error>", volumeName)
 	}
 	if !IsAlreadyExists(err2) {
 		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
@@ -337,7 +411,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletesWithExpBackoff(t *t
 	err3 := retryWithExponentialBackOff(
 		time.Duration(initialOperationWaitTimeShort),
 		func() (bool, error) {
-			err := grm.Run(operationName, operation3)
+			err := grm.Run(volumeName, "" /* operationSubName */, operation3)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed with %v. Will retry.", err)
 				return false, nil
@@ -355,7 +429,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletesWithExpBackoff(t *t
 func Test_NewGoRoutineMap_Positive_WaitEmpty(t *testing.T) {
 	// Test than Wait() on empty GoRoutineMap always succeeds without blocking
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 
 	// Act
 	waitDoneCh := make(chan interface{}, 1)
@@ -374,7 +448,7 @@ func Test_NewGoRoutineMap_Positive_WaitEmpty(t *testing.T) {
 func Test_NewGoRoutineMap_Positive_WaitEmptyWithExpBackoff(t *testing.T) {
 	// Test than Wait() on empty GoRoutineMap always succeeds without blocking
 	// Arrange
-	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 
 	// Act
 	waitDoneCh := make(chan interface{}, 1)
@@ -393,11 +467,11 @@ func Test_NewGoRoutineMap_Positive_WaitEmptyWithExpBackoff(t *testing.T) {
 func Test_NewGoRoutineMap_Positive_Wait(t *testing.T) {
 	// Test that Wait() really blocks until the last operation succeeds
 	// Arrange
-	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err := grm.Run(operationName, operation1)
+	err := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -422,11 +496,11 @@ func Test_NewGoRoutineMap_Positive_Wait(t *testing.T) {
 func Test_NewGoRoutineMap_Positive_WaitWithExpBackoff(t *testing.T) {
 	// Test that Wait() really blocks until the last operation succeeds
 	// Arrange
-	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
-	operationName := "operation-name"
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := api.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err := grm.Run(operationName, operation1)
+	err := grm.Run(volumeName, "" /* operationSubName */, operation1)
 	if err != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
 	}
