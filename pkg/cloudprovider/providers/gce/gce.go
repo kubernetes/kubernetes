@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	masterPorts "k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -737,7 +738,7 @@ func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []str
 				continue
 			}
 			glog.Infof("service %v has nodeport %v, will be used for health check on path %v", apiService.Name, p.NodePort, path)
-			c, err := gce.createHttpHealthCheckIfNeeded(loadBalancerName, path, p.NodePort)
+			c, err := gce.createHttpHealthCheckIfNeeded(loadBalancerName, path, masterPorts.KubeProxyHealthCheckPort)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to create health check for localized service %v on node port %v: %v", loadBalancerName, p.NodePort, err)
 			}
@@ -799,6 +800,7 @@ func serviceNeedsHealthCheck(service *api.Service) (b bool) {
 	return
 }
 
+/* Return the path programmed into the Cloud LB Health Check */
 func getServiceHealthCheckPath(service *api.Service) string {
 	if !serviceNeedsHealthCheck(service) {
 		return ""
@@ -812,7 +814,9 @@ func getServiceHealthCheckPath(service *api.Service) string {
 		return p
 	}
 	*/
-	return healthcheckparser.GenerateURL(service.Namespace, service.Name, string(service.ObjectMeta.UID))
+	// Format using the healthcheckparser library - kube-proxy uses the healthcheckparser
+	// to reconstruct the lookup keys - must match
+	return healthcheckparser.GenerateURL(service.Namespace, service.Name)
 }
 
 func (gce *GCECloud) createHttpHealthCheckIfNeeded(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {

@@ -36,8 +36,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
-	_ "k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -63,6 +64,9 @@ const kubeNodePortsChain utiliptables.Chain = "KUBE-NODEPORTS"
 
 // the kubernetes postrouting chain
 const kubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
+
+// the kubernetes Load Balancer health check redirect chain
+const kubeLbHealthCheckRedirectChain utiliptables.Chain = "KUBE-LB-HEALTHCHECK-REDIRECT"
 
 // the mark-for-masquerade chain
 // TODO: let kubelet manage this chain. Other component should just assume it exists and use it.
@@ -266,6 +270,18 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	args = []string{
 		"-m", "comment", "--comment", "kubernetes postrouting rules",
 		"-j", string(kubePostroutingChain),
+	}
+	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
+		if !utiliptables.IsNotFoundError(err) {
+			glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+			encounteredError = true
+		}
+	}
+
+	// Unlink the lb-healthcheck-redirect chain.
+	args = []string{
+		"-m", "comment", "--comment", "kubernetes load balancer health check redirect rules",
+		"-j", string(kubeLbHealthCheckRedirectChain),
 	}
 	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
 		if !utiliptables.IsNotFoundError(err) {
@@ -482,7 +498,7 @@ func flattenEndpointsInfo(endPoints []*endpointsInfo) []string {
 	return endpointIPs
 }
 
-func filterEndpoints(endPoints []hostPortInfo, endpointIPs []string) []*endpointsInfo {
+func (proxier *Proxier) filterEndpoints(endPoints []hostPortInfo, endpointIPs []string) []*endpointsInfo {
 
 	lookupMap := make(map[string]bool)
 	for _, ip := range endpointIPs {
@@ -513,6 +529,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 	staleConnections := make(map[endpointServicePair]bool)
+	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
 
 	// Update endpoints for services.
 	for i := range allEndpoints {
@@ -528,20 +545,33 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				for i := range ss.Addresses {
 					addr := &ss.Addresses[i]
 					var podGuid types.UID
+					var endpointNodeName string
 					if addr.TargetRef != nil {
 						podGuid = addr.TargetRef.UID
+						endpointNodeName = addr.Hostname
 					}
-					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortInfo{svcEndpoints.ObjectMeta.UID, podGuid, addr.IP, int(port.Port)})
+					hostPortObject := hostPortInfo{epGuid: svcEndpoints.ObjectMeta.UID,
+						podGuid:   podGuid,
+						nodeName:  endpointNodeName,
+						namespace: svcEndpoints.ObjectMeta.Namespace,
+						name:      svcEndpoints.ObjectMeta.Name,
+						host:      addr.IP, port: int(port.Port),
+						localEndpoint: (endpointNodeName == proxier.hostname),
+					}
+					glog.V(4).Infof("Adding hostportinfo %s/%s podGuid: %s Node: %s", hostPortObject.namespace, hostPortObject.name, podGuid, endpointNodeName)
+
+					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortObject)
 				}
 			}
 		}
 
 		for portname := range portsToEndpoints {
 			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
-			glog.Infof("Generated svcPort %+v", svcPort)
+			svcPortToInfoMap[svcPort] = portsToEndpoints[portname]
+			glog.V(2).Infof("Generated svcPort %+v", svcPort)
 			curEndpoints := proxier.endpointsMap[svcPort]
 			newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
-			/* These changes will eliminate all balancing rules
+			/* GK - These changes will eliminate all balancing rules
 			if svc, ok := proxier.serviceMap[svcPort]; ok && svc.onlyNodeLocalEndpoints {
 				localEndpoints := []string{}
 				for i := range newEndpoints {
@@ -561,35 +591,55 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 					staleConnections[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
 				}
 				glog.V(1).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
-				proxier.endpointsMap[svcPort] = filterEndpoints(portsToEndpoints[portname], newEndpoints)
+				proxier.endpointsMap[svcPort] = proxier.filterEndpoints(portsToEndpoints[portname], newEndpoints)
 			}
 			activeEndpoints[svcPort] = true
 		}
 	}
 
 	// Remove endpoints missing from the update.
-	for name := range proxier.endpointsMap {
-		if !activeEndpoints[name] {
+	for svcPort := range proxier.endpointsMap {
+		if !activeEndpoints[svcPort] {
 			// record endpoints of unactive service to stale connections
-			for _, ep := range proxier.endpointsMap[name] {
-				staleConnections[endpointServicePair{endpoint: ep.ip, servicePortName: name}] = true
+			for _, ep := range proxier.endpointsMap[svcPort] {
+				staleConnections[endpointServicePair{endpoint: ep.ip, servicePortName: svcPort}] = true
 			}
 
-			glog.V(2).Infof("Removing endpoints for %q", name)
-			delete(proxier.endpointsMap, name)
+			glog.V(2).Infof("Removing endpoints for %q", svcPort)
+			delete(proxier.endpointsMap, svcPort)
 		}
+
+		// Update the health check entries (TODO only for type loadbalancer and local nodes)
+		proxier.updateHealthCheckEntries(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
 	}
 
 	proxier.syncProxyRules()
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
+// updateHealthCheckEntries - send the new set of local endpoints to the health checker channel
+func (proxier *Proxier) updateHealthCheckEntries(name types.NamespacedName, hostPorts []hostPortInfo) {
+
+	var endpoints []string
+	for _, portInfo := range hostPorts {
+		if portInfo.localEndpoint {
+			// kube-proxy health check only needs local endpoints
+			endpoints = append(endpoints, string(portInfo.podGuid))
+		}
+	}
+	healthcheck.Healthchecker.UpdateEndpoints(name, endpoints)
+}
+
 // used in OnEndpointsUpdate
 type hostPortInfo struct {
-	epGuid  types.UID
-	podGuid types.UID
-	host    string
-	port    int
+	epGuid        types.UID
+	podGuid       types.UID
+	host          string
+	port          int
+	namespace     string
+	name          string
+	nodeName      string
+	localEndpoint bool
 }
 
 func isValidEndpoint(hpp *hostPortInfo) bool {
@@ -751,6 +801,22 @@ func (proxier *Proxier) syncProxyRules() {
 		args := []string{"-m", "comment", "--comment", comment, "-j", string(kubePostroutingChain)}
 		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
 			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, err)
+			return
+		}
+	}
+
+	// Create and link the kube load balancer redirect chain.
+	{
+		if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, kubeLbHealthCheckRedirectChain); err != nil {
+			glog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeLbHealthCheckRedirectChain, err)
+			return
+		}
+
+		comment := "kubernetes load balancer health check redirect rules"
+		// GK TODO - find the filter terms for AWS and other platforms - this rule for source ip 169.254.169.254 only works for GCE
+		args := []string{"-m", "comment", "--comment", comment, "-s", "169.254.169.254", "-m", "tcp", "-p", "tcp", "--dport", fmt.Sprintf("%d", ports.KubeProxyHealthCheckPort), "-j", string(kubeLbHealthCheckRedirectChain)}
+		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainPrerouting, args...); err != nil {
+			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, kubeLbHealthCheckRedirectChain, err)
 			return
 		}
 	}

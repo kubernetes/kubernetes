@@ -23,15 +23,15 @@ import (
 	"strings"
 )
 
-func GenerateURL(namespace, name, uid string) string {
-	return fmt.Sprintf("/healthchecks/svc/%s/%s/%s", namespace, name, uid)
+func GenerateURL(namespace, name string) string {
+	return fmt.Sprintf("/healthchecks/svc/%s/%s", namespace, name)
 }
 
-func ParseURL(url string) (namespace, name, uid string, err error) {
+func ParseURL(url string) (namespace, name string, err error) {
 	parts := strings.Split(url, "/")
-	if len(parts) < 6 {
+	if len(parts) < 5 {
 		err = errors.New("Failed to parse url into healthcheck components")
 		return
 	}
-	return parts[3], parts[4], parts[5], nil
+	return parts[3], parts[4], nil
 }
