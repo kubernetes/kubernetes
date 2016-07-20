@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container_test
+package images
 
 import (
 	"errors"
@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
-func TestPuller(t *testing.T) {
+func TestSerializedPuller(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test_pod",
@@ -106,15 +106,15 @@ func TestPuller(t *testing.T) {
 
 		fakeRuntime := &ctest.FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
-		puller := NewImagePuller(fakeRecorder, fakeRuntime, backOff)
+		puller := newSerializedImagePuller(fakeRecorder, fakeRuntime, backOff)
 
-		fakeRuntime.ImageList = []Image{{"present_image", nil, nil, 1}}
+		fakeRuntime.ImageList = []Image{{"present_image", nil, nil, 0}}
 		fakeRuntime.Err = c.pullerErr
 		fakeRuntime.InspectErr = c.inspectErr
 
 		for tick, expected := range c.expectedErr {
 			fakeClock.Step(time.Second)
-			err, _ := puller.PullImage(pod, container, nil)
+			err, _ := puller.pullImage(pod, container, nil)
 			fakeRuntime.AssertCalls(c.calledFunctions)
 			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
 		}
