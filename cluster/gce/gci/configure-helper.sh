@@ -507,12 +507,23 @@ function start-kube-proxy {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
+  local host_name=$(hostname)
+  local etcd_cluster=""
+  for host in $(echo "${CLUSTER_MASTER_HOSTS}" | tr "," "\n"); do
+    etcd_host="etcd-${host}=http://${host}:$3"
+    if [[ -n "${etcd_cluster}" ]]; then
+      etcd_cluster+=","
+    fi
+    etcd_cluster+="${etcd_host}"
+  done
   local -r temp_file="/tmp/$5"
   cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/etcd.manifest" "${temp_file}"
   sed -i -e "s@{{ *suffix *}}@$1@g" "${temp_file}"
   sed -i -e "s@{{ *port *}}@$2@g" "${temp_file}"
   sed -i -e "s@{{ *server_port *}}@$3@g" "${temp_file}"
   sed -i -e "s@{{ *cpulimit *}}@\"$4\"@g" "${temp_file}"
+  sed -i -e "s@{{ *host_name *}}@$host_name@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   # Replace the volume host path.
   sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
