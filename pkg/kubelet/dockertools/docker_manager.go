@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -128,7 +129,7 @@ type DockerManager struct {
 	dockerPuller DockerPuller
 
 	// wrapped image puller.
-	imagePuller kubecontainer.ImagePuller
+	imagePuller images.ImageManager
 
 	// Root of the Docker runtime.
 	dockerRoot string
@@ -261,11 +262,7 @@ func NewDockerManager(
 		seccompProfileRoot:     seccompProfileRoot,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	if serializeImagePulls {
-		dm.imagePuller = kubecontainer.NewSerializedImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
-	} else {
-		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
-	}
+	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls)
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
 
 	dm.versionCache = cache.NewObjectCache(
@@ -1718,7 +1715,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 
 	// No pod secrets for the infra container.
 	// The message isn't needed for the Infra container
-	if err, msg := dm.imagePuller.PullImage(pod, container, nil); err != nil {
+	if err, msg := dm.imagePuller.EnsureImageExists(pod, container, nil); err != nil {
 		return "", err, msg
 	}
 
@@ -2130,7 +2127,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 // tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
 // was not successful.
 func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, namespaceMode, pidMode, podIP string) (err error, reason string) {
-	err, msg := dm.imagePuller.PullImage(pod, container, pullSecrets)
+	err, msg := dm.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
 	}
