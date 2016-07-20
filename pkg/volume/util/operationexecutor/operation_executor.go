@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package operationexecutor implements interfaces that enable execution of
-// attach, detach, mount, and unmount operations with a goroutinemap so that
-// more than one operation is never triggered on the same volume.
+// attach, detach, mount, and unmount operations with a nestedpendingoperations
+// so that more than one operation is never triggered on the same volume.
 package operationexecutor
 
 import (
@@ -27,14 +27,15 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // OperationExecutor defines a set of operations for attaching, detaching,
-// mounting, or unmounting a volume that are executed with a goroutinemap which
+// mounting, or unmounting a volume that are executed with a NewNestedPendingOperations which
 // prevents more than one operation from being triggered on the same volume.
 //
 // These operations should be idempotent (for example, AttachVolume should
@@ -106,7 +107,7 @@ func NewOperationExecutor(
 	return &operationExecutor{
 		kubeClient:      kubeClient,
 		volumePluginMgr: volumePluginMgr,
-		pendingOperations: goroutinemap.NewGoRoutineMap(
+		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
 			true /* exponentialBackOffOnError */),
 	}
 }
@@ -328,7 +329,7 @@ type operationExecutor struct {
 
 	// pendingOperations keeps track of pending attach and detach operations so
 	// multiple operations are not started on the same volume
-	pendingOperations goroutinemap.GoRoutineMap
+	pendingOperations nestedpendingoperations.NestedPendingOperations
 }
 
 func (oe *operationExecutor) AttachVolume(
@@ -341,7 +342,7 @@ func (oe *operationExecutor) AttachVolume(
 	}
 
 	return oe.pendingOperations.Run(
-		string(volumeToAttach.VolumeName), attachFunc)
+		volumeToAttach.VolumeName, "" /* podName */, attachFunc)
 }
 
 func (oe *operationExecutor) DetachVolume(
@@ -355,7 +356,7 @@ func (oe *operationExecutor) DetachVolume(
 	}
 
 	return oe.pendingOperations.Run(
-		string(volumeToDetach.VolumeName), detachFunc)
+		volumeToDetach.VolumeName, "" /* podName */, detachFunc)
 }
 
 func (oe *operationExecutor) MountVolume(
@@ -368,8 +369,15 @@ func (oe *operationExecutor) MountVolume(
 		return err
 	}
 
+	podName := volumetypes.UniquePodName("")
+	if !volumeToMount.PluginIsAttachable {
+		// Non-attachable volume plugins can execute mount for multiple pods
+		// referencing the same volume in parallel
+		podName = volumehelper.GetUniquePodName(volumeToMount.Pod)
+	}
+
 	return oe.pendingOperations.Run(
-		string(volumeToMount.VolumeName), mountFunc)
+		volumeToMount.VolumeName, podName, mountFunc)
 }
 
 func (oe *operationExecutor) UnmountVolume(
@@ -381,8 +389,12 @@ func (oe *operationExecutor) UnmountVolume(
 		return err
 	}
 
+	// All volume plugins can execute mount for multiple pods referencing the
+	// same volume in parallel
+	podName := volumetypes.UniquePodName(volumeToUnmount.PodUID)
+
 	return oe.pendingOperations.Run(
-		string(volumeToUnmount.VolumeName), unmountFunc)
+		volumeToUnmount.VolumeName, podName, unmountFunc)
 }
 
 func (oe *operationExecutor) UnmountDevice(
@@ -396,7 +408,7 @@ func (oe *operationExecutor) UnmountDevice(
 	}
 
 	return oe.pendingOperations.Run(
-		string(deviceToDetach.VolumeName), unmountDeviceFunc)
+		deviceToDetach.VolumeName, "" /* podName */, unmountDeviceFunc)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
@@ -410,7 +422,7 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	}
 
 	return oe.pendingOperations.Run(
-		string(volumeToMount.VolumeName), verifyControllerAttachedVolumeFunc)
+		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
 }
 
 func (oe *operationExecutor) generateAttachVolumeFunc(
