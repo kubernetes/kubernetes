@@ -348,8 +348,12 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 			if err != nil {
 				return err
 			}
-			glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			kcfg.Cloud = cloud
+			if cloud == nil {
+				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			} else {
+				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+				kcfg.Cloud = cloud
+			}
 		}
 	}
 
