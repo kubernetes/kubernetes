@@ -2031,7 +2031,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			}
 
 			// Overwrite the podIP passed in the pod status, since we just started the infra container.
-			podIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+			podIP = dm.determineContainerIP(pod.Namespace, pod.Name, podInfraContainer)
+			glog.V(4).Infof("Determined pod ip after infra change: %q: %q", format.Pod(pod), podIP)
 		}
 	}
 
