@@ -387,6 +387,23 @@ func TestListImages(t *testing.T) {
 	}
 }
 
+func TestDeleteImage(t *testing.T) {
+	manager, fakeDocker := newTestDockerManager()
+	fakeDocker.Image = &dockertypes.ImageInspect{ID: "1111", RepoTags: []string{"foo"}}
+	manager.RemoveImage(kubecontainer.ImageSpec{Image: "1111"})
+	fakeDocker.AssertCallDetails([]calledDetail{{name: "inspect_image"}, {name: "remove_image",
+		arguments: []interface{}{"1111", dockertypes.ImageRemoveOptions{PruneChildren: true}}}})
+}
+
+func TestDeleteImageWithMultipleTags(t *testing.T) {
+	manager, fakeDocker := newTestDockerManager()
+	fakeDocker.Image = &dockertypes.ImageInspect{ID: "1111", RepoTags: []string{"foo", "bar"}}
+	manager.RemoveImage(kubecontainer.ImageSpec{Image: "1111"})
+	fakeDocker.AssertCallDetails([]calledDetail{{name: "inspect_image"},
+		{name: "remove_image", arguments: []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}},
+		{name: "remove_image", arguments: []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}}})
+}
+
 func TestKillContainerInPod(t *testing.T) {
 	manager, fakeDocker := newTestDockerManager()
 

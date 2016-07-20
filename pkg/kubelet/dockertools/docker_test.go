@@ -30,6 +30,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockernat "github.com/docker/go-connections/nat"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -43,9 +44,7 @@ import (
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
-	fakeDocker.Lock()
-	defer fakeDocker.Unlock()
-	verifyStringArrayEquals(t, fakeDocker.called, calls)
+	assert.New(t).NoError(fakeDocker.AssertCalls(calls))
 }
 
 func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
