@@ -193,8 +193,14 @@ func TestGenericScheduler(t *testing.T) {
 			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			expectsErr:   true,
+			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 			name:         "test 1",
-			wErr:         algorithmpredicates.ErrFakePredicate,
+			wErr: &FitError{
+				Pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+				FailedPredicates: FailedPredicateMap{
+					"machine1": algorithmpredicates.ErrFakePredicate.PredicateName,
+					"machine2": algorithmpredicates.ErrFakePredicate.PredicateName,
+				}},
 		},
 		{
 			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
@@ -244,9 +250,17 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:        []string{"3", "2", "1"},
+			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 			expectsErr:   true,
 			name:         "test 7",
-			wErr:         nil,
+			wErr: &FitError{
+				Pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+				FailedPredicates: FailedPredicateMap{
+					"3": algorithmpredicates.ErrFakePredicate.PredicateName,
+					"2": algorithmpredicates.ErrFakePredicate.PredicateName,
+					"1": algorithmpredicates.ErrFakePredicate.PredicateName,
+				},
+			},
 		},
 		{
 			predicates: map[string]algorithm.FitPredicate{
@@ -270,7 +284,13 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:        []string{"1", "2"},
 			expectsErr:   true,
 			name:         "test 8",
-			wErr:         nil,
+			wErr: &FitError{
+				Pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+				FailedPredicates: FailedPredicateMap{
+					"1": algorithmpredicates.ErrFakePredicate.PredicateName,
+					"2": algorithmpredicates.ErrFakePredicate.PredicateName,
+				},
+			},
 		},
 	}
 	for _, test := range tests {
@@ -283,17 +303,12 @@ func TestGenericScheduler(t *testing.T) {
 		}
 		scheduler := NewGenericScheduler(cache, test.predicates, test.prioritizers, []algorithm.SchedulerExtender{})
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
-		if test.expectsErr {
-			if err == nil {
-				t.Errorf("Unexpected non-error at %s", test.name)
-			}
-		} else {
-			if !reflect.DeepEqual(err, test.wErr) {
-				t.Errorf("Failed : %s, Unexpected error: %v, expected: %v", test.name, err, test.wErr)
-			}
-			if !test.expectedHosts.Has(machine) {
-				t.Errorf("Failed : %s, Expected: %s, Saw: %s", test.name, test.expectedHosts, machine)
-			}
+
+		if !reflect.DeepEqual(err, test.wErr) {
+			t.Errorf("Failed : %s, Unexpected error: %v, expected: %v", test.name, err, test.wErr)
+		}
+		if test.expectedHosts != nil && !test.expectedHosts.Has(machine) {
+			t.Errorf("Failed : %s, Expected: %s, got: %s", test.name, test.expectedHosts, machine)
 		}
 	}
 }
