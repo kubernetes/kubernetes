@@ -198,9 +198,6 @@ type KubeletConfig struct {
 	DockerClient            dockertools.DockerInterface
 	EventClient             *clientset.Clientset
 	Hostname                string
-	HostNetworkSources      []string
-	HostPIDSources          []string
-	HostIPCSources          []string
 	KubeClient              *clientset.Clientset
 	Mounter                 mount.Interface
 	NetworkPlugins          []network.NetworkPlugin

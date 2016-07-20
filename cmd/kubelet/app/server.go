@@ -111,20 +111,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
 func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, error) {
-	hostNetworkSources, err := kubetypes.GetValidatedSources(s.HostNetworkSources)
-	if err != nil {
-		return nil, err
-	}
-
-	hostPIDSources, err := kubetypes.GetValidatedSources(s.HostPIDSources)
-	if err != nil {
-		return nil, err
-	}
-
-	hostIPCSources, err := kubetypes.GetValidatedSources(s.HostIPCSources)
-	if err != nil {
-		return nil, err
-	}
 
 	mounter := mount.New()
 	var writer kubeio.Writer = &kubeio.StdWriter{}
@@ -155,24 +141,21 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 	}
 
 	return &kubelet.KubeletConfig{
-		Auth:               nil, // default does not enforce auth[nz]
-		CAdvisorInterface:  nil, // launches background processes, not set here
-		Cloud:              nil, // cloud provider might start background processes
-		ContainerManager:   nil,
-		DockerClient:       dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
-		HostNetworkSources: hostNetworkSources,
-		HostPIDSources:     hostPIDSources,
-		HostIPCSources:     hostIPCSources,
-		KubeClient:         nil,
-		Mounter:            mounter,
-		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir),
-		OOMAdjuster:        oom.NewOOMAdjuster(),
-		OSInterface:        kubecontainer.RealOS{},
-		Reservation:        *reservation,
-		TLSOptions:         tlsOptions,
-		Writer:             writer,
-		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
-		EvictionConfig:     evictionConfig,
+		Auth:              nil, // default does not enforce auth[nz]
+		CAdvisorInterface: nil, // launches background processes, not set here
+		Cloud:             nil, // cloud provider might start background processes
+		ContainerManager:  nil,
+		DockerClient:      dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
+		KubeClient:        nil,
+		Mounter:           mounter,
+		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir),
+		OOMAdjuster:       oom.NewOOMAdjuster(),
+		OSInterface:       kubecontainer.RealOS{},
+		Reservation:       *reservation,
+		TLSOptions:        tlsOptions,
+		Writer:            writer,
+		VolumePlugins:     ProbeVolumePlugins(s.VolumePluginDir),
+		EvictionConfig:    evictionConfig,
 	}, nil
 }
 
@@ -433,6 +416,8 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 	}
 }
 
+// TODO(mtaufen): Eventually SimpleKubelet should produce a *componentconfig.KubeletConfiguration
+//                instead of a *kubelet.KubeletConfig.
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
 // Under the hood it calls RunKubelet (below)
 func SimpleKubelet(client *clientset.Clientset,
@@ -569,10 +554,30 @@ func RunKubelet(kcfg *kubelet.KubeletConfig, kcfg_new *componentconfig.KubeletCo
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
 
+	// TODO(mtaufen): I moved the validation of these fields here, from UnsecuredKubeletConfig,
+	//                so that I could remove the associated fields from KubeletConfig. I would
+	//                prefer this to be done as part of an independent validation step on the
+	//                KubeletConfiguration. But as far as I can tell, we don't have an explicit
+	//                place for validation of the KubeletConfiguration yet.
+	hostNetworkSources, err := kubetypes.GetValidatedSources(kcfg_new.HostNetworkSources)
+	if err != nil {
+		return err
+	}
+
+	hostPIDSources, err := kubetypes.GetValidatedSources(kcfg_new.HostPIDSources)
+	if err != nil {
+		return err
+	}
+
+	hostIPCSources, err := kubetypes.GetValidatedSources(kcfg_new.HostIPCSources)
+	if err != nil {
+		return err
+	}
+
 	privilegedSources := capabilities.PrivilegedSources{
-		HostNetworkSources: kcfg.HostNetworkSources,
-		HostPIDSources:     kcfg.HostPIDSources,
-		HostIPCSources:     kcfg.HostIPCSources,
+		HostNetworkSources: hostNetworkSources,
+		HostPIDSources:     hostPIDSources,
+		HostIPCSources:     hostIPCSources,
 	}
 	capabilities.Setup(kcfg_new.AllowPrivileged, privilegedSources, 0)
 
