@@ -36,9 +36,6 @@ SHELL := /bin/bash
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-# We want make to yell at us if we use undefined variables.
-MAKEFLAGS += --warn-undefined-variables
-
 # Constants used throughout.
 OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
@@ -47,20 +44,9 @@ PRJ_SRC_PATH := k8s.io/kubernetes
 # Metadata for driving the build lives here.
 META_DIR := .make
 
-#
-# Define variables that we use as inputs so we can warn about undefined variables.
-#
+export KUBE_GOFLAGS := $(GOFLAGS)
 
-WHAT ?=
-TESTS ?=
-
-GOFLAGS ?=
-KUBE_GOFLAGS = $(GOFLAGS)
-export KUBE_GOFLAGS GOFLAGS
-
-GOLDFLAGS ?=
-KUBE_GOLDFLAGS = $(GOLDFLAGS)
-export KUBE_GOLDFLAGS GOLDFLAGS
+export KUBE_GOLDFLAGS := $(GOLDFLAGS)
 
 # Build code.
 #
