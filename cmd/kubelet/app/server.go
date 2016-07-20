@@ -39,7 +39,6 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -62,7 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/crypto"
 	"k8s.io/kubernetes/pkg/util/flock"
@@ -124,11 +122,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		return nil, err
 	}
 
-	reservation, err := parseReservation(s.KubeReserved, s.SystemReserved)
-	if err != nil {
-		return nil, err
-	}
-
 	return &kubelet.KubeletConfig{
 		Auth:              nil, // default does not enforce auth[nz]
 		CAdvisorInterface: nil, // launches background processes, not set here
@@ -140,7 +133,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir),
 		OOMAdjuster:       oom.NewOOMAdjuster(),
 		OSInterface:       kubecontainer.RealOS{},
-		Reservation:       *reservation,
 		TLSOptions:        tlsOptions,
 		Writer:            writer,
 		VolumePlugins:     ProbeVolumePlugins(s.VolumePluginDir),
@@ -667,42 +659,4 @@ func CreateAndInitKubelet(kc_old *kubelet.KubeletConfig, kc_new *componentconfig
 	k.StartGarbageCollection()
 
 	return k, nil
-}
-
-func parseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
-	reservation := new(kubetypes.Reservation)
-	rl, err := parseResourceList(kubeReserved)
-	if err != nil {
-		return nil, err
-	}
-	reservation.Kubernetes = rl
-
-	rl, err = parseResourceList(systemReserved)
-	if err != nil {
-		return nil, err
-	}
-	reservation.System = rl
-
-	return reservation, nil
-}
-
-func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) {
-	rl := make(api.ResourceList)
-	for k, v := range m {
-		switch api.ResourceName(k) {
-		// Only CPU and memory resources are supported.
-		case api.ResourceCPU, api.ResourceMemory:
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				return nil, err
-			}
-			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-			}
-			rl[api.ResourceName(k)] = q
-		default:
-			return nil, fmt.Errorf("cannot reserve %q resource", k)
-		}
-	}
-	return rl, nil
 }
