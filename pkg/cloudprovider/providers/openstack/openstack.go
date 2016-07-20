@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -93,13 +94,54 @@ type LoadBalancerOpts struct {
 	MonitorMaxRetries uint       `gcfg:"monitor-max-retries"`
 }
 
+type OpenStackInstance struct {
+	InstanceID       string `json:"uuid"`
+	Name             string `json:"name"`
+	Hostname         string `json:"hostname"`
+	AvailabilityZone string `json:"availability-zone"`
+}
+
+// Network sets up the OpenStack network endpoint.
+func (os *OpenStack) Network() error {
+	if os.network != nil {
+		return nil
+	}
+	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find neutron endpoint: %v", err)
+		return err
+	}
+	os.network = network
+	return nil
+}
+
+// Compute sets up the OpenStack compute endpoint.
+func (os *OpenStack) Compute() error {
+	if os.compute != nil {
+		return nil
+	}
+	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
+		return err
+	}
+	os.compute = compute
+	return nil
+}
+
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
 	provider *gophercloud.ProviderClient
+	network  *gophercloud.ServiceClient
+	compute  *gophercloud.ServiceClient
 	region   string
 	lbOpts   LoadBalancerOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
-	localInstanceID string
+	openStackInstance *OpenStackInstance
 }
 
 type Config struct {
@@ -156,27 +198,6 @@ func readConfig(config io.Reader) (Config, error) {
 	return cfg, err
 }
 
-// parseMetadataUUID reads JSON from OpenStack metadata server and parses
-// instance ID out of it.
-func parseMetadataUUID(jsonData []byte) (string, error) {
-	// We should receive an object with { 'uuid': '<uuid>' } and couple of other
-	// properties (which we ignore).
-
-	obj := struct{ UUID string }{}
-	err := json.Unmarshal(jsonData, &obj)
-	if err != nil {
-		return "", err
-	}
-
-	uuid := obj.UUID
-	if uuid == "" {
-		err = fmt.Errorf("cannot parse OpenStack metadata, got empty uuid")
-		return "", err
-	}
-
-	return uuid, nil
-}
-
 func readInstanceID() (string, error) {
 	// Try to find instance ID on the local filesystem (created by cloud-init)
 	const instanceIDFile = "/var/lib/cloud/data/instance-id"
@@ -188,62 +209,69 @@ func readInstanceID() (string, error) {
 		if instanceID != "" {
 			return instanceID, nil
 		}
-		// Fall through with empty instanceID and try metadata server.
 	}
 	glog.V(5).Infof("Cannot read %s: '%v', trying metadata server", instanceIDFile, err)
+	return "", err
+}
 
-	// Try to get JSON from metdata server.
+func getInstanceMetaData() (*OpenStackInstance, error) {
+	glog.V(3).Infof("getInstanceMetaData called")
+
+	instanceID, err := readInstanceID()
+	if err == nil {
+		hostname, _ := os.Hostname()
+		return &OpenStackInstance{InstanceID: instanceID, Hostname: hostname}, nil
+	}
+
+	var instance OpenStackInstance
+
 	resp, err := http.Get(metadataUrl)
 	if err != nil {
 		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
-		return "", err
+		return nil, err
 	}
-
 	if resp.StatusCode != 200 {
 		err = fmt.Errorf("got unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
 		glog.V(3).Infof("%v", err)
-		return "", err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	err = json.NewDecoder(resp.Body).Decode(&instance)
 	if err != nil {
-		glog.V(3).Infof("Cannot get HTTP response body from %s: %v", metadataUrl, err)
-		return "", err
+		glog.V(3).Infof("%v", err)
+		return nil, err
 	}
-	instanceID, err := parseMetadataUUID(bodyBytes)
-	if err != nil {
-		glog.V(3).Infof("Cannot parse instance ID from metadata from %s: %v", metadataUrl, err)
-		return "", err
-	}
-
-	glog.V(3).Infof("Got instance id from %s: %s", metadataUrl, instanceID)
-	return instanceID, nil
+	return &instance, nil
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
+	glog.V(3).Info("newOpenStack called")
 	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := readInstanceID()
-	if err != nil {
-		return nil, err
-	}
+	instance, err := getInstanceMetaData()
 
 	os := OpenStack{
-		provider:        provider,
-		region:          cfg.Global.Region,
-		lbOpts:          cfg.LoadBalancer,
-		localInstanceID: id,
+		provider:          provider,
+		region:            cfg.Global.Region,
+		lbOpts:            cfg.LoadBalancer,
+		openStackInstance: instance,
 	}
 
+	// Assume if there was an error getting the InstanceMetaData that we are not an OpenStack Instance
+	if err == nil {
+		os.Compute()
+		os.createKubernetesMetaData(instance.InstanceID, instance.Hostname)
+	}
+	glog.V(3).Infof("Metadata: %v", instance)
 	return &os, nil
 }
 
 type Instances struct {
-	compute            *gophercloud.ServiceClient
+	os                 *OpenStack
 	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
 }
 
@@ -251,15 +279,13 @@ type Instances struct {
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(4).Info("openstack.Instances() called")
 
-	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
+	err := os.Compute()
 	if err != nil {
 		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, false
 	}
 
-	pager := flavors.ListDetail(compute, nil)
+	pager := flavors.ListDetail(os.compute, nil)
 
 	flavor_to_resource := make(map[string]*api.NodeResources)
 	err = pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -289,9 +315,10 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(3).Infof("Found %v compute flavors", len(flavor_to_resource))
 	glog.V(1).Info("Claiming to support Instances")
 
-	return &Instances{compute, flavor_to_resource}, true
+	return &Instances{os, flavor_to_resource}, true
 }
 
+// Function doesn't appear to be used anywhere
 func (i *Instances) List(name_filter string) ([]string, error) {
 	glog.V(4).Infof("openstack List(%v) called", name_filter)
 
@@ -299,7 +326,7 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 		Name:   name_filter,
 		Status: "ACTIVE",
 	}
-	pager := servers.List(i.compute, opts)
+	pager := servers.List(i.os.compute, opts)
 
 	ret := make([]string, 0)
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -450,41 +477,68 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
-func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	glog.V(4).Infof("NodeAddresses(%v) called", name)
-
-	addrs, err := getAddressesByName(i.compute, name)
+// This is only ever called locally in kubelet
+func (i *Instances) NodeAddresses(_ string) ([]api.NodeAddress, error) {
+	glog.V(4).Infof("NodeAddresses() called")
+	addrs, err := getAddressesByName(i.os.compute, i.os.openStackInstance.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+	glog.V(4).Infof("NodeAddresses(%v) => %v", addrs)
 	return addrs, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(name string) (string, error) {
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return "", err
+	if i.os.openStackInstance.Hostname == name {
+		return i.os.openStackInstance.InstanceID, nil
 	}
-	return srv.ID, nil
-}
-
-// InstanceID returns the kubelet's cloud provider ID.
-func (os *OpenStack) InstanceID() (string, error) {
-	return os.localInstanceID, nil
-}
-
-// InstanceID returns the cloud provider ID of the specified instance.
-func (i *Instances) InstanceID(name string) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+	server, err := i.os.getServerFromMetadata(name)
 	if err != nil {
+		glog.Errorf("%s", err)
+	} else {
+		return server.ID, nil
+	}
+	id, err := servers.IDFromName(i.os.compute, name)
+	glog.V(0).Infof("InstanceID for %s: %s", name, id)
+	if err != nil {
+		glog.Errorf("%s", err)
 		return "", err
 	}
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<instanceid>
-	return "/" + srv.ID, nil
+	return id, nil
+}
+
+// InstanceID returns the kubelet's cloud provider ID.
+func (os *OpenStack) InstanceID() (string, error) {
+	return os.openStackInstance.InstanceID, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (i *Instances) InstanceID(name string) (string, error) {
+	if i.os.openStackInstance.Hostname == name {
+		id := "/" + i.os.openStackInstance.InstanceID
+		glog.V(3).Infof("InstanceID is : %v", id)
+		return id, nil
+	}
+	server, err := i.os.getServerFromMetadata(name)
+	if err != nil {
+		glog.Errorf("%s", err)
+	} else {
+		return "/" + server.ID, nil
+	}
+
+	id, err := servers.IDFromName(i.os.compute, name)
+	glog.V(0).Infof("InstanceID for %s: %s", name, id)
+	if err != nil {
+		glog.Errorf("%s", err)
+		return "", err
+	}
+	// In the future it is possible to also return an endpoint as:
+	// <endpoint>/<instanceid>
+	return "/" + id, nil
 }
 
 // InstanceType returns the type of the specified instance.
