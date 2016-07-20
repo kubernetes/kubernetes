@@ -28,6 +28,10 @@ type Process struct {
 	// local to the container's user and group configuration.
 	User string
 
+	// AdditionalGroups specifies the gids that should be added to supplementary groups
+	// in addition to those that the user belongs to.
+	AdditionalGroups []string
+
 	// Cwd will change the processes current working directory inside the container's rootfs.
 	Cwd string
 

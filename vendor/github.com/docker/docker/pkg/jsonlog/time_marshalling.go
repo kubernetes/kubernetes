@@ -1,4 +1,5 @@
-package timeutils
+// Package jsonlog provides helper functions to parse and print time (time.Time) as JSON.
+package jsonlog
 
 import (
 	"errors"
@@ -14,9 +15,9 @@ const (
 	JSONFormat = `"` + time.RFC3339Nano + `"`
 )
 
-// FastMarshalJSON avoids one of the extra allocations that
+// FastTimeMarshalJSON avoids one of the extra allocations that
 // time.MarshalJSON is making.
-func FastMarshalJSON(t time.Time) (string, error) {
+func FastTimeMarshalJSON(t time.Time) (string, error) {
 	if y := t.Year(); y < 0 || y >= 10000 {
 		// RFC 3339 is clear that years are 4 digits exactly.
 		// See golang.org/issue/4556#c15 for more discussion.
