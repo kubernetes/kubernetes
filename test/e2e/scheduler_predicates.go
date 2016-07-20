@@ -257,7 +257,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacity.
@@ -352,7 +351,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -390,7 +388,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, 0, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	It("validates that a pod with an invalid NodeAffinity is rejected", func() {
@@ -431,8 +428,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
-
-		cleanupPods(c, ns)
 	})
 
 	It("validates that NodeSelector is respected if matching [Conformance]", func() {
@@ -464,6 +459,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
@@ -497,7 +494,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -563,7 +559,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, 0, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// Keep the same steps with the test on NodeSelector,
@@ -597,6 +592,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
@@ -644,7 +641,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -655,7 +651,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
-
 	})
 
 	// Verify that an escaped JSON string of NodeAffinity in a YAML PodSpec works.
@@ -688,6 +683,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
@@ -703,7 +700,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/node-selection")
 		testPodPath := filepath.Join(nodeSelectionRoot, "pod-with-node-affinity.yaml")
 		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -766,8 +762,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
-
-		cleanupPods(c, ns)
 	})
 
 	// Test Nodes does not have any pod, hence it should be impossible to schedule a Pod with pod affinity.
@@ -815,7 +809,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, 0, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// test the pod affinity successful matching scenario.
@@ -849,7 +842,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -893,7 +885,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -981,13 +972,13 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
+
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, labelPodName, 1, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// test the pod affinity successful matching scenario with multiple Label Operators.
@@ -1021,7 +1012,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -1073,7 +1063,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1117,7 +1106,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -1172,7 +1160,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1216,7 +1203,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -1230,7 +1216,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/node-selection")
 		testPodPath := filepath.Join(nodeSelectionRoot, "pod-with-pod-affinity.yaml")
 		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1276,6 +1261,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
@@ -1324,7 +1311,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(tolerationPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1370,6 +1356,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
@@ -1409,28 +1397,20 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		_, err = c.Pods(ns).Create(podNoTolerations)
 		framework.ExpectNoError(err)
+
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
-
 		verifyResult(c, podNameNoTolerations, 0, 1, ns)
-		cleanupPods(c, ns)
 
-		// TODO(@kevin-wangzefeng) Figure out how to do it correctly
-		// By("Trying to relaunch the same.")
-		// podNoTolerations, err = c.Pods(ns).Create(&podNoTolerations)
-		// framework.ExpectNoError(err)
-		// defer c.Pods(ns).Delete(podNameNoTolerations, api.NewDeleteOptions(0))
-
-		// // check that pod got scheduled. We intentionally DO NOT check that the
-		// // pod is running because this will create a race condition with the
-		// // kubelet and the scheduler: the scheduler might have scheduled a pod
-		// // already when the kubelet does not know about its new taint yet. The
-		// // kubelet will then refuse to launch the pod.
-		// framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podNameNoTolerations, podNoTolerations.ResourceVersion))
-		// deployedPod, err := c.Pods(ns).Get(podNameNoTolerations)
-		// framework.ExpectNoError(err)
-		// Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
+		By("Removing taint off the node")
+		framework.RemoveTaintOffNode(c, nodeName, taintName)
+		// Wait a bit to allow scheduler to do its thing
+		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
+		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
+		time.Sleep(10 * time.Second)
+		// as taint removed off the node, expect the pod can be successfully scheduled
+		verifyResult(c, podNameNoTolerations, 1, 0, ns)
 	})
 })
