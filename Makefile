@@ -162,7 +162,7 @@ test-e2e: ginkgo generated_files
 #    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
 #
 # Example:
-#   make test-e2e-node FOCUS=kubelet SKIP=container
+#   make test-e2e-node FOCUS=Kubelet SKIP=container
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
 #   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
 # Build and run tests.
