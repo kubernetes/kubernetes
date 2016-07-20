@@ -190,7 +190,9 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 		}
 		etcdPath = defaultEtcdPath
 	}
-	cmd := exec.Command(etcdPath)
+	cmd := exec.Command(etcdPath,
+		"--listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001",
+		"--advertise-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001")
 	// Execute etcd in the data directory instead of using --data-dir because the flag sometimes requires additional
 	// configuration (e.g. --name in version 0.4.9)
 	cmd.Dir = es.etcdDataDir
