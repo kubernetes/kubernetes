@@ -373,14 +373,18 @@ func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
 	return WaitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name, "")
 }
 
-// Runs the given pod and verifies that the output of exact container matches the desired output.
+// TestContainerOutput runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a substring matcher.
 func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	TestContainerOutput(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, ContainSubstring)
 }
 
-// Runs the given pod and verifies that the output of exact container matches the desired regexps.
+// TestContainerOutputRegexp runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	testContainerOutputRegexp(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, MatchRegexp)
 }
 
 // WaitForAnEndpoint waits for at least one endpoint to become available in the

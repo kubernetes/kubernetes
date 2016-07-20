@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -27,27 +26,20 @@ import (
 
 var _ = framework.KubeDescribe("Docker Containers", func() {
 	f := framework.NewDefaultFramework("containers")
-	var c *client.Client
-	var ns string
-
-	BeforeEach(func() {
-		c = f.Client
-		ns = f.Namespace.Name
-	})
 
 	It("should use the image defaults if command and args are blank [Conformance]", func() {
-		framework.TestContainerOutput("use defaults", c, entrypointTestPod(), 0, []string{
+		f.TestContainerOutput("use defaults", entrypointTestPod(), 0, []string{
 			"[/ep default arguments]",
-		}, ns)
+		})
 	})
 
 	It("should be able to override the image's default arguments (docker cmd) [Conformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		framework.TestContainerOutput("override arguments", c, pod, 0, []string{
+		f.TestContainerOutput("override arguments", pod, 0, []string{
 			"[/ep override arguments]",
-		}, ns)
+		})
 	})
 
 	// Note: when you override the entrypoint, the image's arguments (docker cmd)
@@ -56,9 +48,9 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
-		framework.TestContainerOutput("override command", c, pod, 0, []string{
+		f.TestContainerOutput("override command", pod, 0, []string{
 			"[/ep-2]",
-		}, ns)
+		})
 	})
 
 	It("should be able to override the image's default command and arguments [Conformance]", func() {
@@ -66,9 +58,9 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		framework.TestContainerOutput("override all", c, pod, 0, []string{
+		f.TestContainerOutput("override all", pod, 0, []string{
 			"[/ep-2 override arguments]",
-		}, ns)
+		})
 	})
 })
 

@@ -38,9 +38,9 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 
-		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
-		}, f.Namespace.Name)
+		})
 	})
 
 	It("should provide podname as non-root with fsgroup [Feature:FSGroup]", func() {
@@ -52,9 +52,9 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			RunAsUser: &uid,
 			FSGroup:   &gid,
 		}
-		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
-		}, f.Namespace.Name)
+		})
 	})
 
 	It("should update labels on modification [Conformance]", func() {
@@ -130,36 +130,36 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_limit")
 
-		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("2\n"),
-		}, f.Namespace.Name)
+		})
 	})
 
 	It("should provide container's memory limit", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_limit")
 
-		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("67108864\n"),
-		}, f.Namespace.Name)
+		})
 	})
 
 	It("should provide container's cpu request", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_request")
 
-		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("1\n"),
-		}, f.Namespace.Name)
+		})
 	})
 
 	It("should provide container's memory request", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_request")
 
-		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("33554432\n"),
-		}, f.Namespace.Name)
+		})
 	})
 
 })
