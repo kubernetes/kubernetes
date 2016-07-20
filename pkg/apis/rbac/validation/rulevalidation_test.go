@@ -234,7 +234,7 @@ func TestAppliesTo(t *testing.T) {
 			subjects: []rbac.Subject{
 				{Kind: rbac.UserKind, Name: "barfoo"},
 				{Kind: rbac.GroupKind, Name: "foobar"},
-				{Kind: rbac.ServiceAccountKind, Name: "kube-system", Namespace: "default"},
+				{Kind: rbac.ServiceAccountKind, Namespace: "kube-system", Name: "default"},
 			},
 			ctx: api.WithNamespace(
 				api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "system:serviceaccount:kube-system:default"}),
