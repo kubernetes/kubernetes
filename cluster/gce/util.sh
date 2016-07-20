@@ -386,9 +386,8 @@ function detect-master () {
   detect-project
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    local REGION=${ZONE%-*}
-    KUBE_MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
-      --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+    KUBE_MASTER_IP=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
+      "${MASTER_NAME}" --format='value(networkInterfaces[0].accessConfigs[0].natIP)')
   fi
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
@@ -610,9 +609,6 @@ function kube-up {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     parse-master-env
     create-nodes
-  elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
-    create-loadbalancer
-    # TODO: Add logic for copying an existing master.
   else
     check-existing
     create-network
@@ -741,74 +737,6 @@ function create-master() {
   get-master-root-disk-size
 
   create-master-instance "${MASTER_RESERVED_IP}" &
-}
-
-# Detaches old and ataches new external IP to a VM.
-#
-# Arguments:
-#   $1 - VM name
-#   $2 - VM zone
-#   $3 - external static IP; if empty will use an ephemeral IP address.
-function attach-external-ip() {
-  local NAME=${1}
-  local ZONE=${2}
-  local IP_ADDR=${3:-}
-  local ACCESS_CONFIG_NAME=$(gcloud compute instances describe "${NAME}" \
-    --project "${PROJECT}" --zone "${ZONE}" \
-    --format="value(networkInterfaces[0].accessConfigs[0].name)")
-  gcloud compute instances delete-access-config "${NAME}" \
-    --project "${PROJECT}" --zone "${ZONE}" \
-    --access-config-name "${ACCESS_CONFIG_NAME}"
-  if [[ -z ${IP_ADDR} ]]; then
-    gcloud compute instances add-access-config "${NAME}" \
-      --project "${PROJECT}" --zone "${ZONE}" \
-      --access-config-name "${ACCESS_CONFIG_NAME}"
-  else
-    gcloud compute instances add-access-config "${NAME}" \
-      --project "${PROJECT}" --zone "${ZONE}" \
-      --access-config-name "${ACCESS_CONFIG_NAME}" \
-      --address "${IP_ADDR}"
-  fi
-}
-
-# Creates load balancer in front of apiserver if it doesn't exists already. Assumes there's only one
-# existing master replica.
-#
-# Assumes:
-#   PROJECT
-#   MASTER_NAME
-#   ZONE
-function create-loadbalancer() {
-  detect-master
-  local REGION=${ZONE%-*}
-
-  # Step 0: Return early if LB is already configured.
-  if gcloud compute forwarding-rules describe ${MASTER_NAME} \
-    --project "${PROJECT}" --region ${REGION} > /dev/null 2>&1; then
-    echo "Load balancer already exists"
-    return
-  fi
-  local EXISTING_MASTER_ZONE=$(gcloud compute instances list "${MASTER_NAME}" \
-    --project "${PROJECT}" --format="value(zone)")
-  echo "Creating load balancer in front of an already existing master in ${EXISTING_MASTER_ZONE}"
-
-  # Step 1: Detach master IP address and attach ephemeral address to the existing master
-  attach-external-ip ${MASTER_NAME} ${EXISTING_MASTER_ZONE}
-
-  # Step 2: Create target pool.
-  gcloud compute target-pools create "${MASTER_NAME}" --region "${REGION}"
-  # TODO: We should also add master instances with suffixes
-  gcloud compute target-pools add-instances ${MASTER_NAME} --instances ${MASTER_NAME} --zone ${EXISTING_MASTER_ZONE}
-
-  # Step 3: Create forwarding rule.
-  # TODO: This step can take up to 20 min. We need to speed this up...
-  gcloud compute forwarding-rules create ${MASTER_NAME} \
-    --project "${PROJECT}" --region ${REGION} \
-    --target-pool ${MASTER_NAME} --address=${KUBE_MASTER_IP} --ports=443
-
-  echo -n "Waiting for the load balancer configuration to propagate..."
-  until $(curl -k -m1 https://${KUBE_MASTER_IP} > /dev/null 2>&1); do echo -n .; done
-  echo "DONE"
 }
 
 function create-nodes-firewall() {
@@ -1101,53 +1029,6 @@ function kube-down {
     fi
   fi
 
-  # Check if this are any remaining master replicas.
-  local REMAINING_MASTER_COUNT=$(gcloud compute instances list \
-    --project "${PROJECT}" \
-    --regexp "${MASTER_NAME}(-...)?" \
-    --format "value(zone)" | wc -l)
-
-  # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
-  if [[ "${REMAINING_MASTER_COUNT}" == "1" ]]; then
-    local REGION=${ZONE%-*}
-    if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
-      detect-master
-      local REGION=${ZONE%-*}
-      local EXISTING_MASTER_ZONE=$(gcloud compute instances list "${MASTER_NAME}" \
-        --project "${PROJECT}" --format="value(zone)")
-      gcloud compute forwarding-rules delete \
-        --project "${PROJECT}" \
-        --region "${REGION}" \
-        --quiet \
-        "${MASTER_NAME}"
-      attach-external-ip "${MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "${KUBE_MASTER_IP}"
-      gcloud compute target-pools delete \
-        --project "${PROJECT}" \
-        --region "${REGION}" \
-        --quiet \
-        "${MASTER_NAME}"
-    fi
-  fi
-
-  # If there are no more remaining master replicas, we should delete all remaining network resources.
-  if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
-    # Delete firewall rule for the master.
-    if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
-      gcloud compute firewall-rules delete  \
-        --project "${PROJECT}" \
-        --quiet \
-        "${MASTER_NAME}-https"
-    fi
-    # Delete the master's reserved IP
-    if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
-      gcloud compute addresses delete \
-        --project "${PROJECT}" \
-        --region "${REGION}" \
-        --quiet \
-        "${MASTER_NAME}-ip"
-    fi
-  fi
-
   # Find out what minions are running.
   local -a minions
   minions=( $(gcloud compute instances list \
@@ -1165,6 +1046,14 @@ function kube-down {
       "${minions[@]::${batch}}"
     minions=( "${minions[@]:${batch}}" )
   done
+
+  # Delete firewall rule for the master.
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
+    gcloud compute firewall-rules delete  \
+      --project "${PROJECT}" \
+      --quiet \
+      "${MASTER_NAME}-https"
+  fi
 
   # Delete firewall rule for minions.
   if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
@@ -1193,6 +1082,16 @@ function kube-down {
       "${routes[@]::${batch}}"
     routes=( "${routes[@]:${batch}}" )
   done
+
+  # Delete the master's reserved IP
+  local REGION=${ZONE%-*}
+  if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
+    gcloud compute addresses delete \
+      --project "${PROJECT}" \
+      --region "${REGION}" \
+      --quiet \
+      "${MASTER_NAME}-ip"
+  fi
 
   # Delete persistent disk for influx-db.
   if gcloud compute disks describe "${INSTANCE_PREFIX}"-influxdb-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
