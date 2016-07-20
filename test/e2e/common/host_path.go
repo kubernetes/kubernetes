@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
-var _ = framework.KubeDescribe("hostPath", func() {
+var _ = framework.KubeDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
 	var c *client.Client
 	var namespace *api.Namespace
