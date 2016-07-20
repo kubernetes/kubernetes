@@ -141,9 +141,9 @@ If you need support, start with the [troubleshooting guide](docs/troubleshooting
 
 That said, if you have questions, reach out to us one way or another.  We don't bite!
 
-### Community resources:
+### Community resources
 
-* **Awesome-kubernetes**:
+* **Awesome-kubernetes** - [http://ramitsurana.github.io/awesome-kubernetes](https://ramitsurana.github.io/awesome-kubernetes)
 
 You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
 
@@ -151,5 +151,8 @@ You can find more projects, tools and articles related to Kubernetes on the  [aw
 
 Instructive & educational resources for the Kubernetes community. By the community.
 
+* **Community Documentation**
+
+Here you can learn more about the current happening's in the [kubernetes community](https://github.com/kubernetes/community).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
