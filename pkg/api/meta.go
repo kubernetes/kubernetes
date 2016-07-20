@@ -29,7 +29,13 @@ import (
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
 	meta.CreationTimestamp = unversioned.Now()
-	meta.UID = util.NewUUID()
+	// allows admission controllers to assign a UID earlier in the request processing
+	// to support tracking resources pending creation.
+	uid, found := UIDFrom(ctx)
+	if !found {
+		uid = util.NewUUID()
+	}
+	meta.UID = uid
 	meta.SelfLink = ""
 }
 
