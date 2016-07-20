@@ -148,10 +148,6 @@ type Config struct {
 	// More information about kernel oom score calculation here: https://lwn.net/Articles/317814/
 	OomScoreAdj int `json:"oom_score_adj"`
 
-	// AdditionalGroups specifies the gids that should be added to supplementary groups
-	// in addition to those that the user belongs to.
-	AdditionalGroups []string `json:"additional_groups"`
-
 	// UidMappings is an array of User ID mappings for User Namespaces
 	UidMappings []IDMap `json:"uid_mappings"`
 

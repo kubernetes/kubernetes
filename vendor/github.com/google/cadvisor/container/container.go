@@ -59,6 +59,9 @@ type ContainerHandler interface {
 	// Returns container labels, if available.
 	GetContainerLabels() map[string]string
 
+	// Returns the container's ip address, if available
+	GetContainerIPAddress() string
+
 	// Returns whether the container still exists.
 	Exists() bool
 
