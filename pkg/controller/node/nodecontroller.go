@@ -222,10 +222,10 @@ func NewNodeController(
 		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				nc.maybeDeleteTerminatingPod(obj, nc.nodeStore.Store, nc.forcefullyDeletePod)
+				nc.maybeDeleteTerminatingPod(obj)
 			},
 			UpdateFunc: func(_, obj interface{}) {
-				nc.maybeDeleteTerminatingPod(obj, nc.nodeStore.Store, nc.forcefullyDeletePod)
+				nc.maybeDeleteTerminatingPod(obj)
 			},
 		},
 		// We don't need to build a index for podStore here actually, but build one for consistency.

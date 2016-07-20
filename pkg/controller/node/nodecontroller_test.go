@@ -1288,12 +1288,12 @@ func TestCheckPod(t *testing.T) {
 
 	for i, tc := range tcs {
 		var deleteCalls int
-		forcefullyDeletePodsFunc := func(_ *api.Pod) error {
+		nc.forcefullyDeletePod = func(_ *api.Pod) error {
 			deleteCalls++
 			return nil
 		}
 
-		nc.maybeDeleteTerminatingPod(&tc.pod, nc.nodeStore.Store, forcefullyDeletePodsFunc)
+		nc.maybeDeleteTerminatingPod(&tc.pod)
 
 		if tc.prune && deleteCalls != 1 {
 			t.Errorf("[%v] expected number of delete calls to be 1 but got %v", i, deleteCalls)

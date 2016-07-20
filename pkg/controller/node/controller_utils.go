@@ -139,7 +139,7 @@ func forcefullyDeleteNode(kubeClient clientset.Interface, nodeName string, force
 
 // maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
 // that should not be gracefully terminated.
-func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}, nodeStore cache.Store, forcefulDeletePodFunc func(*api.Pod) error) {
+func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
 		return
@@ -152,11 +152,11 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}, nodeStore c
 
 	// delete terminating pods that have not yet been scheduled
 	if len(pod.Spec.NodeName) == 0 {
-		utilruntime.HandleError(forcefulDeletePodFunc(pod))
+		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
 
-	nodeObj, found, err := nodeStore.GetByKey(pod.Spec.NodeName)
+	nodeObj, found, err := nc.nodeStore.Store.GetByKey(pod.Spec.NodeName)
 	if err != nil {
 		// this can only happen if the Store.KeyFunc has a problem creating
 		// a key for the pod. If it happens once, it will happen again so
@@ -169,7 +169,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}, nodeStore c
 	// nonexistent nodes
 	if !found {
 		glog.Warningf("Unable to find Node: %v, deleting all assigned Pods.", pod.Spec.NodeName)
-		utilruntime.HandleError(forcefulDeletePodFunc(pod))
+		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
 
@@ -182,11 +182,11 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}, nodeStore c
 	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.V(0).Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
-		utilruntime.HandleError(forcefulDeletePodFunc(pod))
+		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
 	if gracefulDeletionVersion.GT(v) {
-		utilruntime.HandleError(forcefulDeletePodFunc(pod))
+		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
 }
