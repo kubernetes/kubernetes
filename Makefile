@@ -14,7 +14,7 @@
 
 DBG_MAKEFILE ?=
 ifeq ($(DBG_MAKEFILE),1)
-    $(warning ***** starting makefile for goal(s) "$(MAKECMDGOALS)")
+    $(warning ***** starting Makefile for goal(s) "$(MAKECMDGOALS)")
     $(warning ***** $(shell date))
 else
     # If we're not debugging the Makefile, don't echo recipes.
@@ -29,7 +29,7 @@ endif
 #   test: Run tests.
 #   clean: Clean up.
 
-# It's necessary to set this because some docker images don't make sh -> bash.
+# It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /bin/bash
 
 # We don't need make's built-in rules.
@@ -37,16 +37,17 @@ MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
 # Constants used throughout.
+.EXPORT_ALL_VARIABLES:
 OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
 PRJ_SRC_PATH := k8s.io/kubernetes
+GENERATED_FILE_PREFIX := zz_generated.
 
 # Metadata for driving the build lives here.
 META_DIR := .make
 
-export KUBE_GOFLAGS := $(GOFLAGS)
-
-export KUBE_GOLDFLAGS := $(GOLDFLAGS)
+KUBE_GOFLAGS := $(GOFLAGS)
+KUBE_GOLDFLAGS := $(GOLDFLAGS)
 
 # Build code.
 #
@@ -184,6 +185,14 @@ clean: clean_meta
 clean_meta:
 	rm -rf $(META_DIR)
 
+# Remove all auto-generated artifacts.
+#
+# Example:
+#   make clean_generated
+.PHONY: clean_generated
+clean_generated:
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+
 # Run 'go vet'.
 #
 # Args:
@@ -230,5 +239,10 @@ cross:
 $(notdir $(abspath $(wildcard cmd/*/))): generated_files
 	hack/make-rules/build.sh cmd/$@
 
-# Include logic for generated files.
-include Makefile.generated_files
+# Produce auto-generated files needed for the build.
+#
+# Example:
+#   make generated_files
+.PHONY: generated_files
+generated_files:
+	$(MAKE) -f Makefile.$@ $@
