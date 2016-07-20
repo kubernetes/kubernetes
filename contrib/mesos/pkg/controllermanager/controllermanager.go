@@ -69,6 +69,11 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// Jitter used when starting controller managers
+	ControllerStartJitter = 1.0
+)
+
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
 	*options.CMServer
@@ -172,12 +177,17 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
-		routes, ok := cloud.Routes()
-		if !ok {
-			glog.Fatal("Cloud provider must support routes if configure-cloud-routes is set")
+		if cloud == nil {
+			glog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
+		} else if routes, ok := cloud.Routes(); !ok {
+			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
+		} else {
+			routeController := routecontroller.New(routes, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, clusterCIDR)
+			routeController.Run(s.NodeSyncPeriod.Duration)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
-		routeController := routecontroller.New(routes, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, clusterCIDR)
-		routeController.Run(s.NodeSyncPeriod.Duration)
+	} else {
+		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
 	}
 
 	resourceQuotaControllerClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "resource-quota-controller"))
@@ -275,7 +285,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	provisioner, err := kubecontrollermanager.NewVolumeProvisioner(cloud, s.VolumeConfiguration)
 	if err != nil {
-		glog.Fatal("A Provisioner could not be created, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.")
+		glog.Fatalf("A Provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
 
 	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
