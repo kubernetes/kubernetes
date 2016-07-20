@@ -108,24 +108,11 @@ generated_files: gen_deepcopy gen_conversion
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all *.go dirs)
 endif
-ALL_GO_DIRS := $(shell             \
-    find .                         \
-        -not \(                    \
-            \(                     \
-                -path ./vendor -o  \
-                -path ./_\* -o     \
-                -path ./.\* -o     \
-                -path ./docs -o    \
-                -path ./examples   \
-            \) -prune              \
-        \)                         \
-        -type f -name \*.go        \
-        | sed 's|^./||'            \
-        | xargs -n1 dirname        \
-        | sort -u                  \
+ALL_GO_DIRS := $(shell                                                   \
+    hack/make-rules/helpers/cache_go_dirs.sh $(META_DIR)/all_go_dirs.mk  \
 )
 
-# The name of the make metadata file listing Go files.
+# The name of the metadata file which lists *.go files in each pkg.
 GOFILES_META := gofiles.mk
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
@@ -314,7 +301,7 @@ CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
 # The tool used to generate conversions.
 CONVERSION_GEN := $(BIN_DIR)/conversion-gen
 
-# The name of the make metadata file controlling conversions.
+# The name of the metadata file listing conversion peers for each pkg.
 CONVERSIONS_META := conversions.mk
 
 # All directories that request any form of conversion generation.
